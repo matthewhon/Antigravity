@@ -1,9 +1,10 @@
 import { Request, Response } from 'express';
 import * as crypto from 'crypto';
 import admin from 'firebase-admin';
+import { getDb } from './firebase';
 
 // Helper to get Firestore instance
-const db = admin.firestore();
+const db = getDb();
 
 export const handlePcoWebhook = async (req: Request, res: Response) => {
     const signature = req.headers['x-pco-signature'] as string;
