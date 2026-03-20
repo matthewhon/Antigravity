@@ -1,0 +1,657 @@
+
+import { 
+  collection, 
+  query, 
+  where, 
+  getDocs, 
+  getDoc, 
+  doc, 
+  setDoc, 
+  updateDoc, 
+  deleteDoc, 
+  limit, 
+  writeBatch,
+  orderBy,
+  deleteField
+} from 'firebase/firestore';
+import { db } from './firebase';
+import { 
+    AttendanceRecord, GivingRecord, Church, User, UserRole, DetailedDonation, 
+    PcoPerson, PcoGroup, PcoFund, BudgetRecord, ServicesTeam, ServicePlanSnapshot,
+    ServicesDashboardData, ServicesFilter, SystemSettings, CensusStats,
+    Ministry, MetricDefinition, MetricEntry, AggregatedChurchStats, LogEntry,
+    PastoralNote, PrayerRequest, CheckInRecord
+} from '../types';
+import { calculateServicesAnalytics, calculateAggregatedStats } from './analyticsService';
+
+class FirestoreService {
+  private handleFirestoreError(error: any) {
+    console.error("Firestore Error:", error);
+    throw error;
+  }
+
+  // --- Pastoral Care & Prayer Requests ---
+
+  async getPastoralNotes(churchId: string, personId?: string): Promise<PastoralNote[]> {
+    try {
+      let q;
+      if (personId) {
+        q = query(collection(db, 'pastoral_notes'), where('churchId', '==', churchId), where('personId', '==', personId), orderBy('date', 'desc'));
+      } else {
+        q = query(collection(db, 'pastoral_notes'), where('churchId', '==', churchId), orderBy('date', 'desc'));
+      }
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(d => d.data() as PastoralNote);
+    } catch (e) {
+      return [];
+    }
+  }
+
+  async savePastoralNote(note: PastoralNote) {
+    try {
+      await setDoc(doc(db, 'pastoral_notes', note.id), note, { merge: true });
+    } catch (e) {
+      this.handleFirestoreError(e);
+    }
+  }
+
+  async deletePastoralNote(id: string) {
+    try {
+      await deleteDoc(doc(db, 'pastoral_notes', id));
+    } catch (e) {
+      this.handleFirestoreError(e);
+    }
+  }
+
+  async getPrayerRequests(churchId: string, status?: 'Active' | 'Answered' | 'Archived'): Promise<PrayerRequest[]> {
+    try {
+      let q;
+      if (status) {
+        q = query(collection(db, 'prayer_requests'), where('churchId', '==', churchId), where('status', '==', status), orderBy('date', 'desc'));
+      } else {
+        q = query(collection(db, 'prayer_requests'), where('churchId', '==', churchId), orderBy('date', 'desc'));
+      }
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(d => d.data() as PrayerRequest);
+    } catch (e) {
+      return [];
+    }
+  }
+
+  async savePrayerRequest(request: PrayerRequest) {
+    try {
+      await setDoc(doc(db, 'prayer_requests', request.id), request, { merge: true });
+    } catch (e) {
+      this.handleFirestoreError(e);
+    }
+  }
+
+  async deletePrayerRequest(id: string) {
+    try {
+      await deleteDoc(doc(db, 'prayer_requests', id));
+    } catch (e) {
+      this.handleFirestoreError(e);
+    }
+  }
+
+  // --- Church / Tenant Management ---
+
+  async getChurch(churchId: string): Promise<Church | null> {
+    try {
+      const churchDoc = await getDoc(doc(db, 'churches', churchId));
+      return churchDoc.exists() ? (churchDoc.data() as Church) : null;
+    } catch (e) {
+      this.handleFirestoreError(e);
+      return null;
+    }
+  }
+
+  async getAllChurches(): Promise<Church[]> {
+    try {
+      const snapshot = await getDocs(collection(db, 'churches'));
+      return snapshot.docs.map(d => d.data() as Church);
+    } catch (e) {
+      this.handleFirestoreError(e);
+      return [];
+    }
+  }
+
+  async createChurch(id: string, name: string, subdomain: string, profileData?: Partial<Church>): Promise<Church> {
+    const church: Church = {
+      id,
+      name,
+      subdomain,
+      pcoConnected: false,
+      lastSyncTimestamp: 0,
+      ...profileData
+    };
+    await setDoc(doc(db, 'churches', id), church, { merge: true });
+    return church;
+  }
+
+  async updateChurch(churchId: string, updates: Partial<Church>) {
+    try {
+      const churchRef = doc(db, 'churches', churchId);
+      await setDoc(churchRef, updates, { merge: true });
+    } catch (e) {
+      this.handleFirestoreError(e);
+    }
+  }
+
+  async flushSyncedData(churchId: string): Promise<void> {
+    try {
+        console.log(`Flushing synced PCO data for tenant: ${churchId}`);
+        // Only flush collections that are populated by the PCO Sync process
+        const collectionsToPurge = [
+            'people', 
+            'groups', 
+            'attendance', 
+            'detailed_donations', 
+            'funds', 
+            'teams', 
+            'service_plans'
+        ];
+
+        for (const colName of collectionsToPurge) {
+            const q = query(collection(db, colName), where('churchId', '==', churchId));
+            const snapshot = await getDocs(q);
+            
+            if (snapshot.empty) continue;
+
+            // Batch deletes in chunks
+            const chunk = 400;
+            for (let i = 0; i < snapshot.docs.length; i += chunk) {
+                const batch = writeBatch(db);
+                snapshot.docs.slice(i, i + chunk).forEach(doc => {
+                    batch.delete(doc.ref);
+                });
+                await batch.commit();
+            }
+            console.log(`Flushed ${snapshot.size} docs from ${colName}`);
+        }
+
+        // Reset sync timestamp but keep connection
+        await updateDoc(doc(db, 'churches', churchId), { 
+            lastSyncTimestamp: deleteField()
+        });
+        console.log(`Flush complete for tenant: ${churchId}`);
+
+    } catch (e) {
+        this.handleFirestoreError(e);
+    }
+  }
+
+  async deleteChurchAndData(churchId: string): Promise<void> {
+    try {
+        console.log(`Starting full purge for tenant: ${churchId}`);
+        
+        // List of all collections that store tenant-specific data with a 'churchId' field
+        const collectionsToPurge = [
+            'people', 
+            'groups', 
+            'attendance', 
+            'detailed_donations', 
+            'funds', 
+            'budgets', 
+            'teams', 
+            'service_plans', 
+            'users', // Users are also tenant-scoped via churchId
+            'metric_entries', 
+            'metric_definitions', 
+            'ministries'
+        ];
+
+        for (const colName of collectionsToPurge) {
+            const q = query(collection(db, colName), where('churchId', '==', churchId));
+            const snapshot = await getDocs(q);
+            
+            if (snapshot.empty) continue;
+
+            // Batch deletes in chunks of 400 (Firestore limit is 500)
+            const chunk = 400;
+            for (let i = 0; i < snapshot.docs.length; i += chunk) {
+                const batch = writeBatch(db);
+                snapshot.docs.slice(i, i + chunk).forEach(doc => {
+                    batch.delete(doc.ref);
+                });
+                await batch.commit();
+            }
+            console.log(`Purged ${snapshot.size} docs from ${colName}`);
+        }
+
+        // Finally, delete the church document itself
+        await deleteDoc(doc(db, 'churches', churchId));
+        console.log(`Tenant ${churchId} deleted successfully.`);
+
+    } catch (e) {
+        this.handleFirestoreError(e);
+    }
+  }
+
+  async deleteDonations(churchId: string, ids: string[]): Promise<void> {
+      try {
+          if (ids.length === 0) return;
+          console.log(`Deleting ${ids.length} obsolete donation records for ${churchId}...`);
+          
+          const chunk = 400;
+          for (let i = 0; i < ids.length; i += chunk) {
+              const batch = writeBatch(db);
+              ids.slice(i, i + chunk).forEach(id => {
+                  batch.delete(doc(db, 'detailed_donations', id));
+              });
+              await batch.commit();
+          }
+          console.log("Deletion complete.");
+      } catch (e) {
+          this.handleFirestoreError(e);
+      }
+  }
+
+  async resetAllSubscriptions(): Promise<void> {
+      try {
+          const snapshot = await getDocs(collection(db, 'churches'));
+          const batch = writeBatch(db);
+          let count = 0;
+
+          snapshot.docs.forEach((docSnap) => {
+              batch.update(docSnap.ref, {
+                  subscription: {
+                      status: 'canceled',
+                      planId: 'free',
+                      currentPeriodEnd: Date.now(),
+                      customerId: null 
+                  }
+              });
+              count++;
+          });
+
+          if (count > 0) {
+              await batch.commit();
+          }
+          console.log(`Reset subscriptions for ${count} tenants.`);
+      } catch (e) {
+          this.handleFirestoreError(e);
+      }
+  }
+
+  // --- User Management ---
+
+  async getUserProfile(uid: string): Promise<User | null> {
+    try {
+      const userDoc = await getDoc(doc(db, 'users', uid));
+      return userDoc.exists() ? (userDoc.data() as User) : null;
+    } catch (e) {
+      this.handleFirestoreError(e);
+      return null;
+    }
+  }
+
+  async createUserProfile(user: User): Promise<void> {
+      try {
+          await setDoc(doc(db, 'users', user.id), user, { merge: true });
+      } catch (e) {
+          this.handleFirestoreError(e);
+      }
+  }
+
+  async createTenantUser(churchId: string, userData: any): Promise<void> {
+      // Note: This function typically requires Cloud Functions to create Auth users securely without logging out the admin.
+      // For client-side, we assume an invite flow or standard auth. 
+      // If used purely client-side, it might conflict with current auth session.
+      // Placeholder implementation for data record:
+      const uid = `user_${Date.now()}`; // In reality, this comes from Auth
+      const newUser: User = {
+          id: uid,
+          churchId,
+          name: userData.name,
+          email: userData.email,
+          roles: userData.roles,
+          theme: 'traditional'
+      };
+      await this.createUserProfile(newUser);
+  }
+
+  async updateUserLastLogin(uid: string) {
+      try {
+          await updateDoc(doc(db, 'users', uid), { lastLogin: Date.now() });
+      } catch (e) {
+          // ignore
+      }
+  }
+
+  async updateUserPreferences(uid: string, preferences: Record<string, string[]>) {
+      try {
+          await updateDoc(doc(db, 'users', uid), { widgetPreferences: preferences });
+      } catch (e) {
+          this.handleFirestoreError(e);
+      }
+  }
+
+  async updateUserTheme(uid: string, theme: 'traditional' | 'dark') {
+      try {
+          await updateDoc(doc(db, 'users', uid), { theme });
+      } catch (e) {
+          this.handleFirestoreError(e);
+      }
+  }
+
+  async updateUserRoles(uid: string, newRoles: UserRole[]) {
+    try {
+      const userRef = doc(db, 'users', uid);
+      await updateDoc(userRef, { roles: newRoles });
+    } catch (e) {
+      this.handleFirestoreError(e);
+      throw e;
+    }
+  }
+
+  async deleteUser(uid: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, 'users', uid));
+    } catch (e) {
+      this.handleFirestoreError(e);
+      throw e;
+    }
+  }
+
+  async findUserByEmail(email: string): Promise<User | null> {
+    try {
+      const q = query(collection(db, 'users'), where('email', '==', email.toLowerCase().trim()), limit(1));
+      const snapshot = await getDocs(q);
+      if (snapshot.empty) return null;
+      return snapshot.docs[0].data() as User;
+    } catch (e) {
+      this.handleFirestoreError(e);
+      return null;
+    }
+  }
+
+  async getUsersByChurch(churchId: string): Promise<User[]> {
+    try {
+      const q = query(collection(db, 'users'), where('churchId', '==', churchId));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(d => d.data() as User);
+    } catch (e) {
+      this.handleFirestoreError(e);
+      return [];
+    }
+  }
+
+  async getAllUsersAcrossTenants(): Promise<User[]> {
+    try {
+      const snapshot = await getDocs(collection(db, 'users'));
+      return snapshot.docs.map(d => d.data() as User);
+    } catch (e) {
+      this.handleFirestoreError(e);
+      return [];
+    }
+  }
+
+  async getSystemAdmins(): Promise<User[]> {
+      try {
+          const q = query(collection(db, 'users'), where('roles', 'array-contains', 'System Administration'));
+          const snapshot = await getDocs(q);
+          return snapshot.docs.map(d => d.data() as User);
+      } catch (e) {
+          this.handleFirestoreError(e);
+          return [];
+      }
+  }
+
+  // --- Data Accessors ---
+
+  async getPeople(churchId: string): Promise<PcoPerson[]> {
+      try {
+          const q = query(collection(db, 'people'), where('churchId', '==', churchId));
+          const snapshot = await getDocs(q);
+          return snapshot.docs.map(d => d.data() as PcoPerson);
+      } catch (e) { return []; }
+  }
+
+  async getGroups(churchId: string): Promise<PcoGroup[]> {
+      try {
+          const q = query(collection(db, 'groups'), where('churchId', '==', churchId));
+          const snapshot = await getDocs(q);
+          return snapshot.docs.map(d => d.data() as PcoGroup);
+      } catch (e) { return []; }
+  }
+
+  async getAttendance(churchId: string): Promise<AttendanceRecord[]> {
+    try {
+      const q = query(collection(db, 'attendance'), where('churchId', '==', churchId));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(d => d.data() as AttendanceRecord).sort((a, b) => a.date.localeCompare(b.date));
+    } catch (e) { return []; }
+  }
+
+  async getDetailedDonations(churchId: string): Promise<DetailedDonation[]> {
+    try {
+      const q = query(collection(db, 'detailed_donations'), where('churchId', '==', churchId));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(d => d.data() as DetailedDonation).sort((a, b) => b.date.localeCompare(a.date));
+    } catch (e) { return []; }
+  }
+
+  async hasGivingData(churchId: string): Promise<boolean> {
+      try {
+          const q = query(collection(db, 'detailed_donations'), where('churchId', '==', churchId), limit(1));
+          const snapshot = await getDocs(q);
+          return !snapshot.empty;
+      } catch (e) {
+          return false;
+      }
+  }
+
+  async getFunds(churchId: string): Promise<PcoFund[]> {
+      try {
+          const q = query(collection(db, 'funds'), where('churchId', '==', churchId));
+          const snapshot = await getDocs(q);
+          return snapshot.docs.map(d => d.data() as PcoFund);
+      } catch (e) { return []; }
+  }
+
+  async getBudgets(churchId: string): Promise<BudgetRecord[]> {
+      try {
+          const q = query(collection(db, 'budgets'), where('churchId', '==', churchId));
+          const snapshot = await getDocs(q);
+          return snapshot.docs.map(d => d.data() as BudgetRecord);
+      } catch (e) { return []; }
+  }
+
+  async getServicesTeams(churchId: string): Promise<ServicesTeam[]> {
+      try {
+          const q = query(collection(db, 'teams'), where('churchId', '==', churchId));
+          const snapshot = await getDocs(q);
+          return snapshot.docs.map(d => d.data() as ServicesTeam);
+      } catch (e) { return []; }
+  }
+
+  async getServicePlans(churchId: string): Promise<ServicePlanSnapshot[]> {
+      try {
+          const q = query(collection(db, 'service_plans'), where('churchId', '==', churchId));
+          const snapshot = await getDocs(q);
+          return snapshot.docs.map(d => d.data() as ServicePlanSnapshot);
+      } catch (e) { return []; }
+  }
+
+  async getServicesAnalytics(churchId: string, filter: ServicesFilter): Promise<ServicesDashboardData> {
+      // In a real optimized scenario, this might fetch a pre-calculated document.
+      // Here we fetch raw data and calculate on client/server boundary to emulate a service.
+      const [plans, teams, attendance] = await Promise.all([
+          this.getServicePlans(churchId),
+          this.getServicesTeams(churchId),
+          this.getAttendance(churchId)
+      ]);
+      return calculateServicesAnalytics(plans, teams, attendance, filter);
+  }
+
+  // --- Data Mutation (Batch Upserts) ---
+
+  async upsertPeople(records: PcoPerson[]) { await this.batchUpsert('people', records); }
+  async upsertGroups(records: PcoGroup[]) { await this.batchUpsert('groups', records); }
+  async upsertAttendance(records: AttendanceRecord[]) { await this.batchUpsert('attendance', records); }
+  async upsertCheckIns(records: CheckInRecord[]) { await this.batchUpsert('check_ins', records); }
+  async upsertDetailedDonations(records: DetailedDonation[]) { await this.batchUpsert('detailed_donations', records); }
+  async upsertFunds(records: PcoFund[]) { await this.batchUpsert('funds', records); }
+  async upsertServicesTeams(records: ServicesTeam[]) { await this.batchUpsert('teams', records); }
+  async upsertServicePlans(records: ServicePlanSnapshot[]) { await this.batchUpsert('service_plans', records); }
+  
+  async saveBudget(budget: BudgetRecord) {
+      await setDoc(doc(db, 'budgets', budget.id), budget, { merge: true });
+  }
+
+  private async batchUpsert(collectionName: string, records: any[]) {
+    try {
+      let batch = writeBatch(db);
+      let count = 0;
+      for (const record of records) {
+        const ref = doc(db, collectionName, record.id);
+        batch.set(ref, record, { merge: true });
+        count++;
+        if (count >= 450) {
+            await batch.commit();
+            batch = writeBatch(db);
+            count = 0;
+        }
+      }
+      if (count > 0) await batch.commit();
+    } catch (e) {
+      this.handleFirestoreError(e);
+    }
+  }
+
+  // --- System Settings & Benchmarks ---
+
+  async getSystemSettings(): Promise<SystemSettings> {
+      try {
+          const docSnap = await getDoc(doc(db, 'system', 'settings'));
+          return docSnap.exists() ? (docSnap.data() as SystemSettings) : {};
+      } catch (e) { return {}; }
+  }
+
+  async saveSystemSettings(settings: SystemSettings) {
+      try {
+          await setDoc(doc(db, 'system', 'settings'), settings, { merge: true });
+      } catch (e) { this.handleFirestoreError(e); }
+  }
+
+  async updateCensusCache(churchId: string, data: CensusStats, sourceUrl: string, city: string, state: string) {
+      try {
+          await updateDoc(doc(db, 'churches', churchId), {
+              censusCache: {
+                  lastUpdated: Date.now(),
+                  data,
+                  sourceUrl,
+                  city,
+                  state
+              }
+          });
+      } catch (e) { console.error("Census cache update failed", e); }
+  }
+
+  async getAggregatedStats(): Promise<AggregatedChurchStats[]> {
+      try {
+          const q = query(collection(db, 'aggregated_stats'));
+          const snapshot = await getDocs(q);
+          return snapshot.docs.map(d => d.data() as AggregatedChurchStats);
+      } catch (e) { return []; }
+  }
+
+  async recalculateGlobalBenchmarks() {
+      // 1. Fetch all churches with metrics sharing enabled
+      const churchesSnapshot = await getDocs(query(collection(db, 'churches'), where('metricsSharingEnabled', '==', true)));
+      const churches = churchesSnapshot.docs.map(d => d.data() as Church);
+
+      const batch = writeBatch(db);
+      let count = 0;
+
+      for (const church of churches) {
+          // 2. Fetch data for each church
+          const [people, donations, groups, teams] = await Promise.all([
+              this.getPeople(church.id),
+              this.getDetailedDonations(church.id),
+              this.getGroups(church.id),
+              this.getServicesTeams(church.id)
+          ]);
+
+          // 3. Calculate Stats
+          const stats = calculateAggregatedStats(church.id, people, donations, groups, teams);
+
+          // 4. Save to aggregated_stats collection
+          const ref = doc(db, 'aggregated_stats', church.id);
+          batch.set(ref, stats);
+          count++;
+      }
+
+      if (count > 0) await batch.commit();
+      console.log(`Updated benchmarks for ${count} tenants.`);
+  }
+
+  // --- Metrics Module ---
+
+  async getMinistries(churchId: string): Promise<Ministry[]> {
+      try {
+          const q = query(collection(db, 'ministries'), where('churchId', '==', churchId));
+          const snapshot = await getDocs(q);
+          return snapshot.docs.map(d => d.data() as Ministry);
+      } catch (e) { return []; }
+  }
+
+  async saveMinistry(ministry: Ministry) {
+      await setDoc(doc(db, 'ministries', ministry.id), ministry, { merge: true });
+  }
+
+  async deleteMinistry(id: string) {
+      await deleteDoc(doc(db, 'ministries', id));
+  }
+
+  async getMetricDefinitions(churchId: string): Promise<MetricDefinition[]> {
+      try {
+          const q = query(collection(db, 'metric_definitions'), where('churchId', '==', churchId));
+          const snapshot = await getDocs(q);
+          return snapshot.docs.map(d => d.data() as MetricDefinition);
+      } catch (e) { return []; }
+  }
+
+  async saveMetricDefinition(def: MetricDefinition) {
+      await setDoc(doc(db, 'metric_definitions', def.id), def, { merge: true });
+  }
+
+  async deleteMetricDefinition(id: string) {
+      await deleteDoc(doc(db, 'metric_definitions', id));
+  }
+
+  async getMetricEntries(churchId: string): Promise<MetricEntry[]> {
+      try {
+          // Typically we might limit this by date, but for now fetch all
+          const q = query(collection(db, 'metric_entries'), where('churchId', '==', churchId));
+          const snapshot = await getDocs(q);
+          return snapshot.docs.map(d => d.data() as MetricEntry);
+      } catch (e) { return []; }
+  }
+
+  async saveMetricEntry(entry: MetricEntry) {
+      await setDoc(doc(db, 'metric_entries', entry.id), entry, { merge: true });
+  }
+
+  // --- Logging ---
+
+  async getLogs(churchId?: string, limitCount = 100): Promise<LogEntry[]> {
+      try {
+          let q;
+          const logsRef = collection(db, 'logs');
+          if (churchId && churchId !== 'all') {
+              q = query(logsRef, where('churchId', '==', churchId), orderBy('timestamp', 'desc'), limit(limitCount));
+          } else {
+              q = query(logsRef, orderBy('timestamp', 'desc'), limit(limitCount));
+          }
+          const snapshot = await getDocs(q);
+          return snapshot.docs.map(d => ({ id: d.id, ...d.data() as any } as LogEntry));
+      } catch (e) {
+          console.error("Error fetching logs:", e);
+          return [];
+      }
+  }
+}
+
+export const firestore = new FirestoreService();

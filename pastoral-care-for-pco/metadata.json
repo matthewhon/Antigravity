@@ -1,0 +1,5 @@
+{
+  "name": "Pastoral Care for PCO",
+  "description": "A multi-tenant dashboard for church leadership that integrates with Planning Center API to provide deep insights and AI-powered growth analysis using Gemini.",
+  "requestFramePermissions": []
+}
