@@ -2,6 +2,5 @@ node_modules
 dist
 .git
 cloudbuild.yaml
-Dockerfile
-.dockerignore
+
 npm-debug.log
