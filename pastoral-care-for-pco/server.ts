@@ -22,7 +22,7 @@ console.log("Pre-initialization: Checking Firebase Admin (DISABLED)...");
 async function startServer() {
   try {
     const app = express();
-    const PORT = 3000;
+    const PORT = process.env.PORT || 8080;
 
     // 1. Immediate Health Check (For Cloud Run)
     app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
