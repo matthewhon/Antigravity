@@ -1,5 +1,5 @@
 
-import * as admin from 'firebase-admin';
+import admin from 'firebase-admin';
 import Stripe from 'stripe';
 import { getDb } from './firebase';
 

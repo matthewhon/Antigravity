@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import * as crypto from 'crypto';
-import * as admin from 'firebase-admin';
+import admin from 'firebase-admin';
 
 // Helper to get Firestore instance
 const db = admin.firestore();
