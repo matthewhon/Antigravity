@@ -177,7 +177,7 @@ const App: React.FC = () => {
 
                   if (!response.ok) {
                       const err = await response.json().catch(() => ({}));
-                      throw new Error(err.error_description || `Token exchange failed: ${response.status}`);
+                      throw new Error(err.error_description || err.error || err.message || `Token exchange failed: ${response.status} (Check your Client ID/Secret in Global App Settings for trailing spaces)`);
                   }
 
                   const data = await response.json();

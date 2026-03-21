@@ -11,8 +11,8 @@ export const pcoTokenExchange = async (req: any, res: any) => {
         // Always use Global App Config
         const settingsDoc = await db.doc('system/settings').get();
         const settings = settingsDoc.data() || {};
-        const clientId = settings.pcoClientId;
-        const clientSecret = settings.pcoClientSecret;
+        const clientId = (settings.pcoClientId || '').trim();
+        const clientSecret = (settings.pcoClientSecret || '').trim();
 
         if (!clientId || !clientSecret) {
             res.status(500).json({ error: "Missing global Planning Center OAuth configuration (clientId, clientSecret) in system/settings." });

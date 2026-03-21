@@ -77,12 +77,11 @@ export const pcoProxy = async (req: any, res: any) => {
             const settings = settingsDoc.data() || {};
             
             // Always use System default (Global App Config)
-            const clientId = settings.pcoClientId;
-            const clientSecret = settings.pcoClientSecret;
+            const clientId = (settings.pcoClientId || '').trim();
+            const clientSecret = (settings.pcoClientSecret || '').trim();
 
             if (!clientId || !clientSecret) {
-                console.error("[Proxy] Missing Client ID/Secret for refresh");
-                res.status(401).json({ error: 'Token expired and missing credentials to refresh.' });
+                res.status(500).json({ error: "System missing PCO Credentials" });
                 return;
             }
 
