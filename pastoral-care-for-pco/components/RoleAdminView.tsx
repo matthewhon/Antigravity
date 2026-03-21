@@ -197,7 +197,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
       }
       
       const redirectUri = window.location.origin;
-      const url = `https://api.planningcenteronline.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&state=${churchId}`;
+      const url = `https://api.planningcenteronline.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=people%20services%20giving%20groups&state=${churchId}`;
       window.location.href = url;
   };
 
