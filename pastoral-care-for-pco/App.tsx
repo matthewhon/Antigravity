@@ -160,7 +160,7 @@ const App: React.FC = () => {
                   
                   if (!targetChurch) throw new Error("Church context not found.");
 
-                  const apiBaseUrl = sysSettings.apiBaseUrl || 'https://api-ejvpnqnz4q-uc.a.run.app';
+                  const apiBaseUrl = sysSettings.apiBaseUrl || 'https://api.pastoralcare.barnabassoftware.com';
 
                   // 2. Exchange Token
                   const payload = {
