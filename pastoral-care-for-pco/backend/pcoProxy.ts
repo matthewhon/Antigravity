@@ -76,9 +76,9 @@ export const pcoProxy = async (req: any, res: any) => {
             const settingsDoc = await db.doc('system/settings').get();
             const settings = settingsDoc.data() || {};
             
-            // Use Church overrides if present, else System default
-            const clientId = churchData?.pcoClientId || settings.pcoClientId;
-            const clientSecret = churchData?.pcoClientSecret || settings.pcoClientSecret;
+            // Always use System default (Global App Config)
+            const clientId = settings.pcoClientId;
+            const clientSecret = settings.pcoClientSecret;
 
             if (!clientId || !clientSecret) {
                 console.error("[Proxy] Missing Client ID/Secret for refresh");

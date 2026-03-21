@@ -4,19 +4,18 @@ import { getDb } from './firebase';
 export const pcoTokenExchange = async (req: any, res: any) => {
     try {
         const db = getDb();
-        let { code, refreshToken, clientId, clientSecret, redirectUri, grantType } = req.body;
+        let { code, refreshToken, redirectUri, grantType } = req.body;
 
         const grant_type = grantType || 'authorization_code';
 
-        if (!clientId || !clientSecret) {
-            const settingsDoc = await db.doc('system/settings').get();
-            const settings = settingsDoc.data() || {};
-            clientId = clientId || settings.pcoClientId;
-            clientSecret = clientSecret || settings.pcoClientSecret;
-        }
+        // Always use Global App Config
+        const settingsDoc = await db.doc('system/settings').get();
+        const settings = settingsDoc.data() || {};
+        const clientId = settings.pcoClientId;
+        const clientSecret = settings.pcoClientSecret;
 
         if (!clientId || !clientSecret) {
-            res.status(400).json({ error: "Missing required parameters (clientId, clientSecret) and no system defaults found." });
+            res.status(500).json({ error: "Missing global Planning Center OAuth configuration (clientId, clientSecret) in system/settings." });
             return;
         }
 

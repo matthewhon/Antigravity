@@ -160,20 +160,12 @@ const App: React.FC = () => {
                   
                   if (!targetChurch) throw new Error("Church context not found.");
 
-                  const clientId = targetChurch.pcoClientId || sysSettings.pcoClientId;
-                  const clientSecret = targetChurch.pcoClientSecret || sysSettings.pcoClientSecret;
                   const apiBaseUrl = sysSettings.apiBaseUrl || 'https://api-ejvpnqnz4q-uc.a.run.app';
-
-                  if (!clientId || !clientSecret) {
-                      throw new Error("PCO Configuration missing (Client ID/Secret).");
-                  }
 
                   // 2. Exchange Token
                   const payload = {
                       grantType: 'authorization_code',
                       code,
-                      clientId,
-                      clientSecret,
                       redirectUri: window.location.origin
                   };
 

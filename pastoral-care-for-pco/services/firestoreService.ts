@@ -432,6 +432,19 @@ class FirestoreService {
     } catch (e) { return []; }
   }
 
+  async getAggregatedGiving(churchId: string, limitMonths: number = 12): Promise<import('../types').AggregatedGivingMetric[]> {
+      try {
+          const q = query(
+              collection(db, 'analytics_giving'), 
+              where('churchId', '==', churchId),
+              orderBy('month', 'desc'),
+              limit(limitMonths)
+          );
+          const snapshot = await getDocs(q);
+          return snapshot.docs.map(d => d.data() as import('../types').AggregatedGivingMetric).sort((a,b) => a.month.localeCompare(b.month));
+      } catch (e) { return []; }
+  }
+
   async hasGivingData(churchId: string): Promise<boolean> {
       try {
           const q = query(collection(db, 'detailed_donations'), where('churchId', '==', churchId), limit(1));

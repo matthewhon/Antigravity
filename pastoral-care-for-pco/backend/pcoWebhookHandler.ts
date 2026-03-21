@@ -134,6 +134,25 @@ async function handleDonationEvent(data: any, churchId: string) {
     };
 
     await db.collection('detailed_donations').doc(donationId).set(donation, { merge: true });
+    
+    // Write-time aggregation for fast Analytics retrieval
+    try {
+        const donationDate = new Date(donation.date);
+        const monthKey = `${donationDate.getFullYear()}_${String(donationDate.getMonth() + 1).padStart(2, '0')}`;
+        const aggRef = db.collection('analytics_giving').doc(`${churchId}_${monthKey}`);
+        
+        await aggRef.set({
+            churchId,
+            month: monthKey,
+            totalAmount: admin.firestore.FieldValue.increment(donation.amount),
+            donationCount: admin.firestore.FieldValue.increment(1),
+            [`funds.${donation.fundName}`]: admin.firestore.FieldValue.increment(donation.amount),
+            lastUpdated: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+    } catch (aggError) {
+        console.error(`Failed to update analytics_giving aggregation for ${donationId}`, aggError);
+    }
+    
     console.log(`Synced donation ${donationId}`);
 }
 

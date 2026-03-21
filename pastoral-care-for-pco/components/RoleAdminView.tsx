@@ -189,13 +189,10 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   };
 
   const handleConnectPco = async () => {
-      let clientId = formData.pcoClientId;
+      const sys = await firestore.getSystemSettings();
+      const clientId = sys.pcoClientId;
       if (!clientId) {
-          const sys = await firestore.getSystemSettings();
-          clientId = sys.pcoClientId;
-      }
-      if (!clientId) {
-          alert("No Client ID configured. Please set one in System Settings or provide an override below.");
+          alert("No Client ID configured in System Settings. Please contact an administrator.");
           return;
       }
       
@@ -766,48 +763,6 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                             ) : (
                                 <p className="text-sm text-slate-400 italic">Never synced</p>
                             )}
-                        </div>
-                    </div>
-
-                    <div className="bg-slate-50 dark:bg-slate-800/50 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800">
-                        <div className="flex justify-between items-center mb-6">
-                            <h4 className="font-bold text-slate-900 dark:text-white text-sm">OAuth Credentials Override</h4>
-                            <span className="bg-amber-100 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 text-[9px] font-black uppercase px-2 py-1 rounded">Advanced</span>
-                        </div>
-                        <p className="text-[10px] text-slate-400 dark:text-slate-500 mb-6 leading-relaxed">
-                            (Optional) Use your own PCO Application credentials instead of the system default. 
-                            Only configure this if you have a custom PCO Developer Application for this specific tenant.
-                        </p>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-2">Client ID</label>
-                                <input 
-                                    type="text" 
-                                    value={formData.pcoClientId || ''}
-                                    onChange={e => handleChange('pcoClientId', e.target.value)}
-                                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-xs font-mono text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                                    placeholder="Enter Client ID"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-2">Client Secret</label>
-                                <input 
-                                    type="password" 
-                                    value={formData.pcoClientSecret || ''}
-                                    onChange={e => handleChange('pcoClientSecret', e.target.value)}
-                                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-xs font-mono text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                                    placeholder="Enter Client Secret"
-                                />
-                            </div>
-                        </div>
-                        <div className="mt-6 text-right">
-                            <button 
-                                onClick={handleSaveOrgSettings}
-                                disabled={isSaving}
-                                className="bg-slate-900 dark:bg-slate-700 text-white px-5 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-slate-700 dark:hover:bg-slate-600 transition-all disabled:opacity-50"
-                            >
-                                Save Credentials
-                            </button>
                         </div>
                     </div>
                 </div>

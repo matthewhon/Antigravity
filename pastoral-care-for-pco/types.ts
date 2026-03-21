@@ -477,3 +477,12 @@ export interface PrayerRequest {
 
 export type ServicesFilter = 'Week' | 'Month' | 'Quarter' | 'Year' | 'Next Week' | 'Next Month';
 export type GivingFilter = 'Week' | 'This Week' | 'Month' | 'This Month' | 'Last Month' | 'Quarter' | 'This Quarter' | 'Year' | 'This Year' | 'Custom';
+
+export interface AggregatedGivingMetric {
+    churchId: string;
+    month: string; // YYYY_MM format
+    totalAmount: number;
+    donationCount: number;
+    funds: Record<string, number>;
+    lastUpdated?: any;
+}
