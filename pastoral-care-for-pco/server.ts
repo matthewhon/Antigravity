@@ -9,7 +9,7 @@ import { createServer as createViteServer } from 'vite';
 // import { createCheckoutSession } from './backend/createCheckoutSession';
 // import { cancelSubscription } from './backend/cancelSubscription';
 // import { handleStripeWebhook } from './backend/stripeWebhook';
-// import { pcoTokenExchange } from './backend/pcoTokenExchange';
+import { pcoTokenExchange } from './backend/pcoTokenExchange';
 import { pcoProxy } from './backend/pcoProxy';
 import { handlePcoWebhook } from './backend/pcoWebhookHandler';
 
@@ -30,6 +30,9 @@ async function startServer() {
     // PCO Webhook Endpoint
     // We use express.raw to ensure we can verify the HMAC signature based on the raw body
     app.post('/pco/webhook', express.raw({ type: 'application/json' }), handlePcoWebhook);
+
+    // PCO Token Exchange
+    app.post('/pco/token', express.json(), pcoTokenExchange);
 
     // PCO Proxy
     app.post('/pco/proxy', pcoProxy);
