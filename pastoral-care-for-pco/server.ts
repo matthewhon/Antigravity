@@ -24,8 +24,19 @@ async function startServer() {
     const app = express();
     const PORT = process.env.PORT || 8080;
 
-    // 1. Immediate Health Check (For Cloud Run)
+    // 1. Middlewares FIRST (must come before all routes)
+    app.use(cors({
+      origin: '*',
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization'],
+    }));
+
+    // Handle preflight for all routes
+    app.options('*', cors());
+
+    // 2. Immediate Health Check (For Cloud Run + App Config Test button)
     app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
+    app.get('/health', (req, res) => res.json({ status: 'ok', service: 'pastoral-care-for-pco' }));
 
     // PCO Webhook Endpoint
     // We use express.raw to ensure we can verify the HMAC signature based on the raw body
@@ -35,18 +46,17 @@ async function startServer() {
     app.post('/pco/token', express.json(), pcoTokenExchange);
 
     // PCO Proxy
-    app.post('/pco/proxy', pcoProxy);
+    app.post('/pco/proxy', express.json(), pcoProxy);
 
-    // 2. Standard Middlewares
-    app.use(cors());
+    // 3. Standard Middlewares (JSON body for any other routes)
     app.use((req, res, next) => {
       if (req.path === '/webhook' || req.path === '/pco/webhook') {
-        // Body is already handled by route-specific express.raw() if needed
         next();
       } else {
         express.json()(req, res, next);
       }
     });
+
 
     // 3. Production Static Files (MUST be before the '*' route)
     if (process.env.NODE_ENV === 'production') {
