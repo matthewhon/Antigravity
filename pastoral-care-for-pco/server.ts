@@ -31,8 +31,11 @@ async function startServer() {
       allowedHeaders: ['Content-Type', 'Authorization'],
     }));
 
-    // Handle preflight for all routes
-    app.options('*', cors());
+    // Handle preflight for PCO API routes
+    app.options('/pco/token', cors());
+    app.options('/pco/proxy', cors());
+    app.options('/pco/webhook', cors());
+
 
     // 2. Immediate Health Check (For Cloud Run + App Config Test button)
     app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
