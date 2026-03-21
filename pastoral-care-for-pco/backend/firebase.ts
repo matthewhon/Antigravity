@@ -12,7 +12,7 @@ export const getDb = () => {
         console.error('Firebase Admin init failed:', e);
       }
     }
-    dbInstance = getFirestore('pcforpco');
+    dbInstance = getFirestore();
   }
   return dbInstance;
 };
