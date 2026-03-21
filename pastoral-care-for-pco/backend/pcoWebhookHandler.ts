@@ -2,9 +2,11 @@ import { Request, Response } from 'express';
 import * as crypto from 'crypto';
 import admin from 'firebase-admin';
 import { getDb } from './firebase';
+import { createServerLogger } from '../services/logService';
 
 // Helper to get Firestore instance
 const db = getDb();
+const log = createServerLogger(db);
 
 export const handlePcoWebhook = async (req: Request, res: Response) => {
     const signature = req.headers['x-pco-signature'] as string;
@@ -14,7 +16,7 @@ export const handlePcoWebhook = async (req: Request, res: Response) => {
     const payloadString = req.body.toString(); 
 
     if (!signature) {
-        console.error('Missing X-PCO-Signature header');
+        log.error('Webhook received without X-PCO-Signature header', 'webhook', { churchId });
         return res.status(401).send('Missing Signature');
     }
 
@@ -23,7 +25,7 @@ export const handlePcoWebhook = async (req: Request, res: Response) => {
         const secret = settingsDoc.data()?.secret;
 
         if (!secret) {
-            console.error('Webhook secret not found in database');
+            log.error('Webhook secret not found in database', 'webhook', { churchId });
             return res.status(500).send('Server Error: Secret missing');
         }
 
@@ -31,7 +33,7 @@ export const handlePcoWebhook = async (req: Request, res: Response) => {
         const digest = hmac.update(payloadString).digest('hex');
 
         if (digest !== signature) {
-            console.warn('Webhook Signature Mismatch - Proceeding for Dev (Check Raw Body Parsing)');
+            log.warn('Webhook signature mismatch — proceeding (dev mode)', 'webhook', { churchId });
             // return res.status(403).send('Invalid Signature'); // Uncomment for strict security
         }
 
@@ -39,20 +41,20 @@ export const handlePcoWebhook = async (req: Request, res: Response) => {
         const eventsList = Array.isArray(event?.data) ? event.data : (event?.data ? [event.data] : []);
         
         if (eventsList.length === 0) {
-            console.warn('Invalid Webhook Payload Structure');
+            log.warn('Invalid webhook payload structure — no events in list', 'webhook', { churchId });
             return res.status(400).send('Invalid Payload');
         }
 
         for (const eventItem of eventsList) {
             const eventName = eventItem?.attributes?.name;
-            const resourceData = eventItem?.attributes?.payload?.data; // The actual resource
+            const resourceData = eventItem?.attributes?.payload?.data;
             
             if (!eventName || !resourceData) {
-                console.warn('Invalid Webhook Payload Structure for an event in the list');
+                log.warn('Invalid webhook event item — missing name or payload', 'webhook', { churchId, eventItem });
                 continue;
             }
 
-            console.log(`Processing PCO Webhook: ${eventName}`);
+            log.info(`Processing PCO webhook: ${eventName}`, 'webhook', { churchId, eventName }, churchId);
 
             if (eventName.startsWith('people.v2.events.person')) {
                 await handlePersonEvent(eventName, resourceData, churchId);
@@ -66,13 +68,15 @@ export const handlePcoWebhook = async (req: Request, res: Response) => {
                 await handleCheckInEvent(resourceData, churchId);
             } else if (eventName === 'groups.v2.events.group_attendance.created') {
                 await handleGroupAttendanceEvent(resourceData, churchId);
+            } else {
+                log.info(`Unhandled webhook event type: ${eventName}`, 'webhook', { churchId, eventName }, churchId);
             }
         }
 
         return res.status(200).send('Webhook Processed');
 
-    } catch (error) {
-        console.error('Error processing webhook:', error);
+    } catch (error: any) {
+        log.error('Error processing webhook', 'webhook', { churchId, error: error?.message }, churchId);
         return res.status(500).send('Internal Server Error');
     }
 };
@@ -83,11 +87,10 @@ async function handlePersonEvent(eventName: string, data: any, churchId: string)
 
     if (eventName.endsWith('.deleted')) {
         await db.collection('people').doc(personId).delete();
-        console.log(`Deleted person ${personId}`);
+        log.info(`Person deleted via webhook`, 'webhook', { personId, churchId }, churchId);
         return;
     }
 
-    // Map PCO data to our schema
     const updateData: any = {
         id: personId,
         churchId,
@@ -99,13 +102,11 @@ async function handlePersonEvent(eventName: string, data: any, churchId: string)
         anniversary: attrs.anniversary,
         createdAt: attrs.created_at,
         lastUpdated: Date.now(),
-        // Calculate Age
         age: attrs.birthdate ? new Date().getFullYear() - new Date(attrs.birthdate).getFullYear() : undefined
     };
 
-    // Merge with existing to avoid overwriting fields we don't have here
     await db.collection('people').doc(personId).set(updateData, { merge: true });
-    console.log(`Synced person ${personId}`);
+    log.info(`Person synced via webhook`, 'webhook', { personId, churchId, event: eventName }, churchId);
 }
 
 async function handleDonationEvent(data: any, churchId: string) {
@@ -125,12 +126,12 @@ async function handleDonationEvent(data: any, churchId: string) {
     const donation = {
         id: donationId,
         churchId,
-        amount: attrs.amount_cents / 100, // Convert cents to dollars
-        date: attrs.created_at, // or received_at if available
-        fundName: 'General', // Default, would need relationship fetch
+        amount: attrs.amount_cents / 100,
+        date: attrs.created_at,
+        fundName: 'General',
         donorId: personId || 'anonymous',
         donorName: donorName,
-        isRecurring: false // Default
+        isRecurring: false
     };
 
     await db.collection('detailed_donations').doc(donationId).set(donation, { merge: true });
@@ -149,25 +150,24 @@ async function handleDonationEvent(data: any, churchId: string) {
             [`funds.${donation.fundName}`]: admin.firestore.FieldValue.increment(donation.amount),
             lastUpdated: admin.firestore.FieldValue.serverTimestamp()
         }, { merge: true });
-    } catch (aggError) {
-        console.error(`Failed to update analytics_giving aggregation for ${donationId}`, aggError);
+    } catch (aggError: any) {
+        log.error('Failed to update analytics_giving aggregation', 'webhook', { donationId, churchId, error: aggError?.message }, churchId);
     }
     
-    console.log(`Synced donation ${donationId}`);
+    log.info(`Donation synced via webhook`, 'webhook', { donationId, amount: donation.amount, churchId }, churchId);
 }
 
 async function handlePlanPersonEvent(eventName: string, data: any, churchId: string) {
-    // ... (same logic, just pass churchId if needed for logging or future use)
     const planId = data.relationships?.plan?.data?.id;
     if (planId) {
-        console.log(`Plan Person updated for plan ${planId}`);
+        log.info(`Plan person updated`, 'webhook', { planId, eventName, churchId }, churchId);
     }
 }
 
 async function handleNeededPositionEvent(eventName: string, data: any, churchId: string) {
     const planId = data.relationships?.plan?.data?.id;
     if (planId) {
-        console.log(`Needed Position updated for plan ${planId}`);
+        log.info(`Needed position updated`, 'webhook', { planId, eventName, churchId }, churchId);
     }
 }
 
@@ -191,11 +191,8 @@ async function handleCheckInEvent(data: any, churchId: string) {
         };
 
         await db.collection('check_ins').doc(checkInId).set(record, { merge: true });
-        console.log(`Synced check-in ${checkInId}`);
         
         // Update Weekly Attendance Aggregate
-        // This is tricky in a webhook without fetching existing aggregate.
-        // We can use FieldValue.increment if we have a document for the week.
         const date = new Date(attrs.created_at);
         const day = date.getDay();
         const diff = date.getDate() - day;
@@ -212,13 +209,14 @@ async function handleCheckInEvent(data: any, churchId: string) {
             regulars: attrs.kind !== 'Guest' && attrs.kind !== 'Volunteer' ? admin.firestore.FieldValue.increment(1) : admin.firestore.FieldValue.increment(0),
             volunteers: attrs.kind === 'Volunteer' ? admin.firestore.FieldValue.increment(1) : admin.firestore.FieldValue.increment(0)
         }, { merge: true });
+
+        log.info(`Check-in synced`, 'webhook', { checkInId, eventId, churchId, kind: attrs.kind }, churchId);
     }
 }
 
 async function handleGroupAttendanceEvent(data: any, churchId: string) {
     const groupId = data.relationships?.group?.data?.id;
     if (groupId) {
-        console.log(`Group attendance updated for group ${groupId}`);
+        log.info(`Group attendance updated`, 'webhook', { groupId, churchId }, churchId);
     }
 }
-

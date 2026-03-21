@@ -422,8 +422,13 @@ export interface LogEntry {
     churchId: string;
     timestamp: number;
     level: 'info' | 'warn' | 'error';
+    /** Which subsystem generated this log: sync, webhook, proxy, auth, app, system */
+    source?: 'sync' | 'webhook' | 'proxy' | 'auth' | 'app' | 'system';
     message: string;
+    /** JSON-serialized context object for quick display */
     details?: string;
+    /** Structured metadata for programmatic filtering (e.g. { endpoint, statusCode, retryCount }) */
+    context?: Record<string, any>;
 }
 
 export interface GlobalStats {

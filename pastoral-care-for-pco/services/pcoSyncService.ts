@@ -1,5 +1,6 @@
 
 import { firestore } from './firestoreService';
+import { logger } from './logService';
 import { 
     PcoPerson, PcoGroup, DetailedDonation, PcoFund, AttendanceRecord, 
     ServicePlanSnapshot, ServicesTeam, CheckInRecord
@@ -56,16 +57,17 @@ const pcoFetch = async (churchId: string, endpoint: string, retryCount = 0, meth
             waitTime += Math.random() * 500;
 
             if (retryCount < 5) {
-                console.warn(`PCO Rate Limit 429. Retrying in ${Math.round(waitTime)}ms... (Attempt ${retryCount + 1})`);
+                logger.warn(`PCO Rate Limit 429 — retrying`, 'sync', { endpoint, retryCount, waitTimeMs: Math.round(waitTime) }, churchId);
                 await delay(waitTime);
                 return pcoFetch(churchId, endpoint, retryCount + 1);
             } else {
+                logger.error('PCO API Rate Limit Exceeded: Max retries reached', 'sync', { endpoint }, churchId);
                 throw new Error("PCO API Rate Limit Exceeded: Max retries reached.");
             }
         }
 
         if (response.status === 404) {
-            console.warn(`PCO API Resource Not Found (404): ${endpoint}`);
+            logger.warn(`PCO API Resource Not Found (404)`, 'sync', { endpoint }, churchId);
             return null; // Gracefully handle missing resources
         }
 
@@ -106,14 +108,14 @@ const fetchAllPages = async (churchId: string, endpoint: string, mapFn: (item: a
             
             // Throttle requests slightly to be a good citizen and avoid hitting rate limits too hard
             await delay(200);
-        } catch (e) {
-            console.warn(`Error fetching page ${pageCount} for ${endpoint}`, e);
+        } catch (e: any) {
+            logger.warn(`Error fetching page ${pageCount}`, 'sync', { endpoint, page: pageCount, error: e?.message });
             nextUrl = null; // Stop pagination on error
         }
     }
     
     if (pageCount >= SAFETY_MAX_PAGES) {
-        console.warn(`Sync hit safety limit of ${SAFETY_MAX_PAGES} pages. Data may be incomplete.`);
+        logger.warn(`Sync hit safety page limit — data may be incomplete`, 'sync', { endpoint, pages: SAFETY_MAX_PAGES });
     }
 
     return allItems;
@@ -122,7 +124,8 @@ const fetchAllPages = async (churchId: string, endpoint: string, mapFn: (item: a
 // --- Sync Functions ---
 
 export const syncAllData = async (churchId: string) => {
-    console.log(`Starting Full Sync for ${churchId}...`);
+    logger.info('Full sync started', 'sync', { churchId }, churchId);
+    const startTime = Date.now();
     
     // Ensure Webhooks are set up using the standard service
     await initializeWebhooks(churchId);
@@ -130,27 +133,28 @@ export const syncAllData = async (churchId: string) => {
     // Execute sequentially to manage load better, wrapped in try/catch to ensure partial success
     try {
         await syncPeopleData(churchId);
-    } catch (e) { console.error("Sync People Failed", e); }
+    } catch (e: any) { logger.error('Sync People failed', 'sync', { error: e?.message }, churchId); }
 
     try {
         await syncGroupsData(churchId);
-    } catch (e) { console.error("Sync Groups Failed", e); }
+    } catch (e: any) { logger.error('Sync Groups failed', 'sync', { error: e?.message }, churchId); }
 
     try {
         await syncServicesData(churchId);
-    } catch (e) { console.error("Sync Services Failed", e); }
+    } catch (e: any) { logger.error('Sync Services failed', 'sync', { error: e?.message }, churchId); }
 
     try {
         await syncRecentGiving(churchId);
-    } catch (e) { console.error("Sync Giving Failed", e); }
+    } catch (e: any) { logger.error('Sync Giving failed', 'sync', { error: e?.message }, churchId); }
 
     // Update last sync timestamp regardless of partial failures
+    const durationMs = Date.now() - startTime;
     await firestore.updateChurch(churchId, { lastSyncTimestamp: Date.now() });
-    console.log(`Full Sync Complete for ${churchId}`);
+    logger.info('Full sync complete', 'sync', { churchId, durationMs }, churchId);
 };
 
 export const syncPeopleData = async (churchId: string) => {
-    console.log("Syncing People...");
+    logger.info('Syncing people...', 'sync', { churchId }, churchId);
     const people = await fetchAllPages(churchId, 'people/v2/people?include=addresses,emails,phone_numbers,households,field_data', (p: any, included: any[] = []) => {
         const attrs = p.attributes;
         const rels = p.relationships;
@@ -224,11 +228,11 @@ export const syncPeopleData = async (churchId: string) => {
     if (people.length > 0) {
         await firestore.upsertPeople(people);
     }
-    console.log(`Synced ${people.length} people.`);
+    logger.info(`People sync complete`, 'sync', { churchId, count: people.length }, churchId);
 };
 
 export const syncGroupsData = async (churchId: string) => {
-    console.log("Syncing Groups (Deep Scan)...");
+    logger.info('Syncing groups (deep scan)...', 'sync', { churchId }, churchId);
     
     // 1. Fetch Basic Group List with correctly mapped Types (via 'include')
     const groups = await fetchAllPages(churchId, 'groups/v2/groups', (g: any, included: any[] = []) => {
@@ -253,7 +257,7 @@ export const syncGroupsData = async (churchId: string) => {
         } as PcoGroup;
     });
 
-    console.log(`Found ${groups.length} groups. Starting deep scan for members, leaders, and events...`);
+    logger.info(`Found ${groups.length} groups — starting deep scan`, 'sync', { churchId, count: groups.length }, churchId);
 
     const activeGroups = groups.filter(g => !g.archivedAt);
     const archivedGroups = groups.filter(g => g.archivedAt);
@@ -369,8 +373,8 @@ export const syncGroupsData = async (churchId: string) => {
 
             // Small throttle to be kind to the API between groups
             await delay(50);
-        } catch (e) {
-            console.warn(`Error fetching details for group ${group.id} (${group.name})`, e);
+        } catch (e: any) {
+            logger.warn(`Error fetching details for group ${group.id} (${group.name})`, 'sync', { groupId: group.id, groupName: group.name, error: e?.message }, churchId);
             enrichedGroups.push(group); // Save basic version if details fail
         }
     }
@@ -380,11 +384,11 @@ export const syncGroupsData = async (churchId: string) => {
     if (finalGroups.length > 0) {
         await firestore.upsertGroups(finalGroups);
     }
-    console.log(`Synced ${finalGroups.length} groups with enriched details.`);
+    logger.info('Groups sync complete', 'sync', { churchId, total: finalGroups.length, active: enrichedGroups.length, archived: archivedGroups.length }, churchId);
 };
 
 export const syncServicesData = async (churchId: string) => {
-    console.log("Syncing Services Plans & Teams...");
+    logger.info('Syncing services plans & teams...', 'sync', { churchId }, churchId);
     
     // 1. Sync Teams
     let teams: ServicesTeam[] = [];
@@ -438,9 +442,9 @@ export const syncServicesData = async (churchId: string) => {
         if (teams.length > 0) {
             await firestore.upsertServicesTeams(teams);
         }
-        console.log(`Synced ${teams.length} teams.`);
-    } catch (e) {
-        console.warn("Failed to sync teams (Services might be disabled or restricted)", e);
+        logger.info('Teams sync complete', 'sync', { churchId, count: teams.length }, churchId);
+    } catch (e: any) {
+        logger.warn('Teams sync failed — Services may be disabled or restricted', 'sync', { churchId, error: e?.message }, churchId);
     }
 
     // 2. Sync Future Plans (Next 90 Days) AND Recent Past Plans (Last 90 Days)
@@ -678,11 +682,11 @@ export const syncServicesData = async (churchId: string) => {
     if (allPlansToSave.length > 0) {
         await firestore.upsertServicePlans(allPlansToSave);
     }
-    console.log(`Synced ${allPlansToSave.length} plans (${detailedPlans.length} detailed).`);
+    logger.info('Service plans sync complete', 'sync', { churchId, total: allPlansToSave.length, detailed: detailedPlans.length }, churchId);
 };
 
 export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
-    console.log("Syncing Giving...");
+    logger.info('Syncing giving...', 'sync', { churchId }, churchId);
     // If no start date, default to last 365 days
     const since = startDate ? startDate.toISOString() : new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
     

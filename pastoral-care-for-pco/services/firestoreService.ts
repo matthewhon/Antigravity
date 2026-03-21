@@ -649,15 +649,36 @@ class FirestoreService {
 
   // --- Logging ---
 
-  async getLogs(churchId?: string, limitCount = 100): Promise<LogEntry[]> {
+  async saveLog(entry: LogEntry): Promise<void> {
       try {
-          let q;
+          await setDoc(doc(db, 'logs', entry.id), entry);
+      } catch (e) {
+          // Raw console only — never call logger.error here (circular)
+          console.error('[FirestoreService] Failed to save log entry:', e);
+      }
+  }
+
+  async getLogs(
+      churchId?: string,
+      limitCount = 100,
+      level?: 'info' | 'warn' | 'error',
+      source?: string
+  ): Promise<LogEntry[]> {
+      try {
           const logsRef = collection(db, 'logs');
+          const constraints: any[] = [orderBy('timestamp', 'desc'), limit(limitCount)];
+
           if (churchId && churchId !== 'all') {
-              q = query(logsRef, where('churchId', '==', churchId), orderBy('timestamp', 'desc'), limit(limitCount));
-          } else {
-              q = query(logsRef, orderBy('timestamp', 'desc'), limit(limitCount));
+              constraints.unshift(where('churchId', '==', churchId));
           }
+          if (level) {
+              constraints.unshift(where('level', '==', level));
+          }
+          if (source) {
+              constraints.unshift(where('source', '==', source));
+          }
+
+          const q = query(logsRef, ...constraints);
           const snapshot = await getDocs(q);
           return snapshot.docs.map(d => ({ id: d.id, ...d.data() as any } as LogEntry));
       } catch (e) {
@@ -666,5 +687,6 @@ class FirestoreService {
       }
   }
 }
+
 
 export const firestore = new FirestoreService();

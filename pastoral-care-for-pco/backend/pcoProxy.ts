@@ -1,10 +1,12 @@
 
 import admin from 'firebase-admin';
 import { getDb } from './firebase';
+import { createServerLogger } from '../services/logService';
 
 export const pcoProxy = async (req: any, res: any) => {
-    console.log("[Proxy] Received request to:", req.path, "Body:", JSON.stringify(req.body));
     const db = getDb();
+    const log = createServerLogger(db);
+
     // Enable CORS
     res.set('Access-Control-Allow-Origin', '*');
     if (req.method === 'OPTIONS') {
@@ -17,28 +19,28 @@ export const pcoProxy = async (req: any, res: any) => {
     try {
         const { url, method = 'GET', body, churchId } = req.body;
 
-        console.log(`[Proxy] Request for churchId: ${churchId}, URL: ${url}, Method: ${method}`);
+        log.info(`Proxy request received`, 'proxy', { url, method, churchId }, churchId);
 
         if (!url || !churchId) {
+            log.warn('Proxy request missing url or churchId', 'proxy', { url, churchId });
             res.status(400).json({ error: 'Missing url or churchId' });
             return;
         }
 
         // 1. Get Church Credentials
         const churchDoc = await db.collection('churches').doc(churchId).get();
-        console.log(`[Proxy] Church doc exists: ${churchDoc.exists}`);
         if (!churchDoc.exists) {
+            log.warn('Church not found in proxy', 'proxy', { churchId }, churchId);
             res.status(404).json({ error: 'Church not found' });
             return;
         }
 
         const churchData = churchDoc.data();
-        console.log(`[Proxy] Church data:`, churchData);
         let accessToken = churchData?.pcoAccessToken;
         const refreshToken = churchData?.pcoRefreshToken;
 
         if (!accessToken || !refreshToken) {
-            console.log(`[Proxy] Missing tokens for ${churchId}`);
+            log.warn('Missing PCO tokens for church', 'proxy', { churchId }, churchId);
             res.status(401).json({ error: 'Church not authenticated with PCO' });
             return;
         }
@@ -51,17 +53,11 @@ export const pcoProxy = async (req: any, res: any) => {
                 'User-Agent': 'PastoralCareApp/1.0'
             };
             
-            const options: any = {
-                method,
-                headers
-            };
+            const options: any = { method, headers };
 
             if (body && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
                 options.body = JSON.stringify(body);
             }
-
-            console.log(`[Proxy] ${method} ${url}`);
-            if (method === 'POST') console.log(`[Proxy] Body:`, options.body);
 
             return await fetch(url, options);
         };
@@ -70,22 +66,21 @@ export const pcoProxy = async (req: any, res: any) => {
 
         // 3. Handle Token Expiry (401)
         if (response.status === 401) {
-            console.log(`[Proxy] Token expired for ${churchId}. Refreshing...`);
+            log.warn('PCO access token expired — refreshing', 'proxy', { churchId }, churchId);
             
             // Get Client Credentials
             const settingsDoc = await db.doc('system/settings').get();
             const settings = settingsDoc.data() || {};
             
-            // Always use System default (Global App Config)
             const clientId = (settings.pcoClientId || '').trim();
             const clientSecret = (settings.pcoClientSecret || '').trim();
 
             if (!clientId || !clientSecret) {
+                log.error('System missing PCO credentials for token refresh', 'proxy', { churchId }, churchId);
                 res.status(500).json({ error: "System missing PCO Credentials" });
                 return;
             }
 
-            // Refresh Token
             const refreshParams = new URLSearchParams();
             refreshParams.append('grant_type', 'refresh_token');
             refreshParams.append('refresh_token', refreshToken);
@@ -99,7 +94,7 @@ export const pcoProxy = async (req: any, res: any) => {
 
             if (!refreshRes.ok) {
                 const errText = await refreshRes.text();
-                console.error(`[Proxy] Refresh failed: ${refreshRes.status} ${errText}`);
+                log.error('PCO token refresh failed', 'proxy', { churchId, status: refreshRes.status, error: errText }, churchId);
                 res.status(401).json({ error: 'Session expired. Please reconnect PCO.' });
                 return;
             }
@@ -116,20 +111,20 @@ export const pcoProxy = async (req: any, res: any) => {
                 pcoTokenExpiry: Date.now() + (tokenData.expires_in * 1000)
             });
 
+            log.info('PCO token refreshed successfully', 'proxy', { churchId }, churchId);
+
             // Retry Request
             response = await performRequest(newAccessToken);
         }
 
         // 4. Return Response
         if (!response.ok) {
-            // Forward PCO error
             const errText = await response.text();
-            console.warn(`[Proxy] Upstream Error ${response.status}: ${url}, Error: ${errText}`);
+            log.warn('PCO upstream error', 'proxy', { churchId, url, status: response.status, error: errText.substring(0, 300) }, churchId);
             res.status(response.status).send(errText);
             return;
         }
 
-        // Check content type to decide how to parse
         const contentType = response.headers.get('content-type');
         if (contentType && contentType.includes('application/json')) {
             const data = await response.json();
@@ -140,7 +135,8 @@ export const pcoProxy = async (req: any, res: any) => {
         }
 
     } catch (e: any) {
-        console.error("[Proxy] Internal Error:", e);
+        const { churchId } = req.body || {};
+        log.error('Proxy internal error', 'proxy', { churchId, error: e.message }, churchId);
         res.status(500).json({ error: e.message || 'Internal Proxy Error' });
     }
 };

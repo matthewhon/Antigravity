@@ -30,6 +30,9 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
   // Logging State
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [logFilter, setLogFilter] = useState<string>(''); // churchId or '' for all
+  const [logLevelFilter, setLogLevelFilter] = useState<'' | 'info' | 'warn' | 'error'>('');
+  const [logSourceFilter, setLogSourceFilter] = useState<string>('');
+  const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
 
   useEffect(() => {
     loadSettings();
@@ -50,7 +53,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
       if (activeTab === 'Logging') {
           loadLogs();
       }
-  }, [logFilter]);
+  }, [logFilter, logLevelFilter, logSourceFilter]);
 
   // Auto-check health when URL changes or settings load
   useEffect(() => {
@@ -99,7 +102,12 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
   const loadLogs = async () => {
       setIsLoading(true);
       try {
-          const data = await firestore.getLogs(logFilter);
+          const data = await firestore.getLogs(
+              logFilter || undefined,
+              200,
+              logLevelFilter || undefined,
+              logSourceFilter || undefined
+          );
           setLogs(data);
       } catch (e) {
           console.error("Failed to load logs", e);
@@ -825,14 +833,28 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
             </div>
         )}
         {activeTab === 'Logging' && (
-            <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] border border-slate-100 dark:border-slate-800 shadow-sm">
-                <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-                    <div>
-                        <h3 className="text-xl font-black text-slate-900 dark:text-white">System Logs</h3>
-                        <p className="text-xs text-slate-400 mt-1">Audit trail and application events</p>
+            <div className="space-y-6">
+                {/* Header & Filters */}
+                <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                        <div>
+                            <h3 className="text-xl font-black text-slate-900 dark:text-white">System Logs</h3>
+                            <p className="text-xs text-slate-400 mt-1">Audit trail for sync, webhooks, proxy, and app events</p>
+                        </div>
+                        <button
+                            onClick={loadLogs}
+                            disabled={isLoading}
+                            className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-700 transition-all disabled:opacity-50 flex items-center gap-2"
+                        >
+                            {isLoading ? (
+                                <><span className="animate-spin inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full"></span> Loading...</>
+                            ) : '↻ Refresh'}
+                        </button>
                     </div>
-                    <div className="flex gap-2 items-center">
-                        <select 
+
+                    {/* Filter Bar */}
+                    <div className="flex flex-wrap gap-3">
+                        <select
                             value={logFilter}
                             onChange={(e) => setLogFilter(e.target.value)}
                             className="bg-slate-100 dark:bg-slate-800 border-none text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 rounded-lg py-2 px-3 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
@@ -840,65 +862,171 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                             <option value="">All Tenants</option>
                             {churches.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                         </select>
-                        <button 
-                            onClick={loadLogs}
-                            disabled={isLoading}
-                            className="bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 px-4 py-2 rounded-lg font-black text-[10px] uppercase tracking-widest hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-all disabled:opacity-50"
+
+                        <select
+                            value={logLevelFilter}
+                            onChange={(e) => setLogLevelFilter(e.target.value as any)}
+                            className="bg-slate-100 dark:bg-slate-800 border-none text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 rounded-lg py-2 px-3 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                         >
-                            {isLoading ? 'Loading...' : 'Refresh Logs'}
-                        </button>
+                            <option value="">All Levels</option>
+                            <option value="info">Info</option>
+                            <option value="warn">Warn</option>
+                            <option value="error">Error</option>
+                        </select>
+
+                        <select
+                            value={logSourceFilter}
+                            onChange={(e) => setLogSourceFilter(e.target.value)}
+                            className="bg-slate-100 dark:bg-slate-800 border-none text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 rounded-lg py-2 px-3 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                        >
+                            <option value="">All Sources</option>
+                            <option value="sync">Sync</option>
+                            <option value="webhook">Webhook</option>
+                            <option value="proxy">Proxy</option>
+                            <option value="auth">Auth</option>
+                            <option value="app">App</option>
+                            <option value="system">System</option>
+                        </select>
+
+                        {(logFilter || logLevelFilter || logSourceFilter) && (
+                            <button
+                                onClick={() => { setLogFilter(''); setLogLevelFilter(''); setLogSourceFilter(''); }}
+                                className="text-[10px] font-bold text-rose-500 hover:text-rose-700 px-3 py-2 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors"
+                            >
+                                ✕ Clear Filters
+                            </button>
+                        )}
                     </div>
+
+                    {/* Stats Bar */}
+                    {logs.length > 0 && (
+                        <div className="flex gap-4 mt-5 pt-5 border-t border-slate-100 dark:border-slate-800">
+                            <div className="flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                                <span className="text-[10px] font-bold text-slate-500">{logs.filter(l => l.level === 'info').length} Info</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                                <span className="text-[10px] font-bold text-slate-500">{logs.filter(l => l.level === 'warn').length} Warn</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+                                <span className="text-[10px] font-bold text-slate-500">{logs.filter(l => l.level === 'error').length} Error</span>
+                            </div>
+                            <span className="text-[10px] text-slate-400 ml-auto">{logs.length} entries shown</span>
+                        </div>
+                    )}
                 </div>
 
-                <div className="overflow-x-auto max-h-[600px] custom-scrollbar">
-                    <table className="w-full text-left">
-                        <thead className="bg-slate-50 dark:bg-slate-800 sticky top-0 z-10 border-b border-slate-100 dark:border-slate-700">
-                            <tr>
-                                <th className="p-4 text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest w-48">Timestamp</th>
-                                <th className="p-4 text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest w-24">Level</th>
-                                <th className="p-4 text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest w-40">Tenant</th>
-                                <th className="p-4 text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">Message</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                            {logs.map((log, idx) => {
-                                const tenantName = churches.find(c => c.id === log.churchId)?.name || log.churchId;
-                                let lvlColor = 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300';
-                                if (log.level === 'error') lvlColor = 'bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400';
-                                if (log.level === 'warn') lvlColor = 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400';
-                                if (log.level === 'info') lvlColor = 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400';
+                {/* Logs Table */}
+                <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
+                    <div className="overflow-x-auto max-h-[600px] custom-scrollbar">
+                        <table className="w-full text-left">
+                            <thead className="bg-slate-50 dark:bg-slate-800 sticky top-0 z-10 border-b border-slate-100 dark:border-slate-700">
+                                <tr>
+                                    <th className="p-4 text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest w-44">Timestamp</th>
+                                    <th className="p-4 text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest w-20">Level</th>
+                                    <th className="p-4 text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest w-24">Source</th>
+                                    <th className="p-4 text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest w-36">Tenant</th>
+                                    <th className="p-4 text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">Message</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
+                                {logs.map((log, idx) => {
+                                    const tenantName = churches.find(c => c.id === log.churchId)?.name || log.churchId;
+                                    const isExpanded = expandedLogId === log.id;
 
-                                return (
-                                    <tr key={log.id || idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                                        <td className="p-4">
-                                            <p className="text-xs font-mono text-slate-600 dark:text-slate-400">{new Date(log.timestamp).toLocaleString()}</p>
-                                        </td>
-                                        <td className="p-4">
-                                            <span className={`px-2 py-1 rounded text-[9px] font-black uppercase tracking-widest ${lvlColor}`}>
-                                                {log.level}
-                                            </span>
-                                        </td>
-                                        <td className="p-4">
-                                            <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">
-                                                {tenantName}
-                                            </span>
-                                        </td>
-                                        <td className="p-4">
-                                            <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{log.message}</p>
-                                            {log.details && <p className="text-xs text-slate-400 mt-1 font-mono">{log.details}</p>}
+                                    let lvlBadge = 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400';
+                                    let rowBg = '';
+                                    if (log.level === 'error') {
+                                        lvlBadge = 'bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400';
+                                        rowBg = 'bg-rose-50/40 dark:bg-rose-900/10';
+                                    } else if (log.level === 'warn') {
+                                        lvlBadge = 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400';
+                                        rowBg = 'bg-amber-50/40 dark:bg-amber-900/10';
+                                    }
+
+                                    const srcColors: Record<string, string> = {
+                                        sync: 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400',
+                                        webhook: 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-400',
+                                        proxy: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400',
+                                        auth: 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400',
+                                        app: 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300',
+                                        system: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400',
+                                    };
+                                    const srcColor = srcColors[log.source || 'app'] || srcColors.app;
+
+                                    const hasContext = log.details && log.details !== '{}';
+
+                                    return (
+                                        <>
+                                            <tr
+                                                key={log.id || idx}
+                                                onClick={() => hasContext ? setExpandedLogId(isExpanded ? null : log.id) : undefined}
+                                                className={`${rowBg} ${hasContext ? 'cursor-pointer' : ''} hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors`}
+                                            >
+                                                <td className="p-4">
+                                                    <p className="text-[10px] font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                                                        {new Date(log.timestamp).toLocaleString()}
+                                                    </p>
+                                                </td>
+                                                <td className="p-4">
+                                                    <span className={`px-2 py-1 rounded text-[9px] font-black uppercase tracking-widest ${lvlBadge}`}>
+                                                        {log.level}
+                                                    </span>
+                                                </td>
+                                                <td className="p-4">
+                                                    {log.source && (
+                                                        <span className={`px-2 py-1 rounded text-[9px] font-black uppercase tracking-widest ${srcColor}`}>
+                                                            {log.source}
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="p-4">
+                                                    <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded truncate max-w-[120px] block">
+                                                        {tenantName}
+                                                    </span>
+                                                </td>
+                                                <td className="p-4">
+                                                    <div className="flex items-start justify-between gap-2">
+                                                        <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{log.message}</p>
+                                                        {hasContext && (
+                                                            <span className="text-[9px] text-slate-400 shrink-0 mt-0.5">{isExpanded ? '▲' : '▼'} details</span>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            {isExpanded && hasContext && (
+                                                <tr key={`${log.id}-detail`} className={rowBg}>
+                                                    <td colSpan={5} className="px-4 pb-4">
+                                                        <pre className="text-[11px] font-mono bg-slate-900 text-emerald-400 p-4 rounded-xl overflow-x-auto">
+                                                            {JSON.stringify(JSON.parse(log.details!), null, 2)}
+                                                        </pre>
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </>
+                                    );
+                                })}
+                                {logs.length === 0 && !isLoading && (
+                                    <tr>
+                                        <td colSpan={5} className="p-12 text-center">
+                                            <div className="text-4xl mb-3">📋</div>
+                                            <p className="text-slate-400 text-sm font-bold">No logs found</p>
+                                            <p className="text-slate-400 text-xs mt-1">Logs will appear here after sync or webhook events occur.</p>
                                         </td>
                                     </tr>
-                                );
-                            })}
-                            {logs.length === 0 && !isLoading && (
-                                <tr>
-                                    <td colSpan={4} className="p-8 text-center text-slate-400 text-xs italic">
-                                        No logs found.
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
+                                )}
+                                {isLoading && (
+                                    <tr>
+                                        <td colSpan={5} className="p-8 text-center text-slate-400 text-xs font-bold animate-pulse">
+                                            Loading logs...
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         )}
