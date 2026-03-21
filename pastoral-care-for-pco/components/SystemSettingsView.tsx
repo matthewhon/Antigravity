@@ -787,10 +787,15 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                 <div className="flex gap-4">
                     <button 
                         onClick={async () => {
-                            // OAuth Flow
-                            const response = await fetch('/api/auth/url');
-                            const { url } = await response.json();
-                            window.open(url, 'oauth_popup', 'width=600,height=700');
+                            const clientId = settings.pcoClientId;
+                            if (!clientId) {
+                                alert("Missing Client ID in Global App Settings.");
+                                return;
+                            }
+                            const redirectUri = window.location.origin;
+                            // Adding check_ins with the required underscore per official API documentation
+                            const url = `https://api.planningcenteronline.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=people%20services%20giving%20groups%20check_ins`;
+                            window.location.href = url;
                         }}
                         className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-all"
                     >
