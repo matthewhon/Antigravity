@@ -1,8 +1,8 @@
 import { firestore } from './firestoreService';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
 import { db } from './firebase';
 
-// Helper to get system settings and proxy URL
+// Helper to get the backend proxy URL
 const getProxyUrl = async () => {
     if (import.meta.env.DEV) {
         return '/pco/proxy';
@@ -12,7 +12,7 @@ const getProxyUrl = async () => {
     return `${baseUrl}/pco/proxy`;
 };
 
-// Helper to fetch from PCO via proxy
+// Helper to fetch from PCO via the backend proxy
 async function pcoFetch(churchId: string, endpoint: string, method: string = 'GET', body?: any) {
     const proxyUrl = await getProxyUrl();
     const cleanEndpoint = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
@@ -36,114 +36,106 @@ async function pcoFetch(churchId: string, endpoint: string, method: string = 'GE
     return response.json();
 }
 
+/**
+ * PCO Webhooks v2 Structure:
+ * - Each `Subscription` resource represents ONE event type.
+ * - The `name` attribute is the event topic (e.g. 'people.v2.events.person.created').
+ * - The `url` attribute is the callback endpoint.
+ * - To subscribe to 5 topics, we create 5 separate Subscription objects.
+ *
+ * Correct POST body:
+ * {
+ *   data: {
+ *     type: 'Subscription',
+ *     attributes: { name: 'people.v2.events.person.created', url: '...', active: true }
+ *   }
+ * }
+ */
 export const initializeWebhooks = async (churchId: string) => {
-    const appUrl = window.location.origin;
-    // Webhooks must point to the backend server, not the frontend SPA
     const settings = await firestore.getSystemSettings();
     const backendUrl = settings.apiBaseUrl || 'https://pastoral-care-for-pco-u3gnt7kb5a-uc.a.run.app';
-    const webhookEndpoint = `${backendUrl}/pco/webhook`;
 
-    // PCO Webhooks v2 event topic names to subscribe to
+    // Webhooks must point to the BACKEND server endpoint, not the frontend SPA URL
+    const webhookUrl = `${backendUrl}/pco/webhook`;
+
+    // PCO Webhooks v2 event topic names
     const topics = [
         'people.v2.events.person.created',
         'people.v2.events.person.updated',
         'giving.v2.events.donation.created',
         'services.v2.events.plan_person.updated',
-        'services.v2.events.needed_position.updated'
     ];
 
-    console.log(`Initializing Webhooks for endpoint: ${webhookEndpoint}`);
+    console.log(`[Webhooks] Initializing subscriptions → ${webhookUrl}`);
 
     try {
-        // 1. Check for an existing subscription for our endpoint
-        const existingSubsResponse = await pcoFetch(churchId, 'webhooks/v2/subscriptions');
-        const existingSubs = existingSubsResponse?.data || [];
-        const mySub = existingSubs.find((sub: any) =>
-            sub.attributes.url === webhookEndpoint ||
-            sub.attributes.endpoint_url === webhookEndpoint
+        // 1. Fetch all existing subscriptions for this account
+        const existingResponse = await pcoFetch(churchId, 'webhooks/v2/subscriptions');
+        const existingSubs: any[] = existingResponse?.data || [];
+
+        // Build a set of already-subscribed topic+url combos
+        const alreadySubscribed = new Set(
+            existingSubs
+                .filter((s: any) => s.attributes.url === webhookUrl)
+                .map((s: any) => s.attributes.name)
         );
 
-        let subscriptionId: string | null = null;
+        console.log(`[Webhooks] Found ${existingSubs.length} existing subscriptions. Already subscribed topics:`, [...alreadySubscribed]);
 
-        if (mySub) {
-            console.log('Found existing subscription:', mySub.id);
-            subscriptionId = mySub.id;
+        const createdSecrets: Record<string, string> = {};
+        let subscriptionCount = 0;
 
-            // Reactivate if inactive
-            if (!mySub.attributes.active) {
-                console.log('Subscription inactive, reactivating...');
-                await pcoFetch(churchId, `webhooks/v2/subscriptions/${subscriptionId}`, 'PATCH', {
-                    data: { type: 'Subscription', id: subscriptionId, attributes: { active: true } }
-                });
-            }
-
-            // Check if secret is stored
-            const settingsDoc = await getDoc(doc(db, 'system_settings', 'pco_webhooks'));
-            if (settingsDoc.exists() && settingsDoc.data()?.secret) {
-                console.log('Webhook subscription OK — secret already stored.');
-                return;
-            }
-
-            // No local secret — delete and re-create to get a fresh one
-            console.warn('No local secret stored. Deleting and re-creating subscription...');
-            await pcoFetch(churchId, `webhooks/v2/subscriptions/${subscriptionId}`, 'DELETE');
-            subscriptionId = null;
-        }
-
-        // 2. Create new subscription with ONLY the url attribute.
-        //    PCO Webhooks v2 does NOT accept event topics during creation —
-        //    topics must be added separately via /event_subscriptions.
-        console.log('Creating new webhook subscription...');
-        const createResponse = await pcoFetch(churchId, 'webhooks/v2/subscriptions', 'POST', {
-            data: {
-                type: 'Subscription',
-                attributes: {
-                    url: webhookEndpoint,
-                    active: true
-                }
-            }
-        });
-        const newSub = createResponse?.data;
-        subscriptionId = newSub?.id;
-
-        if (!subscriptionId) {
-            throw new Error('Failed to create webhook subscription — no ID returned.');
-        }
-
-        // 3. Add each event topic individually via event_subscriptions
-        console.log(`Adding ${topics.length} event topics to subscription ${subscriptionId}...`);
+        // 2. For each topic, create a subscription if not already subscribed
         for (const topic of topics) {
+            if (alreadySubscribed.has(topic)) {
+                console.log(`[Webhooks] Already subscribed to: ${topic}`);
+                continue;
+            }
+
             try {
-                await pcoFetch(churchId, `webhooks/v2/subscriptions/${subscriptionId}/event_subscriptions`, 'POST', {
+                console.log(`[Webhooks] Subscribing to: ${topic}`);
+                const createResponse = await pcoFetch(churchId, 'webhooks/v2/subscriptions', 'POST', {
                     data: {
-                        type: 'EventSubscription',
-                        attributes: { name: topic }
+                        type: 'Subscription',
+                        attributes: {
+                            name: topic,
+                            url: webhookUrl,
+                            active: true
+                        }
                     }
                 });
-                console.log(`Subscribed to topic: ${topic}`);
-            } catch (topicErr: any) {
-                // Don't fail the entire init if one topic errors (e.g. unsupported/already subscribed)
-                console.warn(`Failed to subscribe to topic ${topic}:`, topicErr.message);
+
+                const newSub = createResponse?.data;
+                const secret = newSub?.attributes?.authenticity_secret;
+                if (secret) {
+                    createdSecrets[topic] = secret;
+                }
+                subscriptionCount++;
+                console.log(`[Webhooks] ✓ Subscribed to: ${topic}`);
+            } catch (err: any) {
+                console.warn(`[Webhooks] Failed to subscribe to ${topic}:`, err.message);
             }
         }
 
-        // 4. Store the authenticity secret for webhook signature verification
-        const secret = newSub?.attributes?.authenticity_secret;
+        // 3. Store the first secret we received (all topics under same app share the same secret)
+        const secret = Object.values(createdSecrets)[0];
         if (secret) {
-            console.log('Storing webhook secret...');
             await setDoc(doc(db, 'system_settings', 'pco_webhooks'), {
                 secret,
                 updatedAt: new Date().toISOString(),
-                endpoint: webhookEndpoint,
-                subscriptionId
+                endpoint: webhookUrl,
             }, { merge: true });
-            console.log('Webhook secret stored successfully.');
+            console.log('[Webhooks] Secret stored successfully.');
+        }
+
+        if (subscriptionCount > 0) {
+            console.log(`[Webhooks] Created ${subscriptionCount} new subscription(s).`);
         } else {
-            console.warn('No authenticity_secret in response. Webhook verification may fail.');
+            console.log('[Webhooks] All topics already subscribed.');
         }
 
     } catch (error) {
-        console.error('Failed to initialize webhooks:', error);
+        console.error('[Webhooks] Failed to initialize webhooks:', error);
         throw error;
     }
 };
