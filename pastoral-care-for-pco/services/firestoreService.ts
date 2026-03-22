@@ -408,6 +408,32 @@ class FirestoreService {
       } catch (e) { return []; }
   }
 
+  /**
+   * Batch-updates the `checkInCount` field on person documents.
+   * @param churchId The church tenant ID
+   * @param counts Map of { [personId]: checkInCount }
+   */
+  async updatePeopleCheckInCounts(churchId: string, counts: Record<string, number>): Promise<void> {
+      try {
+          const entries = Object.entries(counts);
+          const CHUNK = 400;
+          for (let i = 0; i < entries.length; i += CHUNK) {
+              const batch = writeBatch(db);
+              entries.slice(i, i + CHUNK).forEach(([personId, count]) => {
+                  const ref = doc(db, 'people', `${churchId}_${personId}`);
+                  batch.update(ref, { checkInCount: count });
+              });
+              await batch.commit();
+          }
+          console.log(`[Firestore] Updated checkInCount for ${entries.length} people in church ${churchId}`);
+      } catch (e) {
+          // Non-fatal — log and continue
+          console.warn('[Firestore] updatePeopleCheckInCounts failed:', e);
+      }
+  }
+
+
+
   async getGroups(churchId: string): Promise<PcoGroup[]> {
       try {
           const q = query(collection(db, 'groups'), where('churchId', '==', churchId));

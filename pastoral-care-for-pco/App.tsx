@@ -126,8 +126,11 @@ const App: React.FC = () => {
 
   useEffect(() => {
     firestore.getSystemSettings().then(async (settings) => {
-        if (!settings.apiBaseUrl) {
-            const newSettings = { ...settings, apiBaseUrl: 'https://api.pastoralcare.barnabassoftware.com' };
+        const correctUrl = 'https://pastoral-care-for-pco-u3gnt7kb5a-uc.a.run.app';
+        // Fix stale URL that may have been stored with the old non-existent domain
+        const isStaleUrl = !settings.apiBaseUrl || settings.apiBaseUrl.includes('api.pastoralcare.barnabassoftware.com');
+        if (isStaleUrl) {
+            const newSettings = { ...settings, apiBaseUrl: correctUrl };
             await firestore.saveSystemSettings(newSettings);
             setSystemSettings(newSettings);
         } else {
@@ -135,6 +138,7 @@ const App: React.FC = () => {
         }
     });
   }, [user]);
+
 
   // Handle Planning Center OAuth Callback
   useEffect(() => {

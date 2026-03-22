@@ -135,6 +135,11 @@ export const syncAllData = async (churchId: string) => {
         await syncPeopleData(churchId);
     } catch (e: any) { logger.error('Sync People failed', 'sync', { error: e?.message }, churchId); }
 
+    // Sync check-in counts AFTER people are stored so we can update their records
+    try {
+        await syncCheckInCounts(churchId);
+    } catch (e: any) { logger.error('Sync Check-ins failed', 'sync', { error: e?.message }, churchId); }
+
     try {
         await syncGroupsData(churchId);
     } catch (e: any) { logger.error('Sync Groups failed', 'sync', { error: e?.message }, churchId); }
@@ -155,80 +160,138 @@ export const syncAllData = async (churchId: string) => {
 
 export const syncPeopleData = async (churchId: string) => {
     logger.info('Syncing people...', 'sync', { churchId }, churchId);
-    const people = await fetchAllPages(churchId, 'people/v2/people?include=addresses,emails,phone_numbers,households,field_data', (p: any, included: any[] = []) => {
-        const attrs = p.attributes;
-        const rels = p.relationships;
-        
-        // Calculate Age
-        let age: number | undefined;
-        if (attrs.birthdate) {
-            const birth = new Date(attrs.birthdate);
-            const now = new Date();
-            age = now.getFullYear() - birth.getFullYear();
-            if (now.getMonth() < birth.getMonth() || (now.getMonth() === birth.getMonth() && now.getDate() < birth.getDate())) {
-                age--;
+    const people = await fetchAllPages(
+        churchId,
+        // Include households so we can get householdId + householdName from the included array
+        'people/v2/people?include=addresses,emails,phone_numbers,households,field_data',
+        (p: any, included: any[] = []) => {
+            const attrs = p.attributes;
+            const rels = p.relationships;
+
+            // ── Age calculation ─────────────────────────────────────────────────
+            let age: number | undefined;
+            if (attrs.birthdate) {
+                const birth = new Date(attrs.birthdate);
+                const now = new Date();
+                age = now.getFullYear() - birth.getFullYear();
+                if (now.getMonth() < birth.getMonth() || (now.getMonth() === birth.getMonth() && now.getDate() < birth.getDate())) {
+                    age--;
+                }
             }
+
+            // ── Household (FIX: was incorrectly using primary_campus ID) ────────
+            // PCO people have a `households` relationship (array); use the first one.
+            const householdRef = rels?.households?.data?.[0];
+            const householdId = householdRef?.id || null;
+
+            // Look up the Household record in the `included` array to get its name
+            const householdObj = householdId
+                ? (included || []).find(i => i.type === 'Household' && i.id === householdId)
+                : null;
+            const householdName = householdObj?.attributes?.name || null;
+
+            // ── Spiritual milestones (placeholder — requires custom field mapping) ──
+            const milestones = {
+                salvationDate: null as string | null,
+                baptismDate: null as string | null,
+                isBaptizedAfterSalvation: undefined as boolean | undefined
+            };
+
+            return {
+                id: p.id,
+                churchId,
+                name: `${attrs.first_name} ${attrs.last_name}`,
+                firstName: attrs.first_name || null,
+                lastName: attrs.last_name || null,
+                avatar: attrs.avatar || null,
+                membership: attrs.membership || null,
+                status: attrs.status || null,
+                gender: attrs.gender || null,
+                birthdate: attrs.birthdate || null,
+                anniversary: attrs.anniversary || null,
+                createdAt: attrs.created_at,
+                child: attrs.child ?? false,
+                age,
+                spiritualMilestones: milestones,
+                // ── Households (FIXED) ──────────────────────────────────────────
+                householdId,
+                householdName,
+                // ── Addresses ──────────────────────────────────────────────────
+                addresses: (included || [])
+                    .filter(i => i.type === 'Address' && rels?.addresses?.data?.some((r: any) => r.id === i.id))
+                    .map(a => ({
+                        city: a.attributes.city,
+                        state: a.attributes.state,
+                        zip: a.attributes.zip,
+                        location: a.attributes.location
+                    })),
+                // ── Emails ─────────────────────────────────────────────────────
+                emails: (included || [])
+                    .filter(i => i.type === 'Email' && rels?.emails?.data?.some((r: any) => r.id === i.id))
+                    .map(e => ({
+                        address: e.attributes.address,
+                        location: e.attributes.location,
+                        primary: e.attributes.primary,
+                    })),
+                // checkInCount will be back-filled by syncCheckInCounts()
+                checkInCount: 0,
+            } as PcoPerson;
         }
-
-        // Spiritual Milestones (Try to find in Field Data)
-        let salvationDate: string | null = null;
-        let baptismDate: string | null = null;
-
-        if (rels?.field_data?.data && included) {
-            const fieldDataIds = rels.field_data.data.map((fd: any) => fd.id);
-            const myFieldData = included.filter(i => i.type === 'FieldDatum' && fieldDataIds.includes(i.id));
-            
-            // We need the FieldDefinition to know the name. 
-            // This is complex because FieldDatum links to FieldDefinition.
-            // For this "Universal Sync", fetching all definitions is expensive.
-            // We'll rely on a simplified assumption or skip if too complex.
-            // Actually, PCO returns 'field_definition' in relationships of FieldDatum.
-            // We'd need to include 'field_definitions' in the main fetch to map names.
-            // Let's add 'field_definitions' to include.
-        }
-
-        // Simplified Milestone Logic (Placeholder until we have field mapping UI)
-        // We will just store nulls for now unless we find standard attributes.
-        // Some PCO instances use 'anniversary' for spiritual birthday.
-        
-        const milestones = {
-            salvationDate,
-            baptismDate,
-            isBaptizedAfterSalvation: (salvationDate && baptismDate) ? new Date(baptismDate) > new Date(salvationDate) : undefined
-        };
-
-        return {
-            id: p.id,
-            churchId,
-            name: `${attrs.first_name} ${attrs.last_name}`,
-            avatar: attrs.avatar || null,
-            membership: attrs.membership || null,
-            status: attrs.status || null,
-            gender: attrs.gender || null,
-            birthdate: attrs.birthdate || null,
-            anniversary: attrs.anniversary || null,
-            createdAt: attrs.created_at,
-            child: attrs.child ?? false,
-            age,
-            spiritualMilestones: milestones,
-            addresses: (included || [])
-                .filter(i => i.type === 'Address' && p.relationships?.addresses?.data?.some((r: any) => r.id === i.id))
-                .map(a => ({
-                    city: a.attributes.city,
-                    state: a.attributes.state,
-                    zip: a.attributes.zip,
-                    location: a.attributes.location // Lat/Lng
-                })),
-            householdId: rels?.primary_campus?.data?.id || null // Primary campus is not household, but close enough for grouping if needed. Real household is separate.
-            // PCO API: households are separate. We included 'households'.
-            // relationships.households.data array.
-        } as PcoPerson;
-    });
+    );
 
     if (people.length > 0) {
         await firestore.upsertPeople(people);
     }
     logger.info(`People sync complete`, 'sync', { churchId, count: people.length }, churchId);
+};
+
+/**
+ * Fetches the number of PCO check-ins per person over the last 90 days and
+ * updates each person's `checkInCount` field in Firestore.
+ * This is called AFTER syncPeopleData so person documents already exist.
+ */
+export const syncCheckInCounts = async (churchId: string) => {
+    logger.info('Syncing check-in counts...', 'sync', { churchId }, churchId);
+
+    // PCO returns check-in records newest-first. Fetch last 90 days.
+    const since = new Date();
+    since.setDate(since.getDate() - 90);
+    const sinceStr = since.toISOString().split('T')[0]; // YYYY-MM-DD
+
+    // Aggregate check-in counts by person_id
+    const countMap = new Map<string, number>();
+
+    try {
+        // Fetch all recent check-ins — each record has a `person_id` attribute
+        const checkIns = await fetchAllPages(
+            churchId,
+            `check_ins/v2/check_ins?where[created_at][gte]=${sinceStr}&per_page=100`,
+            (ci: any) => ({
+                personId: ci.attributes?.person_id || ci.relationships?.person?.data?.id || null,
+            })
+        );
+
+        for (const ci of checkIns) {
+            if (!ci.personId) continue;
+            countMap.set(ci.personId, (countMap.get(ci.personId) || 0) + 1);
+        }
+
+        logger.info(`Check-in counts aggregated`, 'sync', {
+            churchId,
+            totalCheckIns: checkIns.length,
+            uniquePeople: countMap.size
+        }, churchId);
+
+        // Batch-update person documents with their check-in count
+        if (countMap.size > 0) {
+            await firestore.updatePeopleCheckInCounts(churchId, Object.fromEntries(countMap));
+        }
+    } catch (e: any) {
+        // Check-ins endpoint may not be accessible with all PCO plans — don't fail the whole sync
+        logger.warn('Could not sync check-in counts (endpoint may be unavailable)', 'sync', { error: e?.message }, churchId);
+    }
+
+    logger.info('Check-in count sync complete', 'sync', { churchId, uniquePeople: countMap.size }, churchId);
 };
 
 export const syncGroupsData = async (churchId: string) => {
