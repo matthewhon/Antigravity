@@ -194,8 +194,9 @@ export const syncPeopleData = async (churchId: string) => {
             const milestones = {
                 salvationDate: null as string | null,
                 baptismDate: null as string | null,
-                isBaptizedAfterSalvation: undefined as boolean | undefined
+                isBaptizedAfterSalvation: null as boolean | null  // null not undefined — Firestore rejects undefined
             };
+
 
             return {
                 id: p.id,
