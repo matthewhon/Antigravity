@@ -192,31 +192,89 @@ async function handleCheckInEvent(data: any, churchId: string) {
 
         await db.collection('check_ins').doc(checkInId).set(record, { merge: true });
         
-        // Update Weekly Attendance Aggregate
-        const date = new Date(attrs.created_at);
-        const day = date.getDay();
-        const diff = date.getDate() - day;
-        const sunday = new Date(date.setDate(diff));
-        const weekKey = `week_${sunday.toISOString().split('T')[0]}`;
+        // Update DAILY attendance aggregate (keyed as daily_churchId_YYYY-MM-DD).
+        // This matches the keys written by syncCheckInsData so the Attendance chart
+        // stays consistent across webhook updates and full syncs.
+        const dateKey = attrs.created_at.split('T')[0]; // YYYY-MM-DD
+        const dailyDocId = `daily_${churchId}_${dateKey}`;
         
-        const weekRef = db.collection('attendance').doc(weekKey);
-        await weekRef.set({
-            id: weekKey,
+        const dailyRef = db.collection('attendance').doc(dailyDocId);
+        await dailyRef.set({
+            id: dailyDocId,
             churchId,
-            date: sunday.toISOString().split('T')[0],
+            date: dateKey,
             count: admin.firestore.FieldValue.increment(1),
             guests: attrs.kind === 'Guest' ? admin.firestore.FieldValue.increment(1) : admin.firestore.FieldValue.increment(0),
-            regulars: attrs.kind !== 'Guest' && attrs.kind !== 'Volunteer' ? admin.firestore.FieldValue.increment(1) : admin.firestore.FieldValue.increment(0),
-            volunteers: attrs.kind === 'Volunteer' ? admin.firestore.FieldValue.increment(1) : admin.firestore.FieldValue.increment(0)
+            regulars: (attrs.kind !== 'Guest' && attrs.kind !== 'Volunteer') ? admin.firestore.FieldValue.increment(1) : admin.firestore.FieldValue.increment(0),
+            volunteers: attrs.kind === 'Volunteer' ? admin.firestore.FieldValue.increment(1) : admin.firestore.FieldValue.increment(0),
+            headcount: 0
         }, { merge: true });
 
-        log.info(`Check-in synced`, 'webhook', { checkInId, eventId, churchId, kind: attrs.kind }, churchId);
+        log.info(`Check-in synced via webhook`, 'webhook', { checkInId, eventId, churchId, kind: attrs.kind }, churchId);
     }
 }
 
 async function handleGroupAttendanceEvent(data: any, churchId: string) {
+    // The webhook payload contains the event (group meeting) that just had attendance recorded.
+    const eventId = data.id;
+    const attrs = data.attributes;
     const groupId = data.relationships?.group?.data?.id;
-    if (groupId) {
-        log.info(`Group attendance updated`, 'webhook', { groupId, churchId }, churchId);
+
+    if (!groupId || !eventId) {
+        log.warn('Group attendance webhook missing groupId or eventId', 'webhook', { churchId });
+        return;
+    }
+
+    try {
+        // The webhook gives us top-level counts directly from the payload attributes
+        const attendanceCount = attrs.attendance_count || 0;
+        const visitorsCount = attrs.visitors_count || 0;
+        const membersCount = Math.max(0, attendanceCount - visitorsCount);
+        const eventDate = attrs.starts_at || attrs.created_at || new Date().toISOString();
+
+        // Build the attendance history entry
+        const newEntry = {
+            eventId: String(eventId),
+            date: eventDate,
+            count: attendanceCount,
+            members: membersCount,
+            visitors: visitorsCount,
+            attendeeIds: [] as string[]
+        };
+
+        // Fetch the current group document from Firestore
+        const groupDocId = `${churchId}_${groupId}`;
+        const groupRef = db.collection('groups').doc(groupDocId);
+        const groupDoc = await groupRef.get();
+
+        if (!groupDoc.exists) {
+            log.warn(`Group doc not found for webhook update — will be created on next sync`, 'webhook', { groupId, churchId });
+            return;
+        }
+
+        const groupData = groupDoc.data()!;
+        const history: any[] = Array.isArray(groupData.attendanceHistory) ? groupData.attendanceHistory : [];
+
+        // Replace existing entry for this event (if re-submitted) or append
+        const existingIdx = history.findIndex(h => h.eventId === String(eventId));
+        if (existingIdx >= 0) {
+            history[existingIdx] = newEntry;
+        } else {
+            history.push(newEntry);
+        }
+
+        // Keep history sorted newest-first and cap to last 104 entries (~2 years of weekly meetings)
+        history.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        const trimmedHistory = history.slice(0, 104);
+
+        await groupRef.set({ attendanceHistory: trimmedHistory, lastUpdated: Date.now() }, { merge: true });
+
+        log.info(`Group attendance synced via webhook`, 'webhook', {
+            groupId, eventId, churchId,
+            members: membersCount, visitors: visitorsCount
+        }, churchId);
+
+    } catch (err: any) {
+        log.error(`Failed to handle group attendance webhook`, 'webhook', { groupId, eventId, churchId, error: err?.message }, churchId);
     }
 }

@@ -64,6 +64,9 @@ export const initializeWebhooks = async (churchId: string) => {
         'people.v2.events.person.updated',
         'giving.v2.events.donation.created',
         'services.v2.events.plan_person.updated',
+        // Real-time incremental sync — avoids full re-syncs after first load
+        'check_ins.v2.events.check_in.created',
+        'groups.v2.events.group_attendance.created',
     ];
 
     console.log(`[Webhooks] Initializing subscriptions → ${webhookUrl}`);

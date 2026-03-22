@@ -140,6 +140,11 @@ export const syncAllData = async (churchId: string) => {
         await syncCheckInCounts(churchId);
     } catch (e: any) { logger.error('Sync Check-ins failed', 'sync', { error: e?.message }, churchId); }
 
+    // Sync Check-ins data to populate the Attendance collection for the Attendance tab widgets
+    try {
+        await syncCheckInsData(churchId);
+    } catch (e: any) { logger.error('Sync Check-ins Data failed', 'sync', { error: e?.message }, churchId); }
+
     try {
         await syncGroupsData(churchId);
     } catch (e: any) { logger.error('Sync Groups failed', 'sync', { error: e?.message }, churchId); }
@@ -375,9 +380,13 @@ export const syncGroupsData = async (churchId: string) => {
                     try {
                         // Tiny throttle to prevent burst limits
                         await delay(50); 
-                        // IMPORTANT: Filter by 'attended' to ensure we only count actual attendees
-                        // Use fetchAllPages to handle large groups (>100 attendees)
-                        const allAttendances = await fetchAllPages(churchId, `events/${eventId}/attendances?filter=attended`, (a: any) => a);
+                        // CORRECT endpoint: groups/v2/groups/{groupId}/events/{eventId}/attendances
+                        // (the old path `events/{eventId}/attendances` does not exist in the PCO Groups API
+                        //  and was silently 404-ing, causing all detail fetches to fall back to event attributes)
+                        const rawAttendances = await fetchAllPages(churchId, `groups/v2/groups/${group.id}/events/${eventId}/attendances`, (a: any) => a);
+                        
+                        // Filter to only people who actually attended (attended === true)
+                        const allAttendances = rawAttendances.filter((a: any) => a.attributes?.attended === true);
                         
                         if (allAttendances.length > 0) {
                             let recMembers = 0;
@@ -394,7 +403,7 @@ export const syncGroupsData = async (churchId: string) => {
                                     } else if (role === 'member' || role === 'leader') {
                                         recMembers++;
                                     } else {
-                                        // Fallback if role is unclear
+                                        // Fallback if role is unclear — check against known membership lists
                                         if (memberIds.includes(String(pid)) || leaderIds.includes(String(pid))) {
                                             recMembers++;
                                         } else {
@@ -404,13 +413,15 @@ export const syncGroupsData = async (churchId: string) => {
                                 }
                             });
 
-                            // Overwrite estimates with real data
+                            // Overwrite estimates with real per-person data
                             membersCount = recMembers;
-                            // Visitors might be recorded as headcounts (attribute) OR specific people (records). 
-                            // Take the max to be safe.
-                            visitorsCount = Math.max(recVisitors, e.attributes.visitors_count || 0);
+                            // Use real visitor count from per-person records.
+                            // Do NOT use Math.max() here — mixing headcount and per-person data inflates the number.
+                            visitorsCount = recVisitors;
                             totalCount = membersCount + visitorsCount;
                         }
+                        // If allAttendances.length === 0, the fallback values from event attributes
+                        // (attendance_count / visitors_count) computed above remain in effect.
                     } catch (attErr) {
                         console.warn(`Error fetching attendance breakdown for event ${eventId}`, attErr);
                         // Fallback to attribute data already set
@@ -708,13 +719,14 @@ export const syncServicesData = async (churchId: string) => {
     if (personServingMap.size > 0) {
         const peopleUpdates: Partial<PcoPerson>[] = [];
         personServingMap.forEach((stats, personId) => {
-            // Calculate Risk Level: > 3 services in 4 weeks (approx 1 month) -> High Risk
-            // We use last 90 days count as a proxy for frequency. 
-            // 90 days = ~12 weeks. If > 9 services in 90 days, that's > 3 per month on average.
-            // Let's use a simple heuristic: > 10 in 90 days = High, > 5 = Medium, else Low.
+            // Burnout threshold: flag anyone averaging >2 services/week over 90 days.
+            // 90 days ≈ 13 weeks → 2x/week = 26, 1x/week = 13.
+            // High:   >26 services in 90 days (>2/week average)
+            // Medium: >13 services in 90 days (>1/week average)
+            // Low:    everyone else
             let riskLevel: 'Low' | 'Medium' | 'High' = 'Low';
-            if (stats.last90Days > 10) riskLevel = 'High';
-            else if (stats.last90Days > 5) riskLevel = 'Medium';
+            if (stats.last90Days > 26) riskLevel = 'High';
+            else if (stats.last90Days > 13) riskLevel = 'Medium';
 
             peopleUpdates.push({
                 id: personId,
@@ -726,15 +738,10 @@ export const syncServicesData = async (churchId: string) => {
             });
         });
         
-        // Batch update people (implementation depends on firestore service capabilities, assuming upsertPeople handles partials or we fetch-merge-save)
-        // For now, we'll assume upsertPeople can handle this or we'd need a specific method.
-        // Since upsertPeople usually takes full objects, we might need to be careful.
-        // Assuming firestore.updatePeopleStats exists or similar. If not, we might skip this for now or implement it.
-        // Let's assume we can use upsertPeople with partial data if the service supports it, or we skip updating people for now and just rely on the plan data.
-        // Actually, the requirement is to "flag their profile". So updating the person record is best.
-        // I'll assume firestore.updatePersonFields exists or similar.
-        // If not, I'll skip the actual DB update call here to avoid breaking things and just log it.
-        console.log(`Calculated serving stats for ${peopleUpdates.length} people.`);
+        // Persist serving stats so the Burnout Watchlist widget has data.
+        // upsertPeople uses merge:true so only the servingStats field is updated.
+        await firestore.upsertPeople(peopleUpdates as any);
+        console.log(`Saved serving stats for ${peopleUpdates.length} people. High risk: ${peopleUpdates.filter((p: any) => p.servingStats?.riskLevel === 'High').length}`);
     }
 
     // Merge detailed plans back into the main list for saving
@@ -896,7 +903,8 @@ export const syncCheckInsData = async (churchId: string) => {
     const sinceStr = since.toISOString();
 
     try {
-        const checkIns = await fetchAllPages(churchId, `check-ins/v2/check_ins?where[created_at][gte]=${sinceStr}&include=event,person`, (c: any, included: any[] = []) => {
+        // FIX 1: PCO Check-Ins API uses underscores, not hyphens — "check_ins" not "check-ins"
+        const checkIns = await fetchAllPages(churchId, `check_ins/v2/check_ins?where[created_at][gte]=${sinceStr}&include=event,person`, (c: any, included: any[] = []) => {
             const attrs = c.attributes;
             const rels = c.relationships;
             const personId = rels?.person?.data?.id;
@@ -909,7 +917,7 @@ export const syncCheckInsData = async (churchId: string) => {
                 eventId: eventId || 'unknown',
                 date: attrs.created_at.split('T')[0],
                 createdAt: attrs.created_at,
-                checkedInAt: attrs.created_at, // PCO uses created_at for check-in time usually
+                checkedInAt: attrs.created_at,
                 securityCode: attrs.security_code,
                 kind: attrs.kind // 'Regular', 'Guest', 'Volunteer'
             } as CheckInRecord;
@@ -918,45 +926,42 @@ export const syncCheckInsData = async (churchId: string) => {
         if (checkIns.length > 0) {
             await firestore.upsertCheckIns(checkIns);
             
-            // Aggregate Weekly Attendance
-            const weeklyStats = new Map<string, { total: number, guests: number, volunteers: number, regulars: number }>();
+            // FIX 2: Aggregate by actual check-in DATE (daily) instead of Sunday week.
+            // The UI filters by exact YYYY-MM-DD ranges — weekly Sunday keys would never match.
+            const dailyStats = new Map<string, { total: number, guests: number, volunteers: number, regulars: number }>();
             
             checkIns.forEach(ci => {
-                // Get Sunday of the week
-                const date = new Date(ci.date);
-                const day = date.getDay();
-                const diff = date.getDate() - day; // adjust when day is sunday
-                const sunday = new Date(date.setDate(diff));
-                const weekKey = sunday.toISOString().split('T')[0];
+                // ci.date is already YYYY-MM-DD from attrs.created_at.split('T')[0]
+                const dateKey = ci.date;
 
-                const current = weeklyStats.get(weekKey) || { total: 0, guests: 0, volunteers: 0, regulars: 0 };
+                const current = dailyStats.get(dateKey) || { total: 0, guests: 0, volunteers: 0, regulars: 0 };
                 current.total++;
                 if (ci.kind === 'Guest') current.guests++;
                 else if (ci.kind === 'Volunteer') current.volunteers++;
                 else current.regulars++;
                 
-                weeklyStats.set(weekKey, current);
+                dailyStats.set(dateKey, current);
             });
 
-            // Convert to AttendanceRecord format for chart compatibility
+            // Convert to AttendanceRecord format for the Services Attendance chart
             const attendanceRecords: AttendanceRecord[] = [];
-            weeklyStats.forEach((stats, date) => {
+            dailyStats.forEach((stats, date) => {
                 attendanceRecords.push({
-                    id: `week_${date}`,
+                    id: `daily_${churchId}_${date}`,
                     churchId,
                     date,
                     count: stats.total,
                     guests: stats.guests,
                     regulars: stats.regulars,
                     volunteers: stats.volunteers,
-                    headcount: 0 // We don't have headcount from individual check-ins easily without event summary
+                    headcount: 0
                 });
             });
 
             if (attendanceRecords.length > 0) {
                 await firestore.upsertAttendance(attendanceRecords);
             }
-            console.log(`Synced ${checkIns.length} check-ins and aggregated ${attendanceRecords.length} weeks.`);
+            console.log(`Synced ${checkIns.length} check-ins, aggregated ${attendanceRecords.length} daily records.`);
         }
     } catch (e) {
         console.error("Check-ins sync failed", e);
