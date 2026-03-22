@@ -526,6 +526,21 @@ class FirestoreService {
 
   // --- Data Mutation (Batch Upserts) ---
 
+  /**
+   * Recursively replaces all `undefined` values with `null` so Firestore doesn't
+   * reject the entire WriteBatch with "Unsupported field value: undefined".
+   */
+  private deepSanitize(obj: any): any {
+      if (obj === undefined) return null;
+      if (obj === null || typeof obj !== 'object') return obj;
+      if (Array.isArray(obj)) return obj.map(item => this.deepSanitize(item));
+      const sanitized: Record<string, any> = {};
+      for (const [key, value] of Object.entries(obj)) {
+          sanitized[key] = this.deepSanitize(value);
+      }
+      return sanitized;
+  }
+
   async upsertPeople(records: PcoPerson[]) { await this.batchUpsert('people', records); }
   async upsertGroups(records: PcoGroup[]) { await this.batchUpsert('groups', records); }
   async upsertAttendance(records: AttendanceRecord[]) { await this.batchUpsert('attendance', records); }
@@ -545,7 +560,9 @@ class FirestoreService {
       let count = 0;
       for (const record of records) {
         const ref = doc(db, collectionName, record.id);
-        batch.set(ref, record, { merge: true });
+        // Sanitize: Firestore rejects undefined values — convert all to null
+        const safe = this.deepSanitize(record);
+        batch.set(ref, safe, { merge: true });
         count++;
         if (count >= 450) {
             await batch.commit();
@@ -558,6 +575,7 @@ class FirestoreService {
       this.handleFirestoreError(e);
     }
   }
+
 
   // --- System Settings & Benchmarks ---
 
