@@ -1,113 +1,1124 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { EmailBuilder } from './EmailBuilder';
+import { EmailBlock } from './EmailBuilder';
 import { TemplateSettingsEditor } from './TemplateSettingsEditor';
 import { EmailPreview } from './EmailPreview';
-import { EmailBlock } from './EmailBuilder';
-import { TemplateSettings } from '../types';
 import { Drawer } from './Drawer';
 import { pcoService } from '../services/pcoService';
+import { firestore } from '../services/firestoreService';
 import { DataChartSelector } from './DataChartSelector';
-import { TextEditorDrawer } from './TextEditorDrawer';
-import { MediaEditorDrawer } from './MediaEditorDrawer';
 
-export const CommunicationModule: React.FC<{ churchId: string }> = ({ churchId }) => {
-  const [blocks, setBlocks] = useState<EmailBlock[]>([]);
-  const [settings, setSettings] = useState<TemplateSettings>({
-    primaryColor: '#4f46e5',
-    textColor: '#1f2937',
-    backgroundColor: '#ffffff',
-    linkColor: '#2563eb',
-    fontFamily: 'sans-serif',
-    header: 'My Newsletter',
-    footer: '© 2026 Church Name'
-  });
-  const [isSettingsDrawerOpen, setIsSettingsDrawerOpen] = useState(false);
-  const [isPcoDrawerOpen, setIsPcoDrawerOpen] = useState(false);
-  const [isPastoralCareDrawerOpen, setIsPastoralCareDrawerOpen] = useState(false);
-  const [isDataChartDrawerOpen, setIsDataChartDrawerOpen] = useState(false);
-  const [isTextEditorOpen, setIsTextEditorOpen] = useState(false);
-  const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
+import { PcoImportModal } from './PcoImportModal';
+import { EmailCampaign, TemplateSettings, PcoList } from '../types';
+import {
+  Mail, Plus, ChevronDown, ChevronUp, CheckCircle, Circle, Send,
+  Clock, Users, AtSign, FileText, AlignLeft, Calendar, ArrowLeft,
+  Trash2, Eye, Pencil, Loader2, X
+} from 'lucide-react';
 
-  const handleEditBlock = (id: string) => {
-    setEditingBlockId(id);
-    setIsTextEditorOpen(true);
+// ─── Helpers ───────────────────────────────────────────────────────────────
+
+const DEFAULT_TEMPLATE: TemplateSettings = {
+  primaryColor: '#4f46e5',
+  textColor: '#1f2937',
+  backgroundColor: '#ffffff',
+  linkColor: '#2563eb',
+  fontFamily: 'sans-serif',
+  header: 'Church Newsletter',
+  footer: '© 2026 Church Name · Unsubscribe'
+};
+
+const newCampaign = (churchId: string, name: string): EmailCampaign => ({
+  id: `email_${Date.now()}`,
+  churchId,
+  name,
+  status: 'draft',
+  subject: name,
+  blocks: [],
+  templateSettings: DEFAULT_TEMPLATE,
+  createdAt: Date.now(),
+  updatedAt: Date.now()
+});
+
+const STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  draft:     { label: 'Draft',     color: 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300' },
+  scheduled: { label: 'Scheduled', color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' },
+  sent:      { label: 'Sent',      color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' },
+  failed:    { label: 'Failed',    color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
+};
+
+// ─── Sub-components ─────────────────────────────────────────────────────────
+
+interface AccordionSectionProps {
+  id: string;
+  title: string;
+  subtitle: string;
+  icon: React.ReactNode;
+  isComplete: boolean;
+  isOpen: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}
+
+const AccordionSection: React.FC<AccordionSectionProps> = ({
+  title, subtitle, icon: _icon, isComplete, isOpen, onToggle, children
+}) => (
+  <div className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden mb-3">
+    <button
+      className="w-full flex items-center gap-3 p-4 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 transition text-left"
+      onClick={onToggle}
+    >
+      {isComplete
+        ? <CheckCircle size={20} className="text-emerald-500 shrink-0" />
+        : <Circle size={20} className="text-slate-300 dark:text-slate-600 shrink-0" />
+      }
+      <div className="flex-grow">
+        <div className="font-semibold text-sm text-slate-900 dark:text-slate-100">{title}</div>
+        <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{subtitle}</div>
+      </div>
+      {isOpen
+        ? <ChevronUp size={16} className="text-slate-400 shrink-0" />
+        : <ChevronDown size={16} className="text-slate-400 shrink-0" />
+      }
+    </button>
+    {isOpen && (
+      <div className="border-t border-slate-200 dark:border-slate-700 p-4 bg-white dark:bg-slate-800">
+        {children}
+      </div>
+    )}
+  </div>
+);
+
+// ─── Campaign Preview Modal ──────────────────────────────────────────────────
+
+const CampaignPreviewModal: React.FC<{ campaign: EmailCampaign; onClose: () => void }> = ({ campaign, onClose }) => {
+  const blocks = (campaign.blocks || []) as EmailBlock[];
+  const settings: TemplateSettings = campaign.templateSettings || DEFAULT_TEMPLATE;
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div
+        className="relative flex flex-col w-full max-w-2xl mx-auto my-8 flex-1 max-h-[calc(100vh-4rem)] rounded-2xl shadow-2xl overflow-hidden bg-white dark:bg-slate-900"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shrink-0">
+          <div className="min-w-0">
+            <p className="font-bold text-slate-900 dark:text-white text-sm truncate">{campaign.subject || campaign.name}</p>
+            {campaign.fromName && (
+              <p className="text-xs text-slate-400 dark:text-slate-500 truncate">
+                From: {campaign.fromName} &lt;{campaign.fromEmail}&gt;
+              </p>
+            )}
+          </div>
+          <button
+            onClick={onClose}
+            className="ml-4 p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition shrink-0"
+          >
+            <X size={18} />
+          </button>
+        </div>
+        {/* Scrollable preview body */}
+        <div className="flex-1 overflow-y-auto bg-slate-100 dark:bg-slate-950 p-4">
+          {blocks.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-40 text-slate-400">
+              <Mail size={32} className="mb-2 opacity-40" />
+              <p className="text-sm">No content blocks yet</p>
+            </div>
+          ) : (
+            <div className="rounded-xl overflow-hidden shadow-lg">
+              <EmailPreview blocks={blocks} settings={settings} />
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── Schedule Modal ───────────────────────────────────────────────────────────
+
+const ScheduleModal: React.FC<{
+  onConfirm: (scheduledAt: number) => void;
+  onCancel: () => void;
+  isScheduling: boolean;
+}> = ({ onConfirm, onCancel, isScheduling }) => {
+  // Default to tomorrow at 9am local time
+  const defaultDt = () => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    d.setHours(9, 0, 0, 0);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   };
+  const [dateTime, setDateTime] = useState(defaultDt);
 
-  const importPcoItem = async (type: 'pco_group' | 'pco_registration' | 'pco_event') => {
-    let items: any[] = [];
-    if (type === 'pco_group') items = await pcoService.getGroups(churchId);
-    else if (type === 'pco_registration') items = await pcoService.getRegistrations(churchId);
-    else if (type === 'pco_event') items = await pcoService.getEvents(churchId);
-    
-    if (items.length > 0) {
-        const newBlock: EmailBlock = { id: Date.now().toString(), type, content: { name: items[0].attributes.name } };
-        setBlocks([...blocks, newBlock]);
+  const handleConfirm = () => {
+    const ts = new Date(dateTime).getTime();
+    if (isNaN(ts) || ts <= Date.now()) {
+      alert('Please choose a time in the future.');
+      return;
     }
-    setIsPcoDrawerOpen(false);
+    onConfirm(ts);
   };
 
   return (
-    <div className="p-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onCancel}>
+      <div
+        className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4"
+        onClick={e => e.stopPropagation()}
+      >
+        <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1 flex items-center gap-2">
+          <Clock size={16} className="text-amber-500" /> Schedule Email
+        </h3>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+          Analytics widgets will automatically refresh with live data before sending.
+        </p>
+        <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Send Date &amp; Time</label>
+        <input
+          type="datetime-local"
+          value={dateTime}
+          onChange={e => setDateTime(e.target.value)}
+          min={new Date().toISOString().slice(0, 16)}
+          className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500 mb-4"
+        />
+        <div className="flex gap-2">
+          <button
+            onClick={onCancel}
+            className="flex-1 py-2 text-sm text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition font-medium"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleConfirm}
+            disabled={isScheduling}
+            className="flex-1 flex items-center justify-center gap-2 py-2 text-sm font-semibold bg-amber-500 hover:bg-amber-600 disabled:bg-amber-300 text-white rounded-xl transition"
+          >
+            {isScheduling ? <><Loader2 size={13} className="animate-spin" /> Scheduling…</> : <><Calendar size={13} /> Schedule</>}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
+interface CampaignListViewProps {
+  churchId: string;
+  campaigns: EmailCampaign[];
+  isLoading: boolean;
+  onOpen: (c: EmailCampaign) => void;
+  onPreview: (c: EmailCampaign) => void;
+  onDelete: (id: string) => void;
+  onCreate: () => void;
+}
+
+const CampaignListView: React.FC<CampaignListViewProps> = ({
+  campaigns, isLoading, onOpen, onPreview, onDelete, onCreate
+}) => {
+  const [tab, setTab] = React.useState<'all' | 'draft' | 'sent'>('all');
+  const filtered = tab === 'all' ? campaigns : campaigns.filter(c => c.status === tab);
+  const counts = {
+    all: campaigns.length,
+    draft: campaigns.filter(c => c.status === 'draft' || c.status === 'scheduled').length,
+    sent: campaigns.filter(c => c.status === 'sent').length,
+  };
+
+  return (
+    <div className="p-6 max-w-4xl mx-auto">
+      {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Communication Module</h1>
-      </div>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <EmailBuilder 
-            blocks={blocks} 
-            setBlocks={setBlocks} 
-            onImportPco={() => setIsPcoDrawerOpen(true)}
-            onOpenPastoralCare={() => setIsPastoralCareDrawerOpen(true)}
-            onOpenDataChart={() => setIsDataChartDrawerOpen(true)}
-            onOpenSettings={() => setIsSettingsDrawerOpen(true)}
-            onEditBlock={handleEditBlock}
-          />
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
+            <Mail size={26} className="text-indigo-500" /> Emails
+          </h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+            Create and send emails to your Planning Center audience
+          </p>
         </div>
-        <div className="lg:col-span-1">
-          <div className="sticky top-6">
-            <h2 className="text-lg font-semibold mb-4">Preview</h2>
-            <EmailPreview blocks={blocks} settings={settings} />
+        <button
+          onClick={onCreate}
+          className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition shadow-sm"
+        >
+          <Plus size={16} /> Create New
+        </button>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl mb-5 w-fit">
+        {(['all', 'draft', 'sent'] as const).map(t => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium transition ${
+              tab === t
+                ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
+                : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
+            }`}
+          >
+            {t === 'all' ? 'All' : t === 'draft' ? 'Drafts' : 'Sent'}
+            <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${
+              tab === t ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-300' : 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
+            }`}>{counts[t]}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Campaign list */}
+      {isLoading ? (
+        <div className="flex items-center justify-center h-40 text-slate-400">
+          <Loader2 size={24} className="animate-spin mr-2" /> Loading campaigns…
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-20 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
+          <Mail size={40} className="mx-auto text-slate-300 dark:text-slate-600 mb-3" />
+          <p className="text-slate-600 dark:text-slate-400 font-medium">
+            {tab === 'sent' ? 'No sent emails yet' : tab === 'draft' ? 'No drafts' : 'No email campaigns yet'}
+          </p>
+          {tab !== 'sent' && (
+            <>
+              <p className="text-sm text-slate-400 dark:text-slate-500 mt-1 mb-4">Create your first email to get started</p>
+              <button onClick={onCreate} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition">
+                <span className="flex items-center gap-1.5"><Plus size={14} /> Create New</span>
+              </button>
+            </>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map(c => {
+            const statusInfo = STATUS_LABELS[c.status] || STATUS_LABELS.draft;
+            return (
+              <div
+                key={c.id}
+                className="flex items-center gap-4 p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:border-indigo-300 dark:hover:border-indigo-600 transition cursor-pointer group"
+                onClick={() => onOpen(c)}
+              >
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center shrink-0">
+                  <Mail size={18} className="text-indigo-500" />
+                </div>
+                <div className="flex-grow min-w-0">
+                  <div className="font-semibold text-slate-900 dark:text-white truncate">{c.name}</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 flex flex-wrap gap-x-2">
+                    <span>{c.subject ? `"${c.subject}"` : 'No subject'}</span>
+                    {c.toListName && <span>· To: {c.toListName}</span>}
+                    <span>· {(c.blocks?.length || 0)} block{(c.blocks?.length || 0) !== 1 ? 's' : ''}</span>
+                    {c.status === 'sent' && c.sentAt && (
+                      <span className="text-emerald-600 dark:text-emerald-400">
+                        · Sent {new Date(c.sentAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </span>
+                    )}
+                    {c.status === 'scheduled' && c.scheduledAt && (
+                      <span className="text-amber-600 dark:text-amber-400">
+                        · Scheduled for {new Date(c.scheduledAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                      </span>
+                    )}
+                    {c.status === 'failed' && c.lastError && (
+                      <span className="text-red-500" title={c.lastError}>· Failed</span>
+                    )}
+                  </div>
+                </div>
+                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full shrink-0 ${statusInfo.color}`}>
+                  {statusInfo.label}
+                </span>
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition shrink-0">
+                  <button
+                    onClick={e => { e.stopPropagation(); onPreview(c); }}
+                    className="p-1.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                    title="Preview"
+                  >
+                    <Eye size={14} />
+                  </button>
+                  <button
+                    onClick={e => { e.stopPropagation(); onOpen(c); }}
+                    className="p-1.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                    title="Edit"
+                  >
+                    <Pencil size={14} />
+                  </button>
+                  <button
+                    onClick={e => { e.stopPropagation(); onDelete(c.id); }}
+                    className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition"
+                    title="Delete"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── Email Editor View ───────────────────────────────────────────────────────
+
+type EditorPanel = 'config' | 'builder' | 'preview';
+
+interface EmailEditorProps {
+  campaign: EmailCampaign;
+  churchId: string;
+  onBack: () => void;
+  onSave: (updates: Partial<EmailCampaign>) => void;
+  onSend: () => void;
+  onSendTest: () => void;
+  onSchedule: () => void;
+  isSending: boolean;
+  isScheduled: boolean;
+}
+
+const EmailEditor: React.FC<EmailEditorProps> = ({
+  campaign, churchId, onBack, onSave, onSend, onSendTest, onSchedule, isSending, isScheduled
+}) => {
+  const [localCampaign, setLocalCampaign] = useState<EmailCampaign>(campaign);
+  const [panel, setPanel] = useState<EditorPanel>('config');
+  const [openSection, setOpenSection] = useState<string | null>('to');
+  const [pcoLists, setPcoLists] = useState<PcoList[]>([]);
+  const [loadingLists, setLoadingLists] = useState(false);
+  const [lastSaved, setLastSaved] = useState<number | null>(null);
+
+  // Drawers (for block builder internals)
+  const [isSettingsDrawerOpen, setIsSettingsDrawerOpen] = useState(false);
+  const [isPcoDrawerOpen, setIsPcoDrawerOpen] = useState(false);
+  const [isDataChartDrawerOpen, setIsDataChartDrawerOpen] = useState(false);
+  const [isPastoralCareDrawerOpen, setIsPastoralCareDrawerOpen] = useState(false);
+
+  // Keep onSave ref up to date to avoid stale closure in update callback
+  const onSaveRef = React.useRef(onSave);
+  React.useEffect(() => { onSaveRef.current = onSave; }, [onSave]);
+
+  // Auto-save on change — uses ref so setBlocks never captures stale onSave
+  const update = useCallback((patch: Partial<EmailCampaign>) => {
+    setLocalCampaign(prev => ({ ...prev, ...patch, updatedAt: Date.now() }));
+    onSaveRef.current(patch);
+    setLastSaved(Date.now());
+  }, []); // stable — never re-created
+
+  // Load PCO Lists when "To" section is opened
+  useEffect(() => {
+    if (openSection === 'to' && pcoLists.length === 0) {
+      setLoadingLists(true);
+      pcoService.getPeopleLists(churchId).then(raw => {
+        const mapped: PcoList[] = (raw || []).map((item: any) => ({
+          id: item.id,
+          name: item.attributes?.name || 'Unnamed List',
+          totalPeople: item.attributes?.total_people || 0,
+          status: item.attributes?.status || 'active'
+        }));
+        setPcoLists(mapped);
+        setLoadingLists(false);
+      }).catch(() => setLoadingLists(false));
+    }
+  }, [openSection, churchId, pcoLists.length]);
+
+  const toggleSection = (id: string) => setOpenSection(prev => prev === id ? null : id);
+
+  const isToComplete = !!(localCampaign.toListId || localCampaign.toListName);
+  const isFromComplete = !!(localCampaign.fromName && localCampaign.fromEmail);
+  const isSubjectComplete = !!(localCampaign.subject?.trim());
+  const isSendTimeComplete = !!(localCampaign.sendAt !== undefined);
+  const isContentComplete = (localCampaign.blocks?.length || 0) > 0;
+  const canSend = isFromComplete && isSubjectComplete;
+
+  const scheduleMode = localCampaign.sendAt === null ? 'now' : 'schedule';
+
+  const handlePcoInsert = (newBlocks: EmailBlock[]) => {
+    const mergedBlocks = [...(localCampaign.blocks || []) as EmailBlock[], ...newBlocks];
+    update({ blocks: mergedBlocks });
+    setIsPcoDrawerOpen(false);
+  };
+
+  const blocks = (localCampaign.blocks || []) as EmailBlock[];
+  const setBlocks = (fn: React.SetStateAction<EmailBlock[]>) => {
+    const newBlocks = typeof fn === 'function' ? fn(blocks) : fn;
+    update({ blocks: newBlocks });
+  };
+
+  const settings: TemplateSettings = localCampaign.templateSettings || DEFAULT_TEMPLATE;
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* ─── Header Bar ─── */}
+      <div className="flex items-center justify-between px-6 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shrink-0">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onBack}
+            className="p-1.5 rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+          >
+            <ArrowLeft size={18} />
+          </button>
+          <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+            <span className="font-medium cursor-pointer hover:text-indigo-600" onClick={onBack}>Emails</span>
+            <ChevronDown size={14} className="-rotate-90" />
+            <span className="font-semibold text-slate-900 dark:text-white">{localCampaign.name}</span>
           </div>
+          {lastSaved && (
+            <span className="text-[10px] font-medium text-emerald-500 flex items-center gap-1">
+              <CheckCircle size={11} /> Saved
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {/* Panel tabs */}
+          <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-1 mr-2">
+            {(['config', 'builder', 'preview'] as EditorPanel[]).map(p => (
+              <button
+                key={p}
+                onClick={() => setPanel(p)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition flex items-center gap-1.5 ${
+                  panel === p
+                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
+                }`}
+              >
+                {p === 'config' && <AlignLeft size={12} />}
+                {p === 'builder' && <Pencil size={12} />}
+                {p === 'preview' && <Eye size={12} />}
+                {p}
+              </button>
+            ))}
+          </div>
+          <button
+            className="px-3 py-2 text-sm text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition font-medium"
+            onClick={onSendTest}
+          >
+            Send Test
+          </button>
+          {/* Schedule button */}
+          {!isScheduled && (
+            <button
+              onClick={onSchedule}
+              disabled={!canSend || isSending}
+              className={`flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-xl transition border ${
+                canSend && !isSending
+                  ? 'border-amber-400 text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/40'
+                  : 'border-slate-200 dark:border-slate-700 text-slate-400 cursor-not-allowed'
+              }`}
+            >
+              <Clock size={14} /> Schedule
+            </button>
+          )}
+          {/* Send Now button */}
+          <button
+            onClick={onSend}
+            disabled={!canSend || isSending}
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl transition ${
+              canSend && !isSending
+                ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm'
+                : 'bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-500 cursor-not-allowed'
+            }`}
+          >
+            {isSending ? (
+              <><Loader2 size={14} className="animate-spin" /> Sending…</>
+            ) : isScheduled ? (
+              <><Send size={14} /> Send Now Instead</>
+            ) : (
+              <><Send size={14} /> Send Now</>
+            )}
+          </button>
         </div>
       </div>
 
+      {/* ─── Body ─── */}
+      <div className="flex flex-1 overflow-hidden">
+
+        {/* Config Panel */}
+        {panel === 'config' && (
+          <div className="flex flex-1 overflow-hidden">
+            {/* Config accordion */}
+            <div className="w-[460px] shrink-0 overflow-y-auto p-6 border-r border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
+
+              {/* To */}
+              <AccordionSection
+                id="to" title="To" icon={<Users size={16} />}
+                subtitle={isToComplete ? (localCampaign.toListName || localCampaign.toListId || '') : 'No recipients selected'}
+                isComplete={isToComplete} isOpen={openSection === 'to'} onToggle={() => toggleSection('to')}
+              >
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+                  Select a Planning Center list as your audience. Unsubscribed individuals are automatically excluded.
+                </p>
+                {loadingLists ? (
+                  <div className="flex items-center gap-2 text-sm text-slate-400">
+                    <Loader2 size={14} className="animate-spin" /> Loading PCO Lists…
+                  </div>
+                ) : (
+                  <select
+                    className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-3"
+                    value={localCampaign.toListId || ''}
+                    onChange={e => {
+                      const selected = pcoLists.find(l => l.id === e.target.value);
+                      update({
+                        toListId: selected?.id,
+                        toListName: selected?.name
+                      });
+                    }}
+                  >
+                    <option value="">— Select a PCO List —</option>
+                    {pcoLists.length === 0 && <option disabled>No lists found (connect PCO first)</option>}
+                    {pcoLists.map(l => (
+                      <option key={l.id} value={l.id}>{l.name} ({l.totalPeople} people)</option>
+                    ))}
+                  </select>
+                )}
+                {isToComplete && (
+                  <div className="flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400">
+                    <CheckCircle size={13} /> {localCampaign.toListName} selected
+                  </div>
+                )}
+              </AccordionSection>
+
+              {/* From */}
+              <AccordionSection
+                id="from" title="From" icon={<AtSign size={16} />}
+                subtitle={isFromComplete
+                  ? `${localCampaign.fromName} <${localCampaign.fromEmail}>`
+                  : 'No sender information'}
+                isComplete={isFromComplete} isOpen={openSection === 'from'} onToggle={() => toggleSection('from')}
+              >
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">From Name</label>
+                    <input
+                      type="text"
+                      className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      placeholder="Pastor John Smith"
+                      value={localCampaign.fromName || ''}
+                      onChange={e => update({ fromName: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">From Email</label>
+                    <input
+                      type="email"
+                      className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      placeholder="pastor@mychurch.org"
+                      value={localCampaign.fromEmail || ''}
+                      onChange={e => update({ fromEmail: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Reply-To (optional)</label>
+                    <input
+                      type="email"
+                      className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      placeholder="replies@mychurch.org"
+                      value={localCampaign.replyTo || ''}
+                      onChange={e => update({ replyTo: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </AccordionSection>
+
+              {/* Subject */}
+              <AccordionSection
+                id="subject" title="Subject" icon={<FileText size={16} />}
+                subtitle={isSubjectComplete ? localCampaign.subject! : 'No subject line'}
+                isComplete={isSubjectComplete} isOpen={openSection === 'subject'} onToggle={() => toggleSection('subject')}
+              >
+                <input
+                  type="text"
+                  className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="Enter email subject…"
+                  value={localCampaign.subject || ''}
+                  onChange={e => update({ subject: e.target.value })}
+                />
+              </AccordionSection>
+
+              {/* Send Time */}
+              <AccordionSection
+                id="sendTime" title="Send Time" icon={<Clock size={16} />}
+                subtitle={
+                  scheduleMode === 'now'
+                    ? 'Send immediately'
+                    : localCampaign.sendAt
+                      ? new Date(localCampaign.sendAt).toLocaleString()
+                      : 'Choose when to send'
+                }
+                isComplete={isSendTimeComplete} isOpen={openSection === 'sendTime'} onToggle={() => toggleSection('sendTime')}
+              >
+                <div className="flex rounded-xl overflow-hidden border border-slate-200 dark:border-slate-600 mb-4">
+                  {(['now', 'schedule'] as const).map(mode => (
+                    <button
+                      key={mode}
+                      onClick={() => update({ sendAt: mode === 'now' ? null : new Date(Date.now() + 3600000).toISOString() })}
+                      className={`flex-1 py-2 text-sm font-semibold capitalize transition ${
+                        scheduleMode === mode
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'
+                      }`}
+                    >
+                      {mode === 'now' ? 'Send Now' : 'Schedule'}
+                    </button>
+                  ))}
+                </div>
+                {scheduleMode === 'schedule' && (
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Date & Time</label>
+                    <input
+                      type="datetime-local"
+                      className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      value={localCampaign.sendAt ? localCampaign.sendAt.slice(0, 16) : ''}
+                      onChange={e => update({ sendAt: e.target.value ? new Date(e.target.value).toISOString() : null })}
+                    />
+                  </div>
+                )}
+                {scheduleMode === 'now' && (
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Clicking "Send Now" will mark this campaign as sent immediately.
+                  </p>
+                )}
+              </AccordionSection>
+
+              {/* Content */}
+              <AccordionSection
+                id="content" title="Content" icon={<Pencil size={16} />}
+                subtitle={`${blocks.length} block${blocks.length !== 1 ? 's' : ''}`}
+                isComplete={isContentComplete} isOpen={openSection === 'content'} onToggle={() => toggleSection('content')}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-600 dark:text-slate-400">{blocks.length} content block{blocks.length !== 1 ? 's' : ''}</span>
+                  <button
+                    onClick={() => setPanel('builder')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg transition"
+                  >
+                    <Pencil size={12} /> Edit Content
+                  </button>
+                </div>
+              </AccordionSection>
+            </div>
+
+            {/* Live preview on the right */}
+            <div className="flex-1 overflow-y-auto p-6 bg-slate-100 dark:bg-slate-950">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Preview</h2>
+                <button onClick={() => setPanel('preview')} className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1">
+                  <Eye size={12} /> Expand
+                </button>
+              </div>
+              <div className="max-w-xl mx-auto">
+                <EmailPreview blocks={blocks} settings={settings} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Block Builder Panel */}
+        {panel === 'builder' && (
+          <div className="flex-1 overflow-hidden flex flex-col">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex items-center gap-3 shrink-0">
+              <button
+                onClick={() => setPanel('config')}
+                className="flex items-center gap-1.5 text-sm text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition"
+              >
+                <ArrowLeft size={14} /> Back to Config
+              </button>
+              <span className="text-slate-300 dark:text-slate-600">|</span>
+              <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">Content Editor</span>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <EmailBuilder
+                blocks={blocks}
+                setBlocks={setBlocks}
+                churchId={churchId}
+                onImportPco={() => setIsPcoDrawerOpen(true)}
+                onOpenPastoralCare={() => setIsPastoralCareDrawerOpen(true)}
+                onOpenDataChart={() => setIsDataChartDrawerOpen(true)}
+                onOpenSettings={() => setIsSettingsDrawerOpen(true)}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Full Preview Panel */}
+        {panel === 'preview' && (
+          <div className="flex-1 overflow-y-auto p-8 bg-slate-100 dark:bg-slate-950">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900 dark:text-white">{localCampaign.subject || 'No Subject'}</h2>
+                {localCampaign.fromName && (
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+                    From: {localCampaign.fromName} &lt;{localCampaign.fromEmail}&gt;
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => setPanel('config')}
+                className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
+              >
+                <AlignLeft size={12} /> Back to Config
+              </button>
+            </div>
+            <div className="max-w-2xl mx-auto shadow-xl rounded-2xl overflow-hidden">
+              <EmailPreview blocks={blocks} settings={settings} />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ─── Drawers ─── */}
       <Drawer isOpen={isSettingsDrawerOpen} onClose={() => setIsSettingsDrawerOpen(false)} title="Template Settings">
-        <TemplateSettingsEditor settings={settings} onChange={setSettings} />
+        <TemplateSettingsEditor
+          settings={settings}
+          onChange={s => update({ templateSettings: s })}
+        />
       </Drawer>
 
-      <Drawer isOpen={isPcoDrawerOpen} onClose={() => setIsPcoDrawerOpen(false)} title="Import PCO Items">
-        <div className="space-y-2">
-            <button onClick={() => importPcoItem('pco_group')} className="w-full p-3 bg-indigo-50 hover:bg-indigo-100 rounded-xl text-sm text-indigo-700 transition">Import Group</button>
-            <button onClick={() => importPcoItem('pco_registration')} className="w-full p-3 bg-indigo-50 hover:bg-indigo-100 rounded-xl text-sm text-indigo-700 transition">Import Registration</button>
-            <button onClick={() => importPcoItem('pco_event')} className="w-full p-3 bg-indigo-50 hover:bg-indigo-100 rounded-xl text-sm text-indigo-700 transition">Import Event</button>
-        </div>
-      </Drawer>
+      {isPcoDrawerOpen && (
+        <PcoImportModal
+          churchId={churchId}
+          onInsert={handlePcoInsert}
+          onClose={() => setIsPcoDrawerOpen(false)}
+        />
+      )}
 
       <Drawer isOpen={isPastoralCareDrawerOpen} onClose={() => setIsPastoralCareDrawerOpen(false)} title="Pastoral Care Charts">
         <div className="space-y-2">
-            <button onClick={() => { setBlocks([...blocks, { id: Date.now().toString(), type: 'pastoral_care_chart', content: { area: 'Visits' } }]); setIsPastoralCareDrawerOpen(false); }} className="w-full p-3 bg-indigo-50 hover:bg-indigo-100 rounded-xl text-sm text-indigo-700 transition">Insert Visits Chart</button>
-            <button onClick={() => { setBlocks([...blocks, { id: Date.now().toString(), type: 'pastoral_care_chart', content: { area: 'Prayer Requests' } }]); setIsPastoralCareDrawerOpen(false); }} className="w-full p-3 bg-indigo-50 hover:bg-indigo-100 rounded-xl text-sm text-indigo-700 transition">Insert Prayer Requests Chart</button>
+          <button onClick={() => { const b = [...blocks, { id: Date.now().toString(), type: 'pastoral_care_chart' as const, content: { area: 'Visits' } }]; update({ blocks: b }); setIsPastoralCareDrawerOpen(false); }} className="w-full p-3 bg-indigo-50 hover:bg-indigo-100 rounded-xl text-sm text-indigo-700 transition">Insert Visits Chart</button>
+          <button onClick={() => { const b = [...blocks, { id: Date.now().toString(), type: 'pastoral_care_chart' as const, content: { area: 'Prayer Requests' } }]; update({ blocks: b }); setIsPastoralCareDrawerOpen(false); }} className="w-full p-3 bg-indigo-50 hover:bg-indigo-100 rounded-xl text-sm text-indigo-700 transition">Insert Prayer Requests Chart</button>
         </div>
       </Drawer>
 
-      <Drawer isOpen={isDataChartDrawerOpen} onClose={() => setIsDataChartDrawerOpen(false)} title="Insert Data Chart">
-        <DataChartSelector onInsert={(module, chartType, filters) => { setBlocks([...blocks, { id: Date.now().toString(), type: 'data_chart', content: { module, chartType, filters } }]); setIsDataChartDrawerOpen(false); }} />
+      <Drawer isOpen={isDataChartDrawerOpen} onClose={() => setIsDataChartDrawerOpen(false)} title="Analytics Widgets">
+        <DataChartSelector
+          churchId={churchId}
+          onInsert={(widgetId, label, data) => {
+            const b = [...blocks, { id: Date.now().toString(), type: 'data_chart' as const, content: { widgetId, label, data } }];
+            update({ blocks: b });
+            setIsDataChartDrawerOpen(false);
+          }}
+        />
       </Drawer>
 
-      <TextEditorDrawer 
-        isOpen={isTextEditorOpen && (blocks.find(b => b.id === editingBlockId)?.type === 'text' || blocks.find(b => b.id === editingBlockId)?.type === 'header' || blocks.find(b => b.id === editingBlockId)?.type === 'html')} 
-        onClose={() => setIsTextEditorOpen(false)} 
-        block={blocks.find(b => b.id === editingBlockId) || null}
-        onUpdate={(id, content) => setBlocks(blocks.map(b => b.id === id ? { ...b, content } : b))}
-      />
 
-      <MediaEditorDrawer 
-        isOpen={isTextEditorOpen && (blocks.find(b => b.id === editingBlockId)?.type === 'image' || blocks.find(b => b.id === editingBlockId)?.type === 'video')}
-        onClose={() => setIsTextEditorOpen(false)} 
-        block={blocks.find(b => b.id === editingBlockId) || null}
-        onUpdate={(id, content) => setBlocks(blocks.map(b => b.id === id ? { ...b, content } : b))}
-      />
+    </div>
+  );
+};
+
+// ─── Main Module ─────────────────────────────────────────────────────────────
+
+interface NewCampaignModalProps {
+  onConfirm: (name: string) => void;
+  onCancel: () => void;
+}
+
+const NewCampaignModal: React.FC<NewCampaignModalProps> = ({ onConfirm, onCancel }) => {
+  const [name, setName] = useState('');
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4">
+        <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-1">New Email Campaign</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Give your email a name to get started.</p>
+        <input
+          type="text"
+          className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4"
+          placeholder="e.g. Weekly Update, Easter Invite…"
+          value={name}
+          onChange={e => setName(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter' && name.trim()) onConfirm(name.trim()); }}
+          autoFocus
+        />
+        <div className="flex gap-2">
+          <button onClick={onCancel} className="flex-1 py-2 text-sm text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-xl transition font-medium">
+            Cancel
+          </button>
+          <button
+            onClick={() => name.trim() && onConfirm(name.trim())}
+            disabled={!name.trim()}
+            className="flex-1 py-2 text-sm text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 disabled:text-slate-400 rounded-xl transition font-semibold"
+          >
+            Create
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── Send Test Modal ────────────────────────────────────────────────────────
+
+interface SendTestModalProps {
+  onConfirm: (email: string) => void;
+  onCancel: () => void;
+  isSending: boolean;
+}
+
+const SendTestModal: React.FC<SendTestModalProps> = ({ onConfirm, onCancel, isSending }) => {
+  const [email, setEmail] = useState('');
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4">
+        <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-1">Send Test Email</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Enter an email address to receive a test copy of this email.</p>
+        <input
+          type="email"
+          className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4"
+          placeholder="you@example.com"
+          value={email}
+          onChange={e => setEmail(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter' && email.trim()) onConfirm(email.trim()); }}
+          autoFocus
+        />
+        <div className="flex gap-2">
+          <button onClick={onCancel} className="flex-1 py-2 text-sm text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-xl transition font-medium">
+            Cancel
+          </button>
+          <button
+            onClick={() => email.trim() && onConfirm(email.trim())}
+            disabled={!email.trim() || isSending}
+            className="flex-1 py-2 text-sm text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 disabled:text-slate-400 rounded-xl transition font-semibold flex items-center justify-center gap-2"
+          >
+            {isSending ? <><Loader2 size={14} className="animate-spin" /> Sending…</> : 'Send Test'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export const CommunicationModule: React.FC<{ churchId: string }> = ({ churchId }) => {
+  const [campaigns, setCampaigns] = useState<EmailCampaign[]>([]);
+  const [activeCampaign, setActiveCampaign] = useState<EmailCampaign | null>(null);
+  const [previewCampaign, setPreviewCampaign] = useState<EmailCampaign | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [showNewModal, setShowNewModal] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [showTestModal, setShowTestModal] = useState(false);
+  const [isSendingTest, setIsSendingTest] = useState(false);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [isScheduling, setIsScheduling] = useState(false);
+  const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+
+  const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 4000);
+  };
+
+  // Load campaigns
+  useEffect(() => {
+    setIsLoading(true);
+    firestore.getEmailCampaigns(churchId).then(c => {
+      setCampaigns(c);
+      setIsLoading(false);
+    }).catch(() => setIsLoading(false));
+  }, [churchId]);
+
+  const handleCreate = async (name: string) => {
+    setShowNewModal(false);
+    const c = newCampaign(churchId, name);
+    try {
+      await firestore.saveEmailCampaign(c);
+      setCampaigns(prev => [c, ...prev]);
+      setActiveCampaign(c);
+    } catch (e: any) {
+      console.error('[CommunicationModule] Failed to create campaign:', e);
+      showToast(`Failed to create campaign: ${e?.message || 'Unknown error'}`, 'error');
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Delete this campaign?')) return;
+    await firestore.deleteEmailCampaign(id);
+    setCampaigns(prev => prev.filter(c => c.id !== id));
+  };
+
+  // Use a ref so handleSave always reads the latest activeCampaign
+  const activeCampaignRef = React.useRef<EmailCampaign | null>(null);
+  React.useEffect(() => { activeCampaignRef.current = activeCampaign; }, [activeCampaign]);
+
+  const handleSave = useCallback((updates: Partial<EmailCampaign>) => {
+    const current = activeCampaignRef.current;
+    if (!current) return;
+    const merged = { ...current, ...updates, updatedAt: Date.now() };
+    setActiveCampaign(merged);
+    activeCampaignRef.current = merged;
+    setCampaigns(prev => prev.map(c => c.id === merged.id ? merged : c));
+    firestore.updateEmailCampaign(merged.id, updates).catch(async (e) => {
+      // If the document doesn't exist yet (e.g. create race), fall back to a full save
+      try {
+        await firestore.saveEmailCampaign(merged);
+      } catch (e2: any) {
+        console.error('Failed to save campaign:', e2);
+        showToast('Auto-save failed. Please check your connection.', 'error');
+      }
+    });
+  }, []); // stable — reads latest via ref
+
+  /** Call backend /email/send. testEmail = undefined → real send, string → test send */
+  const callSendApi = async (campaignId: string, testEmail?: string) => {
+    const sysSettings = await firestore.getSystemSettings();
+    const apiBaseUrl = sysSettings.apiBaseUrl || 'https://pastoral-care-for-pco-u3gnt7kb5a-uc.a.run.app';
+    const endpoint = testEmail ? `${apiBaseUrl}/email/test` : `${apiBaseUrl}/email/send`;
+
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ campaignId, churchId, ...(testEmail ? { testEmail } : {}) })
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+    return data;
+  };
+
+  const handleSend = async () => {
+    if (!activeCampaign) return;
+    setIsSending(true);
+    try {
+      const result = await callSendApi(activeCampaign.id);
+      // Backend already updated Firestore; sync local state
+      const updates: Partial<EmailCampaign> = { status: 'sent', sentAt: Date.now() };
+      handleSave(updates);
+      showToast(result.message || 'Campaign sent successfully!');
+    } catch (e: any) {
+      showToast(e.message || 'Failed to send campaign.', 'error');
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleSendTest = async (testEmail: string) => {
+    if (!activeCampaign) return;
+    setIsSendingTest(true);
+    try {
+      await callSendApi(activeCampaign.id, testEmail);
+      setShowTestModal(false);
+      showToast(`Test email sent to ${testEmail}!`);
+    } catch (e: any) {
+      showToast(e.message || 'Failed to send test email.', 'error');
+    } finally {
+      setIsSendingTest(false);
+    }
+  };
+
+  const handleSchedule = async (scheduledAt: number) => {
+    if (!activeCampaign) return;
+    setIsScheduling(true);
+    try {
+      const sysSettings = await firestore.getSystemSettings();
+      const apiBaseUrl = sysSettings.apiBaseUrl || 'https://pastoral-care-for-pco-u3gnt7kb5a-uc.a.run.app';
+      const res = await fetch(`${apiBaseUrl}/email/schedule`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ campaignId: activeCampaign.id, churchId, scheduledAt }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to schedule');
+      const sendAt = new Date(scheduledAt).toISOString();
+      handleSave({ status: 'scheduled', scheduledAt, sendAt, retryCount: 0, lastError: null });
+      setShowScheduleModal(false);
+      showToast(`Email scheduled for ${new Date(scheduledAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`);
+    } catch (e: any) {
+      showToast(e.message || 'Failed to schedule email.', 'error');
+    } finally {
+      setIsScheduling(false);
+    }
+  };
+
+  const handleCancelSchedule = async () => {
+    if (!activeCampaign || activeCampaign.status !== 'scheduled') return;
+    try {
+      const sysSettings = await firestore.getSystemSettings();
+      const apiBaseUrl = sysSettings.apiBaseUrl || 'https://pastoral-care-for-pco-u3gnt7kb5a-uc.a.run.app';
+      const res = await fetch(`${apiBaseUrl}/email/cancel-schedule`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ campaignId: activeCampaign.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to cancel');
+      handleSave({ status: 'draft', scheduledAt: null, sendAt: null });
+      showToast('Schedule cancelled. Campaign reverted to draft.');
+    } catch (e: any) {
+      showToast(e.message || 'Failed to cancel schedule.', 'error');
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-full relative">
+      {/* Toast */}
+      {toast && (
+        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-[100] px-5 py-3 rounded-2xl shadow-xl text-sm font-semibold text-white transition-all ${
+          toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'
+        }`}>
+          {toast.msg}
+        </div>
+      )}
+
+      {/* Campaign Preview Modal */}
+      {previewCampaign && (
+        <CampaignPreviewModal
+          campaign={previewCampaign}
+          onClose={() => setPreviewCampaign(null)}
+        />
+      )}
+
+      {/* Send Test Modal */}
+      {showTestModal && activeCampaign && (
+        <SendTestModal
+          onConfirm={handleSendTest}
+          onCancel={() => setShowTestModal(false)}
+          isSending={isSendingTest}
+        />
+      )}
+
+      {/* Schedule Modal */}
+      {showScheduleModal && activeCampaign && (
+        <ScheduleModal
+          onConfirm={handleSchedule}
+          onCancel={() => setShowScheduleModal(false)}
+          isScheduling={isScheduling}
+        />
+      )}
+
+      {/* Scheduled Banner */}
+      {activeCampaign?.status === 'scheduled' && activeCampaign.scheduledAt && (
+        <div className="shrink-0 flex items-center justify-between gap-3 px-5 py-2 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800">
+          <div className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400">
+            <Clock size={13} />
+            <span className="font-semibold">Scheduled:</span>
+            {new Date(activeCampaign.scheduledAt).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
+            {activeCampaign.retryCount ? <span className="ml-2 text-red-500">· Retry {activeCampaign.retryCount}/5{activeCampaign.lastError ? ` (${activeCampaign.lastError})` : ''}</span> : null}
+          </div>
+          <button
+            onClick={handleCancelSchedule}
+            className="text-xs font-semibold text-amber-700 dark:text-amber-400 hover:text-red-600 dark:hover:text-red-400 transition"
+          >
+            Cancel Schedule
+          </button>
+        </div>
+      )}
+
+      {/* New campaign modal */}
+      {showNewModal && (
+        <NewCampaignModal onConfirm={handleCreate} onCancel={() => setShowNewModal(false)} />
+      )}
+
+      {/* Main Content */}
+      {activeCampaign ? (
+        <EmailEditor
+          key={activeCampaign.id}
+          campaign={activeCampaign}
+          churchId={churchId}
+          onBack={() => setActiveCampaign(null)}
+          onSave={handleSave}
+          onSend={handleSend}
+          onSendTest={() => setShowTestModal(true)}
+          onSchedule={() => setShowScheduleModal(true)}
+          isSending={isSending}
+          isScheduled={activeCampaign.status === 'scheduled'}
+        />
+      ) : (
+        <CampaignListView
+          churchId={churchId}
+          campaigns={campaigns}
+          isLoading={isLoading}
+          onOpen={c => setActiveCampaign(c)}
+          onPreview={c => setPreviewCampaign(c)}
+          onDelete={handleDelete}
+          onCreate={() => setShowNewModal(true)}
+        />
+      )}
     </div>
   );
 };

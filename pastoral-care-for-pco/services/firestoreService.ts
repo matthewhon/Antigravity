@@ -20,7 +20,7 @@ import {
     PcoPerson, PcoGroup, PcoFund, BudgetRecord, ServicesTeam, ServicePlanSnapshot,
     ServicesDashboardData, ServicesFilter, SystemSettings, CensusStats,
     Ministry, MetricDefinition, MetricEntry, AggregatedChurchStats, LogEntry,
-    PastoralNote, PrayerRequest, CheckInRecord
+    PastoralNote, PrayerRequest, CheckInRecord, EmailCampaign
 } from '../types';
 import { calculateServicesAnalytics, calculateAggregatedStats } from './analyticsService';
 
@@ -691,6 +691,51 @@ class FirestoreService {
       await setDoc(doc(db, 'metric_entries', entry.id), entry, { merge: true });
   }
 
+  // --- Email Campaigns ---
+
+  async getEmailCampaigns(churchId: string): Promise<EmailCampaign[]> {
+      try {
+          // NOTE: No orderBy here — compound queries (where + orderBy) require a
+          // composite Firestore index. If the index is missing, Firestore throws and
+          // the catch silently returns []. Sort in-memory instead.
+          const q = query(collection(db, 'email_campaigns'), where('churchId', '==', churchId));
+          const snapshot = await getDocs(q);
+          return snapshot.docs
+              .map(d => d.data() as EmailCampaign)
+              .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      } catch (e) {
+          console.error('[FirestoreService] getEmailCampaigns failed:', e);
+          return [];
+      }
+  }
+
+  async saveEmailCampaign(campaign: EmailCampaign): Promise<void> {
+      try {
+          // Strip undefined values — Firestore rejects them
+          const safe = JSON.parse(JSON.stringify(campaign));
+          await setDoc(doc(db, 'email_campaigns', campaign.id), safe);
+      } catch (e) {
+          console.error('[FirestoreService] saveEmailCampaign failed:', e);
+          throw e;
+      }
+  }
+
+  async updateEmailCampaign(campaignId: string, updates: Partial<EmailCampaign>): Promise<void> {
+      try {
+          const safe = JSON.parse(JSON.stringify({ ...updates, updatedAt: Date.now() }));
+          await updateDoc(doc(db, 'email_campaigns', campaignId), safe);
+      } catch (e) {
+          console.error('[FirestoreService] updateEmailCampaign failed:', e);
+          throw e;
+      }
+  }
+
+  async deleteEmailCampaign(campaignId: string): Promise<void> {
+      try {
+          await deleteDoc(doc(db, 'email_campaigns', campaignId));
+      } catch (e) { this.handleFirestoreError(e); }
+  }
+
   // --- Logging ---
 
   async saveLog(entry: LogEntry): Promise<void> {
@@ -730,7 +775,46 @@ class FirestoreService {
           return [];
       }
   }
+
+  // --- Sermon Verse Usage ---
+
+  async getSermonVerseUsage(book: string, chapter: number, verse: number): Promise<SermonVerseRecord[]> {
+    const id = `${book}_${chapter}_${verse}`;
+    try {
+      const docSnap = await getDoc(doc(db, 'sermon_verses', id));
+      if (!docSnap.exists()) return [];
+      const data = docSnap.data();
+      return (data.sermons || []) as SermonVerseRecord[];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  async addSermonVerseUsage(
+    book: string, chapter: number, verse: number,
+    churchId: string,
+    sermonTitle: string, preacher: string, date: string
+  ): Promise<void> {
+    const id = `${book}_${chapter}_${verse}`;
+    const newEntry: SermonVerseRecord = { sermonTitle, preacher, date, churchId, addedAt: new Date().toISOString() };
+    try {
+      const docRef = doc(db, 'sermon_verses', id);
+      const docSnap = await getDoc(docRef);
+      const existing: SermonVerseRecord[] = docSnap.exists() ? (docSnap.data().sermons || []) : [];
+      await setDoc(docRef, { book, chapter, verse, sermons: [...existing, newEntry] }, { merge: true });
+    } catch (e) {
+      this.handleFirestoreError(e);
+    }
+  }
 }
 
+export interface SermonVerseRecord {
+  sermonTitle: string;
+  preacher: string;
+  date: string;
+  churchId: string;
+  addedAt: string;
+}
 
 export const firestore = new FirestoreService();
+

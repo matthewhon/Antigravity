@@ -4,6 +4,8 @@ import { Church, User } from '../types';
 import UserProfileModal from './UserProfileModal';
 import { AppLogo } from './AppLogo';
 
+const LIBRARY_OWNER_EMAIL = 'matthewhon01@gmail.com';
+
 interface LayoutProps {
   children: React.ReactNode;
   church: Church;
@@ -16,6 +18,7 @@ interface LayoutProps {
   hasPermission: (view: any) => boolean;
   onRefreshUser?: () => void;
   isSyncing?: boolean;
+  enableLibrary?: boolean;
 }
 
 const Layout: React.FC<LayoutProps> = ({ 
@@ -29,8 +32,10 @@ const Layout: React.FC<LayoutProps> = ({
   onNavigate, 
   hasPermission,
   onRefreshUser,
-  isSyncing
+  isSyncing,
+  enableLibrary
 }) => {
+  const canSeeLibrary = user.email === LIBRARY_OWNER_EMAIL || enableLibrary === true;
   const [isEditingProfile, setIsEditingProfile] = useState(false);
 
   if (!user) return null;
@@ -140,29 +145,14 @@ const Layout: React.FC<LayoutProps> = ({
                         onClick={() => onNavigate('communication')} 
                     />
                 )}
-                
-                {hasPermission('pastor-ai') && (
+
+                {canSeeLibrary && (
                     <NavItem 
-                        icon="🤖" 
-                        label="AI Assistant" 
-                        active={currentView === 'pastor-ai'} 
-                        onClick={() => onNavigate('pastor-ai')} 
-                        highlight="emerald"
+                        icon="📚" 
+                        label="Library" 
+                        active={currentView === 'library'} 
+                        onClick={() => onNavigate('library')} 
                     />
-                )}
-                
-                {/* Divider */}
-                {(hasPermission('settings') || isSystemAdmin) && (
-                    <div className="w-px h-6 bg-slate-700 mx-2 shrink-0"></div>
-                )}
-                
-                {hasPermission('settings') && (
-                  <NavItem 
-                    icon="⚙️" 
-                    label="Settings" 
-                    active={currentView === 'settings'} 
-                    onClick={() => onNavigate('settings')} 
-                  />
                 )}
 
                 {isSystemAdmin && (
@@ -192,6 +182,24 @@ const Layout: React.FC<LayoutProps> = ({
                             ))}
                         </select>
                     </div>
+                )}
+
+                {/* Settings Gear Icon */}
+                {hasPermission('settings') && (
+                    <button
+                        onClick={() => onNavigate('settings')}
+                        title="Settings"
+                        className={`w-8 h-8 flex items-center justify-center rounded-full border transition-all ${
+                            currentView === 'settings'
+                                ? 'bg-indigo-600 border-indigo-500 text-white'
+                                : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700'
+                        }`}
+                    >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="3"/>
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                        </svg>
+                    </button>
                 )}
 
                 {/* Profile Button */}

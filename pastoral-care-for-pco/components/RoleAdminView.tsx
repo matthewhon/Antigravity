@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { User, Church, RiskSettings, ChurchRiskSettings, DonorLifecycleSettings, GroupRiskSettings, CommunityLocation } from '../types';
+import { User, Church, RiskSettings, ChurchRiskSettings, DonorLifecycleSettings, GroupRiskSettings, CommunityLocation, UserRole } from '../types';
 import { CreateUserModal } from './CreateUserModal';
 import { firestore } from '../services/firestoreService';
 import { auth } from '../services/firebase';
@@ -41,6 +41,9 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   const [formData, setFormData] = useState<Partial<Church>>(church);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [pendingRoles, setPendingRoles] = useState<UserRole[]>([]);
+  const [isSavingRoles, setIsSavingRoles] = useState(false);
 
   useEffect(() => {
     loadUsers();
@@ -80,6 +83,58 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
       loadUsers();
     }
   };
+
+  const isChurchAdmin = currentUser.roles.includes('Church Admin');
+
+  const ALL_ROLES: UserRole[] = [
+    'Church Admin', 'Pastor', 'Pastor AI', 'People', 'Services',
+    'Groups', 'Giving', 'Finance', 'Pastoral Care', 'Metrics', 'System Administration'
+  ];
+
+  const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
+    'Church Admin':          'Full access to all settings and user management',
+    'Pastor':                'Full read access to pastoral data and dashboards',
+    'Pastor AI':             'Access to AI-assisted pastoral insights',
+    'People':                'Manage people & household records',
+    'Services':              'Manage service plans, teams & check-ins',
+    'Groups':                'Manage small groups & attendance',
+    'Giving':                'View giving records & donor analytics',
+    'Finance':               'Full financials including fund budgets',
+    'Pastoral Care':         'Access to pastoral care log & prayer requests',
+    'Metrics':               'View aggregated analytics & benchmarks',
+    'System Administration': 'Platform-wide system settings (super admin)',
+  };
+
+  const handleStartEditRoles = (u: User) => {
+    setEditingUserId(u.id);
+    setPendingRoles([...u.roles]);
+  };
+
+  const handleToggleRole = (role: UserRole) => {
+    setPendingRoles(prev =>
+      prev.includes(role) ? prev.filter(r => r !== role) : [...prev, role]
+    );
+  };
+
+  const handleSaveRoles = async (uid: string) => {
+    if (pendingRoles.length === 0) {
+      alert('A user must have at least one role.');
+      return;
+    }
+    setIsSavingRoles(true);
+    try {
+      const target = users.find(u => u.id === uid);
+      if (!target) return;
+      await firestore.createUserProfile({ ...target, roles: pendingRoles });
+      setUsers(prev => prev.map(u => u.id === uid ? { ...u, roles: pendingRoles } : u));
+      setEditingUserId(null);
+    } catch (e: any) {
+      alert('Failed to save roles: ' + (e?.message || 'Unknown error'));
+    } finally {
+      setIsSavingRoles(false);
+    }
+  };
+
 
   // Determine Limit Variables
   const now = Date.now();
@@ -197,7 +252,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
       }
       
       const redirectUri = window.location.origin;
-      const url = `https://api.planningcenteronline.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=people%20services%20giving%20groups%20check_ins&state=${churchId}`;
+      const url = `https://api.planningcenteronline.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=people%20services%20giving%20groups%20check_ins%20registrations%20calendar&state=${churchId}`;
       window.location.href = url;
   };
 
@@ -373,39 +428,114 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
 
                 <div className="space-y-4">
                     {users.map(u => (
-                        <div key={u.id} className="flex flex-col md:flex-row items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700">
-                            <div className="flex items-center gap-4 mb-4 md:mb-0 w-full md:w-auto">
-                                <div className="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-black text-sm">
-                                    {u.name.charAt(0)}
+                        <div key={u.id} className="bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 overflow-hidden">
+                            {/* ── User summary row ── */}
+                            <div className="flex flex-col md:flex-row items-center justify-between p-4 gap-4">
+                                <div className="flex items-center gap-4 w-full md:w-auto">
+                                    <div className="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-black text-sm shrink-0">
+                                        {u.name.charAt(0)}
+                                    </div>
+                                    <div>
+                                        <p className="font-bold text-slate-900 dark:text-white text-sm">{u.name}</p>
+                                        <p className="text-xs text-slate-400 dark:text-slate-500">{u.email}</p>
+                                        {u.lastLogin && (
+                                            <p className="text-[9px] text-slate-400 dark:text-slate-600 mt-0.5 font-medium">
+                                                Last login: {new Date(u.lastLogin).toLocaleDateString()} {new Date(u.lastLogin).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                            </p>
+                                        )}
+                                    </div>
                                 </div>
-                                <div>
-                                    <p className="font-bold text-slate-900 dark:text-white text-sm">{u.name}</p>
-                                    <p className="text-xs text-slate-400 dark:text-slate-500">{u.email}</p>
-                                    {u.lastLogin && (
-                                        <p className="text-[9px] text-slate-400 dark:text-slate-600 mt-0.5 font-medium">
-                                            Last login: {new Date(u.lastLogin).toLocaleDateString()} {new Date(u.lastLogin).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                                        </p>
+                                <div className="flex flex-wrap gap-2 flex-1">
+                                    {u.roles.map(r => (
+                                        <span key={r} className="px-2 py-1 rounded text-[9px] font-bold uppercase tracking-widest bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400">
+                                            {r}
+                                        </span>
+                                    ))}
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                    {/* Edit Roles — only Church Admins can edit other users, not themselves */}
+                                    {isChurchAdmin && currentUser.id !== u.id && (
+                                        editingUserId === u.id ? (
+                                            <button
+                                                onClick={() => setEditingUserId(null)}
+                                                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors px-4 py-2 text-[10px] font-black uppercase tracking-widest"
+                                            >
+                                                Cancel
+                                            </button>
+                                        ) : (
+                                            <button
+                                                onClick={() => handleStartEditRoles(u)}
+                                                className="text-indigo-500 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors px-4 py-2 text-[10px] font-black uppercase tracking-widest"
+                                            >
+                                                Edit Roles
+                                            </button>
+                                        )
+                                    )}
+                                    {currentUser.id !== u.id && (
+                                        <button
+                                            onClick={() => handleRemoveUser(u.id)}
+                                            className="text-slate-300 dark:text-slate-600 hover:text-rose-500 dark:hover:text-rose-400 transition-colors px-4 py-2 text-[10px] font-black uppercase tracking-widest"
+                                        >
+                                            Remove
+                                        </button>
                                     )}
                                 </div>
                             </div>
-                            <div className="flex flex-wrap gap-2 mb-4 md:mb-0">
-                                {u.roles.map(r => (
-                                    <span key={r} className="px-2 py-1 rounded text-[9px] font-bold uppercase tracking-widest bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400">
-                                        {r}
-                                    </span>
-                                ))}
-                            </div>
-                            {currentUser.id !== u.id && (
-                                <button 
-                                    onClick={() => handleRemoveUser(u.id)}
-                                    className="text-slate-300 dark:text-slate-600 hover:text-rose-500 dark:hover:text-rose-400 transition-colors px-4 py-2 text-[10px] font-black uppercase tracking-widest"
-                                >
-                                    Remove
-                                </button>
+
+                            {/* ── Inline role editor (Church Admin only) ── */}
+                            {editingUserId === u.id && (
+                                <div className="border-t border-slate-200 dark:border-slate-700 px-6 py-5 bg-white dark:bg-slate-900">
+                                    <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-4">Assign Roles — {u.name}</p>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-5">
+                                        {ALL_ROLES.map(role => {
+                                            const checked = pendingRoles.includes(role);
+                                            return (
+                                                <label
+                                                    key={role}
+                                                    className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition ${
+                                                        checked
+                                                        ? 'border-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 dark:border-indigo-600'
+                                                        : 'border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-700'
+                                                    }`}
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={checked}
+                                                        onChange={() => handleToggleRole(role)}
+                                                        className="mt-0.5 accent-indigo-600 shrink-0"
+                                                    />
+                                                    <div>
+                                                        <p className={`text-xs font-bold ${ checked ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-700 dark:text-slate-300'}`}>{role}</p>
+                                                        <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 leading-snug">{ROLE_DESCRIPTIONS[role]}</p>
+                                                    </div>
+                                                </label>
+                                            );
+                                        })}
+                                    </div>
+                                    <div className="flex items-center gap-4">
+                                        <button
+                                            onClick={() => handleSaveRoles(u.id)}
+                                            disabled={isSavingRoles}
+                                            className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition shadow-lg"
+                                        >
+                                            {isSavingRoles ? 'Saving…' : 'Save Roles'}
+                                        </button>
+                                        <button
+                                            onClick={() => setEditingUserId(null)}
+                                            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-[10px] font-bold uppercase tracking-widest"
+                                        >
+                                            Cancel
+                                        </button>
+                                        {pendingRoles.length === 0 && (
+                                            <p className="text-[10px] text-rose-500 font-bold">⚠ At least one role required</p>
+                                        )}
+                                    </div>
+                                </div>
                             )}
                         </div>
                     ))}
                 </div>
+
             </div>
         )}
 
@@ -886,16 +1016,14 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                     onSave={(s) => onUpdateChurch && onUpdateChurch({ groupRiskSettings: s })}
                 />
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    <ChurchRiskSettingsView 
-                        settings={church.churchRiskSettings} 
-                        onSave={(s) => onUpdateChurch && onUpdateChurch({ churchRiskSettings: s })} 
-                    />
-                    <DonorLifecycleSettingsView 
-                        settings={church.donorLifecycleSettings} 
-                        onSave={(s) => onUpdateChurch && onUpdateChurch({ donorLifecycleSettings: s })} 
-                    />
-                </div>
+                <ChurchRiskSettingsView 
+                    settings={church.churchRiskSettings} 
+                    onSave={(s) => onUpdateChurch && onUpdateChurch({ churchRiskSettings: s })} 
+                />
+                <DonorLifecycleSettingsView 
+                    settings={church.donorLifecycleSettings} 
+                    onSave={(s) => onUpdateChurch && onUpdateChurch({ donorLifecycleSettings: s })} 
+                />
             </div>
         )}
 

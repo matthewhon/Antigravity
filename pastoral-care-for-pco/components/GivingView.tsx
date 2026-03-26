@@ -10,7 +10,7 @@ import WidgetsController from './WidgetsController';
 import { 
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LineChart, Line, ComposedChart, Cell 
 } from 'recharts';
-import { calculateGivingAnalytics, DEFAULT_LIFECYCLE_SETTINGS } from '../services/analyticsService';
+import { calculateGivingAnalytics } from '../services/analyticsService';
 import { firestore } from '../services/firestoreService';
 
 import { DonationReport } from './DonationReport';
@@ -62,7 +62,7 @@ const TOOLTIP_STYLE = {
 };
 
 const getWidgetSpan = (id: string) => {
-    if (['keyMetrics', 'trends', 'fundPerformance', 'cumulativeYTD', 'donorLifecycle', 'trendsComparison', 'benchmark_giving_avg'].includes(id)) return 'col-span-1 md:col-span-2 lg:col-span-2';
+    if (['keyMetrics', 'trends', 'fundPerformance', 'cumulativeYTD', 'donorLifecycle', 'trendsComparison', 'benchmark_giving_avg', 'budgetProgress'].includes(id)) return 'col-span-1 md:col-span-2 lg:col-span-2';
     return 'col-span-1';
 };
 
@@ -541,6 +541,133 @@ export const GivingView: React.FC<GivingViewProps> = ({
       if (!analytics) return null;
 
       switch(id) {
+          case 'budgetProgress': {
+              const now = new Date();
+              const activeYear = budgetYear;
+              const yearBudgets = budgets.filter(b => b.year === activeYear && b.isActive);
+              if (yearBudgets.length === 0) {
+                  return (
+                      <WidgetWrapper title="Budget Progress" onRemove={() => handleRemoveWidget(id)} source="PCO & Budgets">
+                          <div className="flex flex-col items-center justify-center h-32 text-center space-y-2">
+                              <div className="text-3xl opacity-30">🌡️</div>
+                              <p className="text-xs font-bold text-slate-400 dark:text-slate-500">No active budgets for {activeYear}</p>
+                              <p className="text-[10px] text-slate-400">Add budgets in the Budgets tab to see progress here.</p>
+                          </div>
+                      </WidgetWrapper>
+                  );
+              }
+
+              // Compute per-fund YTD actuals
+              const yearStart = new Date(activeYear, 0, 1);
+              const yearEnd = activeYear < now.getFullYear() ? new Date(activeYear, 11, 31, 23, 59, 59) : now;
+
+              const fundActuals: Record<string, number> = {};
+              donations.forEach(d => {
+                  const dDate = new Date(d.date);
+                  if (dDate >= yearStart && dDate <= yearEnd) {
+                      fundActuals[d.fundName] = (fundActuals[d.fundName] || 0) + d.amount;
+                  }
+              });
+
+              const totalBudget = yearBudgets.reduce((s, b) => s + b.totalAmount, 0);
+              const totalActual = yearBudgets.reduce((s, b) => s + (fundActuals[b.fundName] || 0), 0);
+              const totalPct = totalBudget > 0 ? Math.min((totalActual / totalBudget) * 100, 100) : 0;
+
+              // Colour ramp: red < 40%, amber 40-75%, green >= 75%
+              const barColor = (pct: number) =>
+                  pct >= 75 ? '#10b981' : pct >= 40 ? '#f59e0b' : '#f43f5e';
+
+              return (
+                  <WidgetWrapper
+                      title="Budget Progress"
+                      onRemove={() => handleRemoveWidget(id)}
+                      source="PCO & Budgets"
+                      headerControl={
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">{activeYear}</span>
+                      }
+                  >
+                      <div className="space-y-5">
+                          {/* Overall summary bar */}
+                          <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 space-y-2">
+                              <div className="flex items-center justify-between">
+                                  <span className="text-xs font-black text-slate-700 dark:text-slate-200 uppercase tracking-wider">Overall {activeYear} Budget</span>
+                                  <span className={`text-sm font-black px-2 py-0.5 rounded-full ${
+                                      totalPct >= 75 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400' :
+                                      totalPct >= 40 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400' :
+                                      'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-400'
+                                  }`}>{Math.round(totalPct)}%</span>
+                              </div>
+                              <div className="relative h-5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                                  <div
+                                      className="h-full rounded-full transition-all duration-700"
+                                      style={{ width: `${totalPct}%`, background: `linear-gradient(90deg, ${barColor(totalPct)}, ${barColor(totalPct)}cc)` }}
+                                  />
+                                  {/* Thermometer bulb marker */}
+                                  {totalPct > 0 && totalPct < 98 && (
+                                      <div className="absolute top-0 h-full flex items-center" style={{ left: `${totalPct}%`, transform: 'translateX(-50%)' }}>
+                                          <div className="w-1 h-full bg-white/60 dark:bg-white/30 rounded-full" />
+                                      </div>
+                                  )}
+                              </div>
+                              <div className="flex justify-between text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                                  <span>${totalActual.toLocaleString(undefined, { maximumFractionDigits: 0 })} raised</span>
+                                  <span>${totalBudget.toLocaleString(undefined, { maximumFractionDigits: 0 })} goal</span>
+                              </div>
+                          </div>
+
+                          {/* Per-fund rows */}
+                          <div className="space-y-3">
+                              {yearBudgets
+                                  .sort((a, b) => b.totalAmount - a.totalAmount)
+                                  .map(budget => {
+                                      const actual = fundActuals[budget.fundName] || 0;
+                                      const pct = budget.totalAmount > 0 ? Math.min((actual / budget.totalAmount) * 100, 100) : 0;
+                                      const remaining = Math.max(budget.totalAmount - actual, 0);
+                                      const color = barColor(pct);
+                                      return (
+                                          <div key={budget.id} className="space-y-1.5">
+                                              <div className="flex items-center justify-between">
+                                                  <div className="flex items-center gap-2">
+                                                      {/* Thermometer icon */}
+                                                      <div className="relative w-3 flex flex-col items-center">
+                                                          <div className="w-2 rounded-t-full bg-slate-200 dark:bg-slate-700 overflow-hidden" style={{ height: '28px' }}>
+                                                              <div
+                                                                  className="w-full rounded-t-full transition-all duration-700 absolute bottom-0"
+                                                                  style={{ height: `${pct}%`, backgroundColor: color }}
+                                                              />
+                                                          </div>
+                                                          <div className="w-3 h-3 rounded-full border-2" style={{ borderColor: color, backgroundColor: color }} />
+                                                      </div>
+                                                      <span className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate max-w-[140px]">{budget.fundName}</span>
+                                                  </div>
+                                                  <div className="flex items-center gap-2">
+                                                      <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-md ${
+                                                          pct >= 75 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400' :
+                                                          pct >= 40 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400' :
+                                                          'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-400'
+                                                      }`}>{Math.round(pct)}%</span>
+                                                      <span className="text-[10px] text-slate-400 dark:text-slate-500 whitespace-nowrap">${remaining.toLocaleString(undefined, { maximumFractionDigits: 0 })} left</span>
+                                                  </div>
+                                              </div>
+                                              {/* Progress bar */}
+                                              <div className="relative h-3 bg-slate-100 dark:bg-slate-700/60 rounded-full overflow-hidden">
+                                                  <div
+                                                      className="h-full rounded-full transition-all duration-700"
+                                                      style={{ width: `${pct}%`, backgroundColor: color, opacity: 0.85 }}
+                                                  />
+                                              </div>
+                                              <div className="flex justify-between text-[9px] text-slate-400 dark:text-slate-500">
+                                                  <span>${actual.toLocaleString(undefined, { maximumFractionDigits: 0 })} raised</span>
+                                                  <span>${budget.totalAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })} goal</span>
+                                              </div>
+                                          </div>
+                                      );
+                                  })}
+                          </div>
+                      </div>
+                  </WidgetWrapper>
+              );
+          }
           case 'keyMetrics':
               return (
                   <WidgetWrapper title="Key Financial Overview" onRemove={() => handleRemoveWidget(id)} source="PCO Giving">
@@ -565,14 +692,32 @@ export const GivingView: React.FC<GivingViewProps> = ({
                               <div>
                                   <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Unique Donors</p>
                                   <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400">{analytics.contributingPeople.toLocaleString()}</p>
+                                  <div className={`text-[11px] font-bold flex items-center gap-0.5 mt-1 ${analytics.contributingPeople >= analytics.previousContributingPeople ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                      {analytics.contributingPeople >= analytics.previousContributingPeople ? '↑' : '↓'}
+                                      {analytics.previousContributingPeople > 0
+                                          ? Math.abs(Math.round(((analytics.contributingPeople - analytics.previousContributingPeople) / analytics.previousContributingPeople) * 100)) + '% vs prev'
+                                          : 'vs prev'}
+                                  </div>
                               </div>
                               <div className="border-l border-slate-100 dark:border-slate-800 pl-4">
                                   <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Recurring</p>
                                   <p className="text-2xl font-black text-cyan-600 dark:text-cyan-400">{analytics.recurringGivers.toLocaleString()}</p>
+                                  <div className={`text-[11px] font-bold flex items-center gap-0.5 mt-1 ${analytics.recurringGivers >= analytics.previousRecurringGivers ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                      {analytics.recurringGivers >= analytics.previousRecurringGivers ? '↑' : '↓'}
+                                      {analytics.previousRecurringGivers > 0
+                                          ? Math.abs(Math.round(((analytics.recurringGivers - analytics.previousRecurringGivers) / analytics.previousRecurringGivers) * 100)) + '% vs prev'
+                                          : 'vs prev'}
+                                  </div>
                               </div>
                               <div className="border-l border-slate-100 dark:border-slate-800 pl-4">
                                   <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Avg Gift</p>
                                   <p className="text-2xl font-black text-violet-600 dark:text-violet-400">${Math.round(analytics.averageGift).toLocaleString()}</p>
+                                  <div className={`text-[11px] font-bold flex items-center gap-0.5 mt-1 ${analytics.averageGift >= analytics.previousAverageGift ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                      {analytics.averageGift >= analytics.previousAverageGift ? '↑' : '↓'}
+                                      {analytics.previousAverageGift > 0
+                                          ? Math.abs(Math.round(((analytics.averageGift - analytics.previousAverageGift) / analytics.previousAverageGift) * 100)) + '% vs prev'
+                                          : 'vs prev'}
+                                  </div>
                               </div>
                           </div>
                       </div>
@@ -585,7 +730,14 @@ export const GivingView: React.FC<GivingViewProps> = ({
                           <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={1}>
                               <BarChart data={analytics.trends}>
                                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
-                                  <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: axisColor}} />
+                                  <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: axisColor}} tickFormatter={(val: string) => {
+                                        // Handles both "2026-03" and "2026_03" formats
+                                        const normalized = val.replace('_', '-');
+                                        const [year, month] = normalized.split('-');
+                                        if (!year || !month) return val;
+                                        const d = new Date(Number(year), Number(month) - 1, 1);
+                                        return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                                    }} />
                                   <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: axisColor}} />
                                   <Tooltip contentStyle={TOOLTIP_STYLE} itemStyle={{ color: '#fff' }} cursor={{fill: currentTheme === 'dark' ? '#334155' : '#f8fafc'}} formatter={(value: number) => `$${value.toLocaleString()}`} />
                                   <Bar dataKey="amount" fill="#10b981" radius={[4, 4, 0, 0]} />

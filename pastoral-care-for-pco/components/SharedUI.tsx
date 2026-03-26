@@ -148,7 +148,7 @@ export const DonorListWidget: React.FC<{ title: string; donors: LifecycleDonor[]
                                             />
                                         )}
                                     </p>
-                                    <p className="text-[9px] text-slate-400">Total: ${d.totalAmount.toLocaleString()}</p>
+                                    <p className="text-[9px] text-slate-400">Avg/mo: ${Math.round(d.avgMonthlyAmount).toLocaleString()}</p>
                                 </div>
                             </div>
                             <span className="text-[9px] font-mono text-slate-400">{new Date(d.lastGiftDate).toLocaleDateString()}</span>

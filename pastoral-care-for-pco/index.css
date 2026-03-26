@@ -24,3 +24,23 @@ body {
   min-width: 320px;
   min-height: 100vh;
 }
+
+/* ─── Tiptap editor text visibility ─────────────────────────────────────────── */
+.ProseMirror {
+  color: #1e293b; /* slate-900 */
+  outline: none;
+  min-height: 80px;
+}
+
+.ProseMirror p.is-editor-empty:first-child::before {
+  color: #94a3b8;
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.dark .ProseMirror {
+  color: #f1f5f9; /* slate-100 */
+}
+

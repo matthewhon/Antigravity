@@ -1,5 +1,5 @@
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
 import { GroupsDashboardData, GlobalStats, PeopleDashboardData, PcoPerson, GroupRiskSettings } from '../types';
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
@@ -82,6 +82,36 @@ const GroupsView: React.FC<GroupsViewProps> = ({
 
   const handleRemoveWidget = (id: string) => {
     onUpdateWidgets(visibleWidgets.filter(w => w !== id));
+  };
+
+  // --- Drag-and-Drop reordering ---
+  const dragItem = useRef<number | null>(null);
+  const dragOverItem = useRef<number | null>(null);
+
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, position: number) => {
+    dragItem.current = position;
+    e.currentTarget.style.opacity = '0.5';
+  };
+
+  const handleDragEnter = (_e: React.DragEvent<HTMLDivElement>, position: number) => {
+    dragOverItem.current = position;
+  };
+
+  const handleDragEnd = (e: React.DragEvent<HTMLDivElement>) => {
+    e.currentTarget.style.opacity = '1';
+    if (dragItem.current !== null && dragOverItem.current !== null && dragItem.current !== dragOverItem.current) {
+      const copy = [...safeVisibleWidgets];
+      const dragged = copy[dragItem.current];
+      copy.splice(dragItem.current, 1);
+      copy.splice(dragOverItem.current, 0, dragged);
+      onUpdateWidgets(copy);
+    }
+    dragItem.current = null;
+    dragOverItem.current = null;
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
   };
 
   const getPersonDetails = (id: string) => {
@@ -973,14 +1003,22 @@ const GroupsView: React.FC<GroupsViewProps> = ({
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          {safeVisibleWidgets.map(id => {
+          {safeVisibleWidgets.map((id, index) => {
               let spanClass = "col-span-1";
               if (id === 'groups_stats') spanClass = "col-span-1 md:col-span-2 lg:col-span-4";
               if (id === 'groups_ai_agent' || id === 'groups_risk_agent' || id === 'event_attendance' || id === 'group_leaders' || id === 'groups_age_demographics') spanClass = "col-span-1 lg:col-span-2";
               if (id === 'group_info') spanClass = "col-span-1 lg:col-span-4";
               
               return (
-                  <div key={id} className={spanClass}>
+                  <div
+                      key={id}
+                      className={`${spanClass} cursor-grab active:cursor-grabbing transition-opacity`}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, index)}
+                      onDragEnter={(e) => handleDragEnter(e, index)}
+                      onDragEnd={handleDragEnd}
+                      onDragOver={handleDragOver}
+                  >
                       {renderWidget(id)}
                   </div>
               );

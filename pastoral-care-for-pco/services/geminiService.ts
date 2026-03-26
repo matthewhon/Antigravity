@@ -3,8 +3,10 @@ import { GoogleGenAI } from "@google/genai";
 import { 
     AttendanceData, GivingData, PeopleDashboardData, GivingAnalytics, 
     GeoInsight, GroupsDashboardData, ServicesDashboardData, CensusStats, 
-    BudgetRecord, PcoFund, GroupRiskSettings, PcoGroup, PastoralNote, PcoPerson 
+    BudgetRecord, PcoFund, GroupRiskSettings, PcoGroup, PastoralNote, PcoPerson,
+    UserRole, WidgetDefinition
 } from "../types";
+import { getRoleBasedDefaults, ALL_WIDGETS } from "../constants/widgetRegistry";
 
 export const generateGlobalInsights = async (
     context: {
@@ -50,7 +52,7 @@ export const generateGlobalInsights = async (
 
     try {
         const response = await ai.models.generateContent({
-            model: "gemini-3-flash-preview",
+            model: "gemini-2.0-flash",
             contents: prompt,
         });
         return response.text || "Unable to generate insights.";
@@ -102,7 +104,7 @@ export const generateGroupsStrategy = async (
 
     try {
         const response = await ai.models.generateContent({
-            model: "gemini-3-flash-preview",
+            model: "gemini-2.0-flash",
             contents: prompt,
         });
         return response.text || "Unable to generate groups strategy.";
@@ -191,7 +193,7 @@ export const generateGroupRiskAnalysis = async (
 
     try {
         const response = await ai.models.generateContent({
-            model: "gemini-3-flash-preview",
+            model: "gemini-2.0-flash",
             contents: prompt,
         });
         return response.text || "Risk analysis unavailable.";
@@ -222,7 +224,7 @@ export const generateChurchInsights = async (
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-2.0-flash",
       contents: prompt,
     });
     return response.text || "Unable to generate insights at this time.";
@@ -257,7 +259,7 @@ export const generatePeopleInsights = async (
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-2.0-flash",
       contents: prompt,
     });
     return response.text || "Insight engine warming up...";
@@ -306,7 +308,7 @@ export const chatWithDemographicAnalyst = async (
 
     try {
         const response = await ai.models.generateContent({
-            model: "gemini-3-flash-preview",
+            model: "gemini-2.0-flash",
             contents: question,
             config: {
                 systemInstruction: systemInstruction,
@@ -349,7 +351,7 @@ export const generateGivingInsights = async (
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-2.0-flash",
       contents: prompt,
     });
     return response.text || "Financial analysis unavailable.";
@@ -409,7 +411,7 @@ export const chatWithGivingAnalyst = async (
 
     try {
         const response = await ai.models.generateContent({
-            model: "gemini-3-flash-preview",
+            model: "gemini-2.0-flash",
             contents: question,
             config: {
                 systemInstruction: systemInstruction,
@@ -457,7 +459,7 @@ export const generateGroupsInsights = async (
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-2.0-flash",
       contents: prompt,
     });
     return response.text || "Community analysis unavailable.";
@@ -568,7 +570,7 @@ export const generateCommunityStrategy = async (
 
     try {
         const response = await ai.models.generateContent({
-            model: "gemini-3-flash-preview",
+            model: "gemini-2.0-flash",
             contents: prompt,
         });
         return response.text || "Unable to generate community strategy.";
@@ -613,7 +615,7 @@ export const generateCareAdvice = async (
 
     try {
         const response = await ai.models.generateContent({
-            model: "gemini-3-flash-preview",
+            model: "gemini-2.0-flash",
             contents: prompt,
         });
         return response.text || "Care advice unavailable.";
@@ -706,7 +708,7 @@ export const askPastorAI = async (
 
     try {
         const response = await ai.models.generateContent({
-            model: "gemini-3-flash-preview",
+            model: "gemini-2.0-flash",
             contents: question,
             config: {
                 systemInstruction: systemInstruction,
@@ -716,5 +718,76 @@ export const askPastorAI = async (
     } catch (e) {
         console.error("Pastor AI Error", e);
         return "I'm having trouble connecting to my knowledge base right now. Please try again.";
+    }
+};
+
+/**
+ * Generates a personalized widget layout for a first-time user based on their roles.
+ * Falls back to getRoleBasedDefaults if Gemini is unavailable or returns invalid JSON.
+ */
+export const generateLayoutSuggestion = async (
+    roles: string[]
+): Promise<Record<string, string[]>> => {
+    const fallback = getRoleBasedDefaults(roles);
+
+    // Build a compact widget catalog for the prompt
+    const catalog = Object.entries(ALL_WIDGETS).map(([view, widgets]) =>
+        `${view}: [${widgets.map(w => w.id).join(', ')}]`
+    ).join('\n');
+
+    const prompt = `
+You are a dashboard personalization engine for a church management app.
+A new user is logging in for the first time. Their roles are: ${roles.join(', ')}.
+
+Based on their roles, select the most relevant widget IDs for each view from the catalog below.
+Only include widget IDs that exist in the catalog for that view.
+
+WIDGET CATALOG:
+${catalog}
+
+Return ONLY a valid JSON object (no markdown, no explanation) with this exact shape:
+{
+  "dashboard": [...],
+  "people": [...],
+  "people_households": [...],
+  "people_risk": [...],
+  "groups": [...],
+  "services_overview": [...],
+  "services_attendance": [...],
+  "services_teams": [...],
+  "giving_overview": [...],
+  "giving_donors": [...],
+  "pastoral_church": [...],
+  "pastoral_membership": [...],
+  "pastoral_community": [...],
+  "pastoral_care": [...]
+}
+
+Rules:
+- For views that are not relevant to the user's roles, still return a short sensible default (2–3 widgets).
+- Prioritize widgets that match the user's primary responsibilities.
+- Keep each view to 4–8 widgets maximum.
+`;
+
+    try {
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.0-flash',
+            contents: prompt,
+        });
+
+        const raw = (response.text || '').trim();
+        // Strip markdown code fences if present
+        const jsonStr = raw.replace(/^```json?\n?/, '').replace(/\n?```$/, '').trim();
+        const parsed = JSON.parse(jsonStr);
+
+        // Validate it's an object with at least a dashboard key
+        if (parsed && typeof parsed === 'object' && Array.isArray(parsed.dashboard)) {
+            return parsed as Record<string, string[]>;
+        }
+        return fallback;
+    } catch (e) {
+        console.warn('generateLayoutSuggestion fell back to role-based defaults:', e);
+        return fallback;
     }
 };

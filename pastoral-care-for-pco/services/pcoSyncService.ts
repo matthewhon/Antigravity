@@ -271,7 +271,8 @@ export const syncCheckInCounts = async (churchId: string) => {
         // Fetch all recent check-ins — each record has a `person_id` attribute
         const checkIns = await fetchAllPages(
             churchId,
-            `check_ins/v2/check_ins?where[created_at][gte]=${sinceStr}&per_page=100`,
+            `check-ins/v2/check_ins?where[created_at][gte]=${sinceStr}&per_page=100`,
+
             (ci: any) => ({
                 personId: ci.attributes?.person_id || ci.relationships?.person?.data?.id || null,
             })
@@ -304,7 +305,7 @@ export const syncGroupsData = async (churchId: string) => {
     logger.info('Syncing groups (deep scan)...', 'sync', { churchId }, churchId);
     
     // 1. Fetch Basic Group List with correctly mapped Types (via 'include')
-    const groups = await fetchAllPages(churchId, 'groups/v2/groups', (g: any, included: any[] = []) => {
+    const groups = await fetchAllPages(churchId, 'groups/v2/groups?include=group_type', (g: any, included: any[] = []) => {
         // Resolve Group Type Name from 'included'
         const typeId = g.relationships?.group_type?.data?.id;
         const typeObj = included?.find(i => i.type === 'GroupType' && i.id === typeId);
@@ -640,6 +641,7 @@ export const syncServicesData = async (churchId: string) => {
 
         const membersUrl = `services/v2/service_types/${plan.serviceTypeId}/plans/${plan.id}/team_members`;
         const neededUrl = `services/v2/service_types/${plan.serviceTypeId}/plans/${plan.id}/needed_positions`;
+        const itemsUrl = `services/v2/service_types/${plan.serviceTypeId}/plans/${plan.id}/items?filter=song_items&include=song`;
         
         try {
             // Fetch Members
@@ -698,13 +700,44 @@ export const syncServicesData = async (churchId: string) => {
             });
             const totalNeeded = neededPositions.reduce((sum: number, n: any) => sum + n.quantity, 0);
 
+            // Fetch Plan Items (Songs) — enables Top Songs widget
+            // Uses include=song to get title/author from the related Song resource
+            let items: { type: string; title: string; author?: string }[] = [];
+            try {
+                const itemsData = await pcoFetch(churchId, itemsUrl);
+                // Build a lookup map for included Song resources
+                const includedSongs = new Map<string, { title: string; author: string }>();
+                (itemsData.included || []).forEach((inc: any) => {
+                    if (inc.type === 'Song') {
+                        includedSongs.set(inc.id, {
+                            title: inc.attributes.title || 'Unknown',
+                            author: inc.attributes.author || ''
+                        });
+                    }
+                });
+
+                items = (itemsData.data || []).map((item: any) => {
+                    const songId = item.relationships?.song?.data?.id;
+                    const songDetail = songId ? includedSongs.get(songId) : null;
+                    return {
+                        type: 'song',
+                        title: songDetail?.title || item.attributes.title || 'Unknown Title',
+                        author: songDetail?.author || ''
+                    };
+                }).filter((item: any) => item.title && item.title !== 'Unknown Title');
+            } catch (itemsErr) {
+                // Non-fatal — songs are optional; plan still saves without them
+                console.warn(`Could not fetch items for plan ${plan.id}:`, itemsErr);
+            }
+
             detailedPlans.push({
                 ...plan,
                 teamMembers: members,
                 neededPositions: neededPositions,
                 positionsNeeded: totalNeeded,
                 positionsFilled: members.length,
-                isUnderstaffed: totalNeeded > 0
+                isUnderstaffed: totalNeeded > 0,
+                items
             });
             
             await delay(100); // Throttle detail fetching
@@ -895,75 +928,201 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
 };
 
 export const syncCheckInsData = async (churchId: string) => {
-    console.log("Syncing Check-Ins...");
-    
-    // Sync last 90 days of check-ins
+    logger.info('Syncing Check-Ins via EventTimes + Headcounts...', 'sync', { churchId }, churchId);
+
+    // Fetch last 90 days of event times
+    // PCO Check-Ins hierarchy: Event → EventPeriod → EventTime
+    // EventTime has headcount data directly as attributes (regular_count, guest_count, volunteer_count, total_count)
     const since = new Date();
     since.setDate(since.getDate() - 90);
-    const sinceStr = since.toISOString();
+    const sinceStr = since.toISOString(); // Full ISO string for starts_at filter
 
     try {
-        // FIX 1: PCO Check-Ins API uses underscores, not hyphens — "check_ins" not "check-ins"
-        const checkIns = await fetchAllPages(churchId, `check_ins/v2/check_ins?where[created_at][gte]=${sinceStr}&include=event,person`, (c: any, included: any[] = []) => {
-            const attrs = c.attributes;
-            const rels = c.relationships;
-            const personId = rels?.person?.data?.id;
-            const eventId = rels?.event?.data?.id;
+        // Fetch event times with event name, headcounts, AND attendance_type names
+        // include=event            → event name (e.g. "Sunday Morning")
+        // include=headcounts       → manually-entered headcount totals per AttendanceType
+        // include=attendance_types → the name of each AttendanceType (Standard, Custom, etc.)
+        const eventTimes = await fetchAllPages(
+            churchId,
+            `check-ins/v2/event_times?where[created_at][gte]=${sinceStr}&include=event,headcounts,attendance_types`,
+            (et: any, included: any[] = []) => {
+                const attrs = et.attributes;
+                const startsAt: string = attrs.starts_at;
+                if (!startsAt) return null;
 
-            return {
-                id: c.id,
+                // Resolve the parent event name from included resources
+                const eventId = et.relationships?.event?.data?.id;
+                const eventObj = included?.find(i => i.type === 'Event' && i.id === eventId);
+                const eventName = eventObj?.attributes?.name || 'Service';
+
+                // --- Digital check-in transaction count (people who used the PCO app/kiosk) ---
+                const digitalCheckins: number = attrs.total_count || 0;
+
+                // --- Manual headcounts (from included Headcount + AttendanceType resources) ---
+                // Each Headcount links to an AttendanceType via relationships.attendance_type.data.id
+                // The AttendanceType.name tells us whether it's Standard (Regular/Guest/Volunteer) or Custom
+                const headcountRefs: any[] = et.relationships?.headcounts?.data || [];
+
+                let regulars = 0;
+                let guests = 0;
+                let volunteers = 0;
+                const customHeadcounts: { name: string; total: number }[] = [];
+
+                headcountRefs.forEach((ref: any) => {
+                    const hc = included?.find(i => i.type === 'Headcount' && i.id === ref.id);
+                    if (!hc) return;
+
+                    const hcTotal: number = hc.attributes?.total || 0;
+                    if (hcTotal === 0) return; // Skip zero-count entries
+
+                    // Resolve the AttendanceType name for this headcount
+                    const atTypeId = hc.relationships?.attendance_type?.data?.id;
+                    const atType = included?.find(i => i.type === 'AttendanceType' && i.id === atTypeId);
+                    const typeName: string = (atType?.attributes?.name || '').trim();
+                    const typeNameLower = typeName.toLowerCase();
+
+                    // Standard types: Regular, Guest, Volunteer (by convention in PCO)
+                    if (typeNameLower === 'regular' || typeNameLower === 'regulars') {
+                        regulars += hcTotal;
+                    } else if (typeNameLower === 'guest' || typeNameLower === 'guests') {
+                        guests += hcTotal;
+                    } else if (typeNameLower === 'volunteer' || typeNameLower === 'volunteers') {
+                        volunteers += hcTotal;
+                    } else {
+                        // Custom attendance type — store with its name
+                        const existing = customHeadcounts.find(c => c.name === typeName);
+                        if (existing) {
+                            existing.total += hcTotal;
+                        } else {
+                            customHeadcounts.push({ name: typeName || 'Other', total: hcTotal });
+                        }
+                    }
+                });
+
+                // Grand total = standard headcounts + custom headcounts + digital check-ins
+                const standardTotal = regulars + guests + volunteers;
+                const customTotal = customHeadcounts.reduce((s, c) => s + c.total, 0);
+                const total = standardTotal + customTotal + digitalCheckins;
+
+                return {
+                    id: et.id,
+                    eventId: eventId || 'unknown',
+                    eventName,
+                    startsAt,
+                    date: startsAt.split('T')[0],
+                    regulars,
+                    guests,
+                    volunteers,
+                    digitalCheckins,
+                    customHeadcounts,
+                    total,
+                    headcount: 0, // legacy field, kept for compatibility
+                };
+            }
+        );
+
+
+
+        // Filter out nulls
+        const validTimes = eventTimes.filter(Boolean);
+
+        logger.info(`Found ${validTimes.length} check-in event times`, 'sync', { churchId, count: validTimes.length }, churchId);
+
+        if (validTimes.length === 0) {
+            logger.warn(
+                'No check-in event times found — Check-Ins app may not be active, no events in range, or OAuth scope missing',
+                'sync', { churchId }, churchId
+            );
+            return;
+        }
+
+        // Aggregate event times into daily AttendanceRecord objects
+        // Multiple services on the same day are combined into one daily record,
+        // with individual event details stored in the 'events' array for the Events table widget.
+        const dailyMap = new Map<string, {
+            total: number;
+            guests: number;
+            volunteers: number;
+            regulars: number;
+            headcount: number;
+            digitalCheckins: number;
+            customHeadcounts: { name: string; total: number }[];
+            events: any[];
+        }>();
+
+        for (const et of validTimes) {
+            const existing = dailyMap.get(et.date) || {
+                total: 0,
+                guests: 0,
+                volunteers: 0,
+                regulars: 0,
+                headcount: 0,
+                digitalCheckins: 0,
+                customHeadcounts: [] as { name: string; total: number }[],
+                events: [],
+            };
+
+            existing.total += et.total;
+            existing.guests += et.guests;
+            existing.volunteers += et.volunteers;
+            existing.regulars += et.regulars;
+            existing.headcount += et.headcount;
+            existing.digitalCheckins += et.digitalCheckins || 0;
+
+            // Merge custom headcounts by name
+            for (const custom of (et.customHeadcounts || [])) {
+                const found = existing.customHeadcounts.find(c => c.name === custom.name);
+                if (found) found.total += custom.total;
+                else existing.customHeadcounts.push({ ...custom });
+            }
+
+            existing.events.push({
+                id: et.id,
+                name: et.eventName,
+                startsAt: et.startsAt,
+                guests: et.guests,
+                regulars: et.regulars,
+                volunteers: et.volunteers,
+                headcount: et.headcount,
+                digitalCheckins: et.digitalCheckins || 0,
+                customHeadcounts: et.customHeadcounts || [],
+                total: et.total,
+            });
+
+            dailyMap.set(et.date, existing);
+        }
+
+        // Convert to AttendanceRecord array and save to Firestore
+        const attendanceRecords: AttendanceRecord[] = [];
+        dailyMap.forEach((stats, date) => {
+            attendanceRecords.push({
+                id: `daily_${churchId}_${date}`,
                 churchId,
-                personId: personId || 'unknown',
-                eventId: eventId || 'unknown',
-                date: attrs.created_at.split('T')[0],
-                createdAt: attrs.created_at,
-                checkedInAt: attrs.created_at,
-                securityCode: attrs.security_code,
-                kind: attrs.kind // 'Regular', 'Guest', 'Volunteer'
-            } as CheckInRecord;
+                date,
+                count: stats.total,
+                guests: stats.guests,
+                regulars: stats.regulars,
+                volunteers: stats.volunteers,
+                headcount: stats.headcount,
+                digitalCheckins: stats.digitalCheckins,
+                customHeadcounts: stats.customHeadcounts,
+                events: stats.events,
+            } as any);
         });
 
-        if (checkIns.length > 0) {
-            await firestore.upsertCheckIns(checkIns);
-            
-            // FIX 2: Aggregate by actual check-in DATE (daily) instead of Sunday week.
-            // The UI filters by exact YYYY-MM-DD ranges — weekly Sunday keys would never match.
-            const dailyStats = new Map<string, { total: number, guests: number, volunteers: number, regulars: number }>();
-            
-            checkIns.forEach(ci => {
-                // ci.date is already YYYY-MM-DD from attrs.created_at.split('T')[0]
-                const dateKey = ci.date;
-
-                const current = dailyStats.get(dateKey) || { total: 0, guests: 0, volunteers: 0, regulars: 0 };
-                current.total++;
-                if (ci.kind === 'Guest') current.guests++;
-                else if (ci.kind === 'Volunteer') current.volunteers++;
-                else current.regulars++;
-                
-                dailyStats.set(dateKey, current);
-            });
-
-            // Convert to AttendanceRecord format for the Services Attendance chart
-            const attendanceRecords: AttendanceRecord[] = [];
-            dailyStats.forEach((stats, date) => {
-                attendanceRecords.push({
-                    id: `daily_${churchId}_${date}`,
-                    churchId,
-                    date,
-                    count: stats.total,
-                    guests: stats.guests,
-                    regulars: stats.regulars,
-                    volunteers: stats.volunteers,
-                    headcount: 0
-                });
-            });
-
-            if (attendanceRecords.length > 0) {
-                await firestore.upsertAttendance(attendanceRecords);
-            }
-            console.log(`Synced ${checkIns.length} check-ins, aggregated ${attendanceRecords.length} daily records.`);
+        if (attendanceRecords.length > 0) {
+            await firestore.upsertAttendance(attendanceRecords);
         }
-    } catch (e) {
-        console.error("Check-ins sync failed", e);
+
+        logger.info(
+            'Check-Ins sync complete',
+            'sync',
+            { churchId, eventTimes: validTimes.length, dailyRecords: attendanceRecords.length },
+            churchId
+        );
+
+    } catch (e: any) {
+        logger.error('Check-Ins sync failed', 'sync', { error: e?.message }, churchId);
+        console.error('Check-ins sync failed:', e);
     }
 };

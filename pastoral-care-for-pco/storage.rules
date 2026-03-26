@@ -1,0 +1,28 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // ─── Email media uploads ──────────────────────────────────────────────────
+    // Allow authenticated users to read/write email images and files.
+    // Files are scoped to the church via filename prefix (uploaded by the app).
+
+    match /email_images/{fileName} {
+      allow read: if true;                         // Public read (needed for email recipients)
+      allow write: if request.auth != null         // Must be signed in
+                   && request.resource.size < 10 * 1024 * 1024  // Max 10 MB
+                   && request.resource.contentType.matches('image/.*');
+    }
+
+    match /email_files/{fileName} {
+      allow read: if true;                         // Public read (email recipients click downloads)
+      allow write: if request.auth != null         // Must be signed in
+                   && request.resource.size < 50 * 1024 * 1024; // Max 50 MB
+    }
+
+    // ─── All other paths blocked by default ──────────────────────────────────
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

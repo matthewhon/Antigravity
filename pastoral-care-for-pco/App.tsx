@@ -19,6 +19,8 @@ import { GlobalAdminManager } from './components/GlobalAdminManager';
 import { PastorAIView } from './components/PastorAIView';
 import { CommunicationModule } from './components/CommunicationModule';
 import { MetricsView } from './components/MetricsView';
+import LibraryView from './components/LibraryView';
+import WelcomeLayoutModal from './components/WelcomeLayoutModal';
 import { 
   User, Church, PeopleDashboardData, GivingAnalytics, GroupsDashboardData, 
   ServicesDashboardData, AttendanceData, CensusStats, BudgetRecord, PcoFund, 
@@ -28,7 +30,7 @@ import {
 import { getDefaultWidgets } from './constants/widgetRegistry';
 import { calculateGivingAnalytics, DEFAULT_LIFECYCLE_SETTINGS } from './services/analyticsService';
 import { fetchCensusDataForTenant } from './services/censusService';
-import { generateGlobalInsights, generateGeoInsights } from './services/geminiService';
+import { generateGlobalInsights, generateGeoInsights, generateLayoutSuggestion } from './services/geminiService';
 import { calculateBulkRisk, DEFAULT_RISK_SETTINGS } from './services/riskService';
 
 const App: React.FC = () => {
@@ -70,6 +72,10 @@ const App: React.FC = () => {
   // Widget Preferences
   const [widgets, setWidgets] = useState<string[]>([]);
 
+  // First-login layout suggestion
+  const [layoutSuggestion, setLayoutSuggestion] = useState<Record<string, string[]> | null>(null);
+  const [isGeneratingLayout, setIsGeneratingLayout] = useState(false);
+
   const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
 
   // Refs
@@ -107,6 +113,18 @@ const App: React.FC = () => {
                     const churches = await firestore.getAllChurches();
                     setAllChurches(churches);
                 }
+            }
+
+            // First login detection: no lastLogin + no widgetPreferences saved
+            const isFirstLogin = !userProfile.lastLogin && !userProfile.widgetPreferences;
+            if (isFirstLogin) {
+                setIsGeneratingLayout(true);
+                // Show the modal immediately (spinner state) then populate
+                setLayoutSuggestion({});
+                generateLayoutSuggestion(userProfile.roles as string[])
+                    .then(suggestion => setLayoutSuggestion(suggestion))
+                    .catch(() => setLayoutSuggestion({}))
+                    .finally(() => setIsGeneratingLayout(false));
             }
           } else {
             console.error("No user profile found for auth user");
@@ -354,6 +372,21 @@ const App: React.FC = () => {
           firestore.updateUserPreferences(user.id, newPrefs);
           setUser({ ...user, widgetPreferences: newPrefs });
       }
+  };
+
+  const handleAcceptLayout = (layout: Record<string, string[]>) => {
+      if (!user) return;
+      firestore.updateUserPreferences(user.id, layout);
+      setUser({ ...user, widgetPreferences: layout });
+      // Apply dashboard widgets immediately
+      if (layout['dashboard']) setWidgets(layout['dashboard']);
+      setLayoutSuggestion(null);
+  };
+
+  const handleCustomizeLayout = (layout: Record<string, string[]>) => {
+      // Save the suggestion first so it isn't lost, then close modal
+      handleAcceptLayout(layout);
+      // The user will use the WidgetsController drawer to further adjust
   };
 
   const handleSync = async () => {
@@ -631,7 +664,7 @@ const App: React.FC = () => {
       const totalEnrollment = groups.reduce((sum, g) => sum + g.membersCount, 0);
       const groupTypeMap = new Map<string, number>();
       groups.forEach(g => {
-          groupTypeMap.set(g.groupTypeName, (groupTypeMap.get(g.groupTypeName) || 0) + 1);
+          groupTypeMap.set(g.groupTypeName || 'Unknown', (groupTypeMap.get(g.groupTypeName || 'Unknown') || 0) + 1);
       });
 
       // Calculate Gender Distribution based on Group Members
@@ -738,6 +771,16 @@ const App: React.FC = () => {
   const safeEnabledWidgets = (church.enabledWidgets && church.enabledWidgets.length > 0) ? church.enabledWidgets : undefined;
 
   return (
+    <>
+    {layoutSuggestion !== null && (
+        <WelcomeLayoutModal
+            user={user}
+            suggestedLayout={layoutSuggestion}
+            isLoading={isGeneratingLayout}
+            onAccept={handleAcceptLayout}
+            onCustomize={handleCustomizeLayout}
+        />
+    )}
     <Layout 
         user={user} 
         church={church} 
@@ -749,6 +792,7 @@ const App: React.FC = () => {
         hasPermission={hasPermission}
         onRefreshUser={() => firestore.getUserProfile(user.id).then(u => u && setUser(u))}
         isSyncing={isSyncing}
+        enableLibrary={systemSettings?.enableLibrary}
     >
         {view === 'dashboard' && (
             <DashboardView 
@@ -775,6 +819,7 @@ const App: React.FC = () => {
                 onUpdateTheme={handleUpdateUserTheme}
                 churchRiskSettings={church.churchRiskSettings}
                 onGenerateInsights={handleGenerateAIInsights}
+                churchName={church.name}
             />
         )}
         {view === 'communication' && systemSettings?.enabledModules?.communication !== false && <CommunicationModule churchId={church.id} />}
@@ -903,9 +948,27 @@ const App: React.FC = () => {
                 censusData={censusData}
                 churchConfig={{ city: church.city, state: church.state }}
                 censusError={censusError}
-                visibleWidgets={user.widgetPreferences?.['pastoral'] || getDefaultWidgets('pastoral')}
-                onUpdateWidgets={(w) => {
-                    const newPrefs = { ...user.widgetPreferences, 'pastoral': w };
+                churchWidgets={user.widgetPreferences?.['pastoral_church'] || getDefaultWidgets('pastoral')}
+                membershipWidgets={user.widgetPreferences?.['pastoral_membership'] || getDefaultWidgets('pastoral_membership')}
+                communityWidgets={user.widgetPreferences?.['pastoral_community'] || getDefaultWidgets('pastoral_community')}
+                careWidgets={user.widgetPreferences?.['pastoral_care'] || getDefaultWidgets('pastoral_care')}
+                onUpdateChurchWidgets={(w) => {
+                    const newPrefs = { ...user.widgetPreferences, 'pastoral_church': w };
+                    firestore.updateUserPreferences(user.id, newPrefs);
+                    setUser({ ...user, widgetPreferences: newPrefs });
+                }}
+                onUpdateMembershipWidgets={(w) => {
+                    const newPrefs = { ...user.widgetPreferences, 'pastoral_membership': w };
+                    firestore.updateUserPreferences(user.id, newPrefs);
+                    setUser({ ...user, widgetPreferences: newPrefs });
+                }}
+                onUpdateCommunityWidgets={(w) => {
+                    const newPrefs = { ...user.widgetPreferences, 'pastoral_community': w };
+                    firestore.updateUserPreferences(user.id, newPrefs);
+                    setUser({ ...user, widgetPreferences: newPrefs });
+                }}
+                onUpdateCareWidgets={(w) => {
+                    const newPrefs = { ...user.widgetPreferences, 'pastoral_care': w };
                     firestore.updateUserPreferences(user.id, newPrefs);
                     setUser({ ...user, widgetPreferences: newPrefs });
                 }}
@@ -914,17 +977,7 @@ const App: React.FC = () => {
                 onUpdateTheme={handleUpdateUserTheme}
             />
         )}
-        {view === 'pastor-ai' && (
-            <PastorAIView 
-                peopleData={peopleDashboardData}
-                givingAnalytics={givingAnalyticsData}
-                groupsData={groupsDashboardData}
-                servicesData={servicesData}
-                attendanceData={attendanceChartData}
-                censusData={censusData}
-                churchName={church.name}
-            />
-        )}
+
         {view === 'metrics' && (
             <MetricsView 
                 churchId={church.id}
@@ -966,7 +1019,13 @@ const App: React.FC = () => {
         {view === 'global-admin' && (
             <GlobalAdminManager />
         )}
+        {view === 'library' && (user.email === 'matthewhon01@gmail.com' || systemSettings?.enableLibrary) && (
+            <div className="flex-1 min-h-0 overflow-y-auto p-6">
+                <LibraryView churchId={church.id} />
+            </div>
+        )}
     </Layout>
+    </>
   );
 };
 

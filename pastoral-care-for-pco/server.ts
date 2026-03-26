@@ -12,6 +12,9 @@ import { createServer as createViteServer } from 'vite';
 import { pcoTokenExchange } from './backend/pcoTokenExchange';
 import { pcoProxy } from './backend/pcoProxy';
 import { handlePcoWebhook } from './backend/pcoWebhookHandler';
+import { sendEmail } from './backend/sendEmail';
+import { startEmailScheduler } from './backend/emailScheduler';
+import { getDb } from './backend/firebase';
 
 // Fix for bundled CJS environment
 const __dirname = process.cwd();
@@ -50,6 +53,52 @@ async function startServer() {
 
     // PCO Proxy
     app.post('/pco/proxy', express.json(), pcoProxy);
+
+    // Email (SendGrid)
+    app.post('/email/send', express.json(), sendEmail);
+    app.post('/email/test', express.json(), sendEmail);
+
+    // Schedule an email campaign
+    app.post('/email/schedule', express.json(), async (req: any, res: any) => {
+      const { campaignId, churchId, scheduledAt } = req.body || {};
+      if (!campaignId || !churchId || !scheduledAt) {
+        return res.status(400).json({ error: 'Missing campaignId, churchId, or scheduledAt' });
+      }
+      try {
+        const db = getDb();
+        await db.collection('email_campaigns').doc(campaignId).update({
+          status: 'scheduled',
+          scheduledAt: Number(scheduledAt),
+          sendAt: new Date(Number(scheduledAt)).toISOString(),
+          retryCount: 0,
+          lastError: null,
+          updatedAt: Date.now(),
+        });
+        res.json({ success: true, message: 'Email scheduled successfully.' });
+      } catch (e: any) {
+        res.status(500).json({ error: e.message || 'Failed to schedule email' });
+      }
+    });
+
+    // Cancel a scheduled email (revert to draft)
+    app.post('/email/cancel-schedule', express.json(), async (req: any, res: any) => {
+      const { campaignId } = req.body || {};
+      if (!campaignId) return res.status(400).json({ error: 'Missing campaignId' });
+      try {
+        const db = getDb();
+        await db.collection('email_campaigns').doc(campaignId).update({
+          status: 'draft',
+          scheduledAt: null,
+          sendAt: null,
+          retryCount: 0,
+          lastError: null,
+          updatedAt: Date.now(),
+        });
+        res.json({ success: true, message: 'Schedule cancelled.' });
+      } catch (e: any) {
+        res.status(500).json({ error: e.message || 'Failed to cancel schedule' });
+      }
+    });
 
     // 3. Standard Middlewares (JSON body for any other routes)
     app.use((req, res, next) => {
@@ -94,6 +143,13 @@ async function startServer() {
     // 5. Start Listening
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`>>> Server is listening on port ${PORT} (0.0.0.0)`);
+      // Start email scheduler after server is up
+      try {
+        const db = getDb();
+        startEmailScheduler(db as any);
+      } catch (e) {
+        console.warn('[EmailScheduler] Could not start scheduler:', e);
+      }
     });
 
   } catch (error) {

@@ -121,6 +121,18 @@ export const pcoProxy = async (req: any, res: any) => {
         if (!response.ok) {
             const errText = await response.text();
             log.warn('PCO upstream error', 'proxy', { churchId, url, status: response.status, error: errText.substring(0, 300) }, churchId);
+
+            // Special handling for 404 on registrations — this almost always means the OAuth token
+            // was granted before the 'registrations' scope was added and needs re-authorization.
+            if (response.status === 404 && url?.includes('/registrations/')) {
+                res.status(404).json({
+                    error: 'Registrations not accessible. Your Planning Center connection needs to be updated to include Registrations access.',
+                    requiresReauth: true,
+                    detail: errText.substring(0, 200)
+                });
+                return;
+            }
+
             res.status(response.status).send(errText);
             return;
         }

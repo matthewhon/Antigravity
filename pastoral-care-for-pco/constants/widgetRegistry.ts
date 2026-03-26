@@ -85,6 +85,7 @@ export const SERVICES_TEAMS_WIDGETS: WidgetDefinition[] = [
 
 export const GIVING_WIDGETS: WidgetDefinition[] = [
     { id: 'keyMetrics', label: 'Key Financial Overview', icon: '💰' },
+    { id: 'budgetProgress', label: 'Budget Progress', icon: '🌡️' },
     { id: 'trendsComparison', label: 'Trends Comp', icon: '📉' },
     { id: 'funds', label: 'Funds', icon: '🏦' },
     { id: 'avgGift', label: 'Avg Gift Demographics', icon: '🎁' },
@@ -168,6 +169,67 @@ export const ALL_WIDGETS: Record<string, WidgetDefinition[]> = {
     pastoral_care: PASTORAL_CARE_WIDGETS,
 };
 
+export const getRoleBasedDefaults = (roles: string[]): Record<string, string[]> => {
+    const has = (role: string) => roles.includes(role);
+    const isAdmin   = has('Church Admin') || has('System Administration');
+    const isPastor  = has('Pastor') || isAdmin;
+    const isGiving  = has('Giving') || has('Finance') || isAdmin;
+    const isServices = has('Services') || isAdmin;
+    const isPeople  = has('People') || isAdmin;
+    const isGroups  = has('Groups') || isAdmin;
+    const isCare    = has('Pastoral Care') || isPastor;
+
+    // Dashboard — everyone sees it; tailor by primary role
+    let dashboard = ['ai_insights', 'people_stats'];
+    if (isPastor)   dashboard = ['ai_insights', 'people_stats', 'churchRisk', 'keyMetrics', 'groups_stats', 'services_stats'];
+    else if (isGiving)  dashboard = ['keyMetrics', 'people_stats', 'trends', 'groups_stats'];
+    else if (isServices) dashboard = ['services_stats', 'people_stats', 'ai_insights'];
+    else if (isPeople)  dashboard = ['people_stats', 'churchRisk', 'ai_insights'];
+    else if (isGroups)  dashboard = ['groups_stats', 'people_stats', 'ai_insights'];
+
+    return {
+        dashboard,
+        // People
+        people: isPeople || isPastor
+            ? ['people_stats', 'people_engagement', 'gender', 'age', 'riskDistribution', 'map', 'birthdays']
+            : ['people_stats', 'people_engagement', 'gender', 'age', 'map'],
+        people_households: ['householdSummary', 'householdComp', 'householdSize'],
+        people_risk: isPeople || isPastor
+            ? ['riskDistribution', 'atRiskList', 'riskChanges', 'people_directory']
+            : ['riskDistribution', 'atRiskList'],
+        // Groups
+        groups: isGroups || isPastor
+            ? ['groups_ai_agent', 'groups_stats', 'event_attendance', 'groups_gender', 'group_leaders']
+            : ['groups_stats', 'event_attendance'],
+        // Services
+        services_overview: isServices || isPastor
+            ? ['services_stats', 'upcoming_plans_list', 'staffing_needs', 'team_breakdown', 'checkin_history']
+            : ['services_stats', 'upcoming_plans_list'],
+        services_attendance: ['checkin_history', 'events', 'services_stats'],
+        services_teams: isServices
+            ? ['services_teams_list', 'burnout_watchlist', 'team_roster']
+            : ['services_teams_list'],
+        // Giving
+        giving_overview: isGiving || isPastor
+            ? ['keyMetrics', 'budgetProgress', 'trendsComparison', 'funds', 'topGivers', 'donorLifecycle']
+            : ['keyMetrics', 'trendsComparison', 'funds'],
+        giving_donors: isGiving
+            ? ['topGivers', 'demographics', 'donorLifecycle', 'lifecycleNew', 'lifecycleLapsed']
+            : ['topGivers', 'demographics'],
+        // Pastoral
+        pastoral_church: isPastor
+            ? ['church_growth_stats', 'church_spiritual_stats', 'church_attendance_chart', 'church_guest_funnel']
+            : ['church_growth_stats', 'church_attendance_chart'],
+        pastoral_membership: isPastor || isCare
+            ? ['member_headline_stats', 'member_map', 'member_age_chart', 'member_unconnected', 'member_pastoral_touches']
+            : ['member_headline_stats', 'member_map'],
+        pastoral_community: ['censusHero', 'culturalMosaic', 'ministrySignals', 'economicHealth'],
+        pastoral_care: isCare
+            ? ['care_log', 'prayer_requests', 'follow_ups', 'care_ai_agent']
+            : ['care_log', 'prayer_requests'],
+    };
+};
+
 export const getDefaultWidgets = (view: string): string[] => {
     switch (view) {
         case 'dashboard': return ['ai_insights', 'people_stats', 'keyMetrics', 'groups_stats', 'services_stats', 'churchRisk'];
@@ -177,7 +239,7 @@ export const getDefaultWidgets = (view: string): string[] => {
         case 'groups': return ['groups_ai_agent', 'groups_stats', 'event_attendance', 'groups_gender'];
         case 'services': return ['services_stats', 'upcoming_plans_list', 'staffing_needs', 'team_breakdown', 'checkin_history'];
         case 'services_overview': return ['services_stats', 'upcoming_plans_list', 'staffing_needs', 'team_breakdown', 'checkin_history'];
-        case 'services_attendance': return []; // Default to empty as requested
+        case 'services_attendance': return ['checkin_history', 'events', 'services_stats'];
         case 'services_teams': return ['services_teams_list', 'burnout_watchlist', 'team_roster'];
         case 'giving': return ['keyMetrics', 'trendsComparison', 'funds'];
         case 'giving_donor': return ['topGivers', 'demographics', 'donorLifecycle'];

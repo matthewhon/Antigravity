@@ -1,5 +1,5 @@
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
 import { ServicesDashboardData, ServicesFilter, PcoPerson, GlobalStats, ServicePlanSnapshot } from '../types';
 import { 
     ResponsiveContainer,
@@ -100,6 +100,36 @@ const ServicesView: React.FC<ServicesViewProps> = ({
     onUpdateWidgets(visibleWidgets.filter(w => w !== id));
   };
 
+  // --- Drag-and-Drop reordering ---
+  const dragItem = useRef<number | null>(null);
+  const dragOverItem = useRef<number | null>(null);
+
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, position: number) => {
+    dragItem.current = position;
+    e.currentTarget.style.opacity = '0.5';
+  };
+
+  const handleDragEnter = (_e: React.DragEvent<HTMLDivElement>, position: number) => {
+    dragOverItem.current = position;
+  };
+
+  const handleDragEnd = (e: React.DragEvent<HTMLDivElement>) => {
+    e.currentTarget.style.opacity = '1';
+    if (dragItem.current !== null && dragOverItem.current !== null && dragItem.current !== dragOverItem.current) {
+      const copy = [...safeVisibleWidgets];
+      const dragged = copy[dragItem.current];
+      copy.splice(dragItem.current, 1);
+      copy.splice(dragOverItem.current, 0, dragged);
+      onUpdateWidgets(copy);
+    }
+    dragItem.current = null;
+    dragOverItem.current = null;
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+  };
+
   const getPersonDetails = (id: string) => {
       return people.find(p => p.id === id);
   };
@@ -178,8 +208,11 @@ const ServicesView: React.FC<ServicesViewProps> = ({
 
           if (isInRange) {
               plansFound = true;
-              // Accumulate open positions. Note: positionsNeeded from sync is the count of *unfilled* slots.
-              totalOpenSlots += (plan.positionsNeeded || 0);
+              // Prefer neededPositions array (sum of quantities); fall back to scalar positionsNeeded
+              const openFromArray = plan.neededPositions && plan.neededPositions.length > 0
+                  ? plan.neededPositions.reduce((sum, p) => sum + (p.quantity || 0), 0)
+                  : (plan.positionsNeeded || 0);
+              totalOpenSlots += openFromArray;
               
               plan.teamMembers?.forEach(m => {
                   // Robust status check against Normalized Data: 'Confirmed', 'Pending', 'Declined'
@@ -194,13 +227,13 @@ const ServicesView: React.FC<ServicesViewProps> = ({
       if (!plansFound) return null;
 
       const filled = confirmed + pending;
-      // Open slots are directly tracked from PCO's needed_positions
+      // Open slots come from PCO's needed_positions (already accounts for declines re-opening slots)
       const open = totalOpenSlots;
-      // Total Capacity = People Scheduled + Open Slots
-      const totalCapacity = filled + open; 
+      // Total Capacity = People Scheduled (confirmed + pending) + Open Slots
+      const totalCapacity = filled + open;
       const fillRate = totalCapacity > 0 ? Math.round((filled / totalCapacity) * 100) : 0;
 
-      return { confirmed, pending, declined, needed: totalCapacity, open, fillRate };
+      return { confirmed, pending, declined, totalCapacity, open, fillRate };
   }, [data?.futurePlans]);
 
   const filteredUpcomingPlans = useMemo<ServicePlanSnapshot[]>(() => {
@@ -256,51 +289,59 @@ const ServicesView: React.FC<ServicesViewProps> = ({
   const filteredCheckinTrends = useMemo(() => {
       if (!data?.checkIns?.trends) return [];
       const now = new Date();
-      now.setHours(0,0,0,0);
-      
-      let startDate = new Date(now);
-      let endDate = new Date(now);
-      endDate.setHours(23, 59, 59, 999);
+
+      // Helper: format a Date as local YYYY-MM-DD (avoids UTC-shift from toISOString)
+      const toLocalDateStr = (d: Date) => {
+          const y = d.getFullYear();
+          const m = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          return `${y}-${m}-${day}`;
+      };
+
+      let startDate: Date;
+      let endDate: Date;
 
       switch (checkinFilter) {
-          case 'Current Week':
-              startDate.setDate(now.getDate() - now.getDay()); 
-              endDate.setDate(startDate.getDate() + 6);
+          case 'Current Week': {
+              startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
+              endDate   = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay() + 6);
               break;
-          case 'Last Week':
-              startDate.setDate(now.getDate() - now.getDay() - 7);
-              endDate = new Date(startDate);
-              endDate.setDate(startDate.getDate() + 6);
-              endDate.setHours(23, 59, 59, 999);
+          }
+          case 'Last Week': {
+              startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay() - 7);
+              endDate   = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay() - 1);
               break;
-          case 'Current Month':
+          }
+          case 'Current Month': {
               startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-              endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0); 
-              endDate.setHours(23, 59, 59, 999);
+              endDate   = new Date(now.getFullYear(), now.getMonth() + 1, 0);
               break;
-          case 'Last Month':
+          }
+          case 'Last Month': {
               startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-              endDate = new Date(now.getFullYear(), now.getMonth(), 0); 
-              endDate.setHours(23, 59, 59, 999);
+              endDate   = new Date(now.getFullYear(), now.getMonth(), 0);
               break;
-          case 'Current Quarter':
-              startDate = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
-              endDate = new Date(startDate);
-              endDate.setMonth(startDate.getMonth() + 3);
-              endDate.setDate(0);
-              endDate.setHours(23, 59, 59, 999);
+          }
+          case 'Current Quarter': {
+              const qStart = Math.floor(now.getMonth() / 3) * 3;
+              startDate = new Date(now.getFullYear(), qStart, 1);
+              endDate   = new Date(now.getFullYear(), qStart + 3, 0);
               break;
-          case 'Last Quarter':
-              startDate = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3 - 3, 1);
-              endDate = new Date(startDate);
-              endDate.setMonth(startDate.getMonth() + 3);
-              endDate.setDate(0);
-              endDate.setHours(23, 59, 59, 999);
+          }
+          case 'Last Quarter': {
+              const lqStart = Math.floor(now.getMonth() / 3) * 3 - 3;
+              startDate = new Date(now.getFullYear(), lqStart, 1);
+              endDate   = new Date(now.getFullYear(), lqStart + 3, 0);
               break;
+          }
+          default: {
+              startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+              endDate   = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+          }
       }
 
-      const startStr = startDate.toISOString().split('T')[0];
-      const endStr = endDate.toISOString().split('T')[0];
+      const startStr = toLocalDateStr(startDate);
+      const endStr   = toLocalDateStr(endDate);
 
       return data.checkIns.trends.filter(t => {
           const itemDateStr = t.isoDate || t.date;
@@ -310,18 +351,13 @@ const ServicesView: React.FC<ServicesViewProps> = ({
   }, [data?.checkIns?.trends, checkinFilter]);
 
   const eventHeadcountsData = useMemo(() => {
-      // Flatten events from filtered daily records
       if (!filteredCheckinTrends) return [];
       
       const events: any[] = [];
       filteredCheckinTrends.forEach(trend => {
-          // Check if the trend object actually contains 'events' (our new detailed breakdown)
-          // The type definition was updated, but data comes from Firestore which might need a sync.
-          // We fallback to daily aggregation if detailed 'events' array is missing.
           if ((trend as any).events && Array.isArray((trend as any).events)) {
               events.push(...(trend as any).events);
           } else {
-              // Fallback: Create a dummy event for the day if details are missing
               events.push({
                   name: `Daily Total`,
                   startsAt: trend.date,
@@ -329,14 +365,25 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                   regulars: trend.regulars,
                   volunteers: trend.volunteers,
                   headcount: trend.headcount,
+                  digitalCheckins: (trend as any).digitalCheckins || 0,
+                  customHeadcounts: (trend as any).customHeadcounts || [],
                   total: trend.total
               });
           }
       });
       
-      // Sort by start time
       return events.sort((a,b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
   }, [filteredCheckinTrends]);
+
+  // Collect all unique custom headcount names across filtered trends (for dynamic chart bars)
+  const customHeadcountNames = useMemo(() => {
+      const names = new Set<string>();
+      filteredCheckinTrends.forEach(t => {
+          ((t as any).customHeadcounts || []).forEach((c: any) => names.add(c.name));
+      });
+      return Array.from(names);
+  }, [filteredCheckinTrends]);
+
 
   if (!pcoConnected) {
     return (
@@ -688,7 +735,47 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                 </div>
             );
         case 'team_breakdown':
-            return null;
+            const teamChartData = data.teams
+                .filter(t => (t.memberIds?.length || 0) > 0 || (t.scheduledMemberIds?.length || 0) > 0)
+                .map(t => ({
+                    name: t.name.length > 18 ? t.name.slice(0, 18) + '…' : t.name,
+                    Roster: t.memberIds?.length || 0,
+                    'Serving (Period)': t.scheduledMemberIds?.length || 0,
+                }))
+                .sort((a, b) => b['Serving (Period)'] - a['Serving (Period)'])
+                .slice(0, 12);
+
+            return (
+                <div key="team_breakdown" className="col-span-1 lg:col-span-2">
+                    <WidgetWrapper title="Team Roster Breakdown" onRemove={() => handleRemoveWidget('team_breakdown')} source="PCO Services Teams">
+                        {teamChartData.length > 0 ? (
+                            <div className="h-72">
+                                <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={1}>
+                                    <BarChart data={teamChartData} layout="vertical" margin={{ top: 0, right: 20, left: 10, bottom: 0 }}>
+                                        <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: axisColor }} />
+                                        <YAxis type="category" dataKey="name" width={110} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: axisColor }} />
+                                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={gridColor} />
+                                        <Tooltip
+                                            contentStyle={TOOLTIP_STYLE}
+                                            itemStyle={{ color: '#fff' }}
+                                            cursor={{ fill: currentTheme === 'dark' ? '#334155' : '#f8fafc' }}
+                                        />
+                                        <Legend verticalAlign="top" height={28} iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', color: axisColor }} />
+                                        <Bar dataKey="Roster" fill="#6366f1" radius={[0, 4, 4, 0]} barSize={10} />
+                                        <Bar dataKey="Serving (Period)" fill="#10b981" radius={[0, 4, 4, 0]} barSize={10} />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                        ) : (
+                            <div className="h-full flex flex-col items-center justify-center text-center p-6">
+                                <div className="text-3xl mb-2 grayscale opacity-20">👥</div>
+                                <p className="text-xs font-bold text-slate-400 dark:text-slate-500">No Team Data</p>
+                                <p className="text-[10px] text-slate-400 mt-1">Sync Services data to populate team rosters.</p>
+                            </div>
+                        )}
+                    </WidgetWrapper>
+                </div>
+            );
         case 'positions':
             if (!upcoming30DayStats) {
                 return (
@@ -740,22 +827,52 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                 <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mt-1">Still Needed</span>
                             </div>
                         </div>
-                        <div className="mt-4 text-center">
-                             <p className="text-[10px] text-slate-400 font-medium">
-                                Total Capacity: <span className="text-slate-600 dark:text-slate-300 font-bold">{upcoming30DayStats.needed.toLocaleString()}</span> positions across upcoming plans.
-                             </p>
+                        <div className="mt-4 space-y-2">
+                            <div className="flex justify-between text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                                <span>Fill Rate</span>
+                                <span className="text-slate-700 dark:text-slate-200">{upcoming30DayStats.fillRate}%</span>
+                            </div>
+                            <div className="h-2 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden flex">
+                                <div className="h-full bg-emerald-500 transition-all" style={{ width: `${(upcoming30DayStats.confirmed / (upcoming30DayStats.totalCapacity || 1)) * 100}%` }} />
+                                <div className="h-full bg-amber-400 transition-all" style={{ width: `${(upcoming30DayStats.pending / (upcoming30DayStats.totalCapacity || 1)) * 100}%` }} />
+                            </div>
+                            <p className="text-[10px] text-slate-400 font-medium text-center">
+                                Total Capacity: <span className="text-slate-600 dark:text-slate-300 font-bold">{upcoming30DayStats.totalCapacity.toLocaleString()}</span> positions across upcoming plans.
+                            </p>
                         </div>
                     </WidgetWrapper>
                 </div>
             );
-        case 'checkin_history':
-            const checkinData = filteredCheckinTrends.map(t => ({
-                date: t.date,
-                Regulars: t.regulars,
-                Guests: t.guests,
-                Volunteers: t.volunteers,
-                Headcount: t.headcount
-            }));
+        case 'checkin_history': {
+            // Build chart data — one row per day, with all headcount categories as keys
+            const CUSTOM_COLORS = ['#06b6d4','#f97316','#a855f7','#14b8a6','#ec4899','#84cc16'];
+            const checkinData = filteredCheckinTrends.map(t => {
+                const row: any = {
+                    date: t.date,
+                    Regulars: t.regulars,
+                    Guests: t.guests,
+                    Volunteers: t.volunteers,
+                    'Digital Check-Ins': (t as any).digitalCheckins || 0,
+                };
+                ((t as any).customHeadcounts || []).forEach((c: any) => {
+                    row[c.name] = (row[c.name] || 0) + c.total;
+                });
+                return row;
+            });
+
+            // Grand totals for footer
+            const grandRegulars = filteredCheckinTrends.reduce((s, t) => s + t.regulars, 0);
+            const grandGuests = filteredCheckinTrends.reduce((s, t) => s + t.guests, 0);
+            const grandVolunteers = filteredCheckinTrends.reduce((s, t) => s + t.volunteers, 0);
+            const grandDigital = filteredCheckinTrends.reduce((s, t) => s + ((t as any).digitalCheckins || 0), 0);
+            const grandCustom: Record<string,number> = {};
+            customHeadcountNames.forEach(name => {
+                grandCustom[name] = filteredCheckinTrends.reduce((s, t) => {
+                    const hc = ((t as any).customHeadcounts || []).find((c: any) => c.name === name);
+                    return s + (hc?.total || 0);
+                }, 0);
+            });
+            const grandTotal = grandRegulars + grandGuests + grandVolunteers + grandDigital + Object.values(grandCustom).reduce((s,v) => s+v, 0);
 
             return (
                 <div key="checkin_history" className="col-span-1 lg:col-span-4">
@@ -791,10 +908,13 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                             cursor={{fill: currentTheme === 'dark' ? '#334155' : '#f8fafc'}}
                                         />
                                         <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{fontSize: '10px', fontWeight: 'bold', color: axisColor}} />
-                                        <Bar dataKey="Regulars" stackId="checkins" fill="#6366f1" radius={[0, 0, 0, 0]} barSize={40} />
-                                        <Bar dataKey="Guests" stackId="checkins" fill="#f59e0b" radius={[0, 0, 0, 0]} barSize={40} />
-                                        <Bar dataKey="Volunteers" stackId="checkins" fill="#10b981" radius={[4, 4, 0, 0]} barSize={40} />
-                                        <Bar dataKey="Headcount" name="Manual Headcount" stackId="checkins" fill="#8b5cf6" radius={[4, 4, 0, 0]} barSize={40} />
+                                        <Bar dataKey="Regulars" stackId="checkins" fill="#6366f1" radius={[0,0,0,0]} barSize={40} />
+                                        <Bar dataKey="Guests" stackId="checkins" fill="#f59e0b" radius={[0,0,0,0]} barSize={40} />
+                                        <Bar dataKey="Volunteers" stackId="checkins" fill="#10b981" radius={[0,0,0,0]} barSize={40} />
+                                        {customHeadcountNames.map((name, i) => (
+                                            <Bar key={name} dataKey={name} stackId="checkins" fill={CUSTOM_COLORS[i % CUSTOM_COLORS.length]} radius={[0,0,0,0]} barSize={40} />
+                                        ))}
+                                        <Bar dataKey="Digital Check-Ins" stackId="checkins" fill="#3b82f6" radius={[4,4,0,0]} barSize={40} />
                                     </BarChart>
                                 </ResponsiveContainer>
                             ) : (
@@ -803,9 +923,24 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                 </div>
                             )}
                         </div>
+                        {/* Grand total footer */}
+                        {filteredCheckinTrends.length > 0 && (
+                            <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700 flex flex-wrap gap-x-4 gap-y-1">
+                                <span className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Period Total:</span>
+                                <span className="text-[10px] font-bold text-indigo-500">Regulars: {grandRegulars.toLocaleString()}</span>
+                                <span className="text-[10px] font-bold text-amber-500">Guests: {grandGuests.toLocaleString()}</span>
+                                <span className="text-[10px] font-bold text-emerald-500">Volunteers: {grandVolunteers.toLocaleString()}</span>
+                                {customHeadcountNames.map((name, i) => (
+                                    <span key={name} className="text-[10px] font-bold" style={{color: CUSTOM_COLORS[i % CUSTOM_COLORS.length]}}>{name}: {(grandCustom[name] || 0).toLocaleString()}</span>
+                                ))}
+                                {grandDigital > 0 && <span className="text-[10px] font-bold text-blue-500">Check-Ins: {grandDigital.toLocaleString()}</span>}
+                                <span className="text-[10px] font-black text-slate-700 dark:text-slate-200 ml-auto">Total: {grandTotal.toLocaleString()}</span>
+                            </div>
+                        )}
                     </WidgetWrapper>
                 </div>
             );
+        }
         case 'events':
             return (
                 <div key="events" className="col-span-1 lg:col-span-2">
@@ -891,7 +1026,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                         <th className="p-4 text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">Team Name</th>
                                         <th className="p-4 text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">Leaders</th>
                                         <th className="p-4 text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest text-center">Members</th>
-                                        <th className="p-4 text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest text-center">Active Positions</th>
+                                        <th className="p-4 text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest text-center">Positions / Serving</th>
                                         <th className="p-4 text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest text-right">Action</th>
                                     </tr>
                                 </thead>
@@ -925,9 +1060,22 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                                     </div>
                                                 </td>
                                                 <td className="p-4 text-center">
-                                                    <span className="inline-flex items-center justify-center bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-3 py-1 rounded-full text-xs font-black">
-                                                        {team.positionCount || 0}
-                                                    </span>
+                                                    {(() => {
+                                                        // positionCount = unique named position roles (e.g. "Drummer").
+                                                        // Falls back to scheduled member count when teams don't use named positions.
+                                                        const posCount = team.positionCount || 0;
+                                                        const servingCount = team.scheduledMemberIds?.length || 0;
+                                                        const displayCount = posCount > 0 ? posCount : servingCount;
+                                                        const label = posCount > 0 ? 'Named Roles' : 'Serving Now';
+                                                        return (
+                                                            <div className="flex flex-col items-center">
+                                                                <span className="inline-flex items-center justify-center bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-3 py-1 rounded-full text-xs font-black">
+                                                                    {displayCount}
+                                                                </span>
+                                                                <span className="text-[8px] text-slate-400 mt-1 uppercase tracking-wider font-bold">{label}</span>
+                                                            </div>
+                                                        );
+                                                    })()}
                                                 </td>
                                                 <td className="p-4 text-right">
                                                     <button 
@@ -1133,13 +1281,21 @@ const ServicesView: React.FC<ServicesViewProps> = ({
           </div>
       ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {safeVisibleWidgets.map(id => {
+            {safeVisibleWidgets.map((id, index) => {
                 let spanClass = "col-span-1";
                 if (['services_stats', 'checkin_history', 'teams', 'services_teams_list'].includes(id)) spanClass = "col-span-1 md:col-span-2 lg:col-span-4";
                 else if (['staffing_needs', 'upcoming_plans_list', 'top_songs', 'positions', 'events', 'team_roster', 'burnout_watchlist'].includes(id)) spanClass = "col-span-1 lg:col-span-2";
                 
                 return (
-                    <div key={id} className={spanClass}>
+                    <div
+                        key={id}
+                        className={`${spanClass} cursor-grab active:cursor-grabbing transition-opacity`}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, index)}
+                        onDragEnter={(e) => handleDragEnter(e, index)}
+                        onDragEnd={handleDragEnd}
+                        onDragOver={handleDragOver}
+                    >
                         {renderWidget(id)}
                     </div>
                 );

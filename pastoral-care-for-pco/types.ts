@@ -199,6 +199,7 @@ export interface LifecycleDonor {
     id: string;
     name: string;
     totalAmount: number;
+    avgMonthlyAmount: number;
     lastGiftDate: string;
     avatar?: string | null;
     riskProfile?: RiskProfile;
@@ -208,8 +209,11 @@ export interface GivingAnalytics {
     totalGiving: number;
     previousTotalGiving: number;
     contributingPeople: number;
+    previousContributingPeople: number;
     recurringGivers: number;
+    previousRecurringGivers: number;
     averageGift: number;
+    previousAverageGift: number;
     medianGift: number;
     givingByFund: { name: string, value: number }[];
     trends: { date: string, amount: number }[];
@@ -331,6 +335,8 @@ export interface AttendanceEventSummary {
     regulars: number;
     volunteers: number;
     headcount: number;
+    digitalCheckins: number;
+    customHeadcounts: { name: string; total: number }[];
     total: number;
 }
 
@@ -350,11 +356,13 @@ export interface AttendanceRecord {
     id: string;
     churchId: string;
     date: string;
-    count: number;
-    guests?: number;
-    regulars?: number;
-    volunteers?: number;
-    headcount?: number;
+    count: number;          // Grand total: digital check-ins + all headcounts
+    guests?: number;        // Standard: Guest headcount
+    regulars?: number;      // Standard: Regular headcount
+    volunteers?: number;    // Standard: Volunteer headcount
+    headcount?: number;     // Legacy / unlabeled manual headcount
+    digitalCheckins?: number; // People who actually checked in via PCO Check-Ins app
+    customHeadcounts?: { name: string; total: number }[]; // Custom attendance types
     events?: AttendanceEventSummary[];
 }
 
@@ -379,6 +387,12 @@ export interface SystemSettings {
     enabledModules?: { pastoral: boolean, people: boolean, groups: boolean, services: boolean, giving: boolean, metrics: boolean, communication: boolean };
     allowSignups?: boolean;
     scheduledSyncTime?: string;
+    // SendGrid Email Delivery
+    sendGridApiKey?: string;
+    sendGridFromEmail?: string; // Must be a verified sender in SendGrid (e.g. hello@mychurch.org)
+    sendGridFromName?: string;  // Default "From Name" if campaign doesn't specify one
+    // Scripture Library feature flag
+    enableLibrary?: boolean;
 }
 
 export interface TemplateSettings {
@@ -389,6 +403,51 @@ export interface TemplateSettings {
     fontFamily: string;
     header: string;
     footer: string;
+    // Social media
+    showSocialLinks?: boolean;
+    facebookUrl?: string;
+    youtubeUrl?: string;
+    instagramUrl?: string;
+    twitterUrl?: string;
+}
+
+export interface PcoList {
+    id: string;
+    name: string;
+    totalPeople: number;
+    status: string;
+}
+
+export type EmailCampaignStatus = 'draft' | 'scheduled' | 'sent' | 'failed';
+
+export interface EmailCampaign {
+    id: string;
+    churchId: string;
+    name: string;
+    status: EmailCampaignStatus;
+    // Recipients
+    toListId?: string;
+    toListName?: string;
+    // Sender
+    fromName?: string;
+    fromEmail?: string;
+    replyTo?: string;
+    // Content
+    subject?: string;
+    blocks?: any[];
+    templateSettings?: TemplateSettings;
+    // Scheduling
+    sendAt?: string | null;         // ISO string display value set by UI
+    scheduledAt?: number | null;    // Epoch ms — authoritative trigger for the scheduler
+    sentAt?: number | null;
+    // Analytics refresh tracking
+    analyticsRefreshedAt?: number | null;
+    // Retry logic
+    retryCount?: number;            // How many send attempts have been made
+    lastError?: string | null;      // Last failure message (shown in UI)
+    // Metadata
+    createdAt: number;
+    updatedAt: number;
 }
 
 export interface Ministry {

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
 import { PeopleDashboardData, GeoInsight, CensusStats, GlobalStats } from '../types';
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
@@ -105,6 +105,36 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
     if (onUpdateWidgets) {
         onUpdateWidgets(visibleWidgets.filter(w => w !== id));
     }
+  };
+
+  // --- Drag-and-Drop reordering ---
+  const dragItem = useRef<number | null>(null);
+  const dragOverItem = useRef<number | null>(null);
+
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, position: number) => {
+    dragItem.current = position;
+    e.currentTarget.style.opacity = '0.5';
+  };
+
+  const handleDragEnter = (_e: React.DragEvent<HTMLDivElement>, position: number) => {
+    dragOverItem.current = position;
+  };
+
+  const handleDragEnd = (e: React.DragEvent<HTMLDivElement>) => {
+    e.currentTarget.style.opacity = '1';
+    if (dragItem.current !== null && dragOverItem.current !== null && dragItem.current !== dragOverItem.current) {
+      const copy = [...safeVisibleWidgets];
+      const dragged = copy[dragItem.current];
+      copy.splice(dragItem.current, 1);
+      copy.splice(dragOverItem.current, 0, dragged);
+      if (onUpdateWidgets) onUpdateWidgets(copy);
+    }
+    dragItem.current = null;
+    dragOverItem.current = null;
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
   };
 
   const renderBenchmarkPlaceholder = (title: string, removeId: string) => (
@@ -536,7 +566,7 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
                     <WidgetWrapper title="Top Zip Codes" onRemove={() => handleRemoveWidget(id)} source="PCO Addresses">
                         <div className="h-64">
                             <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={1}>
-                                <BarChart data={data.geoData.byZip} layout="vertical" margin={{ left: 10 }}>
+                                <BarChart data={(data.geoData.byZip || []).filter(z => /^\d{5}$/.test(z.name))} layout="vertical" margin={{ left: 10 }}>
                                     <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={gridColor} />
                                     <XAxis type="number" hide />
                                     <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: axisColor }} width={50} />
@@ -590,19 +620,28 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          {safeVisibleWidgets.map(id => {
-              if (id === 'people_stats' || id === 'householdSummary') return renderWidget(id);
-              
-              let spanClass = "col-span-1";
-              if (id === 'map' || id === 'riskDistribution' || id === 'atRiskList' || id === 'householdList' || id === 'risk_factors' || id === 'benchmark_age') spanClass = "col-span-1 lg:col-span-2";
-              if (id === 'people_directory') spanClass = "col-span-1 lg:col-span-4";
-              
-              return (
-                  <div key={id} className={spanClass}>
-                      {renderWidget(id)}
-                  </div>
-              );
-          })}
+      {safeVisibleWidgets.map((id, index) => {
+          // Full-width stat rows span all columns and skip DnD to avoid layout jumps
+          if (id === 'people_stats' || id === 'householdSummary') return renderWidget(id);
+          
+          let spanClass = "col-span-1";
+          if (id === 'map' || id === 'riskDistribution' || id === 'atRiskList' || id === 'householdList' || id === 'risk_factors' || id === 'benchmark_age') spanClass = "col-span-1 lg:col-span-2";
+          if (id === 'people_directory') spanClass = "col-span-1 lg:col-span-4";
+          
+          return (
+              <div
+                  key={id}
+                  className={`${spanClass} cursor-grab active:cursor-grabbing transition-opacity`}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, index)}
+                  onDragEnter={(e) => handleDragEnter(e, index)}
+                  onDragEnd={handleDragEnd}
+                  onDragOver={handleDragOver}
+              >
+                  {renderWidget(id)}
+              </div>
+          );
+      })}
           {safeVisibleWidgets.length === 0 && (
               <div className="col-span-full py-20 text-center bg-slate-50 dark:bg-slate-900 rounded-[3rem] border border-dashed border-slate-200 dark:border-slate-700">
                   <p className="text-slate-400 dark:text-slate-500 font-bold">No widgets configured for this tab.</p>

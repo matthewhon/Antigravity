@@ -37,8 +37,15 @@ interface PastoralViewProps {
   censusData?: CensusStats | null;
   churchConfig: { city?: string, state?: string };
   censusError?: string;
-  visibleWidgets: string[];
-  onUpdateWidgets: (widgets: string[]) => void;
+  // Per-tab widget preferences
+  churchWidgets: string[];
+  membershipWidgets: string[];
+  communityWidgets: string[];
+  careWidgets: string[];
+  onUpdateChurchWidgets: (widgets: string[]) => void;
+  onUpdateMembershipWidgets: (widgets: string[]) => void;
+  onUpdateCommunityWidgets: (widgets: string[]) => void;
+  onUpdateCareWidgets: (widgets: string[]) => void;
   allowedWidgetIds?: string[];
   googleMapsApiKey?: string;
   onUpdateTheme?: (theme: 'traditional' | 'dark') => void;
@@ -141,8 +148,14 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
   censusData,
   churchConfig,
   censusError,
-  visibleWidgets,
-  onUpdateWidgets,
+  churchWidgets,
+  membershipWidgets,
+  communityWidgets,
+  careWidgets,
+  onUpdateChurchWidgets,
+  onUpdateMembershipWidgets,
+  onUpdateCommunityWidgets,
+  onUpdateCareWidgets,
   allowedWidgetIds,
   googleMapsApiKey,
   onUpdateTheme
@@ -233,6 +246,22 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [strategyReport, setStrategyReport] = useState<string>('');
 
+  // Pick the correct widget list and updater for the active tab
+  const activeWidgets = useMemo(() => {
+      if (activeTab === 'Church') return churchWidgets;
+      if (activeTab === 'Membership') return membershipWidgets;
+      if (activeTab === 'Community') return communityWidgets;
+      if (activeTab === 'Care') return careWidgets;
+      return [];
+  }, [activeTab, churchWidgets, membershipWidgets, communityWidgets, careWidgets]);
+
+  const handleUpdateActiveWidgets = (newWidgets: string[]) => {
+      if (activeTab === 'Church') onUpdateChurchWidgets(newWidgets);
+      else if (activeTab === 'Membership') onUpdateMembershipWidgets(newWidgets);
+      else if (activeTab === 'Community') onUpdateCommunityWidgets(newWidgets);
+      else if (activeTab === 'Care') onUpdateCareWidgets(newWidgets);
+  };
+
   const availableWidgets = useMemo(() => {
       let base: any[] = [];
       if (activeTab === 'Church') base = PASTORAL_CHURCH_WIDGETS;
@@ -319,17 +348,45 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
 
   const safeVisibleWidgets = useMemo(() => {
       const currentTabIds = availableWidgets.map(w => w.id);
-      return visibleWidgets.filter(id => currentTabIds.includes(id));
-  }, [visibleWidgets, availableWidgets]);
+      return activeWidgets.filter(id => currentTabIds.includes(id));
+  }, [activeWidgets, availableWidgets]);
 
   const handleUpdateCurrentTabWidgets = (newWidgetsForTab: string[]) => {
-      const currentTabIds = availableWidgets.map(w => w.id);
-      const otherTabWidgets = visibleWidgets.filter(id => !currentTabIds.includes(id));
-      onUpdateWidgets([...otherTabWidgets, ...newWidgetsForTab]);
+      handleUpdateActiveWidgets(newWidgetsForTab);
   };
 
   const handleRemoveWidget = (id: string) => {
-      onUpdateWidgets(visibleWidgets.filter(w => w !== id));
+      handleUpdateActiveWidgets(safeVisibleWidgets.filter(w => w !== id));
+  };
+
+  // --- Drag-and-Drop reordering ---
+  const dndItem = useRef<number | null>(null);
+  const dndOverItem = useRef<number | null>(null);
+
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, position: number) => {
+    dndItem.current = position;
+    e.currentTarget.style.opacity = '0.5';
+  };
+
+  const handleDragEnter = (_e: React.DragEvent<HTMLDivElement>, position: number) => {
+    dndOverItem.current = position;
+  };
+
+  const handleDragEnd = (e: React.DragEvent<HTMLDivElement>) => {
+    e.currentTarget.style.opacity = '1';
+    if (dndItem.current !== null && dndOverItem.current !== null && dndItem.current !== dndOverItem.current) {
+      const copy = [...safeVisibleWidgets];
+      const dragged = copy[dndItem.current];
+      copy.splice(dndItem.current, 1);
+      copy.splice(dndOverItem.current, 0, dragged);
+      handleUpdateCurrentTabWidgets(copy);
+    }
+    dndItem.current = null;
+    dndOverItem.current = null;
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
   };
 
   const handleGenerateStrategy = async () => {
@@ -537,11 +594,14 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
       }
   }, [activeTab, googleMapsApiKey, peopleData, safeVisibleWidgets, mapInstance]);
 
+  // Reset the map instance whenever we leave the Membership tab so that
+  // returning to it triggers a fresh initialization into the new DOM node.
   useEffect(() => {
-      return () => {
+      if (activeTab !== 'Membership') {
           setMapInstance(null);
-      };
-  }, []);
+      }
+  }, [activeTab]);
+
 
 
   // --- Metrics Calculations ---
@@ -666,7 +726,14 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                           )}
                           {!mapInstance && !mapAuthError && (
                               <div className="absolute inset-0 flex items-center justify-center">
-                                  <p className="text-xs font-bold text-slate-400">Loading Map...</p>
+                                  {!googleMapsApiKey ? (
+                                      <div className="text-center p-6">
+                                          <p className="text-slate-500 font-bold text-xs mb-1">Google Maps API Key Required</p>
+                                          <p className="text-slate-400 text-[10px]">Add your API key in Settings → Organization to enable the map.</p>
+                                      </div>
+                                  ) : (
+                                      <p className="text-xs font-bold text-slate-400">Loading Map...</p>
+                                  )}
                               </div>
                           )}
                       </div>
@@ -1232,7 +1299,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                   (() => {
                       const loc = church.communityLocations?.find(l => l.id === selectedLocationId);
                       if (!loc) return null;
-                      return safeVisibleWidgets.map(id => {
+                      return safeVisibleWidgets.map((id, index) => {
                           let spanClass = "col-span-1";
                           if (['church_growth_stats', 'member_headline_stats', 'member_map'].includes(id)) {
                               spanClass = "col-span-1 md:col-span-2 lg:col-span-4";
@@ -1243,14 +1310,22 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                           }
                           
                           return (
-                              <div key={`${loc.id}-${id}`} className={spanClass}>
+                              <div
+                                  key={`${loc.id}-${id}`}
+                                  className={`${spanClass} cursor-grab active:cursor-grabbing transition-opacity`}
+                                  draggable
+                                  onDragStart={(e) => handleDragStart(e, index)}
+                                  onDragEnter={(e) => handleDragEnter(e, index)}
+                                  onDragEnd={handleDragEnd}
+                                  onDragOver={handleDragOver}
+                              >
                                   {renderWidget(id, locationCensusMap[loc.id], loc.name, loc.isDefault)}
                               </div>
                           );
                       });
                   })()
               ) : (
-                  safeVisibleWidgets.map(id => {
+                  safeVisibleWidgets.map((id, index) => {
                       // Special Full Width Handling
                       let spanClass = "col-span-1";
                       if (['church_growth_stats', 'member_headline_stats', 'member_map'].includes(id)) {
@@ -1262,7 +1337,15 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                       }
                       
                       return (
-                          <div key={id} className={spanClass}>
+                          <div
+                              key={id}
+                              className={`${spanClass} cursor-grab active:cursor-grabbing transition-opacity`}
+                              draggable
+                              onDragStart={(e) => handleDragStart(e, index)}
+                              onDragEnter={(e) => handleDragEnter(e, index)}
+                              onDragEnd={handleDragEnd}
+                              onDragOver={handleDragOver}
+                          >
                               {renderWidget(id)}
                           </div>
                       );

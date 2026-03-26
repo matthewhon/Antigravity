@@ -2,6 +2,7 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 
 /**
  * Firebase configuration for the "pastoral-care-for-pco" project.
@@ -28,5 +29,7 @@ export const auth = getAuth(app);
  * Explicitly passing the database ID fixes the [code=not-found] error.
  */
 export const db = getFirestore(app, "pcforpco");
+
+export const storage = getStorage(app);
 
 export const PROJECT_ID = firebaseConfig.projectId;

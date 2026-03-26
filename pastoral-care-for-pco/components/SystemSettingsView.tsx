@@ -385,8 +385,55 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                 </div>
                             </div>
                         </div>
+
+                        {/* SendGrid */}
+                        <div className="pt-6 border-t border-slate-100 dark:border-slate-800">
+                            <div className="flex justify-between items-center mb-4">
+                                <h4 className="text-xs font-bold text-indigo-600 dark:text-indigo-400">SendGrid (Email Delivery)</h4>
+                                {settings.sendGridApiKey?.startsWith('SG.') ? (
+                                    <span className="text-[9px] font-black bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">ACTIVE</span>
+                                ) : (
+                                    <span className="text-[9px] font-black bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/30">INCOMPLETE</span>
+                                )}
+                            </div>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">API Key</label>
+                                    <input 
+                                        type="password" 
+                                        value={settings.sendGridApiKey || ''}
+                                        onChange={e => handleChange('sendGridApiKey', e.target.value)}
+                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                        placeholder="SG.xxxxxxxxxxxxxxxx"
+                                    />
+                                    <p className="text-[9px] text-slate-400 mt-1.5">Find this in your <a href="https://app.sendgrid.com/settings/api_keys" target="_blank" rel="noopener noreferrer" className="underline text-indigo-400 hover:text-indigo-300">SendGrid Dashboard → Settings → API Keys</a>.</p>
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Default From Email</label>
+                                    <input 
+                                        type="email" 
+                                        value={settings.sendGridFromEmail || ''}
+                                        onChange={e => handleChange('sendGridFromEmail', e.target.value)}
+                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                        placeholder="hello@mychurch.org"
+                                    />
+                                    <p className="text-[9px] text-slate-400 mt-1.5">Must be a <strong>verified sender</strong> in SendGrid. Campaigns can override this per email.</p>
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Default From Name</label>
+                                    <input 
+                                        type="text" 
+                                        value={settings.sendGridFromName || ''}
+                                        onChange={e => handleChange('sendGridFromName', e.target.value)}
+                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                        placeholder="My Church"
+                                    />
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
+
 
                 {/* Stripe & Modules */}
                 <div className="space-y-8">
@@ -538,9 +585,46 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                             </button>
                         </div>
                     </div>
+
+                    {/* Book Management & Indexing */}
+                    <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm mt-8">
+                        <div className="flex justify-between items-center mb-6">
+                            <div>
+                                <h3 className="text-lg font-black text-slate-900 dark:text-white">📚 Book Management & Indexing</h3>
+                                <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-1">Scripture Library Feature</p>
+                            </div>
+                            <span className="text-[9px] font-black bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/30">BETA</span>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl">
+                                <div>
+                                    <p className="text-xs font-bold text-slate-900 dark:text-white">Enable Scripture Library</p>
+                                    <p className="text-[10px] text-slate-400 mt-0.5">Show the 📚 Library tab in the navigation for all users. When off, only the system owner can access it.</p>
+                                </div>
+                                <button
+                                    onClick={() => handleChange('enableLibrary', !settings.enableLibrary)}
+                                    className={`ml-6 flex-none w-12 h-6 rounded-full p-1 transition-colors ${settings.enableLibrary ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'}`}
+                                >
+                                    <div className={`w-4 h-4 bg-white rounded-full transition-transform ${settings.enableLibrary ? 'translate-x-6' : ''}`}></div>
+                                </button>
+                            </div>
+
+                            <div className="flex justify-end pt-2">
+                                <button
+                                    onClick={handleSave}
+                                    disabled={isSaving}
+                                    className="bg-indigo-600 text-white px-5 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-700 transition-all disabled:opacity-50"
+                                >
+                                    {isSaving ? 'Saving...' : 'Save'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         )}
+
 
         {activeTab === 'Tenants' && (
             <div className="space-y-8">
@@ -802,7 +886,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                             }
                             const redirectUri = window.location.origin;
                             // Adding check_ins with the required underscore per official API documentation
-                            const url = `https://api.planningcenteronline.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=people%20services%20giving%20groups%20check_ins`;
+                            const url = `https://api.planningcenteronline.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=people%20services%20giving%20groups%20check_ins%20registrations%20calendar`;
                             window.location.href = url;
                         }}
                         className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-all"

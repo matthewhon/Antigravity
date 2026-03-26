@@ -84,6 +84,11 @@ export const calculateGivingAnalytics = (
     const recurringGivers = new Set(currentPeriodDonations.filter(d => d.isRecurring).map(d => d.donorId)).size;
     const averageGift = currentPeriodDonations.length > 0 ? totalGiving / currentPeriodDonations.length : 0;
 
+    // Previous period equivalents for trend indicators
+    const previousContributingPeople = new Set(previousPeriodDonations.map(d => d.donorId)).size;
+    const previousRecurringGivers = new Set(previousPeriodDonations.filter(d => d.isRecurring).map(d => d.donorId)).size;
+    const previousAverageGift = previousPeriodDonations.length > 0 ? previousTotalGiving / previousPeriodDonations.length : 0;
+
     const amounts = currentPeriodDonations.map(d => d.amount).sort((a,b) => a - b);
     let medianGift = 0;
     if (amounts.length > 0) {
@@ -204,10 +209,16 @@ export const calculateGivingAnalytics = (
             resolvedName = 'Anonymous';
         }
 
+        const totalAmount = gifts.reduce((sum, g) => sum + g.amount, 0);
+        // Calculate avg monthly: spread total giving across distinct calendar months
+        const distinctMonths = new Set(gifts.map(g => g.date.slice(0, 7))).size;
+        const avgMonthlyAmount = distinctMonths > 0 ? totalAmount / distinctMonths : totalAmount;
+
         const donorObj: LifecycleDonor = {
             id: donorId,
             name: resolvedName,
-            totalAmount: gifts.reduce((sum, g) => sum + g.amount, 0),
+            totalAmount,
+            avgMonthlyAmount,
             lastGiftDate: lastGift.date,
             avatar: person?.avatar || null,
             riskProfile: person?.riskProfile
@@ -276,8 +287,11 @@ export const calculateGivingAnalytics = (
         totalGiving,
         previousTotalGiving,
         contributingPeople,
+        previousContributingPeople,
         recurringGivers,
+        previousRecurringGivers,
         averageGift,
+        previousAverageGift,
         medianGift,
         givingByFund,
         trends,
@@ -426,7 +440,7 @@ export const calculateServicesAnalytics = (
                 else if (status === 'declined' || status === 'd') declined++;
 
                 // Build Active Roster for Teams Snapshot
-                const tKey = m.teamId || m.teamName; 
+                const tKey = m.teamId || m.teamName;
                 const isConfirmed = status === 'confirmed' || status === 'c';
                 const isPending = status === 'unconfirmed' || status === 'u' || status === 'pending';
                 
@@ -436,8 +450,12 @@ export const calculateServicesAnalytics = (
                     if ((!teamName || teamName === 'Unknown Team') && m.teamId) {
                         teamName = teamMap.get(m.teamId)?.name || 'Unknown Team';
                     }
+
+                    // Skip entries with no meaningful team name — these create phantom "Unknown" teams
+                    const resolvedName = teamName || tKey;
+                    if (!resolvedName || resolvedName === 'Unknown' || resolvedName === 'Unknown Team') return;
                     
-                    teamIdToName.set(tKey, teamName || tKey);
+                    teamIdToName.set(tKey, resolvedName);
 
                     if (!activeTeamMembers.has(tKey)) {
                         activeTeamMembers.set(tKey, new Set());
@@ -487,11 +505,14 @@ export const calculateServicesAnalytics = (
     // Also handle teams found in schedule that might not be in the 'teams' list (edge case)
     activeTeamMembers.forEach((memberSet, tKey) => {
         if (!teamMap.has(tKey)) {
-             augmentedTeams.push({
+            const resolvedName = teamIdToName.get(tKey) || tKey;
+            // Skip phantom "Unknown" teams — these come from plan members with no team assignment
+            if (!resolvedName || resolvedName === 'Unknown' || resolvedName === 'Unknown Team') return;
+            augmentedTeams.push({
                 id: `temp_${tKey.replace(/\s+/g, '_')}`,
                 churchId: '',
-                name: teamIdToName.get(tKey) || tKey,
-                memberIds: [], // Unknown roster
+                name: resolvedName,
+                memberIds: [],
                 scheduledMemberIds: Array.from(memberSet),
                 leaderCount: 0,
                 leaderPersonIds: [],
@@ -504,11 +525,19 @@ export const calculateServicesAnalytics = (
     augmentedTeams.sort((a, b) => (b.scheduledMemberIds?.length || 0) - (a.scheduledMemberIds?.length || 0));
 
     // 4. Calculate Check-ins Trend
+    // IMPORTANT: Do NOT pre-filter attendance by the ServicesFilter date range here.
+    // The ServicesView component applies its own independent checkinFilter (Current Week /
+    // Last Month / etc.) on top of this data. Pre-filtering here would create a double-filter
+    // that silently drops records whenever the two windows don't overlap.
+    // Instead, pass ALL stored attendance records through and let the UI filter handle slicing.
+    //
+    // We also use ISO string comparison (a.date >= startStr) instead of new Date(a.date)
+    // to avoid UTC-midnight parsing shifting dates by one day in US timezones.
+    const ninetyDaysAgoStr = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)
+        .toISOString().split('T')[0];
+
     const checkInTrends = attendance
-        .filter(a => {
-            const d = new Date(a.date);
-            return d >= startDate && d <= endDate;
-        })
+        .filter(a => a.date >= ninetyDaysAgoStr) // Keep last 90 days, timezone-safe
         .map(a => ({
             date: a.date,
             isoDate: a.date,
@@ -516,8 +545,10 @@ export const calculateServicesAnalytics = (
             guests: a.guests || 0,
             volunteers: a.volunteers || 0,
             headcount: a.headcount || 0,
+            digitalCheckins: a.digitalCheckins || 0,
+            customHeadcounts: a.customHeadcounts || [],
             total: a.count,
-            events: a.events || [] // Pass through detailed events
+            events: (a as any).events || []
         }))
         .sort((a,b) => a.date.localeCompare(b.date));
 
