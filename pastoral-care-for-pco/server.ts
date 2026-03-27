@@ -15,6 +15,7 @@ import { handlePcoWebhook } from './backend/pcoWebhookHandler';
 import { sendEmail } from './backend/sendEmail';
 import { startEmailScheduler } from './backend/emailScheduler';
 import { getDb } from './backend/firebase';
+import { handleGeminiProxy } from './backend/geminiProxy';
 
 // Fix for bundled CJS environment
 const __dirname = process.cwd();
@@ -53,6 +54,9 @@ async function startServer() {
 
     // PCO Proxy
     app.post('/pco/proxy', express.json(), pcoProxy);
+
+    // Gemini AI Proxy (key stays server-side)
+    app.post('/ai/generate', express.json(), handleGeminiProxy);
 
     // Email (SendGrid)
     app.post('/email/send', express.json(), sendEmail);

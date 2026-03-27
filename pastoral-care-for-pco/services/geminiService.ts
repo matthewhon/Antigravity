@@ -1,5 +1,4 @@
 
-import { GoogleGenAI } from "@google/genai";
 import { 
     AttendanceData, GivingData, PeopleDashboardData, GivingAnalytics, 
     GeoInsight, GroupsDashboardData, ServicesDashboardData, CensusStats, 
@@ -7,6 +6,39 @@ import {
     UserRole, WidgetDefinition
 } from "../types";
 import { getRoleBasedDefaults, ALL_WIDGETS } from "../constants/widgetRegistry";
+
+// ---------------------------------------------------------------------------
+// Internal proxy helper — all Gemini calls go through the Cloud Run server
+// so the API key is never exposed in the browser bundle.
+// ---------------------------------------------------------------------------
+interface GeminiProxyPayload {
+    model?: string;
+    prompt: string;
+    systemInstruction?: string;
+    config?: Record<string, any>;
+}
+
+interface GeminiProxyResponse {
+    text: string;
+    candidates?: any[];
+}
+
+const callGemini = async (payload: GeminiProxyPayload): Promise<GeminiProxyResponse> => {
+    const res = await fetch('/ai/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `AI proxy error: ${res.status}`);
+    }
+    return res.json();
+};
+
+// ---------------------------------------------------------------------------
+// Public AI functions — signatures unchanged, now routed via proxy
+// ---------------------------------------------------------------------------
 
 export const generateGlobalInsights = async (
     context: {
@@ -19,9 +51,6 @@ export const generateGlobalInsights = async (
         churchName: string
     }
 ): Promise<string> => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
-    // Construct a dense summary of the church's health
     const attendanceTrend = context.attendance.slice(-4).map(a => a.attendance).join(', ');
     const growthStats = context.people ? `Total: ${context.people.stats.total}, New(30d): ${context.people.stats.newThisMonth}` : 'N/A';
     const givingStats = context.giving ? `Total: $${context.giving.totalGiving}, Donors: ${context.giving.contributingPeople}, Recurring: ${context.giving.recurringGivers}` : 'N/A';
@@ -51,10 +80,7 @@ export const generateGlobalInsights = async (
     `;
 
     try {
-        const response = await ai.models.generateContent({
-            model: "gemini-2.0-flash",
-            contents: prompt,
-        });
+        const response = await callGemini({ model: 'gemini-2.0-flash', prompt });
         return response.text || "Unable to generate insights.";
     } catch (error) {
         console.error("Gemini Global Insight Error:", error);
@@ -66,9 +92,6 @@ export const generateGroupsStrategy = async (
     groupsData: GroupsDashboardData,
     peopleData: PeopleDashboardData | null
 ): Promise<string> => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
-    // Calculate metrics for context
     const totalAdults = peopleData?.stats.total || 1;
     const enrolled = groupsData.stats.totalEnrollment;
     const participationRate = Math.round((enrolled / totalAdults) * 100);
@@ -103,10 +126,7 @@ export const generateGroupsStrategy = async (
     `;
 
     try {
-        const response = await ai.models.generateContent({
-            model: "gemini-2.0-flash",
-            contents: prompt,
-        });
+        const response = await callGemini({ model: 'gemini-2.0-flash', prompt });
         return response.text || "Unable to generate groups strategy.";
     } catch (error) {
         console.error("Gemini Groups Strategy Error:", error);
@@ -115,21 +135,15 @@ export const generateGroupsStrategy = async (
 };
 
 export const generateGroupRiskAnalysis = async (
-    enrichedGroups: any[], // Passed with health status and breakdown
+    enrichedGroups: any[],
     settings: GroupRiskSettings
 ): Promise<string> => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
-    // 1. Analyze Distributions
     const total = enrichedGroups.length;
     const thriving = enrichedGroups.filter(g => g.health.status === 'Thriving');
     const warning = enrichedGroups.filter(g => g.health.status === 'Warning');
     const critical = enrichedGroups.filter(g => g.health.status === 'Critical');
 
-    // 2. Identify Systemic Failures
-    // Calculate average score for each component across ALL groups to see which metric is dragging the church down
     let avgAttendance = 0, avgRetention = 0, avgLeadership = 0, avgEngagement = 0;
-    
     if (total > 0) {
         enrichedGroups.forEach(g => {
             const bd = g.health.breakdown || { attendance: 0, retention: 0, leadership: 0, engagement: 0 };
@@ -144,7 +158,6 @@ export const generateGroupRiskAnalysis = async (
         avgEngagement /= total;
     }
 
-    // 3. Find "Critical" Examples
     const criticalExamples = critical.slice(0, 3).map(g => {
         const bd = g.health.breakdown;
         let lowestFactor = 'Unknown';
@@ -192,10 +205,7 @@ export const generateGroupRiskAnalysis = async (
     `;
 
     try {
-        const response = await ai.models.generateContent({
-            model: "gemini-2.0-flash",
-            contents: prompt,
-        });
+        const response = await callGemini({ model: 'gemini-2.0-flash', prompt });
         return response.text || "Risk analysis unavailable.";
     } catch (error) {
         console.error("Group Risk Analysis Error:", error);
@@ -207,8 +217,6 @@ export const generateChurchInsights = async (
   attendance: AttendanceData[],
   giving: GivingData[]
 ): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  
   const prompt = `
     As an expert church growth consultant, analyze the following data from Planning Center and provide 3-4 concise, actionable insights for church leadership.
     
@@ -223,10 +231,7 @@ export const generateChurchInsights = async (
   `;
 
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
-      contents: prompt,
-    });
+    const response = await callGemini({ model: 'gemini-2.0-flash', prompt });
     return response.text || "Unable to generate insights at this time.";
   } catch (error) {
     console.error("Gemini Error:", error);
@@ -237,8 +242,6 @@ export const generateChurchInsights = async (
 export const generatePeopleInsights = async (
   peopleData: PeopleDashboardData
 ): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  
   const prompt = `
     Analyze this church demographic profile and provide 3 strategic ministry recommendations.
     
@@ -258,10 +261,7 @@ export const generatePeopleInsights = async (
   `;
 
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
-      contents: prompt,
-    });
+    const response = await callGemini({ model: 'gemini-2.0-flash', prompt });
     return response.text || "Insight engine warming up...";
   } catch (error) {
     console.error("Gemini People Error:", error);
@@ -273,8 +273,6 @@ export const chatWithDemographicAnalyst = async (
     question: string,
     context: PeopleDashboardData
 ): Promise<string> => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
     const systemInstruction = `
     You are the "AI Demographic Analyst" for a church. Your goal is to provide strategic ministry insights, analyze population trends, and help leadership understand their people.
 
@@ -307,13 +305,7 @@ export const chatWithDemographicAnalyst = async (
     `;
 
     try {
-        const response = await ai.models.generateContent({
-            model: "gemini-2.0-flash",
-            contents: question,
-            config: {
-                systemInstruction: systemInstruction,
-            },
-        });
+        const response = await callGemini({ model: 'gemini-2.0-flash', prompt: question, systemInstruction });
         return response.text || "I couldn't analyze the demographic data at this moment.";
     } catch (e) {
         console.error("Demographic Analyst Error", e);
@@ -324,8 +316,6 @@ export const chatWithDemographicAnalyst = async (
 export const generateGivingInsights = async (
   analytics: GivingAnalytics
 ): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  
   const prompt = `
     Analyze the following church financial data from Planning Center Giving and provide 3 strategic insights regarding donor health and financial stability.
     
@@ -350,10 +340,7 @@ export const generateGivingInsights = async (
   `;
 
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
-      contents: prompt,
-    });
+    const response = await callGemini({ model: 'gemini-2.0-flash', prompt });
     return response.text || "Financial analysis unavailable.";
   } catch (error) {
     console.error("Gemini Giving Error:", error);
@@ -369,9 +356,6 @@ export const chatWithGivingAnalyst = async (
         funds: PcoFund[]
     }
 ): Promise<string> => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
-    // Calculate basic budget performance for context
     const budgetContext = context.budgets.map(b => 
         `${b.fundName} (${b.year}): Budget $${b.totalAmount}`
     ).join('\n');
@@ -410,13 +394,7 @@ export const chatWithGivingAnalyst = async (
     `;
 
     try {
-        const response = await ai.models.generateContent({
-            model: "gemini-2.0-flash",
-            contents: question,
-            config: {
-                systemInstruction: systemInstruction,
-            },
-        });
+        const response = await callGemini({ model: 'gemini-2.0-flash', prompt: question, systemInstruction });
         return response.text || "I couldn't analyze the financial data at this moment.";
     } catch (e) {
         console.error("Giving Analyst Error", e);
@@ -429,8 +407,6 @@ export const generateGroupsInsights = async (
   peopleData: PeopleDashboardData | null,
   givingAnalytics: GivingAnalytics | null
 ): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
   const prompt = `
     Act as a church community health expert. Analyze the following Small Group data from Planning Center, crossing it with broader church metrics.
 
@@ -458,10 +434,7 @@ export const generateGroupsInsights = async (
   `;
 
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
-      contents: prompt,
-    });
+    const response = await callGemini({ model: 'gemini-2.0-flash', prompt });
     return response.text || "Community analysis unavailable.";
   } catch (error) {
     console.error("Gemini Groups Error:", error);
@@ -472,8 +445,6 @@ export const generateGroupsInsights = async (
 export const generateGeoInsights = async (
   cityData: { name: string; value: number }[]
 ): Promise<GeoInsight> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  
   const topCities = cityData.slice(0, 6).map(c => `${c.name} (${c.value} people)`).join(', ');
   
   const prompt = `
@@ -489,20 +460,17 @@ export const generateGeoInsights = async (
   `;
 
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: prompt,
-      config: {
-        tools: [{ googleMaps: {} }],
-      },
+    const response = await callGemini({
+        model: 'gemini-2.5-flash',
+        prompt,
+        config: { tools: [{ googleMaps: {} }] },
     });
 
     const text = response.text || "No analysis generated.";
     
-    // Extract Maps Grounding Chunks
+    // Extract Maps Grounding Chunks from candidates
     const mapLinks: { title: string; uri: string }[] = [];
-    
-    if (response.candidates && response.candidates[0] && response.candidates[0].groundingMetadata) {
+    if (response.candidates && response.candidates[0]?.groundingMetadata) {
         const chunks = response.candidates[0].groundingMetadata.groundingChunks;
         if (chunks) {
             chunks.forEach((chunk: any) => {
@@ -514,7 +482,6 @@ export const generateGeoInsights = async (
     }
 
     return { text, mapLinks };
-
   } catch (error) {
     console.error("Gemini Maps Grounding Error:", error);
     return { 
@@ -534,9 +501,6 @@ export const generateCommunityStrategy = async (
         censusData: CensusStats[]
     }
 ): Promise<string> => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
-    // Format Census data for the prompt
     const censusSummary = communityContext.censusData.map(c => `
     **${c.locationName}**:
     - Median Age: ${c.demographics?.medianAge}
@@ -569,10 +533,7 @@ export const generateCommunityStrategy = async (
     `;
 
     try {
-        const response = await ai.models.generateContent({
-            model: "gemini-2.0-flash",
-            contents: prompt,
-        });
+        const response = await callGemini({ model: 'gemini-2.0-flash', prompt });
         return response.text || "Unable to generate community strategy.";
     } catch (e) {
         console.error("Community Strategy Error", e);
@@ -585,8 +546,6 @@ export const generateCareAdvice = async (
     recentPeople: PcoPerson[],
     churchName: string
 ): Promise<string> => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
     const notesSummary = notes.slice(0, 10).map(n => 
         `- ${n.personName}: ${n.type} on ${n.date}. Content: ${n.content.substring(0, 50)}...`
     ).join('\n');
@@ -614,10 +573,7 @@ export const generateCareAdvice = async (
     `;
 
     try {
-        const response = await ai.models.generateContent({
-            model: "gemini-2.0-flash",
-            contents: prompt,
-        });
+        const response = await callGemini({ model: 'gemini-2.0-flash', prompt });
         return response.text || "Care advice unavailable.";
     } catch (e) {
         console.error("Care Advice Error", e);
@@ -637,9 +593,6 @@ export const askPastorAI = async (
         churchName?: string
     }
 ): Promise<string> => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
-    // Construct a context summary to feed into the system instruction
     const peopleSummary = context.people ? `
     PEOPLE:
     - Total: ${context.people.stats.total} (Members: ${context.people.stats.members}, Visitors: ${context.people.stats.nonMembers})
@@ -707,13 +660,7 @@ export const askPastorAI = async (
     `;
 
     try {
-        const response = await ai.models.generateContent({
-            model: "gemini-2.0-flash",
-            contents: question,
-            config: {
-                systemInstruction: systemInstruction,
-            },
-        });
+        const response = await callGemini({ model: 'gemini-2.0-flash', prompt: question, systemInstruction });
         return response.text || "I couldn't generate a response at this time.";
     } catch (e) {
         console.error("Pastor AI Error", e);
@@ -723,14 +670,13 @@ export const askPastorAI = async (
 
 /**
  * Generates a personalized widget layout for a first-time user based on their roles.
- * Falls back to getRoleBasedDefaults if Gemini is unavailable or returns invalid JSON.
+ * Falls back to getRoleBasedDefaults if the proxy is unavailable or returns invalid JSON.
  */
 export const generateLayoutSuggestion = async (
     roles: string[]
 ): Promise<Record<string, string[]>> => {
     const fallback = getRoleBasedDefaults(roles);
 
-    // Build a compact widget catalog for the prompt
     const catalog = Object.entries(ALL_WIDGETS).map(([view, widgets]) =>
         `${view}: [${widgets.map(w => w.id).join(', ')}]`
     ).join('\n');
@@ -770,18 +716,11 @@ Rules:
 `;
 
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.0-flash',
-            contents: prompt,
-        });
-
+        const response = await callGemini({ model: 'gemini-2.0-flash', prompt });
         const raw = (response.text || '').trim();
-        // Strip markdown code fences if present
         const jsonStr = raw.replace(/^```json?\n?/, '').replace(/\n?```$/, '').trim();
         const parsed = JSON.parse(jsonStr);
 
-        // Validate it's an object with at least a dashboard key
         if (parsed && typeof parsed === 'object' && Array.isArray(parsed.dashboard)) {
             return parsed as Record<string, string[]>;
         }
