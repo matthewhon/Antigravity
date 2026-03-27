@@ -55,12 +55,10 @@ export const provisionSubuser = async (req: any, res: any) => {
         const existing = church.emailSettings?.sendGridSubuserId;
 
         let subuserId: string;
-        let subApiKey: string;
 
         if (existing) {
-            // Reuse existing subuser — just fetch/store the details
+            // Reuse existing subuser
             subuserId = existing;
-            subApiKey = church.emailSettings?.sendGridSubuserApiKey || '';
         } else {
             // 2. Create SendGrid Subuser
             //    Username must be globally unique in SendGrid, so prefix with "pco_"
@@ -87,24 +85,36 @@ export const provisionSubuser = async (req: any, res: any) => {
                 }
             }
 
-            // 3. Create a scoped API key for this Subuser
-            const keyRes = await fetch('https://api.sendgrid.com/v3/api_keys', {
-                method: 'POST',
-                headers: { ...sgHeaders(masterKey), 'on-behalf-of': subuserId },
-                body: JSON.stringify({
-                    name: `${subuserId}-mail-send`,
-                    scopes: ['mail.send', 'stats.read'],
-                }),
-            });
-
-            if (!keyRes.ok) {
-                const errBody = await keyRes.json().catch(() => ({}));
-                const errMsg = errBody?.errors?.[0]?.message || `SendGrid returned ${keyRes.status}`;
-                throw new Error(`API key creation failed: ${errMsg}`);
+            // 3. Associate the master domain authentication for SHARED_DOMAIN to this Subuser.
+            //    This allows sends from prefix@pastoralcare.barnabassoftware.com to pass
+            //    sender identity checks when using master key + on-behalf-of header.
+            //    We look up the domain auth ID from the master account first.
+            try {
+                const domainsRes = await fetch('https://api.sendgrid.com/v3/whitelabel/domains?limit=50', {
+                    headers: sgHeaders(masterKey),
+                });
+                if (domainsRes.ok) {
+                    const domains: any[] = await domainsRes.json();
+                    const sharedDomainAuth = domains.find((d: any) =>
+                        d.domain === SHARED_DOMAIN && d.valid === true
+                    );
+                    if (sharedDomainAuth) {
+                        // Associate authenticated domain to this Subuser
+                        await fetch(`https://api.sendgrid.com/v3/whitelabel/domains/${sharedDomainAuth.id}/subuser`, {
+                            method: 'POST',
+                            headers: sgHeaders(masterKey),
+                            body: JSON.stringify({ username: subuserId }),
+                        });
+                        log.info(`Shared domain auth ${sharedDomainAuth.id} associated to subuser ${subuserId}`, 'system', { churchId }, churchId);
+                    } else {
+                        log.warn(`No verified domain auth found for ${SHARED_DOMAIN} in master account — sends may fail sender identity check`, 'system', { churchId }, churchId);
+                    }
+                }
+            } catch (domainErr: any) {
+                // Non-fatal — log but continue. The master key + on-behalf-of will still work
+                // if the master account has the domain authenticated at the account level.
+                log.warn(`Could not associate domain auth to subuser: ${domainErr.message}`, 'system', { churchId }, churchId);
             }
-
-            const keyData = await keyRes.json();
-            subApiKey = keyData.api_key || '';
         }
 
         const fromEmail = `${cleanPrefix}@${SHARED_DOMAIN}`;
@@ -116,7 +126,6 @@ export const provisionSubuser = async (req: any, res: any) => {
             fromEmail,
             fromName: fromName || church.name || 'Church',
             sendGridSubuserId: subuserId,
-            sendGridSubuserApiKey: subApiKey,
         };
 
         await db.collection('churches').doc(churchId).update({ emailSettings });

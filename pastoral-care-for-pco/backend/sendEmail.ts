@@ -207,14 +207,25 @@ export async function executeSend(
     const churchData = churchSnap.data() || {};
     const tenantEmail = churchData.emailSettings || {};
 
-    // Prefer tenant-scoped Subuser API key → fall back to global master key
-    const effectiveApiKey = tenantEmail.sendGridSubuserApiKey || globalApiKey;
+    // IMPORTANT: Always use the master API key so that the master account's
+    // domain authentication (e.g. pastoralcare.barnabassoftware.com) applies.
+    // If the church has a provisioned Subuser, add the 'on-behalf-of' header so
+    // that reputation, stats, and unsubscribes are tracked at the Subuser level.
+    // This is the correct SendGrid multi-tenant pattern.
+    sgMail.setApiKey(globalApiKey);
+    if (tenantEmail.sendGridSubuserId) {
+        // Route through the Subuser for reputation isolation
+        (sgMail as any).setDefaultRequest({
+            headers: { 'on-behalf-of': tenantEmail.sendGridSubuserId }
+        });
+    } else {
+        // No Subuser yet — clear any previously set on-behalf-of
+        (sgMail as any).setDefaultRequest({ headers: {} });
+    }
 
     // Prefer tenant-level From settings → campaign override → global fallback
     const tenantFromEmail = tenantEmail.fromEmail || '';
     const tenantFromName  = tenantEmail.fromName  || '';
-
-    sgMail.setApiKey(effectiveApiKey);
 
     // 3. Load campaign
     const campaignSnap = await db.collection('email_campaigns').doc(campaignId).get();
