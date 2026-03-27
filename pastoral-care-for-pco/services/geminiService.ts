@@ -3,7 +3,7 @@ import {
     AttendanceData, GivingData, PeopleDashboardData, GivingAnalytics, 
     GeoInsight, GroupsDashboardData, ServicesDashboardData, CensusStats, 
     BudgetRecord, PcoFund, GroupRiskSettings, PcoGroup, PastoralNote, PcoPerson,
-    UserRole, WidgetDefinition
+    UserRole, WidgetDefinition, DetailedDonation
 } from "../types";
 import { getRoleBasedDefaults, ALL_WIDGETS } from "../constants/widgetRegistry";
 
@@ -80,7 +80,7 @@ export const generateGlobalInsights = async (
     `;
 
     try {
-        const response = await callGemini({ model: 'gemini-2.0-flash', prompt });
+        const response = await callGemini({ model: 'gemini-2.5-flash', prompt });
         return response.text || "Unable to generate insights.";
     } catch (error) {
         console.error("Gemini Global Insight Error:", error);
@@ -126,7 +126,7 @@ export const generateGroupsStrategy = async (
     `;
 
     try {
-        const response = await callGemini({ model: 'gemini-2.0-flash', prompt });
+        const response = await callGemini({ model: 'gemini-2.5-flash', prompt });
         return response.text || "Unable to generate groups strategy.";
     } catch (error) {
         console.error("Gemini Groups Strategy Error:", error);
@@ -205,7 +205,7 @@ export const generateGroupRiskAnalysis = async (
     `;
 
     try {
-        const response = await callGemini({ model: 'gemini-2.0-flash', prompt });
+        const response = await callGemini({ model: 'gemini-2.5-flash', prompt });
         return response.text || "Risk analysis unavailable.";
     } catch (error) {
         console.error("Group Risk Analysis Error:", error);
@@ -231,7 +231,7 @@ export const generateChurchInsights = async (
   `;
 
   try {
-    const response = await callGemini({ model: 'gemini-2.0-flash', prompt });
+    const response = await callGemini({ model: 'gemini-2.5-flash', prompt });
     return response.text || "Unable to generate insights at this time.";
   } catch (error) {
     console.error("Gemini Error:", error);
@@ -261,7 +261,7 @@ export const generatePeopleInsights = async (
   `;
 
   try {
-    const response = await callGemini({ model: 'gemini-2.0-flash', prompt });
+    const response = await callGemini({ model: 'gemini-2.5-flash', prompt });
     return response.text || "Insight engine warming up...";
   } catch (error) {
     console.error("Gemini People Error:", error);
@@ -305,7 +305,7 @@ export const chatWithDemographicAnalyst = async (
     `;
 
     try {
-        const response = await callGemini({ model: 'gemini-2.0-flash', prompt: question, systemInstruction });
+        const response = await callGemini({ model: 'gemini-2.5-flash', prompt: question, systemInstruction });
         return response.text || "I couldn't analyze the demographic data at this moment.";
     } catch (e) {
         console.error("Demographic Analyst Error", e);
@@ -340,7 +340,7 @@ export const generateGivingInsights = async (
   `;
 
   try {
-    const response = await callGemini({ model: 'gemini-2.0-flash', prompt });
+    const response = await callGemini({ model: 'gemini-2.5-flash', prompt });
     return response.text || "Financial analysis unavailable.";
   } catch (error) {
     console.error("Gemini Giving Error:", error);
@@ -394,7 +394,7 @@ export const chatWithGivingAnalyst = async (
     `;
 
     try {
-        const response = await callGemini({ model: 'gemini-2.0-flash', prompt: question, systemInstruction });
+        const response = await callGemini({ model: 'gemini-2.5-flash', prompt: question, systemInstruction });
         return response.text || "I couldn't analyze the financial data at this moment.";
     } catch (e) {
         console.error("Giving Analyst Error", e);
@@ -434,7 +434,7 @@ export const generateGroupsInsights = async (
   `;
 
   try {
-    const response = await callGemini({ model: 'gemini-2.0-flash', prompt });
+    const response = await callGemini({ model: 'gemini-2.5-flash', prompt });
     return response.text || "Community analysis unavailable.";
   } catch (error) {
     console.error("Gemini Groups Error:", error);
@@ -533,7 +533,7 @@ export const generateCommunityStrategy = async (
     `;
 
     try {
-        const response = await callGemini({ model: 'gemini-2.0-flash', prompt });
+        const response = await callGemini({ model: 'gemini-2.5-flash', prompt });
         return response.text || "Unable to generate community strategy.";
     } catch (e) {
         console.error("Community Strategy Error", e);
@@ -573,7 +573,7 @@ export const generateCareAdvice = async (
     `;
 
     try {
-        const response = await callGemini({ model: 'gemini-2.0-flash', prompt });
+        const response = await callGemini({ model: 'gemini-2.5-flash', prompt });
         return response.text || "Care advice unavailable.";
     } catch (e) {
         console.error("Care Advice Error", e);
@@ -590,7 +590,9 @@ export const askPastorAI = async (
         services?: ServicesDashboardData | null,
         attendance?: AttendanceData[],
         census?: CensusStats | null,
-        churchName?: string
+        churchName?: string,
+        donations?: DetailedDonation[],
+        funds?: PcoFund[]
     }
 ): Promise<string> => {
     const peopleSummary = context.people ? `
@@ -605,10 +607,14 @@ export const askPastorAI = async (
     const givingSummary = context.giving ? `
     GIVING:
     - Total Period: $${context.giving.totalGiving} from ${context.giving.contributingPeople} donors.
+    - Previous Period: $${context.giving.previousTotalGiving}
     - Recurring Donors: ${context.giving.recurringGivers}
-    - Avg Gift: $${context.giving.averageGift}
+    - Avg Gift: $${context.giving.averageGift} (Median: $${context.giving.medianGift})
     - Fund Breakdown: ${JSON.stringify(context.giving.givingByFund)}
-    - Top Donors (Anonymized Context): ${context.giving.topGiversList.length} top donors tracked.
+    - Historical Trends (Last 12 periods): ${JSON.stringify(context.giving.trends?.slice(-12) || [])}
+    - Donor Lifecycle: New=${context.giving.donorLifecycle?.new || 0}, Active=${context.giving.donorLifecycle?.active || 0}, Lapsed=${context.giving.donorLifecycle?.lapsed || 0}
+    - At-Risk Givers (${context.giving.atRiskGiversList?.length || 0}): ${(context.giving.atRiskGiversList || []).map(d => d.name).slice(0, 5).join(', ')}
+    - Top 10 Donor Concentration: ${context.giving.topGiverConcentration?.toFixed(1)}% of total giving
     ` : 'GIVING: No data available.';
 
     const groupsSummary = context.groups ? `
@@ -629,7 +635,93 @@ export const askPastorAI = async (
     ATTENDANCE:
     - Last 7 entries: ${JSON.stringify(context.attendance.slice(-7))}
     ` : 'ATTENDANCE: No data available.';
+    // Build rich per-fund analytics from raw donation records
+    let fundDetailsSummary = 'FUND DETAILS: No individual donation records available.';
+    if (context.donations && context.donations.length > 0) {
+        const now = new Date();
+        const thisYear = now.getFullYear();
+        const lastYear = thisYear - 1;
+        const thisYearStr = String(thisYear);
+        const lastYearStr = String(lastYear);
 
+        // This year: Jan–current month count
+        const currentMonthNum = now.getMonth() + 1; // 1-12
+        // Last year same period: Jan–(currentMonth) of last year
+        // Last year H2 (last 6 months): Jul–Dec of last year
+        const lastYearH2Months = ['07','08','09','10','11','12'].map(m => `${lastYearStr}-${m}`);
+
+        // Per-fund structures
+        type FundData = {
+            totalAllTime: number;
+            thisYearTotal: number;
+            lastYearTotal: number;
+            lastYearH2Total: number;
+            lastYearSamePeriodTotal: number; // Jan–currentMonth of last year
+            donorsThisYear: Set<string>;
+            donorsLastYear: Set<string>;
+            byMonth: Record<string, number>;
+            donorNames: Record<string, string>; // donorId->name
+        };
+        const byFund: Record<string, FundData> = {};
+
+        for (const d of context.donations) {
+            const fund = d.fundName || 'General';
+            if (!byFund[fund]) byFund[fund] = {
+                totalAllTime: 0, thisYearTotal: 0, lastYearTotal: 0,
+                lastYearH2Total: 0, lastYearSamePeriodTotal: 0,
+                donorsThisYear: new Set(), donorsLastYear: new Set(),
+                byMonth: {}, donorNames: {}
+            };
+            const fd = byFund[fund];
+            fd.totalAllTime += d.amount;
+            if (d.donorId && d.donorName) fd.donorNames[d.donorId] = d.donorName;
+            const month = d.date.substring(0, 7); // YYYY-MM
+            fd.byMonth[month] = (fd.byMonth[month] || 0) + d.amount;
+            const yr = d.date.substring(0, 4);
+            const mo = d.date.substring(5, 7);
+            if (yr === thisYearStr) {
+                fd.thisYearTotal += d.amount;
+                fd.donorsThisYear.add(d.donorId);
+            }
+            if (yr === lastYearStr) {
+                fd.lastYearTotal += d.amount;
+                fd.donorsLastYear.add(d.donorId);
+                if (lastYearH2Months.includes(month)) fd.lastYearH2Total += d.amount;
+                if (parseInt(mo) <= currentMonthNum) fd.lastYearSamePeriodTotal += d.amount;
+            }
+        }
+
+        const fundLines = Object.entries(byFund).map(([name, fd]) => {
+            // Monthly trend (last 18 months for full year-over-year context)
+            const monthlyHistory = Object.entries(fd.byMonth)
+                .sort(([a], [b]) => a.localeCompare(b))
+                .slice(-18)
+                .map(([month, amt]) => `${month}: $${amt.toFixed(2)}`)
+                .join(', ');
+
+            // Lapsed-by-fund: gave last year but NOT this year
+            const lapsedForFund = Array.from(fd.donorsLastYear)
+                .filter(id => !fd.donorsThisYear.has(id))
+                .map(id => fd.donorNames[id] || id)
+                .slice(0, 10);
+
+            const yoyChange = fd.lastYearSamePeriodTotal > 0
+                ? (((fd.thisYearTotal - fd.lastYearSamePeriodTotal) / fd.lastYearSamePeriodTotal) * 100).toFixed(1)
+                : 'N/A';
+
+            return [
+                `  FUND: ${name}`,
+                `    This Year (Jan–${now.toLocaleString('default',{month:'short'}).toUpperCase()}): $${fd.thisYearTotal.toFixed(2)} | Unique donors: ${fd.donorsThisYear.size}`,
+                `    Last Year Same Period (Jan–${now.toLocaleString('default',{month:'short'}).toUpperCase()} ${lastYear}): $${fd.lastYearSamePeriodTotal.toFixed(2)} | Unique donors: ${fd.donorsLastYear.size}`,
+                `    Last Year H2 (Jul–Dec ${lastYear}): $${fd.lastYearH2Total.toFixed(2)}`,
+                `    Last Year Full (${lastYear}): $${fd.lastYearTotal.toFixed(2)}`,
+                `    YoY Change (same period): ${yoyChange}%`,
+                `    Lapsed Donors (gave ${lastYear}, not yet ${thisYear}): ${lapsedForFund.length > 0 ? lapsedForFund.join(', ') : 'None identified'}`,
+                `    Monthly Trend: [${monthlyHistory}]`,
+            ].join('\n');
+        });
+        fundDetailsSummary = `FUND DETAILS — Year-over-Year Analysis (from ${context.donations.length} donation records, today is ${now.toISOString().substring(0,10)}):\n${fundLines.join('\n\n')}`;
+    }
     const censusSummary = context.census ? `
     COMMUNITY CONTEXT (Census):
     - Location: ${context.census.locationName}
@@ -650,6 +742,7 @@ export const askPastorAI = async (
     ${servicesSummary}
     ${attendanceSummary}
     ${censusSummary}
+    ${fundDetailsSummary}
 
     Guidelines:
     1. Be concise, professional, and pastoral in tone.
@@ -657,10 +750,12 @@ export const askPastorAI = async (
     3. If asked to draft content (emails, announcements), use the context to make it relevant.
     4. Format your response in Markdown (use lists, bold text for key figures).
     5. Highlight trends where visible (e.g., if attendance is trending up or down).
+    6. For fund-specific questions, use the FUND DETAILS section which contains per-fund monthly giving history and unique donor counts.
+    7. When asked about lapsed or at-risk donors for a specific fund, cross-reference the fund's donor list against the overall at-risk and lapsed donor data.
     `;
 
     try {
-        const response = await callGemini({ model: 'gemini-2.0-flash', prompt: question, systemInstruction });
+        const response = await callGemini({ model: 'gemini-2.5-flash', prompt: question, systemInstruction });
         return response.text || "I couldn't generate a response at this time.";
     } catch (e) {
         console.error("Pastor AI Error", e);
@@ -716,7 +811,7 @@ Rules:
 `;
 
     try {
-        const response = await callGemini({ model: 'gemini-2.0-flash', prompt });
+        const response = await callGemini({ model: 'gemini-2.5-flash', prompt });
         const raw = (response.text || '').trim();
         const jsonStr = raw.replace(/^```json?\n?/, '').replace(/\n?```$/, '').trim();
         const parsed = JSON.parse(jsonStr);

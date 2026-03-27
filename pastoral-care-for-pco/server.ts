@@ -16,6 +16,7 @@ import { sendEmail } from './backend/sendEmail';
 import { startEmailScheduler } from './backend/emailScheduler';
 import { getDb } from './backend/firebase';
 import { handleGeminiProxy } from './backend/geminiProxy';
+import { provisionSubuser, authenticateDomain, verifyDomain } from './backend/emailProvisioning';
 
 // Fix for bundled CJS environment
 const __dirname = process.cwd();
@@ -61,6 +62,11 @@ async function startServer() {
     // Email (SendGrid)
     app.post('/email/send', express.json(), sendEmail);
     app.post('/email/test', express.json(), sendEmail);
+
+    // Email provisioning — tenant Subuser + domain authentication
+    app.post('/email/provision-subuser', express.json(), provisionSubuser);
+    app.post('/email/authenticate-domain', express.json(), authenticateDomain);
+    app.post('/email/verify-domain', express.json(), verifyDomain);
 
     // Schedule an email campaign
     app.post('/email/schedule', express.json(), async (req: any, res: any) => {

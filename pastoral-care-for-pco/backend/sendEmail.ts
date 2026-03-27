@@ -191,26 +191,38 @@ export async function executeSend(
 ): Promise<{ recipientCount: number; message: string }> {
     const log = createServerLogger(db);
 
-    // 1. Load system settings
+    // 1. Load system settings (global/fallback)
     const settingsSnap = await db.doc('system/settings').get();
     const settings = settingsSnap.data() || {};
-    const apiKey: string = settings.sendGridApiKey || '';
-    const defaultFromEmail: string = settings.sendGridFromEmail || '';
-    const defaultFromName: string = settings.sendGridFromName || 'Church';
+    const globalApiKey: string = settings.sendGridApiKey || '';
+    const globalFromEmail: string = settings.sendGridFromEmail || '';
+    const globalFromName: string = settings.sendGridFromName || 'Church';
 
-    if (!apiKey || !apiKey.startsWith('SG.')) {
+    if (!globalApiKey || !globalApiKey.startsWith('SG.')) {
         throw new Error('SendGrid is not configured. Please add your API key in App Config → System Settings.');
     }
 
-    sgMail.setApiKey(apiKey);
+    // 2. Load church to check for tenant-specific email configuration
+    const churchSnap = await db.collection('churches').doc(churchId).get();
+    const churchData = churchSnap.data() || {};
+    const tenantEmail = churchData.emailSettings || {};
 
-    // 2. Load campaign
+    // Prefer tenant-scoped Subuser API key → fall back to global master key
+    const effectiveApiKey = tenantEmail.sendGridSubuserApiKey || globalApiKey;
+
+    // Prefer tenant-level From settings → campaign override → global fallback
+    const tenantFromEmail = tenantEmail.fromEmail || '';
+    const tenantFromName  = tenantEmail.fromName  || '';
+
+    sgMail.setApiKey(effectiveApiKey);
+
+    // 3. Load campaign
     const campaignSnap = await db.collection('email_campaigns').doc(campaignId).get();
     if (!campaignSnap.exists) throw new Error('Campaign not found');
     const campaign = campaignSnap.data() as any;
 
-    const fromEmail = campaign.fromEmail || defaultFromEmail;
-    const fromName  = campaign.fromName  || defaultFromName;
+    const fromEmail = campaign.fromEmail || tenantFromEmail || globalFromEmail;
+    const fromName  = campaign.fromName  || tenantFromName  || globalFromName;
     const subject   = campaign.subject   || '(No Subject)';
 
     if (!fromEmail) throw new Error('No "From Email" configured. Set it on the campaign or in App Config → SendGrid.');
@@ -227,8 +239,7 @@ export async function executeSend(
     } else if (campaign.toListId) {
         log.info(`Fetching PCO list ${campaign.toListId} for campaign ${campaignId}`, 'system', { churchId }, churchId);
 
-        const churchSnap = await db.collection('churches').doc(churchId).get();
-        const churchData = churchSnap.data() || {};
+        // churchData already loaded above (for email settings)
         const accessToken = churchData.pcoAccessToken;
 
         if (!accessToken) throw new Error('Church not connected to Planning Center. Cannot fetch recipient list.');

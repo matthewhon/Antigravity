@@ -87,6 +87,30 @@ export interface Church {
     allowSignups?: boolean;
     scheduledSyncTime?: string;
     communityLocations?: CommunityLocation[];
+    emailSettings?: {
+        /** 'shared' = send from @pastoralcare.barnabassoftware.com; 'custom' = tenant's own domain */
+        mode: 'shared' | 'custom';
+        /** For 'shared' mode: the prefix before @pastoralcare.barnabassoftware.com, e.g. "grace" */
+        sharedPrefix?: string;
+        /** Full From email (computed): e.g. grace@pastoralcare.barnabassoftware.com or contact@mychurch.org */
+        fromEmail?: string;
+        /** Display name for the From field */
+        fromName?: string;
+        // Custom domain fields
+        /** e.g. "mychurch.org" */
+        customDomain?: string;
+        /** SendGrid Domain Authentication ID for status checking */
+        domainAuthId?: string;
+        /** The 3 CNAME records the pastor must add to their DNS */
+        cnameRecords?: { host: string; type: 'CNAME'; data: string }[];
+        /** True once SendGrid confirms DNS has propagated */
+        domainVerified?: boolean;
+        // SendGrid Subuser isolation
+        /** SendGrid Subuser username (for reputation isolation) */
+        sendGridSubuserId?: string;
+        /** SendGrid API key scoped to this church's Subuser */
+        sendGridSubuserApiKey?: string;
+    };
 }
 
 export interface AttendanceData {

@@ -388,7 +388,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
 
                         {/* SendGrid */}
                         <div className="pt-6 border-t border-slate-100 dark:border-slate-800">
-                            <div className="flex justify-between items-center mb-4">
+                            <div className="flex justify-between items-center mb-2">
                                 <h4 className="text-xs font-bold text-indigo-600 dark:text-indigo-400">SendGrid (Email Delivery)</h4>
                                 {settings.sendGridApiKey?.startsWith('SG.') ? (
                                     <span className="text-[9px] font-black bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">ACTIVE</span>
@@ -396,9 +396,13 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                     <span className="text-[9px] font-black bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/30">INCOMPLETE</span>
                                 )}
                             </div>
+                            <p className="text-[10px] text-slate-400 mb-4 leading-relaxed">
+                                This is the <strong>master</strong> SendGrid account. Each church tenant gets an isolated Subuser for reputation separation.
+                                Tenants configure their From address in <strong>Settings & Administration → Mail Settings</strong>.
+                            </p>
                             <div className="space-y-4">
                                 <div>
-                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">API Key</label>
+                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Master API Key</label>
                                     <input 
                                         type="password" 
                                         value={settings.sendGridApiKey || ''}
@@ -406,27 +410,43 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                         className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
                                         placeholder="SG.xxxxxxxxxxxxxxxx"
                                     />
-                                    <p className="text-[9px] text-slate-400 mt-1.5">Find this in your <a href="https://app.sendgrid.com/settings/api_keys" target="_blank" rel="noopener noreferrer" className="underline text-indigo-400 hover:text-indigo-300">SendGrid Dashboard → Settings → API Keys</a>.</p>
+                                    <p className="text-[9px] text-slate-400 mt-1.5">
+                                        Find this in your <a href="https://app.sendgrid.com/settings/api_keys" target="_blank" rel="noopener noreferrer" className="underline text-indigo-400 hover:text-indigo-300">SendGrid Dashboard → Settings → API Keys</a>.
+                                        Requires <strong>Full Access</strong> permissions to create Subusers and authenticate domains.
+                                    </p>
                                 </div>
+
                                 <div>
-                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Default From Email</label>
+                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Shared Subdomain</label>
+                                    <div className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-600 dark:text-slate-400 select-all">
+                                        pastoralcare.barnabassoftware.com
+                                    </div>
+                                    <p className="text-[9px] text-slate-400 mt-1.5">
+                                        Tenants on the shared plan send from <code>prefix@pastoralcare.barnabassoftware.com</code>. They choose their prefix in Mail Settings.
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Global Fallback From Email</label>
                                     <input 
                                         type="email" 
                                         value={settings.sendGridFromEmail || ''}
                                         onChange={e => handleChange('sendGridFromEmail', e.target.value)}
                                         className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                                        placeholder="hello@mychurch.org"
+                                        placeholder="noreply@pastoralcare.barnabassoftware.com"
                                     />
-                                    <p className="text-[9px] text-slate-400 mt-1.5">Must be a <strong>verified sender</strong> in SendGrid. Campaigns can override this per email.</p>
+                                    <p className="text-[9px] text-slate-400 mt-1.5">
+                                        Used only if a tenant has no Mail Settings configured. Tenant-level settings take priority over this.
+                                    </p>
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Default From Name</label>
+                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Global Fallback From Name</label>
                                     <input 
                                         type="text" 
                                         value={settings.sendGridFromName || ''}
                                         onChange={e => handleChange('sendGridFromName', e.target.value)}
                                         className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                                        placeholder="My Church"
+                                        placeholder="Pastoral Care"
                                     />
                                 </div>
                             </div>

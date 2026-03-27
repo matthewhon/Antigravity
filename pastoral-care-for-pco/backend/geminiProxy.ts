@@ -21,7 +21,7 @@ import { GoogleGenAI } from '@google/genai';
  */
 export const handleGeminiProxy = async (req: any, res: any) => {
     const {
-        model = 'gemini-2.0-flash',
+        model = 'gemini-2.5-flash',
         prompt,
         systemInstruction,
         config,

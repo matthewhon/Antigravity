@@ -822,7 +822,7 @@ const App: React.FC = () => {
                 churchName={church.name}
             />
         )}
-        {view === 'communication' && systemSettings?.enabledModules?.communication !== false && <CommunicationModule churchId={church.id} />}
+        {view === 'communication' && systemSettings?.enabledModules?.communication !== false && <CommunicationModule churchId={church.id} church={church} />}
         {view === 'people' && (
             <PeopleView 
                 data={peopleDashboardData}

@@ -496,6 +496,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               attendanceData={attendanceData}
               censusData={censusData}
               churchName={churchName}
+              donations={donations}
+              funds={funds}
           />
         </div>
       )}

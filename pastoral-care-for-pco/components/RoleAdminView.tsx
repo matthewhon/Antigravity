@@ -37,7 +37,18 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
 }) => {
   const [users, setUsers] = useState<User[]>([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'Team' | 'Organization' | 'Planning Center' | 'Community' | 'Widget Directory' | 'Risk Profiles' | 'Subscription'>('Team');
+  const [activeTab, setActiveTab] = useState<'Team' | 'Organization' | 'Planning Center' | 'Community' | 'Widget Directory' | 'Risk Profiles' | 'Subscription' | 'Mail Settings'>('Team');
+
+  // Mail Settings state
+  const [mailMode, setMailMode] = useState<'shared' | 'custom'>(church.emailSettings?.mode || 'shared');
+  const [mailPrefix, setMailPrefix] = useState(church.emailSettings?.sharedPrefix || '');
+  const [mailFromName, setMailFromName] = useState(church.emailSettings?.fromName || church.name || '');
+  const [mailCustomDomain, setMailCustomDomain] = useState(church.emailSettings?.customDomain || '');
+  const [mailCustomFromEmail, setMailCustomFromEmail] = useState(church.emailSettings?.fromEmail || '');
+  const [mailCnameRecords, setMailCnameRecords] = useState<{ host: string; type: 'CNAME'; data: string }[]>(church.emailSettings?.cnameRecords || []);
+  const [mailDomainVerified, setMailDomainVerified] = useState(church.emailSettings?.domainVerified || false);
+  const [isMailSaving, setIsMailSaving] = useState(false);
+  const [mailMessage, setMailMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [formData, setFormData] = useState<Partial<Church>>(church);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
@@ -54,10 +65,24 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   }, [church]);
 
   useEffect(() => {
-      if (initialTab && ['Team', 'Organization', 'Planning Center', 'Community', 'Widget Directory', 'Risk Profiles', 'Subscription'].includes(initialTab)) {
+      if (initialTab && ['Team', 'Organization', 'Planning Center', 'Community', 'Widget Directory', 'Risk Profiles', 'Subscription', 'Mail Settings'].includes(initialTab)) {
           setActiveTab(initialTab as any);
       }
   }, [initialTab]);
+
+  // Sync mail state when church prop changes
+  useEffect(() => {
+      const es = church.emailSettings;
+      if (es) {
+          setMailMode(es.mode || 'shared');
+          setMailPrefix(es.sharedPrefix || '');
+          setMailFromName(es.fromName || church.name || '');
+          setMailCustomDomain(es.customDomain || '');
+          setMailCustomFromEmail(es.fromEmail || '');
+          setMailCnameRecords(es.cnameRecords || []);
+          setMailDomainVerified(es.domainVerified || false);
+      }
+  }, [church.emailSettings]);
 
   // Clear save message automatically
   useEffect(() => {
@@ -393,7 +418,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
             </div>
             
             <div className="flex bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl gap-1 overflow-x-auto max-w-full">
-                {['Team', 'Organization', 'Planning Center', 'Community', 'Widget Directory', 'Risk Profiles', 'Subscription'].map(tab => (
+                {['Team', 'Organization', 'Planning Center', 'Community', 'Mail Settings', 'Widget Directory', 'Risk Profiles', 'Subscription'].map(tab => (
                     <button 
                         key={tab}
                         onClick={() => setActiveTab(tab as any)}
@@ -1003,6 +1028,396 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                 </div>
             </div>
         )}
+
+        {activeTab === 'Mail Settings' && (() => {
+            const SHARED_DOMAIN = 'pastoralcare.barnabassoftware.com';
+            const sysApiUrl = (church as any)._apiBaseUrl || 'https://pastoral-care-for-pco-u3gnt7kb5a-uc.a.run.app';
+
+            const getApiBase = async () => {
+                const s = await firestore.getSystemSettings();
+                return s.apiBaseUrl || 'https://pastoral-care-for-pco-u3gnt7kb5a-uc.a.run.app';
+            };
+
+            const emailStatusBadge = () => {
+                const es = church.emailSettings;
+                if (!es) return <span className="text-[9px] font-black bg-slate-100 dark:bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full">Not Configured</span>;
+                if (es.mode === 'custom' && es.domainVerified) return <span className="text-[9px] font-black bg-emerald-100 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">✓ Custom Domain Verified</span>;
+                if (es.mode === 'custom') return <span className="text-[9px] font-black bg-amber-100 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800">Custom Domain — DNS Pending</span>;
+                if (es.mode === 'shared' && es.sharedPrefix) return <span className="text-[9px] font-black bg-indigo-100 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded-full border border-indigo-200 dark:border-indigo-800">✓ Shared Domain Active</span>;
+                return <span className="text-[9px] font-black bg-slate-100 dark:bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full">Not Configured</span>;
+            };
+
+            const handleProvisionShared = async () => {
+                if (!mailPrefix.trim()) { setMailMessage({ type: 'error', text: 'Please enter an email prefix.' }); return; }
+                if (!mailFromName.trim()) { setMailMessage({ type: 'error', text: 'Please enter a display name.' }); return; }
+                setIsMailSaving(true);
+                setMailMessage(null);
+                try {
+                    const apiBase = await getApiBase();
+                    const res = await fetch(`${apiBase}/email/provision-subuser`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ churchId, prefix: mailPrefix.trim(), fromName: mailFromName.trim() }),
+                    });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.error || 'Provisioning failed');
+                    setMailMessage({ type: 'success', text: `✓ ${data.message}` });
+                    if (onUpdateChurch) {
+                        const fresh = await firestore.getChurch(churchId);
+                        if (fresh) onUpdateChurch(fresh);
+                    }
+                } catch (e: any) {
+                    setMailMessage({ type: 'error', text: e.message });
+                } finally {
+                    setIsMailSaving(false);
+                }
+            };
+
+            const handleAuthenticateDomain = async () => {
+                if (!mailCustomDomain.trim()) { setMailMessage({ type: 'error', text: 'Please enter your domain.' }); return; }
+                setIsMailSaving(true);
+                setMailMessage(null);
+                try {
+                    const apiBase = await getApiBase();
+                    const res = await fetch(`${apiBase}/email/authenticate-domain`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            churchId,
+                            domain: mailCustomDomain.trim().toLowerCase(),
+                            fromEmail: mailCustomFromEmail.trim() || undefined,
+                            fromName: mailFromName.trim() || undefined,
+                        }),
+                    });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.error || 'Domain auth failed');
+                    setMailCnameRecords(data.cnameRecords || []);
+                    setMailMessage({ type: 'success', text: data.message });
+                    if (onUpdateChurch) {
+                        const fresh = await firestore.getChurch(churchId);
+                        if (fresh) onUpdateChurch(fresh);
+                    }
+                } catch (e: any) {
+                    setMailMessage({ type: 'error', text: e.message });
+                } finally {
+                    setIsMailSaving(false);
+                }
+            };
+
+            const handleVerifyDomain = async () => {
+                setIsMailSaving(true);
+                setMailMessage(null);
+                try {
+                    const apiBase = await getApiBase();
+                    const res = await fetch(`${apiBase}/email/verify-domain`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ churchId }),
+                    });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.error || 'Verification failed');
+                    setMailDomainVerified(data.verified);
+                    setMailMessage({ type: data.verified ? 'success' : 'error', text: data.message });
+                    if (onUpdateChurch) {
+                        const fresh = await firestore.getChurch(churchId);
+                        if (fresh) onUpdateChurch(fresh);
+                    }
+                } catch (e: any) {
+                    setMailMessage({ type: 'error', text: e.message });
+                } finally {
+                    setIsMailSaving(false);
+                }
+            };
+
+            const copyToClipboard = (text: string) => navigator.clipboard.writeText(text);
+
+            return (
+                <div className="space-y-8 animate-in fade-in">
+
+                    {/* Header */}
+                    <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] border border-slate-100 dark:border-slate-800 shadow-sm">
+                        <div className="flex flex-col lg:flex-row justify-between items-start gap-6 mb-8">
+                            <div>
+                                <div className="flex items-center gap-3 mb-2">
+                                    <h3 className="text-2xl font-black text-slate-900 dark:text-white">Mail Settings</h3>
+                                    {emailStatusBadge()}
+                                </div>
+                                <p className="text-xs text-slate-400 font-medium leading-relaxed max-w-lg">
+                                    Configure how your church appears in outgoing emails. Choose between a shared address on our domain, or verify your own domain for full brand control.
+                                </p>
+                            </div>
+                        </div>
+
+                        {mailMessage && (
+                            <div className={`mb-6 p-4 rounded-xl text-xs font-bold flex items-start gap-2 ${mailMessage.type === 'success' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800' : 'bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-800'}`}>
+                                <span className="shrink-0 mt-0.5">{mailMessage.type === 'success' ? '✓' : '⚠'}</span>
+                                <span>{mailMessage.text}</span>
+                            </div>
+                        )}
+
+                        {/* Mode Selector */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                            <button
+                                onClick={() => setMailMode('shared')}
+                                className={`p-6 rounded-2xl border-2 text-left transition-all ${
+                                    mailMode === 'shared'
+                                        ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/10'
+                                        : 'border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-700'
+                                }`}
+                            >
+                                <div className="flex items-center gap-3 mb-2">
+                                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
+                                        mailMode === 'shared' ? 'border-indigo-500 bg-indigo-500' : 'border-slate-300 dark:border-slate-600'
+                                    }`}>
+                                        {mailMode === 'shared' && <div className="w-2 h-2 bg-white rounded-full" />}
+                                    </div>
+                                    <span className="font-black text-sm text-slate-900 dark:text-white">Shared Subdomain</span>
+                                    <span className="text-[9px] font-black bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded-full">Fastest Setup</span>
+                                </div>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 ml-8 leading-relaxed">
+                                    Send as <code className="font-mono bg-slate-100 dark:bg-slate-800 px-1 rounded">you@{SHARED_DOMAIN}</code>. No DNS changes required — ready in seconds.
+                                </p>
+                            </button>
+
+                            <button
+                                onClick={() => setMailMode('custom')}
+                                className={`p-6 rounded-2xl border-2 text-left transition-all ${
+                                    mailMode === 'custom'
+                                        ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/10'
+                                        : 'border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-700'
+                                }`}
+                            >
+                                <div className="flex items-center gap-3 mb-2">
+                                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
+                                        mailMode === 'custom' ? 'border-indigo-500 bg-indigo-500' : 'border-slate-300 dark:border-slate-600'
+                                    }`}>
+                                        {mailMode === 'custom' && <div className="w-2 h-2 bg-white rounded-full" />}
+                                    </div>
+                                    <span className="font-black text-sm text-slate-900 dark:text-white">Custom Domain</span>
+                                    <span className="text-[9px] font-black bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 px-1.5 py-0.5 rounded-full">Full Brand Control</span>
+                                </div>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 ml-8 leading-relaxed">
+                                    Send from your own domain (e.g. <code className="font-mono bg-slate-100 dark:bg-slate-800 px-1 rounded">contact@mychurch.org</code>). Requires adding 3 CNAME records to your DNS.
+                                </p>
+                            </button>
+                        </div>
+
+                        {/* ── Shared Mode Form ── */}
+                        {mailMode === 'shared' && (
+                            <div className="space-y-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Email Prefix</label>
+                                        <div className="flex items-center gap-0">
+                                            <input
+                                                type="text"
+                                                value={mailPrefix}
+                                                onChange={e => setMailPrefix(e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, ''))}
+                                                placeholder="grace"
+                                                className="flex-1 bg-white dark:bg-slate-800 border border-r-0 border-slate-200 dark:border-slate-700 rounded-l-xl px-4 py-3 font-mono text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+                                            />
+                                            <div className="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-r-xl px-4 py-3 text-xs font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                                                @{SHARED_DOMAIN}
+                                            </div>
+                                        </div>
+                                        <p className="text-[10px] text-slate-400 mt-1.5">
+                                            This becomes your From address: <strong>{mailPrefix || 'you'}@{SHARED_DOMAIN}</strong>
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Display Name</label>
+                                        <input
+                                            type="text"
+                                            value={mailFromName}
+                                            onChange={e => setMailFromName(e.target.value)}
+                                            placeholder="Grace Community Church"
+                                            className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 font-bold text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+                                        />
+                                        <p className="text-[10px] text-slate-400 mt-1.5">Recipients see this as the sender name in their inbox.</p>
+                                    </div>
+                                </div>
+
+                                <div className="bg-indigo-50 dark:bg-indigo-900/10 rounded-2xl p-5 border border-indigo-100 dark:border-indigo-900/30">
+                                    <p className="text-xs font-bold text-indigo-700 dark:text-indigo-300 mb-1">Preview</p>
+                                    <p className="text-sm text-slate-700 dark:text-slate-300">
+                                        <span className="font-bold">{mailFromName || 'Your Church'}</span>{' '}
+                                        <span className="text-slate-400">&lt;{mailPrefix || 'you'}@{SHARED_DOMAIN}&gt;</span>
+                                    </p>
+                                </div>
+
+                                <div className="flex justify-end">
+                                    <button
+                                        onClick={handleProvisionShared}
+                                        disabled={isMailSaving}
+                                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg disabled:opacity-50"
+                                    >
+                                        {isMailSaving ? 'Configuring…' : church.emailSettings?.sendGridSubuserId ? 'Update Email Settings' : 'Activate Shared Email'}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── Custom Domain Form ── */}
+                        {mailMode === 'custom' && (
+                            <div className="space-y-8">
+
+                                {/* Step 1: Display Name + Domain */}
+                                <div className="p-6 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <span className="w-6 h-6 rounded-full bg-indigo-600 text-white text-[10px] font-black flex items-center justify-center">1</span>
+                                        <h4 className="font-bold text-slate-900 dark:text-white text-sm">Enter Your Domain</h4>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div>
+                                            <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Domain</label>
+                                            <input
+                                                type="text"
+                                                value={mailCustomDomain}
+                                                onChange={e => setMailCustomDomain(e.target.value)}
+                                                placeholder="mychurch.org"
+                                                className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 font-mono text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">From Email</label>
+                                            <input
+                                                type="email"
+                                                value={mailCustomFromEmail}
+                                                onChange={e => setMailCustomFromEmail(e.target.value)}
+                                                placeholder={`contact@${mailCustomDomain || 'mychurch.org'}`}
+                                                className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 font-mono text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Display Name</label>
+                                            <input
+                                                type="text"
+                                                value={mailFromName}
+                                                onChange={e => setMailFromName(e.target.value)}
+                                                placeholder="Grace Community Church"
+                                                className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Must first have a Subuser from shared mode */}
+                                    {!church.emailSettings?.sendGridSubuserId && (
+                                        <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl">
+                                            <p className="text-xs font-bold text-amber-700 dark:text-amber-400">⚠ First-time setup required</p>
+                                            <p className="text-[10px] text-amber-600 dark:text-amber-500 mt-0.5">Please configure the Shared Subdomain first to provision your SendGrid account, then come back to add your custom domain.</p>
+                                        </div>
+                                    )}
+
+                                    <div className="flex justify-end mt-4">
+                                        <button
+                                            onClick={handleAuthenticateDomain}
+                                            disabled={isMailSaving || !mailCustomDomain.trim() || !church.emailSettings?.sendGridSubuserId}
+                                            className="bg-violet-600 hover:bg-violet-700 text-white px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg disabled:opacity-40"
+                                        >
+                                            {isMailSaving ? 'Requesting…' : mailCnameRecords.length > 0 ? 'Re-fetch DNS Records' : 'Get DNS Records'}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Step 2: CNAME Records */}
+                                {mailCnameRecords.length > 0 && (
+                                    <div className="p-6 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+                                        <div className="flex items-center gap-2 mb-4">
+                                            <span className="w-6 h-6 rounded-full bg-indigo-600 text-white text-[10px] font-black flex items-center justify-center">2</span>
+                                            <h4 className="font-bold text-slate-900 dark:text-white text-sm">Add These DNS Records</h4>
+                                        </div>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+                                            Add these 3 CNAME records in your DNS provider (GoDaddy, Namecheap, Cloudflare, etc.). DNS changes can take up to 48 hours to propagate.
+                                        </p>
+
+                                        <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+                                            <table className="w-full text-xs">
+                                                <thead className="bg-slate-100 dark:bg-slate-800">
+                                                    <tr>
+                                                        <th className="px-4 py-2.5 text-left font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-[10px]">Type</th>
+                                                        <th className="px-4 py-2.5 text-left font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-[10px]">Host / Name</th>
+                                                        <th className="px-4 py-2.5 text-left font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-[10px]">Points To / Value</th>
+                                                        <th className="px-4 py-2.5"></th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
+                                                    {mailCnameRecords.map((r, i) => (
+                                                        <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                                            <td className="px-4 py-3">
+                                                                <span className="font-black text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/20 px-2 py-0.5 rounded text-[10px]">{r.type}</span>
+                                                            </td>
+                                                            <td className="px-4 py-3">
+                                                                <code className="font-mono text-slate-700 dark:text-slate-300 text-[11px] break-all">{r.host}</code>
+                                                            </td>
+                                                            <td className="px-4 py-3">
+                                                                <code className="font-mono text-slate-700 dark:text-slate-300 text-[11px] break-all">{r.data}</code>
+                                                            </td>
+                                                            <td className="px-4 py-3">
+                                                                <button
+                                                                    onClick={() => copyToClipboard(`${r.host}\t${r.type}\t${r.data}`)}
+                                                                    className="text-slate-400 hover:text-indigo-500 transition-colors text-sm"
+                                                                    title="Copy row"
+                                                                >
+                                                                    📋
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Step 3: Verify */}
+                                {mailCnameRecords.length > 0 && (
+                                    <div className="p-6 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <span className="w-6 h-6 rounded-full bg-indigo-600 text-white text-[10px] font-black flex items-center justify-center">3</span>
+                                                <div>
+                                                    <h4 className="font-bold text-slate-900 dark:text-white text-sm">Verify DNS Propagation</h4>
+                                                    <p className="text-[10px] text-slate-400 mt-0.5">After adding the records, click to check if they've propagated.</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                {mailDomainVerified ? (
+                                                    <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 px-3 py-1.5 rounded-full">
+                                                        ✓ Domain Verified
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-xs font-black text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-3 py-1.5 rounded-full">
+                                                        ⏳ DNS Pending
+                                                    </span>
+                                                )}
+                                                <button
+                                                    onClick={handleVerifyDomain}
+                                                    disabled={isMailSaving}
+                                                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg disabled:opacity-50"
+                                                >
+                                                    {isMailSaving ? 'Checking…' : 'Verify DNS'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Info card */}
+                    <div className="bg-indigo-900/10 dark:bg-indigo-900/20 p-6 rounded-2xl border border-indigo-500/20">
+                        <h4 className="font-bold text-indigo-400 mb-2 text-sm">📬 How Email Delivery Works</h4>
+                        <ul className="text-xs text-slate-400 space-y-1.5 list-disc list-inside leading-relaxed">
+                            <li>Each church gets an isolated SendGrid account (Subuser), so your reputation is separate from other tenants.</li>
+                            <li>The <strong>Shared Subdomain</strong> option lets you start sending immediately — no DNS changes required.</li>
+                            <li>The <strong>Custom Domain</strong> option improves deliverability by authenticating your brand with DKIM/SPF through SendGrid's domain authentication.</li>
+                            <li>Individual email campaigns can still override the From name and address on a per-campaign basis.</li>
+                        </ul>
+                    </div>
+                </div>
+            );
+        })()}
 
         {activeTab === 'Risk Profiles' && (
             <div className="space-y-12">

@@ -9,7 +9,7 @@ import { firestore } from '../services/firestoreService';
 import { DataChartSelector } from './DataChartSelector';
 
 import { PcoImportModal } from './PcoImportModal';
-import { EmailCampaign, TemplateSettings, PcoList } from '../types';
+import { EmailCampaign, TemplateSettings, PcoList, Church } from '../types';
 import {
   Mail, Plus, ChevronDown, ChevronUp, CheckCircle, Circle, Send,
   Clock, Users, AtSign, FileText, AlignLeft, Calendar, ArrowLeft,
@@ -876,7 +876,7 @@ const SendTestModal: React.FC<SendTestModalProps> = ({ onConfirm, onCancel, isSe
   );
 };
 
-export const CommunicationModule: React.FC<{ churchId: string }> = ({ churchId }) => {
+export const CommunicationModule: React.FC<{ churchId: string; church?: Church }> = ({ churchId, church }) => {
   const [campaigns, setCampaigns] = useState<EmailCampaign[]>([]);
   const [activeCampaign, setActiveCampaign] = useState<EmailCampaign | null>(null);
   const [previewCampaign, setPreviewCampaign] = useState<EmailCampaign | null>(null);
@@ -906,6 +906,11 @@ export const CommunicationModule: React.FC<{ churchId: string }> = ({ churchId }
   const handleCreate = async (name: string) => {
     setShowNewModal(false);
     const c = newCampaign(churchId, name);
+    // Prefill From fields from tenant email settings if configured
+    if (church?.emailSettings?.fromEmail) {
+      c.fromEmail = church.emailSettings.fromEmail;
+      c.fromName = church.emailSettings.fromName || church.name || '';
+    }
     try {
       await firestore.saveEmailCampaign(c);
       setCampaigns(prev => [c, ...prev]);
@@ -1036,6 +1041,36 @@ export const CommunicationModule: React.FC<{ churchId: string }> = ({ churchId }
 
   return (
     <div className="flex flex-col h-full relative">
+      {/* Email Config Status Banner — shown when NOT inside an active campaign */}
+      {!activeCampaign && church?.emailSettings && (
+        <div className={`shrink-0 flex items-center gap-3 px-5 py-2 border-b text-xs font-medium ${
+          church.emailSettings.mode === 'custom' && church.emailSettings.domainVerified
+            ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400'
+            : church.emailSettings.mode === 'custom'
+            ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400'
+            : 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-400'
+        }`}>
+          <Mail size={13} className="shrink-0" />
+          <span>
+            {church.emailSettings.mode === 'custom' && church.emailSettings.domainVerified
+              ? `Sending from ${church.emailSettings.fromEmail} (custom domain ✓ verified)`
+              : church.emailSettings.mode === 'custom'
+              ? `Custom domain pending DNS verification — currently using ${church.emailSettings.fromEmail}`
+              : `Sending via ${church.emailSettings.fromEmail || 'shared subdomain'}`
+            }
+          </span>
+        </div>
+      )}
+      {!activeCampaign && !church?.emailSettings && (
+        <div className="shrink-0 flex items-center justify-between gap-3 px-5 py-2.5 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800">
+          <div className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400">
+            <Mail size={13} className="shrink-0" />
+            <span className="font-semibold">Email not configured.</span>
+            <span>Go to Settings &amp; Administration → Mail Settings to set up your From address before sending.</span>
+          </div>
+        </div>
+      )}
+
       {/* Toast */}
       {toast && (
         <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-[100] px-5 py-3 rounded-2xl shadow-xl text-sm font-semibold text-white transition-all ${
