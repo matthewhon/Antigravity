@@ -53,7 +53,7 @@ interface EmailBuilderProps {
 const BLOCK_DEFS: { type: BlockType; label: string; icon: React.ReactNode; default: any }[] = [
   { type: 'text',    label: 'Text',    icon: <Type size={20} />,            default: { text: '<p>Start typing…</p>' } },
   { type: 'image',   label: 'Image',   icon: <ImageIcon size={20} />,       default: { src: '' } },
-  { type: 'button',  label: 'Button',  icon: <MousePointerClick size={20} />, default: { text: 'Click Here', url: '#' } },
+  { type: 'button',  label: 'Button',  icon: <MousePointerClick size={20} />, default: { text: 'Click Here', url: '#', align: 'center', size: 'medium', borderRadius: 'rounded', color: '', textColor: '#ffffff' } },
   { type: 'file',    label: 'File',    icon: <File size={20} />,            default: { name: 'document.pdf', url: '#' } },
   { type: 'divider', label: 'Divider', icon: <Minus size={20} />,           default: {} },
   { type: 'video',   label: 'Video',   icon: <Video size={20} />,           default: { src: '' } },
@@ -78,12 +78,19 @@ const BlockThumbnail: React.FC<{ block: EmailBlock }> = ({ block }) => {
       return c.src
         ? <img src={c.src} alt="block" className="w-full max-h-48 object-cover rounded-lg" />
         : <div className="w-full h-24 bg-slate-100 dark:bg-slate-700 rounded-lg flex items-center justify-center text-slate-400"><ImageIcon size={28} /></div>;
-    case 'button':
+    case 'button': {
+      const btnBg = c.color || '#6366f1';
+      const btnTc = c.textColor || '#ffffff';
+      const btnRad = c.borderRadius === 'pill' ? 999 : c.borderRadius === 'square' ? 4 : 8;
+      const btnPad = c.size === 'small' ? '4px 12px' : c.size === 'large' ? '12px 32px' : '8px 20px';
+      const btnFs = c.size === 'small' ? 11 : c.size === 'large' ? 16 : 13;
+      const alignClass = c.align === 'left' ? 'justify-start' : c.align === 'right' ? 'justify-end' : 'justify-center';
       return (
-        <div className="flex justify-center py-1">
-          <span className="px-5 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold">{c.text || 'Button'}</span>
+        <div className={`flex py-1 ${alignClass}`}>
+          <span style={{ background: btnBg, color: btnTc, borderRadius: btnRad, padding: btnPad, fontSize: btnFs, fontWeight: 600, display: 'inline-block' }}>{c.text || 'Button'}</span>
         </div>
       );
+    }
     case 'divider':
       return <hr className="border-t-2 border-slate-200 dark:border-slate-600 my-2" />;
     case 'video':
@@ -272,7 +279,7 @@ const InlineTextEditor: React.FC<{
   useEffect(() => {
     if (editor) {
       const content = block.content?.text || block.content?.html || '';
-      if (editor.getHTML() !== content) editor.commands.setContent(content, false);
+      if (editor.getHTML() !== content) editor.commands.setContent(content);
     }
     setAlign(block.content?.align || 'left');
   }, [block.id]);
@@ -430,20 +437,97 @@ const InlineMediaEditor: React.FC<{
     );
   }
   if (block.type === 'button') {
+    const btnBg = c.color || '#6366f1';
+    const btnTc = c.textColor || '#ffffff';
+    const btnRad = c.borderRadius === 'pill' ? 999 : c.borderRadius === 'square' ? 4 : 8;
+    const btnPad = c.size === 'small' ? '6px 14px' : c.size === 'large' ? '12px 32px' : '8px 22px';
+    const btnFs = c.size === 'small' ? 12 : c.size === 'large' ? 16 : 14;
+    const alignClass = c.align === 'left' ? 'justify-start' : c.align === 'right' ? 'justify-end' : 'justify-center';
+    const inputCls = 'w-full text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500';
+    const labelCls = 'block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1';
+    const segBtn = (active: boolean) =>
+      `flex-1 text-[11px] font-semibold py-1.5 rounded-lg border transition ${
+        active
+          ? 'bg-indigo-600 text-white border-indigo-600'
+          : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-600 hover:border-indigo-300'
+      }`;
     return (
-      <div className="space-y-2" onClick={e => e.stopPropagation()}>
-        <div className="flex justify-center mb-2">
-          <span className="px-5 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold">{c.text || 'Button'}</span>
+      <div className="space-y-3" onClick={e => e.stopPropagation()}>
+        {/* Live preview */}
+        <div className={`flex ${alignClass} py-2 px-1 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-700`}>
+          <span style={{ background: btnBg, color: btnTc, borderRadius: btnRad, padding: btnPad, fontSize: btnFs, fontWeight: 600, display: 'inline-block' }}>
+            {c.text || 'Button'}
+          </span>
         </div>
+
+        {/* Label */}
         <div>
-          <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Button Label</label>
-          <input type="text" value={c.text || ''} onChange={e => onUpdate({ ...c, text: e.target.value })} placeholder="Click Here"
-            className="w-full text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+          <label className={labelCls}>Button Label</label>
+          <input type="text" value={c.text || ''} onChange={e => onUpdate({ ...c, text: e.target.value })} placeholder="Click Here" className={inputCls} />
         </div>
+
+        {/* URL */}
         <div>
-          <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">URL</label>
-          <input type="url" value={c.url || ''} onChange={e => onUpdate({ ...c, url: e.target.value })} placeholder="https://…"
-            className="w-full text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+          <label className={labelCls}>Link URL</label>
+          <input type="url" value={c.url || ''} onChange={e => onUpdate({ ...c, url: e.target.value })} placeholder="https://…" className={inputCls} />
+        </div>
+
+        {/* Colors */}
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className={labelCls}>Button Color</label>
+            <div className="flex items-center gap-1.5">
+              <input type="color" value={btnBg} onChange={e => onUpdate({ ...c, color: e.target.value })}
+                className="w-8 h-7 rounded cursor-pointer border border-slate-200 dark:border-slate-600 p-0" />
+              <input type="text" value={btnBg} onChange={e => onUpdate({ ...c, color: e.target.value })}
+                className="flex-1 text-[11px] font-mono border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+            </div>
+          </div>
+          <div>
+            <label className={labelCls}>Text Color</label>
+            <div className="flex items-center gap-1.5">
+              <input type="color" value={btnTc} onChange={e => onUpdate({ ...c, textColor: e.target.value })}
+                className="w-8 h-7 rounded cursor-pointer border border-slate-200 dark:border-slate-600 p-0" />
+              <input type="text" value={btnTc} onChange={e => onUpdate({ ...c, textColor: e.target.value })}
+                className="flex-1 text-[11px] font-mono border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+            </div>
+          </div>
+        </div>
+
+        {/* Shape */}
+        <div>
+          <label className={labelCls}>Shape</label>
+          <div className="flex gap-1">
+            {(['square', 'rounded', 'pill'] as const).map(r => (
+              <button key={r} onClick={() => onUpdate({ ...c, borderRadius: r })} className={segBtn((c.borderRadius || 'rounded') === r)}>
+                {r === 'pill' ? '● Pill' : r === 'square' ? '■ Square' : '▢ Rounded'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Size */}
+        <div>
+          <label className={labelCls}>Size</label>
+          <div className="flex gap-1">
+            {(['small', 'medium', 'large'] as const).map(s => (
+              <button key={s} onClick={() => onUpdate({ ...c, size: s })} className={segBtn((c.size || 'medium') === s)}>
+                {s.charAt(0).toUpperCase() + s.slice(1)}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Alignment */}
+        <div>
+          <label className={labelCls}>Alignment</label>
+          <div className="flex gap-1">
+            {(['left', 'center', 'right'] as const).map(a => (
+              <button key={a} onClick={() => onUpdate({ ...c, align: a })} className={segBtn((c.align || 'center') === a)}>
+                {a === 'left' ? '⬅ Left' : a === 'right' ? 'Right ➡' : '↔ Center'}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -608,11 +692,17 @@ const MiniBlockView: React.FC<{ b: { id: string; type: string; content: any } }>
   if (b.type === 'image') return c.src
     ? <img src={c.src} alt="" className="w-full rounded object-cover max-h-24" />
     : <div className="w-full h-12 bg-slate-100 dark:bg-slate-700 rounded flex items-center justify-center text-slate-300"><ImageIcon size={18} /></div>;
-  if (b.type === 'button') return (
-    <div className="flex justify-center">
-      <span className="px-3 py-1.5 bg-indigo-600 text-white rounded text-xs font-semibold">{c.text || 'Button'}</span>
-    </div>
-  );
+  if (b.type === 'button') {
+    const btnBg = c.color || '#6366f1';
+    const btnTc = c.textColor || '#ffffff';
+    const btnRad = c.borderRadius === 'pill' ? 999 : c.borderRadius === 'square' ? 4 : 6;
+    const alignClass = c.align === 'left' ? 'justify-start' : c.align === 'right' ? 'justify-end' : 'justify-center';
+    return (
+      <div className={`flex ${alignClass}`}>
+        <span style={{ background: btnBg, color: btnTc, borderRadius: btnRad, padding: '4px 12px', fontSize: 12, fontWeight: 600, display: 'inline-block' }}>{c.text || 'Button'}</span>
+      </div>
+    );
+  }
   return null;
 };
 

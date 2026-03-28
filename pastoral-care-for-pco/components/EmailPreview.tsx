@@ -177,11 +177,22 @@ export const EmailPreview: React.FC<Props> = ({ blocks, settings, churchLogoUrl 
             )}
 
             {block.type === 'html' && <div dangerouslySetInnerHTML={{ __html: block.content.html }} />}
-            {block.type === 'button' && (
-              <button className="px-4 py-2 rounded-lg" style={{ backgroundColor: settings.primaryColor, color: '#fff' }}>
-                {block.content.text}
-              </button>
-            )}
+            {block.type === 'button' && (() => {
+              const bc = block.content || {};
+              const bg = bc.color || settings.primaryColor || '#6366f1';
+              const tc = bc.textColor || '#ffffff';
+              const rad = bc.borderRadius === 'pill' ? 999 : bc.borderRadius === 'square' ? 4 : 8;
+              const pad = bc.size === 'small' ? '6px 16px' : bc.size === 'large' ? '14px 36px' : '10px 24px';
+              const fs = bc.size === 'small' ? 13 : bc.size === 'large' ? 17 : 15;
+              const alignStyle: React.CSSProperties = { display: 'flex', justifyContent: bc.align === 'left' ? 'flex-start' : bc.align === 'right' ? 'flex-end' : 'center', margin: '4px 0' };
+              return (
+                <div style={alignStyle}>
+                  <a href={bc.url || '#'} style={{ background: bg, color: tc, borderRadius: rad, padding: pad, fontSize: fs, fontWeight: 700, display: 'inline-block', textDecoration: 'none' }}>
+                    {bc.text || 'Click Here'}
+                  </a>
+                </div>
+              );
+            })()}
             {block.type === 'pastoral_care_chart' && (
               <div className="p-4 bg-slate-100 rounded-lg text-sm">📊 Pastoral Care Chart: {block.content.area}</div>
             )}
