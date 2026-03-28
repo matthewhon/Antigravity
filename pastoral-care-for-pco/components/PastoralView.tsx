@@ -107,35 +107,16 @@ const getMinistrySignals = (data: CensusStats) => {
     return signals;
 };
 
-const loadGoogleMapsScript = (apiKey: string): Promise<void> => {
-    return new Promise((resolve, reject) => {
-        if ((window as any).google && (window as any).google.maps) {
-            resolve();
-            return;
-        }
-        const existingScript = document.querySelector(`script[src^="https://maps.googleapis.com/maps/api/js"]`);
-        if (existingScript) {
-            if (existingScript.getAttribute('data-loaded') === 'true') {
-                resolve();
-            } else {
-                existingScript.addEventListener('load', () => resolve());
-            }
-            return;
-        }
-
-        const script = document.createElement('script');
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}`;
-        script.async = true;
-        script.defer = true;
-        script.setAttribute('data-loaded', 'false');
-        script.onload = () => {
-            script.setAttribute('data-loaded', 'true');
-            resolve();
-        };
-        script.onerror = (e) => reject(e);
-        document.head.appendChild(script);
-    });
+const ensureLeafletCss = () => {
+    const id = 'leaflet-css';
+    if (document.getElementById(id)) return;
+    const link = document.createElement('link');
+    link.id = id;
+    link.rel = 'stylesheet';
+    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    document.head.appendChild(link);
 };
+
 
 export const PastoralView: React.FC<PastoralViewProps> = ({
   user,
@@ -473,132 +454,121 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
       setStrategyReport('');
   }, [selectedLocationId, activeTab]);
 
-  // --- Map Initialization Effect ---
+  // --- Map Initialization Effect (Leaflet + OpenStreetMap — no API key required) ---
   useEffect(() => {
-      if (activeTab === 'Membership' && googleMapsApiKey && peopleData && mapRef.current && !mapInstance && safeVisibleWidgets.includes('member_map')) {
-          
-          (window as any).gm_authFailure = () => {
-              console.warn("Google Maps API Authentication Error: Falling back to Embed API.");
-              setMapAuthError(true);
-          };
+      if (activeTab !== 'Membership' || !peopleData || !mapRef.current || mapInstance || !safeVisibleWidgets.includes('member_map')) return;
 
-          loadGoogleMapsScript(googleMapsApiKey).then(() => {
-              const google = (window as any).google;
-              if (!google) return;
+      ensureLeafletCss();
 
-              const locationMap = new Map<string, { count: number, latSum: number, lngSum: number, coordCount: number }>();
-              
-              peopleData.allPeople.forEach(p => {
-                  const addr = p.addresses && p.addresses.length > 0 ? p.addresses[0] : null;
-                  if (addr) {
-                      const city = addr.city?.trim();
-                      const state = addr.state?.trim();
-                      
-                      if (city && state) {
-                          const key = `${city}, ${state}`;
-                          
-                          if (!locationMap.has(key)) {
-                              locationMap.set(key, { count: 0, latSum: 0, lngSum: 0, coordCount: 0 });
-                          }
-                          const loc = locationMap.get(key)!;
-                          loc.count++;
+      // Dynamically import Leaflet (installed as npm package)
+      import('leaflet').then(L => {
+          if (!mapRef.current) return;
 
-                          if (addr.location) {
-                              const [latStr, lngStr] = addr.location.split(',');
-                              const lat = parseFloat(latStr);
-                              const lng = parseFloat(lngStr);
-                              
-                              if (!isNaN(lat) && !isNaN(lng)) {
-                                  loc.latSum += lat;
-                                  loc.lngSum += lng;
-                                  loc.coordCount++;
-                              }
+          // Aggregate people by city — same logic as before
+          const locationMap = new Map<string, { count: number; latSum: number; lngSum: number; coordCount: number }>();
+
+          peopleData.allPeople.forEach(p => {
+              const addr = p.addresses && p.addresses.length > 0 ? p.addresses[0] : null;
+              if (addr) {
+                  const city = addr.city?.trim();
+                  const state = addr.state?.trim();
+                  if (city && state) {
+                      const key = `${city}, ${state}`;
+                      if (!locationMap.has(key)) {
+                          locationMap.set(key, { count: 0, latSum: 0, lngSum: 0, coordCount: 0 });
+                      }
+                      const loc = locationMap.get(key)!;
+                      loc.count++;
+                      if (addr.location) {
+                          const [latStr, lngStr] = addr.location.split(',');
+                          const lat = parseFloat(latStr);
+                          const lng = parseFloat(lngStr);
+                          if (!isNaN(lat) && !isNaN(lng)) {
+                              loc.latSum += lat;
+                              loc.lngSum += lng;
+                              loc.coordCount++;
                           }
                       }
                   }
-              });
-
-              const points = Array.from(locationMap.entries())
-                  .filter(([_, data]) => data.coordCount > 0)
-                  .map(([name, data]) => ({
-                      name,
-                      lat: data.latSum / data.coordCount,
-                      lng: data.lngSum / data.coordCount,
-                      count: data.count
-                  }));
-
-              const defaultCenter = { lat: 39.8283, lng: -98.5795 };
-              const map = new google.maps.Map(mapRef.current, {
-                  center: defaultCenter,
-                  zoom: 4,
-                  mapTypeControl: false,
-                  streetViewControl: false,
-                  fullscreenControl: true,
-                  styles: [
-                      { "featureType": "poi", "elementType": "labels", "stylers": [{ "visibility": "off" }] }
-                  ]
-              });
-
-              const bounds = new google.maps.LatLngBounds();
-              const infoWindow = new google.maps.InfoWindow();
-
-              points.forEach(point => {
-                  const position = { lat: point.lat, lng: point.lng };
-                  const marker = new google.maps.Marker({
-                      position,
-                      map,
-                      icon: {
-                          path: google.maps.SymbolPath.CIRCLE,
-                          scale: Math.min(30, 8 + Math.sqrt(point.count) * 2), 
-                          fillColor: '#6366f1',
-                          fillOpacity: 0.7,
-                          strokeColor: '#4338ca',
-                          strokeWeight: 1,
-                      },
-                      label: {
-                          text: point.count.toString(),
-                          color: "white",
-                          fontSize: "10px",
-                          fontWeight: "bold"
-                      },
-                      title: `${point.name}: ${point.count} People`
-                  });
-
-                  bounds.extend(position);
-
-                  marker.addListener('click', () => {
-                      const content = `
-                          <div style="padding:8px; text-align:center;">
-                              <strong style="font-size:14px; color:#1e293b; display:block; margin-bottom:4px;">${point.name}</strong>
-                              <span style="font-size:12px; color:#6366f1; font-weight:bold;">${point.count} Member${point.count !== 1 ? 's' : ''}</span>
-                          </div>
-                      `;
-                      infoWindow.setContent(content);
-                      infoWindow.open(map, marker);
-                  });
-              });
-
-              if (points.length > 0) {
-                  map.fitBounds(bounds);
-                  const listener = google.maps.event.addListener(map, "idle", () => { 
-                        if (map.getZoom() > 14) map.setZoom(14); 
-                        google.maps.event.removeListener(listener); 
-                  });
               }
-
-              setMapInstance(map);
-          }).catch(err => {
-              console.error("Google Maps Load Error", err);
-              setMapAuthError(true);
           });
-      }
-  }, [activeTab, googleMapsApiKey, peopleData, safeVisibleWidgets, mapInstance]);
 
-  // Reset the map instance whenever we leave the Membership tab so that
-  // returning to it triggers a fresh initialization into the new DOM node.
+          const points = Array.from(locationMap.entries())
+              .filter(([_, d]) => d.coordCount > 0)
+              .map(([name, d]) => ({
+                  name,
+                  lat: d.latSum / d.coordCount,
+                  lng: d.lngSum / d.coordCount,
+                  count: d.count
+              }));
+
+          // Fix default icon paths broken by bundlers
+          (L.Icon.Default.prototype as any)._getIconUrl = undefined;
+          L.Icon.Default.mergeOptions({
+              iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+              iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+              shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+          });
+
+          const map = L.map(mapRef.current!, {
+              center: [39.8283, -98.5795], // Geographic center of US
+              zoom: 4,
+              zoomControl: true,
+              attributionControl: true,
+          });
+
+          // OpenStreetMap tiles — completely free, no API key
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+              attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+              maxZoom: 19,
+          }).addTo(map);
+
+          const bounds: [number, number][] = [];
+
+          const maxCount = Math.max(...points.map(p => p.count), 1);
+
+          points.forEach(point => {
+              // Scale circle radius: 10px min → 40px max, proportional to count
+              const radius = 10 + 30 * (point.count / maxCount);
+
+              const circle = L.circleMarker([point.lat, point.lng], {
+                  radius,
+                  fillColor: '#6366f1',
+                  fillOpacity: 0.7,
+                  color: '#4338ca',
+                  weight: 1.5,
+              }).addTo(map);
+
+              circle.bindPopup(`
+                  <div style="text-align:center; padding:4px 8px;">
+                      <strong style="font-size:13px; color:#1e293b; display:block; margin-bottom:2px;">${point.name}</strong>
+                      <span style="font-size:12px; color:#6366f1; font-weight:700;">${point.count.toLocaleString()} Member${point.count !== 1 ? 's' : ''}</span>
+                  </div>
+              `);
+
+              bounds.push([point.lat, point.lng]);
+          });
+
+          if (bounds.length > 0) {
+              map.fitBounds(bounds as any, { padding: [40, 40], maxZoom: 10 });
+          }
+
+          setMapInstance(map);
+      }).catch(err => {
+          console.error('Leaflet load error:', err);
+          setMapAuthError(true);
+      });
+
+      // Cleanup: destroy map instance when component unmounts
+      return () => {};
+  }, [activeTab, peopleData, safeVisibleWidgets, mapInstance]);
+
+  // Destroy Leaflet map and reset when leaving Membership tab so re-entry triggers fresh init
   useEffect(() => {
-      if (activeTab !== 'Membership') {
+      if (activeTab !== 'Membership' && mapInstance) {
+          try { (mapInstance as any).remove(); } catch { /* ignore */ }
           setMapInstance(null);
+          setMapAuthError(false);
       }
   }, [activeTab]);
 
@@ -713,27 +683,26 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
               ) : null;
           case 'member_map':
               return (
-                  <WidgetWrapper title="Member Heatmap" onRemove={() => handleRemoveWidget(id)} source="Google Maps">
+                  <WidgetWrapper title="Member Heatmap" onRemove={() => handleRemoveWidget(id)} source="OpenStreetMap">
                       <div className="h-96 w-full rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-800 relative">
                           <div ref={mapRef} className="w-full h-full" />
                           {mapAuthError && (
                               <div className="absolute inset-0 flex items-center justify-center bg-slate-100/90 dark:bg-slate-900/90 z-10">
                                   <div className="text-center p-6">
                                       <p className="text-rose-500 font-bold mb-2">Map Load Error</p>
-                                      <p className="text-xs text-slate-500">Please check your Google Maps API Key in Settings.</p>
+                                      <p className="text-xs text-slate-500">Could not load the map. Check your network connection.</p>
                                   </div>
                               </div>
                           )}
                           {!mapInstance && !mapAuthError && (
-                              <div className="absolute inset-0 flex items-center justify-center">
-                                  {!googleMapsApiKey ? (
-                                      <div className="text-center p-6">
-                                          <p className="text-slate-500 font-bold text-xs mb-1">Google Maps API Key Required</p>
-                                          <p className="text-slate-400 text-[10px]">Add your API key in Settings → Organization to enable the map.</p>
-                                      </div>
-                                  ) : (
-                                      <p className="text-xs font-bold text-slate-400">Loading Map...</p>
-                                  )}
+                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                  <div className="flex items-center gap-2">
+                                      <svg className="animate-spin w-4 h-4 text-indigo-400" fill="none" viewBox="0 0 24 24">
+                                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                                      </svg>
+                                      <p className="text-xs font-bold text-slate-400">Loading Map…</p>
+                                  </div>
                               </div>
                           )}
                       </div>

@@ -11,8 +11,9 @@ import { initializeWebhooks } from './pcoWebhookService';
 const getProxyUrl = async () => {
     // Always use the local server relative path since frontend and backend are served from the same origin
     if (typeof window === 'undefined') {
-        // Running on server
-        return 'http://localhost:3000/pco/proxy';
+        // Running on server — use the actual port (defaults to 8080 matching server.ts)
+        const port = process.env.PORT || 8080;
+        return `http://localhost:${port}/pco/proxy`;
     }
     return '/pco/proxy';
 };
@@ -1135,64 +1136,44 @@ export const syncCheckInsData = async (churchId: string) => {
 /**
  * Syncs registration events from PCO Registrations API into Firestore.
  * This is a non-fatal sync step — if the org doesn't have the Registrations
- * module (403/404), it logs a warning and exits gracefully.
+ * module (403/404), the proxy returns { data: [], _pcoNote } or a 403 which
+ * pcoFetch/fetchAllPages surfaces; we catch it and bail gracefully.
  */
 export const syncRegistrationsData = async (churchId: string) => {
     logger.info('Syncing registrations...', 'sync', { churchId }, churchId);
 
-    const proxyUrl = await getProxyUrl();
-    const pcoUrl = 'https://api.planningcenteronline.com/registrations/v2/events?per_page=100&order=starts_at';
-
     try {
-        // Call PCO through the proxy — proxy will return { data: [], _pcoNote } on 404
-        // or throw / return requiresReauth on 403
-        const proxyRes = await fetch(proxyUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ churchId, url: pcoUrl, method: 'GET' })
-        });
-
-        if (!proxyRes.ok) {
-            const errBody = await proxyRes.text();
-            // 403 means missing registrations scope — log and bail gracefully
-            if (proxyRes.status === 403) {
-                logger.warn(
-                    'Registrations sync skipped: scope not granted. Reconnect PCO to enable.',
-                    'sync', { churchId }, churchId
-                );
-                return;
-            }
-            throw new Error(`Registrations proxy error ${proxyRes.status}: ${errBody.substring(0, 200)}`);
-        }
-
-        const body = await proxyRes.json();
-        const rawEvents: any[] = body?.data || [];
-
-        // If PCO returned a _pcoNote it means the org doesn't have Registrations — bail silently
-        if (body?._pcoNote) {
-            logger.info('Registrations module not available for this org — skipping', 'sync', { churchId, note: body._pcoNote }, churchId);
-            return;
-        }
-
+        // Use the shared pcoFetch/fetchAllPages helpers — same as every other sync function.
+        // The proxy handles 403 (scope missing) by returning a 403 status or a _pcoNote flag.
         const now = Date.now();
-        const records: PcoRegistrationEvent[] = rawEvents.map((item: any) => {
-            const attrs = item.attributes || {};
-            return {
-                // Compound ID so batchUpsert correctly scopes per-tenant
-                id: `${churchId}_${item.id}`,
-                churchId,
-                name: attrs.name || 'Unnamed Event',
-                startsAt: attrs.starts_at || null,
-                endsAt: attrs.ends_at || null,
-                signupCount: attrs.signup_count ?? attrs.attendee_count ?? 0,
-                signupLimit: attrs.signup_limit ?? attrs.attendee_limit ?? null,
-                openSignup: attrs.open_signup ?? true,
-                logoUrl: attrs.logo_url || attrs.image_url || null,
-                publicUrl: attrs.public_url ||
-                    (item.id ? `https://registrations.planningcenteronline.com/events/${item.id}` : null),
-                lastSynced: now,
-            } as PcoRegistrationEvent;
-        });
+
+        const rawEvents = await fetchAllPages(
+            churchId,
+            'registrations/v2/events?order=starts_at',
+            (item: any) => {
+                // fetchAllPages returns null for 404 from pcoFetch — skip those
+                if (!item) return null;
+                const attrs = item.attributes || {};
+                return {
+                    // Compound ID so batchUpsert correctly scopes per-tenant
+                    id: `${churchId}_${item.id}`,
+                    churchId,
+                    name: attrs.name || 'Unnamed Event',
+                    startsAt: attrs.starts_at || null,
+                    endsAt: attrs.ends_at || null,
+                    signupCount: attrs.signup_count ?? attrs.attendee_count ?? 0,
+                    signupLimit: attrs.signup_limit ?? attrs.attendee_limit ?? null,
+                    openSignup: attrs.open_signup ?? true,
+                    logoUrl: attrs.logo_url || attrs.image_url || null,
+                    publicUrl: attrs.public_url ||
+                        (item.id ? `https://registrations.planningcenteronline.com/events/${item.id}` : null),
+                    lastSynced: now,
+                } as PcoRegistrationEvent;
+            }
+        );
+
+        // Filter out any nulls (from 404 items)
+        const records = rawEvents.filter(Boolean) as PcoRegistrationEvent[];
 
         if (records.length > 0) {
             await firestore.upsertRegistrations(records);
@@ -1201,7 +1182,15 @@ export const syncRegistrationsData = async (churchId: string) => {
         logger.info('Registrations sync complete', 'sync', { churchId, count: records.length }, churchId);
 
     } catch (e: any) {
-        // Don't fail the whole sync for registrations issues
+        // 403 = missing registrations scope — log and bail gracefully without failing the full sync
+        if (e?.message?.includes('403') || e?.message?.includes('requiresReauth') || e?.message?.includes('not authorized')) {
+            logger.warn(
+                'Registrations sync skipped: scope not granted. Reconnect PCO in Settings → Planning Center to enable.',
+                'sync', { churchId }, churchId
+            );
+            return;
+        }
+        // Don't fail the whole sync for other registrations issues
         logger.warn('Registrations sync failed (non-fatal)', 'sync', { churchId, error: e?.message }, churchId);
         console.warn('Registrations sync failed:', e);
     }
