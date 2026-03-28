@@ -413,16 +413,20 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
     }
   }, [churchId, onLogoRemoved]);
 
-  // Determine if the church is using a shared subdomain (locked from email)
-  const isSharedMode = church?.emailSettings?.mode === 'shared' && !!church?.emailSettings?.fromEmail;
-  const sharedFromEmail = church?.emailSettings?.fromEmail || '';
+  // Determine if the church has a configured From address (shared OR custom domain)
+  // In both cases the From email is locked to what's set in Mail Settings.
+  const isLockedMode = !!church?.emailSettings?.fromEmail;
+  const isCustomMode = church?.emailSettings?.mode === 'custom';
+  // Keep isSharedMode for the badge label
+  const isSharedMode = church?.emailSettings?.mode === 'shared' && isLockedMode;
+  const lockedFromEmail = church?.emailSettings?.fromEmail || '';
 
-  // If on shared mode and the campaign has no fromEmail set, pre-apply it
+  // If a configured From email exists and the campaign doesn't have it set yet, pre-apply it
   const initialCampaign: EmailCampaign = React.useMemo(() => {
-    if (isSharedMode && !campaign.fromEmail) {
+    if (isLockedMode) {
       return {
         ...campaign,
-        fromEmail: sharedFromEmail,
+        fromEmail: lockedFromEmail,
         fromName: campaign.fromName || church?.emailSettings?.fromName || church?.name || '',
       };
     }
@@ -727,19 +731,27 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
                   <div>
                     <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1 flex items-center gap-1.5">
                       From Email
-                      {isSharedMode && (
-                        <span className="text-[9px] font-black bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-1.5 py-0.5 rounded-full tracking-wide">
-                          Shared Domain
+                      {isLockedMode && (
+                        <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full tracking-wide ${
+                          isCustomMode
+                            ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400'
+                            : 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'
+                        }`}>
+                          {isCustomMode ? 'Custom Domain' : 'Shared Domain'}
                         </span>
                       )}
                     </label>
-                    {isSharedMode ? (
+                    {isLockedMode ? (
                       <>
-                        <div className="w-full text-sm border border-indigo-200 dark:border-indigo-700 rounded-lg px-3 py-2 bg-indigo-50 dark:bg-indigo-900/20 text-slate-700 dark:text-indigo-300 font-mono select-all">
-                          {sharedFromEmail}
+                        <div className={`w-full text-sm border rounded-lg px-3 py-2 font-mono select-all ${
+                          isCustomMode
+                            ? 'border-emerald-200 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 text-slate-700 dark:text-emerald-300'
+                            : 'border-indigo-200 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900/20 text-slate-700 dark:text-indigo-300'
+                        }`}>
+                          {lockedFromEmail}
                         </div>
                         <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1.5">
-                          Set in <strong>Settings & Administration → Mail Settings</strong>. Change your prefix there to update this address.
+                          Set in <strong>Settings &amp; Administration &rarr; Mail Settings</strong>. Change it there to update this address.
                         </p>
                       </>
                     ) : (

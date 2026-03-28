@@ -78,10 +78,17 @@ function renderBlocksToHtml(blocks: any[], templateSettings: any, unsubscribeHtm
 
     const bodyContent = (blocks || []).map((block: any) => {
         switch (block.type) {
-            case 'header':
-                return `<h2 style="font-family:${fontFamily};color:${primaryColor};font-size:24px;margin:0 0 16px;">${block.content?.text || ''}</h2>`;
-            case 'text':
-                return `<p style="font-family:${fontFamily};color:${textColor};font-size:15px;line-height:1.6;margin:0 0 16px;">${block.content?.text || ''}</p>`;
+            case 'header': {
+                // Tiptap content is already HTML (may contain <h1>–<h3>, <p>, etc.)
+                // Wrap in a styled div so inline styles apply to child elements.
+                const hHtml = block.content?.text || '';
+                return `<div style="font-family:${fontFamily};color:${primaryColor};font-weight:700;font-size:24px;margin:0 0 16px;line-height:1.3;">${hHtml}</div>`;
+            }
+            case 'text': {
+                // Tiptap content is already HTML — inject base styles via wrapper.
+                const tHtml = block.content?.text || '';
+                return `<div style="font-family:${fontFamily};color:${textColor};font-size:15px;line-height:1.65;margin:0 0 16px;">${tHtml}</div>`;
+            }
             case 'html':
                 return block.content?.html || '';
             case 'image':
@@ -331,7 +338,11 @@ export async function executeSend(
     // This is the correct SendGrid multi-tenant pattern.
     const subuserId: string | undefined = tenantEmail.sendGridSubuserId || undefined;
 
-    // Prefer tenant-level From settings → campaign override → global fallback
+    // Prefer tenant-level From settings → campaign override → global fallback.
+    // IMPORTANT: If the tenant has configured a From email in Mail Settings (shared or
+    // custom domain), it takes precedence over whatever is stored on the campaign, because
+    // the campaign may have been created/saved before the domain was set up, or the admin
+    // may have typed a different address into the campaign editor.
     const tenantFromEmail = tenantEmail.fromEmail || '';
     const tenantFromName  = tenantEmail.fromName  || '';
 
@@ -340,8 +351,8 @@ export async function executeSend(
     if (!campaignSnap.exists) throw new Error('Campaign not found');
     const campaign = campaignSnap.data() as any;
 
-    const fromEmail = campaign.fromEmail || tenantFromEmail || globalFromEmail;
-    const fromName  = campaign.fromName  || tenantFromName  || globalFromName;
+    const fromEmail = tenantFromEmail || campaign.fromEmail || globalFromEmail;
+    const fromName  = tenantFromName  || campaign.fromName  || globalFromName;
     const subject   = campaign.subject   || '(No Subject)';
 
     if (!fromEmail) throw new Error('No "From Email" configured. Set it on the campaign or in App Config → SendGrid.');

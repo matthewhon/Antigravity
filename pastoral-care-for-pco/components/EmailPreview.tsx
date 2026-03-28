@@ -4,6 +4,36 @@ import { TemplateSettings } from '../types';
 import { AnalyticsWidgetBlock, AnalyticsWidgetId } from './DataChartSelector';
 import { CalendarDays, Users, ClipboardList, Image as ImageIcon } from 'lucide-react';
 
+// ─── Scoped prose styles injected once into the page head ─────────────────────
+// These mirror what a mail client / browser would render for common HTML tags
+// produced by the Tiptap editor (p, h1–h4, ul, ol, strong, em, a).
+const PROSE_STYLE_ID = 'email-preview-prose-styles';
+const PROSE_CSS = `
+.ep-prose p   { margin: 0 0 0.75em; line-height: 1.65; }
+.ep-prose p:last-child { margin-bottom: 0; }
+.ep-prose h1  { font-size: 2em;   font-weight: 700; margin: 0 0 0.5em; line-height: 1.2; }
+.ep-prose h2  { font-size: 1.5em; font-weight: 700; margin: 0 0 0.5em; line-height: 1.3; }
+.ep-prose h3  { font-size: 1.25em;font-weight: 600; margin: 0 0 0.4em; line-height: 1.4; }
+.ep-prose h4  { font-size: 1em;   font-weight: 600; margin: 0 0 0.4em; }
+.ep-prose ul  { list-style-type: disc;    padding-left: 1.5em; margin: 0 0 0.75em; }
+.ep-prose ol  { list-style-type: decimal; padding-left: 1.5em; margin: 0 0 0.75em; }
+.ep-prose li  { margin: 0.2em 0; line-height: 1.6; }
+.ep-prose strong { font-weight: 700; }
+.ep-prose em     { font-style: italic; }
+.ep-prose a      { color: #4f46e5; text-decoration: underline; }
+.ep-prose blockquote { border-left: 3px solid #e2e8f0; padding-left: 1em; color: #64748b; margin: 0 0 0.75em; }
+.ep-prose code   { background: #f1f5f9; border-radius: 4px; padding: 0 4px; font-family: monospace; font-size: 0.9em; }
+`;
+
+function ensureProseStyles() {
+  if (typeof document !== 'undefined' && !document.getElementById(PROSE_STYLE_ID)) {
+    const style = document.createElement('style');
+    style.id = PROSE_STYLE_ID;
+    style.textContent = PROSE_CSS;
+    document.head.appendChild(style);
+  }
+}
+
 interface Props {
   blocks: EmailBlock[];
   settings: TemplateSettings;
@@ -124,6 +154,7 @@ const SOCIAL_LINKS: { key: keyof TemplateSettings; label: string; color: string;
 
 export const EmailPreview: React.FC<Props> = ({ blocks, settings, churchLogoUrl }) => {
   useEffect(() => {
+    ensureProseStyles();
     if (blocks.some(b => b.type === 'pco_groups_widget' || b.type === 'pco_registrations_widget')) {
       const script = document.createElement('script');
       script.src = '//pcochef-static.s3.us-east-1.amazonaws.com/plusapi/js/pcochef-plus.js';
@@ -167,10 +198,18 @@ export const EmailPreview: React.FC<Props> = ({ blocks, settings, churchLogoUrl 
         {blocks.map((block) => (
           <div key={block.id}>
             {block.type === 'text' && (
-              <div dangerouslySetInnerHTML={{ __html: resolveMergeTags(block.content.text || '') }} />
+              <div
+                className="ep-prose"
+                style={{ fontSize: 15, lineHeight: 1.65, color: settings.textColor || '#1f2937' }}
+                dangerouslySetInnerHTML={{ __html: resolveMergeTags(block.content.text || '') }}
+              />
             )}
             {block.type === 'header' && (
-              <h2 className="text-xl font-semibold" dangerouslySetInnerHTML={{ __html: resolveMergeTags(block.content.text || '') }} />
+              <div
+                className="ep-prose"
+                style={{ color: settings.primaryColor || '#4f46e5' }}
+                dangerouslySetInnerHTML={{ __html: resolveMergeTags(block.content.text || '') }}
+              />
             )}
             {block.type === 'image' && (
               <img src={block.content.src} alt="Block" className="max-w-full rounded-lg" />
