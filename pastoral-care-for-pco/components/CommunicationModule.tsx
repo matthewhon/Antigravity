@@ -359,6 +359,7 @@ type EditorPanel = 'config' | 'builder' | 'preview';
 interface EmailEditorProps {
   campaign: EmailCampaign;
   churchId: string;
+  church?: Church;
   onBack: () => void;
   onSave: (updates: Partial<EmailCampaign>) => void;
   onSend: () => void;
@@ -369,9 +370,25 @@ interface EmailEditorProps {
 }
 
 const EmailEditor: React.FC<EmailEditorProps> = ({
-  campaign, churchId, onBack, onSave, onSend, onSendTest, onSchedule, isSending, isScheduled
+  campaign, churchId, church, onBack, onSave, onSend, onSendTest, onSchedule, isSending, isScheduled
 }) => {
-  const [localCampaign, setLocalCampaign] = useState<EmailCampaign>(campaign);
+  // Determine if the church is using a shared subdomain (locked from email)
+  const isSharedMode = church?.emailSettings?.mode === 'shared' && !!church?.emailSettings?.fromEmail;
+  const sharedFromEmail = church?.emailSettings?.fromEmail || '';
+
+  // If on shared mode and the campaign has no fromEmail set, pre-apply it
+  const initialCampaign: EmailCampaign = React.useMemo(() => {
+    if (isSharedMode && !campaign.fromEmail) {
+      return {
+        ...campaign,
+        fromEmail: sharedFromEmail,
+        fromName: campaign.fromName || church?.emailSettings?.fromName || church?.name || '',
+      };
+    }
+    return campaign;
+  }, [campaign.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const [localCampaign, setLocalCampaign] = useState<EmailCampaign>(initialCampaign);
   const [panel, setPanel] = useState<EditorPanel>('config');
   const [openSection, setOpenSection] = useState<string | null>('to');
   const [pcoLists, setPcoLists] = useState<PcoList[]>([]);
@@ -667,14 +684,32 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">From Email</label>
-                    <input
-                      type="email"
-                      className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      placeholder="pastor@mychurch.org"
-                      value={localCampaign.fromEmail || ''}
-                      onChange={e => update({ fromEmail: e.target.value })}
-                    />
+                    <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1 flex items-center gap-1.5">
+                      From Email
+                      {isSharedMode && (
+                        <span className="text-[9px] font-black bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-1.5 py-0.5 rounded-full tracking-wide">
+                          Shared Domain
+                        </span>
+                      )}
+                    </label>
+                    {isSharedMode ? (
+                      <>
+                        <div className="w-full text-sm border border-indigo-200 dark:border-indigo-700 rounded-lg px-3 py-2 bg-indigo-50 dark:bg-indigo-900/20 text-slate-700 dark:text-indigo-300 font-mono select-all">
+                          {sharedFromEmail}
+                        </div>
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1.5">
+                          Set in <strong>Settings & Administration → Mail Settings</strong>. Change your prefix there to update this address.
+                        </p>
+                      </>
+                    ) : (
+                      <input
+                        type="email"
+                        className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        placeholder="pastor@mychurch.org"
+                        value={localCampaign.fromEmail || ''}
+                        onChange={e => update({ fromEmail: e.target.value })}
+                      />
+                    )}
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Reply-To (optional)</label>
@@ -1214,6 +1249,7 @@ export const CommunicationModule: React.FC<{ churchId: string; church?: Church }
           key={activeCampaign.id}
           campaign={activeCampaign}
           churchId={churchId}
+          church={church}
           onBack={() => setActiveCampaign(null)}
           onSave={handleSave}
           onSend={handleSend}
