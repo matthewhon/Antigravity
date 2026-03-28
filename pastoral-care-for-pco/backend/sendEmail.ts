@@ -331,12 +331,20 @@ export async function executeSend(
     const churchData = churchSnap.data() || {};
     const tenantEmail = churchData.emailSettings || {};
 
-    // IMPORTANT: Always use the master API key so that the master account's
-    // domain authentication (e.g. pastoralcare.barnabassoftware.com) applies.
-    // If this church has a provisioned Subuser, pass 'on-behalf-of' so that
-    // reputation, stats, and unsubscribes are tracked at the Subuser level.
-    // This is the correct SendGrid multi-tenant pattern.
-    const subuserId: string | undefined = tenantEmail.sendGridSubuserId || undefined;
+    // IMPORTANT: The 'on-behalf-of' subuser header tells SendGrid to check the *subuser's*
+    // sender identities. This only works for the shared domain (pastoralcare.barnabassoftware.com)
+    // because that domain auth is explicitly associated with the subuser at provisioning time.
+    //
+    // For custom domain sends, the domain authentication lives on the master account (it was
+    // created on-behalf-of the subuser but the DKIM/SPF keys are controlled at the master level).
+    // Sending via on-behalf-of for a custom domain causes SendGrid to look for a verified Sender
+    // Identity on the SUBUSER that it cannot find, producing the "does not match a verified Sender
+    // Identity" error. The correct pattern is to send custom domain emails directly with the master
+    // API key (no on-behalf-of), which lets the master account's domain authentication apply.
+    const isCustomDomainMode = tenantEmail.mode === 'custom';
+    const subuserId: string | undefined = (!isCustomDomainMode && tenantEmail.sendGridSubuserId)
+        ? tenantEmail.sendGridSubuserId
+        : undefined;
 
     // Prefer tenant-level From settings → campaign override → global fallback.
     // IMPORTANT: If the tenant has configured a From email in Mail Settings (shared or

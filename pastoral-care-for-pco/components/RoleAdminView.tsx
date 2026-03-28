@@ -1541,7 +1541,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                         {mailMode === 'custom' && (
                             <div className="space-y-8">
 
-                                {/* Step 1: Display Name + Domain */}
+                                    {/* Step 1: Display Name + Domain */}
                                 <div className="p-6 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
                                     <div className="flex items-center gap-2 mb-4">
                                         <span className="w-6 h-6 rounded-full bg-indigo-600 text-white text-[10px] font-black flex items-center justify-center">1</span>
@@ -1580,18 +1580,10 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         </div>
                                     </div>
 
-                                    {/* Must first have a Subuser from shared mode */}
-                                    {!church.emailSettings?.sendGridSubuserId && (
-                                        <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl">
-                                            <p className="text-xs font-bold text-amber-700 dark:text-amber-400">⚠ First-time setup required</p>
-                                            <p className="text-[10px] text-amber-600 dark:text-amber-500 mt-0.5">Please configure the Shared Subdomain first to provision your SendGrid account, then come back to add your custom domain.</p>
-                                        </div>
-                                    )}
-
                                     <div className="flex justify-end mt-4">
                                         <button
                                             onClick={handleAuthenticateDomain}
-                                            disabled={isMailSaving || !mailCustomDomain.trim() || !church.emailSettings?.sendGridSubuserId}
+                                            disabled={isMailSaving || !mailCustomDomain.trim()}
                                             className="bg-violet-600 hover:bg-violet-700 text-white px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg disabled:opacity-40"
                                         >
                                             {isMailSaving ? 'Requesting…' : mailCnameRecords.length > 0 ? 'Re-fetch DNS Records' : 'Get DNS Records'}

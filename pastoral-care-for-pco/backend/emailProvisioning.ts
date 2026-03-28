@@ -173,9 +173,13 @@ export const authenticateDomain = async (req: any, res: any) => {
         const existingSettings = church.emailSettings || {};
         const subuserId = existingSettings.sendGridSubuserId;
 
-        if (!subuserId) {
-            return res.status(400).json({ error: 'Please configure your shared email first before adding a custom domain.' });
-        }
+        // Custom domain auth must live on the MASTER account, not the subuser.
+        // This is because when sending with a custom domain we do NOT use on-behalf-of
+        // (subuser sends require the sender identity to exist on the subuser, which it
+        // doesn't for externally-owned domains). Master account domain auth is the
+        // correct SendGrid pattern for multi-tenant custom domains.
+        //
+        // Note: a subuser is no longer required for custom domain setup.
 
         // Check if domain auth already exists for this domain
         if (existingSettings.customDomain === domain && existingSettings.domainAuthId) {
@@ -190,10 +194,12 @@ export const authenticateDomain = async (req: any, res: any) => {
             }
         }
 
-        // Create domain authentication (on behalf of the subuser)
+        // Create domain authentication on the MASTER account (no on-behalf-of).
+        // The master account's domain authentication applies to all sends made with the
+        // master API key, which is what custom domain sends use.
         const authRes = await fetch('https://api.sendgrid.com/v3/whitelabel/domains', {
             method: 'POST',
-            headers: { ...sgHeaders(masterKey), 'on-behalf-of': subuserId },
+            headers: sgHeaders(masterKey),
             body: JSON.stringify({
                 domain,
                 subdomain: 'em',  // SendGrid uses em.<domain> for CNAME
@@ -273,10 +279,11 @@ export const verifyDomain = async (req: any, res: any) => {
             return res.status(400).json({ error: 'No domain authentication is pending for this church.' });
         }
 
-        // Validate domain on SendGrid's side
+        // Validate domain on the MASTER account (no on-behalf-of), consistent with
+        // how customdomain auth was created and how sends are executed.
         const verifyRes = await fetch(`https://api.sendgrid.com/v3/whitelabel/domains/${domainAuthId}/validate`, {
             method: 'POST',
-            headers: { ...sgHeaders(masterKey), 'on-behalf-of': subuserId || '' },
+            headers: sgHeaders(masterKey),
         });
 
         const verifyData = await verifyRes.json().catch(() => ({}));
