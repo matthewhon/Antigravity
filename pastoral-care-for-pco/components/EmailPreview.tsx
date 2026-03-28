@@ -1,8 +1,8 @@
 import React, { useEffect } from 'react';
-import { EmailBlock } from './EmailBuilder';
+import { EmailBlock, ColumnLayout } from './EmailBuilder';
 import { TemplateSettings } from '../types';
 import { AnalyticsWidgetBlock, AnalyticsWidgetId } from './DataChartSelector';
-import { CalendarDays, Users, ClipboardList } from 'lucide-react';
+import { CalendarDays, Users, ClipboardList, Image as ImageIcon } from 'lucide-react';
 
 interface Props {
   blocks: EmailBlock[];
@@ -11,7 +11,6 @@ interface Props {
   churchLogoUrl?: string;
 }
 
-// Resolve @merge-tags in HTML strings for visual preview
 const resolveMergeTags = (html: string) =>
   html
     .replace(/@first-name/g, '<span style="background:#e0e7ff;color:#4338ca;border-radius:4px;padding:0 4px;font-family:monospace;font-size:0.9em">John</span>')
@@ -21,6 +20,47 @@ const resolveMergeTags = (html: string) =>
     .replace(/@current-month/g, new Date().toLocaleDateString('en-US', { month: 'long' }))
     .replace(/@current-year/g, String(new Date().getFullYear()))
     .replace(/@view-in-browser/g, '<a href="#" style="color:#4338ca">View in browser</a>');
+
+// Convert ColumnLayout string into per-column flex-basis percentages.
+function columnWidths(layout: ColumnLayout): string[] {
+  switch (layout) {
+    case '1':   return ['100%'];
+    case '2':   return ['50%', '50%'];
+    case '3':   return ['33.33%', '33.33%', '33.33%'];
+    case '2:1': return ['66.66%', '33.33%'];
+    case '1:2': return ['33.33%', '66.66%'];
+    default:    return ['50%', '50%'];
+  }
+}
+
+// Renders a single mini-block (text / image / button) inside a column cell.
+const MiniBlockPreview: React.FC<{ b: { id: string; type: string; content: any }; primaryColor: string }> = ({ b, primaryColor }) => {
+  const c = b.content || {};
+  if (b.type === 'text') {
+    return <div style={{ fontSize: 14, lineHeight: 1.6, color: '#1f2937' }} dangerouslySetInnerHTML={{ __html: resolveMergeTags(c.text || '') }} />;
+  }
+  if (b.type === 'image') {
+    return c.src
+      ? <img src={c.src} alt={c.alt || ''} style={{ width: '100%', borderRadius: 8, display: 'block' }} />
+      : <div style={{ background: '#f1f5f9', borderRadius: 8, height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ImageIcon size={24} color="#94a3b8" /></div>;
+  }
+  if (b.type === 'button') {
+    const bg = c.color || primaryColor || '#6366f1';
+    const tc = c.textColor || '#ffffff';
+    const rad = c.borderRadius === 'pill' ? 999 : c.borderRadius === 'square' ? 4 : 8;
+    const pad = c.size === 'small' ? '6px 14px' : c.size === 'large' ? '12px 28px' : '8px 20px';
+    const fs = c.size === 'small' ? 12 : c.size === 'large' ? 16 : 14;
+    const justifyContent = c.align === 'left' ? 'flex-start' : c.align === 'right' ? 'flex-end' : 'center';
+    return (
+      <div style={{ display: 'flex', justifyContent, marginTop: 4 }}>
+        <a href={c.url || '#'} style={{ background: bg, color: tc, borderRadius: rad, padding: pad, fontSize: fs, fontWeight: 700, display: 'inline-block', textDecoration: 'none' }}>
+          {c.text || 'Click Here'}
+        </a>
+      </div>
+    );
+  }
+  return null;
+};
 
 // Rich card for PCO Registration / Group / Calendar event blocks
 const PcoContentCard = ({ block, primaryColor }: { block: EmailBlock; primaryColor: string }) => {
@@ -177,6 +217,32 @@ export const EmailPreview: React.FC<Props> = ({ blocks, settings, churchLogoUrl 
             )}
 
             {block.type === 'html' && <div dangerouslySetInnerHTML={{ __html: block.content.html }} />}
+
+            {block.type === 'columns' && (() => {
+              const layout: ColumnLayout = block.content?.layout || '2';
+              const cells: { id: string; blocks: { id: string; type: string; content: any }[] }[] = block.content?.cells || [];
+              const widths = columnWidths(layout);
+              return (
+                <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                  {cells.map((cell, idx) => (
+                    <div key={cell.id} style={{ flex: `0 0 calc(${widths[idx] ?? '50%'} - 6px)`, minWidth: 0 }}>
+                      {cell.blocks.length === 0 ? (
+                        <div style={{ border: '1px dashed #e2e8f0', borderRadius: 8, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 12 }}>
+                          Empty column
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          {cell.blocks.map(b => (
+                            <MiniBlockPreview key={b.id} b={b} primaryColor={settings.primaryColor} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+
             {block.type === 'button' && (() => {
               const bc = block.content || {};
               const bg = bc.color || settings.primaryColor || '#6366f1';

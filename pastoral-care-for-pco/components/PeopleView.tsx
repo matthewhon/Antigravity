@@ -86,7 +86,7 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'households' | 'risk'>('overview');
 
-  // ---- Registrations: try live PCO first, fall back to Firestore cache ----
+  // ---- Registrations: cache-first (Firestore), then silent background refresh ----
   const [regEvents, setRegEvents] = useState<PcoRegistrationEvent[]>([]);
   const [regLoading, setRegLoading] = useState(false);
   const [regError, setRegError] = useState('');
@@ -108,11 +108,22 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
           return new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime();
         });
 
-    // Try live PCO API first
+    // Step 1: Load Firestore cache immediately — no rate limiting, instant render
+    firestore.getRegistrations(churchId)
+      .then(cached => {
+        if (cached.length > 0) {
+          setRegEvents(mapAndFilter(cached));
+          setRegSource('cached');
+        }
+      })
+      .catch(() => { /* cache miss is fine */ })
+      .finally(() => setRegLoading(false));
+
+    // Step 2: Silent background refresh from live PCO API
+    // If it succeeds, update the display with fresher data.
+    // If it fails (429, scope missing, network error) we already have cache — swallow silently.
     pcoService.getRegistrations(churchId)
       .then((raw: any[]) => {
-        // pcoService returns the raw PCO data array (proxied)
-        // Map from PCO API shape to our PcoRegistrationEvent type
         const mapped: PcoRegistrationEvent[] = (raw || []).map((item: any) => ({
           id: `${churchId}_${item.id}`,
           churchId,
@@ -130,25 +141,16 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
         setRegEvents(mapAndFilter(mapped));
         setRegSource('live');
       })
-      .catch(async (e: any) => {
-        // Live call failed — try Firestore cache before showing error
-        try {
-          const cached = await firestore.getRegistrations(churchId);
-          if (cached.length > 0) {
-            setRegEvents(mapAndFilter(cached));
-            setRegSource('cached');
-            // Show a softer warning, not a hard error
-            if (e?.message?.includes('requiresReauth') || e?.message?.includes('403')) {
-              setRegError('[requiresReauth]'); // triggers the reconnect prompt
-            }
-            return;
-          }
-        } catch {
-          // Firestore also failed — fall through to error state
+      .catch((e: any) => {
+        // Only surface a reauth error if we have no data at all to show
+        if (e?.message?.includes('requiresReauth') || e?.message?.includes('403')) {
+          setRegEvents(prev => {
+            if (prev.length === 0) setRegError('[requiresReauth]');
+            return prev;
+          });
         }
-        setRegError(e?.message || 'Failed to load registrations.');
-      })
-      .finally(() => setRegLoading(false));
+        // 429, network errors etc. — silently swallow, cache data already showing
+      });
   }, [churchId, pcoConnected]);
 
   const categoryPrefix = activeTab === 'overview' ? 'people' : activeTab === 'households' ? 'people_households' : 'people_risk';

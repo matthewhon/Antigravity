@@ -130,6 +130,44 @@ function renderBlocksToHtml(blocks: any[], templateSettings: any, unsubscribeHtm
                     </div>
                   </div>`;
             }
+            case 'columns': {
+                const cells: { id: string; blocks: { id: string; type: string; content: any }[] }[] = block.content?.cells || [];
+                const layout: string = block.content?.layout || '2';
+                // Calculate column widths as percentages
+                const widthMap: Record<string, string[]> = {
+                    '1': ['100%'],
+                    '2': ['50%', '50%'],
+                    '3': ['33%', '33%', '33%'],
+                    '2:1': ['67%', '33%'],
+                    '1:2': ['33%', '67%'],
+                };
+                const widths = widthMap[layout] || ['50%', '50%'];
+
+                const renderMini = (b: any): string => {
+                    const bc = b.content || {};
+                    if (b.type === 'text') return `<div style="font-family:${fontFamily};font-size:14px;color:${textColor};line-height:1.6;">${bc.text || ''}</div>`;
+                    if (b.type === 'image' && bc.src) return `<img src="${bc.src}" alt="${bc.alt || ''}" style="max-width:100%;height:auto;border-radius:6px;display:block;" />`;
+                    if (b.type === 'button') {
+                        const bg = bc.color || primaryColor;
+                        const tc = bc.textColor || '#ffffff';
+                        const rad = bc.borderRadius === 'pill' ? '999px' : bc.borderRadius === 'square' ? '4px' : '8px';
+                        const pad = bc.size === 'small' ? '6px 14px' : bc.size === 'large' ? '12px 28px' : '8px 20px';
+                        const align = bc.align === 'left' ? 'left' : bc.align === 'right' ? 'right' : 'center';
+                        return `<div style="text-align:${align};"><a href="${bc.url || '#'}" style="display:inline-block;background:${bg};color:${tc};font-family:${fontFamily};font-size:14px;font-weight:bold;padding:${pad};border-radius:${rad};text-decoration:none;">${bc.text || 'Click Here'}</a></div>`;
+                    }
+                    return '';
+                };
+
+                const tds = cells.map((cell, i) =>
+                    `<td width="${widths[i] || '50%'}" valign="top" style="padding:0 6px;">
+                        ${cell.blocks.map(renderMini).join('<br/>')}
+                     </td>`
+                ).join('');
+
+                return `<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px;">
+                    <tr>${tds}</tr>
+                </table>`;
+            }
             default:
                 return '';
         }
