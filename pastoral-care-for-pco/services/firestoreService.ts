@@ -20,7 +20,8 @@ import {
     PcoPerson, PcoGroup, PcoFund, BudgetRecord, ServicesTeam, ServicePlanSnapshot,
     ServicesDashboardData, ServicesFilter, SystemSettings, CensusStats,
     Ministry, MetricDefinition, MetricEntry, AggregatedChurchStats, LogEntry,
-    PastoralNote, PrayerRequest, CheckInRecord, EmailCampaign
+    PastoralNote, PrayerRequest, CheckInRecord, EmailCampaign, PcoRegistrationEvent,
+    Poll, PollResponse
 } from '../types';
 import { calculateServicesAnalytics, calculateAggregatedStats } from './analyticsService';
 
@@ -149,7 +150,8 @@ class FirestoreService {
             'detailed_donations', 
             'funds', 
             'teams', 
-            'service_plans'
+            'service_plans',
+            'pco_registrations'
         ];
 
         for (const colName of collectionsToPurge) {
@@ -549,6 +551,24 @@ class FirestoreService {
   async upsertFunds(records: PcoFund[]) { await this.batchUpsert('funds', records); }
   async upsertServicesTeams(records: ServicesTeam[]) { await this.batchUpsert('teams', records); }
   async upsertServicePlans(records: ServicePlanSnapshot[]) { await this.batchUpsert('service_plans', records); }
+  async upsertRegistrations(records: PcoRegistrationEvent[]) { await this.batchUpsert('pco_registrations', records); }
+
+  async getRegistrations(churchId: string): Promise<PcoRegistrationEvent[]> {
+      try {
+          const q = query(
+              collection(db, 'pco_registrations'),
+              where('churchId', '==', churchId)
+          );
+          const snapshot = await getDocs(q);
+          return snapshot.docs
+              .map(d => d.data() as PcoRegistrationEvent)
+              .sort((a, b) => {
+                  if (!a.startsAt) return 1;
+                  if (!b.startsAt) return -1;
+                  return new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime();
+              });
+      } catch (e) { return []; }
+  }
   
   async saveBudget(budget: BudgetRecord) {
       await setDoc(doc(db, 'budgets', budget.id), budget, { merge: true });
@@ -804,6 +824,98 @@ class FirestoreService {
       await setDoc(docRef, { book, chapter, verse, sermons: [...existing, newEntry] }, { merge: true });
     } catch (e) {
       this.handleFirestoreError(e);
+    }
+  }
+
+  // --- Polls ---
+
+  async getPolls(churchId: string): Promise<Poll[]> {
+    try {
+      const q = query(collection(db, 'polls'), where('churchId', '==', churchId));
+      const snapshot = await getDocs(q);
+      return snapshot.docs
+        .map(d => d.data() as Poll)
+        .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    } catch (e) {
+      console.error('[FirestoreService] getPolls failed:', e);
+      return [];
+    }
+  }
+
+  async getPoll(pollId: string): Promise<Poll | null> {
+    try {
+      const docSnap = await getDoc(doc(db, 'polls', pollId));
+      return docSnap.exists() ? (docSnap.data() as Poll) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  async savePoll(poll: Poll): Promise<void> {
+    try {
+      const safe = JSON.parse(JSON.stringify(poll));
+      await setDoc(doc(db, 'polls', poll.id), safe);
+    } catch (e) {
+      this.handleFirestoreError(e);
+      throw e;
+    }
+  }
+
+  async updatePoll(pollId: string, updates: Partial<Poll>): Promise<void> {
+    try {
+      const safe = JSON.parse(JSON.stringify({ ...updates, updatedAt: Date.now() }));
+      await updateDoc(doc(db, 'polls', pollId), safe);
+    } catch (e) {
+      this.handleFirestoreError(e);
+      throw e;
+    }
+  }
+
+  async deletePoll(pollId: string): Promise<void> {
+    try {
+      // Delete all responses first
+      const q = query(collection(db, 'poll_responses'), where('pollId', '==', pollId));
+      const snapshot = await getDocs(q);
+      if (!snapshot.empty) {
+        const CHUNK = 400;
+        for (let i = 0; i < snapshot.docs.length; i += CHUNK) {
+          const batch = writeBatch(db);
+          snapshot.docs.slice(i, i + CHUNK).forEach(d => batch.delete(d.ref));
+          await batch.commit();
+        }
+      }
+      await deleteDoc(doc(db, 'polls', pollId));
+    } catch (e) {
+      this.handleFirestoreError(e);
+    }
+  }
+
+  async getPollResponses(pollId: string): Promise<PollResponse[]> {
+    try {
+      const q = query(collection(db, 'poll_responses'), where('pollId', '==', pollId));
+      const snapshot = await getDocs(q);
+      return snapshot.docs
+        .map(d => d.data() as PollResponse)
+        .sort((a, b) => (b.submittedAt || 0) - (a.submittedAt || 0));
+    } catch (e) {
+      return [];
+    }
+  }
+
+  async submitPollResponse(response: PollResponse): Promise<void> {
+    try {
+      const safe = JSON.parse(JSON.stringify(response));
+      const batch = writeBatch(db);
+      // Write the response
+      batch.set(doc(db, 'poll_responses', response.id), safe);
+      // Increment totalResponses on the poll document
+      batch.update(doc(db, 'polls', response.pollId), {
+        totalResponses: (await this.getPoll(response.pollId))?.totalResponses + 1 || 1,
+        updatedAt: Date.now()
+      });
+      await batch.commit();
+    } catch (e) {
+      throw e;
     }
   }
 }

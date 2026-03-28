@@ -100,6 +100,91 @@ async function startServer() {
     app.post('/email/authenticate-domain', express.json(), authenticateDomain);
     app.post('/email/verify-domain', express.json(), verifyDomain);
 
+    // ─── Public Poll API (no auth required) ─────────────────────────────────
+
+    // GET /polls/:pollId — returns poll config for the public page
+    app.get('/polls/:pollId', async (req: any, res: any) => {
+      const { pollId } = req.params;
+      try {
+        const db = getDb();
+        const pollDoc = await db.collection('polls').doc(pollId).get();
+        if (!pollDoc.exists) return res.status(404).json({ error: 'Poll not found' });
+        const poll = pollDoc.data()!;
+        // Auto-close if past closesAt
+        if (poll.closesAt && poll.closesAt < Date.now() && poll.status === 'active') {
+          await db.collection('polls').doc(pollId).update({ status: 'closed', updatedAt: Date.now() });
+          poll.status = 'closed';
+        }
+        // Return safe subset — no internal fields
+        res.json({
+          id: pollDoc.id,
+          churchId: poll.churchId,
+          title: poll.title,
+          description: poll.description || null,
+          status: poll.status,
+          questions: poll.questions || [],
+          requireName: !!poll.requireName,
+          requireEmail: !!poll.requireEmail,
+          showResultsToRespondents: !!poll.showResultsToRespondents,
+          totalResponses: poll.totalResponses || 0,
+        });
+      } catch (e: any) {
+        res.status(500).json({ error: e.message });
+      }
+    });
+
+    // POST /polls/:pollId/respond — submit a response
+    app.post('/polls/:pollId/respond', express.json(), async (req: any, res: any) => {
+      const { pollId } = req.params;
+      const { answers, respondentName, respondentEmail, sessionToken } = req.body || {};
+      if (!answers || typeof answers !== 'object') {
+        return res.status(400).json({ error: 'Missing answers' });
+      }
+      try {
+        const db = getDb();
+        const pollDoc = await db.collection('polls').doc(pollId).get();
+        if (!pollDoc.exists) return res.status(404).json({ error: 'Poll not found' });
+        const poll = pollDoc.data()!;
+
+        if (poll.status !== 'active') {
+          return res.status(403).json({ error: 'This poll is not currently accepting responses.' });
+        }
+        if (poll.closesAt && poll.closesAt < Date.now()) {
+          await db.collection('polls').doc(pollId).update({ status: 'closed', updatedAt: Date.now() });
+          return res.status(403).json({ error: 'This poll has closed.' });
+        }
+
+        const responseId = `resp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        const response = {
+          id: responseId,
+          pollId,
+          churchId: poll.churchId,
+          respondentName: respondentName || null,
+          respondentEmail: respondentEmail || null,
+          answers,
+          submittedAt: Date.now(),
+          sessionToken: sessionToken || null,
+        };
+
+        await db.collection('poll_responses').doc(responseId).set(response);
+        await db.collection('polls').doc(pollId).update({
+          totalResponses: (poll.totalResponses || 0) + 1,
+          updatedAt: Date.now(),
+        });
+
+        // If showResultsToRespondents, fetch aggregated results
+        if (poll.showResultsToRespondents) {
+          const responsesSnap = await db.collection('poll_responses').where('pollId', '==', pollId).get();
+          const allResponses = responsesSnap.docs.map(d => d.data());
+          res.json({ success: true, totalResponses: (poll.totalResponses || 0) + 1, responses: allResponses });
+        } else {
+          res.json({ success: true });
+        }
+      } catch (e: any) {
+        res.status(500).json({ error: e.message });
+      }
+    });
+
     // Schedule an email campaign
     app.post('/email/schedule', express.json(), async (req: any, res: any) => {
       const { campaignId, churchId, scheduledAt } = req.body || {};

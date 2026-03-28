@@ -580,3 +580,75 @@ export interface AggregatedGivingMetric {
     funds: Record<string, number>;
     lastUpdated?: any;
 }
+
+/** Synced from PCO Registrations /v2/events */
+export interface PcoRegistrationEvent {
+    id: string;
+    churchId: string;
+    name: string;
+    startsAt?: string | null;
+    endsAt?: string | null;
+    signupCount: number;
+    signupLimit?: number | null;
+    openSignup: boolean;
+    logoUrl?: string | null;
+    publicUrl?: string | null;
+    /** ISO timestamp when the record was last synced */
+    lastSynced: number;
+}
+
+// ─── Poll Module ──────────────────────────────────────────────────────────────
+
+export type PollQuestionType = 'single_choice' | 'multiple_choice' | 'text' | 'rating' | 'yes_no';
+
+export interface PollQuestion {
+    id: string;
+    type: PollQuestionType;
+    text: string;
+    required: boolean;
+    /** Answer choices — used for single_choice and multiple_choice */
+    options?: string[];
+    /** Maximum value for rating questions (e.g. 5 or 10) */
+    ratingMax?: number;
+    /** Display order (0-based index) */
+    order: number;
+}
+
+export type PollStatus = 'draft' | 'active' | 'closed';
+
+export interface Poll {
+    id: string;
+    churchId: string;
+    title: string;
+    description?: string;
+    status: PollStatus;
+    questions: PollQuestion[];
+    /** If false, the session token check is skipped (open responses) */
+    allowMultipleSubmissions: boolean;
+    /** Prompt respondent for their name */
+    requireName: boolean;
+    /** Prompt respondent for their email address */
+    requireEmail: boolean;
+    /** Show aggregated results to the respondent after submitting */
+    showResultsToRespondents: boolean;
+    /** Optional epoch ms timestamp at which the poll auto-closes */
+    closesAt?: number | null;
+    /** Denormalized total response count — incremented on each submission */
+    totalResponses: number;
+    createdAt: number;
+    updatedAt: number;
+    createdBy: string;
+}
+
+export interface PollResponse {
+    id: string;
+    pollId: string;
+    churchId: string;
+    respondentName?: string;
+    respondentEmail?: string;
+    /** Map of PollQuestion.id → answer value or array of values */
+    answers: Record<string, string | string[]>;
+    submittedAt: number;
+    /** Random token generated client-side; stored in localStorage to surface to admin */
+    sessionToken: string;
+}

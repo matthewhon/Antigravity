@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
-import { PeopleDashboardData, GeoInsight, CensusStats, GlobalStats } from '../types';
+import { PeopleDashboardData, GeoInsight, CensusStats, GlobalStats, PcoRegistrationEvent } from '../types';
 import { pcoService } from '../services/pcoService';
+import { firestore } from '../services/firestoreService';
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
   BarChart, Bar, XAxis, YAxis, CartesianGrid
@@ -85,54 +86,68 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'households' | 'risk'>('overview');
 
-  // ---- Registrations live data ----
-  interface PcoRegistrationEvent {
-    id: string;
-    name: string;
-    startsAt?: string;
-    endsAt?: string;
-    signupCount: number;
-    signupLimit?: number | null;
-    openSignup: boolean;
-    logoUrl?: string;
-    publicUrl?: string;
-  }
+  // ---- Registrations: try live PCO first, fall back to Firestore cache ----
   const [regEvents, setRegEvents] = useState<PcoRegistrationEvent[]>([]);
   const [regLoading, setRegLoading] = useState(false);
   const [regError, setRegError] = useState('');
+  const [regSource, setRegSource] = useState<'live' | 'cached' | null>(null);
 
   useEffect(() => {
     if (!churchId || !pcoConnected) return;
     setRegLoading(true);
     setRegError('');
+    setRegSource(null);
+
+    const now = new Date();
+    const mapAndFilter = (items: PcoRegistrationEvent[]) =>
+      items
+        .filter(e => !e.startsAt || new Date(e.startsAt) >= now)
+        .sort((a, b) => {
+          if (!a.startsAt) return 1;
+          if (!b.startsAt) return -1;
+          return new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime();
+        });
+
+    // Try live PCO API first
     pcoService.getRegistrations(churchId)
       .then((raw: any[]) => {
-        const now = new Date();
-        const mapped: PcoRegistrationEvent[] = (raw || [])
-          .map((item: any) => ({
-            id: item.id,
-            name: item.attributes?.name || 'Unnamed Event',
-            startsAt: item.attributes?.starts_at,
-            endsAt: item.attributes?.ends_at,
-            signupCount: item.attributes?.signup_count ?? item.attributes?.attendee_count ?? 0,
-            signupLimit: item.attributes?.signup_limit ?? item.attributes?.attendee_limit ?? null,
-            openSignup: item.attributes?.open_signup ?? true,
-            logoUrl: item.attributes?.logo_url || item.attributes?.image_url,
-            publicUrl: item.attributes?.public_url ||
-              (item.id ? `https://registrations.planningcenteronline.com/events/${item.id}` : undefined),
-          }))
-          .filter((e) => {
-            if (!e.startsAt) return true;
-            return new Date(e.startsAt) >= now;
-          })
-          .sort((a, b) => {
-            if (!a.startsAt) return 1;
-            if (!b.startsAt) return -1;
-            return new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime();
-          });
-        setRegEvents(mapped);
+        // pcoService returns the raw PCO data array (proxied)
+        // Map from PCO API shape to our PcoRegistrationEvent type
+        const mapped: PcoRegistrationEvent[] = (raw || []).map((item: any) => ({
+          id: `${churchId}_${item.id}`,
+          churchId,
+          name: item.attributes?.name || 'Unnamed Event',
+          startsAt: item.attributes?.starts_at || null,
+          endsAt: item.attributes?.ends_at || null,
+          signupCount: item.attributes?.signup_count ?? item.attributes?.attendee_count ?? 0,
+          signupLimit: item.attributes?.signup_limit ?? item.attributes?.attendee_limit ?? null,
+          openSignup: item.attributes?.open_signup ?? true,
+          logoUrl: item.attributes?.logo_url || item.attributes?.image_url || null,
+          publicUrl: item.attributes?.public_url ||
+            (item.id ? `https://registrations.planningcenteronline.com/events/${item.id}` : null),
+          lastSynced: Date.now(),
+        }));
+        setRegEvents(mapAndFilter(mapped));
+        setRegSource('live');
       })
-      .catch((e: any) => setRegError(e?.message || 'Failed to load registrations.'))
+      .catch(async (e: any) => {
+        // Live call failed — try Firestore cache before showing error
+        try {
+          const cached = await firestore.getRegistrations(churchId);
+          if (cached.length > 0) {
+            setRegEvents(mapAndFilter(cached));
+            setRegSource('cached');
+            // Show a softer warning, not a hard error
+            if (e?.message?.includes('requiresReauth') || e?.message?.includes('403')) {
+              setRegError('[requiresReauth]'); // triggers the reconnect prompt
+            }
+            return;
+          }
+        } catch {
+          // Firestore also failed — fall through to error state
+        }
+        setRegError(e?.message || 'Failed to load registrations.');
+      })
       .finally(() => setRegLoading(false));
   }, [churchId, pcoConnected]);
 
@@ -635,7 +650,7 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
         case 'upcoming_registrations':
             return (
                 <div key="upcoming_registrations" className="col-span-1 lg:col-span-2">
-                    <WidgetWrapper title="Upcoming Registrations" onRemove={() => handleRemoveWidget(id)} source="PCO Registrations">
+                    <WidgetWrapper title="Upcoming Registrations" onRemove={() => handleRemoveWidget(id)} source={regSource === 'cached' ? 'Cached • PCO Registrations' : 'PCO Registrations'}>
                         <div className="h-72 overflow-y-auto custom-scrollbar">
                             {regLoading && (
                                 <div className="h-full flex items-center justify-center text-slate-400 gap-2">
@@ -646,7 +661,8 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
                                     <span className="text-xs font-medium">Loading from Planning Center…</span>
                                 </div>
                             )}
-                            {!regLoading && regError && (
+                            {/* Full error state — only when no cached data is available */}
+                            {!regLoading && regError && regEvents.length === 0 && (
                                 <div className="h-full flex flex-col items-center justify-center text-center p-4 gap-3">
                                     <div className="text-3xl grayscale opacity-30">🎟️</div>
                                     <p className="text-xs font-bold text-rose-400">Could not load registrations</p>
@@ -657,6 +673,15 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
                                     </p>
                                 </div>
                             )}
+                            {/* Soft reconnect banner when we have cached data but live call needs reauth */}
+                            {!regLoading && regError.includes('requiresReauth') && regEvents.length > 0 && (
+                                <div className="mb-3 px-3 py-2 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 flex items-center gap-2">
+                                    <span className="text-amber-500 text-xs">⚠</span>
+                                    <p className="text-[10px] text-amber-700 dark:text-amber-400 font-medium">
+                                        Showing cached data. <a href="#" onClick={(e) => { e.preventDefault(); window.dispatchEvent(new CustomEvent('navigate', { detail: 'settings' })); }} className="font-bold underline">Reconnect Planning Center</a> to refresh.
+                                    </p>
+                                </div>
+                            )}
                             {!regLoading && !regError && regEvents.length === 0 && (
                                 <div className="h-full flex flex-col items-center justify-center text-center p-4 gap-3">
                                     <div className="text-4xl grayscale opacity-25">🎟️</div>
@@ -664,7 +689,7 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
                                     <p className="text-[10px] text-slate-400">Create events in Planning Center Registrations to see them here.</p>
                                 </div>
                             )}
-                            {!regLoading && !regError && regEvents.length > 0 && (
+                            {!regLoading && regEvents.length > 0 && (
                                 <div className="space-y-3">
                                     {regEvents.map((event) => {
                                         const dateLabel = event.startsAt
