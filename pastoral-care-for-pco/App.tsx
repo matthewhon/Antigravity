@@ -829,7 +829,7 @@ const App: React.FC = () => {
                 churchName={church.name}
             />
         )}
-        {view === 'communication' && systemSettings?.enabledModules?.communication !== false && <CommunicationModule churchId={church.id} church={church} />}
+        {view === 'communication' && systemSettings?.enabledModules?.communication !== false && <CommunicationModule churchId={church.id} church={church} currentUserId={user.id} />}
         {view === 'people' && (
             <PeopleView 
                 data={peopleDashboardData}

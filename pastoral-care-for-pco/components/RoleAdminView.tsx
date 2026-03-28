@@ -13,6 +13,96 @@ import { ALL_WIDGETS } from '../constants/widgetRegistry';
 import { PLANS } from '../services/stripeService';
 import { pcoService } from '../services/pcoService';
 
+// ─── Per-area Sync Component ──────────────────────────────────────────────────
+
+type SyncArea = {
+    key: string;
+    label: string;
+    icon: string;
+    description: string;
+};
+
+const SYNC_AREAS: SyncArea[] = [
+    { key: 'people',        label: 'People',        icon: '👥', description: 'Contacts, households, addresses, field data' },
+    { key: 'groups',        label: 'Groups',        icon: '🏘️', description: 'Groups, memberships, attendance history' },
+    { key: 'services',      label: 'Services',      icon: '🎙️', description: 'Service plans, teams, songs, positions' },
+    { key: 'giving',        label: 'Giving',        icon: '💰', description: 'Donations, funds, donor stats (last 365 days)' },
+    { key: 'checkins',      label: 'Check-Ins',     icon: '✅', description: 'Headcounts, digital check-ins (last 90 days)' },
+    { key: 'registrations', label: 'Registrations', icon: '📋', description: 'Registration events and signup counts' },
+];
+
+type AreaStatus = { state: 'idle' | 'running' | 'success' | 'error'; message?: string };
+
+const SyncAreaButtons: React.FC<{ churchId: string; onSyncComplete: () => void }> = ({ churchId, onSyncComplete }) => {
+    const [areaStatus, setAreaStatus] = React.useState<Record<string, AreaStatus>>({});
+
+    const handleAreaSync = async (area: SyncArea) => {
+        setAreaStatus(prev => ({ ...prev, [area.key]: { state: 'running' } }));
+        try {
+            const res = await fetch('/pco/sync', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ churchId, area: area.key }),
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+                throw new Error(err.error || `HTTP ${res.status}`);
+            }
+            setAreaStatus(prev => ({ ...prev, [area.key]: { state: 'success', message: 'Sync complete' } }));
+            onSyncComplete();
+            // Auto-clear success after 5 s
+            setTimeout(() => setAreaStatus(prev => ({ ...prev, [area.key]: { state: 'idle' } })), 5000);
+        } catch (e: any) {
+            setAreaStatus(prev => ({ ...prev, [area.key]: { state: 'error', message: e.message } }));
+        }
+    };
+
+    return (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {SYNC_AREAS.map(area => {
+                const status = areaStatus[area.key] || { state: 'idle' };
+                return (
+                    <div
+                        key={area.key}
+                        className={`p-4 rounded-2xl border transition-all ${
+                            status.state === 'success' ? 'border-emerald-200 dark:border-emerald-900/40 bg-emerald-50/40 dark:bg-emerald-900/10' :
+                            status.state === 'error'   ? 'border-rose-200 dark:border-rose-900/40 bg-rose-50/40 dark:bg-rose-900/10' :
+                            'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900'
+                        }`}
+                    >
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                            <div className="flex items-center gap-2">
+                                <span className="text-base">{area.icon}</span>
+                                <span className="text-xs font-black text-slate-900 dark:text-white">{area.label}</span>
+                            </div>
+                            {status.state === 'running' && (
+                                <span className="animate-spin inline-block w-3.5 h-3.5 border-2 border-indigo-400 border-t-transparent rounded-full shrink-0 mt-0.5"></span>
+                            )}
+                            {status.state === 'success' && (
+                                <span className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 shrink-0">✓ Done</span>
+                            )}
+                            {status.state === 'error' && (
+                                <span className="text-[9px] font-black text-rose-500 shrink-0">✕ Failed</span>
+                            )}
+                        </div>
+                        <p className="text-[9px] text-slate-400 dark:text-slate-500 leading-snug mb-3">{area.description}</p>
+                        {status.state === 'error' && status.message && (
+                            <p className="text-[9px] text-rose-500 mb-2 leading-snug">{status.message}</p>
+                        )}
+                        <button
+                            onClick={() => handleAreaSync(area)}
+                            disabled={status.state === 'running'}
+                            className="w-full bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 disabled:opacity-50 text-indigo-600 dark:text-indigo-400 text-[9px] font-black uppercase tracking-widest py-2 rounded-xl transition-all"
+                        >
+                            {status.state === 'running' ? 'Syncing…' : 'Force Sync'}
+                        </button>
+                    </div>
+                );
+            })}
+        </div>
+    );
+};
+
 interface RoleAdminViewProps {
   currentUser: User;
   churchId: string;
@@ -994,8 +1084,19 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                         </div>
                     </div>
 
-                    {/* Regular Attenders List */}
+
+                    {/* Right column */}
                     <div className="space-y-8">
+                        {/* Per-area Force Sync */}
+                        <div className="bg-slate-50 dark:bg-slate-800/50 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800">
+                            <div className="flex justify-between items-center mb-6">
+                                <h4 className="font-bold text-slate-900 dark:text-white text-sm">Force Sync by Area</h4>
+                                <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Runs Immediately</span>
+                            </div>
+                            <SyncAreaButtons churchId={churchId} onSyncComplete={async () => { if (onSync) onSync(); }} />
+                        </div>
+
+                        {/* Regular Attenders List */}
                         <div className="bg-indigo-50 dark:bg-indigo-900/10 p-8 rounded-[2rem] border border-indigo-100 dark:border-indigo-900/30">
                             <div className="flex justify-between items-start mb-2">
                                 <h4 className="font-bold text-indigo-900 dark:text-indigo-200 text-sm">Regular Attenders List</h4>

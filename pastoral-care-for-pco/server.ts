@@ -28,7 +28,7 @@ console.log("Pre-initialization: Checking Firebase Admin (DISABLED)...");
 async function startServer() {
   try {
     const app = express();
-    const PORT = process.env.PORT || 8080;
+    const PORT = Number(process.env.PORT) || 8080;
 
     // 1. Middlewares FIRST (must come before all routes)
     app.use(cors({
