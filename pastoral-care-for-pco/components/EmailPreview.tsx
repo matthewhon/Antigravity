@@ -4,6 +4,59 @@ import { TemplateSettings } from '../types';
 import { AnalyticsWidgetBlock, AnalyticsWidgetId } from './DataChartSelector';
 import { CalendarDays, Users, ClipboardList, Image as ImageIcon } from 'lucide-react';
 
+// ─── YouTube helper ───────────────────────────────────────────────────────────
+
+/** Extract YouTube video ID from any standard YouTube URL format. */
+function extractYouTubeId(url: string): string | null {
+  if (!url) return null;
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([A-Za-z0-9_-]{11})/,
+  ];
+  for (const p of patterns) {
+    const m = url.match(p);
+    if (m) return m[1];
+  }
+  return null;
+}
+
+/** Render a YouTube video as a thumbnail with play button overlay (email-safe style). */
+const YouTubeThumbnail: React.FC<{ url: string; videoId: string }> = ({ url, videoId }) => {
+  const thumb = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+  return (
+    <a href={url} target="_blank" rel="noopener noreferrer" style={{ display: 'block', position: 'relative', textDecoration: 'none' }}>
+      <img
+        src={thumb}
+        alt="YouTube video"
+        style={{ width: '100%', display: 'block', borderRadius: 10 }}
+        onError={e => { (e.target as HTMLImageElement).style.background = '#000'; }}
+      />
+      {/* Play button overlay */}
+      <span style={{
+        position: 'absolute', top: '50%', left: '50%',
+        transform: 'translate(-50%, -50%)',
+        width: 64, height: 64,
+        background: 'rgba(0,0,0,0.72)',
+        borderRadius: '50%',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        pointerEvents: 'none',
+      }}>
+        <svg width={28} height={28} viewBox="0 0 24 24" fill="#fff">
+          <polygon points="9.5,7 9.5,17 18,12" />
+        </svg>
+      </span>
+      {/* YouTube badge */}
+      <span style={{
+        position: 'absolute', bottom: 10, right: 12,
+        background: '#ff0000', color: '#fff',
+        fontSize: 10, fontWeight: 800, letterSpacing: '0.5px',
+        padding: '2px 7px', borderRadius: 4,
+        fontFamily: 'sans-serif',
+        pointerEvents: 'none',
+      }}>▶ YouTube</span>
+    </a>
+  );
+};
+
 // ─── Scoped prose styles injected once into the page head ─────────────────────
 // These mirror what a mail client / browser would render for common HTML tags
 // produced by the Tiptap editor (p, h1–h4, ul, ol, strong, em, a).
@@ -212,17 +265,32 @@ export const EmailPreview: React.FC<Props> = ({ blocks, settings, churchLogoUrl 
               />
             )}
             {block.type === 'image' && (
-              <img src={block.content.src} alt="Block" className="max-w-full rounded-lg" />
+              block.content.link
+                ? <a href={block.content.link} target="_blank" rel="noopener noreferrer" style={{ display: 'block' }}>
+                    <img src={block.content.src} alt={block.content.alt || ''} className="max-w-full rounded-lg" style={{ display: 'block' }} />
+                  </a>
+                : <img src={block.content.src} alt={block.content.alt || ''} className="max-w-full rounded-lg" />
             )}
-            {block.type === 'video' && (
-              <div className="max-w-full rounded-lg overflow-hidden">
-                {block.content.src?.includes('youtube.com') || block.content.src?.includes('youtu.be') ? (
-                  <iframe className="w-full aspect-video" src={block.content.src.replace('watch?v=', 'embed/')} title="Video" allowFullScreen />
-                ) : (
-                  <video src={block.content.src} controls className="w-full" />
-                )}
-              </div>
-            )}
+            {block.type === 'video' && (() => {
+              const src: string = block.content.src || '';
+              const ytId = extractYouTubeId(src);
+              if (ytId) {
+                return (
+                  <div className="rounded-xl overflow-hidden" style={{ position: 'relative' }}>
+                    <YouTubeThumbnail url={src} videoId={ytId} />
+                    <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 6, fontFamily: 'sans-serif' }}>
+                      ℹ️ Email recipients will see this thumbnail — clicking opens YouTube.
+                    </p>
+                  </div>
+                );
+              }
+              // Non-YouTube: native video player (browser preview only)
+              return (
+                <div className="rounded-xl overflow-hidden">
+                  <video src={src} controls className="w-full" />
+                </div>
+              );
+            })()}
 
             {(block.type === 'pco_registration' || block.type === 'pco_group' || block.type === 'pco_event') && (
               <PcoContentCard block={block} primaryColor={settings.primaryColor} />

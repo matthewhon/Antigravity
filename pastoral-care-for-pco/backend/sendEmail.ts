@@ -53,6 +53,16 @@ async function sgSend(
 }
 
 /**
+ * Extract a YouTube video ID from any standard YouTube URL.
+ * Handles: watch?v=, youtu.be/, embed/, shorts/
+ */
+function extractYouTubeId(url: string): string | null {
+    if (!url) return null;
+    const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+    return m ? m[1] : null;
+}
+
+/**
  * Minimal HTML renderer for email blocks.
  * Converts the campaign's block array into a sendable HTML string.
  */
@@ -91,11 +101,16 @@ function renderBlocksToHtml(blocks: any[], templateSettings: any, unsubscribeHtm
             }
             case 'html':
                 return block.content?.html || '';
-            case 'image':
-                if (block.content?.url) {
-                    return `<img src="${block.content.url}" alt="${block.content.alt || ''}" style="max-width:100%;height:auto;border-radius:8px;margin-bottom:16px;" />`;
-                }
-                return '';
+            case 'image': {
+                const imgSrc = block.content?.src || block.content?.url || '';
+                if (!imgSrc) return '';
+                const imgAlt = block.content?.alt || '';
+                const imgLink = block.content?.link;
+                const imgTag = `<img src="${imgSrc}" alt="${imgAlt}" style="max-width:100%;height:auto;border-radius:8px;margin-bottom:16px;display:block;" />`;
+                return imgLink
+                    ? `<a href="${imgLink}" style="display:block;" target="_blank" rel="noopener noreferrer">${imgTag}</a>`
+                    : imgTag;
+            }
             case 'button': {
                 const bc = block.content || {};
                 const bg = bc.color || primaryColor;
@@ -112,6 +127,50 @@ function renderBlocksToHtml(blocks: any[], templateSettings: any, unsubscribeHtm
             }
             case 'divider':
                 return `<hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;" />`;
+            case 'video': {
+                // Email clients cannot render <video> or <iframe>.
+                // For YouTube: show a linked thumbnail with play button overlay (email-safe table trick).
+                // For other URLs: show a styled play button link.
+                const videoSrc: string = block.content?.src || '';
+                if (!videoSrc) return '';
+                const ytId = extractYouTubeId(videoSrc);
+                if (ytId) {
+                    const thumbUrl = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
+                    // We use a position:relative trick via a single-cell table to overlay the play button.
+                    // This technique works in Gmail, Apple Mail, and Outlook Web.
+                    return `<div style="margin-bottom:16px;">
+                      <a href="${videoSrc}" target="_blank" rel="noopener noreferrer" style="display:block;text-decoration:none;">
+                        <table cellpadding="0" cellspacing="0" width="100%" style="border-radius:10px;overflow:hidden;">
+                          <tr>
+                            <td style="position:relative;padding:0;line-height:0;">
+                              <img src="${thumbUrl}" alt="Watch on YouTube" width="100%" style="display:block;width:100%;border-radius:10px;" />
+                              <!-- Play button overlay using a centered table -->
+                              <table cellpadding="0" cellspacing="0" style="position:absolute;top:0;left:0;width:100%;height:100%;">
+                                <tr><td align="center" valign="middle">
+                                  <table cellpadding="0" cellspacing="0"><tr><td style="width:68px;height:68px;border-radius:50%;background:rgba(0,0,0,0.72);text-align:center;vertical-align:middle;">
+                                    <span style="display:inline-block;margin-left:5px;width:0;height:0;border-style:solid;border-width:12px 0 12px 22px;border-color:transparent transparent transparent #ffffff;"></span>
+                                  </td></tr></table>
+                                </td></tr>
+                              </table>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style="background:#ff0000;padding:7px 14px;font-family:${fontFamily};font-size:12px;font-weight:800;color:#ffffff;border-radius:0 0 10px 10px;text-align:center;letter-spacing:0.5px;">
+                              &#9654; Watch on YouTube
+                            </td>
+                          </tr>
+                        </table>
+                      </a>
+                    </div>`;
+                }
+                // Non-YouTube fallback: styled play button link
+                return `<div style="margin-bottom:16px;">
+                    <a href="${videoSrc}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;background:#ef4444;color:#ffffff;font-family:${fontFamily};font-size:14px;font-weight:700;padding:10px 20px;border-radius:8px;text-decoration:none;">
+                        <span style="display:inline-block;width:0;height:0;border-style:solid;border-width:7px 0 7px 14px;border-color:transparent transparent transparent #ffffff;vertical-align:middle;margin-right:8px;"></span>Watch Video
+                    </a>
+                    <div style="font-family:${fontFamily};font-size:11px;color:#9ca3af;margin-top:6px;word-break:break-all;">${videoSrc}</div>
+                </div>`;
+            }
             // Analytics widgets — rendered as an embedded card
             case 'analytics_block': {
                 const label = block.content?.label || '';

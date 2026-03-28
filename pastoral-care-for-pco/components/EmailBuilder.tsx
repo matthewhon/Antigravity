@@ -428,11 +428,69 @@ const InlineMediaEditor: React.FC<{
     );
   }
   if (block.type === 'video') {
+    // Extract YouTube ID for live thumbnail preview
+    const extractYtId = (url: string): string | null => {
+      if (!url) return null;
+      const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+      return m ? m[1] : null;
+    };
+    const ytId = extractYtId(c.src || '');
+
     return (
-      <div onClick={e => e.stopPropagation()}>
-        <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Video URL</label>
-        <input type="url" value={c.src || ''} onChange={e => onUpdate({ ...c, src: e.target.value })} placeholder="https://youtube.com/…"
-          className="w-full text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+      <div className="space-y-3" onClick={e => e.stopPropagation()}>
+        {/* Live thumbnail preview */}
+        {ytId ? (
+          <div className="relative rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 group/thumb">
+            <img
+              src={`https://img.youtube.com/vi/${ytId}/hqdefault.jpg`}
+              alt="YouTube thumbnail"
+              className="w-full block rounded-xl"
+              onError={e => { (e.target as HTMLImageElement).style.background = '#000'; }}
+            />
+            {/* Play button overlay */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="w-14 h-14 rounded-full bg-black/65 flex items-center justify-center">
+                <svg width={24} height={24} viewBox="0 0 24 24" fill="white">
+                  <polygon points="8,6 8,18 18,12" />
+                </svg>
+              </div>
+            </div>
+            {/* YouTube badge */}
+            <div className="absolute bottom-2 right-2 bg-red-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded pointer-events-none tracking-wide">
+              ▶ YouTube
+            </div>
+            {/* Remove button */}
+            <button
+              onClick={() => onUpdate({ ...c, src: '' })}
+              className="absolute top-2 right-2 p-1 bg-black/50 text-white rounded-full hover:bg-black/70 transition opacity-0 group-hover/thumb:opacity-100"
+              title="Remove video"
+            >
+              <X size={12} />
+            </button>
+          </div>
+        ) : (
+          <div className="w-full h-24 bg-slate-100 dark:bg-slate-700 rounded-xl flex flex-col items-center justify-center gap-1.5 text-slate-400">
+            <Video size={24} />
+            <span className="text-[10px]">Paste a YouTube URL below</span>
+          </div>
+        )}
+
+        {/* URL input */}
+        <div>
+          <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">YouTube URL</label>
+          <input
+            type="url"
+            value={c.src || ''}
+            onChange={e => onUpdate({ ...c, src: e.target.value })}
+            placeholder="https://youtube.com/watch?v=…"
+            className="w-full text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          />
+        </div>
+
+        {/* Info note */}
+        <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-relaxed">
+          📧 Email recipients will see the video thumbnail above. Clicking it opens YouTube in their browser — email clients don't support embedded video.
+        </p>
       </div>
     );
   }
