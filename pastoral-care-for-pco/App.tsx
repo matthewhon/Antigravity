@@ -441,6 +441,18 @@ const App: React.FC = () => {
       }
   };
 
+  const handleSaveBudget = async (budget: BudgetRecord) => {
+      if (!church) return;
+      try {
+          await firestore.saveBudget(budget);
+          const freshBudgets = await firestore.getBudgets(church.id);
+          setBudgets(freshBudgets);
+      } catch (e: any) {
+          console.error('Failed to save budget:', e);
+          alert(`Failed to save budget: ${e.message}`);
+      }
+  };
+
   const handleSwitchChurch = async (id: string) => {
       const target = allChurches.find(c => c.id === id);
       if (target) {
@@ -944,6 +956,7 @@ const App: React.FC = () => {
                 totalPeople={peopleDashboardData.stats.total}
                 onUpdateTheme={handleUpdateUserTheme}
                 currentTheme={user.theme}
+                onSaveBudget={handleSaveBudget}
             />
         )}
         {view === 'pastoral' && (
