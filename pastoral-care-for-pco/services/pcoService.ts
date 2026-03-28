@@ -53,8 +53,15 @@ export const pcoService = {
         return safeData(data);
     },
     async getRegistrations(churchId: string): Promise<any[]> {
-        const data = await pcoFetch(churchId, `https://api.planningcenteronline.com/registrations/v2/events?order=starts_at&filter=unarchived,published&per_page=100`);
-        return safeData(data);
+        // PCO Registrations v2 — use separate filter params per PCO API spec
+        // Do NOT use comma-separated filters like filter=a,b (those are not standard PCO format)
+        try {
+            const data = await pcoFetch(churchId, `https://api.planningcenteronline.com/registrations/v2/events?per_page=100&order=starts_at`);
+            return safeData(data);
+        } catch (e: any) {
+            // If the scoped endpoint fails, re-throw with original error
+            throw e;
+        }
     },
     async getEvents(churchId: string): Promise<any[]> {
         const data = await pcoFetch(churchId, `https://api.planningcenteronline.com/calendar/v2/events?per_page=100&filter=future`);

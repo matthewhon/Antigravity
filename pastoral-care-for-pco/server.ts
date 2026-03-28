@@ -56,6 +56,38 @@ async function startServer() {
     // PCO Proxy
     app.post('/pco/proxy', express.json(), pcoProxy);
 
+    // PCO Registrations Diagnostic — shows exactly what PCO returns for this church's token
+    app.post('/pco/diagnose-registrations', express.json(), async (req: any, res: any) => {
+      const { churchId } = req.body || {};
+      if (!churchId) return res.status(400).json({ error: 'Missing churchId' });
+      try {
+        const db = getDb();
+        const churchDoc = await db.collection('churches').doc(churchId).get();
+        if (!churchDoc.exists) return res.status(404).json({ error: 'Church not found' });
+        const church = churchDoc.data()!;
+        const token = church.pcoAccessToken;
+        if (!token) return res.status(401).json({ error: 'No PCO access token for this church' });
+
+        const pcoRes = await fetch('https://api.planningcenteronline.com/registrations/v2/events?per_page=1', {
+          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+        });
+        const body = await pcoRes.text();
+        let parsed: any;
+        try { parsed = JSON.parse(body); } catch { parsed = body; }
+
+        res.json({
+          pcoStatus: pcoRes.status,
+          pcoStatusText: pcoRes.statusText,
+          hasRegistrationsScope: pcoRes.status === 200,
+          body: parsed,
+          tokenPrefix: token.substring(0, 8) + '...',
+          churchId,
+        });
+      } catch (e: any) {
+        res.status(500).json({ error: e.message });
+      }
+    });
+
     // Gemini AI Proxy (key stays server-side)
     app.post('/ai/generate', express.json(), handleGeminiProxy);
 

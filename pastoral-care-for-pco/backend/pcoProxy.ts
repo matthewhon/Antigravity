@@ -120,20 +120,25 @@ export const pcoProxy = async (req: any, res: any) => {
         // 4. Return Response
         if (!response.ok) {
             const errText = await response.text();
-            log.warn('PCO upstream error', 'proxy', { churchId, url, status: response.status, error: errText.substring(0, 300) }, churchId);
+            log.warn('PCO upstream error', 'proxy', { churchId, url, status: response.status, error: errText.substring(0, 500) }, churchId);
 
-            // Special handling for 403/404 on registrations — this almost always means the OAuth token
-            // was granted before the 'registrations' scope was added and needs re-authorization.
-            // PCO returns 403 Forbidden when a valid token *lacks* the registrations scope.
-            // PCO returns 404 if the org does not have the Registrations module.
-            // Either way, the user needs to reconnect.
-            if ((response.status === 403 || response.status === 404) && url?.includes('/registrations/')) {
-                res.status(403).json({
-                    error: 'Registrations not accessible. Your Planning Center connection needs to be updated to include Registrations access.',
-                    requiresReauth: true,
-                    detail: errText.substring(0, 200)
-                });
-                return;
+            // Special handling for errors on registrations endpoints
+            if (url?.includes('/registrations/')) {
+                if (response.status === 403) {
+                    // 403 = valid token but missing 'registrations' scope — must reconnect PCO with registrations scope
+                    res.status(403).json({
+                        error: 'Registrations scope not authorized. Please reconnect Planning Center in Settings → Planning Center to grant Registrations access.',
+                        requiresReauth: true,
+                        pcoStatus: 403,
+                        detail: errText.substring(0, 300)
+                    });
+                    return;
+                }
+                if (response.status === 404) {
+                    // 404 = the org's PCO account does not have the Registrations module / product
+                    res.status(200).json({ data: [], meta: { total_count: 0 }, _pcoNote: 'Registrations module not available for this organization' });
+                    return;
+                }
             }
 
             res.status(response.status).send(errText);
