@@ -637,16 +637,6 @@ export const GivingView: React.FC<GivingViewProps> = ({
                                           <div key={budget.id} className="space-y-1.5">
                                               <div className="flex items-center justify-between">
                                                   <div className="flex items-center gap-2">
-                                                      {/* Thermometer icon */}
-                                                      <div className="relative w-3 flex flex-col items-center">
-                                                          <div className="w-2 rounded-t-full bg-slate-200 dark:bg-slate-700 overflow-hidden" style={{ height: '28px' }}>
-                                                              <div
-                                                                  className="w-full rounded-t-full transition-all duration-700 absolute bottom-0"
-                                                                  style={{ height: `${pct}%`, backgroundColor: color }}
-                                                              />
-                                                          </div>
-                                                          <div className="w-3 h-3 rounded-full border-2" style={{ borderColor: color, backgroundColor: color }} />
-                                                      </div>
                                                       <span className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate max-w-[140px]">{budget.fundName}</span>
                                                   </div>
                                                   <div className="flex items-center gap-2">
