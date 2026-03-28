@@ -167,85 +167,102 @@ export const authenticateDomain = async (req: any, res: any) => {
     try {
         const masterKey = await getMasterApiKey(db);
 
-        // Ensure this church has a Subuser (required for per-tenant domain auth)
         const churchSnap = await db.collection('churches').doc(churchId).get();
         const church = churchSnap.data() || {};
         const existingSettings = church.emailSettings || {};
-        const subuserId = existingSettings.sendGridSubuserId;
 
-        // Custom domain auth must live on the MASTER account, not the subuser.
-        // This is because when sending with a custom domain we do NOT use on-behalf-of
-        // (subuser sends require the sender identity to exist on the subuser, which it
-        // doesn't for externally-owned domains). Master account domain auth is the
-        // correct SendGrid pattern for multi-tenant custom domains.
-        //
-        // Note: a subuser is no longer required for custom domain setup.
+        // ── Step 1: Search for an EXISTING domain auth on the MASTER account ────
+        // We CANNOT rely on the stored domainAuthId from Firestore because it may
+        // have been created on-behalf-of a subuser (before this fix). Instead, list
+        // all domain auths on the master account and find one matching this domain.
+        const listRes = await fetch('https://api.sendgrid.com/v3/whitelabel/domains?limit=200', {
+            headers: sgHeaders(masterKey),
+        });
 
-        // Check if domain auth already exists for this domain
-        if (existingSettings.customDomain === domain && existingSettings.domainAuthId) {
-            // Re-fetch existing CNAME records from SendGrid
-            const getRes = await fetch(`https://api.sendgrid.com/v3/whitelabel/domains/${existingSettings.domainAuthId}`, {
-                headers: sgHeaders(masterKey),
-            });
-            if (getRes.ok) {
-                const data = await getRes.json();
-                const cnameRecords = extractCnameRecords(data);
-                return res.json({ success: true, cnameRecords, message: 'Existing CNAME records returned.' });
+        let existingMasterAuthId: string | null = null;
+        let existingMasterCnames: { host: string; type: 'CNAME'; data: string }[] = [];
+
+        if (listRes.ok) {
+            const allDomains: any[] = await listRes.json();
+            // Match by domain name (case-insensitive) on the MASTER account (no on-behalf-of needed for listing)
+            const match = allDomains.find(
+                (d: any) => (d.domain || '').toLowerCase() === domain.toLowerCase()
+            );
+            if (match) {
+                existingMasterAuthId = String(match.id);
+                existingMasterCnames = extractCnameRecords(match);
+                log.info(
+                    `Found existing master-account domain auth #${existingMasterAuthId} for ${domain}`,
+                    'system', { churchId }, churchId
+                );
             }
         }
 
-        // Create domain authentication on the MASTER account (no on-behalf-of).
-        // The master account's domain authentication applies to all sends made with the
-        // master API key, which is what custom domain sends use.
-        const authRes = await fetch('https://api.sendgrid.com/v3/whitelabel/domains', {
-            method: 'POST',
-            headers: sgHeaders(masterKey),
-            body: JSON.stringify({
-                domain,
-                subdomain: 'em',  // SendGrid uses em.<domain> for CNAME
-                automatic_security: true,
-                custom_spf: false,
-                default: true,
-            }),
-        });
+        let domainAuthId: string;
+        let cnameRecords: { host: string; type: 'CNAME'; data: string }[];
 
-        if (!authRes.ok) {
-            const errBody = await authRes.json().catch(() => ({}));
-            const errMsg = errBody?.errors?.[0]?.message || `SendGrid returned ${authRes.status}`;
-            throw new Error(`Domain authentication failed: ${errMsg}`);
+        if (existingMasterAuthId) {
+            // ── Reuse existing master-account domain auth ────────────────────────
+            domainAuthId = existingMasterAuthId;
+            cnameRecords = existingMasterCnames;
+        } else {
+            // ── Create a new domain auth on the MASTER account ──────────────────
+            // Sends custom-domain emails directly with the master key (no on-behalf-of),
+            // so the domain auth must exist at the master-account level.
+            const authRes = await fetch('https://api.sendgrid.com/v3/whitelabel/domains', {
+                method: 'POST',
+                headers: sgHeaders(masterKey),
+                body: JSON.stringify({
+                    domain,
+                    subdomain: 'em',
+                    automatic_security: true,
+                    custom_spf: false,
+                    default: false,  // Don't override master default — matching by from-domain is automatic
+                }),
+            });
+
+            if (!authRes.ok) {
+                const errBody = await authRes.json().catch(() => ({}));
+                const errMsg = errBody?.errors?.[0]?.message || `SendGrid returned ${authRes.status}`;
+                throw new Error(`Domain authentication failed: ${errMsg}`);
+            }
+
+            const authData = await authRes.json();
+            domainAuthId = String(authData.id);
+            cnameRecords = extractCnameRecords(authData);
+            log.info(`Created new master-account domain auth #${domainAuthId} for ${domain}`, 'system', { churchId }, churchId);
         }
 
-        const authData = await authRes.json();
-        const domainAuthId = String(authData.id);
-        const cnameRecords = extractCnameRecords(authData);
-
-        // Save to Firestore
+        // ── Always persist the correct master-account auth ID to Firestore ──────
         const emailSettings = {
             ...existingSettings,
             mode: 'custom',
             customDomain: domain,
             fromEmail: fromEmail || existingSettings.fromEmail || `contact@${domain}`,
             fromName: fromName || existingSettings.fromName || church.name || 'Church',
-            domainAuthId,
+            domainAuthId,   // ← guaranteed to be a MASTER account auth ID
             cnameRecords,
-            domainVerified: false,
+            domainVerified: false,  // Reset — user must re-verify after getting records
         };
 
         await db.collection('churches').doc(churchId).update({ emailSettings });
 
-        log.info(`Domain auth requested for ${churchId}: ${domain}`, 'system', { churchId, domain }, churchId);
+        log.info(`Domain auth configured for ${churchId}: ${domain} (authId: ${domainAuthId})`, 'system', { churchId, domain }, churchId);
 
         return res.json({
             success: true,
             cnameRecords,
             domainAuthId,
-            message: `Domain authentication initiated. Add the 3 CNAME records to your DNS provider, then click "Verify DNS".`,
+            message: existingMasterAuthId
+                ? `Found existing domain auth. Add these CNAME records to your DNS if not already done, then click "Verify DNS".`
+                : `Domain authentication initiated. Add the 3 CNAME records to your DNS provider, then click "Verify DNS".`,
         });
     } catch (e: any) {
         log.error(`[emailProvisioning] authenticateDomain failed: ${e.message}`, 'system', { churchId }, churchId);
         return res.status(500).json({ error: e.message || 'Unknown error' });
     }
 };
+
 
 // ─── Verify Domain DNS ───────────────────────────────────────────────────────
 // Triggers SendGrid to re-check DNS propagation. When all CNAMEs resolve,
