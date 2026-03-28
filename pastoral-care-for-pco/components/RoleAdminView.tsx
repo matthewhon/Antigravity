@@ -11,6 +11,7 @@ import DonorLifecycleSettingsView from './DonorLifecycleSettingsView';
 import { SubscriptionSettingsView } from './SubscriptionSettingsView';
 import { ALL_WIDGETS } from '../constants/widgetRegistry';
 import { PLANS } from '../services/stripeService';
+import { pcoService } from '../services/pcoService';
 
 interface RoleAdminViewProps {
   currentUser: User;
@@ -56,12 +57,24 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   const [pendingRoles, setPendingRoles] = useState<UserRole[]>([]);
   const [isSavingRoles, setIsSavingRoles] = useState(false);
 
+  // PCO Lists state (for regular attenders selection)
+  const [pcoLists, setPcoLists] = useState<{ id: string; attributes: { name: string; total_people: number } }[]>([]);
+  const [isPcoListsLoading, setIsPcoListsLoading] = useState(false);
+  const [pcoListsError, setPcoListsError] = useState<string | null>(null);
+  const [selectedListId, setSelectedListId] = useState(church.regularAttendersListId || '');
+  const [selectedListName, setSelectedListName] = useState(church.regularAttendersListName || '');
+  const [isSavingList, setIsSavingList] = useState(false);
+  const [listSaveMessage, setListSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
   useEffect(() => {
     loadUsers();
   }, [churchId]);
 
   useEffect(() => {
       setFormData(church);
+      // Keep list selection in sync if church prop changes externally
+      setSelectedListId(church.regularAttendersListId || '');
+      setSelectedListName(church.regularAttendersListName || '');
   }, [church]);
 
   useEffect(() => {
@@ -92,6 +105,44 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
       }
       return () => clearTimeout(timer);
   }, [saveMessage]);
+
+  // Load PCO People Lists when Planning Center tab becomes active
+  useEffect(() => {
+      if (activeTab === 'Planning Center' && church.pcoConnected && pcoLists.length === 0 && !isPcoListsLoading) {
+          loadPcoLists();
+      }
+  }, [activeTab, church.pcoConnected]);
+
+  const loadPcoLists = async () => {
+      setIsPcoListsLoading(true);
+      setPcoListsError(null);
+      try {
+          const raw = await pcoService.getPeopleLists(churchId);
+          setPcoLists(raw);
+      } catch (e: any) {
+          setPcoListsError(e.message || 'Failed to load lists from Planning Center.');
+      } finally {
+          setIsPcoListsLoading(false);
+      }
+  };
+
+  const handleSaveRegularAttendersList = async () => {
+      if (!onUpdateChurch) return;
+      setIsSavingList(true);
+      setListSaveMessage(null);
+      try {
+          await onUpdateChurch({
+              regularAttendersListId: selectedListId || undefined,
+              regularAttendersListName: selectedListName || undefined,
+          });
+          setListSaveMessage({ type: 'success', text: 'Regular attenders list saved.' });
+      } catch (e: any) {
+          setListSaveMessage({ type: 'error', text: 'Failed to save: ' + e.message });
+      } finally {
+          setIsSavingList(false);
+          setTimeout(() => setListSaveMessage(null), 4000);
+      }
+  };
 
   const loadUsers = async () => {
     try {
@@ -931,6 +982,112 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 </div>
                             ) : (
                                 <p className="text-sm text-slate-400 italic">Never synced</p>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Regular Attenders List */}
+                    <div className="space-y-8">
+                        <div className="bg-indigo-50 dark:bg-indigo-900/10 p-8 rounded-[2rem] border border-indigo-100 dark:border-indigo-900/30">
+                            <div className="flex justify-between items-start mb-2">
+                                <h4 className="font-bold text-indigo-900 dark:text-indigo-200 text-sm">Regular Attenders List</h4>
+                                {selectedListId && (
+                                    <span className="text-[9px] font-black bg-indigo-600 text-white px-2 py-0.5 rounded-full uppercase tracking-widest">
+                                        Active
+                                    </span>
+                                )}
+                            </div>
+                            <p className="text-[10px] text-indigo-700 dark:text-indigo-400 mb-6 leading-relaxed">
+                                Select the Planning Center People List that represents your <strong>regular attenders</strong>.
+                                This list is used across the app to identify who is considered an active, regular participant of your church.
+                            </p>
+
+                            {!church.pcoConnected ? (
+                                <div className="p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 rounded-xl">
+                                    <p className="text-[10px] font-bold text-amber-700 dark:text-amber-400">
+                                        ⚠ Connect Planning Center first to load available lists.
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-2">
+                                        <div className="flex-1">
+                                            <label className="block text-[10px] font-black uppercase text-indigo-600 dark:text-indigo-400 tracking-widest mb-2">
+                                                PCO People List
+                                            </label>
+                                            {isPcoListsLoading ? (
+                                                <div className="w-full bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-800 rounded-xl px-4 py-3 flex items-center gap-2 text-xs text-slate-400">
+                                                    <span className="animate-spin inline-block w-3 h-3 border-2 border-indigo-400 border-t-transparent rounded-full"></span>
+                                                    Loading lists from Planning Center...
+                                                </div>
+                                            ) : pcoListsError ? (
+                                                <div className="space-y-2">
+                                                    <div className="w-full bg-rose-50 dark:bg-rose-900/10 border border-rose-200 dark:border-rose-800 rounded-xl px-4 py-3 text-xs text-rose-600 dark:text-rose-400">
+                                                        ⚠ {pcoListsError}
+                                                    </div>
+                                                    <button
+                                                        onClick={loadPcoLists}
+                                                        className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
+                                                    >
+                                                        ↻ Retry
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <select
+                                                    id="regular-attenders-list-select"
+                                                    value={selectedListId}
+                                                    onChange={e => {
+                                                        const chosen = pcoLists.find(l => l.id === e.target.value);
+                                                        setSelectedListId(e.target.value);
+                                                        setSelectedListName(chosen?.attributes?.name || '');
+                                                    }}
+                                                    className="w-full bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-800 rounded-xl px-4 py-3 text-sm font-medium text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer"
+                                                >
+                                                    <option value="">— Select a list —</option>
+                                                    {pcoLists.map(list => (
+                                                        <option key={list.id} value={list.id}>
+                                                            {list.attributes?.name}
+                                                            {list.attributes?.total_people != null
+                                                                ? ` (${list.attributes.total_people.toLocaleString()} people)`
+                                                                : ''}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            )}
+                                        </div>
+                                        {!isPcoListsLoading && !pcoListsError && (
+                                            <button
+                                                onClick={loadPcoLists}
+                                                title="Refresh lists"
+                                                className="mt-6 p-3 rounded-xl bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-800 text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors text-sm"
+                                            >
+                                                ↻
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {selectedListName && (
+                                        <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
+                                            ✓ Selected: <span className="font-mono">{selectedListName}</span>
+                                        </p>
+                                    )}
+
+                                    {listSaveMessage && (
+                                        <p className={`text-[10px] font-bold animate-in fade-in ${
+                                            listSaveMessage.type === 'success' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+                                        }`}>
+                                            {listSaveMessage.text}
+                                        </p>
+                                    )}
+
+                                    <button
+                                        onClick={handleSaveRegularAttendersList}
+                                        disabled={isSavingList}
+                                        className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-indigo-200 dark:shadow-none"
+                                    >
+                                        {isSavingList ? 'Saving...' : 'Save Regular Attenders List'}
+                                    </button>
+                                </div>
                             )}
                         </div>
                     </div>

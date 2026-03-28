@@ -87,6 +87,10 @@ export interface Church {
     allowSignups?: boolean;
     scheduledSyncTime?: string;
     communityLocations?: CommunityLocation[];
+    /** PCO List ID used to identify regular attenders of the church */
+    regularAttendersListId?: string;
+    /** Display name of the selected regular attenders PCO list */
+    regularAttendersListName?: string;
     emailSettings?: {
         /** 'shared' = send from @pastoralcare.barnabassoftware.com; 'custom' = tenant's own domain */
         mode: 'shared' | 'custom';
