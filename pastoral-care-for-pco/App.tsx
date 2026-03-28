@@ -21,6 +21,7 @@ import { CommunicationModule } from './components/CommunicationModule';
 import { MetricsView } from './components/MetricsView';
 import LibraryView from './components/LibraryView';
 import WelcomeLayoutModal from './components/WelcomeLayoutModal';
+import { PublicPollView } from './components/PublicPollView';
 import { 
   User, Church, PeopleDashboardData, GivingAnalytics, GroupsDashboardData, 
   ServicesDashboardData, AttendanceData, CensusStats, BudgetRecord, PcoFund, 
@@ -753,6 +754,12 @@ const App: React.FC = () => {
   };
 
   // --- Render ---
+
+  // ── Public Poll Route (no auth required) ──────────────────────────────────
+  const pollMatch = window.location.pathname.match(/^\/poll\/([^/]+)/);
+  if (pollMatch) {
+    return <PublicPollView pollId={pollMatch[1]} />;
+  }
 
   if (loading) {
     return <div className="flex h-screen items-center justify-center text-slate-400 font-bold text-sm bg-slate-50 dark:bg-slate-950">Loading Pastoral Care...</div>;

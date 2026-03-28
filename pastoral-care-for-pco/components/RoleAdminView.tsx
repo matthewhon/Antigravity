@@ -943,10 +943,10 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     <div className="space-y-8">
                         <div className="bg-slate-50 dark:bg-slate-800/50 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800">
-                            <h4 className="font-bold text-slate-900 dark:text-white mb-6 text-sm">Automated Sync</h4>
+                            <h4 className="font-bold text-slate-900 dark:text-white mb-6 text-sm">Automated Sync Schedule</h4>
                             <div className="flex items-center gap-4">
                                 <div className="flex-1">
-                                    <label className="block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-2">Daily Schedule</label>
+                                    <label className="block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-2">Daily Time</label>
                                     <input 
                                         type="time" 
                                         value={formData.scheduledSyncTime || ''}
@@ -954,23 +954,31 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 font-mono text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
                                     />
                                     <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-2 leading-relaxed">
-                                        The system will automatically attempt to sync new data from Planning Center at this time every day. Leave blank to disable auto-sync.
+                                        The system will automatically sync all data from Planning Center at this time each day. Leave blank to disable.
                                     </p>
                                 </div>
                             </div>
-                            <div className="mt-6 text-right">
+                            <div className="mt-4 flex items-center justify-between">
+                                {formData.scheduledSyncTime ? (
+                                    <span className="inline-flex items-center gap-1.5 text-[9px] font-black uppercase text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded-full border border-emerald-100 dark:border-emerald-900/30">
+                                        <span className="relative flex h-1.5 w-1.5"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span></span>
+                                        Auto-sync enabled
+                                    </span>
+                                ) : (
+                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Auto-sync disabled</span>
+                                )}
                                 <button 
                                     onClick={handleSaveOrgSettings}
                                     disabled={isSaving}
-                                    className="text-indigo-600 dark:text-indigo-400 text-xs font-bold hover:underline"
+                                    className="text-indigo-600 dark:text-indigo-400 text-xs font-bold hover:underline disabled:opacity-50"
                                 >
-                                    Save Schedule
+                                    {isSaving ? 'Saving…' : 'Save Schedule'}
                                 </button>
                             </div>
                         </div>
 
                         <div className="bg-slate-50 dark:bg-slate-800/50 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800">
-                            <h4 className="font-bold text-slate-900 dark:text-white mb-4 text-sm">Last Synchronization</h4>
+                            <h4 className="font-bold text-slate-900 dark:text-white mb-4 text-sm">Last Full Sync</h4>
                             {formData.lastSyncTimestamp ? (
                                 <div>
                                     <p className="text-2xl font-mono font-bold text-slate-700 dark:text-slate-300">

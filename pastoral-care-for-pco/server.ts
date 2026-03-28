@@ -14,6 +14,7 @@ import { pcoProxy } from './backend/pcoProxy';
 import { handlePcoWebhook } from './backend/pcoWebhookHandler';
 import { sendEmail } from './backend/sendEmail';
 import { startEmailScheduler } from './backend/emailScheduler';
+import { startSyncScheduler } from './backend/syncScheduler';
 import { getDb } from './backend/firebase';
 import { handleGeminiProxy } from './backend/geminiProxy';
 import { provisionSubuser, authenticateDomain, verifyDomain } from './backend/emailProvisioning';
@@ -55,6 +56,44 @@ async function startServer() {
 
     // PCO Proxy
     app.post('/pco/proxy', express.json(), pcoProxy);
+
+    // PCO Sync — trigger a full or per-area sync from the UI
+    app.post('/pco/sync', express.json(), async (req: any, res: any) => {
+      const { churchId, area } = req.body || {};
+      if (!churchId) return res.status(400).json({ error: 'Missing churchId' });
+
+      try {
+        const {
+          syncAllData,
+          syncPeopleData,
+          syncGroupsData,
+          syncServicesData,
+          syncRecentGiving,
+          syncCheckInCounts,
+          syncCheckInsData,
+          syncRegistrationsData,
+        } = await import('./services/pcoSyncService.js');
+
+        const areaMap: Record<string, () => Promise<void>> = {
+          people:        () => syncPeopleData(churchId),
+          groups:        () => syncGroupsData(churchId),
+          services:      () => syncServicesData(churchId),
+          giving:        () => syncRecentGiving(churchId),
+          checkins:      () => Promise.all([syncCheckInCounts(churchId), syncCheckInsData(churchId)]).then(() => {}),
+          registrations: () => syncRegistrationsData(churchId),
+        };
+
+        if (area && areaMap[area]) {
+          await areaMap[area]();
+          res.json({ success: true, area });
+        } else {
+          await syncAllData(churchId);
+          res.json({ success: true, area: 'all' });
+        }
+      } catch (e: any) {
+        res.status(500).json({ error: e.message || 'Sync failed' });
+      }
+    });
 
     // PCO Registrations Diagnostic — shows exactly what PCO returns for this church's token
     app.post('/pco/diagnose-registrations', express.json(), async (req: any, res: any) => {
@@ -276,6 +315,12 @@ async function startServer() {
         startEmailScheduler(db as any);
       } catch (e) {
         console.warn('[EmailScheduler] Could not start scheduler:', e);
+      }
+      try {
+        const db = getDb();
+        startSyncScheduler(db as any);
+      } catch (e) {
+        console.warn('[SyncScheduler] Could not start scheduler:', e);
       }
     });
 
