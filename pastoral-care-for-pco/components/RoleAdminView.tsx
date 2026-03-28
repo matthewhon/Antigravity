@@ -276,6 +276,20 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
           return;
       }
       
+      // Clear any existing (potentially stale) tokens from Firestore before redirecting.
+      // This ensures that if the code exchange after redirect fails, we don't keep using
+      // a token that was granted before the 'registrations' scope was added.
+      try {
+          await firestore.updateChurch(churchId, {
+              pcoAccessToken: null,
+              pcoRefreshToken: null,
+              pcoTokenExpiry: 0,
+              pcoConnected: false,
+          });
+      } catch (e) {
+          console.warn('Could not clear old PCO tokens before reauth:', e);
+      }
+      
       const redirectUri = window.location.origin;
       const url = `https://api.planningcenteronline.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=people%20services%20giving%20groups%20check_ins%20registrations%20calendar&state=${churchId}`;
       window.location.href = url;

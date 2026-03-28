@@ -25,6 +25,10 @@ const pcoFetch = async (churchId: string, url: string, method = 'GET', body: any
         } catch (innerErr: any) {
             // If it's our requiresReauth throw, re-throw it
             if (innerErr?.message?.includes('[requiresReauth]')) throw innerErr;
+            // Also treat 403 on registrations URLs as a scope reauth signal
+            if (response.status === 403 && url.includes('/registrations/')) {
+                throw new Error(message + ' [requiresReauth]');
+            }
             /* otherwise leave default message */
         }
         throw new Error(message);

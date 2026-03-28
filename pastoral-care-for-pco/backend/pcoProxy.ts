@@ -122,10 +122,13 @@ export const pcoProxy = async (req: any, res: any) => {
             const errText = await response.text();
             log.warn('PCO upstream error', 'proxy', { churchId, url, status: response.status, error: errText.substring(0, 300) }, churchId);
 
-            // Special handling for 404 on registrations — this almost always means the OAuth token
+            // Special handling for 403/404 on registrations — this almost always means the OAuth token
             // was granted before the 'registrations' scope was added and needs re-authorization.
-            if (response.status === 404 && url?.includes('/registrations/')) {
-                res.status(404).json({
+            // PCO returns 403 Forbidden when a valid token *lacks* the registrations scope.
+            // PCO returns 404 if the org does not have the Registrations module.
+            // Either way, the user needs to reconnect.
+            if ((response.status === 403 || response.status === 404) && url?.includes('/registrations/')) {
+                res.status(403).json({
                     error: 'Registrations not accessible. Your Planning Center connection needs to be updated to include Registrations access.',
                     requiresReauth: true,
                     detail: errText.substring(0, 200)
