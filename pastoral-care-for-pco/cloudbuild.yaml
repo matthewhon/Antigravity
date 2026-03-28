@@ -26,7 +26,7 @@ steps:
     - '--timeout'
     - '300s'
 
-serviceAccount: 'projects/$PROJECT_ID/serviceAccounts/511453050214-compute@developer.gserviceaccount.com'
+# serviceAccount removed — using Cloud Build default SA (420611303326@cloudbuild.gserviceaccount.com)
 
 options:
   logging: CLOUD_LOGGING_ONLY
