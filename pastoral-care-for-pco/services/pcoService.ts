@@ -80,6 +80,35 @@ export const pcoService = {
         } catch {
             return [];
         }
-    }
+    },
+
+    async getGroupMembers(churchId: string, groupId: string): Promise<string[]> {
+        // PCO Groups API: get memberships with person included, extract primary emails
+        try {
+            const data = await pcoFetch(churchId,
+                `https://api.planningcenteronline.com/groups/v2/groups/${groupId}/memberships?include=person&per_page=100`
+            );
+            const included: any[] = data?.included || [];
+            const emails: string[] = [];
+            for (const person of included) {
+                if (person.type !== 'Person') continue;
+                // Each person in Groups API has an emails array via a separate endpoint;
+                // instead, fetch basic contact data from People API for the person
+                const personId = person.id;
+                const emailAttr = person.attributes?.email_addresses;
+                if (emailAttr && emailAttr.length > 0) {
+                    const primary = emailAttr.find((e: any) => e.primary) || emailAttr[0];
+                    if (primary?.address) emails.push(primary.address);
+                } else {
+                    // Fallback: use the person's primary email from People API
+                    const personEmail = person.attributes?.primary_email;
+                    if (personEmail) emails.push(personEmail);
+                }
+            }
+            return emails;
+        } catch {
+            return [];
+        }
+    },
 };
 

@@ -288,6 +288,7 @@ export async function executeSend(
     if (testEmail) {
         recipients = [testEmail];
         log.info(`Sending test email to ${testEmail}`, 'system', { campaignId, churchId }, churchId);
+
     } else if (campaign.toListId) {
         log.info(`Fetching PCO list ${campaign.toListId} for campaign ${campaignId}`, 'system', { churchId }, churchId);
 
@@ -318,10 +319,61 @@ export async function executeSend(
         }
 
         if (recipients.length === 0) throw new Error('No email addresses found for the selected list.');
+        log.info(`Sending campaign "${subject}" to ${recipients.length} recipients (PCO list)`, 'system', { campaignId, churchId }, churchId);
 
-        log.info(`Sending campaign "${subject}" to ${recipients.length} recipients`, 'system', { campaignId, churchId }, churchId);
+    } else if (campaign.toGroupId) {
+        log.info(`Fetching PCO group ${campaign.toGroupId} members for campaign ${campaignId}`, 'system', { churchId }, churchId);
+
+        const accessToken = churchData.pcoAccessToken;
+        if (!accessToken) throw new Error('Church not connected to Planning Center. Cannot fetch group members.');
+
+        // Fetch group memberships with person included
+        const groupUrl = `https://api.planningcenteronline.com/groups/v2/groups/${campaign.toGroupId}/memberships?include=person&per_page=100`;
+        const groupRes = await fetch(groupUrl, {
+            headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' }
+        });
+
+        if (!groupRes.ok) {
+            throw new Error(`Failed to fetch PCO group members: ${groupRes.status}`);
+        }
+
+        const groupData = await groupRes.json();
+        const included: any[] = groupData?.included || [];
+        const personIds: string[] = [];
+
+        for (const item of included) {
+            if (item.type === 'Person') {
+                // Try to get email directly from included attributes
+                const emailAttr = item.attributes?.primary_email || item.attributes?.email;
+                if (emailAttr) {
+                    recipients.push(emailAttr);
+                } else {
+                    personIds.push(item.id);
+                }
+            }
+        }
+
+        // For persons without email in the included payload, fetch from People API
+        if (personIds.length > 0) {
+            await Promise.all(personIds.map(async (pid) => {
+                const pRes = await fetch(
+                    `https://api.planningcenteronline.com/people/v2/people/${pid}?include=emails`,
+                    { headers: { Authorization: `Bearer ${accessToken}` } }
+                );
+                if (!pRes.ok) return;
+                const pData = await pRes.json();
+                const emailsIncluded: any[] = pData.included || [];
+                const primary = emailsIncluded.find(e => e.attributes?.primary) || emailsIncluded[0];
+                if (primary?.attributes?.address) recipients.push(primary.attributes.address);
+            }));
+        }
+
+        recipients = [...new Set(recipients.filter(Boolean))]; // dedupe
+        if (recipients.length === 0) throw new Error('No email addresses found for the selected group.');
+        log.info(`Sending campaign "${subject}" to ${recipients.length} recipients (PCO group: ${campaign.toGroupName})`, 'system', { campaignId, churchId }, churchId);
+
     } else {
-        throw new Error('No recipients configured. Select a PCO list on the campaign.');
+        throw new Error('No recipients configured. Select a PCO list or group on the campaign.');
     }
 
     // 5. Send via SendGrid (batches of 500 personalizations per API call)

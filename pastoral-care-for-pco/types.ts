@@ -452,6 +452,8 @@ export interface EmailCampaign {
     // Recipients
     toListId?: string;
     toListName?: string;
+    toGroupId?: string;   // PCO Group ID (alternative to toListId)
+    toGroupName?: string; // PCO Group display name
     // Sender
     fromName?: string;
     fromEmail?: string;

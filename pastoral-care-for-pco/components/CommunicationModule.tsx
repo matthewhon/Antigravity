@@ -375,7 +375,10 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
   const [panel, setPanel] = useState<EditorPanel>('config');
   const [openSection, setOpenSection] = useState<string | null>('to');
   const [pcoLists, setPcoLists] = useState<PcoList[]>([]);
+  const [pcoGroups, setPcoGroups] = useState<{ id: string; name: string; memberCount: number }[]>([]);
+  const [toTab, setToTab] = useState<'lists' | 'groups'>('lists');
   const [loadingLists, setLoadingLists] = useState(false);
+  const [loadingGroups, setLoadingGroups] = useState(false);
   const [lastSaved, setLastSaved] = useState<number | null>(null);
 
   // Drawers (for block builder internals)
@@ -395,9 +398,9 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
     setLastSaved(Date.now());
   }, []); // stable — never re-created
 
-  // Load PCO Lists when "To" section is opened
+  // Load PCO Lists when "To" section is opened on the Lists tab
   useEffect(() => {
-    if (openSection === 'to' && pcoLists.length === 0) {
+    if (openSection === 'to' && toTab === 'lists' && pcoLists.length === 0) {
       setLoadingLists(true);
       pcoService.getPeopleLists(churchId).then(raw => {
         const mapped: PcoList[] = (raw || []).map((item: any) => ({
@@ -410,11 +413,30 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
         setLoadingLists(false);
       }).catch(() => setLoadingLists(false));
     }
-  }, [openSection, churchId, pcoLists.length]);
+  }, [openSection, toTab, churchId, pcoLists.length]);
+
+  // Load PCO Groups when the Groups tab is selected
+  useEffect(() => {
+    if (openSection === 'to' && toTab === 'groups' && pcoGroups.length === 0) {
+      setLoadingGroups(true);
+      pcoService.getGroups(churchId).then(raw => {
+        const mapped = (raw || []).map((item: any) => ({
+          id: item.id,
+          name: item.attributes?.name || 'Unnamed Group',
+          memberCount: item.attributes?.memberships_count ?? item.attributes?.member_count ?? 0,
+        }));
+        setPcoGroups(mapped);
+        setLoadingGroups(false);
+      }).catch(() => setLoadingGroups(false));
+    }
+  }, [openSection, toTab, churchId, pcoGroups.length]);
 
   const toggleSection = (id: string) => setOpenSection(prev => prev === id ? null : id);
 
-  const isToComplete = !!(localCampaign.toListId || localCampaign.toListName);
+  const isToComplete = !!(localCampaign.toListId || localCampaign.toGroupId);
+  const toRecipientLabel = localCampaign.toGroupName
+    ? `Group: ${localCampaign.toGroupName}`
+    : localCampaign.toListName || localCampaign.toListId || '';
   const isFromComplete = !!(localCampaign.fromName && localCampaign.fromEmail);
   const isSubjectComplete = !!(localCampaign.subject?.trim());
   const isSendTimeComplete = !!(localCampaign.sendAt !== undefined);
@@ -532,38 +554,95 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
               {/* To */}
               <AccordionSection
                 id="to" title="To" icon={<Users size={16} />}
-                subtitle={isToComplete ? (localCampaign.toListName || localCampaign.toListId || '') : 'No recipients selected'}
+                subtitle={isToComplete ? toRecipientLabel : 'No recipients selected'}
                 isComplete={isToComplete} isOpen={openSection === 'to'} onToggle={() => toggleSection('to')}
               >
-                <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
-                  Select a Planning Center list as your audience. Unsubscribed individuals are automatically excluded.
-                </p>
-                {loadingLists ? (
-                  <div className="flex items-center gap-2 text-sm text-slate-400">
-                    <Loader2 size={14} className="animate-spin" /> Loading PCO Lists…
-                  </div>
-                ) : (
-                  <select
-                    className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-3"
-                    value={localCampaign.toListId || ''}
-                    onChange={e => {
-                      const selected = pcoLists.find(l => l.id === e.target.value);
-                      update({
-                        toListId: selected?.id,
-                        toListName: selected?.name
-                      });
-                    }}
-                  >
-                    <option value="">— Select a PCO List —</option>
-                    {pcoLists.length === 0 && <option disabled>No lists found (connect PCO first)</option>}
-                    {pcoLists.map(l => (
-                      <option key={l.id} value={l.id}>{l.name} ({l.totalPeople} people)</option>
-                    ))}
-                  </select>
+                {/* Lists / Groups tabs */}
+                <div className="flex rounded-lg overflow-hidden border border-slate-200 dark:border-slate-600 mb-3">
+                  {(['lists', 'groups'] as const).map(tab => (
+                    <button
+                      key={tab}
+                      onClick={() => setToTab(tab)}
+                      className={`flex-1 py-1.5 text-xs font-semibold capitalize transition ${
+                        toTab === tab
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-600'
+                      }`}
+                    >
+                      PCO {tab === 'lists' ? 'Lists' : 'Groups'}
+                    </button>
+                  ))}
+                </div>
+
+                {toTab === 'lists' && (
+                  <>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+                      Select a Planning Center <strong>List</strong> as your audience. Unsubscribed individuals are automatically excluded.
+                    </p>
+                    {loadingLists ? (
+                      <div className="flex items-center gap-2 text-sm text-slate-400">
+                        <Loader2 size={14} className="animate-spin" /> Loading PCO Lists…
+                      </div>
+                    ) : (
+                      <select
+                        className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-3"
+                        value={localCampaign.toListId || ''}
+                        onChange={e => {
+                          const selected = pcoLists.find(l => l.id === e.target.value);
+                          update({
+                            toListId: selected?.id,
+                            toListName: selected?.name,
+                            toGroupId: undefined,
+                            toGroupName: undefined,
+                          });
+                        }}
+                      >
+                        <option value="">— Select a PCO List —</option>
+                        {pcoLists.length === 0 && <option disabled>No lists found (connect PCO first)</option>}
+                        {pcoLists.map(l => (
+                          <option key={l.id} value={l.id}>{l.name} ({l.totalPeople} people)</option>
+                        ))}
+                      </select>
+                    )}
+                  </>
                 )}
+
+                {toTab === 'groups' && (
+                  <>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+                      Send to all members of a Planning Center <strong>Group</strong>. Member emails are fetched at send time.
+                    </p>
+                    {loadingGroups ? (
+                      <div className="flex items-center gap-2 text-sm text-slate-400">
+                        <Loader2 size={14} className="animate-spin" /> Loading PCO Groups…
+                      </div>
+                    ) : (
+                      <select
+                        className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-3"
+                        value={localCampaign.toGroupId || ''}
+                        onChange={e => {
+                          const selected = pcoGroups.find(g => g.id === e.target.value);
+                          update({
+                            toGroupId: selected?.id,
+                            toGroupName: selected?.name,
+                            toListId: undefined,
+                            toListName: undefined,
+                          });
+                        }}
+                      >
+                        <option value="">— Select a PCO Group —</option>
+                        {pcoGroups.length === 0 && <option disabled>No groups found (connect PCO first)</option>}
+                        {pcoGroups.map(g => (
+                          <option key={g.id} value={g.id}>{g.name}{g.memberCount > 0 ? ` (${g.memberCount} members)` : ''}</option>
+                        ))}
+                      </select>
+                    )}
+                  </>
+                )}
+
                 {isToComplete && (
                   <div className="flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400">
-                    <CheckCircle size={13} /> {localCampaign.toListName} selected
+                    <CheckCircle size={13} /> {toRecipientLabel}
                   </div>
                 )}
               </AccordionSection>
