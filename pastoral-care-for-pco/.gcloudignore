@@ -1,7 +1,29 @@
+# Exclude version control
 .gcloudignore
 .git
 .gitignore
-node_modules/
+
+# Exclude local build artifacts
 dist/
+build/
+
+# Exclude local dependencies — Cloud Build installs these in the Docker build
+node_modules/
+functions/node_modules/
+
+# Exclude dev/debug files
 npm-debug.log
 *.local
+.env
+.env.*
+
+# Exclude OS metadata
+.DS_Store
+Thumbs.db
+
+# Exclude editor files
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln

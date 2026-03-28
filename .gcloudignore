@@ -1,0 +1,25 @@
+# Exclude version control
+.gcloudignore
+.git
+.gitignore
+
+# Exclude local build artifacts (in subdirectory)
+pastoral-care-for-pco/dist/
+pastoral-care-for-pco/build/
+
+# Exclude local dependencies — Cloud Build installs these in the Docker build
+pastoral-care-for-pco/node_modules/
+pastoral-care-for-pco/functions/node_modules/
+
+# Exclude dev/debug files
+pastoral-care-for-pco/npm-debug.log
+pastoral-care-for-pco/*.local
+pastoral-care-for-pco/.env
+pastoral-care-for-pco/.env.*
+
+# Exclude zip archives
+*.zip
+
+# Exclude OS metadata
+.DS_Store
+Thumbs.db

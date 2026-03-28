@@ -1,6 +1,56 @@
-import sgMail from '@sendgrid/mail';
 import { getDb } from './firebase';
 import { createServerLogger } from '../services/logService';
+
+// ─── SendGrid v3 raw send helper ─────────────────────────────────────────────
+// We use fetch() directly instead of @sendgrid/mail so we can set the
+// 'on-behalf-of' header for Subuser reputation isolation while still using
+// the master API key (which carries the master account's domain authentication).
+
+async function sgSend(
+    messages: {
+        to: string;
+        from: { email: string; name?: string };
+        replyTo?: string;
+        subject: string;
+        html: string;
+    }[],
+    masterApiKey: string,
+    subuserId?: string
+): Promise<void> {
+    // Build personalizations (one per recipient)
+    const personalizations = messages.map(m => ({ to: [{ email: m.to }] }));
+
+    const firstMsg = messages[0];
+    const payload: Record<string, any> = {
+        personalizations,
+        from: firstMsg.from,
+        subject: firstMsg.subject,
+        content: [{ type: 'text/html', value: firstMsg.html }],
+    };
+    if (firstMsg.replyTo) {
+        payload.reply_to = { email: firstMsg.replyTo };
+    }
+
+    const headers: Record<string, string> = {
+        Authorization: `Bearer ${masterApiKey}`,
+        'Content-Type': 'application/json',
+    };
+    if (subuserId) {
+        headers['on-behalf-of'] = subuserId;
+    }
+
+    const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+    });
+
+    if (!res.ok && res.status !== 202) {
+        const body = await res.json().catch(() => ({}));
+        const errMsg = (body as any)?.errors?.[0]?.message || `SendGrid returned ${res.status}`;
+        throw new Error(errMsg);
+    }
+}
 
 /**
  * Minimal HTML renderer for email blocks.
@@ -209,19 +259,10 @@ export async function executeSend(
 
     // IMPORTANT: Always use the master API key so that the master account's
     // domain authentication (e.g. pastoralcare.barnabassoftware.com) applies.
-    // If the church has a provisioned Subuser, add the 'on-behalf-of' header so
-    // that reputation, stats, and unsubscribes are tracked at the Subuser level.
+    // If this church has a provisioned Subuser, pass 'on-behalf-of' so that
+    // reputation, stats, and unsubscribes are tracked at the Subuser level.
     // This is the correct SendGrid multi-tenant pattern.
-    sgMail.setApiKey(globalApiKey);
-    if (tenantEmail.sendGridSubuserId) {
-        // Route through the Subuser for reputation isolation
-        (sgMail as any).setDefaultRequest({
-            headers: { 'on-behalf-of': tenantEmail.sendGridSubuserId }
-        });
-    } else {
-        // No Subuser yet — clear any previously set on-behalf-of
-        (sgMail as any).setDefaultRequest({ headers: {} });
-    }
+    const subuserId: string | undefined = tenantEmail.sendGridSubuserId || undefined;
 
     // Prefer tenant-level From settings → campaign override → global fallback
     const tenantFromEmail = tenantEmail.fromEmail || '';
@@ -283,8 +324,8 @@ export async function executeSend(
         throw new Error('No recipients configured. Select a PCO list on the campaign.');
     }
 
-    // 5. Send via SendGrid (batches of 50)
-    const messages = recipients.map(to => ({
+    // 5. Send via SendGrid (batches of 500 personalizations per API call)
+    const msgObjects = recipients.map(to => ({
         to,
         from: { email: fromEmail, name: fromName },
         replyTo: campaign.replyTo || undefined,
@@ -292,9 +333,9 @@ export async function executeSend(
         html,
     }));
 
-    const BATCH = 50;
-    for (let i = 0; i < messages.length; i += BATCH) {
-        await sgMail.send(messages.slice(i, i + BATCH) as any);
+    const BATCH = 500; // SendGrid allows up to 1000 personalizations per call
+    for (let i = 0; i < msgObjects.length; i += BATCH) {
+        await sgSend(msgObjects.slice(i, i + BATCH), globalApiKey, subuserId);
     }
 
     // 6. Mark sent (skip for test)
