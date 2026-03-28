@@ -86,7 +86,7 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'households' | 'risk'>('overview');
 
-  // ---- Registrations: cache-first (Firestore), then silent background refresh ----
+  // ---- Registrations: show Firestore cache instantly, then trigger server-side sync ----
   const [regEvents, setRegEvents] = useState<PcoRegistrationEvent[]>([]);
   const [regLoading, setRegLoading] = useState(false);
   const [regError, setRegError] = useState('');
@@ -108,48 +108,40 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
           return new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime();
         });
 
-    // Step 1: Load Firestore cache immediately — no rate limiting, instant render
-    firestore.getRegistrations(churchId)
-      .then(cached => {
-        if (cached.length > 0) {
-          setRegEvents(mapAndFilter(cached));
-          setRegSource('cached');
-        }
-      })
-      .catch(() => { /* cache miss is fine */ })
+    const loadFromFirestore = () =>
+      firestore.getRegistrations(churchId).then(items => {
+        setRegEvents(mapAndFilter(items));
+        setRegSource('cached');
+      });
+
+    // Step 1: Show cached Firestore data immediately so the widget renders right away
+    loadFromFirestore()
+      .catch(() => { /* empty cache is fine */ })
       .finally(() => setRegLoading(false));
 
-    // Step 2: Silent background refresh from live PCO API
-    // If it succeeds, update the display with fresher data.
-    // If it fails (429, scope missing, network error) we already have cache — swallow silently.
-    pcoService.getRegistrations(churchId)
-      .then((raw: any[]) => {
-        const mapped: PcoRegistrationEvent[] = (raw || []).map((item: any) => ({
-          id: `${churchId}_${item.id}`,
-          churchId,
-          name: item.attributes?.name || 'Unnamed Event',
-          startsAt: item.attributes?.starts_at || null,
-          endsAt: item.attributes?.ends_at || null,
-          signupCount: item.attributes?.signup_count ?? item.attributes?.attendee_count ?? 0,
-          signupLimit: item.attributes?.signup_limit ?? item.attributes?.attendee_limit ?? null,
-          openSignup: item.attributes?.open_signup ?? true,
-          logoUrl: item.attributes?.logo_url || item.attributes?.image_url || null,
-          publicUrl: item.attributes?.public_url ||
-            (item.id ? `https://registrations.planningcenteronline.com/events/${item.id}` : null),
-          lastSynced: Date.now(),
-        }));
-        setRegEvents(mapAndFilter(mapped));
-        setRegSource('live');
-      })
-      .catch((e: any) => {
-        // Only surface a reauth error if we have no data at all to show
-        if (e?.message?.includes('requiresReauth') || e?.message?.includes('403')) {
+    // Step 2: Trigger a server-side registrations-only sync in the background.
+    // The server handles PCO auth, pagination, and rate limiting correctly.
+    // When it completes, re-read Firestore to pick up the freshly synced events.
+    fetch('/pco/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ churchId, area: 'registrations' }),
+    })
+      .then(res => {
+        if (res.ok) {
+          // Refresh the widget from Firestore now that the sync has written fresh data
+          return loadFromFirestore().then(() => setRegSource('live'));
+        }
+        // Non-ok (403 scope missing, etc.) — keep whatever cache we have, optionally signal reauth
+        if (res.status === 403) {
           setRegEvents(prev => {
             if (prev.length === 0) setRegError('[requiresReauth]');
             return prev;
           });
         }
-        // 429, network errors etc. — silently swallow, cache data already showing
+      })
+      .catch(() => {
+        // Network / server error — cached data is already showing, swallow silently
       });
   }, [churchId, pcoConnected]);
 
