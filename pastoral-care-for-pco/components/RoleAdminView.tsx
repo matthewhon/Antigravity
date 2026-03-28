@@ -1311,11 +1311,11 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
 
         {activeTab === 'Mail Settings' && (() => {
             const SHARED_DOMAIN = 'pastoralcare.barnabassoftware.com';
-            const sysApiUrl = (church as any)._apiBaseUrl || 'https://pastoral-care-for-pco-u3gnt7kb5a-uc.a.run.app';
+            const sysApiUrl = (church as any)._apiBaseUrl || 'https://pastoralcare.barnabassoftware.com';
 
             const getApiBase = async () => {
                 const s = await firestore.getSystemSettings();
-                return s.apiBaseUrl || 'https://pastoral-care-for-pco-u3gnt7kb5a-uc.a.run.app';
+                return s.apiBaseUrl || 'https://pastoralcare.barnabassoftware.com';
             };
 
             const emailStatusBadge = () => {

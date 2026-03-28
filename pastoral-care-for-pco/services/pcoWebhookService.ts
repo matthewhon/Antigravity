@@ -8,7 +8,7 @@ const getProxyUrl = async () => {
         return '/pco/proxy';
     }
     const settings = await firestore.getSystemSettings();
-    const baseUrl = settings.apiBaseUrl || 'https://pastoral-care-for-pco-u3gnt7kb5a-uc.a.run.app';
+    const baseUrl = settings.apiBaseUrl || 'https://pastoralcare.barnabassoftware.com';
     return `${baseUrl}/pco/proxy`;
 };
 
@@ -53,7 +53,7 @@ async function pcoFetch(churchId: string, endpoint: string, method: string = 'GE
  */
 export const initializeWebhooks = async (churchId: string) => {
     const settings = await firestore.getSystemSettings();
-    const backendUrl = settings.apiBaseUrl || 'https://pastoral-care-for-pco-u3gnt7kb5a-uc.a.run.app';
+    const backendUrl = settings.apiBaseUrl || 'https://pastoralcare.barnabassoftware.com';
 
     // Webhooks must point to the BACKEND server endpoint, not the frontend SPA URL
     const webhookUrl = `${backendUrl}/pco/webhook`;

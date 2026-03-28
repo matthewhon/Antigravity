@@ -7,7 +7,7 @@ import { Drawer } from './Drawer';
 import { pcoService } from '../services/pcoService';
 import { firestore } from '../services/firestoreService';
 import { storage } from '../services/firebase';
-import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
+import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { DataChartSelector } from './DataChartSelector';
 import { PollsManager } from './PollsManager';
 
@@ -412,6 +412,7 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
       console.error('[CommunicationModule] Logo remove failed:', e);
     }
   }, [churchId, onLogoRemoved]);
+
   // Determine if the church is using a shared subdomain (locked from email)
   const isSharedMode = church?.emailSettings?.mode === 'shared' && !!church?.emailSettings?.fromEmail;
   const sharedFromEmail = church?.emailSettings?.fromEmail || '';
@@ -1034,7 +1035,7 @@ const SendTestModal: React.FC<SendTestModalProps> = ({ onConfirm, onCancel, isSe
   );
 };
 
-export const CommunicationModule: React.FC<{ churchId: string; church?: Church; currentUserId?: string }> = ({ churchId, church, currentUserId }) => {
+export const CommunicationModule: React.FC<{ churchId: string; church?: Church; currentUserId?: string; onUpdateChurch?: (updates: Partial<Church>) => void }> = ({ churchId, church, currentUserId, onUpdateChurch }) => {
   const [activeTab, setActiveTab] = useState<'emails' | 'polls'>('emails');
   const [campaigns, setCampaigns] = useState<EmailCampaign[]>([]);
   const [activeCampaign, setActiveCampaign] = useState<EmailCampaign | null>(null);
@@ -1111,7 +1112,7 @@ export const CommunicationModule: React.FC<{ churchId: string; church?: Church; 
   /** Call backend /email/send. testEmail = undefined → real send, string → test send */
   const callSendApi = async (campaignId: string, testEmail?: string) => {
     const sysSettings = await firestore.getSystemSettings();
-    const apiBaseUrl = sysSettings.apiBaseUrl || 'https://pastoral-care-for-pco-u3gnt7kb5a-uc.a.run.app';
+    const apiBaseUrl = sysSettings.apiBaseUrl || 'https://pastoralcare.barnabassoftware.com';
     const endpoint = testEmail ? `${apiBaseUrl}/email/test` : `${apiBaseUrl}/email/send`;
 
     const res = await fetch(endpoint, {
@@ -1160,7 +1161,7 @@ export const CommunicationModule: React.FC<{ churchId: string; church?: Church; 
     setIsScheduling(true);
     try {
       const sysSettings = await firestore.getSystemSettings();
-      const apiBaseUrl = sysSettings.apiBaseUrl || 'https://pastoral-care-for-pco-u3gnt7kb5a-uc.a.run.app';
+      const apiBaseUrl = sysSettings.apiBaseUrl || 'https://pastoralcare.barnabassoftware.com';
       const res = await fetch(`${apiBaseUrl}/email/schedule`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1183,7 +1184,7 @@ export const CommunicationModule: React.FC<{ churchId: string; church?: Church; 
     if (!activeCampaign || activeCampaign.status !== 'scheduled') return;
     try {
       const sysSettings = await firestore.getSystemSettings();
-      const apiBaseUrl = sysSettings.apiBaseUrl || 'https://pastoral-care-for-pco-u3gnt7kb5a-uc.a.run.app';
+      const apiBaseUrl = sysSettings.apiBaseUrl || 'https://pastoralcare.barnabassoftware.com';
       const res = await fetch(`${apiBaseUrl}/email/cancel-schedule`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1336,13 +1337,8 @@ export const CommunicationModule: React.FC<{ churchId: string; church?: Church; 
           onSchedule={() => setShowScheduleModal(true)}
           isSending={isSending}
           isScheduled={activeCampaign.status === 'scheduled'}
-          onLogoUploaded={logoUrl => {
-            // Propagate church-level logo to parent state (triggers re-render with new logo)
-            if (church) (church as any).logoUrl = logoUrl;
-          }}
-          onLogoRemoved={() => {
-            if (church) (church as any).logoUrl = undefined;
-          }}
+          onLogoUploaded={logoUrl => onUpdateChurch?.({ logoUrl })}
+          onLogoRemoved={() => onUpdateChurch?.({ logoUrl: undefined })}
         />
       ) : (
         <CampaignListView

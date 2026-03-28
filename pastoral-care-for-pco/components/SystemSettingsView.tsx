@@ -775,9 +775,9 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                 <div className="pt-4 border-t border-indigo-500/20">
                                     <label className="block text-[10px] font-black uppercase text-indigo-400 tracking-widest mb-2">Webhook Endpoint</label>
                                     <div className="bg-black/40 p-4 rounded-xl border border-indigo-500/30 flex items-center justify-between gap-4">
-                                        <code className="text-xs font-mono text-emerald-400 truncate">https://pastoralcare.barnabassoftare.com/stripe</code>
+                                        <code className="text-xs font-mono text-emerald-400 truncate">https://pastoralcare.barnabassoftware.com/stripe</code>
                                         <button 
-                                            onClick={() => navigator.clipboard.writeText("https://pastoralcare.barnabassoftare.com/stripe")}
+                                            onClick={() => navigator.clipboard.writeText("https://pastoralcare.barnabassoftware.com/stripe")}
                                             className="text-slate-400 hover:text-white transition-colors"
                                             title="Copy to Clipboard"
                                         >

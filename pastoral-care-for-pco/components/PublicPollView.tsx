@@ -10,7 +10,7 @@ function getApiBase(): string {
   if (typeof window !== 'undefined') {
     const host = window.location.hostname;
     if (host === 'localhost' || host === '127.0.0.1') {
-      return 'https://pastoral-care-for-pco-u3gnt7kb5a-uc.a.run.app';
+      return 'https://pastoralcare.barnabassoftware.com';
     }
     return window.location.origin;
   }

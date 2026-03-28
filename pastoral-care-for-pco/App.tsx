@@ -145,9 +145,11 @@ const App: React.FC = () => {
 
   useEffect(() => {
     firestore.getSystemSettings().then(async (settings) => {
-        const correctUrl = 'https://pastoral-care-for-pco-u3gnt7kb5a-uc.a.run.app';
-        // Fix stale URL that may have been stored with the old non-existent domain
-        const isStaleUrl = !settings.apiBaseUrl || settings.apiBaseUrl.includes('api.pastoralcare.barnabassoftware.com');
+        const correctUrl = 'https://pastoralcare.barnabassoftware.com';
+        // Fix stale URL — covers: no URL, old api.* subdomain, old Cloud Run URL
+        const isStaleUrl = !settings.apiBaseUrl 
+            || settings.apiBaseUrl.includes('api.pastoralcare.barnabassoftware.com')
+            || settings.apiBaseUrl.includes('u3gnt7kb5a-uc.a.run.app');
         if (isStaleUrl) {
             const newSettings = { ...settings, apiBaseUrl: correctUrl };
             await firestore.saveSystemSettings(newSettings);
@@ -183,7 +185,7 @@ const App: React.FC = () => {
                   
                   if (!targetChurch) throw new Error("Church context not found.");
 
-                  const apiBaseUrl = sysSettings.apiBaseUrl || 'https://pastoral-care-for-pco-u3gnt7kb5a-uc.a.run.app';
+                  const apiBaseUrl = sysSettings.apiBaseUrl || 'https://pastoralcare.barnabassoftware.com';
 
                   // 2. Exchange Token
                   const payload = {
@@ -829,7 +831,7 @@ const App: React.FC = () => {
                 churchName={church.name}
             />
         )}
-        {view === 'communication' && systemSettings?.enabledModules?.communication !== false && <CommunicationModule churchId={church.id} church={church} currentUserId={user.id} />}
+        {view === 'communication' && systemSettings?.enabledModules?.communication !== false && <CommunicationModule churchId={church.id} church={church} currentUserId={user.id} onUpdateChurch={(updates) => { firestore.updateChurch(church.id, updates); setChurch({ ...church, ...updates }); }} />}
         {view === 'people' && (
             <PeopleView 
                 data={peopleDashboardData}
