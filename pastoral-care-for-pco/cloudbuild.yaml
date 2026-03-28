@@ -1,11 +1,11 @@
 steps:
 - name: 'gcr.io/cloud-builders/docker'
   dir: 'pastoral-care-for-pco'
-  args: ['build', '-t', 'gcr.io/$PROJECT_ID/${_SERVICE_NAME}', '.']
+  args: ['build', '-t', 'gcr.io/${_PROJECT_ID}/${_SERVICE_NAME}', '.']
 
 - name: 'gcr.io/cloud-builders/docker'
   dir: 'pastoral-care-for-pco'
-  args: ['push', 'gcr.io/$PROJECT_ID/${_SERVICE_NAME}']
+  args: ['push', 'gcr.io/${_PROJECT_ID}/${_SERVICE_NAME}']
 
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
   entrypoint: gcloud
@@ -15,7 +15,7 @@ steps:
     - 'deploy'
     - '${_SERVICE_NAME}'
     - '--image'
-    - 'gcr.io/$PROJECT_ID/${_SERVICE_NAME}'
+    - 'gcr.io/${_PROJECT_ID}/${_SERVICE_NAME}'
     - '--region'
     - '${_REGION}'
     - '--platform'
@@ -25,15 +25,16 @@ steps:
     - '8080'
     - '--timeout'
     - '300s'
-
-# serviceAccount removed — using Cloud Build default SA (420611303326@cloudbuild.gserviceaccount.com)
+    - '--project'
+    - '${_PROJECT_ID}'
 
 options:
   logging: CLOUD_LOGGING_ONLY
 
 substitutions:
+  _PROJECT_ID: gen-lang-client-0779452267
   _SERVICE_NAME: pastoral-care-for-pco
   _REGION: us-central1
 
 images:
-  - 'gcr.io/$PROJECT_ID/${_SERVICE_NAME}'
+  - 'gcr.io/${_PROJECT_ID}/${_SERVICE_NAME}'
