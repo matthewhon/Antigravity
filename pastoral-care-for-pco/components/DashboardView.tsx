@@ -368,7 +368,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   <WidgetWrapper title="Church - Age Demographics" onRemove={() => handleRemoveWidget(id)} source="People">
                       <div className="h-52">
                           <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={1}>
-                              <BarChart data={peopleData.ageData}>
+                              <BarChart data={peopleData.ageData} margin={{ top: 20, right: 0, left: 0, bottom: 0 }}>
                                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
                                   <XAxis dataKey="range" axisLine={false} tickLine={false} tick={{fontSize: 9, fill: axisColor}} />
                                   <Tooltip 

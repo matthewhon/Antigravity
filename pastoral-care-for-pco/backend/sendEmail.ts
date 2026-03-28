@@ -56,7 +56,7 @@ async function sgSend(
  * Minimal HTML renderer for email blocks.
  * Converts the campaign's block array into a sendable HTML string.
  */
-function renderBlocksToHtml(blocks: any[], templateSettings: any): string {
+function renderBlocksToHtml(blocks: any[], templateSettings: any, unsubscribeHtml = ''): string {
     const bg = templateSettings?.backgroundColor || '#ffffff';
     const textColor = templateSettings?.textColor || '#1f2937';
     const primaryColor = templateSettings?.primaryColor || '#4f46e5';
@@ -89,12 +89,20 @@ function renderBlocksToHtml(blocks: any[], templateSettings: any): string {
                     return `<img src="${block.content.url}" alt="${block.content.alt || ''}" style="max-width:100%;height:auto;border-radius:8px;margin-bottom:16px;" />`;
                 }
                 return '';
-            case 'button':
-                return `<div style="text-align:center;margin:16px 0;">
-                    <a href="${block.content?.url || '#'}" style="display:inline-block;background:${primaryColor};color:#ffffff;font-family:${fontFamily};font-size:14px;font-weight:bold;padding:12px 28px;border-radius:8px;text-decoration:none;">
-                        ${block.content?.label || 'Click Here'}
+            case 'button': {
+                const bc = block.content || {};
+                const bg = bc.color || primaryColor;
+                const tc = bc.textColor || '#ffffff';
+                const rad = bc.borderRadius === 'pill' ? '999px' : bc.borderRadius === 'square' ? '4px' : '8px';
+                const pad = bc.size === 'small' ? '8px 18px' : bc.size === 'large' ? '14px 36px' : '12px 28px';
+                const fs = bc.size === 'small' ? '13px' : bc.size === 'large' ? '17px' : '15px';
+                const align = bc.align === 'left' ? 'left' : bc.align === 'right' ? 'right' : 'center';
+                return `<div style="text-align:${align};margin:16px 0;">
+                    <a href="${bc.url || '#'}" style="display:inline-block;background:${bg};color:${tc};font-family:${fontFamily};font-size:${fs};font-weight:bold;padding:${pad};border-radius:${rad};text-decoration:none;">
+                        ${bc.text || 'Click Here'}
                     </a>
                   </div>`;
+            }
             case 'divider':
                 return `<hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;" />`;
             // Analytics widgets — rendered as an embedded card
@@ -145,12 +153,33 @@ function renderBlocksToHtml(blocks: any[], templateSettings: any): string {
             </td>
           </tr>
           <tr><td>${footerHtml}</td></tr>
+          <tr><td>${unsubscribeHtml}</td></tr>
         </table>
       </td>
     </tr>
   </table>
 </body>
 </html>`;
+}
+
+/**
+ * Generates a personalised unsubscribe footer snippet for one recipient.
+ * Token = base64url(churchId:email) — common, URL-safe convention.
+ */
+function buildUnsubscribeHtml(
+    churchId: string,
+    recipientEmail: string,
+    fontFamily: string,
+    appBaseUrl: string
+): string {
+    const token = Buffer.from(`${churchId}:${recipientEmail.toLowerCase()}`).toString('base64url');
+    const link = `${appBaseUrl}/unsubscribe?token=${token}`;
+    return `<div style="text-align:center;padding:12px 32px 20px;">
+        <p style="margin:0;font-family:${fontFamily};font-size:11px;color:#9ca3af;">
+          Don't want these emails?
+          <a href="${link}" style="color:#6b7280;text-decoration:underline;">Unsubscribe</a>
+        </p>
+      </div>`;
 }
 
 /** Renders an analytics widget data payload as static email-safe HTML */
@@ -279,8 +308,27 @@ export async function executeSend(
 
     if (!fromEmail) throw new Error('No "From Email" configured. Set it on the campaign or in App Config → SendGrid.');
 
-    // 3. Build HTML
-    const html = renderBlocksToHtml(campaign.blocks || [], campaign.templateSettings || {});
+    // 3. Base HTML template rendered per-recipient in the send loop below.
+    //    (Each email gets a personalized unsubscribe link injected.)
+
+    // Load unsubscriber blocklist for this church (skip for test sends)
+    const unsubscribedEmails = new Set<string>();
+    if (!testEmail) {
+        try {
+            const unsubSnap = await db.collection('email_unsubscribes').where('churchId', '==', churchId).get();
+            unsubSnap.docs.forEach((d: any) => unsubscribedEmails.add((d.data().email || '').toLowerCase()));
+            if (unsubscribedEmails.size > 0) {
+                log.info(`Suppression list loaded: ${unsubscribedEmails.size} unsubscribed address(es).`, 'system', { churchId }, churchId);
+            }
+        } catch (e: any) {
+            log.warn(`Could not load unsubscribe list: ${e.message}`, 'system', { churchId }, churchId);
+        }
+    }
+
+    // Determine app base URL for unsubscribe links
+    const settingsSnap2 = await db.doc('system/settings').get();
+    const appBaseUrl: string = (settingsSnap2.data() || {}).apiBaseUrl || 'https://pastoralcare.barnabassoftware.com';
+    const fontFamily: string = campaign.templateSettings?.fontFamily || 'sans-serif';
 
     // 4. Determine recipients
     let recipients: string[] = [];
@@ -376,18 +424,39 @@ export async function executeSend(
         throw new Error('No recipients configured. Select a PCO list or group on the campaign.');
     }
 
-    // 5. Send via SendGrid (batches of 500 personalizations per API call)
-    const msgObjects = recipients.map(to => ({
-        to,
-        from: { email: fromEmail, name: fromName },
-        replyTo: campaign.replyTo || undefined,
-        subject,
-        html,
-    }));
+    // 5. Filter unsubscribers
+    const beforeCount = recipients.length;
+    if (!testEmail && unsubscribedEmails.size > 0) {
+        recipients = recipients.filter(r => !unsubscribedEmails.has(r.toLowerCase()));
+        const suppressed = beforeCount - recipients.length;
+        if (suppressed > 0) {
+            log.info(`Suppressed ${suppressed} unsubscribed recipient(s).`, 'system', { campaignId, churchId }, churchId);
+        }
+    }
+    if (recipients.length === 0 && !testEmail) {
+        throw new Error('All recipients have unsubscribed. No emails were sent.');
+    }
 
-    const BATCH = 500; // SendGrid allows up to 1000 personalizations per call
-    for (let i = 0; i < msgObjects.length; i += BATCH) {
-        await sgSend(msgObjects.slice(i, i + BATCH), globalApiKey, subuserId);
+    // 6. Send via SendGrid — each recipient gets a personalised unsubscribe link,
+    //    so we build per-recipient HTML and send in batches of individual messages.
+    const BATCH = 50; // smaller batches since each message has unique HTML
+    for (let i = 0; i < recipients.length; i += BATCH) {
+        const batch = recipients.slice(i, i + BATCH);
+        for (const recipientEmail of batch) {
+            const unsubHtml = testEmail
+                ? '' // no unsubscribe link on test sends
+                : buildUnsubscribeHtml(churchId, recipientEmail, fontFamily, appBaseUrl);
+            const personalizedHtml = renderBlocksToHtml(
+                campaign.blocks || [],
+                campaign.templateSettings || {},
+                unsubHtml
+            );
+            await sgSend(
+                [{ to: recipientEmail, from: { email: fromEmail, name: fromName }, replyTo: campaign.replyTo || undefined, subject, html: personalizedHtml }],
+                globalApiKey,
+                subuserId
+            );
+        }
     }
 
     // 6. Mark sent (skip for test)

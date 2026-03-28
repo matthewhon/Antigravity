@@ -139,7 +139,72 @@ async function startServer() {
     app.post('/email/authenticate-domain', express.json(), authenticateDomain);
     app.post('/email/verify-domain', express.json(), verifyDomain);
 
-    // ─── Public Poll API (no auth required) ─────────────────────────────────
+    // ─── Public Unsubscribe (no auth required) ───────────────────────────────
+    // Token = base64url(churchId:email)
+
+    app.get('/unsubscribe', async (req: any, res: any) => {
+      const { token } = req.query;
+      if (!token || typeof token !== 'string') {
+        return res.status(400).send('<h2>Invalid unsubscribe link.</h2>');
+      }
+      try {
+        const decoded = Buffer.from(token, 'base64url').toString('utf8');
+        const colonIdx = decoded.indexOf(':');
+        if (colonIdx < 1) return res.status(400).send('<h2>Invalid token.</h2>');
+        const churchId = decoded.slice(0, colonIdx);
+        const email = decoded.slice(colonIdx + 1).toLowerCase().trim();
+        if (!churchId || !email || !email.includes('@')) {
+          return res.status(400).send('<h2>Invalid unsubscribe token.</h2>');
+        }
+
+        const db = getDb();
+        const docId = `${churchId}_${Buffer.from(email).toString('base64url')}`;
+
+        // Check if already unsubscribed
+        const existing = await db.collection('email_unsubscribes').doc(docId).get();
+        if (!existing.exists) {
+          await db.collection('email_unsubscribes').doc(docId).set({
+            id: docId,
+            churchId,
+            email,
+            unsubscribedAt: Date.now(),
+          });
+        }
+
+        res.status(200).send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Unsubscribed</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f8fafc;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+    .card{background:#fff;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,.08);padding:48px 40px;max-width:460px;width:100%;text-align:center}
+    .icon{width:64px;height:64px;background:#f0fdf4;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 24px}
+    h1{font-size:22px;font-weight:700;color:#0f172a;margin-bottom:12px}
+    p{font-size:15px;color:#64748b;line-height:1.6}
+    .email{font-weight:600;color:#334155}
+    .note{margin-top:20px;font-size:13px;color:#94a3b8}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+    </div>
+    <h1>You've been unsubscribed</h1>
+    <p><span class="email">${email}</span> has been removed from this church's email list.</p>
+    <p class="note">You won't receive any further emails from this sender. If this was a mistake, please contact your church directly.</p>
+  </div>
+</body>
+</html>`);
+      } catch (e: any) {
+        console.error('[Unsubscribe] Error:', e);
+        res.status(500).send('<h2>Something went wrong. Please try again later.</h2>');
+      }
+    });
+
 
     // GET /polls/:pollId — returns poll config for the public page
     app.get('/polls/:pollId', async (req: any, res: any) => {

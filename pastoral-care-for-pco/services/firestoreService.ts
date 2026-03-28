@@ -756,6 +756,27 @@ class FirestoreService {
       } catch (e) { this.handleFirestoreError(e); }
   }
 
+  // --- Email Unsubscribes ---
+
+  async getEmailUnsubscribes(churchId: string): Promise<import('../types').EmailUnsubscribe[]> {
+      try {
+          const q = query(collection(db, 'email_unsubscribes'), where('churchId', '==', churchId));
+          const snapshot = await getDocs(q);
+          return snapshot.docs
+              .map(d => d.data() as import('../types').EmailUnsubscribe)
+              .sort((a, b) => (b.unsubscribedAt || 0) - (a.unsubscribedAt || 0));
+      } catch (e) {
+          console.error('[FirestoreService] getEmailUnsubscribes failed:', e);
+          return [];
+      }
+  }
+
+  async removeEmailUnsubscribe(id: string): Promise<void> {
+      try {
+          await deleteDoc(doc(db, 'email_unsubscribes', id));
+      } catch (e) { this.handleFirestoreError(e); }
+  }
+
   // --- Logging ---
 
   async saveLog(entry: LogEntry): Promise<void> {

@@ -12,11 +12,11 @@ import { DataChartSelector } from './DataChartSelector';
 import { PollsManager } from './PollsManager';
 
 import { PcoImportModal } from './PcoImportModal';
-import { EmailCampaign, TemplateSettings, PcoList, Church } from '../types';
+import { EmailCampaign, TemplateSettings, PcoList, Church, EmailUnsubscribe } from '../types';
 import {
   Mail, Plus, ChevronDown, ChevronUp, CheckCircle, Circle, Send,
   Clock, Users, AtSign, FileText, AlignLeft, Calendar, ArrowLeft,
-  Trash2, Eye, Pencil, Loader2, X, List
+  Trash2, Eye, Pencil, Loader2, X, List, UserMinus, Search
 } from 'lucide-react';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -1036,7 +1036,7 @@ const SendTestModal: React.FC<SendTestModalProps> = ({ onConfirm, onCancel, isSe
 };
 
 export const CommunicationModule: React.FC<{ churchId: string; church?: Church; currentUserId?: string; onUpdateChurch?: (updates: Partial<Church>) => void }> = ({ churchId, church, currentUserId, onUpdateChurch }) => {
-  const [activeTab, setActiveTab] = useState<'emails' | 'polls'>('emails');
+  const [activeTab, setActiveTab] = useState<'emails' | 'polls' | 'unsubscribers'>('emails');
   const [campaigns, setCampaigns] = useState<EmailCampaign[]>([]);
   const [activeCampaign, setActiveCampaign] = useState<EmailCampaign | null>(null);
   const [previewCampaign, setPreviewCampaign] = useState<EmailCampaign | null>(null);
@@ -1048,6 +1048,12 @@ export const CommunicationModule: React.FC<{ churchId: string; church?: Church; 
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [isScheduling, setIsScheduling] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+
+  // ── Unsubscribers state ──────────────────────────────────────────────────────
+  const [unsubscribers, setUnsubscribers] = useState<EmailUnsubscribe[]>([]);
+  const [unsubLoading, setUnsubLoading] = useState(false);
+  const [unsubSearch, setUnsubSearch] = useState('');
+  const [unsubLoaded, setUnsubLoaded] = useState(false);
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type });
@@ -1062,6 +1068,28 @@ export const CommunicationModule: React.FC<{ churchId: string; church?: Church; 
       setIsLoading(false);
     }).catch(() => setIsLoading(false));
   }, [churchId]);
+
+  // Load unsubscribers lazily when the tab is first opened
+  useEffect(() => {
+    if (activeTab === 'unsubscribers' && !unsubLoaded) {
+      setUnsubLoading(true);
+      firestore.getEmailUnsubscribes(churchId)
+        .then(list => { setUnsubscribers(list); setUnsubLoaded(true); })
+        .catch(() => {})
+        .finally(() => setUnsubLoading(false));
+    }
+  }, [activeTab, churchId, unsubLoaded]);
+
+  const handleRemoveUnsubscribe = async (unsub: EmailUnsubscribe) => {
+    if (!confirm(`Re-subscribe ${unsub.email}? They will be able to receive emails from this list again.`)) return;
+    await firestore.removeEmailUnsubscribe(unsub.id);
+    setUnsubscribers(prev => prev.filter(u => u.id !== unsub.id));
+    showToast(`${unsub.email} has been re-subscribed.`);
+  };
+
+  const filteredUnsubs = unsubSearch.trim()
+    ? unsubscribers.filter(u => u.email.toLowerCase().includes(unsubSearch.toLowerCase()))
+    : unsubscribers;
 
   const handleCreate = async (name: string) => {
     setShowNewModal(false);
@@ -1223,7 +1251,113 @@ export const CommunicationModule: React.FC<{ churchId: string; church?: Church; 
         >
           <List size={14} /> Polls
         </button>
+        <button
+          onClick={() => setActiveTab('unsubscribers')}
+          className={`flex items-center gap-2 px-4 py-2 -mb-px text-sm font-semibold border-b-2 transition ${
+            activeTab === 'unsubscribers'
+              ? 'border-red-500 text-red-600 dark:text-red-400 dark:border-red-400'
+              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
+          }`}
+        >
+          <UserMinus size={14} /> Unsubscribers
+          {unsubscribers.length > 0 && (
+            <span className="text-xs px-1.5 py-0.5 rounded-full font-semibold bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400">
+              {unsubscribers.length}
+            </span>
+          )}
+        </button>
       </div>
+
+      {/* ─── Unsubscribers Tab ─────────────────────────────────────────── */}
+      {activeTab === 'unsubscribers' && (
+        <div className="flex-1 overflow-y-auto p-6 max-w-4xl mx-auto w-full">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <UserMinus size={20} className="text-red-500" /> Unsubscribers
+              </h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                People who have opted out of your emails. They are automatically excluded from future sends.
+              </p>
+            </div>
+            {unsubscribers.length > 0 && (
+              <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">
+                {unsubscribers.length} total
+              </span>
+            )}
+          </div>
+
+          {/* Search */}
+          {unsubscribers.length > 0 && (
+            <div className="relative mb-4">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search by email…"
+                value={unsubSearch}
+                onChange={e => setUnsubSearch(e.target.value)}
+                className="w-full pl-8 pr-3 py-2 text-sm border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-400"
+              />
+            </div>
+          )}
+
+          {/* Table */}
+          {unsubLoading ? (
+            <div className="flex items-center justify-center h-40 text-slate-400">
+              <Loader2 size={22} className="animate-spin mr-2" /> Loading…
+            </div>
+          ) : filteredUnsubs.length === 0 ? (
+            <div className="text-center py-20 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
+              <UserMinus size={36} className="mx-auto text-slate-300 dark:text-slate-600 mb-3" />
+              <p className="text-slate-500 dark:text-slate-400 font-medium">
+                {unsubSearch ? 'No results match your search' : 'No unsubscribers yet'}
+              </p>
+              {!unsubSearch && (
+                <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">
+                  When someone clicks "Unsubscribe" in an email, they'll appear here.
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Email</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Unsubscribed</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Campaign</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60">
+                  {filteredUnsubs.map(u => (
+                    <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition">
+                      <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-200">{u.email}</td>
+                      <td className="px-4 py-3 text-slate-500 dark:text-slate-400">
+                        {u.unsubscribedAt
+                          ? new Date(u.unsubscribedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                          : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-slate-500 dark:text-slate-400 text-xs">
+                        {u.campaignName || <span className="text-slate-300 dark:text-slate-600">—</span>}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          onClick={() => handleRemoveUnsubscribe(u)}
+                          title="Re-subscribe (remove from list)"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition"
+                        >
+                          <CheckCircle size={12} /> Re-subscribe
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ─── Polls Tab ────────────────────────────────────────────────── */}
       {activeTab === 'polls' && (

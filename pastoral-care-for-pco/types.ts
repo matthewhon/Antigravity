@@ -446,6 +446,16 @@ export interface TemplateSettings {
     twitterUrl?: string;
 }
 
+/** Tracks an individual who unsubscribed from a church's email list. */
+export interface EmailUnsubscribe {
+    id: string;           // `{churchId}_{base64email}`
+    churchId: string;
+    email: string;        // stored lowercase
+    unsubscribedAt: number; // epoch ms
+    campaignId?: string;
+    campaignName?: string;
+}
+
 export interface PcoList {
     id: string;
     name: string;
