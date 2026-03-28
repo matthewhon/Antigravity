@@ -245,6 +245,15 @@ export const GivingView: React.FC<GivingViewProps> = ({
         const day = now.getDay();
         startDate.setDate(now.getDate() - day); 
     }
+    else if (f === 'Last Week') {
+        const day = now.getDay(); // 0=Sun ... 6=Sat
+        // End = last Saturday (or today if today is Sun)
+        endDate = new Date(now);
+        endDate.setDate(now.getDate() - day - 1); // last Saturday
+        // Start = Monday 6 days before that Saturday
+        startDate = new Date(endDate);
+        startDate.setDate(endDate.getDate() - 6); // previous Monday
+    }
     else if (f === 'Month') startDate.setDate(now.getDate() - 30);
     else if (f === 'This Month') {
         startDate = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -937,6 +946,89 @@ export const GivingView: React.FC<GivingViewProps> = ({
           case 'lifecycleRecovered': return <DonorListWidget title="Recovered Donors" donors={analytics.lists?.recovered || []} color="cyan" onRemove={() => handleRemoveWidget(id)} />;
           case 'lifecycleInactive': return <DonorListWidget title="Inactive Donors" donors={analytics.lists?.inactive || []} color="rose" onRemove={() => handleRemoveWidget(id)} />;
           case 'lifecycleSecond': return <DonorListWidget title="Second Time Donors" donors={analytics.lists?.secondTime || []} color="violet" onRemove={() => handleRemoveWidget(id)} />;
+          case 'lastWeekFunds': {
+              // Calculate Mon-Sun of last calendar week
+              const lwNow = new Date();
+              const lwDay = lwNow.getDay(); // 0=Sun
+              const lwEnd = new Date(lwNow);
+              lwEnd.setDate(lwNow.getDate() - lwDay - 1); // last Saturday
+              lwEnd.setHours(23, 59, 59, 999);
+              const lwStart = new Date(lwEnd);
+              lwStart.setDate(lwEnd.getDate() - 6); // previous Monday
+              lwStart.setHours(0, 0, 0, 0);
+
+              const weekLabel = `${lwStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${lwEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+
+              // Aggregate donations per fund for last week
+              const fundTotals: Record<string, number> = {};
+              donations.forEach(d => {
+                  const dDate = new Date(d.date);
+                  if (dDate >= lwStart && dDate <= lwEnd) {
+                      fundTotals[d.fundName] = (fundTotals[d.fundName] || 0) + d.amount;
+                  }
+              });
+
+              const fundRows = Object.entries(fundTotals)
+                  .sort(([, a], [, b]) => b - a);
+
+              const weekTotal = fundRows.reduce((s, [, v]) => s + v, 0);
+
+              // Colour palette for fund rows
+              const FUND_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#06b6d4', '#f43f5e', '#8b5cf6', '#ec4899', '#14b8a6'];
+
+              return (
+                  <WidgetWrapper
+                      title="Last Week by Fund"
+                      onRemove={() => handleRemoveWidget(id)}
+                      source="PCO Giving"
+                      headerControl={
+                          <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500">{weekLabel}</span>
+                      }
+                  >
+                      {fundRows.length === 0 ? (
+                          <div className="flex flex-col items-center justify-center h-32 text-center space-y-2">
+                              <div className="text-3xl opacity-30">📭</div>
+                              <p className="text-xs font-bold text-slate-400 dark:text-slate-500">No giving recorded last week</p>
+                          </div>
+                      ) : (
+                          <div className="space-y-4">
+                              {/* Week total hero */}
+                              <div className="p-4 rounded-xl bg-gradient-to-br from-indigo-50 to-emerald-50 dark:from-indigo-900/20 dark:to-emerald-900/20 flex items-center justify-between">
+                                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Week Total</p>
+                                  <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400">${weekTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                              </div>
+                              {/* Per-fund rows */}
+                              <div className="space-y-3">
+                                  {fundRows.map(([fundName, amount], i) => {
+                                      const pct = weekTotal > 0 ? (amount / weekTotal) * 100 : 0;
+                                      const color = FUND_COLORS[i % FUND_COLORS.length];
+                                      return (
+                                          <div key={fundName} className="space-y-1">
+                                              <div className="flex items-center justify-between">
+                                                  <div className="flex items-center gap-2">
+                                                      <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                                                      <span className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate max-w-[140px]">{fundName}</span>
+                                                  </div>
+                                                  <div className="flex items-center gap-2">
+                                                      <span className="text-xs font-black text-slate-800 dark:text-white">${amount.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                                                      <span className="text-[10px] text-slate-400 dark:text-slate-500 w-8 text-right">{Math.round(pct)}%</span>
+                                                  </div>
+                                              </div>
+                                              <div className="relative h-2 bg-slate-100 dark:bg-slate-700/60 rounded-full overflow-hidden">
+                                                  <div
+                                                      className="h-full rounded-full transition-all duration-700"
+                                                      style={{ width: `${pct}%`, backgroundColor: color, opacity: 0.85 }}
+                                                  />
+                                              </div>
+                                          </div>
+                                      );
+                                  })}
+                              </div>
+                          </div>
+                      )}
+                  </WidgetWrapper>
+              );
+          }
           default: return null;
       }
   };
@@ -952,6 +1044,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
               >
                   <option value="Week">Last 7 Days</option>
                   <option value="This Week">This Week</option>
+                  <option value="Last Week">Last Week</option>
                   <option value="Month">Last 30 Days</option>
                   <option value="This Month">This Month</option>
                   <option value="Last Month">Last Month</option>

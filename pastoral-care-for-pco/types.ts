@@ -587,7 +587,7 @@ export interface PrayerRequest {
 }
 
 export type ServicesFilter = 'Week' | 'Month' | 'Quarter' | 'Year' | 'Next Week' | 'Next Month';
-export type GivingFilter = 'Week' | 'This Week' | 'Month' | 'This Month' | 'Last Month' | 'Quarter' | 'This Quarter' | 'Year' | 'This Year' | 'Custom';
+export type GivingFilter = 'Week' | 'This Week' | 'Last Week' | 'Month' | 'This Month' | 'Last Month' | 'Quarter' | 'This Quarter' | 'Year' | 'This Year' | 'Custom';
 
 export interface AggregatedGivingMetric {
     churchId: string;
