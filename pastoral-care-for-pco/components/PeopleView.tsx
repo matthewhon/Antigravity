@@ -1,5 +1,6 @@
-import React, { useMemo, useState, useRef } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { PeopleDashboardData, GeoInsight, CensusStats, GlobalStats } from '../types';
+import { pcoService } from '../services/pcoService';
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
   BarChart, Bar, XAxis, YAxis, CartesianGrid
@@ -26,6 +27,7 @@ interface PeopleViewProps {
   onSync?: () => void;
   isSyncing?: boolean;
   pcoConnected: boolean;
+  churchId?: string;
   onUpdateTheme?: (theme: 'traditional' | 'dark') => void;
   currentTheme?: 'traditional' | 'dark';
   globalStats?: GlobalStats | null;
@@ -78,9 +80,61 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
   currentTheme,
   globalStats,
   userSettings = {},
-  onUpdateSettings = (_k: string, _v: any) => {}
+  onUpdateSettings = (_k: string, _v: any) => {},
+  churchId,
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'households' | 'risk'>('overview');
+
+  // ---- Registrations live data ----
+  interface PcoRegistrationEvent {
+    id: string;
+    name: string;
+    startsAt?: string;
+    endsAt?: string;
+    signupCount: number;
+    signupLimit?: number | null;
+    openSignup: boolean;
+    logoUrl?: string;
+    publicUrl?: string;
+  }
+  const [regEvents, setRegEvents] = useState<PcoRegistrationEvent[]>([]);
+  const [regLoading, setRegLoading] = useState(false);
+  const [regError, setRegError] = useState('');
+
+  useEffect(() => {
+    if (!churchId || !pcoConnected) return;
+    setRegLoading(true);
+    setRegError('');
+    pcoService.getRegistrations(churchId)
+      .then((raw: any[]) => {
+        const now = new Date();
+        const mapped: PcoRegistrationEvent[] = (raw || [])
+          .map((item: any) => ({
+            id: item.id,
+            name: item.attributes?.name || 'Unnamed Event',
+            startsAt: item.attributes?.starts_at,
+            endsAt: item.attributes?.ends_at,
+            signupCount: item.attributes?.signup_count ?? item.attributes?.attendee_count ?? 0,
+            signupLimit: item.attributes?.signup_limit ?? item.attributes?.attendee_limit ?? null,
+            openSignup: item.attributes?.open_signup ?? true,
+            logoUrl: item.attributes?.logo_url || item.attributes?.image_url,
+            publicUrl: item.attributes?.public_url ||
+              (item.id ? `https://registrations.planningcenteronline.com/events/${item.id}` : undefined),
+          }))
+          .filter((e) => {
+            if (!e.startsAt) return true;
+            return new Date(e.startsAt) >= now;
+          })
+          .sort((a, b) => {
+            if (!a.startsAt) return 1;
+            if (!b.startsAt) return -1;
+            return new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime();
+          });
+        setRegEvents(mapped);
+      })
+      .catch((e: any) => setRegError(e?.message || 'Failed to load registrations.'))
+      .finally(() => setRegLoading(false));
+  }, [churchId, pcoConnected]);
 
   const categoryPrefix = activeTab === 'overview' ? 'people' : activeTab === 'households' ? 'people_households' : 'people_risk';
 
@@ -578,6 +632,112 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
                     </WidgetWrapper>
                 </div>
             );
+        case 'upcoming_registrations':
+            return (
+                <div key="upcoming_registrations" className="col-span-1 lg:col-span-2">
+                    <WidgetWrapper title="Upcoming Registrations" onRemove={() => handleRemoveWidget(id)} source="PCO Registrations">
+                        <div className="h-72 overflow-y-auto custom-scrollbar">
+                            {regLoading && (
+                                <div className="h-full flex items-center justify-center text-slate-400 gap-2">
+                                    <svg className="animate-spin w-5 h-5 text-indigo-400" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                                    </svg>
+                                    <span className="text-xs font-medium">Loading from Planning Center…</span>
+                                </div>
+                            )}
+                            {!regLoading && regError && (
+                                <div className="h-full flex flex-col items-center justify-center text-center p-4 gap-3">
+                                    <div className="text-3xl grayscale opacity-30">🎟️</div>
+                                    <p className="text-xs font-bold text-rose-400">Could not load registrations</p>
+                                    <p className="text-[10px] text-slate-400 max-w-xs">
+                                        {regError.includes('requiresReauth')
+                                            ? 'Reconnect Planning Center in Settings → Planning Center to grant Registrations access.'
+                                            : regError}
+                                    </p>
+                                </div>
+                            )}
+                            {!regLoading && !regError && regEvents.length === 0 && (
+                                <div className="h-full flex flex-col items-center justify-center text-center p-4 gap-3">
+                                    <div className="text-4xl grayscale opacity-25">🎟️</div>
+                                    <p className="text-xs font-bold text-slate-400">No upcoming registration events</p>
+                                    <p className="text-[10px] text-slate-400">Create events in Planning Center Registrations to see them here.</p>
+                                </div>
+                            )}
+                            {!regLoading && !regError && regEvents.length > 0 && (
+                                <div className="space-y-3">
+                                    {regEvents.map((event) => {
+                                        const dateLabel = event.startsAt
+                                            ? new Date(event.startsAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                                            : 'Date TBD';
+                                        const fillPct = event.signupLimit && event.signupLimit > 0
+                                            ? Math.min(100, Math.round((event.signupCount / event.signupLimit) * 100))
+                                            : null;
+                                        const isFull = fillPct !== null && fillPct >= 100;
+                                        return (
+                                            <div key={event.id} className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 hover:border-indigo-200 dark:hover:border-indigo-700 transition-colors">
+                                                {/* Icon / Logo */}
+                                                {event.logoUrl ? (
+                                                    <img src={event.logoUrl} alt={event.name} className="w-12 h-12 rounded-lg object-cover shrink-0 bg-slate-200" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                                                ) : (
+                                                    <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-indigo-100 to-violet-100 dark:from-indigo-900/40 dark:to-violet-900/40 flex items-center justify-center shrink-0">
+                                                        <span className="text-xl">🎟️</span>
+                                                    </div>
+                                                )}
+
+                                                {/* Info */}
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{event.name}</p>
+                                                    <p className="text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold mt-0.5">{dateLabel}</p>
+
+                                                    {/* Registration count / fill bar */}
+                                                    <div className="mt-2 flex items-center gap-2">
+                                                        <span className="text-[10px] font-black text-slate-700 dark:text-slate-300 tabular-nums">{event.signupCount.toLocaleString()}</span>
+                                                        {event.signupLimit ? (
+                                                            <span className="text-[10px] text-slate-400">{`/ ${event.signupLimit.toLocaleString()} spots`}</span>
+                                                        ) : (
+                                                            <span className="text-[10px] text-slate-400">registered</span>
+                                                        )}
+                                                        {isFull && (
+                                                            <span className="ml-1 px-1.5 py-0.5 rounded text-[9px] font-black bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 uppercase tracking-widest">Full</span>
+                                                        )}
+                                                        {!event.openSignup && !isFull && (
+                                                            <span className="ml-1 px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 uppercase tracking-widest">Closed</span>
+                                                        )}
+                                                    </div>
+
+                                                    {fillPct !== null && (
+                                                        <div className="mt-1.5 w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                                                            <div
+                                                                className={`h-full rounded-full transition-all ${
+                                                                    isFull ? 'bg-rose-400' : fillPct >= 75 ? 'bg-amber-400' : 'bg-emerald-400'
+                                                                }`}
+                                                                style={{ width: `${fillPct}%` }}
+                                                            />
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Link */}
+                                                {event.publicUrl && (
+                                                    <a
+                                                        href={event.publicUrl}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="shrink-0 text-[10px] font-black uppercase tracking-widest text-indigo-500 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 mt-1 transition-colors"
+                                                    >
+                                                        View →
+                                                    </a>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    </WidgetWrapper>
+                </div>
+            );
         default:
             return null;
     }
@@ -625,7 +785,7 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
           if (id === 'people_stats' || id === 'householdSummary') return renderWidget(id);
           
           let spanClass = "col-span-1";
-          if (id === 'map' || id === 'riskDistribution' || id === 'atRiskList' || id === 'householdList' || id === 'risk_factors' || id === 'benchmark_age') spanClass = "col-span-1 lg:col-span-2";
+          if (id === 'map' || id === 'riskDistribution' || id === 'atRiskList' || id === 'householdList' || id === 'risk_factors' || id === 'benchmark_age' || id === 'upcoming_registrations') spanClass = "col-span-1 lg:col-span-2";
           if (id === 'people_directory') spanClass = "col-span-1 lg:col-span-4";
           
           return (

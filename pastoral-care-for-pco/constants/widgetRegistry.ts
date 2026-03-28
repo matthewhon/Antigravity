@@ -29,6 +29,7 @@ export const PEOPLE_OVERVIEW_WIDGETS: WidgetDefinition[] = [
     { id: 'anniversaries', label: 'Anniversaries', icon: '💍' },
     { id: 'recent', label: 'New People', icon: '✨' },
     { id: 'zip', label: 'Top Zip Codes', icon: '📮' },
+    { id: 'upcoming_registrations', label: 'Upcoming Registrations', icon: '🎟️' },
 ];
 
 export const PEOPLE_HOUSEHOLD_WIDGETS: WidgetDefinition[] = [

@@ -848,6 +848,7 @@ const App: React.FC = () => {
                 onSync={handleSync}
                 isSyncing={isSyncing}
                 pcoConnected={church.pcoConnected}
+                churchId={church.id}
                 onUpdateTheme={handleUpdateUserTheme}
                 currentTheme={user.theme}
             />
