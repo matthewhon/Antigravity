@@ -6,6 +6,8 @@ import { EmailPreview } from './EmailPreview';
 import { Drawer } from './Drawer';
 import { pcoService } from '../services/pcoService';
 import { firestore } from '../services/firestoreService';
+import { storage } from '../services/firebase';
+import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { DataChartSelector } from './DataChartSelector';
 import { PollsManager } from './PollsManager';
 
@@ -26,7 +28,8 @@ const DEFAULT_TEMPLATE: TemplateSettings = {
   linkColor: '#2563eb',
   fontFamily: 'sans-serif',
   header: 'Church Newsletter',
-  footer: '© 2026 Church Name · Unsubscribe'
+  footer: '© 2026 Church Name · Unsubscribe',
+  showLogo: true,
 };
 
 const newCampaign = (churchId: string, name: string): EmailCampaign => ({
@@ -92,7 +95,7 @@ const AccordionSection: React.FC<AccordionSectionProps> = ({
 
 // ─── Campaign Preview Modal ──────────────────────────────────────────────────
 
-const CampaignPreviewModal: React.FC<{ campaign: EmailCampaign; onClose: () => void }> = ({ campaign, onClose }) => {
+const CampaignPreviewModal: React.FC<{ campaign: EmailCampaign; onClose: () => void; churchLogoUrl?: string }> = ({ campaign, onClose, churchLogoUrl }) => {
   const blocks = (campaign.blocks || []) as EmailBlock[];
   const settings: TemplateSettings = campaign.templateSettings || DEFAULT_TEMPLATE;
   return (
@@ -127,7 +130,7 @@ const CampaignPreviewModal: React.FC<{ campaign: EmailCampaign; onClose: () => v
             </div>
           ) : (
             <div className="rounded-xl overflow-hidden shadow-lg">
-              <EmailPreview blocks={blocks} settings={settings} />
+              <EmailPreview blocks={blocks} settings={settings} churchLogoUrl={churchLogoUrl} />
             </div>
           )}
         </div>
@@ -368,11 +371,47 @@ interface EmailEditorProps {
   onSchedule: () => void;
   isSending: boolean;
   isScheduled: boolean;
+  onLogoUploaded?: (logoUrl: string) => void;
+  onLogoRemoved?: () => void;
 }
 
 const EmailEditor: React.FC<EmailEditorProps> = ({
-  campaign, churchId, church, onBack, onSave, onSend, onSendTest, onSchedule, isSending, isScheduled
+  campaign, churchId, church, onBack, onSave, onSend, onSendTest, onSchedule, isSending, isScheduled,
+  onLogoUploaded, onLogoRemoved,
 }) => {
+  const [logoUploading, setLogoUploading] = useState(false);
+
+  // Upload a new church logo to Firebase Storage, then persist the URL to Firestore
+  const handleLogoUpload = useCallback(async (file: File) => {
+    setLogoUploading(true);
+    try {
+      const ext = file.name.split('.').pop() || 'png';
+      const path = `church_logos/${churchId}/logo_${Date.now()}.${ext}`;
+      const sRef = storageRef(storage, path);
+      await new Promise<void>((resolve, reject) => {
+        const task = uploadBytesResumable(sRef, file);
+        task.on('state_changed', () => {}, reject, () => resolve());
+      });
+      const logoUrl = await getDownloadURL(sRef);
+      await firestore.updateChurch(churchId, { logoUrl });
+      onLogoUploaded?.(logoUrl);
+    } catch (e) {
+      console.error('[CommunicationModule] Logo upload failed:', e);
+      alert('Logo upload failed. Please try again.');
+    } finally {
+      setLogoUploading(false);
+    }
+  }, [churchId, onLogoUploaded]);
+
+  // Remove church logo from Firestore (does not delete from Storage to preserve old emails)
+  const handleLogoRemove = useCallback(async () => {
+    try {
+      await firestore.updateChurch(churchId, { logoUrl: undefined });
+      onLogoRemoved?.();
+    } catch (e) {
+      console.error('[CommunicationModule] Logo remove failed:', e);
+    }
+  }, [churchId, onLogoRemoved]);
   // Determine if the church is using a shared subdomain (locked from email)
   const isSharedMode = church?.emailSettings?.mode === 'shared' && !!church?.emailSettings?.fromEmail;
   const sharedFromEmail = church?.emailSettings?.fromEmail || '';
@@ -865,7 +904,7 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
               </button>
             </div>
             <div className="max-w-2xl mx-auto shadow-xl rounded-2xl overflow-hidden">
-              <EmailPreview blocks={blocks} settings={settings} />
+              <EmailPreview blocks={blocks} settings={settings} churchLogoUrl={church?.logoUrl} />
             </div>
           </div>
         )}
@@ -876,6 +915,10 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
         <TemplateSettingsEditor
           settings={settings}
           onChange={s => update({ templateSettings: s })}
+          churchLogoUrl={church?.logoUrl}
+          onUploadLogo={handleLogoUpload}
+          onRemoveLogo={handleLogoRemove}
+          logoUploading={logoUploading}
         />
       </Drawer>
 
@@ -1234,6 +1277,7 @@ export const CommunicationModule: React.FC<{ churchId: string; church?: Church; 
         <CampaignPreviewModal
           campaign={previewCampaign}
           onClose={() => setPreviewCampaign(null)}
+          churchLogoUrl={church?.logoUrl}
         />
       )}
 
@@ -1292,6 +1336,13 @@ export const CommunicationModule: React.FC<{ churchId: string; church?: Church; 
           onSchedule={() => setShowScheduleModal(true)}
           isSending={isSending}
           isScheduled={activeCampaign.status === 'scheduled'}
+          onLogoUploaded={logoUrl => {
+            // Propagate church-level logo to parent state (triggers re-render with new logo)
+            if (church) (church as any).logoUrl = logoUrl;
+          }}
+          onLogoRemoved={() => {
+            if (church) (church as any).logoUrl = undefined;
+          }}
         />
       ) : (
         <CampaignListView

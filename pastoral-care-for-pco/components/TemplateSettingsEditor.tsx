@@ -1,9 +1,18 @@
-import React from 'react';
+import React, { useRef, useState, useCallback } from 'react';
 import { TemplateSettings } from '../types';
+import { Upload, Loader2, Trash2, Image as ImageIcon } from 'lucide-react';
 
 interface Props {
   settings: TemplateSettings;
   onChange: (settings: TemplateSettings) => void;
+  /** Church-wide logo URL (from Firestore Church doc). Used as the default preview. */
+  churchLogoUrl?: string;
+  /** Called when the user selects a new logo file. Parent handles upload + Firestore save. */
+  onUploadLogo?: (file: File) => Promise<void>;
+  /** Called when the user wants to remove the church-level logo entirely. */
+  onRemoveLogo?: () => Promise<void>;
+  /** True while the logo is being uploaded. */
+  logoUploading?: boolean;
 }
 
 const LABEL: Record<string, string> = {
@@ -56,11 +65,187 @@ function TwitterIcon({ size = 16 }: { size?: number }) {
   );
 }
 
-export const TemplateSettingsEditor: React.FC<Props> = ({ settings, onChange }) => {
+export const TemplateSettingsEditor: React.FC<Props> = ({
+  settings,
+  onChange,
+  churchLogoUrl,
+  onUploadLogo,
+  onRemoveLogo,
+  logoUploading = false,
+}) => {
   const set = (key: keyof TemplateSettings, value: any) => onChange({ ...settings, [key]: value });
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const [dragOver, setDragOver] = useState(false);
+
+  // Effective logo to display — per-campaign override, then church-wide
+  const effectiveLogo = settings.logoUrl || churchLogoUrl;
+  const showLogoEnabled = settings.showLogo !== false; // default = true
+
+  const handleFileSelected = useCallback(async (file: File) => {
+    if (!onUploadLogo) return;
+    // Validate type
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file (PNG, JPG, SVG, etc.).');
+      return;
+    }
+    // Validate size — 2 MB
+    if (file.size > 2 * 1024 * 1024) {
+      alert('Logo must be smaller than 2 MB. Recommended: 400 × 120 px PNG or SVG.');
+      return;
+    }
+    await onUploadLogo(file);
+  }, [onUploadLogo]);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) handleFileSelected(file);
+  }, [handleFileSelected]);
 
   return (
     <div className="space-y-6">
+
+      {/* ── Church Logo ─────────────────────────────────────────── */}
+      <div className="p-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-bold text-xs text-slate-500 dark:text-slate-400 uppercase tracking-widest">
+            Church Logo
+          </h3>
+          {/* Show/hide toggle */}
+          <button
+            onClick={() => set('showLogo', !showLogoEnabled)}
+            className={`flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-lg transition ${
+              showLogoEnabled
+                ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+            }`}
+          >
+            <span className={`w-8 h-4 rounded-full relative transition-colors ${showLogoEnabled ? 'bg-indigo-500' : 'bg-slate-300 dark:bg-slate-600'}`}>
+              <span className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform ${showLogoEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+            </span>
+            Show in header
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          {/* Current logo preview */}
+          {effectiveLogo && (
+            <div className="relative flex items-center justify-center bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 min-h-[80px]">
+              <img
+                src={effectiveLogo}
+                alt="Church logo"
+                className="max-h-16 max-w-full object-contain"
+                onError={e => { (e.target as HTMLImageElement).style.opacity = '0.3'; }}
+              />
+              {settings.logoUrl && settings.logoUrl !== churchLogoUrl && (
+                <span className="absolute top-2 right-2 text-[9px] font-bold bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-300 px-1.5 py-0.5 rounded-full">
+                  Campaign override
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Drop zone / upload button */}
+          <input
+            ref={logoInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={e => {
+              const file = e.target.files?.[0];
+              if (file) handleFileSelected(file);
+              // Reset value so re-selecting the same file triggers onChange
+              e.target.value = '';
+            }}
+          />
+          <div
+            onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={handleDrop}
+            onClick={() => !logoUploading && logoInputRef.current?.click()}
+            className={`flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-xl py-5 cursor-pointer transition ${
+              dragOver
+                ? 'border-indigo-400 bg-indigo-50 dark:bg-indigo-900/20'
+                : 'border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-600 hover:bg-slate-50 dark:hover:bg-slate-800'
+            } ${logoUploading ? 'pointer-events-none opacity-60' : ''}`}
+          >
+            {logoUploading ? (
+              <>
+                <Loader2 size={22} className="animate-spin text-indigo-400" />
+                <span className="text-xs text-slate-500 dark:text-slate-400">Uploading…</span>
+              </>
+            ) : effectiveLogo ? (
+              <>
+                <Upload size={18} className="text-slate-400" />
+                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                  Replace logo
+                </span>
+                <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                  PNG, SVG or JPG · max 2 MB
+                </span>
+              </>
+            ) : (
+              <>
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center">
+                  <ImageIcon size={20} className="text-indigo-400" />
+                </div>
+                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                  Upload church logo
+                </span>
+                <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                  Recommended: 400 × 120 px · PNG or SVG · max 2 MB
+                </span>
+                <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                  Drop a file here or click to browse
+                </span>
+              </>
+            )}
+          </div>
+
+          {/* Action buttons when logo exists */}
+          {effectiveLogo && (
+            <div className="flex gap-2">
+              {/* Remove church-wide logo */}
+              {onRemoveLogo && churchLogoUrl && (
+                <button
+                  onClick={async () => {
+                    if (confirm('Remove the church logo? This will clear it from all future emails.')) {
+                      await onRemoveLogo();
+                    }
+                  }}
+                  disabled={logoUploading}
+                  className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-900/50 text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition disabled:opacity-50"
+                >
+                  <Trash2 size={12} />
+                  Remove logo
+                </button>
+              )}
+              {/* Clear per-campaign override */}
+              {settings.logoUrl && (
+                <button
+                  onClick={() => set('logoUrl', undefined)}
+                  className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 transition"
+                >
+                  Use church default
+                </button>
+              )}
+            </div>
+          )}
+
+          {showLogoEnabled && effectiveLogo && (
+            <p className="text-[10px] text-indigo-500 dark:text-indigo-400">
+              ✓ Logo will appear centered in the email header above the title text.
+            </p>
+          )}
+          {!effectiveLogo && (
+            <p className="text-[10px] text-slate-400 dark:text-slate-500">
+              No logo uploaded. The header will show the title text only.
+            </p>
+          )}
+        </div>
+      </div>
+
       {/* ── Design ─────────────────────────────────────────────────── */}
       <div className="p-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm">
         <h3 className="font-bold text-xs text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-4">Design</h3>

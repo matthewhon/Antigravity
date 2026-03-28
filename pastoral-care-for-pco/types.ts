@@ -87,6 +87,8 @@ export interface Church {
     allowSignups?: boolean;
     scheduledSyncTime?: string;
     communityLocations?: CommunityLocation[];
+    /** Church-wide logo URL (stored in Firebase Storage, used as default in email templates) */
+    logoUrl?: string;
     /** PCO List ID used to identify regular attenders of the church */
     regularAttendersListId?: string;
     /** Display name of the selected regular attenders PCO list */
@@ -431,6 +433,11 @@ export interface TemplateSettings {
     fontFamily: string;
     header: string;
     footer: string;
+    // Church logo (shown in email header)
+    /** Whether to display the church logo in the email header. Defaults to true when logoUrl is present. */
+    showLogo?: boolean;
+    /** Per-campaign logo URL override. Falls back to Church.logoUrl when not set. */
+    logoUrl?: string;
     // Social media
     showSocialLinks?: boolean;
     facebookUrl?: string;

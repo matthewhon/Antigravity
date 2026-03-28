@@ -7,6 +7,8 @@ import { CalendarDays, Users, ClipboardList } from 'lucide-react';
 interface Props {
   blocks: EmailBlock[];
   settings: TemplateSettings;
+  /** Church-wide logo URL fallback (from Firestore Church doc). Used when settings.logoUrl is not set. */
+  churchLogoUrl?: string;
 }
 
 // Resolve @merge-tags in HTML strings for visual preview
@@ -80,7 +82,7 @@ const SOCIAL_LINKS: { key: keyof TemplateSettings; label: string; color: string;
 
 // ─── Main Preview Component ───────────────────────────────────────────────────
 
-export const EmailPreview: React.FC<Props> = ({ blocks, settings }) => {
+export const EmailPreview: React.FC<Props> = ({ blocks, settings, churchLogoUrl }) => {
   useEffect(() => {
     if (blocks.some(b => b.type === 'pco_groups_widget' || b.type === 'pco_registrations_widget')) {
       const script = document.createElement('script');
@@ -96,13 +98,29 @@ export const EmailPreview: React.FC<Props> = ({ blocks, settings }) => {
     ? SOCIAL_LINKS.filter(s => (settings as any)[s.key]?.trim())
     : [];
 
+  // Effective logo: per-campaign override → church-wide default
+  const effectiveLogo = settings.logoUrl || churchLogoUrl;
+  const showLogo = settings.showLogo !== false && !!effectiveLogo;
+
   return (
     <div
       className="p-6 rounded-2xl shadow-lg min-h-[600px]"
       style={{ backgroundColor: settings.backgroundColor, color: settings.textColor, fontFamily: settings.fontFamily }}
     >
-      <header className="mb-6 border-b border-slate-200 pb-4">
-        <h1 className="text-2xl font-bold">{settings.header}</h1>
+      <header className="mb-6 border-b border-slate-200 pb-4 text-center">
+        {showLogo && (
+          <div className="flex justify-center mb-3">
+            <img
+              src={effectiveLogo}
+              alt="Church logo"
+              style={{ maxHeight: 60, maxWidth: 240, objectFit: 'contain', display: 'block' }}
+              onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+            />
+          </div>
+        )}
+        <h1 className="text-2xl font-bold" style={{ textAlign: showLogo ? 'center' : 'left' }}>
+          {settings.header}
+        </h1>
       </header>
 
       <div className="space-y-4">
