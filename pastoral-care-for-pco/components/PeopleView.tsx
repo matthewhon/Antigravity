@@ -644,7 +644,7 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
         case 'upcoming_registrations':
             return (
                 <div key="upcoming_registrations" className="col-span-1 lg:col-span-2">
-                    <WidgetWrapper title="Upcoming Registrations" onRemove={() => handleRemoveWidget(id)} source={regSource === 'cached' ? 'Cached • PCO Registrations' : 'PCO Registrations'}>
+                    <WidgetWrapper title="Upcoming Registrations" onRemove={() => handleRemoveWidget(id)} source={regSource === 'live' ? 'Live • PCO Registrations' : regSource === 'cached' ? 'Cached • PCO Registrations' : 'PCO Registrations'}>
                         <div className="h-72 overflow-y-auto custom-scrollbar">
                             {regLoading && (
                                 <div className="h-full flex items-center justify-center text-slate-400 gap-2">
@@ -689,12 +689,23 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
                                         const dateLabel = event.startsAt
                                             ? new Date(event.startsAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
                                             : 'Date TBD';
+                                        const closesLabel = event.closeAt
+                                            ? `Closes ${new Date(event.closeAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+                                            : null;
+                                        const confirmed = (event.totalAttendees ?? event.signupCount) - (event.waitlistedCount ?? 0) - (event.canceledCount ?? 0);
+                                        const displayCount = confirmed > 0 ? confirmed : event.signupCount;
                                         const fillPct = event.signupLimit && event.signupLimit > 0
-                                            ? Math.min(100, Math.round((event.signupCount / event.signupLimit) * 100))
+                                            ? Math.min(100, Math.round((displayCount / event.signupLimit) * 100))
                                             : null;
                                         const isFull = fillPct !== null && fillPct >= 100;
+                                        const isAlmostFull = fillPct !== null && fillPct >= 80 && !isFull;
+                                        const isClosed = !event.openSignup;
+                                        const visibilityBadge = event.visibility === 'private' ? { label: 'Private', color: 'slate' }
+                                            : event.visibility === 'link_only' ? { label: 'Link Only', color: 'amber' }
+                                            : null;
+
                                         return (
-                                            <div key={event.id} className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 hover:border-indigo-200 dark:hover:border-indigo-700 transition-colors">
+                                            <div key={event.id} className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 hover:border-indigo-200 dark:hover:border-indigo-800 transition-colors group">
                                                 {/* Icon / Logo */}
                                                 {event.logoUrl ? (
                                                     <img src={event.logoUrl} alt={event.name} className="w-12 h-12 rounded-lg object-cover shrink-0 bg-slate-200" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
@@ -706,34 +717,73 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
 
                                                 {/* Info */}
                                                 <div className="flex-1 min-w-0">
-                                                    <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{event.name}</p>
-                                                    <p className="text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold mt-0.5">{dateLabel}</p>
-
-                                                    {/* Registration count / fill bar */}
-                                                    <div className="mt-2 flex items-center gap-2">
-                                                        <span className="text-[10px] font-black text-slate-700 dark:text-slate-300 tabular-nums">{event.signupCount.toLocaleString()}</span>
-                                                        {event.signupLimit ? (
-                                                            <span className="text-[10px] text-slate-400">{`/ ${event.signupLimit.toLocaleString()} spots`}</span>
-                                                        ) : (
-                                                            <span className="text-[10px] text-slate-400">registered</span>
-                                                        )}
-                                                        {isFull && (
-                                                            <span className="ml-1 px-1.5 py-0.5 rounded text-[9px] font-black bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 uppercase tracking-widest">Full</span>
-                                                        )}
-                                                        {!event.openSignup && !isFull && (
-                                                            <span className="ml-1 px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 uppercase tracking-widest">Closed</span>
+                                                    {/* Title + badges */}
+                                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                                        <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{event.name}</p>
+                                                        {isFull && <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 uppercase tracking-widest shrink-0">Full</span>}
+                                                        {isClosed && !isFull && <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400 uppercase tracking-widest shrink-0">Closed</span>}
+                                                        {isAlmostFull && <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 uppercase tracking-widest shrink-0">Almost Full</span>}
+                                                        {visibilityBadge && (
+                                                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-widest shrink-0 ${
+                                                                visibilityBadge.color === 'amber'
+                                                                    ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400'
+                                                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                                                            }`}>
+                                                                {visibilityBadge.label}
+                                                            </span>
                                                         )}
                                                     </div>
 
+                                                    {/* Date + campus */}
+                                                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                                        <p className="text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold">{dateLabel}</p>
+                                                        {event.campusName && (
+                                                            <span className="text-[10px] text-slate-400">· {event.campusName}</span>
+                                                        )}
+                                                        {closesLabel && (
+                                                            <span className="text-[10px] text-slate-400">· {closesLabel}</span>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Attendee counts row */}
+                                                    <div className="mt-2 flex items-center gap-3 flex-wrap">
+                                                        {/* Confirmed */}
+                                                        <div className="flex items-center gap-1">
+                                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block"></span>
+                                                            <span className="text-[10px] font-black text-slate-700 dark:text-slate-300 tabular-nums">{displayCount.toLocaleString()}</span>
+                                                            <span className="text-[10px] text-slate-400">
+                                                                {event.signupLimit ? `/ ${event.signupLimit.toLocaleString()} spots` : 'registered'}
+                                                            </span>
+                                                        </div>
+                                                        {/* Waitlisted */}
+                                                        {(event.waitlistedCount ?? 0) > 0 && (
+                                                            <div className="flex items-center gap-1">
+                                                                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block"></span>
+                                                                <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 tabular-nums">{event.waitlistedCount} waitlisted</span>
+                                                            </div>
+                                                        )}
+                                                        {/* Canceled */}
+                                                        {(event.canceledCount ?? 0) > 0 && (
+                                                            <div className="flex items-center gap-1">
+                                                                <span className="w-1.5 h-1.5 rounded-full bg-slate-400 inline-block"></span>
+                                                                <span className="text-[10px] text-slate-400 tabular-nums">{event.canceledCount} canceled</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Capacity fill bar */}
                                                     {fillPct !== null && (
                                                         <div className="mt-1.5 w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
                                                             <div
                                                                 className={`h-full rounded-full transition-all ${
-                                                                    isFull ? 'bg-rose-400' : fillPct >= 75 ? 'bg-amber-400' : 'bg-emerald-400'
+                                                                    isFull ? 'bg-rose-400' : isAlmostFull ? 'bg-amber-400' : 'bg-emerald-400'
                                                                 }`}
                                                                 style={{ width: `${fillPct}%` }}
                                                             />
                                                         </div>
+                                                    )}
+                                                    {fillPct !== null && (
+                                                        <p className="text-[9px] text-slate-400 mt-0.5 font-mono">{fillPct}% capacity</p>
                                                     )}
                                                 </div>
 
@@ -743,7 +793,7 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
                                                         href={event.publicUrl}
                                                         target="_blank"
                                                         rel="noopener noreferrer"
-                                                        className="shrink-0 text-[10px] font-black uppercase tracking-widest text-indigo-500 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 mt-1 transition-colors"
+                                                        className="shrink-0 text-[10px] font-black uppercase tracking-widest text-indigo-500 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 mt-1 opacity-0 group-hover:opacity-100 transition-opacity"
                                                     >
                                                         View →
                                                     </a>
@@ -757,6 +807,7 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
                     </WidgetWrapper>
                 </div>
             );
+
         default:
             return null;
     }

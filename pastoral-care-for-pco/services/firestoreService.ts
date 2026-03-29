@@ -21,6 +21,7 @@ import {
     ServicesDashboardData, ServicesFilter, SystemSettings, CensusStats,
     Ministry, MetricDefinition, MetricEntry, AggregatedChurchStats, LogEntry,
     PastoralNote, PrayerRequest, CheckInRecord, EmailCampaign, PcoRegistrationEvent,
+    PcoRegistrationAttendee, PcoRegistrationCampus,
     Poll, PollResponse
 } from '../types';
 import { calculateServicesAnalytics, calculateAggregatedStats } from './analyticsService';
@@ -552,27 +553,32 @@ class FirestoreService {
   async upsertServicesTeams(records: ServicesTeam[]) { await this.batchUpsert('teams', records); }
   async upsertServicePlans(records: ServicePlanSnapshot[]) { await this.batchUpsert('service_plans', records); }
   async upsertRegistrations(records: PcoRegistrationEvent[]) { await this.batchUpsert('pco_registrations', records); }
+  async upsertRegistrationAttendees(records: PcoRegistrationAttendee[]) { await this.batchUpsert('pco_registration_attendees', records); }
+  async upsertRegistrationCampuses(records: PcoRegistrationCampus[]) { await this.batchUpsert('pco_registration_campuses', records); }
 
   /**
-   * Deletes all pco_registrations documents for a tenant.
-   * Called before a full-replace sync to ensure cancelled/deleted PCO events
-   * don't remain stale in Firestore.
+   * Clears all pco_registrations AND pco_registration_attendees for a tenant.
+   * Called before a full-replace sync.
    */
   async clearRegistrations(churchId: string): Promise<void> {
-      try {
-          const q = query(collection(db, 'pco_registrations'), where('churchId', '==', churchId));
-          const snapshot = await getDocs(q);
-          if (snapshot.empty) return;
-          const CHUNK = 400;
-          for (let i = 0; i < snapshot.docs.length; i += CHUNK) {
-              const batch = writeBatch(db);
-              snapshot.docs.slice(i, i + CHUNK).forEach(d => batch.delete(d.ref));
-              await batch.commit();
+      const clearCollection = async (colName: string) => {
+          try {
+              const q = query(collection(db, colName), where('churchId', '==', churchId));
+              const snapshot = await getDocs(q);
+              if (snapshot.empty) return;
+              const CHUNK = 400;
+              for (let i = 0; i < snapshot.docs.length; i += CHUNK) {
+                  const batch = writeBatch(db);
+                  snapshot.docs.slice(i, i + CHUNK).forEach(d => batch.delete(d.ref));
+                  await batch.commit();
+              }
+              console.log(`[Firestore] Cleared ${snapshot.size} docs from ${colName} for tenant ${churchId}`);
+          } catch (e) {
+              console.warn(`[Firestore] clear ${colName} failed (non-fatal):`, e);
           }
-          console.log(`[Firestore] Cleared ${snapshot.size} old registrations for tenant ${churchId}`);
-      } catch (e) {
-          console.warn('[Firestore] clearRegistrations failed (non-fatal):', e);
-      }
+      };
+      await clearCollection('pco_registrations');
+      await clearCollection('pco_registration_attendees');
   }
 
   async getRegistrations(churchId: string): Promise<PcoRegistrationEvent[]> {
@@ -589,6 +595,24 @@ class FirestoreService {
                   if (!b.startsAt) return -1;
                   return new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime();
               });
+      } catch (e) { return []; }
+  }
+
+  async getRegistrationAttendees(churchId: string, eventId?: string): Promise<PcoRegistrationAttendee[]> {
+      try {
+          const constraints: any[] = [where('churchId', '==', churchId)];
+          if (eventId) constraints.push(where('eventId', '==', eventId));
+          const q = query(collection(db, 'pco_registration_attendees'), ...constraints);
+          const snapshot = await getDocs(q);
+          return snapshot.docs.map(d => d.data() as PcoRegistrationAttendee);
+      } catch (e) { return []; }
+  }
+
+  async getRegistrationCampuses(churchId: string): Promise<PcoRegistrationCampus[]> {
+      try {
+          const q = query(collection(db, 'pco_registration_campuses'), where('churchId', '==', churchId));
+          const snapshot = await getDocs(q);
+          return snapshot.docs.map(d => d.data() as PcoRegistrationCampus);
       } catch (e) { return []; }
   }
   

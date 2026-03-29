@@ -4,7 +4,8 @@ import { createServerLogger } from './logService';
 import { getDb } from '../backend/firebase';
 import { 
     PcoPerson, PcoGroup, DetailedDonation, PcoFund, AttendanceRecord, 
-    ServicePlanSnapshot, ServicesTeam, CheckInRecord, PcoRegistrationEvent
+    ServicePlanSnapshot, ServicesTeam, CheckInRecord,
+    PcoRegistrationEvent, PcoRegistrationAttendee, PcoRegistrationCampus
 } from '../types';
 import { initializeWebhooks } from './pcoWebhookService';
 
@@ -1142,23 +1143,25 @@ export const syncCheckInsData = async (churchId: string) => {
 };
 
 /**
- * Syncs registration events from PCO Registrations API into Firestore.
- * This is a FULL REPLACE sync — existing registrations for the tenant are
- * cleared first so that cancelled/deleted PCO events don't remain stale.
- * Non-fatal: if the org doesn't have the Registrations module (403/404),
- * we bail gracefully without failing the overall sync.
+ * Full Registrations sync:
+ *  1. Campuses  — /registrations/v2/campuses
+ *  2. Events    — /registrations/v2/events (all attributes)
+ *  3. Attendees — /registrations/v2/events/{id}/registrations?include=attendees
+ *
+ * Stored in:
+ *   pco_registrations           (one doc per event)
+ *   pco_registration_attendees  (one doc per attendee)
+ *   pco_registration_campuses   (one doc per campus)
+ *
+ * Non-fatal: if the org has no Registrations module (probe returns _pcoNote) we bail silently.
  */
 export const syncRegistrationsData = async (churchId: string) => {
     logger.info('Syncing registrations (full replace)...', 'sync', { churchId }, churchId);
 
     try {
-        // --- Probe call: check if the Registrations module is available before paginating ---
-        // The proxy converts 404 → HTTP 200 with { data: [], _pcoNote: '...' }
-        // so we detect the _pcoNote flag here to bail before clearing existing data.
+        // ── Probe: check module availability before clearing any existing data ───
         const probeData = await pcoFetch(churchId, 'registrations/v2/events?per_page=1&order=starts_at');
-
         if (!probeData || probeData._pcoNote) {
-            // Module not available for this org — skip entirely, don't clear existing data
             logger.info(
                 'Registrations module not available for this organization — skipping sync',
                 'sync', { churchId, note: probeData?._pcoNote }, churchId
@@ -1168,43 +1171,180 @@ export const syncRegistrationsData = async (churchId: string) => {
 
         const now = Date.now();
 
+        // ── 1. Campuses ─────────────────────────────────────────────────────────
+        let campuses: PcoRegistrationCampus[] = [];
+        try {
+            campuses = await fetchAllPages(
+                churchId,
+                'registrations/v2/campuses',
+                (item: any) => {
+                    if (!item) return null;
+                    const attrs = item.attributes || {};
+                    return {
+                        id: `${churchId}_${item.id}`,
+                        pcoId: item.id,
+                        churchId,
+                        name: attrs.name || 'Unnamed Campus',
+                        createdAt: attrs.created_at || null,
+                        updatedAt: attrs.updated_at || null,
+                        lastSynced: now,
+                    } as PcoRegistrationCampus;
+                }
+            );
+            campuses = campuses.filter(Boolean);
+            if (campuses.length > 0) {
+                await firestore.upsertRegistrationCampuses(campuses);
+            }
+            logger.info('Registration campuses synced', 'sync', { churchId, count: campuses.length }, churchId);
+        } catch (campusErr: any) {
+            logger.warn('Campus sync failed (non-fatal)', 'sync', { churchId, error: campusErr?.message }, churchId);
+        }
+
+        // Build campus lookup for enriching events
+        const campusMap = new Map<string, string>(); // pcoId → name
+        campuses.forEach(c => campusMap.set(c.pcoId, c.name));
+
+        // ── 2. Events ───────────────────────────────────────────────────────────
         const rawEvents = await fetchAllPages(
             churchId,
             'registrations/v2/events?order=starts_at',
             (item: any) => {
                 if (!item) return null;
                 const attrs = item.attributes || {};
+                const campusId = item.relationships?.campus?.data?.id || null;
                 return {
                     id: `${churchId}_${item.id}`,
+                    pcoId: item.id,
                     churchId,
                     name: attrs.name || 'Unnamed Event',
-                    startsAt: attrs.starts_at || null,
-                    endsAt: attrs.ends_at || null,
-                    signupCount: attrs.signup_count ?? attrs.attendee_count ?? 0,
-                    signupLimit: attrs.signup_limit ?? attrs.attendee_limit ?? null,
-                    openSignup: attrs.open_signup ?? true,
+                    description: attrs.description || null,
                     logoUrl: attrs.logo_url || attrs.image_url || null,
                     publicUrl: attrs.public_url ||
                         (item.id ? `https://registrations.planningcenteronline.com/events/${item.id}` : null),
+                    visibility: attrs.visibility || null,
+                    registrationType: attrs.registration_type || null,
+                    // Dates
+                    startsAt: attrs.starts_at || attrs.first_event_date || null,
+                    endsAt: attrs.ends_at || null,
+                    openAt: attrs.open_at || null,
+                    closeAt: attrs.close_at || null,
+                    // Counts
+                    signupCount: attrs.active_attendees_count ?? attrs.signup_count ?? attrs.attendee_count ?? 0,
+                    signupLimit: attrs.signup_limit ?? attrs.attendee_limit ?? null,
+                    openSignup: attrs.open_signup ?? true,
+                    // Campus
+                    campusId: campusId,
+                    campusName: campusId ? (campusMap.get(campusId) ?? null) : null,
+                    // Counters filled in during attendee sync below
+                    totalRegistrations: 0,
+                    totalAttendees: 0,
+                    waitlistedCount: 0,
+                    canceledCount: 0,
                     lastSynced: now,
                 } as PcoRegistrationEvent;
             }
         );
 
-        const records = rawEvents.filter(Boolean) as PcoRegistrationEvent[];
+        const events = rawEvents.filter(Boolean) as PcoRegistrationEvent[];
+        logger.info(`Fetched ${events.length} registration events`, 'sync', { churchId }, churchId);
 
-        // --- Full Replace: clear existing tenant data, then write fresh records ---
-        // Only clear if we successfully fetched from the API (probe passed above).
+        // ── 3. Clear existing data AFTER fetch succeeds ──────────────────────
         await firestore.clearRegistrations(churchId);
 
-        if (records.length > 0) {
-            await firestore.upsertRegistrations(records);
+        // ── 4. Attendees for each event ──────────────────────────────────────
+        const allAttendees: PcoRegistrationAttendee[] = [];
+
+        for (const event of events) {
+            try {
+                // Fetch registrations with attendees included
+                const regAttendees = await fetchAllPages(
+                    churchId,
+                    `registrations/v2/events/${event.pcoId}/registrations?include=attendees`,
+                    (regItem: any, included: any[] = []) => {
+                        if (!regItem) return null;
+                        const regAttrs = regItem.attributes || {};
+                        const isCanceled = regAttrs.is_canceled ?? false;
+
+                        // Get attendee references from this registration
+                        const attendeeRefs: any[] = regItem.relationships?.attendees?.data || [];
+
+                        // Map attendees from the included array
+                        return attendeeRefs.map((ref: any) => {
+                            const attendeeData = included?.find(
+                                (i: any) => i.type === 'Attendee' && i.id === ref.id
+                            );
+                            if (!attendeeData) return null;
+
+                            const aAttrs = attendeeData.attributes || {};
+                            const personId = attendeeData.relationships?.person?.data?.id || null;
+                            const isWaitlisted = aAttrs.is_waitlisted ?? false;
+                            const statusRaw = aAttrs.status || (isWaitlisted ? 'waitlisted' : isCanceled ? 'canceled' : 'confirmed');
+
+                            return {
+                                id: `${churchId}_${attendeeData.id}`,
+                                pcoId: attendeeData.id,
+                                churchId,
+                                eventId: event.id,
+                                pcoEventId: event.pcoId,
+                                registrationId: regItem.id || null,
+                                name: aAttrs.name || aAttrs.first_name
+                                    ? `${aAttrs.first_name || ''} ${aAttrs.last_name || ''}`.trim()
+                                    : 'Unknown',
+                                status: statusRaw,
+                                isWaitlisted,
+                                isCanceled: aAttrs.is_canceled ?? isCanceled,
+                                attendeeTypeName: aAttrs.attendee_type_name || aAttrs.selection_type_name || null,
+                                personId,
+                                emergencyContactName: aAttrs.emergency_contact_name || null,
+                                emergencyContactPhone: aAttrs.emergency_contact_phone_number || null,
+                                totalCostCents: regAttrs.total_cost_minus_discounts ?? null,
+                                balanceDueCents: regAttrs.balance_due_cents ?? null,
+                                createdAt: regAttrs.created_at || null,
+                                lastSynced: now,
+                            } as PcoRegistrationAttendee;
+                        }).filter(Boolean);
+                    }
+                );
+
+                const eventAttendees = regAttendees.flat().filter(Boolean) as PcoRegistrationAttendee[];
+
+                // Update event counters from actual attendee data
+                event.totalAttendees = eventAttendees.length;
+                event.totalRegistrations = new Set(eventAttendees.map(a => a.registrationId).filter(Boolean)).size;
+                event.waitlistedCount = eventAttendees.filter(a => a.isWaitlisted).length;
+                event.canceledCount = eventAttendees.filter(a => a.isCanceled).length;
+                // Keep signupCount in sync with confirmed count
+                event.signupCount = eventAttendees.filter(a => !a.isWaitlisted && !a.isCanceled).length || event.signupCount;
+
+                allAttendees.push(...eventAttendees);
+            } catch (attErr: any) {
+                logger.warn(
+                    `Attendee fetch failed for event ${event.pcoId} (non-fatal)`,
+                    'sync', { churchId, eventId: event.pcoId, error: attErr?.message }, churchId
+                );
+            }
+
+            // Throttle between events to be a good API citizen
+            await delay(150);
         }
 
-        logger.info('Registrations full sync complete', 'sync', { churchId, count: records.length }, churchId);
+        // ── 5. Persist to Firestore ──────────────────────────────────────────
+        if (events.length > 0) {
+            await firestore.upsertRegistrations(events);
+        }
+        if (allAttendees.length > 0) {
+            await firestore.upsertRegistrationAttendees(allAttendees);
+        }
+
+        logger.info(
+            'Registrations full sync complete',
+            'sync',
+            { churchId, events: events.length, attendees: allAttendees.length, campuses: campuses.length },
+            churchId
+        );
 
     } catch (e: any) {
-        // 403 = missing registrations scope — log and bail gracefully
+        // 403 = missing registrations scope
         if (e?.message?.includes('403') || e?.message?.includes('requiresReauth') || e?.message?.includes('not authorized')) {
             logger.warn(
                 'Registrations sync skipped: scope not granted. Reconnect PCO in Settings → Planning Center to enable.',
@@ -1212,9 +1352,7 @@ export const syncRegistrationsData = async (churchId: string) => {
             );
             return;
         }
-        // Don't fail the whole sync for other registrations issues
         logger.warn('Registrations sync failed (non-fatal)', 'sync', { churchId, error: e?.message }, churchId);
         console.warn('Registrations sync failed:', e);
     }
 };
-

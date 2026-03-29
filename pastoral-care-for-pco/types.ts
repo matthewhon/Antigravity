@@ -600,17 +600,71 @@ export interface AggregatedGivingMetric {
 
 /** Synced from PCO Registrations /v2/events */
 export interface PcoRegistrationEvent {
-    id: string;
+    id: string;                    // `${churchId}_${pcoEventId}`
+    pcoId: string;                 // raw PCO event ID
     churchId: string;
     name: string;
-    startsAt?: string | null;
-    endsAt?: string | null;
-    signupCount: number;
-    signupLimit?: number | null;
-    openSignup: boolean;
+    description?: string | null;   // HTML description
     logoUrl?: string | null;
     publicUrl?: string | null;
-    /** ISO timestamp when the record was last synced */
+    visibility?: string | null;    // 'public' | 'private' | 'link_only'
+    registrationType?: string | null; // 'detailed' | 'simple'
+    // Dates
+    startsAt?: string | null;      // ISO — first event date
+    endsAt?: string | null;
+    openAt?: string | null;        // when registration opens
+    closeAt?: string | null;       // when registration closes
+    // Counts
+    signupCount: number;           // confirmed attendee count (active_attendees_count)
+    signupLimit?: number | null;
+    openSignup: boolean;
+    // Aggregated signup data (populated from /registrations sub-resource)
+    totalRegistrations?: number;   // distinct registrations (checkouts)
+    totalAttendees?: number;       // total attendee records
+    waitlistedCount?: number;
+    canceledCount?: number;
+    // Campus
+    campusId?: string | null;
+    campusName?: string | null;
+    // Sync metadata
+    lastSynced: number;
+}
+
+/** A single attendee record for a Registration event (from /events/{id}/registrations?include=attendees) */
+export interface PcoRegistrationAttendee {
+    id: string;                    // `${churchId}_${pcoAttendeeId}`
+    pcoId: string;
+    churchId: string;
+    eventId: string;               // ref to PcoRegistrationEvent.id
+    pcoEventId: string;            // raw PCO event ID
+    registrationId?: string | null; // PCO registration (checkout) ID
+    // Person details
+    name: string;
+    status: string;                // 'confirmed' | 'waitlisted' | 'canceled'
+    isWaitlisted: boolean;
+    isCanceled: boolean;
+    attendeeTypeName?: string | null; // e.g. 'Adult', 'Child', 'Volunteer'
+    // Linked PCO Person
+    personId?: string | null;      // PCO People person ID
+    // Emergency contact (if collected)
+    emergencyContactName?: string | null;
+    emergencyContactPhone?: string | null;
+    // Financial
+    totalCostCents?: number | null;
+    balanceDueCents?: number | null;
+    // Metadata
+    createdAt?: string | null;
+    lastSynced: number;
+}
+
+/** Campus from PCO Registrations /v2/campuses */
+export interface PcoRegistrationCampus {
+    id: string;                    // `${churchId}_${pcoCampusId}`
+    pcoId: string;
+    churchId: string;
+    name: string;
+    createdAt?: string | null;
+    updatedAt?: string | null;
     lastSynced: number;
 }
 
