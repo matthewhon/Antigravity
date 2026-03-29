@@ -386,24 +386,28 @@ export async function executeSend(
     }
 
     // 2. Load church to check for tenant-specific email configuration
-    const churchSnap = await db.collection('churches').doc(churchId).get();
-    const churchData = churchSnap.data() || {};
-    const tenantEmail = churchData.emailSettings || {};
-
-    // IMPORTANT: The 'on-behalf-of' subuser header tells SendGrid to check the *subuser's*
-    // sender identities. This only works for the shared domain (pastoralcare.barnabassoftware.com)
-    // because that domain auth is explicitly associated with the subuser at provisioning time.
+    const churchSnap = await db.col    // IMPORTANT: The 'on-behalf-of' subuser header tells SendGrid to check the *subuser's*
+    // sender identities. For the shared domain, the domain auth is explicitly associated
+    // with the subuser at provisioning time, so on-behalf-of works.
     //
-    // For custom domain sends, the domain authentication lives on the master account (it was
-    // created on-behalf-of the subuser but the DKIM/SPF keys are controlled at the master level).
-    // Sending via on-behalf-of for a custom domain causes SendGrid to look for a verified Sender
-    // Identity on the SUBUSER that it cannot find, producing the "does not match a verified Sender
-    // Identity" error. The correct pattern is to send custom domain emails directly with the master
-    // API key (no on-behalf-of), which lets the master account's domain authentication apply.
+    // For custom domain sends: the domain auth is created on the master account, then
+    // associated with the subuser after DNS validation. Until that association is complete
+    // (i.e. domainVerified = true), sending via on-behalf-of will fail with "Sender Identity"
+    // errors. We therefore send without on-behalf-of (master key only) for custom domains.
+    // This is safe because the master account's domain auth covers the from-email domain.
     const isCustomDomainMode = tenantEmail.mode === 'custom';
     const subuserId: string | undefined = (!isCustomDomainMode && tenantEmail.sendGridSubuserId)
         ? tenantEmail.sendGridSubuserId
         : undefined;
+
+    // Guard: if custom domain is configured but not yet DNS-verified, fail early with a
+    // clear message rather than letting SendGrid return a cryptic Sender Identity error.
+    if (isCustomDomainMode && !tenantEmail.domainVerified) {
+        throw new Error(
+            `Custom domain "${tenantEmail.customDomain || '(unknown)'}" has not been verified yet. ` +
+            `Go to Settings → Mail Settings → Verify DNS before sending.`
+        );
+    }
 
     // Prefer tenant-level From settings → campaign override → global fallback.
     // IMPORTANT: If the tenant has configured a From email in Mail Settings (shared or
@@ -421,6 +425,22 @@ export async function executeSend(
     const fromEmail = tenantFromEmail || campaign.fromEmail || globalFromEmail;
     const fromName  = tenantFromName  || campaign.fromName  || globalFromName;
     const subject   = campaign.subject   || '(No Subject)';
+
+    if (!fromEmail) throw new Error('No "From Email" configured. Set it on the campaign or in App Config → SendGrid.');
+
+    // Extra guard for custom domain: catch from-email domain mismatch early.
+    // If someone has a custom domain "grace.org" but the resolved from-email is
+    // "pastor@gmail.com" (e.g. from an old campaign field), SendGrid will reject it.
+    if (isCustomDomainMode && tenantEmail.customDomain && fromEmail) {
+        const fromDomain = fromEmail.split('@')[1]?.toLowerCase();
+        const configuredDomain = tenantEmail.customDomain.toLowerCase();
+        if (fromDomain && fromDomain !== configuredDomain) {
+            throw new Error(
+                `From email "${fromEmail}" does not match the authenticated custom domain "${configuredDomain}". ` +
+                `Update the From Email in Settings → Mail Settings.`
+            );
+        }
+    }.subject   || '(No Subject)';
 
     if (!fromEmail) throw new Error('No "From Email" configured. Set it on the campaign or in App Config → SendGrid.');
 
