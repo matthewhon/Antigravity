@@ -8,26 +8,25 @@ import {
 } from '../types';
 import { initializeWebhooks } from './pcoWebhookService';
 
-// Lazy-initialize the server-side logger so that importing this module in
-// the browser bundle does NOT trigger a call to getDb() (Firebase Admin).
-// getDb() reads server-only env vars and throws when evaluated in the browser,
-// causing a silent crash that leaves the app blank.
-let _logger: ReturnType<typeof createServerLogger> | null = null;
-const getLogger = () => {
-    if (!_logger) {
-        // Dynamically require so Vite doesn't try to bundle firebase-admin
+// Server-side logger — only initialised when running in Node.js.
+// In the browser this module is imported (for client-side syncAllData calls that
+// POST to the server), but getDb() must NOT be called because it requires
+// Firebase Admin env vars that don't exist in the browser.  Using a no-op
+// console fallback keeps the browser bundle from crashing.
+const logger = (() => {
+    if (typeof window === 'undefined') {
+        // Node.js / server context — safe to use Firebase Admin
         // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { getDb } = require('../backend/firebase');
-        _logger = createServerLogger(getDb());
+        return createServerLogger(getDb());
     }
-    return _logger!;
-};
-// Convenience alias — every call site in this file uses `logger.xxx`
-const logger = {
-    info:  (...args: Parameters<ReturnType<typeof createServerLogger>['info']>)  => getLogger().info(...args),
-    warn:  (...args: Parameters<ReturnType<typeof createServerLogger>['warn']>)  => getLogger().warn(...args),
-    error: (...args: Parameters<ReturnType<typeof createServerLogger>['error']>) => getLogger().error(...args),
-};
+    // Browser context — no-op stubs so all logger.xxx() calls are safe
+    return {
+        info:  (msg: string, ...rest: any[]) => console.log('[sync]', msg, ...rest),
+        warn:  (msg: string, ...rest: any[]) => console.warn('[sync]', msg, ...rest),
+        error: (msg: string, ...rest: any[]) => console.error('[sync]', msg, ...rest),
+    };
+})();
 
 
 // Helper to get system settings and proxy URL
