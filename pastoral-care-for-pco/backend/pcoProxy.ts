@@ -120,12 +120,13 @@ export const pcoProxy = async (req: any, res: any) => {
         // 4. Return Response
         if (!response.ok) {
             const errText = await response.text();
-            log.warn('PCO upstream error', 'proxy', { churchId, url, status: response.status, error: errText.substring(0, 500) }, churchId);
 
-            // Special handling for errors on registrations endpoints
+            // Special handling for registrations endpoints — check BEFORE logging
+            // so we don't emit noisy warn logs for expected conditions.
             if (url?.includes('/registrations/')) {
                 if (response.status === 403) {
-                    // 403 = valid token but missing 'registrations' scope — must reconnect PCO with registrations scope
+                    // 403 = valid token but missing 'registrations' scope — must reconnect
+                    log.warn('Registrations scope not granted — reconnect PCO to enable', 'proxy', { churchId }, churchId);
                     res.status(403).json({
                         error: 'Registrations scope not authorized. Please reconnect Planning Center in Settings → Planning Center to grant Registrations access.',
                         requiresReauth: true,
@@ -135,12 +136,15 @@ export const pcoProxy = async (req: any, res: any) => {
                     return;
                 }
                 if (response.status === 404) {
-                    // 404 = the org's PCO account does not have the Registrations module / product
+                    // 404 = org's PCO account does not have the Registrations module/product
+                    // This is expected and non-fatal — return empty data silently.
+                    log.info('Registrations module not available for this organization (404 — non-fatal)', 'proxy', { churchId }, churchId);
                     res.status(200).json({ data: [], meta: { total_count: 0 }, _pcoNote: 'Registrations module not available for this organization' });
                     return;
                 }
             }
 
+            log.warn('PCO upstream error', 'proxy', { churchId, url, status: response.status, error: errText.substring(0, 500) }, churchId);
             res.status(response.status).send(errText);
             return;
         }

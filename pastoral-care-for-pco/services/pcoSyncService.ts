@@ -1,11 +1,19 @@
 
 import { firestore } from './firestoreService';
-import { logger } from './logService';
+import { createServerLogger } from './logService';
+import { getDb } from '../backend/firebase';
 import { 
     PcoPerson, PcoGroup, DetailedDonation, PcoFund, AttendanceRecord, 
     ServicePlanSnapshot, ServicesTeam, CheckInRecord, PcoRegistrationEvent
 } from '../types';
 import { initializeWebhooks } from './pcoWebhookService';
+
+// Use the server-side (firebase-admin) logger so sync logs actually persist to
+// Firestore when this module runs in Node.js (via /pco/sync or syncScheduler).
+// The client-side `logger` uses the browser Firebase SDK which cannot write
+// from a Node.js context — all its Firestore writes would silently fail.
+const logger = createServerLogger(getDb());
+
 
 // Helper to get system settings and proxy URL
 const getProxyUrl = async () => {
@@ -1144,19 +1152,29 @@ export const syncRegistrationsData = async (churchId: string) => {
     logger.info('Syncing registrations (full replace)...', 'sync', { churchId }, churchId);
 
     try {
-        // Use the shared pcoFetch/fetchAllPages helpers — same as every other sync function.
-        // The proxy handles 403 (scope missing) by returning a 403 status or a _pcoNote flag.
+        // --- Probe call: check if the Registrations module is available before paginating ---
+        // The proxy converts 404 → HTTP 200 with { data: [], _pcoNote: '...' }
+        // so we detect the _pcoNote flag here to bail before clearing existing data.
+        const probeData = await pcoFetch(churchId, 'registrations/v2/events?per_page=1&order=starts_at');
+
+        if (!probeData || probeData._pcoNote) {
+            // Module not available for this org — skip entirely, don't clear existing data
+            logger.info(
+                'Registrations module not available for this organization — skipping sync',
+                'sync', { churchId, note: probeData?._pcoNote }, churchId
+            );
+            return;
+        }
+
         const now = Date.now();
 
         const rawEvents = await fetchAllPages(
             churchId,
             'registrations/v2/events?order=starts_at',
             (item: any) => {
-                // fetchAllPages returns null for 404 from pcoFetch — skip those
                 if (!item) return null;
                 const attrs = item.attributes || {};
                 return {
-                    // Compound ID so batchUpsert correctly scopes per-tenant
                     id: `${churchId}_${item.id}`,
                     churchId,
                     name: attrs.name || 'Unnamed Event',
@@ -1173,11 +1191,10 @@ export const syncRegistrationsData = async (churchId: string) => {
             }
         );
 
-        // Filter out any nulls (from 404 items)
         const records = rawEvents.filter(Boolean) as PcoRegistrationEvent[];
 
-        // --- Full Replace: clear existing tenant data before writing fresh records ---
-        // This ensures cancelled events in PCO are removed, not left stale.
+        // --- Full Replace: clear existing tenant data, then write fresh records ---
+        // Only clear if we successfully fetched from the API (probe passed above).
         await firestore.clearRegistrations(churchId);
 
         if (records.length > 0) {
@@ -1187,7 +1204,7 @@ export const syncRegistrationsData = async (churchId: string) => {
         logger.info('Registrations full sync complete', 'sync', { churchId, count: records.length }, churchId);
 
     } catch (e: any) {
-        // 403 = missing registrations scope — log and bail gracefully without failing the full sync
+        // 403 = missing registrations scope — log and bail gracefully
         if (e?.message?.includes('403') || e?.message?.includes('requiresReauth') || e?.message?.includes('not authorized')) {
             logger.warn(
                 'Registrations sync skipped: scope not granted. Reconnect PCO in Settings → Planning Center to enable.',
@@ -1200,3 +1217,4 @@ export const syncRegistrationsData = async (churchId: string) => {
         console.warn('Registrations sync failed:', e);
     }
 };
+
