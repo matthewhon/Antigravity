@@ -121,6 +121,19 @@ export const pcoProxy = async (req: any, res: any) => {
         if (!response.ok) {
             const errText = await response.text();
 
+            // 429 — PCO rate limit hit. Return a structured JSON so the client can
+            // display a meaningful message instead of the raw "Proxy error: 429" string.
+            if (response.status === 429) {
+                const retryAfter = response.headers.get('Retry-After');
+                log.warn('PCO rate limit (429) hit at proxy level', 'proxy', { churchId, url, retryAfter }, churchId);
+                res.status(429).json({
+                    error: 'Planning Center rate limit reached. Please wait a moment before trying again.',
+                    pcoStatus: 429,
+                    retryAfter: retryAfter ? parseInt(retryAfter, 10) : 30,
+                });
+                return;
+            }
+
             // Special handling for registrations endpoints — check BEFORE logging
             // so we don't emit noisy warn logs for expected conditions.
             if (url?.includes('/registrations/')) {
@@ -145,7 +158,7 @@ export const pcoProxy = async (req: any, res: any) => {
             }
 
             log.warn('PCO upstream error', 'proxy', { churchId, url, status: response.status, error: errText.substring(0, 500) }, churchId);
-            res.status(response.status).send(errText);
+            res.status(response.status).json({ error: `PCO API error (${response.status})`, pcoStatus: response.status, detail: errText.substring(0, 300) });
             return;
         }
 

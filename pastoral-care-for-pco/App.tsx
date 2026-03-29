@@ -870,6 +870,7 @@ const App: React.FC = () => {
                 isSyncing={isSyncing}
                 pcoConnected={church.pcoConnected}
                 churchId={church.id}
+                apiBaseUrl={systemSettings?.apiBaseUrl || 'https://pastoralcare.barnabassoftware.com'}
                 onUpdateTheme={handleUpdateUserTheme}
                 currentTheme={user.theme}
             />

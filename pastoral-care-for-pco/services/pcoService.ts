@@ -12,19 +12,29 @@ const pcoFetch = async (churchId: string, url: string, method = 'GET', body: any
         body: JSON.stringify({ churchId, url, method, body })
     });
     if (!response.ok) {
+        // Default message uses status code; we'll try to replace with a server message
         let message = `Proxy error: ${response.status}`;
         try {
-            const errBody = await response.clone().json();
+            const errBody = await response.json();
+
+            // 429 — PCO rate limit. Give a user-friendly message.
+            if (response.status === 429 || errBody?.pcoStatus === 429) {
+                const wait = errBody?.retryAfter ? ` (wait ~${errBody.retryAfter}s)` : '';
+                throw new Error(`Planning Center rate limit reached${wait}. Please wait a moment before trying again.`);
+            }
+
+            // requiresReauth — scope missing, user must reconnect PCO
             if (errBody?.requiresReauth) {
-                // Provide a clear re-auth message that the UI can detect
                 message = errBody.error || message;
                 throw new Error(message + ' [requiresReauth]');
             }
+
             if (errBody?.error) message = errBody.error;
             else if (errBody?.message) message = errBody.message;
         } catch (innerErr: any) {
-            // If it's our requiresReauth throw, re-throw it
-            if (innerErr?.message?.includes('[requiresReauth]')) throw innerErr;
+            // Re-throw any errors we constructed above
+            if (innerErr?.message?.includes('[requiresReauth]') ||
+                innerErr?.message?.includes('rate limit')) throw innerErr;
             // Also treat 403 on registrations URLs as a scope reauth signal
             if (response.status === 403 && url.includes('/registrations/')) {
                 throw new Error(message + ' [requiresReauth]');

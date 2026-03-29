@@ -284,10 +284,15 @@ export const PcoImportModal: React.FC<Props> = ({ churchId, onInsert, onClose })
               <Loader2 size={20} className="animate-spin" /> Loading from Planning Center…
             </div>
           ) : errors[tab] ? (
-            <div className="flex items-center justify-center h-40 text-center">
+          <div className="flex items-center justify-center h-40 text-center">
               <div>
                 <p className="text-red-500 text-sm font-medium">{errors[tab]}</p>
-                {(errors[tab].includes('404') || errors[tab].includes('Not Found')) && tab === 'registrations' ? (
+                {errors[tab].includes('rate limit') ? (
+                  <p className="text-slate-400 text-xs mt-2 max-w-xs">
+                    Planning Center limits how many requests can be made in a short period.
+                    Wait 30–60 seconds then click <strong>Retry</strong> below.
+                  </p>
+                ) : (errors[tab].includes('404') || errors[tab].includes('Not Found')) && tab === 'registrations' ? (
                   <p className="text-slate-400 text-xs mt-2 max-w-xs">
                     Your Planning Center account needs to be reconnected to grant Registrations access.
                     Go to <strong>Settings → Planning Center</strong> and click <strong>Setup Integration</strong> to reconnect.
@@ -295,6 +300,15 @@ export const PcoImportModal: React.FC<Props> = ({ churchId, onInsert, onClose })
                 ) : (
                   <p className="text-slate-400 text-xs mt-1">Make sure PCO is connected in Settings.</p>
                 )}
+                <button
+                  onClick={() => {
+                    setErrors(p => ({ ...p, [tab]: '' }));
+                    setItems(p => ({ ...p, [tab]: [] }));
+                  }}
+                  className="mt-3 px-4 py-1.5 text-xs font-semibold text-indigo-600 dark:text-indigo-400 border border-indigo-300 dark:border-indigo-700 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition"
+                >
+                  Retry
+                </button>
               </div>
             </div>
           ) : filtered.length === 0 ? (

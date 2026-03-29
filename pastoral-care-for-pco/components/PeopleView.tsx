@@ -29,6 +29,8 @@ interface PeopleViewProps {
   isSyncing?: boolean;
   pcoConnected: boolean;
   churchId?: string;
+  /** Base URL of the Express server — required to call /pco/sync correctly in production */
+  apiBaseUrl?: string;
   onUpdateTheme?: (theme: 'traditional' | 'dark') => void;
   currentTheme?: 'traditional' | 'dark';
   globalStats?: GlobalStats | null;
@@ -83,6 +85,7 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
   userSettings = {},
   onUpdateSettings = (_k: string, _v: any) => {},
   churchId,
+  apiBaseUrl,
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'households' | 'risk'>('overview');
 
@@ -98,10 +101,15 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
     setRegError('');
     setRegSource(null);
 
-    const now = new Date();
+    // Show events that start in the future OR started within the last 14 days
+    // (covers ongoing multi-day events and reduces confusion when PCO events
+    // have no future registrations yet but are still relevant)
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 14);
+
     const mapAndFilter = (items: PcoRegistrationEvent[]) =>
       items
-        .filter(e => !e.startsAt || new Date(e.startsAt) >= now)
+        .filter(e => !e.startsAt || new Date(e.startsAt) >= cutoff)
         .sort((a, b) => {
           if (!a.startsAt) return 1;
           if (!b.startsAt) return -1;
@@ -120,9 +128,13 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
       .finally(() => setRegLoading(false));
 
     // Step 2: Trigger a server-side registrations-only sync in the background.
-    // The server handles PCO auth, pagination, and rate limiting correctly.
-    // When it completes, re-read Firestore to pick up the freshly synced events.
-    fetch('/pco/sync', {
+    // IMPORTANT: Use the absolute apiBaseUrl so this works in production (Cloud Run)
+    // where the frontend is served from a different origin than the Express server.
+    const syncUrl = apiBaseUrl
+      ? `${apiBaseUrl}/pco/sync`
+      : '/pco/sync'; // local dev fallback
+
+    fetch(syncUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ churchId, area: 'registrations' }),
