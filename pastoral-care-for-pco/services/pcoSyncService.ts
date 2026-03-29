@@ -1,7 +1,6 @@
 
 import { firestore } from './firestoreService';
 import { createServerLogger } from './logService';
-import { getDb } from '../backend/firebase';
 import { 
     PcoPerson, PcoGroup, DetailedDonation, PcoFund, AttendanceRecord, 
     ServicePlanSnapshot, ServicesTeam, CheckInRecord,
@@ -9,11 +8,26 @@ import {
 } from '../types';
 import { initializeWebhooks } from './pcoWebhookService';
 
-// Use the server-side (firebase-admin) logger so sync logs actually persist to
-// Firestore when this module runs in Node.js (via /pco/sync or syncScheduler).
-// The client-side `logger` uses the browser Firebase SDK which cannot write
-// from a Node.js context — all its Firestore writes would silently fail.
-const logger = createServerLogger(getDb());
+// Lazy-initialize the server-side logger so that importing this module in
+// the browser bundle does NOT trigger a call to getDb() (Firebase Admin).
+// getDb() reads server-only env vars and throws when evaluated in the browser,
+// causing a silent crash that leaves the app blank.
+let _logger: ReturnType<typeof createServerLogger> | null = null;
+const getLogger = () => {
+    if (!_logger) {
+        // Dynamically require so Vite doesn't try to bundle firebase-admin
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { getDb } = require('../backend/firebase');
+        _logger = createServerLogger(getDb());
+    }
+    return _logger!;
+};
+// Convenience alias — every call site in this file uses `logger.xxx`
+const logger = {
+    info:  (...args: Parameters<ReturnType<typeof createServerLogger>['info']>)  => getLogger().info(...args),
+    warn:  (...args: Parameters<ReturnType<typeof createServerLogger>['warn']>)  => getLogger().warn(...args),
+    error: (...args: Parameters<ReturnType<typeof createServerLogger>['error']>) => getLogger().error(...args),
+};
 
 
 // Helper to get system settings and proxy URL
