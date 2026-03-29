@@ -204,6 +204,73 @@ async function fetchWidgetData(
             return { upcoming, dayRange };
         }
 
+        case 'giving_last_week_by_fund': {
+            const snap = await db.collection('detailed_donations').where('churchId', '==', churchId).get();
+            const allDonations: any[] = snap.docs.map((d: any) => d.data());
+
+            const now = new Date();
+            const day = now.getDay(); // 0 = Sun
+            const lwEnd = new Date(now);
+            lwEnd.setDate(now.getDate() - day - 1); // last Saturday
+            lwEnd.setHours(23, 59, 59, 999);
+            const lwStart = new Date(lwEnd);
+            lwStart.setDate(lwEnd.getDate() - 6); // previous Monday
+            lwStart.setHours(0, 0, 0, 0);
+
+            const weekLabel = `${lwStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${lwEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+
+            const fundTotals: Record<string, number> = {};
+            allDonations.forEach(d => {
+                const dDate = new Date(d.date);
+                if (dDate >= lwStart && dDate <= lwEnd) {
+                    fundTotals[d.fundName] = (fundTotals[d.fundName] || 0) + d.amount;
+                }
+            });
+
+            const fundRows = Object.entries(fundTotals).sort(([, a], [, b]) => b - a);
+            const weekTotal = fundRows.reduce((s, [, v]) => s + v, 0);
+            return {
+                weekLabel,
+                weekTotal,
+                funds: fundRows.map(([name, amount]) => ({
+                    name,
+                    amount,
+                    pct: weekTotal > 0 ? Math.round((amount / weekTotal) * 100) : 0,
+                })),
+            };
+        }
+
+        case 'giving_budget_progress': {
+            const [donationsSnap, budgetsSnap] = await Promise.all([
+                db.collection('detailed_donations').where('churchId', '==', churchId).get(),
+                db.collection('budgets').where('churchId', '==', churchId).get(),
+            ]);
+            const allDonations: any[] = donationsSnap.docs.map((d: any) => d.data());
+            const allBudgets: any[]   = budgetsSnap.docs.map((d: any) => d.data());
+            const yearNow = new Date().getFullYear();
+            const now2 = new Date();
+            const yearBudgets = allBudgets.filter((b: any) => b.year === yearNow && b.isActive);
+            const yearStart = new Date(yearNow, 0, 1);
+            const fundActuals: Record<string, number> = {};
+            allDonations.forEach((d: any) => {
+                const dDate = new Date(d.date);
+                if (dDate >= yearStart && dDate <= now2) {
+                    fundActuals[d.fundName] = (fundActuals[d.fundName] || 0) + d.amount;
+                }
+            });
+            const totalBudget = yearBudgets.reduce((s: number, b: any) => s + b.totalAmount, 0);
+            const totalActual = yearBudgets.reduce((s: number, b: any) => s + (fundActuals[b.fundName] || 0), 0);
+            const funds = yearBudgets
+                .sort((a: any, b: any) => b.totalAmount - a.totalAmount)
+                .map((b: any) => ({
+                    name: b.fundName,
+                    actual: fundActuals[b.fundName] || 0,
+                    budget: b.totalAmount,
+                    pct: b.totalAmount > 0 ? Math.min(Math.round(((fundActuals[b.fundName] || 0) / b.totalAmount) * 100), 100) : 0,
+                }));
+            return { year: yearNow, totalBudget, totalActual, totalPct: totalBudget > 0 ? Math.min(Math.round((totalActual / totalBudget) * 100), 100) : 0, funds };
+        }
+
         default:
             return {};
     }
