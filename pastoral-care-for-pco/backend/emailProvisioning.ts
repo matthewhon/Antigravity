@@ -172,9 +172,10 @@ export const authenticateDomain = async (req: any, res: any) => {
         const existingSettings = church.emailSettings || {};
 
         // ── Step 1: Search for an EXISTING domain auth on the MASTER account ────
-        // We CANNOT rely on the stored domainAuthId from Firestore because it may
-        // have been created on-behalf-of a subuser (before this fix). Instead, list
-        // all domain auths on the master account and find one matching this domain.
+        // List domain auths using the master key (no on-behalf-of) — this returns
+        // only master-account-level auths. We also check if a subuser-owned auth
+        // exists for this domain (from the old code path) and delete it, because
+        // master-key sends cannot use subuser-owned domain identities.
         const listRes = await fetch('https://api.sendgrid.com/v3/whitelabel/domains?limit=200', {
             headers: sgHeaders(masterKey),
         });
@@ -195,6 +196,47 @@ export const authenticateDomain = async (req: any, res: any) => {
                     `Found existing master-account domain auth #${existingMasterAuthId} for ${domain}`,
                     'system', { churchId }, churchId
                 );
+            }
+        }
+
+        // ── Step 1b: Check for a subuser-owned domain auth and DELETE it ─────────
+        // If the domain was previously authenticated on-behalf-of a subuser (old code
+        // path), it won't appear in the master-account list above. We must find it
+        // on the subuser and delete it before creating a clean master-account auth.
+        // This is what produces the "Sender Identity" error: master key sends cannot
+        // reference a domain auth owned by a subuser.
+        const subuserId: string | undefined = existingSettings.sendGridSubuserId;
+        if (!existingMasterAuthId && subuserId) {
+            try {
+                const subuserListRes = await fetch('https://api.sendgrid.com/v3/whitelabel/domains?limit=200', {
+                    headers: {
+                        ...sgHeaders(masterKey),
+                        'on-behalf-of': subuserId,
+                    },
+                });
+                if (subuserListRes.ok) {
+                    const subuserDomains: any[] = await subuserListRes.json();
+                    const subuserMatch = subuserDomains.find(
+                        (d: any) => (d.domain || '').toLowerCase() === domain.toLowerCase()
+                    );
+                    if (subuserMatch) {
+                        log.warn(
+                            `Found subuser-owned domain auth #${subuserMatch.id} for ${domain} on subuser ${subuserId} — deleting it to allow master-account re-creation`,
+                            'system', { churchId }, churchId
+                        );
+                        // Delete the subuser-owned auth so we can create a clean master-account one
+                        await fetch(`https://api.sendgrid.com/v3/whitelabel/domains/${subuserMatch.id}`, {
+                            method: 'DELETE',
+                            headers: {
+                                ...sgHeaders(masterKey),
+                                'on-behalf-of': subuserId,
+                            },
+                        });
+                        log.info(`Deleted subuser-owned domain auth #${subuserMatch.id} for ${domain}`, 'system', { churchId }, churchId);
+                    }
+                }
+            } catch (subuserErr: any) {
+                log.warn(`Could not check/delete subuser domain auth: ${subuserErr.message}`, 'system', { churchId }, churchId);
             }
         }
 
