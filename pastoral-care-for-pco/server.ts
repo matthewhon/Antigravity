@@ -17,7 +17,7 @@ import { startEmailScheduler } from './backend/emailScheduler';
 import { startSyncScheduler } from './backend/syncScheduler';
 import { getDb } from './backend/firebase';
 import { handleGeminiProxy } from './backend/geminiProxy';
-import { provisionSubuser, authenticateDomain, verifyDomain } from './backend/emailProvisioning';
+import { provisionSubuser, authenticateDomain, verifyDomain, diagnoseDomain } from './backend/emailProvisioning';
 
 // Fix for bundled CJS environment
 const __dirname = process.cwd();
@@ -138,6 +138,7 @@ async function startServer() {
     app.post('/email/provision-subuser', express.json(), provisionSubuser);
     app.post('/email/authenticate-domain', express.json(), authenticateDomain);
     app.post('/email/verify-domain', express.json(), verifyDomain);
+    app.post('/email/diagnose-domain', express.json(), diagnoseDomain);
 
     // ─── Public Unsubscribe (no auth required) ───────────────────────────────
     // Token = base64url(churchId:email)

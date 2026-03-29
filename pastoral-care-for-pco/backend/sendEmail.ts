@@ -47,8 +47,13 @@ async function sgSend(
 
     if (!res.ok && res.status !== 202) {
         const body = await res.json().catch(() => ({}));
-        const errMsg = (body as any)?.errors?.[0]?.message || `SendGrid returned ${res.status}`;
-        throw new Error(errMsg);
+        const errors: any[] = (body as any)?.errors || [];
+        // Include all error messages + the from-address to aid diagnosis
+        const fromAddr = firstMsg.from.email;
+        const detail = errors.length > 0
+            ? errors.map((e: any) => e.message).join('; ')
+            : `SendGrid HTTP ${res.status}`;
+        throw new Error(`[SendGrid] from=${fromAddr} status=${res.status}: ${detail}`);
     }
 }
 

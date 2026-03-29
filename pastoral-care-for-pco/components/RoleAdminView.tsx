@@ -141,6 +141,8 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   const [mailDomainVerified, setMailDomainVerified] = useState(church.emailSettings?.domainVerified || false);
   const [isMailSaving, setIsMailSaving] = useState(false);
   const [mailMessage, setMailMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [mailDiagEmail, setMailDiagEmail] = useState('');
+  const [mailDiagChecks, setMailDiagChecks] = useState<{ label: string; status: 'pass' | 'fail' | 'warn'; detail: string }[] | null>(null);
   const [formData, setFormData] = useState<Partial<Church>>(church);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
@@ -1416,6 +1418,42 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                 }
             };
 
+            const handleDiagnose = async () => {
+                if (!mailDiagEmail.trim() || !mailDiagEmail.includes('@')) {
+                    setMailMessage({ type: 'error', text: 'Enter a valid email address to send the test to.' });
+                    return;
+                }
+                setIsMailSaving(true);
+                setMailDiagChecks(null);
+                setMailMessage(null);
+                try {
+                    const apiBase = await getApiBase();
+                    const res = await fetch(`${apiBase}/email/diagnose-domain`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ churchId, testEmailAddress: mailDiagEmail.trim() }),
+                    });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.error || 'Diagnosis failed');
+                    setMailDiagChecks(data.checks || []);
+                    const allPass = (data.checks || []).every((c: any) => c.status !== 'fail');
+                    setMailMessage({
+                        type: allPass ? 'success' : 'error',
+                        text: allPass
+                            ? '✓ All checks passed! Test email sent. Check your inbox.'
+                            : '⚠ Some checks failed. See results below for details.',
+                    });
+                    if (onUpdateChurch) {
+                        const fresh = await firestore.getChurch(churchId);
+                        if (fresh) onUpdateChurch(fresh);
+                    }
+                } catch (e: any) {
+                    setMailMessage({ type: 'error', text: e.message });
+                } finally {
+                    setIsMailSaving(false);
+                }
+            };
+
             const copyToClipboard = (text: string) => navigator.clipboard.writeText(text);
 
             return (
@@ -1691,6 +1729,68 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                 </button>
                                             </div>
                                         </div>
+                                    </div>
+                                )}
+
+                                {/* Step 4: Diagnose & Test */}
+                                {(mailCnameRecords.length > 0 || mailDomainAuthId) && (
+                                    <div className="p-6 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+                                        <div className="flex items-center gap-2 mb-4">
+                                            <span className="w-6 h-6 rounded-full bg-indigo-600 text-white text-[10px] font-black flex items-center justify-center">4</span>
+                                            <div>
+                                                <h4 className="font-bold text-slate-900 dark:text-white text-sm">Diagnose SendGrid Setup & Send Test</h4>
+                                                <p className="text-[10px] text-slate-400 mt-0.5">Checks your full SendGrid configuration and sends a real test email to confirm delivery.</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex gap-3 items-end mb-4">
+                                            <div className="flex-1">
+                                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1.5">Send Test To</label>
+                                                <input
+                                                    type="email"
+                                                    value={mailDiagEmail}
+                                                    onChange={e => setMailDiagEmail(e.target.value)}
+                                                    placeholder="yourname@example.com"
+                                                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 font-mono text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                                />
+                                            </div>
+                                            <button
+                                                onClick={handleDiagnose}
+                                                disabled={isMailSaving || !mailDiagEmail.trim()}
+                                                className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg disabled:opacity-40 whitespace-nowrap"
+                                            >
+                                                {isMailSaving ? 'Running…' : '🔍 Run Diagnostics'}
+                                            </button>
+                                        </div>
+
+                                        {mailDiagChecks && mailDiagChecks.length > 0 && (
+                                            <div className="space-y-2">
+                                                {mailDiagChecks.map((check, i) => (
+                                                    <div
+                                                        key={i}
+                                                        className={`flex items-start gap-3 p-3 rounded-xl border text-xs ${
+                                                            check.status === 'pass'
+                                                                ? 'bg-emerald-50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-800'
+                                                                : check.status === 'warn'
+                                                                    ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800'
+                                                                    : 'bg-rose-50 dark:bg-rose-900/10 border-rose-200 dark:border-rose-800'
+                                                        }`}
+                                                    >
+                                                        <span className={`shrink-0 text-base mt-0.5 ${
+                                                            check.status === 'pass' ? 'text-emerald-500' : check.status === 'warn' ? 'text-amber-500' : 'text-rose-500'
+                                                        }`}>
+                                                            {check.status === 'pass' ? '✓' : check.status === 'warn' ? '⚠' : '✗'}
+                                                        </span>
+                                                        <div className="min-w-0">
+                                                            <p className={`font-bold ${
+                                                                check.status === 'pass' ? 'text-emerald-700 dark:text-emerald-300' : check.status === 'warn' ? 'text-amber-700 dark:text-amber-300' : 'text-rose-700 dark:text-rose-300'
+                                                            }`}>{check.label}</p>
+                                                            <p className="text-slate-500 dark:text-slate-400 mt-0.5 whitespace-pre-line break-all">{check.detail}</p>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>

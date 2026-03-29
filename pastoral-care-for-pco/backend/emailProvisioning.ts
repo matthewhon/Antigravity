@@ -464,3 +464,200 @@ function extractCnameRecords(data: any): { host: string; type: 'CNAME'; data: st
 
     return records;
 }
+
+// ─── Diagnose Custom Domain + Send Test Email ────────────────────────────────
+// Performs a full SendGrid health check for the tenant's custom domain:
+//   1. Confirms domainAuthId exists in Firestore
+//   2. Fetches the domain auth record from SendGrid master account
+//   3. Checks if the domain is valid (DNS propagated)
+//   4. Checks if the domain auth is associated with the tenant's subuser
+//   5. Attempts to send a real test email and reports success/failure
+//
+// Returns a structured `checks` array for the UI to display as a checklist.
+
+export const diagnoseDomain = async (req: any, res: any) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    if (req.method === 'OPTIONS') {
+        res.set('Access-Control-Allow-Methods', 'POST');
+        res.set('Access-Control-Allow-Headers', 'Content-Type');
+        return res.status(204).send('');
+    }
+
+    const { churchId, testEmailAddress } = req.body || {};
+    if (!churchId) return res.status(400).json({ error: 'Missing churchId' });
+    if (!testEmailAddress || !testEmailAddress.includes('@')) {
+        return res.status(400).json({ error: 'Missing or invalid testEmailAddress' });
+    }
+
+    const db = getDb();
+    const log = createServerLogger(db);
+
+    // Each check: { label, status: 'pass'|'fail'|'warn', detail }
+    const checks: { label: string; status: 'pass' | 'fail' | 'warn'; detail: string }[] = [];
+
+    try {
+        const masterKey = await getMasterApiKey(db);
+
+        // ── Load church settings ──────────────────────────────────────────────
+        const churchSnap = await db.collection('churches').doc(churchId).get();
+        const church = churchSnap.data() || {};
+        const emailSettings = church.emailSettings || {};
+        const { domainAuthId, customDomain, fromEmail, fromName, sendGridSubuserId, domainVerified } = emailSettings;
+
+        // Check 1: domainAuthId exists
+        if (!domainAuthId) {
+            checks.push({ label: 'Domain auth ID exists in settings', status: 'fail', detail: 'No domainAuthId found. Click "Get DNS Records" in Step 1 first.' });
+            return res.json({ success: false, checks });
+        }
+        checks.push({ label: 'Domain auth ID exists in settings', status: 'pass', detail: `Auth ID: ${domainAuthId}` });
+
+        // Check 2: domainVerified flag in Firestore
+        checks.push({
+            label: 'DNS verified flag in database',
+            status: domainVerified ? 'pass' : 'fail',
+            detail: domainVerified
+                ? 'Firestore shows domain as verified.'
+                : 'domainVerified = false. Click "Verify DNS" in Step 3 after DNS propagates.',
+        });
+
+        // Check 3: Fetch domain auth from SendGrid master account
+        let sgDomainData: any = null;
+        try {
+            const detailRes = await fetch(`https://api.sendgrid.com/v3/whitelabel/domains/${domainAuthId}`, {
+                headers: sgHeaders(masterKey),
+            });
+            if (detailRes.ok) {
+                sgDomainData = await detailRes.json();
+                checks.push({
+                    label: 'Domain auth found in SendGrid master account',
+                    status: 'pass',
+                    detail: `Domain: ${sgDomainData.domain}, Subdomain: ${sgDomainData.subdomain}`,
+                });
+            } else {
+                const body = await detailRes.json().catch(() => ({}));
+                checks.push({
+                    label: 'Domain auth found in SendGrid master account',
+                    status: 'fail',
+                    detail: `SendGrid returned ${detailRes.status}: ${body?.errors?.[0]?.message || 'Not found'}. You may need to click "Get DNS Records" again.`,
+                });
+            }
+        } catch (e: any) {
+            checks.push({ label: 'Domain auth found in SendGrid master account', status: 'fail', detail: e.message });
+        }
+
+        // Check 4: Is the domain valid (DNS propagated) in SendGrid?
+        if (sgDomainData) {
+            const sgValid: boolean = sgDomainData.valid === true;
+            checks.push({
+                label: 'DNS records valid in SendGrid',
+                status: sgValid ? 'pass' : 'fail',
+                detail: sgValid
+                    ? 'All CNAME records resolved correctly.'
+                    : 'DNS not yet valid in SendGrid. Records may still be propagating (up to 48h). Click "Verify DNS" to recheck.',
+            });
+
+            // If not valid, show which records are failing
+            if (!sgValid && sgDomainData.dns) {
+                const failing: string[] = [];
+                for (const [key, val] of Object.entries(sgDomainData.dns as Record<string, any>)) {
+                    if (val && val.valid === false) {
+                        failing.push(`${key}: ${val.host}`);
+                    }
+                }
+                if (failing.length > 0) {
+                    checks.push({
+                        label: 'Failing DNS records',
+                        status: 'warn',
+                        detail: failing.join('\n'),
+                    });
+                }
+            }
+        }
+
+        // Check 5: Is the domain associated with this tenant's subuser?
+        if (sendGridSubuserId && sgDomainData) {
+            const subuserUsername: string | undefined = sgDomainData.username;
+            const isAssociated = subuserUsername === sendGridSubuserId;
+            checks.push({
+                label: 'Domain associated with tenant subuser',
+                status: isAssociated ? 'pass' : 'warn',
+                detail: isAssociated
+                    ? `Associated with subuser: ${sendGridSubuserId}`
+                    : `Not yet associated with subuser "${sendGridSubuserId}" (currently: "${subuserUsername || 'none'}"). ` +
+                      `This happens automatically when DNS verification passes. Click "Verify DNS" to associate.`,
+            });
+        } else if (!sendGridSubuserId) {
+            checks.push({ label: 'Domain associated with tenant subuser', status: 'warn', detail: 'No sendGridSubuserId found — subuser not provisioned. Use Shared Domain first to create the subuser.' });
+        }
+
+        // Check 6: From email domain matches the authenticated domain
+        const resolvedFromEmail = fromEmail || `contact@${customDomain}`;
+        const fromDomain = resolvedFromEmail.split('@')[1]?.toLowerCase();
+        const domainMatch = fromDomain === (customDomain || '').toLowerCase();
+        checks.push({
+            label: 'From email domain matches authenticated domain',
+            status: domainMatch ? 'pass' : 'fail',
+            detail: domainMatch
+                ? `"${resolvedFromEmail}" matches domain "${customDomain}"`
+                : `"${resolvedFromEmail}" (domain: ${fromDomain}) does NOT match "${customDomain}". Update From Email in Step 1.`,
+        });
+
+        // Check 7: Send actual test email
+        try {
+            const resolvedFromName = fromName || church.name || 'Church';
+            const headers: Record<string, string> = {
+                Authorization: `Bearer ${masterKey}`,
+                'Content-Type': 'application/json',
+            };
+            // Custom domain: no on-behalf-of (use master key directly)
+            const payload = {
+                personalizations: [{ to: [{ email: testEmailAddress }] }],
+                from: { email: resolvedFromEmail, name: resolvedFromName },
+                subject: `✅ Test Email — ${customDomain} domain check`,
+                content: [{
+                    type: 'text/html',
+                    value: `<div style="font-family:sans-serif;max-width:480px;margin:40px auto;padding:32px;border:1px solid #e2e8f0;border-radius:16px">
+                        <h2 style="color:#4f46e5;margin:0 0 12px">Domain Test Successful 🎉</h2>
+                        <p style="color:#475569;line-height:1.6">This test email confirms that <strong>${customDomain}</strong> is correctly authenticated with SendGrid and emails can be delivered from <strong>${resolvedFromEmail}</strong>.</p>
+                        <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0">
+                        <p style="color:#94a3b8;font-size:12px">Sent via Pastoral Care · Auth ID: ${domainAuthId}</p>
+                    </div>`,
+                }],
+            };
+
+            const sendRes = await fetch('https://api.sendgrid.com/v3/mail/send', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(payload),
+            });
+
+            if (sendRes.ok || sendRes.status === 202) {
+                checks.push({
+                    label: `Test email sent to ${testEmailAddress}`,
+                    status: 'pass',
+                    detail: `Successfully sent from ${resolvedFromEmail}. Check your inbox (and spam folder).`,
+                });
+            } else {
+                const errBody = await sendRes.json().catch(() => ({}));
+                const errMsg = (errBody as any)?.errors?.map((e: any) => e.message).join('; ')
+                    || `SendGrid HTTP ${sendRes.status}`;
+                checks.push({
+                    label: `Test email to ${testEmailAddress}`,
+                    status: 'fail',
+                    detail: `Send failed: ${errMsg}`,
+                });
+            }
+        } catch (sendErr: any) {
+            checks.push({ label: `Test email to ${testEmailAddress}`, status: 'fail', detail: sendErr.message });
+        }
+
+        const allPassed = checks.every(c => c.status !== 'fail');
+        log.info(`Domain diagnosis for ${churchId} (${customDomain}): ${allPassed ? 'ALL PASS' : 'ISSUES FOUND'}`, 'system', { churchId, domainAuthId }, churchId);
+
+        return res.json({ success: allPassed, checks });
+
+    } catch (e: any) {
+        log.error(`[emailProvisioning] diagnoseDomain failed: ${e.message}`, 'system', { churchId }, churchId);
+        return res.status(500).json({ error: e.message || 'Unknown error' });
+    }
+};
