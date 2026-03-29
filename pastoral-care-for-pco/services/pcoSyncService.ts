@@ -1135,12 +1135,13 @@ export const syncCheckInsData = async (churchId: string) => {
 
 /**
  * Syncs registration events from PCO Registrations API into Firestore.
- * This is a non-fatal sync step — if the org doesn't have the Registrations
- * module (403/404), the proxy returns { data: [], _pcoNote } or a 403 which
- * pcoFetch/fetchAllPages surfaces; we catch it and bail gracefully.
+ * This is a FULL REPLACE sync — existing registrations for the tenant are
+ * cleared first so that cancelled/deleted PCO events don't remain stale.
+ * Non-fatal: if the org doesn't have the Registrations module (403/404),
+ * we bail gracefully without failing the overall sync.
  */
 export const syncRegistrationsData = async (churchId: string) => {
-    logger.info('Syncing registrations...', 'sync', { churchId }, churchId);
+    logger.info('Syncing registrations (full replace)...', 'sync', { churchId }, churchId);
 
     try {
         // Use the shared pcoFetch/fetchAllPages helpers — same as every other sync function.
@@ -1175,11 +1176,15 @@ export const syncRegistrationsData = async (churchId: string) => {
         // Filter out any nulls (from 404 items)
         const records = rawEvents.filter(Boolean) as PcoRegistrationEvent[];
 
+        // --- Full Replace: clear existing tenant data before writing fresh records ---
+        // This ensures cancelled events in PCO are removed, not left stale.
+        await firestore.clearRegistrations(churchId);
+
         if (records.length > 0) {
             await firestore.upsertRegistrations(records);
         }
 
-        logger.info('Registrations sync complete', 'sync', { churchId, count: records.length }, churchId);
+        logger.info('Registrations full sync complete', 'sync', { churchId, count: records.length }, churchId);
 
     } catch (e: any) {
         // 403 = missing registrations scope — log and bail gracefully without failing the full sync

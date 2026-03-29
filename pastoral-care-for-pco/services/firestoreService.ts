@@ -553,6 +553,28 @@ class FirestoreService {
   async upsertServicePlans(records: ServicePlanSnapshot[]) { await this.batchUpsert('service_plans', records); }
   async upsertRegistrations(records: PcoRegistrationEvent[]) { await this.batchUpsert('pco_registrations', records); }
 
+  /**
+   * Deletes all pco_registrations documents for a tenant.
+   * Called before a full-replace sync to ensure cancelled/deleted PCO events
+   * don't remain stale in Firestore.
+   */
+  async clearRegistrations(churchId: string): Promise<void> {
+      try {
+          const q = query(collection(db, 'pco_registrations'), where('churchId', '==', churchId));
+          const snapshot = await getDocs(q);
+          if (snapshot.empty) return;
+          const CHUNK = 400;
+          for (let i = 0; i < snapshot.docs.length; i += CHUNK) {
+              const batch = writeBatch(db);
+              snapshot.docs.slice(i, i + CHUNK).forEach(d => batch.delete(d.ref));
+              await batch.commit();
+          }
+          console.log(`[Firestore] Cleared ${snapshot.size} old registrations for tenant ${churchId}`);
+      } catch (e) {
+          console.warn('[Firestore] clearRegistrations failed (non-fatal):', e);
+      }
+  }
+
   async getRegistrations(churchId: string): Promise<PcoRegistrationEvent[]> {
       try {
           const q = query(

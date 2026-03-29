@@ -28,7 +28,7 @@ const SYNC_AREAS: SyncArea[] = [
     { key: 'services',      label: 'Services',      icon: '🎙️', description: 'Service plans, teams, songs, positions' },
     { key: 'giving',        label: 'Giving',        icon: '💰', description: 'Donations, funds, donor stats (last 365 days)' },
     { key: 'checkins',      label: 'Check-Ins',     icon: '✅', description: 'Headcounts, digital check-ins (last 90 days)' },
-    { key: 'registrations', label: 'Registrations', icon: '📋', description: 'Registration events and signup counts' },
+    { key: 'registrations', label: 'Registrations', icon: '📋', description: 'Full replace — clears & re-fetches all registration events from Planning Center' },
 ];
 
 type AreaStatus = { state: 'idle' | 'running' | 'success' | 'error'; message?: string };
