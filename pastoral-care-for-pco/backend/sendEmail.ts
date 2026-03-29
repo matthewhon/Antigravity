@@ -395,19 +395,21 @@ export async function executeSend(
     const churchData = churchSnap.data() || {};
     const tenantEmail = churchData.emailSettings || {};
 
-    // IMPORTANT: The 'on-behalf-of' subuser header tells SendGrid to check the *subuser's*
-    // sender identities. For the shared domain, the domain auth is explicitly associated
-    // with the subuser at provisioning time, so on-behalf-of works.
+    // IMPORTANT: Both shared and custom domain sends use the master API key + 'on-behalf-of'
+    // header to route through the tenant's SendGrid subuser.
     //
-    // For custom domain sends: the domain auth is created on the master account, then
-    // associated with the subuser after DNS validation. Until that association is complete
-    // (i.e. domainVerified = true), sending via on-behalf-of will fail with "Sender Identity"
-    // errors. We therefore send without on-behalf-of (master key only) for custom domains.
-    // This is safe because the master account's domain auth covers the from-email domain.
-    const isCustomDomainMode = tenantEmail.mode === 'custom';
-    const subuserId: string | undefined = (!isCustomDomainMode && tenantEmail.sendGridSubuserId)
-        ? tenantEmail.sendGridSubuserId
-        : undefined;
+    // SHARED DOMAIN: The shared domain auth (pastoralcare.barnabassoftware.com) is associated
+    // with the subuser at provisioning time, so on-behalf-of works immediately.
+    //
+    // CUSTOM DOMAIN: After DNS verification, our verifyDomain endpoint calls:
+    //   POST /v3/whitelabel/domains/{id}/subuser  (SendGrid docs: associate domain with subuser)
+    // This transfers ownership of the Sender Identity to the subuser. Once associated,
+    // the master account can NO LONGER use it as a Sender Identity without on-behalf-of.
+    // So custom domain sends MUST also use on-behalf-of — the subuser now owns the identity.
+    //
+    // NOTE: Our pre-send guard (domainVerified check above) ensures we never reach this
+    // point for unverified custom domains, so the association is guaranteed to have run.
+    const subuserId: string | undefined = tenantEmail.sendGridSubuserId || undefined;
 
     // Guard: if custom domain is configured but not yet DNS-verified, fail early with a
     // clear message rather than letting SendGrid return a cryptic Sender Identity error.
