@@ -609,7 +609,13 @@ export const diagnoseDomain = async (req: any, res: any) => {
                 Authorization: `Bearer ${masterKey}`,
                 'Content-Type': 'application/json',
             };
-            // Custom domain: no on-behalf-of (use master key directly)
+            // After DNS verification, the domain auth is associated with the subuser
+            // (via verifyDomain → POST /v3/whitelabel/domains/{id}/subuser).
+            // The subuser now OWNS the Sender Identity, so we MUST use on-behalf-of —
+            // the master account alone can no longer satisfy the Sender Identity check.
+            if (sendGridSubuserId) {
+                headers['on-behalf-of'] = sendGridSubuserId;
+            }
             const payload = {
                 personalizations: [{ to: [{ email: testEmailAddress }] }],
                 from: { email: resolvedFromEmail, name: resolvedFromName },

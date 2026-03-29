@@ -409,6 +409,7 @@ export async function executeSend(
     //
     // NOTE: Our pre-send guard (domainVerified check above) ensures we never reach this
     // point for unverified custom domains, so the association is guaranteed to have run.
+    const isCustomDomainMode = tenantEmail.mode === 'custom';
     const subuserId: string | undefined = tenantEmail.sendGridSubuserId || undefined;
 
     // Guard: if custom domain is configured but not yet DNS-verified, fail early with a
