@@ -372,6 +372,51 @@ export const verifyDomain = async (req: any, res: any) => {
             'emailSettings.cnameRecords': cnameRecords,
         });
 
+        // ── Step 4 (per SendGrid docs): Associate validated domain with subuser ──
+        // SendGrid docs: "the parent account must first authenticate and validate
+        // the domain. The parent may then associate the authenticated domain via
+        // the subuser management tools."
+        //
+        // This makes the domain visible in the subuser's SendGrid account, enables
+        // proper bounce/stat isolation per tenant, and allows the on-behalf-of header
+        // to be used for custom domain sends (removing the need for the master-only workaround).
+        if (isValid) {
+            const subuserId: string | undefined = emailSettings.sendGridSubuserId;
+            if (subuserId) {
+                try {
+                    const assocRes = await fetch(
+                        `https://api.sendgrid.com/v3/whitelabel/domains/${domainAuthId}/subuser`,
+                        {
+                            method: 'POST',
+                            headers: sgHeaders(masterKey),
+                            body: JSON.stringify({ username: subuserId }),
+                        }
+                    );
+                    if (assocRes.ok || assocRes.status === 400) {
+                        // 400 often means "already associated" — treat as success
+                        log.info(
+                            `Domain auth #${domainAuthId} associated with subuser ${subuserId}`,
+                            'system', { churchId, domainAuthId, subuserId }, churchId
+                        );
+                    } else {
+                        const assocBody = await assocRes.json().catch(() => ({}));
+                        log.warn(
+                            `Could not associate domain auth with subuser: ${assocRes.status} — ${JSON.stringify(assocBody)}`,
+                            'system', { churchId }, churchId
+                        );
+                    }
+                } catch (assocErr: any) {
+                    // Non-fatal — the master-account domain auth still works for sends
+                    log.warn(`Subuser domain association failed: ${assocErr.message}`, 'system', { churchId }, churchId);
+                }
+            } else {
+                log.warn(
+                    `Domain verified for ${churchId} but no sendGridSubuserId found — skipping subuser association.`,
+                    'system', { churchId }, churchId
+                );
+            }
+        }
+
         log.info(`Domain verification for ${churchId}: ${isValid ? 'VERIFIED' : 'PENDING'}`, 'system', { churchId, domainAuthId }, churchId);
 
         return res.json({
@@ -387,6 +432,7 @@ export const verifyDomain = async (req: any, res: any) => {
         return res.status(500).json({ error: e.message || 'Unknown error' });
     }
 };
+
 
 // ─── Helper: Extract CNAME records from SendGrid domain auth response ────────
 
