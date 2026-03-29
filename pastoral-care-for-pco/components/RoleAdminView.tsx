@@ -137,6 +137,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   const [mailCustomDomain, setMailCustomDomain] = useState(church.emailSettings?.customDomain || '');
   const [mailCustomFromEmail, setMailCustomFromEmail] = useState(church.emailSettings?.fromEmail || '');
   const [mailCnameRecords, setMailCnameRecords] = useState<{ host: string; type: 'CNAME'; data: string }[]>(church.emailSettings?.cnameRecords || []);
+  const [mailDomainAuthId, setMailDomainAuthId] = useState<string>(church.emailSettings?.domainAuthId || '');
   const [mailDomainVerified, setMailDomainVerified] = useState(church.emailSettings?.domainVerified || false);
   const [isMailSaving, setIsMailSaving] = useState(false);
   const [mailMessage, setMailMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -183,6 +184,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
           setMailCustomDomain(es.customDomain || '');
           setMailCustomFromEmail(es.fromEmail || '');
           setMailCnameRecords(es.cnameRecords || []);
+          setMailDomainAuthId(es.domainAuthId || '');
           setMailDomainVerified(es.domainVerified || false);
       }
   }, [church.emailSettings]);
@@ -1372,6 +1374,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                     const data = await res.json();
                     if (!res.ok) throw new Error(data.error || 'Domain auth failed');
                     setMailCnameRecords(data.cnameRecords || []);
+                    if (data.domainAuthId) setMailDomainAuthId(String(data.domainAuthId));
                     setMailMessage({ type: 'success', text: data.message });
                     if (onUpdateChurch) {
                         const fresh = await firestore.getChurch(churchId);
@@ -1397,6 +1400,10 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                     const data = await res.json();
                     if (!res.ok) throw new Error(data.error || 'Verification failed');
                     setMailDomainVerified(data.verified);
+                    // Also refresh CNAME records if backend returned them
+                    if (data.cnameRecords && data.cnameRecords.length > 0) {
+                        setMailCnameRecords(data.cnameRecords);
+                    }
                     setMailMessage({ type: data.verified ? 'success' : 'error', text: data.message });
                     if (onUpdateChurch) {
                         const fresh = await firestore.getChurch(churchId);
@@ -1546,6 +1553,12 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                     <div className="flex items-center gap-2 mb-4">
                                         <span className="w-6 h-6 rounded-full bg-indigo-600 text-white text-[10px] font-black flex items-center justify-center">1</span>
                                         <h4 className="font-bold text-slate-900 dark:text-white text-sm">Enter Your Domain</h4>
+                                        {church.emailSettings?.customDomain && (
+                                            <span className="ml-auto text-[10px] font-bold text-slate-500 dark:text-slate-400 font-mono bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded-lg">
+                                                Currently: {church.emailSettings.customDomain}
+                                                {church.emailSettings.domainAuthId ? ` · Auth #${church.emailSettings.domainAuthId}` : ''}
+                                            </span>
+                                        )}
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                         <div>
@@ -1586,13 +1599,13 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             disabled={isMailSaving || !mailCustomDomain.trim()}
                                             className="bg-violet-600 hover:bg-violet-700 text-white px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg disabled:opacity-40"
                                         >
-                                            {isMailSaving ? 'Requesting…' : mailCnameRecords.length > 0 ? 'Re-fetch DNS Records' : 'Get DNS Records'}
+                                            {isMailSaving ? 'Requesting…' : (mailCnameRecords.length > 0 || mailDomainAuthId) ? 'Re-fetch DNS Records' : 'Get DNS Records'}
                                         </button>
                                     </div>
                                 </div>
 
                                 {/* Step 2: CNAME Records */}
-                                {mailCnameRecords.length > 0 && (
+                                {(mailCnameRecords.length > 0 || mailDomainAuthId) && (
                                     <div className="p-6 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
                                         <div className="flex items-center gap-2 mb-4">
                                             <span className="w-6 h-6 rounded-full bg-indigo-600 text-white text-[10px] font-black flex items-center justify-center">2</span>
@@ -1602,47 +1615,54 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             Add these 3 CNAME records in your DNS provider (GoDaddy, Namecheap, Cloudflare, etc.). DNS changes can take up to 48 hours to propagate.
                                         </p>
 
-                                        <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
-                                            <table className="w-full text-xs">
-                                                <thead className="bg-slate-100 dark:bg-slate-800">
-                                                    <tr>
-                                                        <th className="px-4 py-2.5 text-left font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-[10px]">Type</th>
-                                                        <th className="px-4 py-2.5 text-left font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-[10px]">Host / Name</th>
-                                                        <th className="px-4 py-2.5 text-left font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-[10px]">Points To / Value</th>
-                                                        <th className="px-4 py-2.5"></th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
-                                                    {mailCnameRecords.map((r, i) => (
-                                                        <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                                                            <td className="px-4 py-3">
-                                                                <span className="font-black text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/20 px-2 py-0.5 rounded text-[10px]">{r.type}</span>
-                                                            </td>
-                                                            <td className="px-4 py-3">
-                                                                <code className="font-mono text-slate-700 dark:text-slate-300 text-[11px] break-all">{r.host}</code>
-                                                            </td>
-                                                            <td className="px-4 py-3">
-                                                                <code className="font-mono text-slate-700 dark:text-slate-300 text-[11px] break-all">{r.data}</code>
-                                                            </td>
-                                                            <td className="px-4 py-3">
-                                                                <button
-                                                                    onClick={() => copyToClipboard(`${r.host}\t${r.type}\t${r.data}`)}
-                                                                    className="text-slate-400 hover:text-indigo-500 transition-colors text-sm"
-                                                                    title="Copy row"
-                                                                >
-                                                                    📋
-                                                                </button>
-                                                            </td>
+                                        {mailCnameRecords.length > 0 ? (
+                                            <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+                                                <table className="w-full text-xs">
+                                                    <thead className="bg-slate-100 dark:bg-slate-800">
+                                                        <tr>
+                                                            <th className="px-4 py-2.5 text-left font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-[10px]">Type</th>
+                                                            <th className="px-4 py-2.5 text-left font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-[10px]">Host / Name</th>
+                                                            <th className="px-4 py-2.5 text-left font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-[10px]">Points To / Value</th>
+                                                            <th className="px-4 py-2.5"></th>
                                                         </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
+                                                        {mailCnameRecords.map((r, i) => (
+                                                            <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                                                <td className="px-4 py-3">
+                                                                    <span className="font-black text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/20 px-2 py-0.5 rounded text-[10px]">{r.type}</span>
+                                                                </td>
+                                                                <td className="px-4 py-3">
+                                                                    <code className="font-mono text-slate-700 dark:text-slate-300 text-[11px] break-all">{r.host}</code>
+                                                                </td>
+                                                                <td className="px-4 py-3">
+                                                                    <code className="font-mono text-slate-700 dark:text-slate-300 text-[11px] break-all">{r.data}</code>
+                                                                </td>
+                                                                <td className="px-4 py-3">
+                                                                    <button
+                                                                        onClick={() => copyToClipboard(`${r.host}\t${r.type}\t${r.data}`)}
+                                                                        className="text-slate-400 hover:text-indigo-500 transition-colors text-sm"
+                                                                        title="Copy row"
+                                                                    >
+                                                                        📋
+                                                                    </button>
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        ) : (
+                                            <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-xs text-amber-600 dark:text-amber-400">
+                                                <p className="font-bold mb-1">⚠ DNS records not cached locally</p>
+                                                <p>Your domain <strong>{church.emailSettings?.customDomain}</strong> is registered in SendGrid (Auth ID: {mailDomainAuthId}), but the CNAME records are not cached here. Click <strong>"Re-fetch DNS Records"</strong> in Step 1 to reload them.</p>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
 
                                 {/* Step 3: Verify */}
-                                {mailCnameRecords.length > 0 && (
+                                {(mailCnameRecords.length > 0 || mailDomainAuthId) && (
                                     <div className="p-6 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-2">

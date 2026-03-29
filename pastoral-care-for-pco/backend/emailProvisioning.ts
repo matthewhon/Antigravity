@@ -332,7 +332,7 @@ export const verifyDomain = async (req: any, res: any) => {
         const churchSnap = await db.collection('churches').doc(churchId).get();
         const church = churchSnap.data() || {};
         const emailSettings = church.emailSettings || {};
-        const { domainAuthId, sendGridSubuserId: subuserId } = emailSettings;
+        const { domainAuthId } = emailSettings;
 
         if (!domainAuthId) {
             return res.status(400).json({ error: 'No domain authentication is pending for this church.' });
@@ -346,12 +346,30 @@ export const verifyDomain = async (req: any, res: any) => {
         });
 
         const verifyData = await verifyRes.json().catch(() => ({}));
-
         const isValid: boolean = verifyData.valid === true;
 
-        // Update Firestore
+        // Also fetch the domain auth record to refresh cnameRecords in Firestore.
+        // This ensures the CNAME table is always populated in the UI even on reload.
+        let cnameRecords: { host: string; type: 'CNAME'; data: string }[] = emailSettings.cnameRecords || [];
+        try {
+            const detailRes = await fetch(`https://api.sendgrid.com/v3/whitelabel/domains/${domainAuthId}`, {
+                headers: sgHeaders(masterKey),
+            });
+            if (detailRes.ok) {
+                const detail = await detailRes.json();
+                const freshRecords = extractCnameRecords(detail);
+                if (freshRecords.length > 0) {
+                    cnameRecords = freshRecords;
+                }
+            }
+        } catch (detailErr: any) {
+            log.warn(`Could not refresh CNAME records during verification: ${detailErr.message}`, 'system', { churchId }, churchId);
+        }
+
+        // Update Firestore — patch only the fields we need to change
         await db.collection('churches').doc(churchId).update({
             'emailSettings.domainVerified': isValid,
+            'emailSettings.cnameRecords': cnameRecords,
         });
 
         log.info(`Domain verification for ${churchId}: ${isValid ? 'VERIFIED' : 'PENDING'}`, 'system', { churchId, domainAuthId }, churchId);
@@ -359,6 +377,7 @@ export const verifyDomain = async (req: any, res: any) => {
         return res.json({
             success: true,
             verified: isValid,
+            cnameRecords,   // Return fresh records to UI so it can repopulate state
             message: isValid
                 ? '✓ Domain verified! Your custom domain is ready to send.'
                 : 'DNS has not propagated yet. This can take up to 48 hours. Try again soon.',
