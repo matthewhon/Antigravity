@@ -386,7 +386,11 @@ export async function executeSend(
     }
 
     // 2. Load church to check for tenant-specific email configuration
-    const churchSnap = await db.col    // IMPORTANT: The 'on-behalf-of' subuser header tells SendGrid to check the *subuser's*
+    const churchSnap = await db.collection('churches').doc(churchId).get();
+    const churchData = churchSnap.data() || {};
+    const tenantEmail = churchData.emailSettings || {};
+
+    // IMPORTANT: The 'on-behalf-of' subuser header tells SendGrid to check the *subuser's*
     // sender identities. For the shared domain, the domain auth is explicitly associated
     // with the subuser at provisioning time, so on-behalf-of works.
     //
@@ -440,9 +444,7 @@ export async function executeSend(
                 `Update the From Email in Settings → Mail Settings.`
             );
         }
-    }.subject   || '(No Subject)';
-
-    if (!fromEmail) throw new Error('No "From Email" configured. Set it on the campaign or in App Config → SendGrid.');
+    }
 
     // 3. Base HTML template rendered per-recipient in the send loop below.
     //    (Each email gets a personalized unsubscribe link injected.)
