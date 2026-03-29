@@ -1,2 +1,2 @@
-'npm' is not recognized as an internal or external command,
-operable program or batch file.
+Deploy command:
+gcloud builds submit --config cloudbuild.yaml --project=gen-lang-client-0779452267 .

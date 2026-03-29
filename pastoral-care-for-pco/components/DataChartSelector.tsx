@@ -12,6 +12,7 @@ export type AnalyticsWidgetId =
   | 'giving_donor_acquisition'
   | 'giving_cumulative_ytd'
   | 'giving_budget_progress'
+  | 'giving_last_week_by_fund'
   | 'people_stats'
   | 'people_age'
   | 'people_gender'
@@ -83,6 +84,13 @@ const WIDGET_DEFS: WidgetDef[] = [
     id: 'giving_budget_progress',
     label: 'Budget Progress',
     description: 'Thermometer-style progress bars showing each fund\'s donations vs annual budget goal',
+    module: 'Giving',
+    icon: <DollarSign size={14} />,
+  },
+  {
+    id: 'giving_last_week_by_fund',
+    label: 'Last Week by Fund',
+    description: 'Giving totals for each fund during last calendar week (Mon–Sun)',
     module: 'Giving',
     icon: <DollarSign size={14} />,
   },
@@ -248,6 +256,40 @@ async function fetchWidgetSnapshot(
         pctOfYtdBudget,
         hasBudget: activeBudgets.length > 0,
         fundFilter: fundFilter || null,
+      };
+    }
+    case 'giving_last_week_by_fund': {
+      const now = new Date();
+      const day = now.getDay(); // 0 = Sun
+      const lwEnd = new Date(now);
+      lwEnd.setDate(now.getDate() - day - 1); // last Saturday
+      lwEnd.setHours(23, 59, 59, 999);
+      const lwStart = new Date(lwEnd);
+      lwStart.setDate(lwEnd.getDate() - 6); // previous Monday
+      lwStart.setHours(0, 0, 0, 0);
+
+      const weekLabel = `${lwStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${lwEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+
+      const rawDonations = await firestore.getDetailedDonations(churchId);
+      const fundTotals: Record<string, number> = {};
+      rawDonations.forEach(d => {
+        const dDate = new Date(d.date);
+        if (dDate >= lwStart && dDate <= lwEnd) {
+          fundTotals[d.fundName] = (fundTotals[d.fundName] || 0) + d.amount;
+        }
+      });
+
+      const fundRows = Object.entries(fundTotals).sort(([, a], [, b]) => b - a);
+      const weekTotal = fundRows.reduce((s, [, v]) => s + v, 0);
+
+      return {
+        weekLabel,
+        weekTotal,
+        funds: fundRows.map(([name, amount]) => ({
+          name,
+          amount,
+          pct: weekTotal > 0 ? Math.round((amount / weekTotal) * 100) : 0,
+        })),
       };
     }
     case 'giving_budget_progress': {
@@ -851,6 +893,50 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
             ))}
             {(funds as any[]).length === 0 && (
               <p className="text-xs text-slate-400 text-center py-2">No active budgets for {year}</p>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    case 'giving_last_week_by_fund': {
+      const { weekLabel, weekTotal = 0, funds = [] } = data;
+      const FUND_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#06b6d4', '#f43f5e', '#8b5cf6', '#ec4899', '#14b8a6'];
+      return (
+        <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2.5 flex items-center justify-between">
+            <p className="text-[11px] font-bold text-indigo-100 uppercase tracking-widest">Last Week by Fund</p>
+            <span className="text-[10px] font-bold text-indigo-200">{weekLabel}</span>
+          </div>
+          <div className="bg-white dark:bg-slate-800 px-4 py-4 space-y-3">
+            {/* Week total */}
+            {weekTotal > 0 && (
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-700">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Week Total</span>
+                <span className="text-lg font-black text-emerald-600 dark:text-emerald-400">{fmt(weekTotal, true)}</span>
+              </div>
+            )}
+            {/* Per-fund rows */}
+            {(funds as { name: string; amount: number; pct: number }[]).map((f, i) => (
+              <div key={i} className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: FUND_COLORS[i % FUND_COLORS.length] }} />
+                    <span className="text-[10px] font-semibold text-slate-700 dark:text-slate-300 truncate max-w-[55%]">{f.name}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-black text-slate-900 dark:text-white">{fmt(f.amount, true)}</span>
+                    <span className="text-[9px] text-slate-400">{f.pct}%</span>
+                  </div>
+                </div>
+                <div className="h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full">
+                  <div className="h-full rounded-full" style={{ width: `${f.pct}%`, backgroundColor: FUND_COLORS[i % FUND_COLORS.length], opacity: 0.85 }} />
+                </div>
+              </div>
+            ))}
+            {(funds as any[]).length === 0 && (
+              <p className="text-xs text-slate-400 text-center py-2">No giving recorded last week</p>
             )}
           </div>
         </div>
