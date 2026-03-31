@@ -202,6 +202,11 @@ export interface PcoGroup {
     attendanceHistory?: { eventId: string, date: string, count: number, members: number, visitors: number, attendeeIds: string[] }[];
 }
 
+export interface ProgressStats {
+    thisMonth: number;
+    lastMonth: number;
+}
+
 export interface PeopleDashboardData {
     stats: { total: number, members: number, nonMembers: number, newThisMonth: number, households: number };
     genderData: DemographicData[];
@@ -214,6 +219,7 @@ export interface PeopleDashboardData {
     geoData: { byCity: {name: string, value: number}[], byZip: {name: string, value: number}[] };
     allPeople: PcoPerson[];
     householdStats?: { totalHouseholds: number, pcoHouseholds: number, avgSize: number, sizeDistribution: any[], composition: any[], householdList: any[] };
+    progressStats?: ProgressStats;
 }
 
 export interface GroupsDashboardData {
@@ -223,6 +229,7 @@ export interface GroupsDashboardData {
     allGroups: PcoGroup[];
     recentGroups: PcoGroup[];
     genderDistribution?: DemographicData[];
+    progressStats?: ProgressStats;
 }
 
 export interface LifecycleDonor {
@@ -253,6 +260,7 @@ export interface GivingAnalytics {
     topGiversList: any[];
     atRiskGiversList: any[];
     topGiverConcentration: number;
+    progressStats?: ProgressStats;
 }
 
 export interface ServicePlanSnapshot {
@@ -308,6 +316,7 @@ export interface ServicesDashboardData {
     checkIns: { totalCheckIns: number, uniqueAttendees: number, breakdown: any, trends: any[] };
     futurePlans: ServicePlanSnapshot[];
     recentPlans?: ServicePlanSnapshot[];
+    progressStats?: ProgressStats;
 }
 
 export interface CensusStats {

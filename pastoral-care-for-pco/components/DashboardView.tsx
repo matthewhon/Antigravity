@@ -302,6 +302,50 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   </div>
               );
           
+          case 'church_progress': {
+              const groupsStats = groupsData?.progressStats;
+              const givingStats = givingAnalytics?.progressStats;
+              const servicesStats = servicesData?.progressStats;
+              
+              const renderRow = (label: string, thisMonth: number = 0, lastMonth: number = 0) => {
+                  const diff = thisMonth - lastMonth;
+                  const absDiff = Math.abs(diff);
+                  const isUp = diff >= 0;
+                  const colorClass = isUp ? 'text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 dark:text-emerald-400' : 'text-rose-500 bg-rose-50 dark:bg-rose-900/20 dark:text-rose-400';
+                  
+                  return (
+                      <div className="flex items-center justify-between py-3 border-b border-slate-100 dark:border-slate-800 last:border-0 last:pb-0">
+                          <span className="text-sm font-bold text-slate-600 dark:text-slate-300">{label}</span>
+                          <div className="flex items-center gap-4">
+                              <span className="text-xl font-black text-slate-900 dark:text-white">{thisMonth.toLocaleString()}</span>
+                              <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-black ${colorClass} w-16 justify-center`}>
+                                  <span>{isUp ? '▲' : '▼'}</span>
+                                  <span>{absDiff.toLocaleString()}</span>
+                              </div>
+                          </div>
+                      </div>
+                  );
+              };
+
+              return (
+                  <div className="bg-white dark:bg-slate-800 p-8 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm h-full flex flex-col">
+                      <div className="flex justify-between items-center mb-6">
+                          <div>
+                              <h4 className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">Church Progress</h4>
+                              <p className="text-[9px] font-bold text-indigo-400 uppercase tracking-widest mt-1">Last 30 Days</p>
+                          </div>
+                          <button onClick={() => handleRemoveWidget(id)} className="text-slate-300 dark:text-slate-600 hover:text-rose-500 transition-colors">✕</button>
+                      </div>
+
+                      <div className="flex-1 flex flex-col justify-center">
+                          {renderRow('Group Attendance', groupsStats?.thisMonth, groupsStats?.lastMonth)}
+                          {renderRow('Donors', givingStats?.thisMonth, givingStats?.lastMonth)}
+                          {renderRow('Volunteers', servicesStats?.thisMonth, servicesStats?.lastMonth)}
+                      </div>
+                  </div>
+              );
+          }
+          
           case 'people_engagement': {
               const ENGAGEMENT_COLORS: Record<string, string> = {
                   'Core': '#6366f1', 'Regular': '#8b5cf6', 'Sporadic': '#f43f5e', 'Inactive': '#94a3b8'

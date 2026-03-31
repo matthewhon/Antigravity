@@ -8,6 +8,7 @@ export const DASHBOARD_WIDGETS: WidgetDefinition[] = [
     { id: 'groups_stats', label: 'Groups Stats', icon: '📂' },
     { id: 'services_stats', label: 'Services Stats', icon: '🎹' },
     { id: 'churchRisk', label: 'Church Health', icon: '🏥' },
+    { id: 'church_progress', label: 'Church Progress', icon: '📈' },
     { id: 'people_engagement', label: 'Engagement', icon: '📊' },
     { id: 'gender', label: 'Gender', icon: '🚻' },
     { id: 'age', label: 'Age', icon: '🎂' },
@@ -183,7 +184,7 @@ export const getRoleBasedDefaults = (roles: string[]): Record<string, string[]> 
 
     // Dashboard — everyone sees it; tailor by primary role
     let dashboard = ['ai_insights', 'people_stats'];
-    if (isPastor)   dashboard = ['ai_insights', 'people_stats', 'churchRisk', 'keyMetrics', 'groups_stats', 'services_stats'];
+    if (isPastor)   dashboard = ['ai_insights', 'church_progress', 'people_stats', 'churchRisk', 'keyMetrics', 'groups_stats', 'services_stats'];
     else if (isGiving)  dashboard = ['keyMetrics', 'people_stats', 'trends', 'groups_stats'];
     else if (isServices) dashboard = ['services_stats', 'people_stats', 'ai_insights'];
     else if (isPeople)  dashboard = ['people_stats', 'churchRisk', 'ai_insights'];
@@ -234,7 +235,7 @@ export const getRoleBasedDefaults = (roles: string[]): Record<string, string[]> 
 
 export const getDefaultWidgets = (view: string): string[] => {
     switch (view) {
-        case 'dashboard': return ['ai_insights', 'people_stats', 'keyMetrics', 'groups_stats', 'services_stats', 'churchRisk'];
+        case 'dashboard': return ['ai_insights', 'church_progress', 'people_stats', 'keyMetrics', 'groups_stats', 'services_stats', 'churchRisk'];
         case 'people': return ['people_stats', 'people_engagement', 'gender', 'age', 'community_age_comparison', 'map'];
         case 'people_households': return ['householdSummary', 'householdComp', 'householdSize'];
         case 'people_risk': return ['riskDistribution', 'atRiskList'];

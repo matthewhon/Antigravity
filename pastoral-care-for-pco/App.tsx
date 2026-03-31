@@ -723,6 +723,34 @@ const App: React.FC = () => {
           { name: 'Female', value: female }
       ].filter(d => d.value > 0);
 
+      // Calculate Church Progress Stats specifically
+      const now = new Date();
+      const thirtyDaysAgoIso = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const sixtyDaysAgoIso = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const todayIso = now.toISOString().split('T')[0];
+
+      const attendedThisMonth = new Set<string>();
+      const attendedLastMonth = new Set<string>();
+
+      groups.forEach(g => {
+          if (g.attendanceHistory) {
+              g.attendanceHistory.forEach(h => {
+                  const eventDate = h.date.split('T')[0];
+                  if (eventDate > todayIso || eventDate < sixtyDaysAgoIso) return;
+                  
+                  if (h.attendeeIds) {
+                      h.attendeeIds.forEach(id => {
+                          if (eventDate >= thirtyDaysAgoIso) {
+                              attendedThisMonth.add(id);
+                          } else if (eventDate >= sixtyDaysAgoIso && eventDate < thirtyDaysAgoIso) {
+                              attendedLastMonth.add(id);
+                          }
+                      });
+                  }
+              });
+          }
+      });
+
       return {
           stats: {
               totalGroups: groups.length,
@@ -735,7 +763,8 @@ const App: React.FC = () => {
           groupsByDay: [],
           allGroups: groups,
           recentGroups: groups.slice(0, 5),
-          genderDistribution
+          genderDistribution,
+          progressStats: { thisMonth: attendedThisMonth.size, lastMonth: attendedLastMonth.size }
       };
   }, [groups, people]);
 

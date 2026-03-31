@@ -283,6 +283,17 @@ export const calculateGivingAnalytics = (
         .sort((a,b) => b.totalAmount - a.totalAmount)
         .slice(0, 10);
 
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * ONE_DAY);
+    const sixtyDaysAgo = new Date(now.getTime() - 60 * ONE_DAY);
+    const givingThisMonth = new Set(donations.filter(d => {
+        const dDate = new Date(d.date);
+        return dDate >= thirtyDaysAgo && dDate <= now;
+    }).map(d => d.donorId)).size;
+    const givingLastMonth = new Set(donations.filter(d => {
+        const dDate = new Date(d.date);
+        return dDate >= sixtyDaysAgo && dDate < thirtyDaysAgo;
+    }).map(d => d.donorId)).size;
+
     return {
         totalGiving,
         previousTotalGiving,
@@ -316,7 +327,8 @@ export const calculateGivingAnalytics = (
         },
         topGiversList,
         atRiskGiversList,
-        topGiverConcentration
+        topGiverConcentration,
+        progressStats: { thisMonth: givingThisMonth, lastMonth: givingLastMonth }
     };
 };
 
@@ -524,6 +536,29 @@ export const calculateServicesAnalytics = (
     // Sort by most active (scheduled count)
     augmentedTeams.sort((a, b) => (b.scheduledMemberIds?.length || 0) - (a.scheduledMemberIds?.length || 0));
 
+    // Calculate Church Progress Stats for generic 30/60 days (independent of filter)
+    const thirtyDaysAgoIso = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const sixtyDaysAgoIso = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    
+    const servingThisMonth = new Set<string>();
+    const servingLastMonth = new Set<string>();
+
+    plans.forEach(plan => {
+        const planDate = plan.sortDate.split('T')[0];
+        if (planDate > todayISO || planDate < sixtyDaysAgoIso) return;
+        
+        plan.teamMembers?.forEach(m => {
+            const status = m.status?.toLowerCase() || '';
+            if ((status === 'confirmed' || status === 'c') && m.personId) {
+                if (planDate >= thirtyDaysAgoIso) {
+                    servingThisMonth.add(m.personId);
+                } else if (planDate >= sixtyDaysAgoIso && planDate < thirtyDaysAgoIso) {
+                    servingLastMonth.add(m.personId);
+                }
+            }
+        });
+    });
+
     // 4. Calculate Check-ins Trend
     // IMPORTANT: Do NOT pre-filter attendance by the ServicesFilter date range here.
     // The ServicesView component applies its own independent checkinFilter (Current Week /
@@ -589,7 +624,8 @@ export const calculateServicesAnalytics = (
             breakdown,
             trends: checkInTrends
         },
-        futurePlans
+        futurePlans,
+        progressStats: { thisMonth: servingThisMonth.size, lastMonth: servingLastMonth.size }
     };
 };
 
