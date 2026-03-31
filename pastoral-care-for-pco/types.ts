@@ -165,6 +165,7 @@ export interface PcoPerson {
     groupIds?: string[];
     lastUpdated?: number;
     riskProfile?: RiskProfile;
+    historicRiskCategory?: string;
     isDonor?: boolean;
     engagementStatus?: string;
     spiritualMilestones?: {
@@ -740,4 +741,15 @@ export interface PollResponse {
     submittedAt: number;
     /** Random token generated client-side; stored in localStorage to surface to admin */
     sessionToken: string;
+}
+
+export interface RiskChangeRecord {
+    id: string;             // e.g. `${churchId}_${personId}_${timestamp}`
+    churchId: string;
+    personId: string;
+    personName: string;
+    date: string;           // ISO date string
+    oldCategory: string;    // 'Healthy' | 'At Risk' | 'Disconnected'
+    newCategory: string;
+    timestamp: number;
 }
