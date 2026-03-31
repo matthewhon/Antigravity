@@ -55,7 +55,7 @@ async function fetchWidgetData(
     db: any,
     churchId: string,
     widgetId: string,
-    config: { fundName?: string; dayRange?: number } = {}
+    config: { fundName?: string; dayRange?: number; timePeriod?: string } = {}
 ): Promise<any> {
     const fundFilter = config.fundName?.trim() || '';
     const dayRange   = config.dayRange  || 14;
@@ -357,6 +357,74 @@ async function fetchWidgetData(
                     };
                 });
             return { upcoming };
+        }
+
+        case 'group_attendance': {
+            const period = config.timePeriod || 'This Month';
+            const now = new Date();
+            let start = new Date();
+            let end = new Date();
+            start.setHours(0, 0, 0, 0);
+            end.setHours(23, 59, 59, 999);
+
+            if (period === 'This Week') {
+                start.setDate(start.getDate() - start.getDay());
+            } else if (period === 'Last Week') {
+                start.setDate(start.getDate() - start.getDay() - 7);
+                end = new Date(start);
+                end.setDate(start.getDate() + 6);
+                end.setHours(23, 59, 59, 999);
+            } else if (period === 'This Month') {
+                start.setDate(1);
+            } else if (period === 'Last Month') {
+                start.setDate(1);
+                start.setMonth(start.getMonth() - 1);
+                end = new Date(start);
+                end.setMonth(end.getMonth() + 1);
+                end.setDate(0);
+                end.setHours(23, 59, 59, 999);
+            } else if (period === 'Last Quarter') {
+                start.setDate(start.getDate() - 90);
+            }
+
+            const groupSnap = await db.collection('groups').where('churchId', '==', churchId).get();
+            const groups: any[] = groupSnap.docs.map((d: any) => d.data());
+
+            const aggMap = new Map<string, { date: string; timestamp: number; members: number; visitors: number }>();
+            groups.forEach((g: any) => {
+                (g.attendanceHistory || []).forEach((h: any) => {
+                    const hDate = new Date(h.date);
+                    if (hDate >= start && hDate <= end) {
+                        const y = hDate.getFullYear();
+                        const mo = String(hDate.getMonth() + 1).padStart(2, '0');
+                        const dy = String(hDate.getDate()).padStart(2, '0');
+                        const key = `${y}-${mo}-${dy}`;
+                        if (!aggMap.has(key)) aggMap.set(key, { date: key, timestamp: hDate.getTime(), members: 0, visitors: 0 });
+                        const entry = aggMap.get(key)!;
+                        entry.members += h.members || 0;
+                        entry.visitors += h.visitors || 0;
+                    }
+                });
+            });
+
+            const rows = Array.from(aggMap.values()).sort((a, b) => a.timestamp - b.timestamp).map(d => {
+                const [y, m, dy] = d.date.split('-').map(Number);
+                const dateObj = new Date(y, m - 1, dy);
+                return {
+                    name: dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                    members: d.members,
+                    visitors: d.visitors,
+                    total: d.members + d.visitors,
+                };
+            });
+
+            return {
+                period,
+                rows,
+                periodTotal:    rows.reduce((s, r) => s + r.total,    0),
+                periodMembers:  rows.reduce((s, r) => s + r.members,  0),
+                periodVisitors: rows.reduce((s, r) => s + r.visitors, 0),
+            };
         }
 
         default:

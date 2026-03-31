@@ -21,12 +21,14 @@ export type AnalyticsWidgetId =
   | 'people_anniversaries'
   | 'services_upcoming_events'
   | 'church_progress'
-  | 'upcoming_registrations';
+  | 'upcoming_registrations'
+  | 'group_attendance';
 
 // Config required before inserting a widget (null = no config needed)
 export interface WidgetConfigDef {
-  fundPicker?: boolean;   // Show a fund selector
-  dayRangePicker?: boolean; // Show a days-ahead range picker
+  fundPicker?: boolean;       // Show a fund selector
+  dayRangePicker?: boolean;   // Show a days-ahead range picker
+  timePeriodPicker?: boolean; // Show a historical time-period selector
 }
 
 interface WidgetDef {
@@ -40,8 +42,9 @@ interface WidgetDef {
 
 // User-chosen settings before fetching data
 interface WidgetConfig {
-  fundName?: string;  // '' = all funds
-  dayRange?: number;  // e.g. 7, 14, 30
+  fundName?: string;    // '' = all funds
+  dayRange?: number;    // e.g. 7, 14, 30
+  timePeriod?: string;  // e.g. 'This Week', 'Last Month'
 }
 
 const WIDGET_DEFS: WidgetDef[] = [
@@ -160,6 +163,14 @@ const WIDGET_DEFS: WidgetDef[] = [
     description: 'Upcoming PCO registration events with attendee counts and capacity',
     module: 'People',
     icon: <Calendar size={14} />,
+  },
+  {
+    id: 'group_attendance',
+    label: 'Group Attendance',
+    description: 'Aggregated group attendance for a selected time period — members vs. visitors',
+    module: 'Services',
+    icon: <BarChart2 size={14} />,
+    configDef: { timePeriodPicker: true },
   },
 ];
 
@@ -423,6 +434,72 @@ async function fetchWidgetSnapshot(
           { label: 'Volunteers',       thisMonth: servingThis.size, lastMonth: servingLast.size },
         ],
       };
+    }
+    case 'group_attendance': {
+      const period = config.timePeriod || 'This Month';
+      const now2 = new Date();
+      let start2 = new Date();
+      let end2 = new Date();
+      start2.setHours(0, 0, 0, 0);
+      end2.setHours(23, 59, 59, 999);
+
+      if (period === 'This Week') {
+        const day2 = start2.getDay();
+        start2.setDate(start2.getDate() - day2);
+      } else if (period === 'Last Week') {
+        start2.setDate(start2.getDate() - start2.getDay() - 7);
+        end2 = new Date(start2);
+        end2.setDate(start2.getDate() + 6);
+        end2.setHours(23, 59, 59, 999);
+      } else if (period === 'This Month') {
+        start2.setDate(1);
+      } else if (period === 'Last Month') {
+        start2.setDate(1);
+        start2.setMonth(start2.getMonth() - 1);
+        end2 = new Date(start2);
+        end2.setMonth(end2.getMonth() + 1);
+        end2.setDate(0);
+        end2.setHours(23, 59, 59, 999);
+      } else if (period === 'Last Quarter') {
+        start2.setDate(start2.getDate() - 90);
+      }
+
+      const groups = await firestore.getGroups(churchId);
+      const aggMap = new Map<string, { date: string; timestamp: number; members: number; visitors: number }>();
+
+      groups.forEach(g => {
+        if (!g.attendanceHistory) return;
+        g.attendanceHistory.forEach((h: any) => {
+          const hDate = new Date(h.date);
+          if (hDate >= start2 && hDate <= end2) {
+            const y = hDate.getFullYear();
+            const mo = String(hDate.getMonth() + 1).padStart(2, '0');
+            const dy = String(hDate.getDate()).padStart(2, '0');
+            const key = `${y}-${mo}-${dy}`;
+            if (!aggMap.has(key)) aggMap.set(key, { date: key, timestamp: hDate.getTime(), members: 0, visitors: 0 });
+            const entry = aggMap.get(key)!;
+            entry.members += h.members || 0;
+            entry.visitors += h.visitors || 0;
+          }
+        });
+      });
+
+      const rows2 = Array.from(aggMap.values()).sort((a, b) => a.timestamp - b.timestamp).map(d => {
+        const [y, m, dy] = d.date.split('-').map(Number);
+        const dateObj = new Date(y, m - 1, dy);
+        return {
+          name: dateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+          members: d.members,
+          visitors: d.visitors,
+          total: d.members + d.visitors,
+        };
+      });
+
+      const periodTotal = rows2.reduce((s, r) => s + r.total, 0);
+      const periodMembers = rows2.reduce((s, r) => s + r.members, 0);
+      const periodVisitors = rows2.reduce((s, r) => s + r.visitors, 0);
+
+      return { period, rows: rows2, periodTotal, periodMembers, periodVisitors };
     }
     case 'upcoming_registrations': {
       const regs = await firestore.getRegistrations(churchId);
@@ -1113,6 +1190,48 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
       );
     }
 
+    case 'group_attendance': {
+      const rows: { name: string; members: number; visitors: number; total: number }[] = data.rows || [];
+      const maxVal = Math.max(...rows.map(r => r.total), 1);
+      return (
+        <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+          <div className="bg-gradient-to-r from-indigo-600 to-blue-600 px-4 py-2.5 flex items-center justify-between">
+            <p className="text-[11px] font-bold text-indigo-100 uppercase tracking-widest">Group Attendance</p>
+            <span className="text-[10px] font-bold text-indigo-200">{data.period || 'This Month'}</span>
+          </div>
+          <div className="bg-white dark:bg-slate-800 px-4 py-3">
+            <div className="flex gap-6 mb-3">
+              <div>
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Total</p>
+                <p className="text-xl font-black text-slate-900 dark:text-white">{fmt(data.periodTotal || 0)}</p>
+              </div>
+              <div>
+                <p className="text-[9px] font-bold text-indigo-400 uppercase tracking-widest">Members</p>
+                <p className="text-xl font-black text-indigo-600 dark:text-indigo-400">{fmt(data.periodMembers || 0)}</p>
+              </div>
+              <div>
+                <p className="text-[9px] font-bold text-amber-400 uppercase tracking-widest">Visitors</p>
+                <p className="text-xl font-black text-amber-500 dark:text-amber-400">{fmt(data.periodVisitors || 0)}</p>
+              </div>
+            </div>
+            {rows.length === 0 && <p className="text-xs text-slate-400 text-center py-2">No attendance data for this period</p>}
+            <div className="flex items-end gap-0.5" style={{ height: 56 }}>
+              {rows.slice(-20).map((r, i) => {
+                const mH = Math.max(2, Math.round((r.members / maxVal) * 48));
+                const vH = Math.max(r.visitors > 0 ? 2 : 0, Math.round((r.visitors / maxVal) * 48));
+                return (
+                  <div key={i} className="flex-1 flex flex-col justify-end" title={`${r.name}: ${r.total} total`}>
+                    {vH > 0 && <div className="w-full bg-amber-400 rounded-t-sm" style={{ height: vH }} />}
+                    <div className="w-full bg-indigo-500 rounded-t-sm" style={{ height: mH }} />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     default:
       return null;
   }
@@ -1138,6 +1257,7 @@ const WidgetConfigPanel: React.FC<{
   const [loadingFunds, setLoadingFunds] = useState(false);
   const [fundName, setFundName] = useState('');
   const [dayRange, setDayRange] = useState('14');
+  const [timePeriod, setTimePeriod] = useState('This Month');
 
   useEffect(() => {
     if (!widget.configDef?.fundPicker) return;
@@ -1211,8 +1331,28 @@ const WidgetConfigPanel: React.FC<{
         </div>
       )}
 
+      {/* Time Period Picker */}
+      {widget.configDef?.timePeriodPicker && (
+        <div>
+          <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+            Time Period
+          </label>
+          <select
+            value={timePeriod}
+            onChange={e => setTimePeriod(e.target.value)}
+            className="w-full text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
+            <option value="This Week">This Week</option>
+            <option value="Last Week">Last Week</option>
+            <option value="This Month">This Month</option>
+            <option value="Last Month">Last Month</option>
+            <option value="Last Quarter">Last Quarter (90 days)</option>
+          </select>
+        </div>
+      )}
+
       <button
-        onClick={() => onConfirm({ fundName, dayRange: parseInt(dayRange, 10) })}
+        onClick={() => onConfirm({ fundName, dayRange: parseInt(dayRange, 10), timePeriod })}
         disabled={isLoading}
         className="w-full flex items-center justify-center gap-2 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white text-xs font-bold rounded-xl transition"
       >

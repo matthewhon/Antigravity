@@ -418,6 +418,54 @@ function renderAnalyticsBlockHtml(
               <table width="100%" cellpadding="0" cellspacing="0" style="background:#fff;">${rowHtml || '<tr><td style="padding:12px 16px;font-size:11px;color:#94a3b8;text-align:center;">No upcoming registration events</td></tr>'}</table>
             </div>`;
         }
+        case 'group_attendance': {
+            const rows: { name: string; members: number; visitors: number; total: number }[] = data.rows || [];
+            const max = Math.max(...rows.map((r: any) => r.total), 1);
+            const periodTotal    = data.periodTotal    || 0;
+            const periodMembers  = data.periodMembers  || 0;
+            const periodVisitors = data.periodVisitors || 0;
+            const period         = data.period         || 'This Month';
+
+            // Bar chart as a single-row table — each cell is one day's stacked bar
+            const barCells = rows.slice(-24).map((r: any) => {
+                const totalH   = Math.max(2, Math.round((r.total    / max) * 48));
+                const memberH  = Math.max(2, Math.round((r.members  / max) * 48));
+                const visitorH = r.visitors > 0 ? Math.max(2, Math.round((r.visitors / max) * 48)) : 0;
+                return `<td valign="bottom" style="text-align:center;padding:0 1px;vertical-align:bottom;" title="${r.name}: ${r.total}">
+                  ${visitorH > 0 ? `<div style="width:100%;height:${visitorH}px;background:#fbbf24;border-radius:2px 2px 0 0;"></div>` : ''}
+                  <div style="width:100%;height:${memberH}px;background:#6366f1;border-radius:${visitorH > 0 ? '0' : '2px 2px'} 0 0;"></div>
+                </td>`;
+            }).join('');
+
+            return `<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:16px;">
+              <div style="background:linear-gradient(135deg,#4f46e5,#2563eb);padding:10px 16px;display:flex;justify-content:space-between;align-items:center;">
+                <div style="font-size:10px;font-weight:800;color:#c7d2fe;text-transform:uppercase;letter-spacing:1px;">Group Attendance</div>
+                <div style="font-size:10px;color:#a5b4fc;">${period}</div>
+              </div>
+              <div style="background:#fff;padding:12px 16px;">
+                <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:10px;">
+                  <tr>
+                    <td style="padding:0 12px 0 0;">
+                      <div style="font-size:8px;color:#94a3b8;text-transform:uppercase;font-weight:700;">Total</div>
+                      <div style="font-size:20px;font-weight:900;color:#1e293b;">${periodTotal.toLocaleString()}</div>
+                    </td>
+                    <td style="padding:0 12px;">
+                      <div style="font-size:8px;color:#6366f1;text-transform:uppercase;font-weight:700;">Members</div>
+                      <div style="font-size:20px;font-weight:900;color:#4f46e5;">${periodMembers.toLocaleString()}</div>
+                    </td>
+                    <td>
+                      <div style="font-size:8px;color:#d97706;text-transform:uppercase;font-weight:700;">Visitors</div>
+                      <div style="font-size:20px;font-weight:900;color:#f59e0b;">${periodVisitors.toLocaleString()}</div>
+                    </td>
+                  </tr>
+                </table>
+                ${rows.length > 0
+                    ? `<table width="100%" cellpadding="0" cellspacing="0" style="height:56px;"><tr>${barCells}</tr></table>`
+                    : `<div style="font-size:11px;color:#94a3b8;text-align:center;padding:8px 0;">No attendance data for this period</div>`
+                }
+              </div>
+            </div>`;
+        }
         default:
             // Generic fallback: label only
             return `<div style="border:1px solid #e2e8f0;border-radius:8px;padding:12px;font-family:${fontFamily};font-size:12px;color:${textColor};margin-bottom:16px;">${label}</div>`;
