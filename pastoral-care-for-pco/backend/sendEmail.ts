@@ -363,6 +363,61 @@ function renderAnalyticsBlockHtml(
               <table width="100%" cellpadding="0" cellspacing="0" style="background:#fff;">${rows || '<tr><td style="padding:12px 16px;font-size:11px;color:#94a3b8;text-align:center;">No upcoming services</td></tr>'}</table>
             </div>`;
         }
+        case 'church_progress': {
+            const rows: { label: string; thisMonth: number; lastMonth: number }[] = data.rows || [];
+            const rowHtml = rows.map(r => {
+                const diff = r.thisMonth - r.lastMonth;
+                const isUp = diff >= 0;
+                const pctChange = r.lastMonth > 0 ? Math.round((Math.abs(diff) / r.lastMonth) * 100) : null;
+                const badgeBg = isUp ? '#f0fdf4' : '#fef2f2';
+                const badgeColor = isUp ? '#16a34a' : '#dc2626';
+                const arrow = isUp ? '▲' : '▼';
+                const changeLabel = pctChange !== null ? `${pctChange}%` : Math.abs(diff).toLocaleString();
+                return `<tr>
+                  <td style="padding:8px 16px;border-bottom:1px solid #f1f5f9;font-family:${fontFamily};font-size:12px;font-weight:600;color:#334155;">${r.label}</td>
+                  <td style="padding:8px 16px;border-bottom:1px solid #f1f5f9;text-align:right;">
+                    <span style="font-size:14px;font-weight:900;color:#1e293b;">${r.thisMonth.toLocaleString()}</span>
+                    <span style="margin-left:8px;font-size:10px;font-weight:800;background:${badgeBg};color:${badgeColor};padding:2px 6px;border-radius:6px;">${arrow} ${changeLabel}</span>
+                  </td>
+                </tr>`;
+            }).join('');
+            return `<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:16px;">
+              <div style="background:linear-gradient(135deg,#4f46e5,#7c3aed);padding:10px 16px;display:flex;justify-content:space-between;align-items:center;">
+                <div style="font-size:10px;font-weight:800;color:#c7d2fe;text-transform:uppercase;letter-spacing:1px;">Church Progress</div>
+                <div style="font-size:10px;color:#a5b4fc;">Last 30 Days</div>
+              </div>
+              <table width="100%" cellpadding="0" cellspacing="0" style="background:#fff;">${rowHtml || '<tr><td style="padding:12px 16px;font-size:11px;color:#94a3b8;text-align:center;">No progress data available</td></tr>'}</table>
+            </div>`;
+        }
+        case 'upcoming_registrations': {
+            const events: { name: string; dateStr: string; signupCount: number; signupLimit: number | null; fillPct: number | null; isFull: boolean; waitlistedCount: number; publicUrl: string | null }[] = data.upcoming || [];
+            const rowHtml = events.slice(0, 6).map(e => {
+                const capacityText = e.signupLimit ? `${e.signupCount.toLocaleString()} / ${e.signupLimit.toLocaleString()} spots` : `${e.signupCount.toLocaleString()} registered`;
+                const badgeHtml = e.isFull
+                    ? `<span style="font-size:9px;font-weight:800;text-transform:uppercase;background:#fee2e2;color:#dc2626;padding:2px 6px;border-radius:6px;">Full</span>`
+                    : e.waitlistedCount > 0
+                    ? `<span style="font-size:9px;font-weight:800;background:#fef3c7;color:#d97706;padding:2px 6px;border-radius:6px;">${e.waitlistedCount} waitlisted</span>`
+                    : '';
+                const barHtml = e.fillPct !== null
+                    ? `<div style="margin-top:4px;height:4px;background:#e5e7eb;border-radius:4px;overflow:hidden;"><div style="height:100%;background:${e.isFull ? '#f87171' : e.fillPct >= 80 ? '#fbbf24' : '#34d399'};width:${e.fillPct}%;"></div></div>`
+                    : '';
+                return `<tr>
+                  <td style="padding:8px 16px;border-bottom:1px solid #f1f5f9;">
+                    <div style="font-size:11px;font-weight:700;color:#1e293b;">${e.name}</div>
+                    <div style="font-size:10px;color:#6366f1;margin-top:2px;">${e.dateStr}</div>
+                    <div style="font-size:10px;color:#64748b;margin-top:2px;">${capacityText} ${badgeHtml}</div>
+                    ${barHtml}
+                  </td>
+                </tr>`;
+            }).join('');
+            return `<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:16px;">
+              <div style="background:linear-gradient(135deg,#7c3aed,#a21caf);padding:10px 16px;display:flex;justify-content:space-between;align-items:center;">
+                <div style="font-size:10px;font-weight:800;color:#e9d5ff;text-transform:uppercase;letter-spacing:1px;">Upcoming Registrations</div>
+                <div style="font-size:10px;color:#d8b4fe;">${events.length} event${events.length !== 1 ? 's' : ''}</div>
+              </div>
+              <table width="100%" cellpadding="0" cellspacing="0" style="background:#fff;">${rowHtml || '<tr><td style="padding:12px 16px;font-size:11px;color:#94a3b8;text-align:center;">No upcoming registration events</td></tr>'}</table>
+            </div>`;
+        }
         default:
             // Generic fallback: label only
             return `<div style="border:1px solid #e2e8f0;border-radius:8px;padding:12px;font-family:${fontFamily};font-size:12px;color:${textColor};margin-bottom:16px;">${label}</div>`;
