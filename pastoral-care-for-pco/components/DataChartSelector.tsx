@@ -19,7 +19,9 @@ export type AnalyticsWidgetId =
   | 'people_membership'
   | 'people_birthdays'
   | 'people_anniversaries'
-  | 'services_upcoming_events';
+  | 'services_upcoming_events'
+  | 'church_progress'
+  | 'upcoming_registrations';
 
 // Config required before inserting a widget (null = no config needed)
 export interface WidgetConfigDef {
@@ -144,6 +146,20 @@ const WIDGET_DEFS: WidgetDef[] = [
     module: 'Services',
     icon: <Calendar size={14} />,
     configDef: { dayRangePicker: true },
+  },
+  {
+    id: 'church_progress',
+    label: 'Church Progress',
+    description: 'Last 30-day vs prior 30-day comparison for group attendance, giving, and volunteers',
+    module: 'Services',
+    icon: <BarChart2 size={14} />,
+  },
+  {
+    id: 'upcoming_registrations',
+    label: 'Upcoming Registrations',
+    description: 'Upcoming PCO registration events with attendee counts and capacity',
+    module: 'People',
+    icon: <Calendar size={14} />,
   },
 ];
 
@@ -359,6 +375,88 @@ async function fetchWidgetSnapshot(
         };
       });
       return { upcoming, dayRange: days };
+    }
+    case 'church_progress': {
+      const now = new Date();
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const sixtyDaysAgo  = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+
+      // Giving — unique donors this month vs last month
+      const donations = await firestore.getDetailedDonations(churchId);
+      const givingThis  = new Set(donations.filter(d => new Date(d.date) >= thirtyDaysAgo).map(d => d.donorId)).size;
+      const givingLast  = new Set(donations.filter(d => { const dd = new Date(d.date); return dd >= sixtyDaysAgo && dd < thirtyDaysAgo; }).map(d => d.donorId)).size;
+
+      // Services — volunteers with confirmed status
+      const plans = await firestore.getServicePlans(churchId);
+      const thirtyStr = thirtyDaysAgo.toISOString().split('T')[0];
+      const sixtyStr  = sixtyDaysAgo.toISOString().split('T')[0];
+      const todayStr  = now.toISOString().split('T')[0];
+      const servingThis = new Set<string>();
+      const servingLast = new Set<string>();
+      plans.forEach(p => {
+        const planDate = (p.sortDate || '').split('T')[0];
+        if (planDate > todayStr || planDate < sixtyStr) return;
+        (p.teamMembers || []).forEach((m: any) => {
+          const status = m.status?.toLowerCase() || '';
+          if ((status === 'confirmed' || status === 'c') && m.personId) {
+            if (planDate >= thirtyStr) servingThis.add(m.personId);
+            else servingLast.add(m.personId);
+          }
+        });
+      });
+
+      // Groups — attendance counts
+      const groups = await firestore.getGroups(churchId);
+      let groupThis = 0, groupLast = 0;
+      groups.forEach(g => {
+        (g.attendanceHistory || []).forEach((h: any) => {
+          const hDate = new Date(h.date || h.startedAt || 0);
+          if (hDate >= thirtyDaysAgo) groupThis += h.count || 0;
+          else if (hDate >= sixtyDaysAgo) groupLast += h.count || 0;
+        });
+      });
+
+      return {
+        rows: [
+          { label: 'Group Attendance', thisMonth: groupThis, lastMonth: groupLast },
+          { label: 'Donors',           thisMonth: givingThis, lastMonth: givingLast },
+          { label: 'Volunteers',       thisMonth: servingThis.size, lastMonth: servingLast.size },
+        ],
+      };
+    }
+    case 'upcoming_registrations': {
+      const regs = await firestore.getRegistrations(churchId);
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 14);
+      const upcoming = regs
+        .filter(e => !e.startsAt || new Date(e.startsAt) >= cutoff)
+        .sort((a, b) => {
+          if (!a.startsAt) return 1;
+          if (!b.startsAt) return -1;
+          return new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime();
+        })
+        .slice(0, 8)
+        .map(e => {
+          const confirmed = ((e.totalAttendees ?? e.signupCount) - (e.waitlistedCount ?? 0) - (e.canceledCount ?? 0));
+          const displayCount = confirmed > 0 ? confirmed : e.signupCount;
+          const fillPct = e.signupLimit && e.signupLimit > 0
+            ? Math.min(100, Math.round((displayCount / e.signupLimit) * 100))
+            : null;
+          return {
+            id: e.id,
+            name: e.name,
+            dateStr: e.startsAt
+              ? new Date(e.startsAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+              : 'Date TBD',
+            signupCount: displayCount,
+            signupLimit: e.signupLimit || null,
+            fillPct,
+            isFull: fillPct !== null && fillPct >= 100,
+            waitlistedCount: e.waitlistedCount || 0,
+            publicUrl: (e as any).publicUrl || null,
+          };
+        });
+      return { upcoming };
     }
     case 'people_stats':
     case 'people_age':
@@ -938,6 +1036,78 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
             {(funds as any[]).length === 0 && (
               <p className="text-xs text-slate-400 text-center py-2">No giving recorded last week</p>
             )}
+          </div>
+        </div>
+      );
+    }
+
+    case 'church_progress': {
+      const rows: { label: string; thisMonth: number; lastMonth: number }[] = data.rows || [];
+      return (
+        <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+          <div className="bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2.5 flex items-center justify-between">
+            <p className="text-[11px] font-bold text-indigo-100 uppercase tracking-widest">Church Progress</p>
+            <span className="text-[10px] font-bold text-indigo-200">Last 30 Days</span>
+          </div>
+          <div className="bg-white dark:bg-slate-800 px-4 py-3 space-y-3">
+            {rows.map(r => {
+              const diff = r.thisMonth - r.lastMonth;
+              const isUp = diff >= 0;
+              const pctChange = r.lastMonth > 0 ? Math.round((Math.abs(diff) / r.lastMonth) * 100) : null;
+              return (
+                <div key={r.label} className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">{r.label}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-black text-slate-900 dark:text-white">{fmt(r.thisMonth)}</span>
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                      isUp ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400'
+                    }`}>
+                      {isUp ? '▲' : '▼'} {pctChange !== null ? `${pctChange}%` : fmt(Math.abs(diff))}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+            {rows.length === 0 && <p className="text-xs text-slate-400 text-center py-2">No progress data available</p>}
+          </div>
+        </div>
+      );
+    }
+
+    case 'upcoming_registrations': {
+      const events: { name: string; dateStr: string; signupCount: number; signupLimit: number | null; fillPct: number | null; isFull: boolean; waitlistedCount: number; publicUrl: string | null }[] = data.upcoming || [];
+      return (
+        <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+          <div className="bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 py-2.5 flex items-center justify-between">
+            <p className="text-[11px] font-bold text-violet-100 uppercase tracking-widest">Upcoming Registrations</p>
+            <span className="text-xs font-bold text-violet-200">{events.length} event{events.length !== 1 ? 's' : ''}</span>
+          </div>
+          <div className="bg-white dark:bg-slate-800 px-4 py-2">
+            {events.length === 0 && <p className="text-xs text-slate-400 py-2 text-center">No upcoming registration events</p>}
+            {events.map((e, i) => (
+              <div key={i} className="py-2 border-b border-slate-50 dark:border-slate-700/50 last:border-0">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{e.name}</p>
+                    <p className="text-[10px] text-indigo-500 dark:text-indigo-400 mt-0.5">{e.dateStr}</p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p className="text-xs font-black text-slate-900 dark:text-white">
+                      {fmt(e.signupCount)}{e.signupLimit ? ` / ${fmt(e.signupLimit)}` : ''}
+                    </p>
+                    {e.isFull && <span className="text-[9px] font-bold text-rose-600 dark:text-rose-400 uppercase">Full</span>}
+                    {!e.isFull && e.waitlistedCount > 0 && <span className="text-[9px] font-bold text-amber-600 dark:text-amber-400 uppercase">{e.waitlistedCount} waitlisted</span>}
+                  </div>
+                </div>
+                {e.fillPct !== null && (
+                  <div className="mt-1 h-1 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                    <div className={`h-full rounded-full ${
+                      e.isFull ? 'bg-rose-400' : e.fillPct >= 80 ? 'bg-amber-400' : 'bg-emerald-400'
+                    }`} style={{ width: `${e.fillPct}%` }} />
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       );

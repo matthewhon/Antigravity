@@ -271,6 +271,94 @@ async function fetchWidgetData(
             return { year: yearNow, totalBudget, totalActual, totalPct: totalBudget > 0 ? Math.min(Math.round((totalActual / totalBudget) * 100), 100) : 0, funds };
         }
 
+        case 'church_progress': {
+            const now = new Date();
+            const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+            const sixtyDaysAgo  = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+            const thirtyStr = thirtyDaysAgo.toISOString().split('T')[0];
+            const sixtyStr  = sixtyDaysAgo.toISOString().split('T')[0];
+            const todayStr  = now.toISOString().split('T')[0];
+
+            const [donSnap, planSnap, groupSnap] = await Promise.all([
+                db.collection('detailed_donations').where('churchId', '==', churchId).get(),
+                db.collection('service_plans').where('churchId', '==', churchId).get(),
+                db.collection('groups').where('churchId', '==', churchId).get(),
+            ]);
+
+            const donations: any[] = donSnap.docs.map((d: any) => d.data());
+            const givingThis = new Set(donations.filter((d: any) => d.date >= thirtyStr && d.date <= todayStr).map((d: any) => d.donorId)).size;
+            const givingLast = new Set(donations.filter((d: any) => d.date >= sixtyStr && d.date < thirtyStr).map((d: any) => d.donorId)).size;
+
+            const plans: any[] = planSnap.docs.map((d: any) => d.data());
+            const servingThis = new Set<string>();
+            const servingLast = new Set<string>();
+            plans.forEach((p: any) => {
+                const planDate = (p.sortDate || '').split('T')[0];
+                if (planDate > todayStr || planDate < sixtyStr) return;
+                (p.teamMembers || []).forEach((m: any) => {
+                    const status = m.status?.toLowerCase() || '';
+                    if ((status === 'confirmed' || status === 'c') && m.personId) {
+                        if (planDate >= thirtyStr) servingThis.add(m.personId);
+                        else servingLast.add(m.personId);
+                    }
+                });
+            });
+
+            const groups: any[] = groupSnap.docs.map((d: any) => d.data());
+            let groupThis = 0, groupLast = 0;
+            groups.forEach((g: any) => {
+                (g.attendanceHistory || []).forEach((h: any) => {
+                    const hDate = new Date(h.date || h.startedAt || 0);
+                    if (hDate >= thirtyDaysAgo) groupThis += h.count || 0;
+                    else if (hDate >= sixtyDaysAgo) groupLast += h.count || 0;
+                });
+            });
+
+            return {
+                rows: [
+                    { label: 'Group Attendance', thisMonth: groupThis, lastMonth: groupLast },
+                    { label: 'Donors',           thisMonth: givingThis, lastMonth: givingLast },
+                    { label: 'Volunteers',       thisMonth: servingThis.size, lastMonth: servingLast.size },
+                ],
+            };
+        }
+
+        case 'upcoming_registrations': {
+            const snap = await db.collection('pco_registrations').where('churchId', '==', churchId).get();
+            const allRegs: any[] = snap.docs.map((d: any) => d.data());
+            const cutoff = new Date();
+            cutoff.setDate(cutoff.getDate() - 14);
+            const upcoming = allRegs
+                .filter((e: any) => !e.startsAt || new Date(e.startsAt) >= cutoff)
+                .sort((a: any, b: any) => {
+                    if (!a.startsAt) return 1;
+                    if (!b.startsAt) return -1;
+                    return new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime();
+                })
+                .slice(0, 8)
+                .map((e: any) => {
+                    const confirmed = ((e.totalAttendees ?? e.signupCount) - (e.waitlistedCount ?? 0) - (e.canceledCount ?? 0));
+                    const displayCount = confirmed > 0 ? confirmed : (e.signupCount || 0);
+                    const fillPct = e.signupLimit && e.signupLimit > 0
+                        ? Math.min(100, Math.round((displayCount / e.signupLimit) * 100))
+                        : null;
+                    return {
+                        id: e.id,
+                        name: e.name,
+                        dateStr: e.startsAt
+                            ? new Date(e.startsAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                            : 'Date TBD',
+                        signupCount: displayCount,
+                        signupLimit: e.signupLimit || null,
+                        fillPct,
+                        isFull: fillPct !== null && fillPct >= 100,
+                        waitlistedCount: e.waitlistedCount || 0,
+                        publicUrl: e.publicUrl || null,
+                    };
+                });
+            return { upcoming };
+        }
+
         default:
             return {};
     }
