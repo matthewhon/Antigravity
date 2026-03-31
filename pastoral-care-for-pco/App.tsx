@@ -509,11 +509,11 @@ const App: React.FC = () => {
           peopleWithGroups, 
           donations, 
           groups, 
-          [], 
+          servicesData?.recentPlans || [], 
           teams, 
           church?.riskSettings || DEFAULT_RISK_SETTINGS
       );
-  }, [people, donations, groups, teams, church?.riskSettings]);
+  }, [people, donations, groups, servicesData, teams, church?.riskSettings]);
 
   const attendanceData = useMemo<AttendanceData[]>(() => {
       return attendance.map(a => ({
