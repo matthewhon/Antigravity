@@ -51,6 +51,7 @@ export const PEOPLE_RISK_WIDGETS: WidgetDefinition[] = [
 export const GROUPS_WIDGETS: WidgetDefinition[] = [
     { id: 'groups_risk_agent', label: 'Risk Consultant', icon: '🩺' },
     { id: 'groups_ai_agent', label: 'Activate Agent', icon: '🚀' },
+    { id: 'groups_health', label: 'Groups Health', icon: '❤️' },
     { id: 'groups_stats', label: 'Groups Stats', icon: '📊' },
     { id: 'groups_age_demographics', label: 'Age Demographics', icon: '🎂' },
     { id: 'event_attendance', label: 'Group Attendance', icon: '📅' },
@@ -203,8 +204,8 @@ export const getRoleBasedDefaults = (roles: string[]): Record<string, string[]> 
             : ['riskDistribution', 'atRiskList'],
         // Groups
         groups: isGroups || isPastor
-            ? ['groups_ai_agent', 'groups_stats', 'event_attendance', 'groups_gender', 'group_leaders']
-            : ['groups_stats', 'event_attendance'],
+            ? ['groups_ai_agent', 'groups_health', 'groups_stats', 'event_attendance', 'groups_gender', 'group_leaders']
+            : ['groups_health', 'groups_stats', 'event_attendance'],
         // Services
         services_overview: isServices || isPastor
             ? ['services_stats', 'upcoming_plans_list', 'staffing_needs', 'team_breakdown', 'checkin_history']
@@ -240,7 +241,7 @@ export const getDefaultWidgets = (view: string): string[] => {
         case 'people': return ['people_stats', 'people_engagement', 'gender', 'age', 'community_age_comparison', 'map'];
         case 'people_households': return ['householdSummary', 'householdComp', 'householdSize'];
         case 'people_risk': return ['riskDistribution', 'atRiskList'];
-        case 'groups': return ['groups_ai_agent', 'groups_stats', 'event_attendance', 'groups_gender'];
+        case 'groups': return ['groups_ai_agent', 'groups_health', 'groups_stats', 'event_attendance', 'groups_gender'];
         case 'services': return ['services_stats', 'upcoming_plans_list', 'staffing_needs', 'team_breakdown', 'checkin_history'];
         case 'services_overview': return ['services_stats', 'upcoming_plans_list', 'staffing_needs', 'team_breakdown', 'checkin_history'];
         case 'services_attendance': return ['checkin_history', 'events', 'services_stats'];

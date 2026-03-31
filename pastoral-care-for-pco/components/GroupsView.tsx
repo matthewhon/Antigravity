@@ -499,6 +499,43 @@ const GroupsView: React.FC<GroupsViewProps> = ({
                       </WidgetWrapper>
                   </div>
               );
+          case 'groups_health':
+              return data ? (
+                  <div key="groups_health" className="col-span-1 lg:col-span-2">
+                      <div className="bg-white dark:bg-slate-800 p-8 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm h-full flex flex-col justify-between relative">
+                            <div className="flex justify-between items-center mb-6">
+                                <h4 className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">Groups Health</h4>
+                                <button onClick={() => handleRemoveWidget(id)} className="absolute top-6 right-6 text-slate-300 dark:text-slate-600 hover:text-rose-500 transition-colors z-20">✕</button>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-8 mb-8">
+                                <div>
+                                    <p className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter">{data.stats.totalGroups}</p>
+                                    <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1">Active Groups</p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-4xl font-black text-indigo-600 dark:text-indigo-400 tracking-tighter">{data.stats.totalEnrollment}</p>
+                                    <p className="text-[10px] font-bold text-indigo-300 dark:text-indigo-700 uppercase tracking-widest mt-1">Enrolled</p>
+                                </div>
+                            </div>
+
+                            <div>
+                                <div className="flex justify-between items-end mb-3">
+                                    <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Participation Rate</span>
+                                    <span className="text-3xl font-black text-slate-900 dark:text-white">
+                                        {Math.round((data.stats.averageAttendance / (data.stats.totalEnrollment || 1)) * 100)}%
+                                    </span>
+                                </div>
+                                <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-6 overflow-hidden border border-slate-200 dark:border-slate-600">
+                                    <div 
+                                        className="bg-indigo-500 h-full rounded-full transition-all duration-1000 ease-out shadow-sm" 
+                                        style={{width: `${Math.min(100, (data.stats.averageAttendance / (data.stats.totalEnrollment || 1)) * 100)}%`}}
+                                    ></div>
+                                </div>
+                            </div>
+                      </div>
+                  </div>
+              ) : null;
           case 'groups_stats':
               return (
                   <div key="groups_stats" className="col-span-1 md:col-span-2 lg:col-span-4">
