@@ -639,6 +639,7 @@ export const calculateServicesAnalytics = (
             trends: checkInTrends
         },
         futurePlans,
+        recentPlans: plans, // Make all plans available for risk bulk calculation
         progressStats: { thisMonth: servingThisMonth.size, lastMonth: servingLastMonth.size }
     };
 };
