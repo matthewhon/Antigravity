@@ -582,9 +582,25 @@ export const GivingView: React.FC<GivingViewProps> = ({
               const totalActual = yearBudgets.reduce((s, b) => s + (fundActuals[b.fundName] || 0), 0);
               const totalPct = totalBudget > 0 ? Math.min((totalActual / totalBudget) * 100, 100) : 0;
 
-              // Colour ramp: red < 40%, amber 40-75%, green >= 75%
-              const barColor = (pct: number) =>
-                  pct >= 75 ? '#10b981' : pct >= 40 ? '#f59e0b' : '#f43f5e';
+              // Pace-aware colour logic:
+              // Expected YTD = sum of monthly budget amounts through the current month
+              const currentMonth = activeYear === now.getFullYear() ? now.getMonth() : (activeYear < now.getFullYear() ? 11 : -1);
+              const totalExpectedYTD = currentMonth >= 0
+                  ? yearBudgets.reduce((s, b) => {
+                      const monthlySum = b.monthlyAmounts.slice(0, currentMonth + 1).reduce((a, v) => a + v, 0);
+                      return s + monthlySum;
+                  }, 0)
+                  : 0;
+              const expectedPct = totalBudget > 0 ? Math.min((totalExpectedYTD / totalBudget) * 100, 100) : 0;
+              // paceRatio: how actual giving compares to where we should be this month (% of expected)
+              const paceRatio = totalExpectedYTD > 0 ? (totalActual / totalExpectedYTD) * 100 : 100;
+              // Colour ramp: green = within 10% of pace, yellow = 10-20% behind, red = >20% behind
+              const statusColor = (ratio: number) =>
+                  ratio >= 90 ? '#10b981' : ratio >= 80 ? '#f59e0b' : '#f43f5e';
+              const totalColor = statusColor(paceRatio);
+              // Per-fund expected YTD helper
+              const fundExpectedYTD = (b: typeof yearBudgets[0]) =>
+                  currentMonth >= 0 ? b.monthlyAmounts.slice(0, currentMonth + 1).reduce((a, v) => a + v, 0) : 0;
 
               return (
                   <WidgetWrapper
@@ -601,25 +617,24 @@ export const GivingView: React.FC<GivingViewProps> = ({
                               <div className="flex items-center justify-between">
                                   <span className="text-xs font-black text-slate-700 dark:text-slate-200 uppercase tracking-wider">Overall {activeYear} Budget</span>
                                   <span className={`text-sm font-black px-2 py-0.5 rounded-full ${
-                                      totalPct >= 75 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400' :
-                                      totalPct >= 40 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400' :
+                                      paceRatio >= 90 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400' :
+                                      paceRatio >= 80 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400' :
                                       'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-400'
                                   }`}>{Math.round(totalPct)}%</span>
                               </div>
                               <div className="relative h-5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
                                   <div
                                       className="h-full rounded-full transition-all duration-700"
-                                      style={{ width: `${totalPct}%`, background: `linear-gradient(90deg, ${barColor(totalPct)}, ${barColor(totalPct)}cc)` }}
+                                      style={{ width: `${totalPct}%`, background: `linear-gradient(90deg, ${totalColor}, ${totalColor}cc)` }}
                                   />
-                                  {/* Thermometer bulb marker */}
-                                  {totalPct > 0 && totalPct < 98 && (
-                                      <div className="absolute top-0 h-full flex items-center" style={{ left: `${totalPct}%`, transform: 'translateX(-50%)' }}>
-                                          <div className="w-1 h-full bg-white/60 dark:bg-white/30 rounded-full" />
-                                      </div>
+                                  {/* Expected pace marker */}
+                                  {expectedPct > 0 && expectedPct < 99 && (
+                                      <div className="absolute top-0 h-full" style={{ left: `${expectedPct}%`, transform: 'translateX(-50%)', width: '2px', backgroundColor: 'rgba(100,116,139,0.6)' }} />
                                   )}
                               </div>
                               <div className="flex justify-between text-[10px] font-semibold text-slate-500 dark:text-slate-400">
                                   <span>${totalActual.toLocaleString(undefined, { maximumFractionDigits: 0 })} raised</span>
+                                  <span className="opacity-60">pace: ${totalExpectedYTD.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
                                   <span>${totalBudget.toLocaleString(undefined, { maximumFractionDigits: 0 })} goal</span>
                               </div>
                           </div>
@@ -632,7 +647,10 @@ export const GivingView: React.FC<GivingViewProps> = ({
                                       const actual = fundActuals[budget.fundName] || 0;
                                       const pct = budget.totalAmount > 0 ? Math.min((actual / budget.totalAmount) * 100, 100) : 0;
                                       const remaining = Math.max(budget.totalAmount - actual, 0);
-                                      const color = barColor(pct);
+                                      const expectedForFund = fundExpectedYTD(budget);
+                                      const fundPaceRatio = expectedForFund > 0 ? (actual / expectedForFund) * 100 : 100;
+                                      const color = statusColor(fundPaceRatio);
+                                      const fundExpectedPct = budget.totalAmount > 0 ? Math.min((expectedForFund / budget.totalAmount) * 100, 100) : 0;
                                       return (
                                           <div key={budget.id} className="space-y-1.5">
                                               <div className="flex items-center justify-between">
@@ -641,8 +659,8 @@ export const GivingView: React.FC<GivingViewProps> = ({
                                                   </div>
                                                   <div className="flex items-center gap-2">
                                                       <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-md ${
-                                                          pct >= 75 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400' :
-                                                          pct >= 40 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400' :
+                                                          fundPaceRatio >= 90 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400' :
+                                                          fundPaceRatio >= 80 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400' :
                                                           'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-400'
                                                       }`}>{Math.round(pct)}%</span>
                                                       <span className="text-[10px] text-slate-400 dark:text-slate-500 whitespace-nowrap">${remaining.toLocaleString(undefined, { maximumFractionDigits: 0 })} left</span>
@@ -654,6 +672,10 @@ export const GivingView: React.FC<GivingViewProps> = ({
                                                       className="h-full rounded-full transition-all duration-700"
                                                       style={{ width: `${pct}%`, backgroundColor: color, opacity: 0.85 }}
                                                   />
+                                                  {/* Expected pace marker */}
+                                                  {fundExpectedPct > 0 && fundExpectedPct < 99 && (
+                                                      <div className="absolute top-0 h-full" style={{ left: `${fundExpectedPct}%`, transform: 'translateX(-50%)', width: '2px', backgroundColor: 'rgba(100,116,139,0.5)' }} />
+                                                  )}
                                               </div>
                                               <div className="flex justify-between text-[9px] text-slate-400 dark:text-slate-500">
                                                   <span>${actual.toLocaleString(undefined, { maximumFractionDigits: 0 })} raised</span>

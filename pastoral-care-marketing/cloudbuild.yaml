@@ -1,0 +1,25 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/gen-lang-client-0779452267/pastoralwebsite:latest'
+      - '.'
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/gen-lang-client-0779452267/pastoralwebsite:latest'
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'pastoralwebsite'
+      - '--image=gcr.io/gen-lang-client-0779452267/pastoralwebsite:latest'
+      - '--region=us-central1'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+      - '--port=8080'
+      - '--project=gen-lang-client-0779452267'
+images:
+  - 'gcr.io/gen-lang-client-0779452267/pastoralwebsite:latest'
