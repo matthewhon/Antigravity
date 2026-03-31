@@ -224,13 +224,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                             <div className="flex justify-between items-end mb-3">
                                 <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Participation Rate</span>
                                 <span className="text-3xl font-black text-slate-900 dark:text-white">
-                                    {Math.round((groupsData.stats.totalEnrollment / (peopleData?.stats.total || 1)) * 100)}%
+                                    {Math.round((groupsData.stats.averageAttendance / (groupsData.stats.totalEnrollment || 1)) * 100)}%
                                 </span>
                             </div>
                             <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-6 overflow-hidden border border-slate-200 dark:border-slate-600">
                                 <div 
                                     className="bg-indigo-500 h-full rounded-full transition-all duration-1000 ease-out shadow-sm" 
-                                    style={{width: `${Math.min(100, (groupsData.stats.totalEnrollment / (peopleData?.stats.total || 1)) * 100)}%`}}
+                                    style={{width: `${Math.min(100, (groupsData.stats.averageAttendance / (groupsData.stats.totalEnrollment || 1)) * 100)}%`}}
                                 ></div>
                             </div>
                         </div>

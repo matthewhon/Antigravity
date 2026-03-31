@@ -678,9 +678,22 @@ const App: React.FC = () => {
   const groupsDashboardData = useMemo<GroupsDashboardData>(() => {
       const totalEnrollment = groups.reduce((sum, g) => sum + g.membersCount, 0);
       const groupTypeMap = new Map<string, number>();
+      let totalAverageAttendance = 0;
+
       groups.forEach(g => {
           groupTypeMap.set(g.groupTypeName || 'Unknown', (groupTypeMap.get(g.groupTypeName || 'Unknown') || 0) + 1);
+          
+          if (g.attendanceHistory && g.attendanceHistory.length > 0) {
+              const events = [...g.attendanceHistory].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+              const recentEvents = events.slice(0, 4);
+              const sum = recentEvents.reduce((acc, ev) => acc + (ev.count || 0), 0);
+              if (recentEvents.length > 0) {
+                  totalAverageAttendance += sum / recentEvents.length;
+              }
+          }
       });
+
+      totalAverageAttendance = Math.round(totalAverageAttendance);
 
       // Calculate Gender Distribution based on Group Members
       let male = 0;
@@ -715,7 +728,8 @@ const App: React.FC = () => {
               totalGroups: groups.length,
               totalEnrollment,
               averageGroupSize: groups.length > 0 ? Math.round(totalEnrollment / groups.length) : 0,
-              publicGroups: groups.filter(g => g.isPublic).length
+              publicGroups: groups.filter(g => g.isPublic).length,
+              averageAttendance: totalAverageAttendance
           },
           groupsByType: Array.from(groupTypeMap.entries()).map(([name, value]) => ({ name, value })),
           groupsByDay: [],

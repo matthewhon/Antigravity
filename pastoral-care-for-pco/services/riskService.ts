@@ -102,13 +102,10 @@ export const calculateBulkRisk = (
     // Pre-process context data for speed
     const donorIds = new Set(donations.map(d => d.donorId));
     
-    // Determine volunteers based on team membership AND recent plan scheduling
+    // Determine volunteers based strictly on recent plan scheduling (confirmed positions)
     const volunteerIds = new Set<string>();
     
-    // 1. Add team members (Roster)
-    teams.forEach(t => t.memberIds.forEach(id => volunteerIds.add(id)));
-    
-    // 2. Add recent plan participants (last 3 months)
+    // Add recent plan participants (last 3 months)
     // STRICT RULE: Only count if they have a 'Confirmed' status on the plan
     const recentPlans = plans.filter(p => new Date(p.sortDate) >= new Date(Date.now() - 90 * 24 * 60 * 60 * 1000));
     recentPlans.forEach(p => {

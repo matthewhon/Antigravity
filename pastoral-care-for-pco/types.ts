@@ -217,7 +217,7 @@ export interface PeopleDashboardData {
 }
 
 export interface GroupsDashboardData {
-    stats: { totalGroups: number, totalEnrollment: number, averageGroupSize: number, publicGroups: number };
+    stats: { totalGroups: number, totalEnrollment: number, averageGroupSize: number, publicGroups: number, averageAttendance: number };
     groupsByType: { name: string, value: number }[];
     groupsByDay: any[];
     allGroups: PcoGroup[];
