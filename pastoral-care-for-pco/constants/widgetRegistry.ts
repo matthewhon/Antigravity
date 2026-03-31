@@ -53,7 +53,7 @@ export const GROUPS_WIDGETS: WidgetDefinition[] = [
     { id: 'groups_ai_agent', label: 'Activate Agent', icon: '🚀' },
     { id: 'groups_stats', label: 'Groups Stats', icon: '📊' },
     { id: 'groups_age_demographics', label: 'Age Demographics', icon: '🎂' },
-    { id: 'event_attendance', label: 'Event Attendance', icon: '📅' },
+    { id: 'event_attendance', label: 'Group Attendance', icon: '📅' },
     { id: 'groups_gender', label: 'Gender Breakdown', icon: '🚻' },
     { id: 'types', label: 'Group Types', icon: '🏷️' },
     { id: 'recent_groups', label: 'New Groups', icon: '✨' },

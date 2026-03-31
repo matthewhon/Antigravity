@@ -518,7 +518,7 @@ const GroupsView: React.FC<GroupsViewProps> = ({
               return (
                   <div key="event_attendance" className="col-span-1 lg:col-span-2">
                       <WidgetWrapper 
-                          title="Event Attendance" 
+                          title="Group Attendance" 
                           onRemove={() => handleRemoveWidget(id)} 
                           source="Group Events"
                           headerControl={
