@@ -171,7 +171,7 @@ export const TextEditorDrawer: React.FC<Props> = ({ isOpen, onClose, block, onUp
     if (editor && block) {
       const content = block.content.text || block.content.html || '';
       if (editor.getHTML() !== content) {
-        editor.commands.setContent(content, false);
+        editor.commands.setContent(content, { emitUpdate: false });
       }
     }
   }, [block?.id]);

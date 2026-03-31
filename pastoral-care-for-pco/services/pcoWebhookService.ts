@@ -59,11 +59,20 @@ export const initializeWebhooks = async (churchId: string) => {
     const topics = [
         'people.v2.events.person.created',
         'people.v2.events.person.updated',
+        'people.v2.events.person.destroyed', // To automatically remove deleted people
         'giving.v2.events.donation.created',
         'services.v2.events.plan_person.updated',
         // Real-time incremental sync — avoids full re-syncs after first load
         'check_ins.v2.events.check_in.created',
         'groups.v2.events.group_attendance.created',
+        
+        // Group and Membership changes
+        'groups.v2.events.group.created',
+        'groups.v2.events.group.updated',
+        'groups.v2.events.group.destroyed',
+        'groups.v2.events.membership.created',
+        'groups.v2.events.membership.updated',
+        'groups.v2.events.membership.destroyed',
     ];
 
     console.log(`[Webhooks] Initializing subscriptions → ${webhookUrl}`);

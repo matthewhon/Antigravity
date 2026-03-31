@@ -4,11 +4,8 @@ import App from './App';
 import './index.css';
 
 class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean, error: Error | null}> {
+  public props!: { children: React.ReactNode };
   public state = { hasError: false, error: null as Error | null };
-
-  constructor(props: {children: React.ReactNode}) {
-    super(props);
-  }
 
   static getDerivedStateFromError(error: Error) {
     return { hasError: true, error };
