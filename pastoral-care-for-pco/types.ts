@@ -487,6 +487,9 @@ export interface EmailCampaign {
     sendAt?: string | null;         // ISO string display value set by UI
     scheduledAt?: number | null;    // Epoch ms — authoritative trigger for the scheduler
     sentAt?: number | null;
+    recurringFrequency?: 'daily' | 'weekly' | 'monthly' | null;
+    lastSentAt?: number | null;
+    sentHistory?: { sentAt: number; recipientCount: number }[];
     // Analytics refresh tracking
     analyticsRefreshedAt?: number | null;
     // Retry logic

@@ -16,7 +16,7 @@ import { EmailCampaign, TemplateSettings, PcoList, Church, EmailUnsubscribe } fr
 import {
   Mail, Plus, ChevronDown, ChevronUp, CheckCircle, Circle, Send,
   Clock, Users, AtSign, FileText, AlignLeft, Calendar, ArrowLeft,
-  Trash2, Eye, Pencil, Loader2, X, List, UserMinus, Search
+  Trash2, Eye, Pencil, Loader2, X, List, UserMinus, Search, Copy
 } from 'lucide-react';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -142,7 +142,7 @@ const CampaignPreviewModal: React.FC<{ campaign: EmailCampaign; onClose: () => v
 // ─── Schedule Modal ───────────────────────────────────────────────────────────
 
 const ScheduleModal: React.FC<{
-  onConfirm: (scheduledAt: number) => void;
+  onConfirm: (scheduledAt: number, recurringFrequency?: 'daily' | 'weekly' | 'monthly') => void;
   onCancel: () => void;
   isScheduling: boolean;
 }> = ({ onConfirm, onCancel, isScheduling }) => {
@@ -155,6 +155,7 @@ const ScheduleModal: React.FC<{
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   };
   const [dateTime, setDateTime] = useState(defaultDt);
+  const [frequency, setFrequency] = useState<'none' | 'daily' | 'weekly' | 'monthly'>('none');
 
   const handleConfirm = () => {
     const ts = new Date(dateTime).getTime();
@@ -162,7 +163,7 @@ const ScheduleModal: React.FC<{
       alert('Please choose a time in the future.');
       return;
     }
-    onConfirm(ts);
+    onConfirm(ts, frequency === 'none' ? undefined : frequency);
   };
 
   return (
@@ -185,6 +186,19 @@ const ScheduleModal: React.FC<{
           min={new Date().toISOString().slice(0, 16)}
           className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500 mb-4"
         />
+        
+        <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Repeat Options</label>
+        <select
+          value={frequency}
+          onChange={e => setFrequency(e.target.value as any)}
+          className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500 mb-6"
+        >
+          <option value="none">Does not repeat</option>
+          <option value="daily">Daily</option>
+          <option value="weekly">Weekly</option>
+          <option value="monthly">Monthly</option>
+        </select>
+
         <div className="flex gap-2">
           <button
             onClick={onCancel}
@@ -213,11 +227,12 @@ interface CampaignListViewProps {
   onOpen: (c: EmailCampaign) => void;
   onPreview: (c: EmailCampaign) => void;
   onDelete: (id: string) => void;
+  onDuplicate: (c: EmailCampaign) => void;
   onCreate: () => void;
 }
 
 const CampaignListView: React.FC<CampaignListViewProps> = ({
-  campaigns, isLoading, onOpen, onPreview, onDelete, onCreate
+  campaigns, isLoading, onOpen, onPreview, onDelete, onDuplicate, onCreate
 }) => {
   const [tab, setTab] = React.useState<'all' | 'draft' | 'sent'>('all');
   const filtered = tab === 'all' ? campaigns : campaigns.filter(c => c.status === tab);
@@ -313,7 +328,8 @@ const CampaignListView: React.FC<CampaignListViewProps> = ({
                     )}
                     {c.status === 'scheduled' && c.scheduledAt && (
                       <span className="text-amber-600 dark:text-amber-400">
-                        · Scheduled for {new Date(c.scheduledAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                        {c.recurringFrequency ? `· Repeats ${c.recurringFrequency}. Next: ` : '· Scheduled for '}
+                        {new Date(c.scheduledAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                       </span>
                     )}
                     {c.status === 'failed' && c.lastError && (
@@ -338,6 +354,13 @@ const CampaignListView: React.FC<CampaignListViewProps> = ({
                     title="Edit"
                   >
                     <Pencil size={14} />
+                  </button>
+                  <button
+                    onClick={e => { e.stopPropagation(); onDuplicate(c); }}
+                    className="p-1.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                    title="Duplicate"
+                  >
+                    <Copy size={14} />
                   </button>
                   <button
                     onClick={e => { e.stopPropagation(); onDelete(c.id); }}
@@ -971,15 +994,24 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
 interface NewCampaignModalProps {
   onConfirm: (name: string) => void;
   onCancel: () => void;
+  title?: string;
+  description?: string;
+  defaultName?: string;
 }
 
-const NewCampaignModal: React.FC<NewCampaignModalProps> = ({ onConfirm, onCancel }) => {
-  const [name, setName] = useState('');
+const NewCampaignModal: React.FC<NewCampaignModalProps> = ({ 
+  onConfirm, 
+  onCancel, 
+  title = "New Email Campaign", 
+  description = "Give your email a name to get started.", 
+  defaultName = "" 
+}) => {
+  const [name, setName] = useState(defaultName);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4">
-        <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-1">New Email Campaign</h2>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Give your email a name to get started.</p>
+        <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-1">{title}</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">{description}</p>
         <input
           type="text"
           className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4"
@@ -1054,6 +1086,7 @@ export const CommunicationModule: React.FC<{ churchId: string; church?: Church; 
   const [previewCampaign, setPreviewCampaign] = useState<EmailCampaign | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showNewModal, setShowNewModal] = useState(false);
+  const [duplicateCampaignState, setDuplicateCampaignState] = useState<EmailCampaign | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [showTestModal, setShowTestModal] = useState(false);
   const [isSendingTest, setIsSendingTest] = useState(false);
@@ -1127,6 +1160,36 @@ export const CommunicationModule: React.FC<{ churchId: string; church?: Church; 
     setCampaigns(prev => prev.filter(c => c.id !== id));
   };
 
+  const handleDuplicate = (campaignToDuplicate: EmailCampaign) => {
+    setDuplicateCampaignState(campaignToDuplicate);
+  };
+
+  const finishDuplicate = async (newName: string) => {
+    if (!duplicateCampaignState) return;
+    const newCampaign: EmailCampaign = {
+      ...duplicateCampaignState,
+      id: `email_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      name: newName,
+      subject: duplicateCampaignState.subject ? `Copy of ${duplicateCampaignState.subject}` : '',
+      status: 'draft',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      sentAt: undefined,
+      scheduledAt: undefined,
+      retryCount: undefined,
+      lastError: undefined,
+    };
+    setDuplicateCampaignState(null);
+    try {
+      await firestore.saveEmailCampaign(newCampaign);
+      setCampaigns(prev => [newCampaign, ...prev]);
+      showToast('Email duplicated successfully!', 'success');
+    } catch (e: any) {
+      console.error('[CommunicationModule] Failed to duplicate campaign:', e);
+      showToast(`Failed to duplicate campaign: ${e?.message || 'Unknown error'}`, 'error');
+    }
+  };
+
   // Use a ref so handleSave always reads the latest activeCampaign
   const activeCampaignRef = React.useRef<EmailCampaign | null>(null);
   React.useEffect(() => { activeCampaignRef.current = activeCampaign; }, [activeCampaign]);
@@ -1196,7 +1259,7 @@ export const CommunicationModule: React.FC<{ churchId: string; church?: Church; 
     }
   };
 
-  const handleSchedule = async (scheduledAt: number) => {
+  const handleSchedule = async (scheduledAt: number, recurringFrequency?: 'daily' | 'weekly' | 'monthly') => {
     if (!activeCampaign) return;
     setIsScheduling(true);
     try {
@@ -1205,12 +1268,12 @@ export const CommunicationModule: React.FC<{ churchId: string; church?: Church; 
       const res = await fetch(`${apiBaseUrl}/email/schedule`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ campaignId: activeCampaign.id, churchId, scheduledAt }),
+        body: JSON.stringify({ campaignId: activeCampaign.id, churchId, scheduledAt, recurringFrequency }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to schedule');
       const sendAt = new Date(scheduledAt).toISOString();
-      handleSave({ status: 'scheduled', scheduledAt, sendAt, retryCount: 0, lastError: null });
+      handleSave({ status: 'scheduled', scheduledAt, sendAt, recurringFrequency, retryCount: 0, lastError: null });
       setShowScheduleModal(false);
       showToast(`Email scheduled for ${new Date(scheduledAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`);
     } catch (e: any) {
@@ -1232,7 +1295,7 @@ export const CommunicationModule: React.FC<{ churchId: string; church?: Church; 
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to cancel');
-      handleSave({ status: 'draft', scheduledAt: null, sendAt: null });
+      handleSave({ status: 'draft', scheduledAt: null, sendAt: null, recurringFrequency: null });
       showToast('Schedule cancelled. Campaign reverted to draft.');
     } catch (e: any) {
       showToast(e.message || 'Failed to cancel schedule.', 'error');
@@ -1469,6 +1532,17 @@ export const CommunicationModule: React.FC<{ churchId: string; church?: Church; 
         <NewCampaignModal onConfirm={handleCreate} onCancel={() => setShowNewModal(false)} />
       )}
 
+      {/* Duplicate campaign modal */}
+      {duplicateCampaignState && (
+        <NewCampaignModal
+          title="Duplicate Email Campaign"
+          description={`Enter a new name for the copy of "${duplicateCampaignState.name}".`}
+          defaultName={`Copy of ${duplicateCampaignState.name}`}
+          onConfirm={finishDuplicate}
+          onCancel={() => setDuplicateCampaignState(null)}
+        />
+      )}
+
       {/* Main Content */}
       {activeCampaign ? (
         <EmailEditor
@@ -1494,6 +1568,7 @@ export const CommunicationModule: React.FC<{ churchId: string; church?: Church; 
           onOpen={c => setActiveCampaign(c)}
           onPreview={c => setPreviewCampaign(c)}
           onDelete={handleDelete}
+          onDuplicate={handleDuplicate}
           onCreate={() => setShowNewModal(true)}
         />
       )}

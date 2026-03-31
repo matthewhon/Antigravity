@@ -575,16 +575,65 @@ export const diagnoseDomain = async (req: any, res: any) => {
         }
 
         // Check 5: Is the domain associated with this tenant's subuser?
+        // NOTE: sgDomainData.username always shows the *owner* of the domain auth (the
+        // master account), not the associated subuser. To verify subuser association we
+        // must query the subuser's domain list via the on-behalf-of header and check
+        // whether this domain auth ID appears there.
         if (sendGridSubuserId && sgDomainData) {
-            const subuserUsername: string | undefined = sgDomainData.username;
-            const isAssociated = subuserUsername === sendGridSubuserId;
+            let isAssociated = false;
+            let associationDetail = '';
+            try {
+                const subuserDomainsRes = await fetch('https://api.sendgrid.com/v3/whitelabel/domains?limit=200', {
+                    headers: {
+                        ...sgHeaders(masterKey),
+                        'on-behalf-of': sendGridSubuserId,
+                    },
+                });
+                if (subuserDomainsRes.ok) {
+                    const subuserDomains: any[] = await subuserDomainsRes.json();
+                    // Look for this domain auth by ID or by matching domain name
+                    const match = subuserDomains.find(
+                        (d: any) => String(d.id) === String(domainAuthId) ||
+                                    (d.domain || '').toLowerCase() === (customDomain || '').toLowerCase()
+                    );
+                    isAssociated = !!match;
+                    if (!isAssociated && sgDomainData.valid === true) {
+                        // DNS is valid but not yet associated — try to associate now
+                        const assocRes = await fetch(
+                            `https://api.sendgrid.com/v3/whitelabel/domains/${domainAuthId}/subuser`,
+                            {
+                                method: 'POST',
+                                headers: sgHeaders(masterKey),
+                                body: JSON.stringify({ username: sendGridSubuserId }),
+                            }
+                        );
+                        // 400 often means "already associated" — treat as success
+                        if (assocRes.ok || assocRes.status === 400) {
+                            isAssociated = true;
+                            associationDetail = `Auto-associated with subuser "${sendGridSubuserId}" during diagnostics.`;
+                            log.info(
+                                `Domain auth #${domainAuthId} auto-associated with subuser ${sendGridSubuserId} during diagnose`,
+                                'system', { churchId, domainAuthId, sendGridSubuserId }, churchId
+                            );
+                        } else {
+                            const assocBody = await assocRes.json().catch(() => ({}));
+                            associationDetail = `Association attempt returned ${assocRes.status}: ${(assocBody as any)?.errors?.[0]?.message || 'unknown error'}. Try clicking "Verify DNS".`;
+                        }
+                    } else if (isAssociated) {
+                        associationDetail = `Associated with subuser "${sendGridSubuserId}".`;
+                    } else {
+                        associationDetail = `Not yet associated with subuser "${sendGridSubuserId}". DNS may still be propagating — click "Verify DNS" once DNS is confirmed.`;
+                    }
+                } else {
+                    associationDetail = `Could not query subuser domain list (HTTP ${subuserDomainsRes.status}). Association status unknown.`;
+                }
+            } catch (assocCheckErr: any) {
+                associationDetail = `Could not verify association: ${assocCheckErr.message}`;
+            }
             checks.push({
                 label: 'Domain associated with tenant subuser',
                 status: isAssociated ? 'pass' : 'warn',
-                detail: isAssociated
-                    ? `Associated with subuser: ${sendGridSubuserId}`
-                    : `Not yet associated with subuser "${sendGridSubuserId}" (currently: "${subuserUsername || 'none'}"). ` +
-                      `This happens automatically when DNS verification passes. Click "Verify DNS" to associate.`,
+                detail: associationDetail,
             });
         } else if (!sendGridSubuserId) {
             checks.push({ label: 'Domain associated with tenant subuser', status: 'warn', detail: 'No sendGridSubuserId found — subuser not provisioned. Use Shared Domain first to create the subuser.' });

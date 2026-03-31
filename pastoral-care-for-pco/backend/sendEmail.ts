@@ -375,7 +375,8 @@ export async function executeSend(
     db: any,
     campaignId: string,
     churchId: string,
-    testEmail?: string
+    testEmail?: string,
+    skipStatusUpdate?: boolean
 ): Promise<{ recipientCount: number; message: string }> {
     const log = createServerLogger(db);
 
@@ -491,27 +492,52 @@ export async function executeSend(
 
         if (!accessToken) throw new Error('Church not connected to Planning Center. Cannot fetch recipient list.');
 
-        const pcoUrl = `https://api.planningcenteronline.com/people/v2/lists/${campaign.toListId}/people?fields[Person]=emails&per_page=100`;
-        const pcoRes = await fetch(pcoUrl, {
-            headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' }
-        });
+        // PCO emails are a related resource — use include=emails to sideload them.
+        // The per_page=100 limit applies to people; paginate if the list is larger.
+        let pcoPage = 1;
+        let hasMore = true;
+        while (hasMore) {
+            const pcoUrl = `https://api.planningcenteronline.com/people/v2/lists/${campaign.toListId}/people?include=emails&per_page=100&offset=${(pcoPage - 1) * 100}`;
+            const pcoRes = await fetch(pcoUrl, {
+                headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' }
+            });
 
-        if (pcoRes.ok) {
+            if (!pcoRes.ok) {
+                log.warn(`Failed to fetch PCO list members (page ${pcoPage}): ${pcoRes.status}`, 'system', { churchId, listId: campaign.toListId }, churchId);
+                // Fall back to local Firestore cache
+                const peopleSnap = await db.collection('people').where('churchId', '==', churchId).get();
+                recipients = peopleSnap.docs.map((d: any) => d.data().email as string).filter(Boolean);
+                break;
+            }
+
             const pcoData = await pcoRes.json();
             const people: any[] = pcoData.data || [];
-            recipients = people
-                .map((p: any) => {
-                    const emails = p.attributes?.emails || [];
-                    const primary = emails.find((e: any) => e.primary) || emails[0];
-                    return primary?.address || null;
-                })
-                .filter(Boolean);
-        } else {
-            log.warn(`Failed to fetch PCO list members: ${pcoRes.status}`, 'system', { churchId, listId: campaign.toListId }, churchId);
-            const peopleSnap = await db.collection('people').where('churchId', '==', churchId).get();
-            recipients = peopleSnap.docs.map(d => d.data().email as string).filter(Boolean);
+            const included: any[] = pcoData.included || [];
+
+            // Build a lookup: personId → primary email from the included email objects
+            const emailByPersonId = new Map<string, string>();
+            for (const inc of included) {
+                if (inc.type === 'Email' && inc.attributes?.address) {
+                    // Each Email object has a relationships.person.data.id pointing back to the person
+                    const personId: string | undefined = inc.relationships?.person?.data?.id;
+                    if (personId && (!emailByPersonId.has(personId) || inc.attributes?.primary)) {
+                        emailByPersonId.set(personId, inc.attributes.address);
+                    }
+                }
+            }
+
+            for (const person of people) {
+                const email = emailByPersonId.get(person.id);
+                if (email) recipients.push(email);
+            }
+
+            // Check for next page
+            const nextOffset = pcoData.meta?.next?.offset;
+            hasMore = !!nextOffset && people.length === 100;
+            pcoPage++;
         }
 
+        recipients = [...new Set(recipients.filter(Boolean))]; // dedupe
         if (recipients.length === 0) throw new Error('No email addresses found for the selected list.');
         log.info(`Sending campaign "${subject}" to ${recipients.length} recipients (PCO list)`, 'system', { campaignId, churchId }, churchId);
 
@@ -589,9 +615,13 @@ export async function executeSend(
     for (let i = 0; i < recipients.length; i += BATCH) {
         const batch = recipients.slice(i, i + BATCH);
         for (const recipientEmail of batch) {
-            const unsubHtml = testEmail
-                ? '' // no unsubscribe link on test sends
-                : buildUnsubscribeHtml(churchId, recipientEmail, fontFamily, appBaseUrl);
+            // Always include the unsubscribe footer — on test sends we use the test
+            // email address so the link renders correctly, but append a note so the
+            // sender knows it's a preview rather than a live unsubscribe token.
+            const unsubHtml = buildUnsubscribeHtml(churchId, recipientEmail, fontFamily, appBaseUrl)
+                + (testEmail
+                    ? `<div style="text-align:center;padding:0 32px 8px;"><p style="margin:0;font-family:${fontFamily};font-size:10px;color:#d1d5db;">(TEST SEND — unsubscribe link not active)</p></div>`
+                    : '');
             const personalizedHtml = renderBlocksToHtml(
                 campaign.blocks || [],
                 campaign.templateSettings || {},
@@ -605,8 +635,8 @@ export async function executeSend(
         }
     }
 
-    // 6. Mark sent (skip for test)
-    if (!testEmail) {
+    // 6. Mark sent (skip for test or when scheduler is managing recurring dates)
+    if (!testEmail && !skipStatusUpdate) {
         await db.collection('email_campaigns').doc(campaignId).update({
             status: 'sent',
             sentAt: Date.now(),

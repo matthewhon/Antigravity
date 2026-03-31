@@ -136,7 +136,9 @@ export const pcoProxy = async (req: any, res: any) => {
 
             // Special handling for registrations endpoints — check BEFORE logging
             // so we don't emit noisy warn logs for expected conditions.
-            if (url?.includes('/registrations/')) {
+            // Matches both /registrations/v2/... and /registrations/v2/signups/... paths.
+            const isRegistrationsUrl = url?.includes('/registrations/v2/');
+            if (isRegistrationsUrl) {
                 if (response.status === 403) {
                     // 403 = valid token but missing 'registrations' scope — must reconnect
                     log.warn('Registrations scope not granted — reconnect PCO to enable', 'proxy', { churchId }, churchId);

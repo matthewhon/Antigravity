@@ -1156,13 +1156,14 @@ export const syncCheckInsData = async (churchId: string) => {
 };
 
 /**
- * Full Registrations sync:
+ * Full Registrations sync using the correct PCO Registrations API v2 structure:
+ *  - PCO calls these "signups" (not "events") in the API, though they appear as "events" in the UI.
  *  1. Campuses  — /registrations/v2/campuses
- *  2. Events    — /registrations/v2/events (all attributes)
- *  3. Attendees — /registrations/v2/events/{id}/registrations?include=attendees
+ *  2. Signups   — /registrations/v2/signups?include=signup_times  (maps to PcoRegistrationEvent)
+ *  3. Attendees — /registrations/v2/signups/{id}/attendees?include=person,registration
  *
  * Stored in:
- *   pco_registrations           (one doc per event)
+ *   pco_registrations           (one doc per signup)
  *   pco_registration_attendees  (one doc per attendee)
  *   pco_registration_campuses   (one doc per campus)
  *
@@ -1173,7 +1174,8 @@ export const syncRegistrationsData = async (churchId: string) => {
 
     try {
         // ── Probe: check module availability before clearing any existing data ───
-        const probeData = await pcoFetch(churchId, 'registrations/v2/events?per_page=1&order=starts_at');
+        // Use the correct /signups endpoint; /events does not exist in the PCO Registrations API.
+        const probeData = await pcoFetch(churchId, 'registrations/v2/signups?per_page=1');
         if (!probeData || probeData._pcoNote) {
             logger.info(
                 'Registrations module not available for this organization — skipping sync',
@@ -1213,42 +1215,64 @@ export const syncRegistrationsData = async (churchId: string) => {
             logger.warn('Campus sync failed (non-fatal)', 'sync', { churchId, error: campusErr?.message }, churchId);
         }
 
-        // Build campus lookup for enriching events
+        // Build campus lookup for enriching signups
         const campusMap = new Map<string, string>(); // pcoId → name
         campuses.forEach(c => campusMap.set(c.pcoId, c.name));
 
-        // ── 2. Events ───────────────────────────────────────────────────────────
-        const rawEvents = await fetchAllPages(
+        // ── 2. Signups (what PCO calls "events" in the UI) ───────────────────
+        // PCO Registrations API v2 uses the resource name "signups" for registration events.
+        // Signup attributes: name, description, logo_url, open_at, close_at, new_registration_url, archived.
+        // Actual event start/end dates live in the related SignupTime resources (included here).
+        const rawSignups = await fetchAllPages(
             churchId,
-            'registrations/v2/events?order=starts_at',
-            (item: any) => {
+            'registrations/v2/signups?include=signup_times',
+            (item: any, included: any[] = []) => {
                 if (!item) return null;
                 const attrs = item.attributes || {};
+
+                // Resolve the earliest upcoming (or most recent past) SignupTime for a usable date
+                const signupTimeRefs: any[] = item.relationships?.signup_times?.data || [];
+                const signupTimes = signupTimeRefs
+                    .map((ref: any) => included?.find((i: any) => i.type === 'SignupTime' && i.id === ref.id))
+                    .filter(Boolean)
+                    .sort((a: any, b: any) => {
+                        const aDate = a.attributes?.starts_at || a.attributes?.created_at || '';
+                        const bDate = b.attributes?.starts_at || b.attributes?.created_at || '';
+                        return aDate.localeCompare(bDate);
+                    });
+
+                // Pick the first upcoming time; fall back to the last past time
+                const nowIso = new Date().toISOString();
+                const upcomingTime = signupTimes.find((t: any) => (t.attributes?.starts_at || '') >= nowIso);
+                const chosenTime = upcomingTime || signupTimes[signupTimes.length - 1];
+                const startsAt = chosenTime?.attributes?.starts_at || attrs.open_at || null;
+                const endsAt = chosenTime?.attributes?.ends_at || attrs.close_at || null;
+
                 const campusId = item.relationships?.campus?.data?.id || null;
+
                 return {
                     id: `${churchId}_${item.id}`,
                     pcoId: item.id,
                     churchId,
                     name: attrs.name || 'Unnamed Event',
                     description: attrs.description || null,
-                    logoUrl: attrs.logo_url || attrs.image_url || null,
-                    publicUrl: attrs.public_url ||
+                    logoUrl: attrs.logo_url || null,
+                    publicUrl: attrs.new_registration_url ||
                         (item.id ? `https://registrations.planningcenteronline.com/events/${item.id}` : null),
-                    visibility: attrs.visibility || null,
-                    registrationType: attrs.registration_type || null,
-                    // Dates
-                    startsAt: attrs.starts_at || attrs.first_event_date || null,
-                    endsAt: attrs.ends_at || null,
+                    visibility: attrs.archived ? 'archived' : 'public',
+                    registrationType: null,
+                    // Dates — open_at/close_at are the registration window; startsAt from SignupTime is the event date
+                    startsAt,
+                    endsAt,
                     openAt: attrs.open_at || null,
                     closeAt: attrs.close_at || null,
-                    // Counts
-                    signupCount: attrs.active_attendees_count ?? attrs.signup_count ?? attrs.attendee_count ?? 0,
-                    signupLimit: attrs.signup_limit ?? attrs.attendee_limit ?? null,
-                    openSignup: attrs.open_signup ?? true,
+                    // Counts — filled in during attendee sync below
+                    signupCount: 0,
+                    signupLimit: null,
+                    openSignup: !attrs.archived,
                     // Campus
-                    campusId: campusId,
+                    campusId,
                     campusName: campusId ? (campusMap.get(campusId) ?? null) : null,
-                    // Counters filled in during attendee sync below
                     totalRegistrations: 0,
                     totalAttendees: 0,
                     waitlistedCount: 0,
@@ -1258,86 +1282,90 @@ export const syncRegistrationsData = async (churchId: string) => {
             }
         );
 
-        const events = rawEvents.filter(Boolean) as PcoRegistrationEvent[];
-        logger.info(`Fetched ${events.length} registration events`, 'sync', { churchId }, churchId);
+        const events = rawSignups.filter(Boolean) as PcoRegistrationEvent[];
+        logger.info(`Fetched ${events.length} registration signups`, 'sync', { churchId }, churchId);
 
         // ── 3. Clear existing data AFTER fetch succeeds ──────────────────────
         await firestore.clearRegistrations(churchId);
 
-        // ── 4. Attendees for each event ──────────────────────────────────────
+        // ── 4. Attendees for each signup ─────────────────────────────────────
+        // Endpoint: GET /registrations/v2/signups/{id}/attendees?include=person,registration
+        // Attendee booleans use no `is_` prefix: `waitlisted`, `canceled`, `active`, `complete`
         const allAttendees: PcoRegistrationAttendee[] = [];
 
         for (const event of events) {
             try {
-                // Fetch registrations with attendees included
-                const regAttendees = await fetchAllPages(
+                const eventAttendees = await fetchAllPages(
                     churchId,
-                    `registrations/v2/events/${event.pcoId}/registrations?include=attendees`,
-                    (regItem: any, included: any[] = []) => {
-                        if (!regItem) return null;
-                        const regAttrs = regItem.attributes || {};
-                        const isCanceled = regAttrs.is_canceled ?? false;
+                    `registrations/v2/signups/${event.pcoId}/attendees?include=person,registration`,
+                    (attendeeItem: any, included: any[] = []) => {
+                        if (!attendeeItem) return null;
+                        const aAttrs = attendeeItem.attributes || {};
 
-                        // Get attendee references from this registration
-                        const attendeeRefs: any[] = regItem.relationships?.attendees?.data || [];
+                        // Resolve the linked Person for name data
+                        const personId = attendeeItem.relationships?.person?.data?.id || null;
+                        const personData = personId
+                            ? included?.find((i: any) => i.type === 'Person' && i.id === personId)
+                            : null;
+                        const pAttrs = personData?.attributes || {};
+                        // PCO Person resource has: name, first_name, last_name
+                        const name = pAttrs.name ||
+                            (`${pAttrs.first_name || ''} ${pAttrs.last_name || ''}`.trim()) ||
+                            'Unknown';
 
-                        // Map attendees from the included array
-                        return attendeeRefs.map((ref: any) => {
-                            const attendeeData = included?.find(
-                                (i: any) => i.type === 'Attendee' && i.id === ref.id
-                            );
-                            if (!attendeeData) return null;
+                        // Resolve the linked Registration for financial data
+                        const regId = attendeeItem.relationships?.registration?.data?.id || null;
+                        const regData = regId
+                            ? included?.find((i: any) => i.type === 'Registration' && i.id === regId)
+                            : null;
+                        const rAttrs = regData?.attributes || {};
 
-                            const aAttrs = attendeeData.attributes || {};
-                            const personId = attendeeData.relationships?.person?.data?.id || null;
-                            const isWaitlisted = aAttrs.is_waitlisted ?? false;
-                            const statusRaw = aAttrs.status || (isWaitlisted ? 'waitlisted' : isCanceled ? 'canceled' : 'confirmed');
+                        // PCO Attendee boolean status fields — no `is_` prefix in v2
+                        const isWaitlisted = aAttrs.waitlisted ?? false;
+                        const isCanceled = aAttrs.canceled ?? false;
+                        const statusRaw = isWaitlisted ? 'waitlisted' : isCanceled ? 'canceled' : 'confirmed';
 
-                            return {
-                                id: `${churchId}_${attendeeData.id}`,
-                                pcoId: attendeeData.id,
-                                churchId,
-                                eventId: event.id,
-                                pcoEventId: event.pcoId,
-                                registrationId: regItem.id || null,
-                                name: aAttrs.name || aAttrs.first_name
-                                    ? `${aAttrs.first_name || ''} ${aAttrs.last_name || ''}`.trim()
-                                    : 'Unknown',
-                                status: statusRaw,
-                                isWaitlisted,
-                                isCanceled: aAttrs.is_canceled ?? isCanceled,
-                                attendeeTypeName: aAttrs.attendee_type_name || aAttrs.selection_type_name || null,
-                                personId,
-                                emergencyContactName: aAttrs.emergency_contact_name || null,
-                                emergencyContactPhone: aAttrs.emergency_contact_phone_number || null,
-                                totalCostCents: regAttrs.total_cost_minus_discounts ?? null,
-                                balanceDueCents: regAttrs.balance_due_cents ?? null,
-                                createdAt: regAttrs.created_at || null,
-                                lastSynced: now,
-                            } as PcoRegistrationAttendee;
-                        }).filter(Boolean);
+                        return {
+                            id: `${churchId}_${attendeeItem.id}`,
+                            pcoId: attendeeItem.id,
+                            churchId,
+                            eventId: event.id,
+                            pcoEventId: event.pcoId,
+                            registrationId: regId || null,
+                            name,
+                            status: statusRaw,
+                            isWaitlisted,
+                            isCanceled,
+                            attendeeTypeName: aAttrs.selection_type_name || null,
+                            personId,
+                            emergencyContactName: null,
+                            emergencyContactPhone: null,
+                            totalCostCents: rAttrs.total_cost_cents ?? null,
+                            balanceDueCents: rAttrs.balance_due_cents ?? null,
+                            createdAt: aAttrs.created_at || null,
+                            lastSynced: now,
+                        } as PcoRegistrationAttendee;
                     }
                 );
 
-                const eventAttendees = regAttendees.flat().filter(Boolean) as PcoRegistrationAttendee[];
+                const validAttendees = eventAttendees.filter(Boolean) as PcoRegistrationAttendee[];
 
-                // Update event counters from actual attendee data
-                event.totalAttendees = eventAttendees.length;
-                event.totalRegistrations = new Set(eventAttendees.map(a => a.registrationId).filter(Boolean)).size;
-                event.waitlistedCount = eventAttendees.filter(a => a.isWaitlisted).length;
-                event.canceledCount = eventAttendees.filter(a => a.isCanceled).length;
-                // Keep signupCount in sync with confirmed count
-                event.signupCount = eventAttendees.filter(a => !a.isWaitlisted && !a.isCanceled).length || event.signupCount;
+                // Back-fill event counters from actual attendee data
+                event.totalAttendees = validAttendees.length;
+                event.totalRegistrations = new Set(validAttendees.map(a => a.registrationId).filter(Boolean)).size;
+                event.waitlistedCount = validAttendees.filter(a => a.isWaitlisted).length;
+                event.canceledCount = validAttendees.filter(a => a.isCanceled).length;
+                event.signupCount = validAttendees.filter(a => !a.isWaitlisted && !a.isCanceled).length || 0;
 
-                allAttendees.push(...eventAttendees);
+                allAttendees.push(...validAttendees);
             } catch (attErr: any) {
                 logger.warn(
-                    `Attendee fetch failed for event ${event.pcoId} (non-fatal)`,
-                    'sync', { churchId, eventId: event.pcoId, error: attErr?.message }, churchId
+                    `Attendee fetch failed for signup ${event.pcoId} (non-fatal)`,
+                    'sync', { churchId, signupId: event.pcoId, error: attErr?.message }, churchId
                 );
             }
 
-            // Throttle between events to be a good API citizen
+            // Throttle between signups to be a good API citizen
             await delay(150);
         }
 
@@ -1369,3 +1397,4 @@ export const syncRegistrationsData = async (churchId: string) => {
         console.warn('Registrations sync failed:', e);
     }
 };
+

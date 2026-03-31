@@ -928,16 +928,26 @@ const PCO_PICK_CONFIG: Record<PcoPickType, {
     label: 'Registration',
     icon: <ClipboardList size={14} />,
     fetch: (id) => pcoService.getRegistrations(id),
-    map: (item) => ({
-      id: item.id,
-      name: item.attributes?.name || 'Unnamed',
-      date: item.attributes?.starts_at ? new Date(item.attributes.starts_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : undefined,
-      imageUrl: item.attributes?.logo_url || item.attributes?.image_url,
-      description: item.attributes?.description,
-      meta: item.attributes?.open_signup ? 'Open' : 'Closed',
-      url: item.attributes?.public_url || (item.id ? `https://registrations.planningcenteronline.com/events/${item.id}` : undefined)
-    })
+    map: (item) => {
+      // The Signup resource has no top-level starts_at; dates are in included SignupTimes.
+      // pcoService.getRegistrations includes signup_times so they'll be in the raw response included array.
+      // However since we're mapping raw items (not the full page), use open_at as a fallback date.
+      const attrs = item.attributes || {};
+      const dateStr = attrs.open_at
+        ? new Date(attrs.open_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        : undefined;
+      return {
+        id: item.id,
+        name: attrs.name || 'Unnamed',
+        date: dateStr,
+        imageUrl: attrs.logo_url,
+        description: attrs.description,
+        meta: attrs.archived ? 'Archived' : 'Active',
+        url: attrs.new_registration_url || (item.id ? `https://registrations.planningcenteronline.com/events/${item.id}` : undefined)
+      };
+    }
   },
+
   pco_group: {
     label: 'Group',
     icon: <Users size={14} />,

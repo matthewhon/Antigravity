@@ -343,13 +343,41 @@ export function startEmailScheduler(db: any): void {
                         log.info(`[Scheduler] Refreshed ${count} analytics block(s) for campaign ${campaignId}`, 'system', { campaignId }, churchId);
                     }
 
-                    // 2. Execute send
-                    const result = await executeSend(db as any, campaignId, churchId);
+                    // 2. Execute send (skip status update if recurring)
+                    const isRecurring = !!campaign.recurringFrequency;
+                    const result = await executeSend(db as any, campaignId, churchId, undefined, isRecurring);
 
                     log.info(
                         `[Scheduler] Campaign ${campaignId} sent successfully: ${result.message}`,
                         'system', { campaignId, churchId }, churchId
                     );
+
+                    // 3. Handle recurring reschedule
+                    if (isRecurring) {
+                        const nowTime = Date.now();
+                        const d = new Date(campaign.scheduledAt || nowTime);
+                        if (campaign.recurringFrequency === 'daily') d.setDate(d.getDate() + 1);
+                        else if (campaign.recurringFrequency === 'weekly') d.setDate(d.getDate() + 7);
+                        else if (campaign.recurringFrequency === 'monthly') d.setMonth(d.getMonth() + 1);
+                        else d.setDate(d.getDate() + 1); // fallback
+                        
+                        const nextEpoch = d.getTime();
+                        const history = campaign.sentHistory || [];
+                        history.push({ sentAt: nowTime, recipientCount: result.recipientCount });
+
+                        await db.collection('email_campaigns').doc(campaignId).update({
+                            status: 'scheduled',
+                            scheduledAt: nextEpoch,
+                            sendAt: d.toISOString(),
+                            lastSentAt: nowTime,
+                            sentHistory: history,
+                            retryCount: 0,
+                            lastError: null,
+                            updatedAt: Date.now(),
+                        });
+                        
+                        log.info(`[Scheduler] Recurring campaign ${campaignId} rescheduled to ${d.toISOString()}`, 'system', { campaignId, nextEpoch }, churchId);
+                    }
 
                 } catch (e: any) {
                     const errMsg = e?.message || 'Unknown error';

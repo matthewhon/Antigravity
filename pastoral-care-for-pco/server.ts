@@ -107,7 +107,8 @@ async function startServer() {
         const token = church.pcoAccessToken;
         if (!token) return res.status(401).json({ error: 'No PCO access token for this church' });
 
-        const pcoRes = await fetch('https://api.planningcenteronline.com/registrations/v2/events?per_page=1', {
+        // PCO Registrations API v2 uses /signups (not /events) as the top-level resource
+        const pcoRes = await fetch('https://api.planningcenteronline.com/registrations/v2/signups?per_page=1', {
           headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
         });
         const body = await pcoRes.text();
@@ -126,6 +127,7 @@ async function startServer() {
         res.status(500).json({ error: e.message });
       }
     });
+
 
     // Gemini AI Proxy (key stays server-side)
     app.post('/ai/generate', express.json(), handleGeminiProxy);
@@ -292,20 +294,24 @@ async function startServer() {
 
     // Schedule an email campaign
     app.post('/email/schedule', express.json(), async (req: any, res: any) => {
-      const { campaignId, churchId, scheduledAt } = req.body || {};
+      const { campaignId, churchId, scheduledAt, recurringFrequency } = req.body || {};
       if (!campaignId || !churchId || !scheduledAt) {
         return res.status(400).json({ error: 'Missing campaignId, churchId, or scheduledAt' });
       }
       try {
         const db = getDb();
-        await db.collection('email_campaigns').doc(campaignId).update({
+        const updates: any = {
           status: 'scheduled',
           scheduledAt: Number(scheduledAt),
           sendAt: new Date(Number(scheduledAt)).toISOString(),
           retryCount: 0,
           lastError: null,
           updatedAt: Date.now(),
-        });
+        };
+        if (recurringFrequency) updates.recurringFrequency = recurringFrequency;
+        else updates.recurringFrequency = null;
+
+        await db.collection('email_campaigns').doc(campaignId).update(updates);
         res.json({ success: true, message: 'Email scheduled successfully.' });
       } catch (e: any) {
         res.status(500).json({ error: e.message || 'Failed to schedule email' });
@@ -322,6 +328,7 @@ async function startServer() {
           status: 'draft',
           scheduledAt: null,
           sendAt: null,
+          recurringFrequency: null,
           retryCount: 0,
           lastError: null,
           updatedAt: Date.now(),

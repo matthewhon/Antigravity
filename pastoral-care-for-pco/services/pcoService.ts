@@ -36,7 +36,7 @@ const pcoFetch = async (churchId: string, url: string, method = 'GET', body: any
             if (innerErr?.message?.includes('[requiresReauth]') ||
                 innerErr?.message?.includes('rate limit')) throw innerErr;
             // Also treat 403 on registrations URLs as a scope reauth signal
-            if (response.status === 403 && url.includes('/registrations/')) {
+            if (response.status === 403 && url.includes('/registrations/v2/')) {
                 throw new Error(message + ' [requiresReauth]');
             }
             /* otherwise leave default message */
@@ -63,16 +63,17 @@ export const pcoService = {
         return safeData(data);
     },
     async getRegistrations(churchId: string): Promise<any[]> {
-        // PCO Registrations v2 — use separate filter params per PCO API spec
-        // Do NOT use comma-separated filters like filter=a,b (those are not standard PCO format)
+        // PCO Registrations API v2 — events are called "signups" in the API resource name
+        // The old /events endpoint does not exist; use /signups instead.
         try {
-            const data = await pcoFetch(churchId, `https://api.planningcenteronline.com/registrations/v2/events?per_page=100&order=starts_at`);
+            const data = await pcoFetch(churchId, `https://api.planningcenteronline.com/registrations/v2/signups?per_page=100&include=signup_times`);
             return safeData(data);
         } catch (e: any) {
             // If the scoped endpoint fails, re-throw with original error
             throw e;
         }
     },
+
     async getEvents(churchId: string): Promise<any[]> {
         const data = await pcoFetch(churchId, `https://api.planningcenteronline.com/calendar/v2/events?per_page=100&filter=future`);
         return safeData(data);
