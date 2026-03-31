@@ -12,6 +12,9 @@ export const DEFAULT_RISK_SETTINGS: RiskSettings = {
     thresholds: {
         healthyMin: 70,
         atRiskMin: 40
+    },
+    targets: {
+        serving90Days: 4
     }
 };
 
@@ -45,7 +48,7 @@ export const DEFAULT_GROUP_RISK_SETTINGS: GroupRiskSettings = {
 const calculatePersonRisk = (
     person: PcoPerson, 
     settings: RiskSettings, 
-    context: { isDonor: boolean, isGroupMember: boolean, isVolunteer: boolean }
+    context: { isDonor: boolean, isGroupMember: boolean, timesServed: number }
 ): RiskProfile => {
     let score = 0;
     const factors: string[] = [];
@@ -67,9 +70,13 @@ const calculatePersonRisk = (
     if (!context.isGroupMember) factors.push('Not in Group');
 
     // 3. Serving
-    const servingScore = context.isVolunteer ? 1 : 0;
+    const targetServing = settings.targets?.serving90Days || 4;
+    let servingScore = 0;
+    if (context.timesServed >= targetServing) servingScore = 1;
+    else if (context.timesServed > 0) servingScore = context.timesServed / targetServing;
+    
     score += servingScore * settings.weights.serving;
-    if (!context.isVolunteer) factors.push('Not Serving');
+    if (context.timesServed === 0) factors.push('Not Serving');
 
     // 4. Giving
     const givingScore = context.isDonor ? 1 : 0;
@@ -103,7 +110,7 @@ export const calculateBulkRisk = (
     const donorIds = new Set(donations.map(d => d.donorId));
     
     // Determine volunteers based strictly on recent plan scheduling (confirmed positions)
-    const volunteerIds = new Set<string>();
+    const volunteerCounts = new Map<string, number>();
     
     // Add recent plan participants (last 3 months)
     // STRICT RULE: Only count if they have a 'Confirmed' status on the plan
@@ -111,17 +118,17 @@ export const calculateBulkRisk = (
     recentPlans.forEach(p => {
         p.teamMembers?.forEach(tm => {
             if (tm.personId && tm.status === 'Confirmed') {
-                volunteerIds.add(tm.personId);
+                volunteerCounts.set(tm.personId, (volunteerCounts.get(tm.personId) || 0) + 1);
             }
         });
     });
 
     return people.map(person => {
         const isDonor = donorIds.has(person.id);
-        const isVolunteer = volunteerIds.has(person.id);
+        const timesServed = volunteerCounts.get(person.id) || 0;
         const isGroupMember = !!(person.groupIds && person.groupIds.length > 0);
 
-        const profile = calculatePersonRisk(person, settings, { isDonor, isGroupMember, isVolunteer });
+        const profile = calculatePersonRisk(person, settings, { isDonor, isGroupMember, timesServed });
         
         // Calculate Engagement Status based on checkInCount
         const count = person.checkInCount || 0;
@@ -130,11 +137,20 @@ export const calculateBulkRisk = (
         else if (count >= 4) engagementStatus = 'Regular';
         else if (count > 0) engagementStatus = 'Sporadic';
 
+        const timesPerWeek = timesServed / (90 / 7);
+
         return {
             ...person,
             riskProfile: profile,
             isDonor, // Flag person as donor for frontend filtering
-            engagementStatus
+            engagementStatus,
+            servingStats: {
+                ...person.servingStats,
+                last90DaysCount: timesServed,
+                timesPerWeek: Number(timesPerWeek.toFixed(2)),
+                riskLevel: person.servingStats?.riskLevel || 'High',
+                nextServiceDate: person.servingStats?.nextServiceDate
+            }
         };
     });
 };

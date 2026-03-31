@@ -15,6 +15,7 @@ export interface User {
 export interface RiskSettings {
     weights: { attendance: number, groups: number, serving: number, giving: number, membership: number };
     thresholds: { healthyMin: number, atRiskMin: number };
+    targets?: { serving90Days: number };
 }
 
 export interface ChurchRiskSettings {
@@ -181,6 +182,7 @@ export interface PcoPerson {
     };
     servingStats?: {
         last90DaysCount: number;
+        timesPerWeek?: number;
         riskLevel: 'Low' | 'Medium' | 'High';
         nextServiceDate?: string;
     };

@@ -76,10 +76,10 @@ export const CarePeopleListWidget: React.FC<CarePeopleListWidgetProps> = ({
                 break;
             case 'serving':
                 if (person.riskProfile && !person.riskProfile.factors.includes('Not Serving')) {
-                    // It's a bit tricky because the backend determines 'isVolunteer' which sets the score,
-                    // but we can infer it: if they don't have 'Not Serving' in factors, they got the score.
-                    // Actually, let's just trust the riskProfile.factors!
-                    score = weight;
+                    const timesServed = person.servingStats?.last90DaysCount || 0;
+                    const targetServing = settings.targets?.serving90Days || 4;
+                    if (timesServed >= targetServing) score = weight;
+                    else if (timesServed > 0) score = Math.round((timesServed / targetServing) * weight);
                 }
                 break;
             case 'giving':
@@ -169,8 +169,13 @@ export const CarePeopleListWidget: React.FC<CarePeopleListWidgetProps> = ({
                                         <td className="p-2 text-center text-xs font-bold text-slate-600 dark:text-slate-300">
                                             {calculateFactorScore(person, 'groups')}<span className="text-[9px] text-slate-400">/{settings.weights.groups}</span>
                                         </td>
-                                        <td className="p-2 text-center text-xs font-bold text-slate-600 dark:text-slate-300">
-                                            {calculateFactorScore(person, 'serving')}<span className="text-[9px] text-slate-400">/{settings.weights.serving}</span>
+                                        <td className="p-2 text-center">
+                                            <div className="text-xs font-bold text-slate-600 dark:text-slate-300">
+                                                {calculateFactorScore(person, 'serving')}<span className="text-[9px] text-slate-400">/{settings.weights.serving}</span>
+                                            </div>
+                                            <div className="text-[9px] text-slate-400 mt-1 whitespace-nowrap" title="Confirmed services in last 90 days / average per week">
+                                                {person.servingStats?.last90DaysCount || 0}x ({person.servingStats?.timesPerWeek || 0}/wk)
+                                            </div>
                                         </td>
                                         <td className="p-2 text-center text-xs font-bold text-slate-600 dark:text-slate-300">
                                             {calculateFactorScore(person, 'giving')}<span className="text-[9px] text-slate-400">/{settings.weights.giving}</span>

@@ -36,6 +36,15 @@ const RiskSettingsView: React.FC<RiskSettingsViewProps> = ({ settings, onSave })
     setIsDirty(true);
   };
 
+  const handleTargetChange = (key: keyof NonNullable<RiskSettings['targets']>, val: string) => {
+    const num = parseInt(val, 10);
+    setLocalSettings(prev => ({
+        ...prev,
+        targets: { ...(prev.targets || { serving90Days: 4 }), [key]: num }
+    }));
+    setIsDirty(true);
+  };
+
   const handleSave = () => {
       onSave(localSettings);
       setIsDirty(false);
@@ -88,6 +97,22 @@ const RiskSettingsView: React.FC<RiskSettingsViewProps> = ({ settings, onSave })
                     value={localSettings.weights.serving} 
                     onChange={(v) => handleWeightChange('serving', v)} 
                 />
+                
+                <div className="pl-6 ml-2 border-l-2 border-slate-100 dark:border-slate-800 pb-2">
+                    <div className="flex justify-between items-center mb-2">
+                        <div>
+                            <span className="text-xs font-bold text-slate-700 dark:text-slate-300 block">Target Serve Frequency</span>
+                            <span className="text-[10px] text-slate-400 dark:text-slate-500 block">Times scheduled in last 90 days for full score</span>
+                        </div>
+                        <input 
+                            type="number"
+                            min="1" max="50"
+                            value={localSettings.targets?.serving90Days || 4}
+                            onChange={(e) => handleTargetChange('serving90Days', e.target.value)}
+                            className="w-16 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white text-center text-sm font-black rounded-lg py-1 border border-slate-200 dark:border-slate-600 outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                    </div>
+                </div>
                 <WeightSlider 
                     label="Generosity" 
                     description="Impact of giving history."
