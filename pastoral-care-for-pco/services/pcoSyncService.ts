@@ -4,9 +4,11 @@ import { createServerLogger } from './logService';
 import { 
     PcoPerson, PcoGroup, DetailedDonation, PcoFund, AttendanceRecord, 
     ServicePlanSnapshot, ServicesTeam, CheckInRecord,
-    PcoRegistrationEvent, PcoRegistrationAttendee, PcoRegistrationCampus
+    PcoRegistrationEvent, PcoRegistrationAttendee, PcoRegistrationCampus,
+    RiskChangeRecord
 } from '../types';
 import { initializeWebhooks } from './pcoWebhookService';
+import { calculateBulkRisk, DEFAULT_RISK_SETTINGS } from './riskService';
 
 // Server-side logger — only initialised when running in Node.js.
 // In the browser this module is imported (for client-side syncAllData calls that
@@ -185,6 +187,11 @@ export const syncAllData = async (churchId: string) => {
         await syncRegistrationsData(churchId);
     } catch (e: any) { logger.error('Sync Registrations failed', 'sync', { error: e?.message }, churchId); }
 
+    // Evaluate risk profiles & log changes
+    try {
+        await syncRiskChanges(churchId);
+    } catch (e: any) { logger.error('Sync Risk Changes failed', 'sync', { error: e?.message }, churchId); }
+
     // Update last sync timestamp regardless of partial failures
     const durationMs = Date.now() - startTime;
     await firestore.updateChurch(churchId, { lastSyncTimestamp: Date.now() });
@@ -327,6 +334,81 @@ export const syncCheckInCounts = async (churchId: string) => {
     }
 
     logger.info('Check-in count sync complete', 'sync', { churchId, uniquePeople: countMap.size }, churchId);
+};
+
+/**
+ * Calculates risk for all people based on newly fetched data, detects category changes,
+ * updates people with their new historicRiskCategory, and logs changes to risk_changes collection.
+ */
+export const syncRiskChanges = async (churchId: string) => {
+    logger.info('Evaluating risk profile changes...', 'sync', { churchId }, churchId);
+    
+    try {
+        const [church, people, donations, groups, plans, teams] = await Promise.all([
+            firestore.getChurch(churchId),
+            firestore.getPeople(churchId),
+            firestore.getDetailedDonations(churchId),
+            firestore.getGroups(churchId),
+            firestore.getServicePlans(churchId),
+            firestore.getServicesTeams(churchId)
+        ]);
+
+        const settings = church?.riskSettings || DEFAULT_RISK_SETTINGS;
+        
+        // Calculate the new risk profiles synchronously using all fetched data
+        const evaluatedPeople = calculateBulkRisk(people, donations, groups, plans, teams, settings);
+        
+        const changes: RiskChangeRecord[] = [];
+        const peopleToUpdate: Partial<PcoPerson>[] = [];
+        const nowMs = Date.now();
+        const nowIso = new Date().toISOString();
+
+        for (const person of evaluatedPeople) {
+            const currentCat = person.riskProfile?.category || 'Disconnected';
+            const oldCat = person.historicRiskCategory || currentCat;
+            
+            // If the category has objectively changed, log it and update the person record
+            if (currentCat !== oldCat) {
+                changes.push({
+                    id: `${churchId}_${person.id}_${nowMs}`,
+                    churchId,
+                    personId: person.id,
+                    personName: person.name,
+                    date: nowIso,
+                    oldCategory: oldCat,
+                    newCategory: currentCat,
+                    timestamp: nowMs
+                });
+                
+                peopleToUpdate.push({
+                    id: person.id,
+                    churchId,
+                    historicRiskCategory: currentCat
+                });
+            } else if (!person.historicRiskCategory) {
+                // Initial set without creating a fake status change log
+                peopleToUpdate.push({
+                    id: person.id,
+                    churchId,
+                    historicRiskCategory: currentCat
+                });
+            }
+        }
+        
+        if (changes.length > 0) {
+            await firestore.upsertRiskChanges(changes);
+            logger.info(`Logged ${changes.length} risk status changes.`, 'sync', { churchId }, churchId);
+        }
+        
+        if (peopleToUpdate.length > 0) {
+            await firestore.upsertPeople(peopleToUpdate as PcoPerson[]);
+            logger.info(`Updated historicRiskCategory on ${peopleToUpdate.length} people.`, 'sync', { churchId }, churchId);
+        }
+
+    } catch (e: any) {
+        logger.error('Failed to evaluate risk profile changes', 'sync', { error: e?.message }, churchId);
+        throw e;
+    }
 };
 
 export const syncGroupsData = async (churchId: string) => {

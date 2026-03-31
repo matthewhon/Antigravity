@@ -532,7 +532,7 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
                 <div key="riskChanges" className="col-span-1">
                     <div className="h-full relative group">
                         <button onClick={() => handleRemoveWidget(id)} className="absolute top-6 right-6 text-slate-300 dark:text-slate-600 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100 z-10">✕</button>
-                        <StatusChangesWidget people={data.allPeople} />
+                        <StatusChangesWidget people={data.allPeople} recentRiskChanges={data.recentRiskChanges} />
                     </div>
                 </div>
             );

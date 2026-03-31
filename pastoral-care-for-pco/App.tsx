@@ -26,7 +26,7 @@ import {
   User, Church, PeopleDashboardData, GivingAnalytics, GroupsDashboardData, 
   ServicesDashboardData, AttendanceData, CensusStats, BudgetRecord, PcoFund, 
   DetailedDonation, PcoPerson, ServicesFilter, GivingFilter, GeoInsight,
-  PcoGroup, AttendanceRecord, ServicesTeam, RiskSettings, SystemSettings
+  PcoGroup, AttendanceRecord, ServicesTeam, RiskSettings, SystemSettings, RiskChangeRecord
 } from './types';
 import { getDefaultWidgets } from './constants/widgetRegistry';
 import { calculateGivingAnalytics, DEFAULT_LIFECYCLE_SETTINGS } from './services/analyticsService';
@@ -52,6 +52,7 @@ const App: React.FC = () => {
   const [funds, setFunds] = useState<PcoFund[]>([]);
   const [budgets, setBudgets] = useState<BudgetRecord[]>([]);
   const [teams, setTeams] = useState<ServicesTeam[]>([]);
+  const [recentRiskChanges, setRecentRiskChanges] = useState<RiskChangeRecord[]>([]);
   
   // Dashboard Aggregates
   const [servicesData, setServicesData] = useState<ServicesDashboardData | null>(null);
@@ -305,14 +306,15 @@ const App: React.FC = () => {
   }, [church?.city, church?.state, church?.communityLocations]);
 
   const loadTenantData = async (churchId: string) => {
-      const [p, g, a, d, f, b, t] = await Promise.all([
+      const [p, g, a, d, f, b, t, rc] = await Promise.all([
           firestore.getPeople(churchId),
           firestore.getGroups(churchId),
           firestore.getAttendance(churchId),
           firestore.getDetailedDonations(churchId),
           firestore.getFunds(churchId),
           firestore.getBudgets(churchId),
-          firestore.getServicesTeams(churchId)
+          firestore.getServicesTeams(churchId),
+          firestore.getRecentRiskChanges(churchId)
       ]);
       setPeople(p);
       setGroups(g);
@@ -321,6 +323,7 @@ const App: React.FC = () => {
       setFunds(f);
       setBudgets(b);
       setTeams(t);
+      setRecentRiskChanges(rc);
   };
 
   const loadServicesData = async (churchId: string, filter: ServicesFilter) => {
@@ -661,9 +664,10 @@ const App: React.FC = () => {
               sizeDistribution,
               composition,
               householdList
-          }
+          },
+          recentRiskChanges
       };
-  }, [people, riskEnrichedPeople]);
+  }, [people, riskEnrichedPeople, recentRiskChanges]);
 
   const givingAnalyticsData = useMemo(() => {
       return calculateGivingAnalytics(

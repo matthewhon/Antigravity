@@ -22,7 +22,7 @@ import {
     Ministry, MetricDefinition, MetricEntry, AggregatedChurchStats, LogEntry,
     PastoralNote, PrayerRequest, CheckInRecord, EmailCampaign, PcoRegistrationEvent,
     PcoRegistrationAttendee, PcoRegistrationCampus,
-    Poll, PollResponse
+    Poll, PollResponse, RiskChangeRecord
 } from '../types';
 import { calculateServicesAnalytics, calculateAggregatedStats } from './analyticsService';
 
@@ -435,6 +435,44 @@ class FirestoreService {
       }
   }
 
+  async getRecentRiskChanges(churchId: string, daysBack: number = 30): Promise<RiskChangeRecord[]> {
+      try {
+          const since = new Date();
+          since.setDate(since.getDate() - daysBack);
+          const threshold = since.getTime();
+          
+          const q = query(
+              collection(db, 'risk_changes'), 
+              where('churchId', '==', churchId),
+              where('timestamp', '>=', threshold),
+              orderBy('timestamp', 'desc')
+          );
+          const snapshot = await getDocs(q);
+          return snapshot.docs.map(d => d.data() as RiskChangeRecord);
+      } catch (e) { 
+          console.warn('[Firestore] getRecentRiskChanges failed:', e);
+          return []; 
+      }
+  }
+
+  async upsertRiskChanges(changes: RiskChangeRecord[]): Promise<void> {
+      try {
+          if (!changes || changes.length === 0) return;
+          const CHUNK = 400;
+          for (let i = 0; i < changes.length; i += CHUNK) {
+              const batch = writeBatch(db);
+              changes.slice(i, i + CHUNK).forEach(change => {
+                  const safeChange = this.deepSanitize(change);
+                  const ref = doc(db, 'risk_changes', change.id);
+                  batch.set(ref, safeChange, { merge: true });
+              });
+              await batch.commit();
+          }
+          console.log(`[Firestore] Upserted ${changes.length} risk changes`);
+      } catch (e) {
+          console.warn('[Firestore] upsertRiskChanges failed:', e);
+      }
+  }
 
 
   async getGroups(churchId: string): Promise<PcoGroup[]> {

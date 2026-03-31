@@ -224,6 +224,7 @@ export interface PeopleDashboardData {
     allPeople: PcoPerson[];
     householdStats?: { totalHouseholds: number, pcoHouseholds: number, avgSize: number, sizeDistribution: any[], composition: any[], householdList: any[] };
     progressStats?: ProgressStats;
+    recentRiskChanges?: RiskChangeRecord[];
 }
 
 export interface GroupsDashboardData {

@@ -1,11 +1,12 @@
 
 import React, { useState, useMemo } from 'react';
-import { PcoPerson, RiskSettings } from '../types';
+import { PcoPerson, RiskSettings, RiskChangeRecord } from '../types';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend, AreaChart, Area, XAxis, YAxis, CartesianGrid, BarChart, Bar } from 'recharts';
 
 interface RiskProps {
   people: PcoPerson[];
   currentTheme?: 'traditional' | 'dark';
+  recentRiskChanges?: RiskChangeRecord[];
 }
 
 const RISK_COLORS = {
@@ -176,28 +177,42 @@ export const AtRiskListWidget: React.FC<RiskProps> = ({ people }) => {
   );
 };
 
-export const StatusChangesWidget: React.FC<RiskProps> = ({ people }) => {
-    const total = people.length;
-    const improvedCount = Math.max(1, Math.round(total * 0.04)); // 4% improved
-    const declinedCount = Math.max(1, Math.round(total * 0.02)); // 2% declined
-    const disconnectedCount = Math.max(0, Math.round(total * 0.01)); // 1% dropped
+export const StatusChangesWidget: React.FC<RiskProps> = ({ recentRiskChanges = [] }) => {
+    // Categorize the actual changes
+    const improvedCount = recentRiskChanges.filter(c => 
+        (c.oldCategory === 'At Risk' && c.newCategory === 'Healthy') ||
+        (c.oldCategory === 'Disconnected' && (c.newCategory === 'Healthy' || c.newCategory === 'At Risk'))
+    ).length;
+    
+    const declinedCount = recentRiskChanges.filter(c => 
+        (c.oldCategory === 'Healthy' && c.newCategory === 'At Risk')
+    ).length;
 
-    // Generate recent changes list using stable deterministic selection based on ID char codes
-    const recentChanges = people
-        .filter(p => p.id && p.name)
-        .sort((a, b) => b.id.localeCompare(a.id)) // Stable sort
-        .slice(0, 4)
-        .map((p, idx) => {
-            const types = ['improved', 'declined', 'dropped'];
-            const type = types[idx % 3];
-            return { ...p, changeType: type };
+    const disconnectedCount = recentRiskChanges.filter(c => 
+        (c.oldCategory === 'Healthy' || c.oldCategory === 'At Risk') && c.newCategory === 'Disconnected'
+    ).length;
+
+    const recentMovements = [...recentRiskChanges]
+        .sort((a, b) => b.timestamp - a.timestamp)
+        .slice(0, 8)
+        .map(c => {
+            let type: 'improved' | 'declined' | 'dropped' = 'declined';
+            if (c.newCategory === 'Disconnected') type = 'dropped';
+            else if (c.newCategory === 'Healthy') type = 'improved';
+            else if (c.oldCategory === 'Disconnected' && c.newCategory === 'At Risk') type = 'improved';
+            return {
+                id: c.id,
+                name: c.personName,
+                changeType: type,
+                oldCategory: c.oldCategory,
+                newCategory: c.newCategory
+            };
         });
 
     return (
         <div className="bg-white dark:bg-slate-850 p-8 rounded-[3rem] border border-slate-100 dark:border-slate-800 shadow-sm h-full flex flex-col transition-colors">
             <div className="flex justify-between items-center mb-6">
                 <h4 className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">Status Changes (30d)</h4>
-                <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-2 py-1 rounded font-bold">Simulated</span>
             </div>
 
             <div className="grid grid-cols-3 gap-2 mb-6">
@@ -217,21 +232,28 @@ export const StatusChangesWidget: React.FC<RiskProps> = ({ people }) => {
 
             <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2">
                 <p className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">Recent Movements</p>
-                {recentChanges.map(p => (
-                    <div key={p.id} className="flex items-center justify-between p-2 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors">
+                {recentMovements.length === 0 ? (
+                    <div className="h-20 flex items-center justify-center text-center p-2">
+                        <p className="text-[10px] text-slate-400 font-medium">No recent status changes</p>
+                    </div>
+                ) : recentMovements.map(m => (
+                    <div key={m.id} className="flex items-center justify-between p-2 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors">
                         <div className="flex items-center gap-3">
                             <div className={`w-2 h-2 rounded-full ${
-                                p.changeType === 'improved' ? 'bg-emerald-500' : 
-                                p.changeType === 'declined' ? 'bg-amber-500' : 'bg-rose-500'
+                                m.changeType === 'improved' ? 'bg-emerald-500' : 
+                                m.changeType === 'declined' ? 'bg-amber-500' : 'bg-rose-500'
                             }`}></div>
-                            <span className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate max-w-[120px]">{p.name}</span>
+                            <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300 truncate max-w-[120px]">{m.name}</span>
                         </div>
-                        <span className={`text-[9px] font-black uppercase tracking-wider ${
-                             p.changeType === 'improved' ? 'text-emerald-600 dark:text-emerald-400' : 
-                             p.changeType === 'declined' ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'
-                        }`}>
-                            {p.changeType === 'improved' ? 'Healthy ↗' : p.changeType === 'declined' ? 'At Risk ↘' : 'Lost ↘'}
-                        </span>
+                        <div className="text-right">
+                            <p className={`text-[9px] font-black uppercase tracking-wider ${
+                                 m.changeType === 'improved' ? 'text-emerald-600 dark:text-emerald-400' : 
+                                 m.changeType === 'declined' ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'
+                            }`}>
+                                {m.newCategory} {m.changeType === 'improved' ? '↗' : '↘'}
+                            </p>
+                            <p className="text-[8px] text-slate-400 uppercase font-medium mt-0.5">was {m.oldCategory}</p>
+                        </div>
                     </div>
                 ))}
             </div>
