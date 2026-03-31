@@ -1190,8 +1190,15 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                 </div>
             );
         case 'burnout_watchlist':
-            // Filter people with High Risk
-            const atRiskVolunteers = people.filter(p => p.servingStats?.riskLevel === 'High');
+            // Filter people with High Risk AND who have actual confirmed recent services on record.
+            // A persisted riskLevel from a previous sync should not cause someone to appear here
+            // if they have no recentServices entries (i.e. no confirmed past services were found
+            // during the last sync within the 90-day detail window).
+            const atRiskVolunteers = people.filter(p =>
+                p.servingStats?.riskLevel === 'High' &&
+                p.servingStats?.recentServices &&
+                p.servingStats.recentServices.length > 0
+            );
 
             return (
                 <div key="burnout_watchlist" className="col-span-1 lg:col-span-2">
