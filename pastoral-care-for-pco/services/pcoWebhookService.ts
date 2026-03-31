@@ -52,11 +52,8 @@ async function pcoFetch(churchId: string, endpoint: string, method: string = 'GE
  * }
  */
 export const initializeWebhooks = async (churchId: string) => {
-    const settings = await firestore.getSystemSettings();
-    const backendUrl = settings.apiBaseUrl || 'https://pastoralcare.barnabassoftware.com';
-
-    // Webhooks must point to the BACKEND server endpoint, not the frontend SPA URL
-    const webhookUrl = `${backendUrl}/pco/webhook`;
+    // The user explicitly requested this exact webhook URL for all production sites
+    const webhookUrl = 'https://pastoralcare.barnabassoftware.com/pco/webhook';
 
     // PCO Webhooks v2 event topic names
     const topics = [
@@ -77,13 +74,26 @@ export const initializeWebhooks = async (churchId: string) => {
         const existingSubs: any[] = existingResponse?.data || [];
 
         // Build a set of already-subscribed topic+url combos
-        const alreadySubscribed = new Set(
-            existingSubs
-                .filter((s: any) => s.attributes.url === webhookUrl)
-                .map((s: any) => s.attributes.name)
-        );
+        const alreadySubscribed = new Set<string>();
 
-        console.log(`[Webhooks] Found ${existingSubs.length} existing subscriptions. Already subscribed topics:`, [...alreadySubscribed]);
+        // Cleanup subscriptions that point to old/wrong URLs
+        for (const sub of existingSubs) {
+            const topicName = sub.attributes.name;
+            const topicUrl = sub.attributes.url;
+            if (topicUrl === webhookUrl) {
+                alreadySubscribed.add(topicName);
+            } else if (topics.includes(topicName)) {
+                // If it's one of our topics but the URL is wrong, delete it so we can recreate it
+                try {
+                    console.log(`[Webhooks] Deleting old subscription for ${topicName} pointing to ${topicUrl}`);
+                    await pcoFetch(churchId, `webhooks/v2/subscriptions/${sub.id}`, 'DELETE');
+                } catch (err: any) {
+                    console.warn(`[Webhooks] Failed to delete old subscription ${sub.id}:`, err.message);
+                }
+            }
+        }
+
+        console.log(`[Webhooks] Found ${existingSubs.length} existing subscriptions. Already correct topics:`, [...alreadySubscribed]);
 
         const createdSecrets: Record<string, string> = {};
         let subscriptionCount = 0;

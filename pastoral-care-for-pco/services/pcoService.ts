@@ -132,5 +132,16 @@ export const pcoService = {
             return [];
         }
     },
+
+    async addNoteToPerson(churchId: string, personId: string, content: string): Promise<any> {
+        return await pcoFetch(churchId, `https://api.planningcenteronline.com/people/v2/people/${personId}/notes`, 'POST', {
+            data: {
+                type: 'Note',
+                attributes: {
+                    note: content
+                }
+            }
+        });
+    }
 };
 

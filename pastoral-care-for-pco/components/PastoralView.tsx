@@ -24,6 +24,7 @@ import { PastoralCalendar } from './PastoralCalendar';
 import { fetchCensusDataForTenant } from '../services/censusService';
 import { generateCommunityStrategy, generateCareAdvice } from '../services/geminiService';
 import { firestore } from '../services/firestoreService';
+import { pcoService } from '../services/pcoService';
 import Markdown from 'react-markdown';
 
 interface PastoralViewProps {
@@ -115,6 +116,85 @@ const ensureLeafletCss = () => {
     link.rel = 'stylesheet';
     link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
     document.head.appendChild(link);
+};
+
+const PersonSearchCombobox = ({ 
+    people, 
+    value, 
+    onChange, 
+    onNameChange,
+    placeholder = "Search person..." 
+}: { 
+    people: PcoPerson[], 
+    value: string, 
+    onChange: (id: string, name: string) => void,
+    onNameChange?: (name: string) => void,
+    placeholder?: string
+}) => {
+    const [query, setQuery] = useState('');
+    const [isOpen, setIsOpen] = useState(false);
+    const wrapperRef = useRef<HTMLDivElement>(null);
+
+    // Initialize display value based on selected ID
+    useEffect(() => {
+        if (value) {
+            const person = people.find(p => p.id === value);
+            if (person) setQuery(person.name);
+        } else if (!onNameChange) {
+            // Only reset if we're strictly enforcing a valid ID (like in newNote)
+            setQuery('');
+        }
+    }, [value, people, onNameChange]);
+
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) setIsOpen(false);
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const filtered = people.filter(p => typeof p.name === 'string' && p.name.toLowerCase().includes(query.toLowerCase())).slice(0, 10);
+
+    return (
+        <div className="relative" ref={wrapperRef}>
+            <input
+                type="text"
+                value={query}
+                onChange={(e) => {
+                    setQuery(e.target.value);
+                    setIsOpen(true);
+                    onChange('', ''); // Clear strict selection when typing
+                    if (onNameChange) onNameChange(e.target.value);
+                }}
+                onFocus={() => setIsOpen(true)}
+                placeholder={placeholder}
+                className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none placeholder:text-slate-400 font-bold"
+            />
+            {isOpen && filtered.length > 0 && (
+                <div className="absolute z-20 w-full mt-2 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-xl shadow-xl max-h-48 overflow-auto">
+                    {filtered.map(p => (
+                        <div
+                            key={p.id}
+                            className="p-3 text-sm hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer text-slate-700 dark:text-slate-200 border-b border-slate-50 dark:border-slate-700/50 last:border-0"
+                            onClick={() => {
+                                onChange(p.id, p.name);
+                                setQuery(p.name);
+                                setIsOpen(false);
+                            }}
+                        >
+                            {p.name}
+                        </div>
+                    ))}
+                </div>
+            )}
+            {isOpen && query && filtered.length === 0 && (
+                <div className="absolute z-20 w-full mt-2 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-xl shadow-xl p-4 text-sm text-slate-400 text-center italic">
+                    No matching members found
+                </div>
+            )}
+        </div>
+    );
 };
 
 
@@ -300,6 +380,21 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
       };
 
       await firestore.savePastoralNote(note);
+
+      // Sink to PCO if connected
+      if (pcoConnected && person?.id) {
+          try {
+              let noteText = `[Pastoral Care: ${note.type}]\n${note.content}`;
+              if (note.followUpDate) {
+                  const formattedDate = new Date(note.followUpDate).toLocaleDateString();
+                  noteText += `\n\nFollow-up needed by: ${formattedDate}`;
+              }
+              await pcoService.addNoteToPerson(church.id, person.id, noteText);
+          } catch (e) {
+              console.error('Failed to sync note to PCO:', e);
+          }
+      }
+
       setNotes([note, ...notes]);
       setIsAddingNote(false);
       setNewNote({ type: 'Note', content: '', date: new Date().toISOString().split('T')[0], isCompleted: false });
@@ -1339,17 +1434,13 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                   
                   <div className="space-y-4">
                       <div>
-                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Person</label>
-                          <select 
-                            value={newNote.personId || ''} 
-                            onChange={(e) => setNewNote({...newNote, personId: e.target.value})}
-                            className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                          >
-                              <option value="">Select Person...</option>
-                              {peopleData?.allPeople.map(p => (
-                                  <option key={p.id} value={p.id}>{p.name}</option>
-                              ))}
-                          </select>
+                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Search Person (Required)</label>
+                          <PersonSearchCombobox 
+                              people={peopleData?.allPeople || []}
+                              value={newNote.personId || ''}
+                              onChange={(id) => setNewNote({...newNote, personId: id})}
+                              placeholder="Search for a congregation member..."
+                          />
                       </div>
 
                       <div className="grid grid-cols-2 gap-4">
@@ -1420,31 +1511,16 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                   
                   <div className="space-y-4">
                       <div>
-                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Person (Optional)</label>
-                          <select 
-                            value={newPrayer.personId || ''} 
-                            onChange={(e) => setNewPrayer({...newPrayer, personId: e.target.value})}
-                            className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                          >
-                              <option value="">Anonymous / Other</option>
-                              {peopleData?.allPeople.map(p => (
-                                  <option key={p.id} value={p.id}>{p.name}</option>
-                              ))}
-                          </select>
+                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Person Name</label>
+                          <PersonSearchCombobox 
+                              people={peopleData?.allPeople || []}
+                              value={newPrayer.personId || ''}
+                              onChange={(id, name) => setNewPrayer({...newPrayer, personId: id, personName: name})}
+                              onNameChange={(name) => setNewPrayer({...newPrayer, personName: name})}
+                              placeholder="Search or type a name..."
+                          />
+                          <p className="text-[10px] text-slate-400 mt-2 font-medium">Type any name (or select an existing person) to associate with this request.</p>
                       </div>
-
-                      {!newPrayer.personId && (
-                          <div>
-                              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Name (if not in directory)</label>
-                              <input 
-                                type="text" 
-                                value={newPrayer.personName || ''} 
-                                onChange={(e) => setNewPrayer({...newPrayer, personName: e.target.value})}
-                                placeholder="e.g. John Doe"
-                                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                              />
-                          </div>
-                      )}
 
                       <div>
                           <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Request</label>

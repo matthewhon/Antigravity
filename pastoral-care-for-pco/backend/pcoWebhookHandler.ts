@@ -10,16 +10,24 @@ const log = createServerLogger(db);
 // ─── Entry Point ─────────────────────────────────────────────────────────────
 
 export const handlePcoWebhook = async (req: Request, res: Response) => {
-    const signature = req.headers['x-pco-signature'] as string;
-    const churchId = req.query.churchId as string;
-    const payloadString = req.body.toString();
-
-    if (!signature) {
-        log.error('Webhook received without X-PCO-Signature header', 'webhook', { churchId });
-        return res.status(401).send('Missing Signature');
-    }
-
     try {
+        const signature = req.headers['x-pco-signature'] as string;
+        const churchId = req.query.churchId as string;
+        
+        let payloadString = '';
+        if (Buffer.isBuffer(req.body)) {
+            payloadString = req.body.toString('utf8');
+        } else if (typeof req.body === 'string') {
+            payloadString = req.body;
+        } else if (req.body) {
+            payloadString = JSON.stringify(req.body);
+        }
+
+        if (!signature) {
+            log.error('Webhook received without X-PCO-Signature header', 'webhook', { churchId });
+            return res.status(401).send('Missing Signature');
+        }
+
         const settingsDoc = await db.collection('system_settings').doc('pco_webhooks').get();
         const secret = settingsDoc.data()?.secret;
 
@@ -34,6 +42,11 @@ export const handlePcoWebhook = async (req: Request, res: Response) => {
         if (digest !== signature) {
             log.warn('Webhook signature mismatch — proceeding (dev mode)', 'webhook', { churchId });
             // return res.status(403).send('Invalid Signature'); // Uncomment for strict security
+        }
+
+        if (!payloadString) {
+            log.warn('Empty webhook payload received', 'webhook', { churchId });
+            return res.status(400).send('Empty Payload');
         }
 
         const event = JSON.parse(payloadString);
@@ -100,7 +113,7 @@ export const handlePcoWebhook = async (req: Request, res: Response) => {
         return res.status(200).send('Webhook Processed');
 
     } catch (error: any) {
-        log.error('Error processing webhook', 'webhook', { churchId, error: error?.message }, churchId);
+        log.error('Error processing webhook', 'webhook', { churchId: req.query.churchId, error: error?.message });
         return res.status(500).send('Internal Server Error');
     }
 };
