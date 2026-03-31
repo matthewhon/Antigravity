@@ -371,15 +371,15 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
           churchId: church.id,
           personId: newNote.personId,
           personName: person?.name || 'Unknown',
-          authorId: user.id,
-          authorName: user.name,
+          authorId: user.id || 'system',
+          authorName: user.name || 'Unknown',
           date: newNote.date || new Date().toISOString().split('T')[0],
-          type: newNote.type as any,
+          type: (newNote.type || 'Note') as any,
           content: newNote.content,
-          followUpDate: newNote.followUpDate,
+          followUpDate: newNote.followUpDate || null,
           isCompleted: false,
           tags: []
-      };
+      } as any;
 
       await firestore.savePastoralNote(note);
 
@@ -410,13 +410,13 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
       const request: PrayerRequest = {
           id: `prayer_${Date.now()}`,
           churchId: church.id,
-          personId: newPrayer.personId,
+          personId: newPrayer.personId || null,
           personName: person?.name || newPrayer.personName || 'Anonymous',
           request: newPrayer.request,
           date: newPrayer.date || new Date().toISOString().split('T')[0],
           status: 'Active',
           isPublic: newPrayer.isPublic || false
-      };
+      } as any;
 
       await firestore.savePrayerRequest(request);
       setPrayerRequests([request, ...prayerRequests]);

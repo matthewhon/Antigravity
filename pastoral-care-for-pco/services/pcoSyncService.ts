@@ -659,7 +659,7 @@ export const syncServicesData = async (churchId: string) => {
     const plansToDetail = [...futurePlansToDetail, ...pastPlansToDetail];
 
     const detailedPlans: ServicePlanSnapshot[] = [];
-    const personServingMap = new Map<string, { last90Days: number, nextServiceDate?: string }>();
+    const personServingMap = new Map<string, { last90Days: number, nextServiceDate?: string, recentServices: { date: string, planId: string, teamName: string, serviceTypeName: string }[] }>();
 
     for (const plan of plansToDetail) {
         if (!plan.serviceTypeId) {
@@ -689,7 +689,7 @@ export const syncServicesData = async (churchId: string) => {
 
             members.forEach((m: any) => {
                 if (m.personId && (m.status === 'Confirmed' || m.status === 'C')) {
-                    const current = personServingMap.get(m.personId) || { last90Days: 0 };
+                    const current = personServingMap.get(m.personId) || { last90Days: 0, recentServices: [] };
                     
                     if (isPast) {
                         // Check if within last 90 days window
@@ -698,6 +698,14 @@ export const syncServicesData = async (churchId: string) => {
                         if (planDate >= ninetyDaysAgo) {
                             current.last90Days++;
                         }
+                        // Always track recent past services up to a reasonable limit (e.g. they served in the past 90 days)
+                        // This allows showing the recent plans widget
+                        current.recentServices.push({
+                            date: plan.sortDate,
+                            planId: plan.id,
+                            teamName: m.teamName,
+                            serviceTypeName: plan.serviceTypeName || 'Unknown'
+                        });
                     } else if (isFuture) {
                         // Track next service date
                         if (!current.nextServiceDate || planDate < new Date(current.nextServiceDate)) {
@@ -791,12 +799,16 @@ export const syncServicesData = async (churchId: string) => {
             if (stats.last90Days > 26) riskLevel = 'High';
             else if (stats.last90Days > 13) riskLevel = 'Medium';
 
+            // Sort recent services descending
+            stats.recentServices.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
             peopleUpdates.push({
                 id: personId,
                 servingStats: {
                     last90DaysCount: stats.last90Days,
                     riskLevel,
-                    nextServiceDate: stats.nextServiceDate
+                    nextServiceDate: stats.nextServiceDate,
+                    recentServices: stats.recentServices.slice(0, 10) // keep top 10
                 }
             });
         });

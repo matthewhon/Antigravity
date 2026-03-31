@@ -72,6 +72,8 @@ const ServicesView: React.FC<ServicesViewProps> = ({
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
   const [isServicesSyncing, setIsServicesSyncing] = useState(false);
   const [isCheckInsSyncing, setIsCheckInsSyncing] = useState(false);
+  const [expandedRosterPersonId, setExpandedRosterPersonId] = useState<string | null>(null);
+  const [expandedBurnoutPersonId, setExpandedBurnoutPersonId] = useState<string | null>(null);
 
   const availableWidgets = useMemo(() => {
     let widgets: any[] = [];
@@ -1128,27 +1130,51 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                             {selectedTeam ? (
                                 rosterMembers.length > 0 ? (
                                     rosterMembers.map((p, idx) => (
-                                        <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800">
-                                            <div className="flex items-center gap-3">
-                                                {p?.avatar ? (
-                                                    <img src={p.avatar} alt={p.name} className="w-8 h-8 rounded-full object-cover" referrerPolicy="no-referrer" />
-                                                ) : (
-                                                    <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-500 dark:text-slate-400">
-                                                        {p?.name.charAt(0)}
+                                        <div key={idx} onClick={() => setExpandedRosterPersonId(expandedRosterPersonId === p.id ? null : p.id)} className="flex flex-col bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 overflow-hidden cursor-pointer transition-colors hover:bg-slate-100 dark:hover:bg-slate-800">
+                                            <div className="flex items-center justify-between p-3">
+                                                <div className="flex items-center gap-3">
+                                                    {p?.avatar ? (
+                                                        <img src={p.avatar} alt={p.name} className="w-8 h-8 rounded-full object-cover" referrerPolicy="no-referrer" />
+                                                    ) : (
+                                                        <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-500 dark:text-slate-400">
+                                                            {p?.name.charAt(0)}
+                                                        </div>
+                                                    )}
+                                                    <div>
+                                                        <p className="text-xs font-bold text-slate-900 dark:text-white">{p?.name}</p>
+                                                        <p className="text-[9px] text-slate-400">{p?.email || 'No Email'}</p>
                                                     </div>
-                                                )}
-                                                <div>
-                                                    <p className="text-xs font-bold text-slate-900 dark:text-white">{p?.name}</p>
-                                                    <p className="text-[9px] text-slate-400">{p?.email || 'No Email'}</p>
+                                                </div>
+                                                <div className="text-right flex flex-col items-end gap-1">
+                                                    {p?.servingStats?.riskLevel === 'High' && (
+                                                        <span className="inline-flex items-center gap-1 bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider">
+                                                            🔥 High Risk
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </div>
-                                            <div className="text-right">
-                                                {p?.servingStats?.riskLevel === 'High' && (
-                                                    <span className="inline-flex items-center gap-1 bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider">
-                                                        🔥 High Risk
-                                                    </span>
-                                                )}
-                                            </div>
+                                            {expandedRosterPersonId === p.id && (
+                                                <div className="p-3 bg-white dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-700 animate-in slide-in-from-top-2">
+                                                    <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Recent Services (Last 90d)</p>
+                                                    {p?.servingStats?.recentServices && p.servingStats.recentServices.length > 0 ? (
+                                                        <div className="space-y-1.5">
+                                                            {p.servingStats.recentServices.map((rs, i) => (
+                                                                <div key={i} className="flex justify-between items-center text-[10px] bg-slate-50 dark:bg-slate-800 px-2 py-1.5 rounded-lg border border-slate-100 dark:border-slate-700">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="font-bold text-indigo-500 dark:text-indigo-400">
+                                                                            {new Date(rs.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                                                        </span>
+                                                                        <span className="text-slate-600 dark:text-slate-300 font-medium">{rs.teamName}</span>
+                                                                    </div>
+                                                                    <span className="text-slate-400 truncate max-w-[100px]">{rs.serviceTypeName}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    ) : (
+                                                        <p className="text-[10px] text-slate-400 italic">No recent services recorded.</p>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
                                     ))
                                 ) : (
@@ -1173,26 +1199,50 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                         <div className="overflow-y-auto max-h-96 custom-scrollbar pr-2 space-y-3">
                             {atRiskVolunteers.length > 0 ? (
                                 atRiskVolunteers.map((p, idx) => (
-                                    <div key={idx} className="flex items-center justify-between p-3 bg-rose-50 dark:bg-rose-900/10 rounded-xl border border-rose-100 dark:border-rose-900/30">
-                                        <div className="flex items-center gap-3">
-                                            {p.avatar ? (
-                                                <img src={p.avatar} alt={p.name} className="w-10 h-10 rounded-full object-cover ring-2 ring-rose-200 dark:ring-rose-800" referrerPolicy="no-referrer" />
-                                            ) : (
-                                                <div className="w-10 h-10 rounded-full bg-rose-200 dark:bg-rose-800 flex items-center justify-center text-xs font-bold text-rose-600 dark:text-rose-200">
-                                                    {p.name.charAt(0)}
+                                    <div key={idx} onClick={() => setExpandedBurnoutPersonId(expandedBurnoutPersonId === p.id ? null : p.id)} className="flex flex-col bg-rose-50 dark:bg-rose-900/10 rounded-xl border border-rose-100 dark:border-rose-900/30 overflow-hidden cursor-pointer transition-colors hover:bg-rose-100 dark:hover:bg-rose-900/20">
+                                        <div className="flex items-center justify-between p-3">
+                                            <div className="flex items-center gap-3">
+                                                {p.avatar ? (
+                                                    <img src={p.avatar} alt={p.name} className="w-10 h-10 rounded-full object-cover ring-2 ring-rose-200 dark:ring-rose-800" referrerPolicy="no-referrer" />
+                                                ) : (
+                                                    <div className="w-10 h-10 rounded-full bg-rose-200 dark:bg-rose-800 flex items-center justify-center text-xs font-bold text-rose-600 dark:text-rose-200">
+                                                        {p.name.charAt(0)}
+                                                    </div>
+                                                )}
+                                                <div>
+                                                    <p className="text-sm font-bold text-slate-900 dark:text-white">{p.name}</p>
+                                                    <p className="text-[10px] text-rose-500 font-medium">High Serving Load</p>
                                                 </div>
-                                            )}
-                                            <div>
-                                                <p className="text-sm font-bold text-slate-900 dark:text-white">{p.name}</p>
-                                                <p className="text-[10px] text-rose-500 font-medium">High Serving Load</p>
+                                            </div>
+                                            <div className="text-center bg-white dark:bg-slate-800 px-3 py-1.5 rounded-lg shadow-sm">
+                                                <span className="block text-lg font-black text-rose-600 dark:text-rose-400 leading-none">
+                                                    {p.servingStats?.last90DaysCount || 0}
+                                                </span>
+                                                <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">Services (90d)</span>
                                             </div>
                                         </div>
-                                        <div className="text-center bg-white dark:bg-slate-800 px-3 py-1.5 rounded-lg shadow-sm">
-                                            <span className="block text-lg font-black text-rose-600 dark:text-rose-400 leading-none">
-                                                {p.servingStats?.last90DaysCount || 0}
-                                            </span>
-                                            <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">Services (90d)</span>
-                                        </div>
+                                        {expandedBurnoutPersonId === p.id && (
+                                            <div className="p-3 bg-white dark:bg-slate-800/50 border-t border-rose-100 dark:border-rose-900/30 animate-in slide-in-from-top-2">
+                                                <p className="text-[10px] font-black uppercase text-rose-400 tracking-widest mb-2">Recent Services (Last 90d)</p>
+                                                {p?.servingStats?.recentServices && p.servingStats.recentServices.length > 0 ? (
+                                                    <div className="space-y-1.5">
+                                                        {p.servingStats.recentServices.map((rs, i) => (
+                                                            <div key={i} className="flex justify-between items-center text-[10px] bg-rose-50/50 dark:bg-rose-900/20 px-2 py-1.5 rounded-lg border border-rose-100/50 dark:border-rose-800/50">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="font-bold text-rose-600 dark:text-rose-400">
+                                                                        {new Date(rs.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                                                    </span>
+                                                                    <span className="text-slate-600 dark:text-slate-300 font-medium">{rs.teamName}</span>
+                                                                </div>
+                                                                <span className="text-slate-500 dark:text-slate-400 truncate max-w-[100px]">{rs.serviceTypeName}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-[10px] text-slate-400 italic">No recent services recorded.</p>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 ))
                             ) : (

@@ -185,6 +185,7 @@ export interface PcoPerson {
         timesPerWeek?: number;
         riskLevel: 'Low' | 'Medium' | 'High';
         nextServiceDate?: string;
+        recentServices?: { date: string, planId?: string, teamName?: string, serviceTypeName?: string }[];
     };
     field_data?: { field_definition: { name: string }, value: string }[];
 }

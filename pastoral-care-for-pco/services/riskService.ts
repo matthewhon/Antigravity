@@ -111,6 +111,7 @@ export const calculateBulkRisk = (
     
     // Determine volunteers based strictly on recent plan scheduling (confirmed positions)
     const volunteerCounts = new Map<string, number>();
+    const volunteerRecentPlans = new Map<string, { date: string, planId?: string, teamName?: string, serviceTypeName?: string }[]>();
     
     // Add recent plan participants (last 3 months)
     // STRICT RULE: Only count if they have a 'Confirmed' status on the plan and it occurred in the last 90 days
@@ -126,6 +127,14 @@ export const calculateBulkRisk = (
             const status = tm.status?.toLowerCase() || '';
             if (tm.personId && (status === 'confirmed' || status === 'c')) {
                 volunteerCounts.set(tm.personId, (volunteerCounts.get(tm.personId) || 0) + 1);
+                const recent = volunteerRecentPlans.get(tm.personId) || [];
+                recent.push({
+                    date: p.sortDate,
+                    planId: p.id,
+                    teamName: tm.teamName,
+                    serviceTypeName: p.serviceTypeName
+                });
+                volunteerRecentPlans.set(tm.personId, recent);
             }
         });
     });
@@ -145,6 +154,8 @@ export const calculateBulkRisk = (
         else if (count > 0) engagementStatus = 'Sporadic';
 
         const timesPerWeek = timesServed / (90 / 7);
+        const recentServices = volunteerRecentPlans.get(person.id) || [];
+        recentServices.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
         return {
             ...person,
@@ -156,7 +167,8 @@ export const calculateBulkRisk = (
                 last90DaysCount: timesServed,
                 timesPerWeek: Number(timesPerWeek.toFixed(2)),
                 riskLevel: person.servingStats?.riskLevel || 'High',
-                nextServiceDate: person.servingStats?.nextServiceDate
+                nextServiceDate: person.servingStats?.nextServiceDate,
+                recentServices: recentServices.slice(0, 10) // store up to 10 most recent
             }
         };
     });
