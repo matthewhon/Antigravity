@@ -92,6 +92,15 @@ const Layout: React.FC<LayoutProps> = ({
                   />
                 )}
 
+                {hasPermission('communication') && (
+                    <NavItem 
+                        icon="✉️" 
+                        label="Communication" 
+                        active={currentView === 'communication'} 
+                        onClick={() => onNavigate('communication')} 
+                    />
+                )}
+
                 {hasPermission('groups') && (
                   <NavItem 
                     icon="📂" 
@@ -119,15 +128,6 @@ const Layout: React.FC<LayoutProps> = ({
                   />
                 )}
 
-                {hasPermission('metrics') && (
-                  <NavItem 
-                    icon="📈" 
-                    label="Metrics" 
-                    active={currentView === 'metrics'} 
-                    onClick={() => onNavigate('metrics')} 
-                  />
-                )}
-
                 {hasPermission('pastoral') && (
                   <NavItem 
                     icon="🕊️" 
@@ -136,14 +136,14 @@ const Layout: React.FC<LayoutProps> = ({
                     onClick={() => onNavigate('pastoral')} 
                   />
                 )}
-                
-                {hasPermission('communication') && (
-                    <NavItem 
-                        icon="✉️" 
-                        label="Communication" 
-                        active={currentView === 'communication'} 
-                        onClick={() => onNavigate('communication')} 
-                    />
+
+                {hasPermission('metrics') && (
+                  <NavItem 
+                    icon="📈" 
+                    label="Metrics" 
+                    active={currentView === 'metrics'} 
+                    onClick={() => onNavigate('metrics')} 
+                  />
                 )}
 
                 {canSeeLibrary && (

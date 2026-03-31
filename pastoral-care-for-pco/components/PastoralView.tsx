@@ -464,16 +464,15 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
       import('leaflet').then(L => {
           if (!mapRef.current) return;
 
-          // Aggregate people by city — same logic as before
+          // Aggregate people by zip code
           const locationMap = new Map<string, { count: number; latSum: number; lngSum: number; coordCount: number }>();
 
           peopleData.allPeople.forEach(p => {
               const addr = p.addresses && p.addresses.length > 0 ? p.addresses[0] : null;
               if (addr) {
-                  const city = addr.city?.trim();
-                  const state = addr.state?.trim();
-                  if (city && state) {
-                      const key = `${city}, ${state}`;
+                  const zip = addr.zip?.trim();
+                  if (zip) {
+                      const key = zip;
                       if (!locationMap.has(key)) {
                           locationMap.set(key, { count: 0, latSum: 0, lngSum: 0, coordCount: 0 });
                       }
@@ -541,7 +540,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
 
               circle.bindPopup(`
                   <div style="text-align:center; padding:4px 8px;">
-                      <strong style="font-size:13px; color:#1e293b; display:block; margin-bottom:2px;">${point.name}</strong>
+                      <strong style="font-size:13px; color:#1e293b; display:block; margin-bottom:2px;">ZIP: ${point.name}</strong>
                       <span style="font-size:12px; color:#6366f1; font-weight:700;">${point.count.toLocaleString()} Member${point.count !== 1 ? 's' : ''}</span>
                   </div>
               `);
