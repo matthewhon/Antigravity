@@ -744,15 +744,17 @@ export const syncServicesData = async (churchId: string) => {
                     }
                 });
 
-                items = (itemsData.data || []).map((item: any) => {
-                    const songId = item.relationships?.song?.data?.id;
-                    const songDetail = songId ? includedSongs.get(songId) : null;
-                    return {
-                        type: 'song',
-                        title: songDetail?.title || item.attributes.title || 'Unknown Title',
-                        author: songDetail?.author || ''
-                    };
-                }).filter((item: any) => item.title && item.title !== 'Unknown Title');
+                items = (itemsData.data || [])
+                    .filter((item: any) => item.attributes.item_type === 'song' || item.relationships?.song?.data?.id)
+                    .map((item: any) => {
+                        const songId = item.relationships?.song?.data?.id;
+                        const songDetail = songId ? includedSongs.get(songId) : null;
+                        return {
+                            type: 'song',
+                            title: songDetail?.title || item.attributes.title || 'Unknown Title',
+                            author: songDetail?.author || ''
+                        };
+                    }).filter((item: any) => item.title && item.title !== 'Unknown Title');
             } catch (itemsErr) {
                 // Non-fatal — songs are optional; plan still saves without them
                 console.warn(`Could not fetch items for plan ${plan.id}:`, itemsErr);
