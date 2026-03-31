@@ -153,6 +153,7 @@ export const PASTORAL_CARE_WIDGETS: WidgetDefinition[] = [
     { id: 'prayer_requests', label: 'Prayer Requests', icon: '🙏' },
     { id: 'follow_ups', label: 'Follow-ups', icon: '📅' },
     { id: 'care_ai_agent', label: 'Care Advisor', icon: '🤖' },
+    { id: 'care_people_list', label: 'People Risk List', icon: '📋' },
 ];
 
 export const ALL_WIDGETS: Record<string, WidgetDefinition[]> = {
@@ -228,8 +229,8 @@ export const getRoleBasedDefaults = (roles: string[]): Record<string, string[]> 
             : ['member_headline_stats', 'member_map'],
         pastoral_community: ['censusHero', 'culturalMosaic', 'ministrySignals', 'economicHealth'],
         pastoral_care: isCare
-            ? ['care_log', 'prayer_requests', 'follow_ups', 'care_ai_agent']
-            : ['care_log', 'prayer_requests'],
+            ? ['care_log', 'prayer_requests', 'follow_ups', 'care_ai_agent', 'care_people_list']
+            : ['care_log', 'prayer_requests', 'care_people_list'],
     };
 };
 
@@ -247,7 +248,7 @@ export const getDefaultWidgets = (view: string): string[] => {
         case 'giving': return ['keyMetrics', 'trendsComparison', 'funds'];
         case 'giving_donor': return ['topGivers', 'demographics', 'donorLifecycle'];
         case 'pastoral': return ['church_growth_stats', 'church_spiritual_stats', 'member_headline_stats', 'member_map'];
-        case 'pastoral_care': return ['care_log', 'prayer_requests', 'follow_ups', 'care_ai_agent'];
+        case 'pastoral_care': return ['care_log', 'prayer_requests', 'follow_ups', 'care_ai_agent', 'care_people_list'];
         default: return [];
     }
 };

@@ -340,7 +340,9 @@ export const calculateGivingAnalytics = (
         atRiskGiversList,
         topGiverConcentration,
         progressStats: { thisMonth: givingThisMonth, lastMonth: givingLastMonth },
-        timePeriodLabel
+        timePeriodLabel,
+        currentLabel,
+        previousLabel
     };
 };
 

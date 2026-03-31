@@ -262,6 +262,8 @@ export interface GivingAnalytics {
     topGiverConcentration: number;
     progressStats?: ProgressStats;
     timePeriodLabel?: string;
+    currentLabel?: string;
+    previousLabel?: string;
 }
 
 export interface ServicePlanSnapshot {

@@ -21,6 +21,8 @@ import {
 } from './SharedUI';
 import { CommunityComparison } from './CommunityComparison';
 import { PastoralCalendar } from './PastoralCalendar';
+import { CarePeopleListWidget } from './CarePeopleListWidget';
+import { DEFAULT_RISK_SETTINGS } from '../services/riskService';
 import { fetchCensusDataForTenant } from '../services/censusService';
 import { generateCommunityStrategy, generateCareAdvice } from '../services/geminiService';
 import { firestore } from '../services/firestoreService';
@@ -1277,6 +1279,16 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                   </div>
               );
           
+          case 'care_people_list':
+              return (
+                  <CarePeopleListWidget
+                      peopleData={peopleData}
+                      settings={church.riskSettings || DEFAULT_RISK_SETTINGS}
+                      onRemove={() => handleRemoveWidget(id)}
+                      currentTheme={currentTheme}
+                  />
+              );
+          
           default:
               return null;
       }
@@ -1364,7 +1376,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                       if (!loc) return null;
                       return safeVisibleWidgets.map((id, index) => {
                           let spanClass = "col-span-1";
-                          if (['church_growth_stats', 'member_headline_stats', 'member_map'].includes(id)) {
+                          if (['church_growth_stats', 'member_headline_stats', 'member_map', 'care_people_list'].includes(id)) {
                               spanClass = "col-span-1 md:col-span-2 lg:col-span-4";
                           } else if (['church_spiritual_stats', 'censusHero', 'community_ai_agent', 'member_geo_list', 'ministrySignals', 'care_ai_agent'].includes(id)) {
                               spanClass = "col-span-1 lg:col-span-2";
@@ -1391,7 +1403,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                   safeVisibleWidgets.map((id, index) => {
                       // Special Full Width Handling
                       let spanClass = "col-span-1";
-                      if (['church_growth_stats', 'member_headline_stats', 'member_map'].includes(id)) {
+                      if (['church_growth_stats', 'member_headline_stats', 'member_map', 'care_people_list'].includes(id)) {
                           spanClass = "col-span-1 md:col-span-2 lg:col-span-4";
                       } else if (['church_spiritual_stats', 'censusHero', 'community_ai_agent', 'member_geo_list', 'ministrySignals', 'care_ai_agent'].includes(id)) {
                           spanClass = "col-span-1 lg:col-span-2";
