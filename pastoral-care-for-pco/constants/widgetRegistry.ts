@@ -83,7 +83,7 @@ export const SERVICES_ATTENDANCE_WIDGETS: WidgetDefinition[] = [
 export const SERVICES_TEAMS_WIDGETS: WidgetDefinition[] = [
     { id: 'services_teams_list', label: 'Teams Directory', icon: '📋' },
     { id: 'team_roster', label: 'Team Roster', icon: '👥' },
-    { id: 'burnout_watchlist', label: 'Burnout Watchlist', icon: '🔥' }
+    { id: 'burnout_watchlist', label: 'Burnout Watchlist (>2x Weekly)', icon: '🔥' }
 ];
 
 export const GIVING_WIDGETS: WidgetDefinition[] = [

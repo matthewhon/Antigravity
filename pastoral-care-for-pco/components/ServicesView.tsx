@@ -1202,7 +1202,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
 
             return (
                 <div key="burnout_watchlist" className="col-span-1 lg:col-span-2">
-                    <WidgetWrapper title="Burnout Watchlist" onRemove={() => handleRemoveWidget('burnout_watchlist')} source="Serving Frequency (90 Days)">
+                    <WidgetWrapper title="Burnout Watchlist (>2x Weekly)" onRemove={() => handleRemoveWidget('burnout_watchlist')} source="Confirmed Services (90 Days)">
                         <div className="overflow-y-auto max-h-96 custom-scrollbar pr-2 space-y-3">
                             {atRiskVolunteers.length > 0 ? (
                                 atRiskVolunteers.map((p, idx) => (
@@ -1256,7 +1256,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                 <div className="h-full flex flex-col items-center justify-center text-center py-10">
                                     <div className="text-4xl mb-2">💚</div>
                                     <p className="text-xs font-bold text-slate-500 dark:text-slate-400">Healthy Roster!</p>
-                                    <p className="text-[10px] text-slate-400 max-w-[200px]">No volunteers flagged for high burnout risk based on recent serving frequency.</p>
+                                    <p className="text-[10px] text-slate-400 max-w-[200px]">No volunteers flagged — no one served more than 2× in a single week.</p>
                                 </div>
                             )}
                         </div>

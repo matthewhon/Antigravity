@@ -872,14 +872,26 @@ export const syncServicesData = async (churchId: string) => {
     if (personServingMap.size > 0) {
         const peopleUpdates: Partial<PcoPerson>[] = [];
         personServingMap.forEach((stats, personId) => {
-            // Burnout threshold: flag anyone averaging >2 services/week over 90 days.
-            // 90 days ≈ 13 weeks → 2x/week = 26, 1x/week = 13.
-            // High:   >26 services in 90 days (>2/week average)
-            // Medium: >13 services in 90 days (>1/week average)
+            // Burnout threshold: flag anyone who served MORE THAN 2 times in any single week.
+            // We bucket recentServices by ISO calendar week (Mon–Sun) and check the max bucket.
+            // High:   any week with >2 confirmed services
+            // Medium: any week with exactly 2 confirmed services
             // Low:    everyone else
+            const weekBuckets = new Map<string, number>();
+            stats.recentServices.forEach(rs => {
+                const d = new Date(rs.date);
+                // ISO week key: YYYY-Www  (approximate using Monday-aligned week number)
+                const dayOfWeek = (d.getDay() + 6) % 7; // Mon=0 … Sun=6
+                const monday = new Date(d);
+                monday.setDate(d.getDate() - dayOfWeek);
+                const weekKey = monday.toISOString().slice(0, 10); // "YYYY-MM-DD" of that Monday
+                weekBuckets.set(weekKey, (weekBuckets.get(weekKey) || 0) + 1);
+            });
+            const maxWeeklyCount = weekBuckets.size > 0 ? Math.max(...weekBuckets.values()) : 0;
+
             let riskLevel: 'Low' | 'Medium' | 'High' = 'Low';
-            if (stats.last90Days > 26) riskLevel = 'High';
-            else if (stats.last90Days > 13) riskLevel = 'Medium';
+            if (maxWeeklyCount > 2) riskLevel = 'High';
+            else if (maxWeeklyCount === 2) riskLevel = 'Medium';
 
             // Sort recent services descending
             stats.recentServices.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
