@@ -113,11 +113,18 @@ export const calculateBulkRisk = (
     const volunteerCounts = new Map<string, number>();
     
     // Add recent plan participants (last 3 months)
-    // STRICT RULE: Only count if they have a 'Confirmed' status on the plan
-    const recentPlans = plans.filter(p => new Date(p.sortDate) >= new Date(Date.now() - 90 * 24 * 60 * 60 * 1000));
+    // STRICT RULE: Only count if they have a 'Confirmed' status on the plan and it occurred in the last 90 days
+    const now = new Date();
+    const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+    const recentPlans = plans.filter(p => {
+        const d = new Date(p.sortDate);
+        return d >= ninetyDaysAgo && d <= now;
+    });
+    
     recentPlans.forEach(p => {
         p.teamMembers?.forEach(tm => {
-            if (tm.personId && tm.status === 'Confirmed') {
+            const status = tm.status?.toLowerCase() || '';
+            if (tm.personId && (status === 'confirmed' || status === 'c')) {
                 volunteerCounts.set(tm.personId, (volunteerCounts.get(tm.personId) || 0) + 1);
             }
         });
