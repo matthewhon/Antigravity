@@ -261,6 +261,7 @@ export interface GivingAnalytics {
     atRiskGiversList: any[];
     topGiverConcentration: number;
     progressStats?: ProgressStats;
+    timePeriodLabel?: string;
 }
 
 export interface ServicePlanSnapshot {

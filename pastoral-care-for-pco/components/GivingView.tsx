@@ -770,18 +770,25 @@ export const GivingView: React.FC<GivingViewProps> = ({
           case 'trendsComparison':
               return (
                   <WidgetWrapper title="Giving Time Comparison" onRemove={() => handleRemoveWidget(id)} source="Current vs Prev">
-                      <div className="h-64">
-                          <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={1}>
-                              <BarChart data={analytics.comparisonTrends}>
-                                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
-                                  <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: axisColor}} />
-                                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: axisColor}} />
-                                  <Tooltip cursor={{fill: currentTheme === 'dark' ? '#334155' : '#f8fafc'}} contentStyle={TOOLTIP_STYLE} itemStyle={{ color: '#fff' }} formatter={(value: number) => `$${value.toLocaleString()}`} />
-                                  <Legend verticalAlign="top" iconType="circle" wrapperStyle={{fontSize: '10px'}} />
-                                  <Bar dataKey="current" name="Current" fill="#6366f1" radius={[4, 4, 0, 0]} />
-                                  <Bar dataKey="previous" name="Previous" fill="#cbd5e1" radius={[4, 4, 0, 0]} />
-                              </BarChart>
-                          </ResponsiveContainer>
+                      <div className="flex flex-col h-full">
+                          <div className="h-64 flex-shrink-0">
+                              <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={1}>
+                                  <BarChart data={analytics.comparisonTrends}>
+                                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
+                                      <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: axisColor}} />
+                                      <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: axisColor}} />
+                                      <Tooltip cursor={{fill: currentTheme === 'dark' ? '#334155' : '#f8fafc'}} contentStyle={TOOLTIP_STYLE} itemStyle={{ color: '#fff' }} formatter={(value: number) => `$${value.toLocaleString()}`} />
+                                      <Legend verticalAlign="top" iconType="circle" wrapperStyle={{fontSize: '10px'}} />
+                                      <Bar dataKey="current" name="Current" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                                      <Bar dataKey="previous" name="Previous" fill="#cbd5e1" radius={[4, 4, 0, 0]} />
+                                  </BarChart>
+                              </ResponsiveContainer>
+                          </div>
+                          {analytics.timePeriodLabel && (
+                              <div className="text-center mt-3 mb-1 text-[11px] text-slate-400 dark:text-slate-500 font-medium tracking-wide">
+                                  {analytics.timePeriodLabel}
+                              </div>
+                          )}
                       </div>
                   </WidgetWrapper>
               );

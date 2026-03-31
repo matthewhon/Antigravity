@@ -65,6 +65,17 @@ export const calculateGivingAnalytics = (
     const previousEndDate = new Date(startDate.getTime() - 1);
     const previousStartDate = new Date(previousEndDate.getTime() - durationTime);
 
+    const formatDateStr = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: d.getFullYear() !== now.getFullYear() ? 'numeric' : undefined });
+    const currentLabel = startDate.toDateString() === endDate.toDateString() 
+        ? formatDateStr(startDate)
+        : `${formatDateStr(startDate)} - ${formatDateStr(endDate)}`;
+
+    const previousLabel = previousStartDate.toDateString() === previousEndDate.toDateString() 
+        ? formatDateStr(previousStartDate)
+        : `${formatDateStr(previousStartDate)} - ${formatDateStr(previousEndDate)}`;
+        
+    const timePeriodLabel = `${currentLabel} vs. ${previousLabel}`;
+
     const currentPeriodDonations = donations.filter(d => {
         const dDate = new Date(d.date);
         return dDate >= startDate && dDate <= endDate;
@@ -328,7 +339,8 @@ export const calculateGivingAnalytics = (
         topGiversList,
         atRiskGiversList,
         topGiverConcentration,
-        progressStats: { thisMonth: givingThisMonth, lastMonth: givingLastMonth }
+        progressStats: { thisMonth: givingThisMonth, lastMonth: givingLastMonth },
+        timePeriodLabel
     };
 };
 
