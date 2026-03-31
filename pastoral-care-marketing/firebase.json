@@ -1,0 +1,30 @@
+{
+  "hosting": {
+    "site": "pastoralwebsite",
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      ".firebaserc",
+      "Dockerfile",
+      "cloudbuild.yaml",
+      "**/.*"
+    ],
+    "headers": [
+      {
+        "source": "**/*.@(jpg|jpeg|gif|png|webp|svg|ico)",
+        "headers": [
+          { "key": "Cache-Control", "value": "public, max-age=604800, immutable" }
+        ]
+      },
+      {
+        "source": "**/*.html",
+        "headers": [
+          { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }
+        ]
+      }
+    ],
+    "rewrites": [
+      { "source": "**", "destination": "/index.html" }
+    ]
+  }
+}
