@@ -7,12 +7,14 @@ import StarterKit from '@tiptap/starter-kit';
 import { storage } from '../services/firebase';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL, listAll } from 'firebase/storage';
 import { pcoService } from '../services/pcoService';
+import { generateEmailContent } from '../services/geminiService';
 import { AnalyticsWidgetBlock, AnalyticsWidgetId } from './DataChartSelector';
 import {
   Type, Heading as HeadingIcon, Image as ImageIcon, MousePointerClick, File,
   Minus, Video, Code, Users, Calendar, ClipboardList, GripVertical, Trash2,
   Copy, ChevronRight, ChevronDown, Palette, AlignLeft, AlignCenter, AlignRight, LayoutGrid, Plus,
-  AtSign, Search, Loader2, X, ChevronUp, Bold, Italic, List, ListOrdered, Link, Upload, Images
+  AtSign, Search, Loader2, X, ChevronUp, Bold, Italic, List, ListOrdered, Link, Upload, Images,
+  Sparkles, Send, RotateCcw, Check, ChevronLeft, MessageSquare
 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -46,6 +48,8 @@ interface EmailBuilderProps {
   onOpenSettings: () => void;
   onEditBlock?: (id: string) => void;
   churchId?: string;
+  campaignSubject?: string;
+  churchName?: string;
 }
 
 // ─── Block definitions for palette ───────────────────────────────────────────
@@ -991,7 +995,14 @@ const PcoQuickPicker: React.FC<{
 
   useEffect(() => {
     config.fetch(churchId)
-      .then(raw => { setItems((raw || []).map(config.map)); setLoading(false); })
+      .then(raw => {
+        // For registrations, exclude events archived in Planning Center
+        const filtered = type === 'pco_registration'
+          ? (raw || []).filter((item: any) => !item.attributes?.archived)
+          : (raw || []);
+        setItems(filtered.map(config.map));
+        setLoading(false);
+      })
       .catch(e => { setError(e?.message || 'Failed to load'); setLoading(false); });
   }, [type, churchId]);
 
@@ -1070,14 +1081,301 @@ const PcoQuickPicker: React.FC<{
   );
 };
 
+// ─── AI Writing Panel ────────────────────────────────────────────────────────
+
+type AiMessage = { role: 'user' | 'model'; text: string; html?: string };
+const AI_TONES = ['Warm & Pastoral', 'Formal', 'Friendly', 'Inspirational', 'Urgent'] as const;
+type AiTone = typeof AI_TONES[number];
+
+const EmailAIPanel: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  selectedBlock: EmailBlock | null;
+  campaignSubject?: string;
+  churchName?: string;
+  onInsert: (html: string, replaceSelectedBlock: boolean) => void;
+}> = ({ isOpen, onClose, selectedBlock, campaignSubject, churchName, onInsert }) => {
+  const [messages, setMessages] = useState<AiMessage[]>([]);
+  const [input, setInput] = useState('');
+  const [tone, setTone] = useState<AiTone>('Warm & Pastoral');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [lastHtml, setLastHtml] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Strip HTML tags for display
+  const stripHtml = (html: string) => html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+
+  // Auto-scroll to bottom when messages update
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages, loading]);
+
+  // Focus input when panel opens
+  useEffect(() => {
+    if (isOpen) setTimeout(() => inputRef.current?.focus(), 100);
+  }, [isOpen]);
+
+  const selectedBlockText = selectedBlock
+    ? stripHtml(selectedBlock.content?.text || selectedBlock.content?.html || '')
+    : undefined;
+
+  const handleSend = async () => {
+    const trimmed = input.trim();
+    if (!trimmed || loading) return;
+    setError(null);
+    const userMsg: AiMessage = { role: 'user', text: trimmed };
+    const newHistory = [...messages, userMsg];
+    setMessages(newHistory);
+    setInput('');
+    setLoading(true);
+    try {
+      const { html } = await generateEmailContent(
+        newHistory.map(m => ({ role: m.role, text: m.text })),
+        {
+          tone,
+          selectedBlockText,
+          campaignSubject,
+          churchName,
+        }
+      );
+      const modelMsg: AiMessage = { role: 'model', text: stripHtml(html), html };
+      setMessages(prev => [...prev, modelMsg]);
+      setLastHtml(html);
+    } catch (e: any) {
+      setError(e?.message || 'Something went wrong.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  const handleCopy = () => {
+    if (!lastHtml) return;
+    navigator.clipboard.writeText(stripHtml(lastHtml));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleClear = () => {
+    setMessages([]);
+    setLastHtml(null);
+    setError(null);
+  };
+
+  // Suggestion chips shown when the conversation is empty
+  const suggestions = selectedBlock
+    ? [
+        'Make this shorter',
+        'Make this more compelling',
+        'Add a clear call to action',
+        'Rewrite in a more formal tone',
+      ]
+    : [
+        'Write a welcome message for new visitors',
+        'Announce our upcoming service series',
+        'Write a giving appeal for the general fund',
+        'Draft an invitation to our small groups',
+      ];
+
+  return (
+    <div
+      className={`flex flex-col h-full bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-700 transition-all duration-300 ease-in-out overflow-hidden ${
+        isOpen ? 'w-80 shrink-0' : 'w-0'
+      }`}
+    >
+      {isOpen && (
+        <>
+          {/* ── Panel Header ── */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-700 bg-gradient-to-r from-indigo-600 to-violet-600 shrink-0">
+            <div className="flex items-center gap-2">
+              <Sparkles size={16} className="text-white/90" />
+              <span className="text-sm font-bold text-white">AI Writing Assistant</span>
+            </div>
+            <div className="flex items-center gap-1">
+              {messages.length > 0 && (
+                <button
+                  onClick={handleClear}
+                  title="Clear conversation"
+                  className="p-1 rounded text-white/70 hover:text-white hover:bg-white/10 transition"
+                >
+                  <RotateCcw size={13} />
+                </button>
+              )}
+              <button
+                onClick={onClose}
+                className="p-1 rounded text-white/70 hover:text-white hover:bg-white/10 transition"
+              >
+                <X size={15} />
+              </button>
+            </div>
+          </div>
+
+          {/* ── Context badge (selected block) ── */}
+          {selectedBlock && (
+            <div className="px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/20 border-b border-indigo-100 dark:border-indigo-800 shrink-0">
+              <p className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wide mb-0.5">Editing selected block</p>
+              <p className="text-[11px] text-slate-600 dark:text-slate-400 truncate">
+                {selectedBlockText?.slice(0, 60) || '(empty block)'}…
+              </p>
+            </div>
+          )}
+
+          {/* ── Tone selector ── */}
+          <div className="px-3 pt-3 pb-1 shrink-0">
+            <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5">Tone</p>
+            <div className="flex flex-wrap gap-1">
+              {AI_TONES.map(t => (
+                <button
+                  key={t}
+                  onClick={() => setTone(t)}
+                  className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border transition ${
+                    tone === t
+                      ? 'bg-indigo-600 text-white border-indigo-600'
+                      : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-600 hover:border-indigo-300'
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* ── Message area ── */}
+          <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-2 space-y-3">
+            {messages.length === 0 && !loading && (
+              <>
+                <div className="flex flex-col items-center justify-center py-6 text-center">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-100 to-violet-100 dark:from-indigo-900/40 dark:to-violet-900/40 flex items-center justify-center mb-3">
+                    <Sparkles size={24} className="text-indigo-500" />
+                  </div>
+                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">What would you like to write?</p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Describe your content and I'll draft it for you.</p>
+                </div>
+                <div className="space-y-1.5">
+                  {suggestions.map(s => (
+                    <button
+                      key={s}
+                      onClick={() => { setInput(s); inputRef.current?.focus(); }}
+                      className="w-full text-left text-xs px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:border-indigo-300 dark:hover:border-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-700 dark:hover:text-indigo-300 transition"
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {messages.map((msg, idx) => (
+              <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                {msg.role === 'user' ? (
+                  <div className="max-w-[85%] bg-indigo-600 text-white rounded-2xl rounded-tr-sm px-3 py-2 text-xs leading-relaxed">
+                    {msg.text}
+                  </div>
+                ) : (
+                  <div className="max-w-[95%] space-y-2">
+                    <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl rounded-tl-sm px-3 py-2.5">
+                      <div
+                        className="text-xs text-slate-700 dark:text-slate-200 leading-relaxed prose prose-xs max-w-none"
+                        dangerouslySetInnerHTML={{ __html: msg.html || msg.text }}
+                      />
+                    </div>
+                    {/* Action row for latest model message */}
+                    {idx === messages.length - 1 && msg.html && (
+                      <div className="flex items-center gap-1.5 px-1">
+                        <button
+                          onClick={() => onInsert(msg.html!, !!selectedBlock)}
+                          className="flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition"
+                        >
+                          <Plus size={10} />
+                          {selectedBlock ? 'Replace block' : 'Insert block'}
+                        </button>
+                        <button
+                          onClick={handleCopy}
+                          className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:border-indigo-300 hover:text-indigo-600 rounded-lg transition bg-white dark:bg-slate-800"
+                        >
+                          {copied ? <><Check size={10} /> Copied</> : <><Copy size={10} /> Copy</>}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {loading && (
+              <div className="flex justify-start">
+                <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl rounded-tl-sm px-4 py-3 flex items-center gap-2">
+                  <span className="flex gap-0.5">
+                    {[0,1,2].map(i => (
+                      <span
+                        key={i}
+                        className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-bounce"
+                        style={{ animationDelay: `${i * 150}ms` }}
+                      />
+                    ))}
+                  </span>
+                  <span className="text-[11px] text-slate-400">Writing…</span>
+                </div>
+              </div>
+            )}
+
+            {error && (
+              <div className="text-[11px] text-red-500 bg-red-50 dark:bg-red-900/20 rounded-xl px-3 py-2 border border-red-200 dark:border-red-800">
+                {error}
+              </div>
+            )}
+          </div>
+
+          {/* ── Input row ── */}
+          <div className="px-3 pb-3 pt-2 border-t border-slate-100 dark:border-slate-700 shrink-0">
+            <div className="flex items-end gap-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-2xl px-3 py-2 focus-within:border-indigo-400 focus-within:ring-1 focus-within:ring-indigo-400 transition">
+              <textarea
+                ref={inputRef}
+                rows={2}
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Describe what to write…"
+                className="flex-1 bg-transparent text-xs text-slate-900 dark:text-white placeholder-slate-400 resize-none outline-none leading-relaxed"
+                disabled={loading}
+              />
+              <button
+                onClick={handleSend}
+                disabled={!input.trim() || loading}
+                className="p-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 dark:disabled:bg-slate-600 text-white transition shrink-0 self-end"
+              >
+                <Send size={13} />
+              </button>
+            </div>
+            <p className="text-[9px] text-slate-400 dark:text-slate-500 mt-1 text-center">Enter to send · Shift+Enter for new line</p>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
 // ─── Main EmailBuilder ────────────────────────────────────────────────────────
 
 export const EmailBuilder: React.FC<EmailBuilderProps> = ({
-  blocks, setBlocks, onImportPco, onOpenPastoralCare, onOpenDataChart, onOpenSettings, churchId = ''
+  blocks, setBlocks, onImportPco, onOpenPastoralCare, onOpenDataChart, onOpenSettings, churchId = '',
+  campaignSubject, churchName,
 }) => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [quickPickType, setQuickPickType] = useState<PcoPickType | null>(null);
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -1148,6 +1446,25 @@ export const EmailBuilder: React.FC<EmailBuilderProps> = ({
   };
 
   const activeBlock = blocks.find(b => b.id === activeId);
+  const selectedBlock = blocks.find(b => b.id === selectedId) ?? null;
+  const selectedIsTextBlock = selectedBlock && ['text', 'header', 'html'].includes(selectedBlock.type);
+
+  // Handle AI insert: replace selected text block OR append a new one
+  const handleAiInsert = (html: string, replaceSelected: boolean) => {
+    if (replaceSelected && selectedId && selectedIsTextBlock) {
+      setBlocks(prev => prev.map(b =>
+        b.id === selectedId ? { ...b, content: { ...b.content, text: html, html } } : b
+      ));
+    } else {
+      const newBlock: EmailBlock = {
+        id: `block_${Date.now()}`,
+        type: 'text',
+        content: { text: html, html },
+      };
+      setBlocks(prev => [...prev, newBlock]);
+      setSelectedId(newBlock.id);
+    }
+  };
 
   return (
     <div className="flex h-full" style={{ minHeight: 600 }}>
@@ -1290,7 +1607,18 @@ export const EmailBuilder: React.FC<EmailBuilderProps> = ({
       </div>
 
       {/* ── Canvas ── */}
-      <div className="flex-1 overflow-y-auto bg-slate-100 dark:bg-slate-950 p-8">
+      <div className="flex-1 overflow-y-auto bg-slate-100 dark:bg-slate-950 p-8 relative">
+        {/* Floating AI button */}
+        {!aiPanelOpen && (
+          <button
+            onClick={() => setAiPanelOpen(true)}
+            title="Open AI Writing Assistant"
+            className="fixed right-4 bottom-8 z-40 flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-sm font-bold shadow-lg hover:shadow-indigo-500/30 transition-all group"
+          >
+            <Sparkles size={16} className="group-hover:animate-pulse" />
+            <span className="hidden sm:inline">AI Writer</span>
+          </button>
+        )}
         <div className="max-w-2xl mx-auto">
 
           <DndContext
@@ -1360,6 +1688,16 @@ export const EmailBuilder: React.FC<EmailBuilderProps> = ({
           )}
         </div>
       </div>
+
+      {/* ── AI Panel ── */}
+      <EmailAIPanel
+        isOpen={aiPanelOpen}
+        onClose={() => setAiPanelOpen(false)}
+        selectedBlock={selectedIsTextBlock ? selectedBlock : null}
+        campaignSubject={campaignSubject}
+        churchName={churchName}
+        onInsert={handleAiInsert}
+      />
     </div>
   );
 };

@@ -231,21 +231,25 @@ export const EmailPreview: React.FC<Props> = ({ blocks, settings, churchLogoUrl 
       className="p-6 rounded-2xl shadow-lg min-h-[600px]"
       style={{ backgroundColor: settings.backgroundColor, color: settings.textColor, fontFamily: settings.fontFamily }}
     >
-      <header className="mb-6 border-b border-slate-200 pb-4 text-center">
-        {showLogo && (
-          <div className="flex justify-center mb-3">
-            <img
-              src={effectiveLogo}
-              alt="Church logo"
-              style={{ maxHeight: 60, maxWidth: 240, objectFit: 'contain', display: 'block' }}
-              onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-            />
-          </div>
-        )}
-        <h1 className="text-2xl font-bold" style={{ textAlign: showLogo ? 'center' : 'left' }}>
-          {settings.header}
-        </h1>
-      </header>
+      {(showLogo || settings.header?.trim()) && (
+        <header className="mb-6 border-b border-slate-200 pb-4 text-center">
+          {showLogo && (
+            <div className="flex justify-center mb-3">
+              <img
+                src={effectiveLogo}
+                alt="Church logo"
+                style={{ maxHeight: 60, maxWidth: 240, objectFit: 'contain', display: 'block' }}
+                onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              />
+            </div>
+          )}
+          {settings.header?.trim() && (
+            <h1 className="text-2xl font-bold" style={{ textAlign: showLogo ? 'center' : 'left' }}>
+              {settings.header}
+            </h1>
+          )}
+        </header>
+      )}
 
       <div className="space-y-4">
         {blocks.map((block) => (

@@ -825,3 +825,78 @@ Rules:
         return fallback;
     }
 };
+
+// ---------------------------------------------------------------------------
+// Email Writing Agent — generates content for the Email Builder AI panel
+// ---------------------------------------------------------------------------
+
+/**
+ * AI writing assistant for the Email Builder.
+ *
+ * @param messages  Conversation history as [{role:'user'|'model', text:string}]
+ * @param context   Optional context to ground the AI (campaign subject, selected block text, tone)
+ * @returns         { html: string } — clean HTML output ready to paste into a Tiptap block
+ */
+export const generateEmailContent = async (
+    messages: { role: 'user' | 'model'; text: string }[],
+    context?: {
+        tone?: string;
+        selectedBlockText?: string;
+        campaignSubject?: string;
+        churchName?: string;
+    }
+): Promise<{ html: string }> => {
+    const toneGuide = context?.tone
+        ? `Use a ${context.tone} tone throughout.`
+        : 'Use a warm, pastoral, and engaging tone.';
+
+    const blockCtx = context?.selectedBlockText
+        ? `\n\nThe user has the following existing email block content selected:\n"""\n${context.selectedBlockText}\n"""\nIf the request is about improving or rewriting it, use this as your base.`
+        : '';
+
+    const subjectCtx = context?.campaignSubject
+        ? `\n\nThe email subject / campaign name is: "${context.campaignSubject}". Keep content consistent with this theme.`
+        : '';
+
+    const churchCtx = context?.churchName
+        ? `You are writing content for ${context.churchName}.`
+        : 'You are writing content for a local church.';
+
+    const systemInstruction = `You are an expert church email copywriter and communications director. ${churchCtx}
+
+Your job is to help write compelling, concise email content for church email campaigns — announcements, newsletters, invitations, devotionals, and more.
+
+${toneGuide}${blockCtx}${subjectCtx}
+
+CRITICAL OUTPUT RULES:
+1. Output ONLY clean HTML using these allowed tags: <p>, <h1>, <h2>, <h3>, <strong>, <em>, <ul>, <ol>, <li>, <a href="...">
+2. Do NOT use markdown (no **, no #, no -, no backticks).
+3. Do NOT wrap in \`\`\`html blocks or add any preamble/commentary.
+4. Do NOT include <html>, <body>, <head>, or <style> tags.
+5. Keep paragraphs concise and scannable — 2-3 sentences max per paragraph.
+6. If writing a heading, use <h2> (not <h1> which is reserved for the email title).
+7. If the user asks for something non-text (like an image or button), politely explain you can only generate text content.
+
+Start writing immediately with the content — no preamble like "Here is your email content:".`;
+
+    // Build the multi-turn prompt string from conversation history
+    const conversationBlock = messages
+        .map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.text}`)
+        .join('\n\n');
+
+    const prompt = conversationBlock;
+
+    try {
+        const response = await callGemini({
+            model: 'gemini-2.5-flash',
+            prompt,
+            systemInstruction,
+        });
+        const raw = (response.text || '').trim();
+        return { html: raw };
+    } catch (e) {
+        console.error('Email AI Error:', e);
+        throw new Error('The AI writing assistant is temporarily unavailable. Please try again.');
+    }
+};
+

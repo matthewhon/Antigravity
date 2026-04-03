@@ -183,7 +183,9 @@ export const PcoImportModal: React.FC<Props> = ({ churchId, onInsert, onClose })
         let raw: any[] = [];
         if (tab === 'registrations') {
           raw = await pcoService.getRegistrations(churchId);
-          setItems(p => ({ ...p, registrations: (raw || []).map(mapRegistration) }));
+          // Exclude events that have been archived in Planning Center
+          const activeRegistrations = (raw || []).filter((item: any) => !item.attributes?.archived);
+          setItems(p => ({ ...p, registrations: activeRegistrations.map(mapRegistration) }));
         } else if (tab === 'groups') {
           raw = await pcoService.getGroups(churchId);
           setItems(p => ({ ...p, groups: (raw || []).map(mapGroup) }));

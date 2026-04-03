@@ -27,7 +27,7 @@ const DEFAULT_TEMPLATE: TemplateSettings = {
   backgroundColor: '#ffffff',
   linkColor: '#2563eb',
   fontFamily: 'sans-serif',
-  header: 'Church Newsletter',
+  header: '',
   footer: '© 2026 Church Name · Unsubscribe',
   showLogo: true,
 };
@@ -911,6 +911,8 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
                 blocks={blocks}
                 setBlocks={setBlocks}
                 churchId={churchId}
+                campaignSubject={localCampaign.subject || localCampaign.name}
+                churchName={church?.name}
                 onImportPco={() => setIsPcoDrawerOpen(true)}
                 onOpenPastoralCare={() => setIsPastoralCareDrawerOpen(true)}
                 onOpenDataChart={() => setIsDataChartDrawerOpen(true)}
