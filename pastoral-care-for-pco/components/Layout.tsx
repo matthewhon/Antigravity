@@ -92,14 +92,7 @@ const Layout: React.FC<LayoutProps> = ({
                   />
                 )}
 
-                {hasPermission('communication') && (
-                    <NavItem 
-                        icon="✉️" 
-                        label="Communication" 
-                        active={currentView === 'communication'} 
-                        onClick={() => onNavigate('communication')} 
-                    />
-                )}
+
 
                 {hasPermission('groups') && (
                   <NavItem 

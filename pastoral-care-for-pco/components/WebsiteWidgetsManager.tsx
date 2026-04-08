@@ -39,7 +39,10 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
       // Force iframe reload
       const iframe = document.getElementById('widget-preview') as HTMLIFrameElement;
       if (iframe) {
-          iframe.src = iframe.src;
+          const newUrl = new URL(iframe.src);
+          newUrl.searchParams.set('refresh', 'true');
+          newUrl.searchParams.set('t', Date.now().toString());
+          iframe.src = newUrl.toString();
       }
       showToast(`${type} synced successfully`);
     } catch (e: any) {

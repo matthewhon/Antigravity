@@ -20,7 +20,7 @@ import {
   Trash2, Eye, Pencil, Loader2, X, List, UserMinus, Search, Copy, Globe
 } from 'lucide-react';
 
-// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Helpers ───────────────────────────────────────────────────────────────
 
 const DEFAULT_TEMPLATE: TemplateSettings = {
   primaryColor: '#4f46e5',
@@ -29,7 +29,7 @@ const DEFAULT_TEMPLATE: TemplateSettings = {
   linkColor: '#2563eb',
   fontFamily: 'sans-serif',
   header: '',
-  footer: 'Â© 2026 Church Name Â· Unsubscribe',
+  footer: '© 2026 Church Name · Unsubscribe',
   showLogo: true,
 };
 
@@ -52,7 +52,7 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   failed:    { label: 'Failed',    color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
 };
 
-// â”€â”€â”€ Sub-components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Sub-components ─────────────────────────────────────────────────────────
 
 interface AccordionSectionProps {
   id: string;
@@ -94,7 +94,7 @@ const AccordionSection: React.FC<AccordionSectionProps> = ({
   </div>
 );
 
-// â”€â”€â”€ Campaign Preview Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Campaign Preview Modal ──────────────────────────────────────────────────
 
 const CampaignPreviewModal: React.FC<{ campaign: EmailCampaign; onClose: () => void; churchLogoUrl?: string }> = ({ campaign, onClose, churchLogoUrl }) => {
   const blocks = (campaign.blocks || []) as EmailBlock[];
@@ -140,7 +140,7 @@ const CampaignPreviewModal: React.FC<{ campaign: EmailCampaign; onClose: () => v
   );
 };
 
-// â”€â”€â”€ Schedule Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Schedule Modal ───────────────────────────────────────────────────────────
 
 const ScheduleModal: React.FC<{
   onConfirm: (scheduledAt: number, recurringFrequency?: 'daily' | 'weekly' | 'monthly') => void;
@@ -212,7 +212,7 @@ const ScheduleModal: React.FC<{
             disabled={isScheduling}
             className="flex-1 flex items-center justify-center gap-2 py-2 text-sm font-semibold bg-amber-500 hover:bg-amber-600 disabled:bg-amber-300 text-white rounded-xl transition"
           >
-            {isScheduling ? <><Loader2 size={13} className="animate-spin" /> Schedulingâ€¦</> : <><Calendar size={13} /> Schedule</>}
+            {isScheduling ? <><Loader2 size={13} className="animate-spin" /> Scheduling…</> : <><Calendar size={13} /> Schedule</>}
           </button>
         </div>
       </div>
@@ -286,7 +286,7 @@ const CampaignListView: React.FC<CampaignListViewProps> = ({
       {/* Campaign list */}
       {isLoading ? (
         <div className="flex items-center justify-center h-40 text-slate-400">
-          <Loader2 size={24} className="animate-spin mr-2" /> Loading campaignsâ€¦
+          <Loader2 size={24} className="animate-spin mr-2" /> Loading campaigns…
         </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-20 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
@@ -320,21 +320,21 @@ const CampaignListView: React.FC<CampaignListViewProps> = ({
                   <div className="font-semibold text-slate-900 dark:text-white truncate">{c.name}</div>
                   <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 flex flex-wrap gap-x-2">
                     <span>{c.subject ? `"${c.subject}"` : 'No subject'}</span>
-                    {c.toListName && <span>Â· To: {c.toListName}</span>}
-                    <span>Â· {(c.blocks?.length || 0)} block{(c.blocks?.length || 0) !== 1 ? 's' : ''}</span>
+                    {c.toListName && <span>· To: {c.toListName}</span>}
+                    <span>· {(c.blocks?.length || 0)} block{(c.blocks?.length || 0) !== 1 ? 's' : ''}</span>
                     {c.status === 'sent' && c.sentAt && (
                       <span className="text-emerald-600 dark:text-emerald-400">
-                        Â· Sent {new Date(c.sentAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        · Sent {new Date(c.sentAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                       </span>
                     )}
                     {c.status === 'scheduled' && c.scheduledAt && (
                       <span className="text-amber-600 dark:text-amber-400">
-                        {c.recurringFrequency ? `Â· Repeats ${c.recurringFrequency}. Next: ` : 'Â· Scheduled for '}
+                        {c.recurringFrequency ? `· Repeats ${c.recurringFrequency}. Next: ` : '· Scheduled for '}
                         {new Date(c.scheduledAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                       </span>
                     )}
                     {c.status === 'failed' && c.lastError && (
-                      <span className="text-red-500" title={c.lastError}>Â· Failed</span>
+                      <span className="text-red-500" title={c.lastError}>· Failed</span>
                     )}
                   </div>
                 </div>
@@ -380,7 +380,7 @@ const CampaignListView: React.FC<CampaignListViewProps> = ({
   );
 };
 
-// â”€â”€â”€ Email Editor View â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Email Editor View ───────────────────────────────────────────────────────
 
 type EditorPanel = 'config' | 'builder' | 'preview';
 
@@ -420,7 +420,7 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
       await firestore.updateChurch(churchId, { logoUrl });
       onLogoUploaded?.(logoUrl);
     } catch (e) {
-      console.error('[CommunicationModule] Logo upload failed:', e);
+      console.error('[ToolsView] Logo upload failed:', e);
       alert('Logo upload failed. Please try again.');
     } finally {
       setLogoUploading(false);
@@ -433,7 +433,7 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
       await firestore.updateChurch(churchId, { logoUrl: undefined });
       onLogoRemoved?.();
     } catch (e) {
-      console.error('[CommunicationModule] Logo remove failed:', e);
+      console.error('[ToolsView] Logo remove failed:', e);
     }
   }, [churchId, onLogoRemoved]);
 
@@ -477,12 +477,12 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
   const onSaveRef = React.useRef(onSave);
   React.useEffect(() => { onSaveRef.current = onSave; }, [onSave]);
 
-  // Auto-save on change â€” uses ref so setBlocks never captures stale onSave
+  // Auto-save on change — uses ref so setBlocks never captures stale onSave
   const update = useCallback((patch: Partial<EmailCampaign>) => {
     setLocalCampaign(prev => ({ ...prev, ...patch, updatedAt: Date.now() }));
     onSaveRef.current(patch);
     setLastSaved(Date.now());
-  }, []); // stable â€” never re-created
+  }, []); // stable — never re-created
 
   // Load PCO Lists when "To" section is opened on the Lists tab
   useEffect(() => {
@@ -547,7 +547,7 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
 
   return (
     <div className="flex flex-col h-full">
-      {/* â”€â”€â”€ Header Bar â”€â”€â”€ */}
+      {/* ─── Header Bar ─── */}
       <div className="flex items-center justify-between px-6 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shrink-0">
         <div className="flex items-center gap-3">
           <button
@@ -618,7 +618,7 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
             }`}
           >
             {isSending ? (
-              <><Loader2 size={14} className="animate-spin" /> Sendingâ€¦</>
+              <><Loader2 size={14} className="animate-spin" /> Sending…</>
             ) : isScheduled ? (
               <><Send size={14} /> Send Now Instead</>
             ) : (
@@ -628,7 +628,7 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
         </div>
       </div>
 
-      {/* â”€â”€â”€ Body â”€â”€â”€ */}
+      {/* ─── Body ─── */}
       <div className="flex flex-1 overflow-hidden">
 
         {/* Config Panel */}
@@ -667,7 +667,7 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
                     </p>
                     {loadingLists ? (
                       <div className="flex items-center gap-2 text-sm text-slate-400">
-                        <Loader2 size={14} className="animate-spin" /> Loading PCO Listsâ€¦
+                        <Loader2 size={14} className="animate-spin" /> Loading PCO Lists…
                       </div>
                     ) : (
                       <select
@@ -683,7 +683,7 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
                           });
                         }}
                       >
-                        <option value="">â€” Select a PCO List â€”</option>
+                        <option value="">— Select a PCO List —</option>
                         {pcoLists.length === 0 && <option disabled>No lists found (connect PCO first)</option>}
                         {pcoLists.map(l => (
                           <option key={l.id} value={l.id}>{l.name} ({l.totalPeople} people)</option>
@@ -700,7 +700,7 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
                     </p>
                     {loadingGroups ? (
                       <div className="flex items-center gap-2 text-sm text-slate-400">
-                        <Loader2 size={14} className="animate-spin" /> Loading PCO Groupsâ€¦
+                        <Loader2 size={14} className="animate-spin" /> Loading PCO Groups…
                       </div>
                     ) : (
                       <select
@@ -716,7 +716,7 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
                           });
                         }}
                       >
-                        <option value="">â€” Select a PCO Group â€”</option>
+                        <option value="">— Select a PCO Group —</option>
                         {pcoGroups.length === 0 && <option disabled>No groups found (connect PCO first)</option>}
                         {pcoGroups.map(g => (
                           <option key={g.id} value={g.id}>{g.name}{g.memberCount > 0 ? ` (${g.memberCount} members)` : ''}</option>
@@ -810,7 +810,7 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
                 <input
                   type="text"
                   className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder="Enter email subjectâ€¦"
+                  placeholder="Enter email subject…"
                   value={localCampaign.subject || ''}
                   onChange={e => update({ subject: e.target.value })}
                 />
@@ -949,7 +949,7 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
         )}
       </div>
 
-      {/* â”€â”€â”€ Drawers â”€â”€â”€ */}
+      {/* ─── Drawers ─── */}
       <Drawer isOpen={isSettingsDrawerOpen} onClose={() => setIsSettingsDrawerOpen(false)} title="Template Settings">
         <TemplateSettingsEditor
           settings={settings}
@@ -992,7 +992,7 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
   );
 };
 
-// â”€â”€â”€ Main Module â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Main Module ─────────────────────────────────────────────────────────────
 
 interface NewCampaignModalProps {
   onConfirm: (name: string) => void;
@@ -1018,7 +1018,7 @@ const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
         <input
           type="text"
           className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4"
-          placeholder="e.g. Weekly Update, Easter Inviteâ€¦"
+          placeholder="e.g. Weekly Update, Easter Invite…"
           value={name}
           onChange={e => setName(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && name.trim()) onConfirm(name.trim()); }}
@@ -1041,7 +1041,7 @@ const NewCampaignModal: React.FC<NewCampaignModalProps> = ({
   );
 };
 
-// â”€â”€â”€ Send Test Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Send Test Modal ────────────────────────────────────────────────────────
 
 interface SendTestModalProps {
   onConfirm: (email: string) => void;
@@ -1074,7 +1074,7 @@ const SendTestModal: React.FC<SendTestModalProps> = ({ onConfirm, onCancel, isSe
             disabled={!email.trim() || isSending}
             className="flex-1 py-2 text-sm text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 disabled:text-slate-400 rounded-xl transition font-semibold flex items-center justify-center gap-2"
           >
-            {isSending ? <><Loader2 size={14} className="animate-spin" /> Sendingâ€¦</> : 'Send Test'}
+            {isSending ? <><Loader2 size={14} className="animate-spin" /> Sending…</> : 'Send Test'}
           </button>
         </div>
       </div>
@@ -1099,7 +1099,7 @@ onUpdateChurch }) => {
   const [isScheduling, setIsScheduling] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
-  // â”€â”€ Unsubscribers state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Unsubscribers state ──────────────────────────────────────────────────────
   const [unsubscribers, setUnsubscribers] = useState<EmailUnsubscribe[]>([]);
   const [unsubLoading, setUnsubLoading] = useState(false);
   const [unsubSearch, setUnsubSearch] = useState('');
@@ -1154,7 +1154,7 @@ onUpdateChurch }) => {
       setCampaigns(prev => [c, ...prev]);
       setActiveCampaign(c);
     } catch (e: any) {
-      console.error('[CommunicationModule] Failed to create campaign:', e);
+      console.error('[ToolsView] Failed to create campaign:', e);
       showToast(`Failed to create campaign: ${e?.message || 'Unknown error'}`, 'error');
     }
   };
@@ -1190,7 +1190,7 @@ onUpdateChurch }) => {
       setCampaigns(prev => [newCampaign, ...prev]);
       showToast('Email duplicated successfully!', 'success');
     } catch (e: any) {
-      console.error('[CommunicationModule] Failed to duplicate campaign:', e);
+      console.error('[ToolsView] Failed to duplicate campaign:', e);
       showToast(`Failed to duplicate campaign: ${e?.message || 'Unknown error'}`, 'error');
     }
   };
@@ -1215,9 +1215,9 @@ onUpdateChurch }) => {
         showToast('Auto-save failed. Please check your connection.', 'error');
       }
     });
-  }, []); // stable â€” reads latest via ref
+  }, []); // stable — reads latest via ref
 
-  /** Call backend /email/send. testEmail = undefined â†’ real send, string â†’ test send */
+  /** Call backend /email/send. testEmail = undefined → real send, string → test send */
   const callSendApi = async (campaignId: string, testEmail?: string) => {
     const sysSettings = await firestore.getSystemSettings();
     const apiBaseUrl = sysSettings.apiBaseUrl || 'https://pastoralcare.barnabassoftware.com';
@@ -1309,7 +1309,7 @@ onUpdateChurch }) => {
 
   return (
     <div className="flex flex-col h-full relative">
-      {/* â”€â”€â”€ Tab Switcher â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ─── Tab Switcher ─────────────────────────────────────────────── */}
       <div className="shrink-0 flex items-center gap-1 px-5 pt-4 pb-0 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 overflow-x-auto no-scrollbar">
         <button
           onClick={() => setActiveTab('website')}
@@ -1365,7 +1365,7 @@ onUpdateChurch }) => {
         </div>
       )}
 
-      {/* â”€â”€â”€ Unsubscribers Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ─── Unsubscribers Tab ─────────────────────────────────────────── */}
       {activeTab === 'unsubscribers' && (
         <div className="flex-1 overflow-y-auto p-6 max-w-4xl mx-auto w-full">
           <div className="flex items-center justify-between mb-5">
@@ -1390,7 +1390,7 @@ onUpdateChurch }) => {
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search by emailâ€¦"
+                placeholder="Search by email…"
                 value={unsubSearch}
                 onChange={e => setUnsubSearch(e.target.value)}
                 className="w-full pl-8 pr-3 py-2 text-sm border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-400"
@@ -1401,7 +1401,7 @@ onUpdateChurch }) => {
           {/* Table */}
           {unsubLoading ? (
             <div className="flex items-center justify-center h-40 text-slate-400">
-              <Loader2 size={22} className="animate-spin mr-2" /> Loadingâ€¦
+              <Loader2 size={22} className="animate-spin mr-2" /> Loading…
             </div>
           ) : filteredUnsubs.length === 0 ? (
             <div className="text-center py-20 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
@@ -1433,10 +1433,10 @@ onUpdateChurch }) => {
                       <td className="px-4 py-3 text-slate-500 dark:text-slate-400">
                         {u.unsubscribedAt
                           ? new Date(u.unsubscribedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                          : 'â€”'}
+                          : '—'}
                       </td>
                       <td className="px-4 py-3 text-slate-500 dark:text-slate-400 text-xs">
-                        {u.campaignName || <span className="text-slate-300 dark:text-slate-600">â€”</span>}
+                        {u.campaignName || <span className="text-slate-300 dark:text-slate-600">—</span>}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <button
@@ -1456,14 +1456,14 @@ onUpdateChurch }) => {
         </div>
       )}
 
-      {/* â”€â”€â”€ Polls Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ─── Polls Tab ────────────────────────────────────────────────── */}
       {activeTab === 'polls' && (
         <div className="flex-1 overflow-y-auto">
           <PollsManager churchId={churchId} currentUserId={currentUserId || ''} />
         </div>
       )}
 
-      {/* â”€â”€â”€ Emails Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ─── Emails Tab ───────────────────────────────────────────────── */}
       {activeTab === 'emails' && (
         <>
       {!activeCampaign && church?.emailSettings && (
@@ -1477,9 +1477,9 @@ onUpdateChurch }) => {
           <Mail size={13} className="shrink-0" />
           <span>
             {church.emailSettings.mode === 'custom' && church.emailSettings.domainVerified
-              ? `Sending from ${church.emailSettings.fromEmail} (custom domain âœ“ verified)`
+              ? `Sending from ${church.emailSettings.fromEmail} (custom domain ✓ verified)`
               : church.emailSettings.mode === 'custom'
-              ? `Custom domain pending DNS verification â€” currently using ${church.emailSettings.fromEmail}`
+              ? `Custom domain pending DNS verification — currently using ${church.emailSettings.fromEmail}`
               : `Sending via ${church.emailSettings.fromEmail || 'shared subdomain'}`
             }
           </span>
@@ -1490,7 +1490,7 @@ onUpdateChurch }) => {
           <div className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400">
             <Mail size={13} className="shrink-0" />
             <span className="font-semibold">Email not configured.</span>
-            <span>Go to Settings &amp; Administration â†’ Mail Settings to set up your From address before sending.</span>
+            <span>Go to Settings &amp; Administration → Mail Settings to set up your From address before sending.</span>
           </div>
         </div>
       )}
@@ -1538,7 +1538,7 @@ onUpdateChurch }) => {
             <Clock size={13} />
             <span className="font-semibold">Scheduled:</span>
             {new Date(activeCampaign.scheduledAt).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
-            {activeCampaign.retryCount ? <span className="ml-2 text-red-500">Â· Retry {activeCampaign.retryCount}/5{activeCampaign.lastError ? ` (${activeCampaign.lastError})` : ''}</span> : null}
+            {activeCampaign.retryCount ? <span className="ml-2 text-red-500">· Retry {activeCampaign.retryCount}/5{activeCampaign.lastError ? ` (${activeCampaign.lastError})` : ''}</span> : null}
           </div>
           <button
             onClick={handleCancelSchedule}

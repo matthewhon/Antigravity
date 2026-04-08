@@ -44,7 +44,8 @@ function GroupsWidget({ churchId, layout, color }: any) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${apiBaseUrl}/api/public/groups/${churchId}`)
+    const queryStr = window.location.search.includes('refresh=true') ? '?refresh=true' : '';
+    fetch(`${apiBaseUrl}/api/public/groups/${churchId}${queryStr}`)
       .then(r => r.json())
       .then(data => {
         setGroups(data);
@@ -85,7 +86,8 @@ function RegistrationsWidget({ churchId, layout, color }: any) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${apiBaseUrl}/api/public/registrations/${churchId}`)
+    const queryStr = window.location.search.includes('refresh=true') ? '?refresh=true' : '';
+    fetch(`${apiBaseUrl}/api/public/registrations/${churchId}${queryStr}`)
       .then(r => r.json())
       .then(data => {
         setEvents(data);
@@ -125,7 +127,8 @@ function EventsWidget({ churchId, layout, color }: any) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${apiBaseUrl}/api/public/events/${churchId}`)
+    const queryStr = window.location.search.includes('refresh=true') ? '?refresh=true' : '';
+    fetch(`${apiBaseUrl}/api/public/events/${churchId}${queryStr}`)
       .then(r => r.json())
       .then(data => {
         setEvents(data);
