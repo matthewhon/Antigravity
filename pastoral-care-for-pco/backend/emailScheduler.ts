@@ -8,7 +8,7 @@ import { createServerLogger } from '../services/logService';
  * re-fetch the data using the same configuration (widgetId + config) that the
  * user set at insert time and replace the stored `data` payload with fresh numbers.
  */
-async function refreshAnalyticsBlocks(
+export async function refreshCampaignBlocks(
     db: any,
     churchId: string,
     blocks: any[]
@@ -17,29 +17,79 @@ async function refreshAnalyticsBlocks(
 
     const updated = await Promise.all(
         blocks.map(async (block: any) => {
-            if (block.type !== 'analytics_block') return block;
+            if (block.type === 'analytics_block' || block.type === 'data_chart') {
+                const widgetId: string = block.content?.widgetId;
+                const config: any   = block.content?.config || {};  // fundName, dayRange, etc.
 
-            const widgetId: string = block.content?.widgetId;
-            const config: any   = block.content?.config || {};  // fundName, dayRange, etc.
+                if (!widgetId) return block;
 
-            if (!widgetId) return block;
-
-            try {
-                const freshData = await fetchWidgetData(db, churchId, widgetId, config);
-                refreshed++;
-                return {
-                    ...block,
-                    content: {
-                        ...block.content,
-                        data: freshData,
-                        refreshedAt: Date.now(),
-                    },
-                };
-            } catch (e: any) {
-                // Non-fatal: keep old data, log the failure
-                console.warn(`[Scheduler] Failed to refresh widget "${widgetId}" for church ${churchId}:`, e?.message);
-                return block;
+                try {
+                    const freshData = await fetchWidgetData(db, churchId, widgetId, config);
+                    refreshed++;
+                    return {
+                        ...block,
+                        content: {
+                            ...block.content,
+                            data: freshData,
+                            refreshedAt: Date.now(),
+                        },
+                    };
+                } catch (e: any) {
+                    // Non-fatal: keep old data, log the failure
+                    console.warn(`[Scheduler] Failed to refresh chart widget "${widgetId}" for church ${churchId}:`, e?.message);
+                    return block;
+                }
             }
+
+            if (block.type === 'pastoral_care_chart') {
+                const area = block.content?.area; // 'Visits' or 'Prayer Requests'
+                try {
+                    const now = Date.now();
+                    const thirtyDaysAgo = now - (30 * 24 * 60 * 60 * 1000);
+                    let data: any = {};
+                    
+                    if (area === 'Visits') {
+                        const snap = await db.collection('pastoral_notes')
+                            .where('churchId', '==', churchId)
+                            .get();
+                        const notes: any[] = snap.docs.map((d: any) => d.data());
+                        const recent = notes.filter(n => new Date(n.date || n.createdAt).getTime() >= thirtyDaysAgo);
+                        data = { 
+                            recentCount: recent.length, 
+                            totalCount: notes.length,
+                            period: 'Last 30 Days'
+                        };
+                    } else if (area === 'Prayer Requests') {
+                        const snap = await db.collection('prayer_requests')
+                            .where('churchId', '==', churchId)
+                            .get();
+                        const reqs: any[] = snap.docs.map((d: any) => d.data());
+                        const recent = reqs.filter(r => new Date(r.date || r.createdAt).getTime() >= thirtyDaysAgo);
+                        const answered = reqs.filter(r => r.status === 'Answered').length;
+                        data = { 
+                            recentCount: recent.length, 
+                            answeredCount: answered,
+                            totalCount: reqs.length,
+                            period: 'Last 30 Days'
+                        };
+                    }
+                    
+                    refreshed++;
+                    return {
+                        ...block,
+                        content: {
+                            ...block.content,
+                            data,
+                            refreshedAt: Date.now()
+                        }
+                    };
+                } catch (e: any) {
+                    console.warn(`[Scheduler] Failed to refresh pastoral care chart for church ${churchId}:`, e?.message);
+                    return block;
+                }
+            }
+
+            return block;
         })
     );
 
@@ -481,12 +531,16 @@ export function startEmailScheduler(db: any): void {
                 try {
                     // 1. Refresh analytics blocks with live data
                     const blocks: any[] = campaign.blocks || [];
-                    const hasAnalytics = blocks.some((b: any) => b.type === 'analytics_block');
+                    const hasRefreshable = blocks.some((b: any) => 
+                        b.type === 'analytics_block' || 
+                        b.type === 'data_chart' || 
+                        b.type === 'pastoral_care_chart'
+                    );
 
                     let finalBlocks = blocks;
-                    if (hasAnalytics) {
-                        log.info(`[Scheduler] Refreshing analytics blocks for campaign ${campaignId}`, 'system', { campaignId }, churchId);
-                        const { blocks: refreshed, refreshed: count } = await refreshAnalyticsBlocks(db, churchId, blocks);
+                    if (hasRefreshable) {
+                        log.info(`[Scheduler] Refreshing dynamic blocks for campaign ${campaignId}`, 'system', { campaignId }, churchId);
+                        const { blocks: refreshed, refreshed: count } = await refreshCampaignBlocks(db, churchId, blocks);
                         finalBlocks = refreshed;
 
                         // Persist refreshed blocks back to Firestore before sending
@@ -496,7 +550,7 @@ export function startEmailScheduler(db: any): void {
                             updatedAt: Date.now(),
                         });
 
-                        log.info(`[Scheduler] Refreshed ${count} analytics block(s) for campaign ${campaignId}`, 'system', { campaignId }, churchId);
+                        log.info(`[Scheduler] Refreshed ${count} dynamic block(s) for campaign ${campaignId}`, 'system', { campaignId }, churchId);
                     }
 
                     // 2. Execute send (skip status update if recurring)

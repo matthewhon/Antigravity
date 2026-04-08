@@ -1,5 +1,6 @@
 import { getDb } from './firebase';
 import { createServerLogger } from '../services/logService';
+import { refreshCampaignBlocks } from './emailScheduler';
 
 // ─── SendGrid v3 raw send helper ─────────────────────────────────────────────
 // We use fetch() directly instead of @sendgrid/mail so we can set the
@@ -177,11 +178,40 @@ function renderBlocksToHtml(blocks: any[], templateSettings: any, unsubscribeHtm
                 </div>`;
             }
             // Analytics widgets — rendered as an embedded card
-            case 'analytics_block': {
+            case 'analytics_block':
+            case 'data_chart': {
                 const label = block.content?.label || '';
                 const widgetId = block.content?.widgetId || '';
                 // Render a simplified non-interactive version for email
                 return renderAnalyticsBlockHtml(widgetId, label, block.content?.data, primaryColor, fontFamily, textColor);
+            }
+            case 'pastoral_care_chart': {
+                const area = block.content?.area || 'Pastoral Care';
+                const data = block.content?.data || {};
+                const period = data.period || 'Last 30 Days';
+                const count1Text = area === 'Visits' ? 'Recent Visits' : 'Recent Requests';
+                const count2Text = area === 'Visits' ? 'Active / Total' : 'Answered';
+                const val1 = data.recentCount || 0;
+                const val2 = area === 'Visits' ? (data.totalCount || 0) : (data.answeredCount || 0);
+                
+                return `<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:16px;">
+                  <div style="background:linear-gradient(135deg,#4f46e5,#6366f1);padding:12px 16px;display:flex;justify-content:space-between;align-items:center;">
+                    <div style="font-size:11px;font-weight:800;color:#e0e7ff;text-transform:uppercase;letter-spacing:1px;font-family:${fontFamily};">Pastoral Care: ${area}</div>
+                    <div style="font-size:10px;color:#c7d2fe;font-family:${fontFamily};">${period}</div>
+                  </div>
+                  <table width="100%" cellpadding="0" cellspacing="0" style="background:#fff;">
+                    <tr>
+                      <td style="padding:16px;width:50%;">
+                        <div style="font-size:9px;color:#94a3b8;text-transform:uppercase;font-weight:700;font-family:${fontFamily};">${count1Text}</div>
+                        <div style="font-size:24px;font-weight:900;color:#1e293b;font-family:${fontFamily};margin-top:2px;">${val1}</div>
+                      </td>
+                      <td style="padding:16px;width:50%;">
+                        <div style="font-size:9px;color:#94a3b8;text-transform:uppercase;font-weight:700;font-family:${fontFamily};">${count2Text}</div>
+                        <div style="font-size:24px;font-weight:900;color:#1e293b;font-family:${fontFamily};margin-top:2px;">${val2}</div>
+                      </td>
+                    </tr>
+                  </table>
+                </div>`;
             }
             // PCO content cards
             case 'pco_registration':
@@ -537,6 +567,28 @@ export async function executeSend(
     const campaignSnap = await db.collection('email_campaigns').doc(campaignId).get();
     if (!campaignSnap.exists) throw new Error('Campaign not found');
     const campaign = campaignSnap.data() as any;
+
+    let blocks = campaign.blocks || [];
+    const hasRefreshable = blocks.some((b: any) => 
+        b.type === 'analytics_block' || 
+        b.type === 'data_chart' || 
+        b.type === 'pastoral_care_chart'
+    );
+
+    // Only refresh if NOT called by the scheduler (which already refreshed them)
+    if (hasRefreshable && !skipStatusUpdate) {
+        log.info(`[SendEmail] Refreshing dynamic blocks for campaign ${campaignId} prior to dispatch.`, 'system', { campaignId }, churchId);
+        const refreshedResult = await refreshCampaignBlocks(db, churchId, blocks);
+        blocks = refreshedResult.blocks;
+        campaign.blocks = blocks;
+
+        if (!testEmail) {
+            await db.collection('email_campaigns').doc(campaignId).update({
+                blocks: blocks,
+                analyticsRefreshedAt: Date.now()
+            });
+        }
+    }
 
     const fromEmail = tenantFromEmail || campaign.fromEmail || globalFromEmail;
     const fromName  = tenantFromName  || campaign.fromName  || globalFromName;
