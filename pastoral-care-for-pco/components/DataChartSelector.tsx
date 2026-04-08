@@ -22,7 +22,8 @@ export type AnalyticsWidgetId =
   | 'services_upcoming_events'
   | 'church_progress'
   | 'upcoming_registrations'
-  | 'group_attendance';
+  | 'group_attendance'
+  | 'events';
 
 // Config required before inserting a widget (null = no config needed)
 export interface WidgetConfigDef {
@@ -170,6 +171,14 @@ const WIDGET_DEFS: WidgetDef[] = [
     description: 'Aggregated group attendance for a selected time period — members vs. visitors',
     module: 'Services',
     icon: <BarChart2 size={14} />,
+    configDef: { timePeriodPicker: true },
+  },
+  {
+    id: 'events',
+    label: 'Events Check-Ins',
+    description: 'Events headcount and check-in summary',
+    module: 'Services',
+    icon: <Calendar size={14} />,
     configDef: { timePeriodPicker: true },
   },
 ];
@@ -500,6 +509,79 @@ async function fetchWidgetSnapshot(
       const periodVisitors = rows2.reduce((s, r) => s + r.visitors, 0);
 
       return { period, rows: rows2, periodTotal, periodMembers, periodVisitors };
+    }
+    case 'events': {
+      const period = config.timePeriod || 'This Month';
+      const now2 = new Date();
+      let start2 = new Date();
+      let end2 = new Date();
+      start2.setHours(0, 0, 0, 0);
+      end2.setHours(23, 59, 59, 999);
+
+      if (period === 'This Week') {
+        const day2 = start2.getDay();
+        start2.setDate(start2.getDate() - day2);
+      } else if (period === 'Last Week') {
+        start2.setDate(start2.getDate() - start2.getDay() - 7);
+        end2 = new Date(start2);
+        end2.setDate(start2.getDate() + 6);
+        end2.setHours(23, 59, 59, 999);
+      } else if (period === 'This Month') {
+        start2.setDate(1);
+      } else if (period === 'Last Month') {
+        start2.setDate(1);
+        start2.setMonth(start2.getMonth() - 1);
+        end2 = new Date(start2);
+        end2.setMonth(end2.getMonth() + 1);
+        end2.setDate(0);
+        end2.setHours(23, 59, 59, 999);
+      } else if (period === 'Last Quarter') {
+        start2.setDate(start2.getDate() - 90);
+      }
+
+      const toLocalDateStr = (d: Date) => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      };
+
+      const attendance = await firestore.getAttendance(churchId);
+      const startStr = toLocalDateStr(start2);
+      const endStr   = toLocalDateStr(end2);
+
+      const checkInTrends = attendance
+        .filter(a => a.date >= startStr && a.date <= endStr)
+        .map(a => ({
+          date: a.date,
+          isoDate: a.date,
+          guests: a.guests || 0,
+          regulars: a.regulars || 0,
+          volunteers: a.volunteers || 0,
+          headcount: a.headcount || 0,
+          total: a.count,
+          events: (a as any).events || []
+        }));
+
+      const eventsData: any[] = [];
+      checkInTrends.forEach(trend => {
+        if (trend.events && Array.isArray(trend.events)) {
+          eventsData.push(...trend.events);
+        } else {
+          eventsData.push({
+            name: `Daily Total`,
+            startsAt: trend.date,
+            guests: trend.guests,
+            regulars: trend.regulars,
+            volunteers: trend.volunteers,
+            headcount: trend.headcount,
+            total: trend.total
+          });
+        }
+      });
+      eventsData.sort((a,b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
+
+      return { period, events: eventsData.slice(0, 10) };
     }
     case 'upcoming_registrations': {
       const regs = await firestore.getRegistrations(churchId);
@@ -1227,6 +1309,46 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
                 );
               })}
             </div>
+          </div>
+        </div>
+      );
+    }
+
+    case 'events': {
+      const events: { name: string; startsAt: string; guests?: number; regulars?: number; volunteers?: number; headcount?: number; total: number }[] = data.events || [];
+      return (
+        <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+          <div className="bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2.5 flex items-center justify-between">
+            <p className="text-[11px] font-bold text-violet-100 uppercase tracking-widest">Events</p>
+            <span className="text-[10px] font-bold text-violet-200">{data.period || 'This Month'}</span>
+          </div>
+          <div className="bg-white dark:bg-slate-800 px-4 py-2">
+            {events.length === 0 && <p className="text-xs text-slate-400 py-2 text-center">No event check-ins for this period</p>}
+            {events.map((e, i) => {
+              const displayDate = new Date(e.startsAt);
+              const dateStr = displayDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+              const timeStr = (!e.startsAt.includes('T') && e.name === 'Daily Total') ? '' : displayDate.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+              const checkinsCount = (e.guests || 0) + (e.regulars || 0) + (e.volunteers || 0);
+
+              return (
+                <div key={i} className="py-2 border-b border-slate-50 dark:border-slate-700/50 last:border-0">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{e.name}</p>
+                      <p className="text-[10px] text-indigo-500 dark:text-indigo-400 mt-0.5">{dateStr}{timeStr ? ` • ${timeStr}` : ''}</p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="text-xs font-black text-emerald-600 dark:text-emerald-400">
+                        {fmt(e.total)} Total
+                      </p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase">
+                        {checkinsCount} In • {e.headcount || 0} HC
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       );
