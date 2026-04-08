@@ -18,6 +18,7 @@ import { startSyncScheduler } from './backend/syncScheduler';
 import { getDb } from './backend/firebase';
 import { handleGeminiProxy } from './backend/geminiProxy';
 import { provisionSubuser, authenticateDomain, verifyDomain, diagnoseDomain } from './backend/emailProvisioning';
+import { getPublicGroups, getPublicRegistrations, getPublicEvents, serveWidgetScript } from './backend/publicApi.js';
 
 // Fix for bundled CJS environment
 const __dirname = process.cwd();
@@ -141,6 +142,12 @@ async function startServer() {
     app.post('/email/authenticate-domain', express.json(), authenticateDomain);
     app.post('/email/verify-domain', express.json(), verifyDomain);
     app.post('/email/diagnose-domain', express.json(), diagnoseDomain);
+
+    // ─── Public Widget Sync Endpoints ───────────────────────────────
+    app.get('/api/public/groups/:churchId', getPublicGroups);
+    app.get('/api/public/registrations/:churchId', getPublicRegistrations);
+    app.get('/api/public/events/:churchId', getPublicEvents);
+    app.get('/widget.js', serveWidgetScript);
 
     // ─── Public Unsubscribe (no auth required) ───────────────────────────────
     // Token = base64url(churchId:email)

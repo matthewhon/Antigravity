@@ -146,6 +146,15 @@ const Layout: React.FC<LayoutProps> = ({
                   />
                 )}
 
+                {hasPermission('tools') && (
+                  <NavItem 
+                    icon="🧰" 
+                    label="Tools" 
+                    active={currentView === 'tools'} 
+                    onClick={() => onNavigate('tools')} 
+                  />
+                )}
+
                 {canSeeLibrary && (
                     <NavItem 
                         icon="📚" 

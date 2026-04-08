@@ -17,11 +17,11 @@ import RoleAdminView from './components/RoleAdminView';
 import { SystemSettingsView } from './components/SystemSettingsView';
 import { GlobalAdminManager } from './components/GlobalAdminManager';
 import { PastorAIView } from './components/PastorAIView';
-import { CommunicationModule } from './components/CommunicationModule';
 import { MetricsView } from './components/MetricsView';
 import LibraryView from './components/LibraryView';
 import WelcomeLayoutModal from './components/WelcomeLayoutModal';
 import { PublicPollView } from './components/PublicPollView';
+import { ToolsView } from './components/ToolsView';
 import { 
   User, Church, PeopleDashboardData, GivingAnalytics, GroupsDashboardData, 
   ServicesDashboardData, AttendanceData, CensusStats, BudgetRecord, PcoFund, 
@@ -360,6 +360,8 @@ const App: React.FC = () => {
           'metrics': 'Metrics'
       };
       
+      if (v === 'tools') return true; // Let the view itself handle specific tab permissions if needed, or allow all church users
+
       const requiredRole = roleMap[v];
       return requiredRole ? user.roles.includes(requiredRole as any) : false;
   };
@@ -890,7 +892,6 @@ const App: React.FC = () => {
                 churchName={church.name}
             />
         )}
-        {view === 'communication' && systemSettings?.enabledModules?.communication !== false && <CommunicationModule churchId={church.id} church={church} currentUserId={user.id} onUpdateChurch={(updates) => { firestore.updateChurch(church.id, updates); setChurch({ ...church, ...updates }); }} />}
         {view === 'people' && (
             <PeopleView 
                 data={peopleDashboardData}
@@ -1095,6 +1096,7 @@ const App: React.FC = () => {
                 <LibraryView churchId={church.id} />
             </div>
         )}
+        {view === 'tools' && <ToolsView churchId={church.id} church={church} currentUserId={user.id} onUpdateChurch={(updates) => { firestore.updateChurch(church.id, updates); setChurch({ ...church, ...updates }); }} />}
     </Layout>
     </>
   );

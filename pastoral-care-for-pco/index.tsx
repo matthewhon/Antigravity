@@ -43,10 +43,23 @@ if (!rootElement) {
 }
 
 const root = ReactDOM.createRoot(rootElement);
-root.render(
-  <React.StrictMode>
-    <ErrorBoundary>
-      <App />
-    </ErrorBoundary>
-  </React.StrictMode>
-);
+
+if (window.location.search.includes('widget=true')) {
+  import('./components/widgets/WidgetApp').then(({ default: WidgetApp }) => {
+    root.render(
+      <React.StrictMode>
+        <ErrorBoundary>
+          <WidgetApp />
+        </ErrorBoundary>
+      </React.StrictMode>
+    );
+  });
+} else {
+  root.render(
+    <React.StrictMode>
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
+    </React.StrictMode>
+  );
+}
