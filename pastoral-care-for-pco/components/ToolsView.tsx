@@ -1082,7 +1082,9 @@ const SendTestModal: React.FC<SendTestModalProps> = ({ onConfirm, onCancel, isSe
   );
 };
 
-export const CommunicationModule: React.FC<{ churchId: string; church?: Church; currentUserId?: string; onUpdateChurch?: (updates: Partial<Church>) => void }> = ({ churchId, church, currentUserId, onUpdateChurch }) => {
+export const ToolsView: React.FC<{ churchId: string; church?: Church; 
+currentUserId?: string; onUpdateChurch?: (updates: Partial<Church>) => void }> = ({ churchId, church, currentUserId, 
+onUpdateChurch }) => {
   const [activeTab, setActiveTab] = useState<'emails' | 'polls' | 'unsubscribers'>('emails');
   const [campaigns, setCampaigns] = useState<EmailCampaign[]>([]);
   const [activeCampaign, setActiveCampaign] = useState<EmailCampaign | null>(null);
