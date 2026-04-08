@@ -477,6 +477,81 @@ async function fetchWidgetData(
             };
         }
 
+        case 'events': {
+            const period = config.timePeriod || 'This Month';
+            const now2 = new Date();
+            let start2 = new Date();
+            let end2 = new Date();
+            start2.setHours(0, 0, 0, 0);
+            end2.setHours(23, 59, 59, 999);
+
+            if (period === 'This Week') {
+                const day2 = start2.getDay();
+                start2.setDate(start2.getDate() - day2);
+            } else if (period === 'Last Week') {
+                start2.setDate(start2.getDate() - start2.getDay() - 7);
+                end2 = new Date(start2);
+                end2.setDate(start2.getDate() + 6);
+                end2.setHours(23, 59, 59, 999);
+            } else if (period === 'This Month') {
+                start2.setDate(1);
+            } else if (period === 'Last Month') {
+                start2.setDate(1);
+                start2.setMonth(start2.getMonth() - 1);
+                end2 = new Date(start2);
+                end2.setMonth(end2.getMonth() + 1);
+                end2.setDate(0);
+                end2.setHours(23, 59, 59, 999);
+            } else if (period === 'Last Quarter') {
+                start2.setDate(start2.getDate() - 90);
+            }
+
+            const toLocalDateStr = (d: Date) => {
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${y}-${m}-${day}`;
+            };
+
+            const attendanceSnap = await db.collection('attendance').where('churchId', '==', churchId).get();
+            const attendance: any[] = attendanceSnap.docs.map((d: any) => d.data());
+            const startStr = toLocalDateStr(start2);
+            const endStr   = toLocalDateStr(end2);
+
+            const checkInTrends = attendance
+                .filter(a => a.date >= startStr && a.date <= endStr)
+                .map(a => ({
+                    date: a.date,
+                    isoDate: a.date,
+                    guests: a.guests || 0,
+                    regulars: a.regulars || 0,
+                    volunteers: a.volunteers || 0,
+                    headcount: a.headcount || 0,
+                    total: a.count,
+                    events: a.events || []
+                }));
+
+            const eventsData: any[] = [];
+            checkInTrends.forEach(trend => {
+                if (trend.events && Array.isArray(trend.events)) {
+                    eventsData.push(...trend.events);
+                } else {
+                    eventsData.push({
+                        name: `Daily Total`,
+                        startsAt: trend.date,
+                        guests: trend.guests,
+                        regulars: trend.regulars,
+                        volunteers: trend.volunteers,
+                        headcount: trend.headcount,
+                        total: trend.total
+                    });
+                }
+            });
+            eventsData.sort((a,b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
+
+            return { period, events: eventsData.slice(0, 10) };
+        }
+
         default:
             return {};
     }
