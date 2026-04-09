@@ -68,7 +68,8 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
       + (layout === 'grid' ? `&gridCols=${gridCols}` : '')
       + (type === 'groups' && groupType ? `&groupType=${encodeURIComponent(groupType)}` : '')
       + (type === 'groups' ? `&showTags=${showTags}` : '')
-      + (type === 'registrations' ? `&dateFilter=${dateFilter}&tagFilter=${encodeURIComponent(tagFilter)}&imageRatio=${imageRatio}` : '');
+      + (type === 'registrations' ? `&dateFilter=${dateFilter}&tagFilter=${encodeURIComponent(tagFilter)}` : '')
+      + `&imageRatio=${imageRatio}`;
 
   const iframeUrl = `${domain}/?widget=true&${commonParams}`;
   const scriptUrl = `${domain}/widget.js?${commonParams}`;
@@ -182,7 +183,7 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
             </div>
           )}
 
-          {type === 'registrations' && ( layout === 'grid' || layout === 'list' ) && (
+          {(layout === 'grid' || layout === 'list') && (
             <div>
                <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Image Ratio</label>
                <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-xl">
@@ -291,7 +292,7 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
                             Script Embed
                         </h4>
                         <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Dynamically injects the iframe for cleaner markup.</p>
-                        <div className="bg-slate-900 p-3 rounded-lg overflow-x-auto text-[11px] text-slate-300 font-mono">
+                        <div className="bg-slate-900 p-3 rounded-lg break-all text-[11px] text-slate-300 font-mono">
                             {scriptEmbedCode}
                         </div>
                         <button 
@@ -308,7 +309,7 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
                             Iframe Embed
                         </h4>
                         <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">A standard iframe element. Works on restrictive CMSs.</p>
-                        <div className="bg-slate-900 p-3 rounded-lg overflow-x-auto text-[11px] text-slate-300 font-mono">
+                        <div className="bg-slate-900 p-3 rounded-lg break-all text-[11px] text-slate-300 font-mono">
                             {iframeEmbedCode}
                         </div>
                         <button 

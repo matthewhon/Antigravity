@@ -39,9 +39,9 @@ export default function WidgetApp() {
 
   return (
     <div className={`min-h-screen bg-transparent p-4 font-sans ${theme === 'dark' ? 'text-slate-200' : 'text-slate-800'}`}>
-      {type === 'groups' && <GroupsWidget churchId={churchId} layout={layout} color={color} gridCols={gridCols} groupType={groupType} showTags={showTags} />}
+      {type === 'groups' && <GroupsWidget churchId={churchId} layout={layout} color={color} gridCols={gridCols} groupType={groupType} showTags={showTags} imageRatio={imageRatio} />}
       {type === 'registrations' && <RegistrationsWidget churchId={churchId} layout={layout} color={color} gridCols={gridCols} dateFilter={dateFilter} tagFilter={tagFilter} imageRatio={imageRatio} />}
-      {(type === 'events' || type === 'calendar') && <EventsWidget churchId={churchId} layout={layout} color={color} gridCols={gridCols} />}
+      {(type === 'events' || type === 'calendar') && <EventsWidget churchId={churchId} layout={layout} color={color} gridCols={gridCols} imageRatio={imageRatio} />}
     </div>
   );
 }
@@ -55,7 +55,7 @@ function getGridClass(layout: string, gridCols: string) {
   }
 }
 
-function GroupsWidget({ churchId, layout, color, gridCols, groupType, showTags }: any) {
+function GroupsWidget({ churchId, layout, color, gridCols, groupType, showTags, imageRatio }: any) {
   const [groups, setGroups] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -75,12 +75,13 @@ function GroupsWidget({ churchId, layout, color, gridCols, groupType, showTags }
       });
   }, [churchId]);
 
-  if (loading) return <div className="text-center p-8 animate-pulse text-slate-400">Loading Groups...</div>;
-  if (error) return <div className="text-center p-8 text-rose-500 border-2 border-dashed border-rose-200 dark:border-rose-900/30 rounded-xl bg-rose-50 dark:bg-rose-900/10"><strong>Connection Error:</strong> {error}. <br/>Please ensure Planning Center is securely connected with the required permissions.</div>;
   const filteredGroups = useMemo(() => {
     if (!groupType) return groups;
     return groups.filter(g => g.groupTypeName?.toLowerCase().includes(groupType.toLowerCase()));
   }, [groups, groupType]);
+
+  if (loading) return <div className="text-center p-8 animate-pulse text-slate-400">Loading Groups...</div>;
+  if (error) return <div className="text-center p-8 text-rose-500 border-2 border-dashed border-rose-200 dark:border-rose-900/30 rounded-xl bg-rose-50 dark:bg-rose-900/10"><strong>Connection Error:</strong> {error}. <br/>Please ensure Planning Center is securely connected with the required permissions.</div>;
 
   if (!filteredGroups.length) return <div className="text-center p-8 text-slate-400 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl">No groups found matching your criteria.</div>;
 
@@ -88,7 +89,11 @@ function GroupsWidget({ churchId, layout, color, gridCols, groupType, showTags }
     <div className={`grid gap-4 ${getGridClass(layout, gridCols)}`}>
       {filteredGroups.map(g => (
         <div key={g.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition">
-          {g.headerImage && <img src={g.headerImage} alt={g.name} className="w-full h-48 object-contain object-center bg-slate-50 dark:bg-slate-950 border-b border-slate-100 dark:border-slate-800" />}
+          {g.headerImage && (
+             <div className={`w-full ${imageRatio === '1:1' ? 'aspect-square' : 'aspect-video'} bg-slate-50 dark:bg-slate-950 border-b border-slate-100 dark:border-slate-800`}>
+               <img src={g.headerImage} alt={g.name} className="w-full h-full object-cover" />
+             </div>
+          )}
           <div className="p-5">
             <h3 className="font-bold text-lg text-slate-900 dark:text-slate-100 mb-1">{g.name || 'Unnamed Group'}</h3>
             {showTags && g.groupTypeName && <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-slate-100 dark:bg-slate-800 text-slate-500 mb-3">{g.groupTypeName}</span>}
@@ -127,9 +132,6 @@ function RegistrationsWidget({ churchId, layout, color, gridCols, dateFilter, ta
       });
   }, [churchId]);
 
-  if (loading) return <div className="text-center p-8 animate-pulse text-slate-400">Loading Registrations...</div>;
-  if (error) return <div className="text-center p-8 text-rose-500 border-2 border-dashed border-rose-200 dark:border-rose-900/30 rounded-xl bg-rose-50 dark:bg-rose-900/10"><strong>Connection Error:</strong> {error}. <br/>Please ensure Planning Center is securely connected with the required permissions.</div>;
-
   const filteredEvents = useMemo(() => {
     let result = events;
 
@@ -160,6 +162,9 @@ function RegistrationsWidget({ churchId, layout, color, gridCols, dateFilter, ta
     }
     return result;
   }, [events, dateFilter, tagFilter]);
+
+  if (loading) return <div className="text-center p-8 animate-pulse text-slate-400">Loading Registrations...</div>;
+  if (error) return <div className="text-center p-8 text-rose-500 border-2 border-dashed border-rose-200 dark:border-rose-900/30 rounded-xl bg-rose-50 dark:bg-rose-900/10"><strong>Connection Error:</strong> {error}. <br/>Please ensure Planning Center is securely connected with the required permissions.</div>;
 
   if (!filteredEvents.length) return <div className="text-center p-8 text-slate-400 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl">No signups match your criteria.</div>;
 
@@ -262,7 +267,7 @@ function RegistrationsWidget({ churchId, layout, color, gridCols, dateFilter, ta
   );
 }
 
-function EventsWidget({ churchId, layout, color, gridCols }: any) {
+function EventsWidget({ churchId, layout, color, gridCols, imageRatio }: any) {
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -348,7 +353,11 @@ function EventsWidget({ churchId, layout, color, gridCols }: any) {
     <div className={`grid gap-4 ${getGridClass(layout, gridCols)}`}>
       {events.map(e => (
         <div key={e.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition flex flex-col">
-          {e.imageUrl && <img src={e.imageUrl} alt={e.name} className="w-full h-48 object-contain object-center bg-slate-50 dark:bg-slate-950 border-b border-slate-100 dark:border-slate-800" />}
+          {e.imageUrl && (
+             <div className={`w-full ${imageRatio === '1:1' ? 'aspect-square' : 'aspect-video'} bg-slate-50 dark:bg-slate-950 border-b border-slate-100 dark:border-slate-800`}>
+                <img src={e.imageUrl} alt={e.name} className="w-full h-full object-cover" />
+             </div>
+          )}
           <div className="p-5 flex-grow flex flex-col">
             <h3 className="font-bold text-lg text-slate-900 dark:text-slate-100 mb-1">{e.name || 'Unnamed Event'}</h3>
             <div className="text-sm text-slate-600 dark:text-slate-400 mb-3 flex flex-wrap items-center gap-2">
