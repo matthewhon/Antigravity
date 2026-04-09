@@ -339,13 +339,13 @@ function renderAnalyticsBlockHtml(
 
     switch (widgetId) {
         case 'giving_cumulative_ytd': {
-            const cumulative: { date: string; amount: number }[] = data.cumulative || [];
-            const maxVal = cumulative.length > 0 ? cumulative[cumulative.length - 1].amount : 1;
-            const bars = cumulative.map(pt => {
-                const h = Math.max(2, Math.round((pt.amount / maxVal) * 56));
+            const months: { label: string; actual: number | null; budget: number; isPast: boolean }[] = data.months || [];
+            const maxVal = months.length > 0 ? Math.max(...months.map(m => Math.max(m.actual || 0, m.budget))) : 1;
+            const bars = months.map(pt => {
+                const actualH = pt.actual !== null ? Math.max(2, Math.round((pt.actual / maxVal) * 56)) : 0;
                 return `<td valign="bottom" style="text-align:center;padding:0 1px;">
-                  <div style="background:#34d399;width:100%;height:${h}px;border-radius:2px 2px 0 0;"></div>
-                  <div style="font-size:7px;color:#94a3b8;">${pt.date.slice(5)}</div>
+                  <div style="background:#34d399;width:100%;height:${actualH}px;border-radius:2px 2px 0 0;${!pt.isPast ? 'opacity:0.4;' : ''}"></div>
+                  <div style="font-size:7px;color:#94a3b8;margin-top:2px;">${pt.label.charAt(0)}</div>
                 </td>`;
             }).join('');
             return `<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:16px;">
