@@ -130,15 +130,26 @@ export async function getPublicEvents(req: any, res: any) {
   }
 
   try {
-    const data = await fetchFromPco(churchId, 'https://api.planningcenteronline.com/calendar/v2/events?per_page=100&filter=future');
-    const events = (data.data || []).map((e: any) => ({
-      id: e.id,
-      name: e.attributes.name,
-      startsAt: e.attributes.starts_at || null,
-      location: e.attributes.location || null,
-      publicUrl: e.attributes.church_center_url || e.attributes.public_url || null,
-      imageUrl: e.attributes.image_url || null,
-    }));
+    const data = await fetchFromPco(churchId, 'https://api.planningcenteronline.com/calendar/v2/event_instances?include=event&filter=future&per_page=100');
+    
+    const includedEvents = data.included || [];
+
+    const events = (data.data || []).map((instance: any) => {
+      const eventId = instance.relationships?.event?.data?.id;
+      const parentEvent = includedEvents.find((inc: any) => inc.type === 'Event' && inc.id === eventId);
+      const eventDetails = parentEvent ? parentEvent.attributes : {};
+
+      return {
+        id: instance.id,
+        name: eventDetails.name || instance.attributes.title || 'Unnamed Event',
+        description: eventDetails.description || null,
+        startsAt: instance.attributes.starts_at || null,
+        endsAt: instance.attributes.ends_at || null,
+        location: instance.attributes.location || eventDetails.location || null,
+        publicUrl: eventDetails.church_center_url || eventDetails.public_url || null,
+        imageUrl: eventDetails.image_url || null,
+      };
+    });
     cache[cacheKey] = { data: events, timestamp: Date.now() };
     res.json(events);
   } catch (e: any) {
