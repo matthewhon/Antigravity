@@ -65,9 +65,9 @@ export default function WidgetApp() {
 
   return (
     <div className={`min-h-screen bg-transparent p-4 font-sans ${theme === 'dark' ? 'text-slate-200' : 'text-slate-800'}`}>
-      {type === 'groups' && <GroupsWidget churchId={churchId} layout={layout} color={color} gridCols={gridCols} groupType={groupType} showTags={showTags} imageRatio={imageRatio} />}
-      {type === 'registrations' && <RegistrationsWidget churchId={churchId} layout={layout} color={color} gridCols={gridCols} dateFilter={dateFilter} tagFilter={tagFilter} imageRatio={imageRatio} />}
-      {(type === 'events' || type === 'calendar') && <EventsWidget churchId={churchId} layout={layout} color={color} gridCols={gridCols} imageRatio={imageRatio} />}
+      {type === 'groups' && <GroupsWidget churchId={churchId} layout={layout} color={color} gridCols={gridCols} groupType={groupType} showTags={showTags} imageRatio={imageRatio} maxItems={maxItems} />}
+      {type === 'registrations' && <RegistrationsWidget churchId={churchId} layout={layout} color={color} gridCols={gridCols} dateFilter={dateFilter} tagFilter={tagFilter} imageRatio={imageRatio} maxItems={maxItems} />}
+      {(type === 'events' || type === 'calendar') && <EventsWidget churchId={churchId} layout={layout} color={color} gridCols={gridCols} imageRatio={imageRatio} maxItems={maxItems} />}
     </div>
   );
 }
@@ -82,7 +82,7 @@ function getGridClass(layout: string, gridCols: string) {
   }
 }
 
-function GroupsWidget({ churchId, layout, color, gridCols, groupType, showTags, imageRatio }: any) {
+function GroupsWidget({ churchId, layout, color, gridCols, groupType, showTags, imageRatio, maxItems }: any) {
   const [groups, setGroups] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -103,9 +103,13 @@ function GroupsWidget({ churchId, layout, color, gridCols, groupType, showTags, 
   }, [churchId]);
 
   const filteredGroups = useMemo(() => {
-    if (!groupType) return groups;
-    return groups.filter(g => g.groupTypeName?.toLowerCase().includes(groupType.toLowerCase()));
-  }, [groups, groupType]);
+    let result = groups;
+    if (groupType) {
+      result = result.filter(g => g.groupTypeName?.toLowerCase().includes(groupType.toLowerCase()));
+    }
+    if (maxItems > 0) result = result.slice(0, maxItems);
+    return result;
+  }, [groups, groupType, maxItems]);
 
   if (loading) return <div className="text-center p-8 animate-pulse text-slate-400">Loading Groups...</div>;
   if (error) return <div className="text-center p-8 text-rose-500 border-2 border-dashed border-rose-200 dark:border-rose-900/30 rounded-xl bg-rose-50 dark:bg-rose-900/10"><strong>Connection Error:</strong> {error}. <br/>Please ensure Planning Center is securely connected with the required permissions.</div>;
@@ -137,7 +141,7 @@ function GroupsWidget({ churchId, layout, color, gridCols, groupType, showTags, 
   );
 }
 
-function RegistrationsWidget({ churchId, layout, color, gridCols, dateFilter, tagFilter, imageRatio }: any) {
+function RegistrationsWidget({ churchId, layout, color, gridCols, dateFilter, tagFilter, imageRatio, maxItems }: any) {
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -186,8 +190,9 @@ function RegistrationsWidget({ churchId, layout, color, gridCols, dateFilter, ta
         e.description?.toLowerCase().includes(lowerTag)
       );
     }
+    if (maxItems > 0) result = result.slice(0, maxItems);
     return result;
-  }, [events, dateFilter, tagFilter]);
+  }, [events, dateFilter, tagFilter, maxItems]);
 
   if (loading) return <div className="text-center p-8 animate-pulse text-slate-400">Loading Registrations...</div>;
   if (error) return <div className="text-center p-8 text-rose-500 border-2 border-dashed border-rose-200 dark:border-rose-900/30 rounded-xl bg-rose-50 dark:bg-rose-900/10"><strong>Connection Error:</strong> {error}. <br/>Please ensure Planning Center is securely connected with the required permissions.</div>;
@@ -293,7 +298,7 @@ function RegistrationsWidget({ churchId, layout, color, gridCols, dateFilter, ta
   );
 }
 
-function EventsWidget({ churchId, layout, color, gridCols, imageRatio }: any) {
+function EventsWidget({ churchId, layout, color, gridCols, imageRatio, maxItems }: any) {
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -318,6 +323,8 @@ function EventsWidget({ churchId, layout, color, gridCols, imageRatio }: any) {
   if (loading) return <div className="text-center p-8 animate-pulse text-slate-400">Loading Events...</div>;
   if (error) return <div className="text-center p-8 text-rose-500 border-2 border-dashed border-rose-200 dark:border-rose-900/30 rounded-xl bg-rose-50 dark:bg-rose-900/10"><strong>Connection Error:</strong> {error}. <br/>Please ensure Planning Center is securely connected with the required permissions.</div>;
   if (!events.length) return <div className="text-center p-8 text-slate-400 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl">No events available.</div>;
+
+  const filteredEvents = maxItems > 0 && layout !== 'month' ? events.slice(0, maxItems) : events;
 
   if (layout === 'month') {
     const today = new Date();
@@ -425,7 +432,7 @@ function EventsWidget({ churchId, layout, color, gridCols, imageRatio }: any) {
 
   return (
     <div className={`grid gap-4 ${getGridClass(layout, gridCols)}`}>
-      {events.map(e => (
+      {filteredEvents.map(e => (
         <div key={e.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition flex flex-col">
           {e.imageUrl && (
              <div className={`w-full ${imageRatio === '1:1' ? 'aspect-square' : 'aspect-video'} bg-slate-50 dark:bg-slate-950 border-b border-slate-100 dark:border-slate-800`}>

@@ -20,6 +20,7 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
   const [imageRatio, setImageRatio] = useState('16:9'); // 16:9, 1:1
   const [autoHeight, setAutoHeight] = useState(false);  
   const [scale, setScale] = useState<number>(1);
+  const [maxItems, setMaxItems] = useState('0');
   const [isSyncing, setIsSyncing] = useState(false);
   const [toast, setToast] = useState('');
   const [copiedScript, setCopiedScript] = useState(false);
@@ -72,7 +73,8 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
       + (type === 'registrations' ? `&dateFilter=${dateFilter}&tagFilter=${encodeURIComponent(tagFilter)}` : '')
       + `&imageRatio=${imageRatio}`
       + (autoHeight ? `&autoHeight=true` : '')
-      + (scale !== 1 ? `&scale=${scale}` : '');
+      + (scale !== 1 ? `&scale=${scale}` : '')
+      + (maxItems && maxItems !== '0' ? `&maxItems=${maxItems}` : '');
 
   const iframeUrl = `${domain}/?widget=true&${commonParams}`;
   const scriptUrl = `${domain}/widget.js?${commonParams}`;
@@ -207,6 +209,20 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
                 <span>Default</span>
                 <span>Larger</span>
              </div>
+          </div>
+
+          {/* Max Items Limit */}
+          <div>
+            <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Max Items to Display</label>
+            <input 
+              type="number" 
+              min="0"
+              placeholder="0 for unlimited" 
+              value={maxItems} 
+              onChange={e => setMaxItems(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+            />
+            <p className="text-[10px] text-slate-500 mt-1">Leave as 0 to show all items.</p>
           </div>
 
           {layout === 'grid' && (
