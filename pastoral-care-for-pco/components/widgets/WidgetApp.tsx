@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay } from 'date-fns';
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths } from 'date-fns';
 
 const apiBaseUrl = process.env.NODE_ENV === 'production' 
   ? 'https://pastoralcare.barnabassoftware.com' 
@@ -98,8 +98,7 @@ function GroupsWidget({ churchId, layout, color, gridCols, groupType, showTags, 
             <h3 className="font-bold text-lg text-slate-900 dark:text-slate-100 mb-1">{g.name || 'Unnamed Group'}</h3>
             {showTags && g.groupTypeName && <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-slate-100 dark:bg-slate-800 text-slate-500 mb-3">{g.groupTypeName}</span>}
             <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2">{g.description || 'No description provided.'}</p>
-            <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-              <span className="text-xs text-slate-500 dark:text-slate-500 font-medium">{g.membersCount || 0} members</span>
+            <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end">
               <a href={g.publicUrl || '#'} target="_blank" rel="noreferrer" className={`text-sm font-semibold tracking-wide text-${color}-600 dark:text-${color}-400 hover:text-${color}-500 transition`}>
                 Join →
               </a>
@@ -271,6 +270,8 @@ function EventsWidget({ churchId, layout, color, gridCols, imageRatio }: any) {
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedEvent, setSelectedEvent] = useState<any>(null);
 
   useEffect(() => {
     const queryStr = window.location.search.includes('refresh=true') ? '?refresh=true' : '';
@@ -293,14 +294,23 @@ function EventsWidget({ churchId, layout, color, gridCols, imageRatio }: any) {
 
   if (layout === 'month') {
     const today = new Date();
-    const start = startOfWeek(startOfMonth(today));
-    const end = endOfWeek(endOfMonth(today));
+    const start = startOfWeek(startOfMonth(currentDate));
+    const end = endOfWeek(endOfMonth(currentDate));
     const days = eachDayOfInterval({ start, end });
+
+    const handlePrevMonth = () => setCurrentDate(prev => subMonths(prev, 1));
+    const handleNextMonth = () => setCurrentDate(prev => addMonths(prev, 1));
+    const handleToday = () => setCurrentDate(new Date());
 
     return (
       <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-slate-100 dark:border-slate-800">
-           <h2 className="text-xl font-black text-slate-900 dark:text-white">{format(today, 'MMMM yyyy')}</h2>
+        <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
+           <h2 className="text-xl font-black text-slate-900 dark:text-white capitalize">{format(currentDate, 'MMMM yyyy')}</h2>
+           <div className="flex gap-2">
+             <button onClick={handlePrevMonth} className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition shadow-sm">←</button>
+             <button onClick={handleToday} className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition shadow-sm">Today</button>
+             <button onClick={handleNextMonth} className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition shadow-sm">→</button>
+           </div>
         </div>
         <div className="grid grid-cols-7 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
@@ -327,24 +337,61 @@ function EventsWidget({ churchId, layout, color, gridCols, imageRatio }: any) {
                   }`}>
                       {format(day, 'd')}
                   </div>
-                  <div className="space-y-1">
+                  <div className="space-y-2">
                       {dayEvents.map(event => (
-                          <a 
+                          <div 
                               key={event.id}
-                              href={event.publicUrl || '#'}
-                              target="_blank"
-                              rel="noreferrer"
-                              className={`block px-1.5 py-1 rounded truncate text-[10px] font-bold bg-${color}-100 text-${color}-800 dark:bg-${color}-900/30 dark:text-${color}-300 hover:opacity-80 transition`}
+                              onClick={() => setSelectedEvent(event)}
+                              className={`block rounded-lg overflow-hidden border border-slate-100 dark:border-slate-800 transition shadow-sm hover:shadow-md group flex flex-col cursor-pointer`}
                               title={event.name}
                           >
-                              {format(new Date(event.startsAt), 'h:mm a')} {event.name}
-                          </a>
+                              {dayEvents.length === 1 && event.imageUrl ? (
+                                <div className="w-full aspect-video bg-slate-100 dark:bg-slate-800 relative">
+                                    <img src={event.imageUrl} alt={event.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                                    <div className="absolute bottom-0 left-0 right-0 p-1.5">
+                                        <div className="text-[10px] font-bold text-white truncate drop-shadow-md">
+                                            {format(new Date(event.startsAt), 'h:mm a')} {event.name}
+                                        </div>
+                                    </div>
+                                </div>
+                              ) : (
+                                <div className={`px-1.5 py-1.5 truncate text-[10px] font-bold bg-${color}-50 text-${color}-800 dark:bg-${color}-900/20 dark:text-${color}-300 group-hover:bg-${color}-100 dark:group-hover:bg-${color}-900/40 transition`}>
+                                    <span className="opacity-75 mr-1">{format(new Date(event.startsAt), 'h:mm a')}</span>
+                                    {event.name}
+                                </div>
+                              )}
+                          </div>
                       ))}
                   </div>
               </div>
             );
           })}
         </div>
+
+        {selectedEvent && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+                <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl relative">
+                   <button onClick={() => setSelectedEvent(null)} className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-white dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white transition shadow-sm border border-slate-200 dark:border-slate-700">✕</button>
+                   {selectedEvent.imageUrl && <img src={selectedEvent.imageUrl} alt={selectedEvent.name} className="w-full h-48 object-cover rounded-t-2xl" />}
+                   <div className="p-6 pt-8">
+                       <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">{selectedEvent.name}</h3>
+                       <div className="text-sm font-medium text-slate-500 mb-4">
+                           {selectedEvent.startsAt ? format(new Date(selectedEvent.startsAt), 'EEEE, MMMM d, yyyy h:mm a') : 'Time TBD'}
+                           {selectedEvent.location && <span className="block mt-1">{selectedEvent.location}</span>}
+                       </div>
+                       {selectedEvent.description && (
+                           <div className="prose dark:prose-invert prose-sm max-w-none text-slate-600 dark:text-slate-400 mb-6" dangerouslySetInnerHTML={{ __html: selectedEvent.description }} />
+                       )}
+                       {selectedEvent.publicUrl && (
+                           <a href={selectedEvent.publicUrl} target="_blank" rel="noreferrer" className={`block w-full text-center px-4 py-3 rounded-xl font-bold text-white bg-${color}-600 hover:bg-${color}-700 transition shadow-md`}>
+                               View Event Details
+                           </a>
+                       )}
+                   </div>
+                </div>
+            </div>
+        )}
       </div>
     );
   }
@@ -360,6 +407,12 @@ function EventsWidget({ churchId, layout, color, gridCols, imageRatio }: any) {
           )}
           <div className="p-5 flex-grow flex flex-col">
             <h3 className="font-bold text-lg text-slate-900 dark:text-slate-100 mb-1">{e.name || 'Unnamed Event'}</h3>
+            {(e.featured || e.recurring || e.repeats) && (
+                <div className="flex flex-wrap gap-2 mb-3">
+                    {e.featured && <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">Featured</span>}
+                    {(e.recurring || e.repeats) && <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">Recurring</span>}
+                </div>
+            )}
             <div className="text-sm text-slate-600 dark:text-slate-400 mb-3 flex flex-wrap items-center gap-2">
                  {e.startsAt && <span className="font-medium whitespace-nowrap">{new Date(e.startsAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>}
                  {e.startsAt && e.location && <span className="w-1 h-1 flex-shrink-0 rounded-full bg-slate-300 dark:bg-slate-700"/>}
