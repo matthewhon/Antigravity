@@ -88,7 +88,7 @@ export async function getPublicGroups(req: any, res: any) {
         isPublic: g.attributes.publicly_visible !== false
       };
     });
-    const publicGroups = groups.filter((g: any) => g.isPublic);
+    const publicGroups = groups.filter((g: any) => g.isPublic && !g.attributes?.archived_at);
     cache[cacheKey] = { data: publicGroups, timestamp: Date.now() };
     res.json(publicGroups);
   } catch (e: any) {
@@ -105,13 +105,19 @@ export async function getPublicRegistrations(req: any, res: any) {
   }
 
   try {
-    const data = await fetchFromPco(churchId, 'https://api.planningcenteronline.com/registrations/v2/signups?per_page=100');
-    const events = (data.data || []).map((e: any) => ({
+    const data = await fetchFromPco(churchId, 'https://api.planningcenteronline.com/registrations/v2/events?per_page=100');
+    
+    // Filter out archived registration events
+    let rawEvents = data.data || [];
+    rawEvents = rawEvents.filter((e: any) => !e.attributes?.archived_at);
+
+    const events = rawEvents.map((e: any) => ({
       id: e.id,
       name: e.attributes.name,
       description: e.attributes.description,
       logoUrl: e.attributes.logo_url || null,
       signupsCount: e.attributes.signups_count || 0,
+      startsAt: e.attributes.starts_at || null,
       publicUrl: e.attributes.church_center_url || e.attributes.public_url || null,
     }));
     cache[cacheKey] = { data: events, timestamp: Date.now() };

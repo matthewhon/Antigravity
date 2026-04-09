@@ -21,6 +21,7 @@ export default function WidgetApp() {
   const autoHeight = params.get('autoHeight') === 'true';
   const iframeId = params.get('iframeId');
   const scale = params.get('scale') || '1';
+  const maxItems = parseInt(params.get('maxItems') || '0', 10);
 
   useEffect(() => {
     if (autoHeight && iframeId) {
