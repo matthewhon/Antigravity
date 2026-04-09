@@ -55,7 +55,10 @@ async function fetchFromPco(churchId: string, url: string) {
   }
 
   if (!response.ok) {
-    throw new Error(`PCO API error: ${response.status}`);
+    let errorMsg = `PCO API error: ${response.status}`;
+    if (response.status === 401) errorMsg = 'Unauthorized: Planning Center Token expired or invalid. Please re-authenticate your church account.';
+    if (response.status === 403) errorMsg = 'Forbidden: Your Planning Center connection lacks the necessary scopes (e.g. calendar/registrations). Please re-authenticate to upgrade your permissions.';
+    throw new Error(errorMsg);
   }
   return response.json();
 }
@@ -134,6 +137,7 @@ export async function getPublicEvents(req: any, res: any) {
       startsAt: e.attributes.starts_at || null,
       location: e.attributes.location || null,
       publicUrl: e.attributes.church_center_url || e.attributes.public_url || null,
+      imageUrl: e.attributes.image_url || null,
     }));
     cache[cacheKey] = { data: events, timestamp: Date.now() };
     res.json(events);
