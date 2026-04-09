@@ -118,7 +118,7 @@ function GroupsWidget({ churchId, layout, color, gridCols, groupType, showTags, 
           <div className="p-5">
             <h3 className="font-bold text-lg text-slate-900 dark:text-slate-100 mb-1">{g.name || 'Unnamed Group'}</h3>
             {showTags && g.groupTypeName && <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-slate-100 dark:bg-slate-800 text-slate-500 mb-3">{g.groupTypeName}</span>}
-            <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2">{g.description || 'No description provided.'}</p>
+            <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2">{g.description?.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ') || 'No description provided.'}</p>
             <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end">
               <a href={g.publicUrl || '#'} target="_blank" rel="noreferrer" className={`text-sm font-semibold tracking-wide text-${color}-600 dark:text-${color}-400 hover:text-${color}-500 transition`}>
                 Join →
