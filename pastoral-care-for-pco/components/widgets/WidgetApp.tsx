@@ -18,7 +18,28 @@ export default function WidgetApp() {
   const dateFilter = params.get('dateFilter') || 'future';
   const tagFilter = params.get('tagFilter') || '';
   const imageRatio = params.get('imageRatio') || '16:9';
+  const autoHeight = params.get('autoHeight') === 'true';
+  const iframeId = params.get('iframeId');
 
+  useEffect(() => {
+    if (autoHeight && iframeId) {
+      const reportHeight = () => {
+        window.parent.postMessage({ 
+          type: 'pco-widget-resize', 
+          iframeId, 
+          height: document.documentElement.scrollHeight 
+        }, '*');
+      };
+      
+      const observer = new ResizeObserver(reportHeight);
+      observer.observe(document.body);
+      
+      // Delay initial report slightly to ensure images/fonts calculation
+      setTimeout(reportHeight, 100);
+      
+      return () => observer.disconnect();
+    }
+  }, [autoHeight, iframeId]);
   useEffect(() => {
     const html = document.documentElement;
     const body = document.body;

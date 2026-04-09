@@ -18,7 +18,7 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
   const [dateFilter, setDateFilter] = useState('future'); // future, month, all
   const [tagFilter, setTagFilter] = useState('');
   const [imageRatio, setImageRatio] = useState('16:9'); // 16:9, 1:1
-  
+  const [autoHeight, setAutoHeight] = useState(false);  
   const [isSyncing, setIsSyncing] = useState(false);
   const [toast, setToast] = useState('');
   const [copiedScript, setCopiedScript] = useState(false);
@@ -69,7 +69,8 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
       + (type === 'groups' && groupType ? `&groupType=${encodeURIComponent(groupType)}` : '')
       + (type === 'groups' ? `&showTags=${showTags}` : '')
       + (type === 'registrations' ? `&dateFilter=${dateFilter}&tagFilter=${encodeURIComponent(tagFilter)}` : '')
-      + `&imageRatio=${imageRatio}`;
+      + `&imageRatio=${imageRatio}`
+      + (autoHeight ? `&autoHeight=true` : '');
 
   const iframeUrl = `${domain}/?widget=true&${commonParams}`;
   const scriptUrl = `${domain}/widget.js?${commonParams}`;
@@ -170,6 +171,20 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
                  </button>
                )}
              </div>
+          </div>
+
+          <div>
+             <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Display Mode</label>
+             <label className="flex items-center gap-3 cursor-pointer">
+               <input 
+                 type="checkbox" 
+                 checked={autoHeight} 
+                 onChange={e => setAutoHeight(e.target.checked)}
+                 className="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 bg-white dark:bg-slate-900"
+               />
+               <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Auto Height (No Scrollbar)</span>
+             </label>
+             <p className="text-[10px] text-slate-500 mt-2 leading-relaxed">Checking this will make the widget grow to fit all its content without showing an internal scrollbar. (Recommended to use the Script Embed for this feature)</p>
           </div>
 
           {layout === 'grid' && type !== 'events' && (

@@ -147,23 +147,23 @@ export async function getPublicEvents(req: any, res: any) {
 }
 
 export async function serveWidgetScript(req: any, res: any) {
-  // Return JS that creates an iframe
-  // Format: <script src="/widget.js?churchId=x&type=groups&theme=dark" .../>
   const churchId = req.query.churchId || '';
   const type = req.query.type || 'groups';
   const theme = req.query.theme || 'light';
   const color = req.query.color || 'indigo';
   const layout = req.query.layout || 'grid';
+  const autoHeight = req.query.autoHeight === 'true';
 
   res.setHeader('Content-Type', 'application/javascript');
   
   const scriptContent = `
 (function() {
   var iframe = document.createElement('iframe');
-  var baseUrl = window.location.origin; // or hardcode if needed, but relative works if script is loaded from backend
-  const origin = new URL(document.currentScript.src).origin;
+  var origin = new URL(document.currentScript.src).origin;
+  var iframeId = 'pco-widget-' + Math.random().toString(36).substr(2, 9);
   
-  iframe.src = origin + '/?widget=true&type=${type}&churchId=${churchId}&theme=${theme}&color=${color}&layout=${layout}';
+  iframe.id = iframeId;
+  iframe.src = origin + '/?widget=true&type=${type}&churchId=${churchId}&theme=${theme}&color=${color}&layout=${layout}&autoHeight=${autoHeight}&iframeId=' + iframeId;
   iframe.style.width = '100%';
   iframe.style.height = '600px'; 
   iframe.style.border = 'none';
@@ -171,7 +171,12 @@ export async function serveWidgetScript(req: any, res: any) {
   iframe.style.overflow = 'hidden';
   iframe.allow = 'clipboard-write';
   
-  // Insert after the current script tag
+  window.addEventListener('message', function(e) {
+    if (e.data && e.data.type === 'pco-widget-resize' && e.data.iframeId === iframeId) {
+      iframe.style.height = e.data.height + 'px';
+    }
+  });
+
   var currentScript = document.currentScript;
   currentScript.parentNode.insertBefore(iframe, currentScript.nextSibling);
 })();
