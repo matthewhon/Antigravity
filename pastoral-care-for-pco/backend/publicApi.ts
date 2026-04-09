@@ -171,25 +171,27 @@ export async function getPublicEvents(req: any, res: any) {
 }
 
 export async function serveWidgetScript(req: any, res: any) {
-  const churchId = req.query.churchId || '';
-  const type = req.query.type || 'groups';
-  const theme = req.query.theme || 'light';
-  const color = req.query.color || 'indigo';
-  const layout = req.query.layout || 'grid';
-  const autoHeight = req.query.autoHeight === 'true';
-  const scale = req.query.scale || '1';
-  const maxItems = req.query.maxItems || '0';
-
   res.setHeader('Content-Type', 'application/javascript');
   
   const scriptContent = `
 (function() {
+  var currentScript = document.currentScript;
+  if (!currentScript) {
+      console.warn('PCO Widget: currentScript not found. Ensure script is not loaded dynamically in a way that obscures it.');
+      return;
+  }
+  
+  var scriptUrl = new URL(currentScript.src);
   var iframe = document.createElement('iframe');
-  var origin = new URL(document.currentScript.src).origin;
   var iframeId = 'pco-widget-' + Math.random().toString(36).substr(2, 9);
   
+  // Forward all query parameters from the script URL to the iframe dynamically
+  var iframeParams = new URLSearchParams(scriptUrl.search);
+  iframeParams.set('widget', 'true');
+  iframeParams.set('iframeId', iframeId);
+  
   iframe.id = iframeId;
-  iframe.src = origin + '/?widget=true&type=${type}&churchId=${churchId}&theme=${theme}&color=${color}&layout=${layout}&autoHeight=${autoHeight}&scale=${scale}&maxItems=${maxItems}&iframeId=' + iframeId;
+  iframe.src = scriptUrl.origin + '/?' + iframeParams.toString();
   iframe.style.width = '100%';
   iframe.style.height = '600px'; 
   iframe.style.border = 'none';
@@ -203,7 +205,6 @@ export async function serveWidgetScript(req: any, res: any) {
     }
   });
 
-  var currentScript = document.currentScript;
   currentScript.parentNode.insertBefore(iframe, currentScript.nextSibling);
 })();
   `;

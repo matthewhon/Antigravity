@@ -119,6 +119,9 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
       <div className="flex flex-grow overflow-hidden">
         {/* Left Config Panel */}
         <div className="w-80 border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 overflow-y-auto p-6 space-y-6">
+          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/50 rounded-xl p-3 text-xs text-amber-800 dark:text-amber-400">
+            <strong>Note:</strong> Changes made here do not automatically update existing widgets on your real website. If you change a setting like Widget Size, you must copy the embed code below and replace it on your website.
+          </div>
             
           <div>
             <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Widget Type</label>
