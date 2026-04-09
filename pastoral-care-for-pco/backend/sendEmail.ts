@@ -349,12 +349,18 @@ function renderAnalyticsBlockHtml(
                 </td>`;
             }).join('');
             return `<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:16px;">
-              <div style="background:linear-gradient(135deg,#059669,#10b981);padding:10px 16px;display:flex;justify-content:space-between;align-items:center;">
-                <div>
-                  <div style="font-size:10px;font-weight:800;color:#a7f3d0;text-transform:uppercase;letter-spacing:1px;">Cumulative Giving YTD</div>
-                  ${data.fundFilter ? `<div style="font-size:9px;color:#6ee7b7;">${data.fundFilter}</div>` : ''}
-                </div>
-                <div style="font-size:16px;font-weight:900;color:#fff;">${fmt(data.totalYTD || 0, true)}</div>
+              <div style="background:linear-gradient(135deg,#059669,#10b981);padding:10px 16px;">
+                <table width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td align="left" valign="middle">
+                      <div style="font-size:10px;font-weight:800;color:#a7f3d0;text-transform:uppercase;letter-spacing:1px;">Cumulative Giving YTD</div>
+                      ${data.fundFilter ? `<div style="font-size:9px;color:#6ee7b7;margin-top:2px;">${data.fundFilter}</div>` : ''}
+                    </td>
+                    <td align="right" valign="middle">
+                      <div style="font-size:16px;font-weight:900;color:#fff;">${fmt(data.totalYTD || 0, true)}</div>
+                    </td>
+                  </tr>
+                </table>
               </div>
               <div style="background:#fff;padding:8px 16px;">
                 <table width="100%" cellpadding="0" cellspacing="0"><tr>${bars}</tr></table>
@@ -367,10 +373,14 @@ function renderAnalyticsBlockHtml(
                 <div style="font-size:10px;font-weight:800;color:#a7f3d0;text-transform:uppercase;letter-spacing:1px;">Key Financial Overview</div>
                 <div style="font-size:22px;font-weight:900;color:#fff;margin-top:4px;">${fmt(data.totalGiving || 0, true)}</div>
               </div>
-              <div style="background:#fff;padding:12px 16px;display:flex;gap:24px;">
-                <div><div style="font-size:8px;color:#94a3b8;text-transform:uppercase;font-weight:700;">Donors</div><div style="font-size:18px;font-weight:900;color:#4f46e5;">${fmt(data.contributingPeople || 0)}</div></div>
-                <div><div style="font-size:8px;color:#94a3b8;text-transform:uppercase;font-weight:700;">Recurring</div><div style="font-size:18px;font-weight:900;color:#0891b2;">${fmt(data.recurringGivers || 0)}</div></div>
-                <div><div style="font-size:8px;color:#94a3b8;text-transform:uppercase;font-weight:700;">Avg Gift</div><div style="font-size:18px;font-weight:900;color:#7c3aed;">${fmt(data.averageGift || 0, true)}</div></div>
+              <div style="background:#fff;padding:12px 16px;">
+                <table width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td width="33%" align="left"><div style="font-size:8px;color:#94a3b8;text-transform:uppercase;font-weight:700;">Donors</div><div style="font-size:18px;font-weight:900;color:#4f46e5;">${fmt(data.contributingPeople || 0)}</div></td>
+                    <td width="33%" align="center"><div style="font-size:8px;color:#94a3b8;text-transform:uppercase;font-weight:700;">Recurring</div><div style="font-size:18px;font-weight:900;color:#0891b2;">${fmt(data.recurringGivers || 0)}</div></td>
+                    <td width="33%" align="right"><div style="font-size:8px;color:#94a3b8;text-transform:uppercase;font-weight:700;">Avg Gift</div><div style="font-size:18px;font-weight:900;color:#7c3aed;">${fmt(data.averageGift || 0, true)}</div></td>
+                  </tr>
+                </table>
               </div>
             </div>`;
         case 'giving_fund_performance': {
@@ -379,10 +389,12 @@ function renderAnalyticsBlockHtml(
             const fundRows = funds.map(f => {
                 const w = Math.max(2, Math.round((f.value / maxVal) * 100));
                 return `<tr><td style="padding:4px 0;">
-                  <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px;">
-                    <span style="font-weight:600;color:#334155;font-family:${fontFamily};">${f.name}</span>
-                    <span style="font-weight:800;color:#0f172a;font-family:${fontFamily};">${fmt(f.value, true)}</span>
-                  </div>
+                  <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:4px;">
+                    <tr>
+                      <td align="left" style="font-size:11px;font-weight:600;color:#334155;font-family:${fontFamily};">${f.name}</td>
+                      <td align="right" style="font-size:11px;font-weight:800;color:#0f172a;font-family:${fontFamily};">${fmt(f.value, true)}</td>
+                    </tr>
+                  </table>
                   <div style="background:#f1f5f9;border-radius:4px;height:6px;width:100%;">
                     <div style="background:#6366f1;height:100%;border-radius:4px;width:${w}%;"></div>
                   </div>
@@ -404,11 +416,15 @@ function renderAnalyticsBlockHtml(
               <div style="background:linear-gradient(135deg,#0ea5e9,#2563eb);padding:10px 16px;">
                 <div style="font-size:10px;font-weight:800;color:#bae6fd;text-transform:uppercase;letter-spacing:1px;font-family:${fontFamily};">Donor Lifecycle Status</div>
               </div>
-              <div style="background:#fff;padding:12px 16px;display:flex;gap:16px;">
-                <div style="flex:1;"><div style="font-size:8px;color:#94a3b8;text-transform:uppercase;font-weight:700;font-family:${fontFamily};">Active</div><div style="font-size:18px;font-weight:900;color:#0ea5e9;font-family:${fontFamily};">${fmt(lc.active || 0)}</div></div>
-                <div style="flex:1;"><div style="font-size:8px;color:#94a3b8;text-transform:uppercase;font-weight:700;font-family:${fontFamily};">New</div><div style="font-size:18px;font-weight:900;color:#10b981;font-family:${fontFamily};">${fmt(lc.new || 0)}</div></div>
-                <div style="flex:1;"><div style="font-size:8px;color:#94a3b8;text-transform:uppercase;font-weight:700;font-family:${fontFamily};">Recovered</div><div style="font-size:18px;font-weight:900;color:#8b5cf6;font-family:${fontFamily};">${fmt(lc.recovered || 0)}</div></div>
-                <div style="flex:1;"><div style="font-size:8px;color:#94a3b8;text-transform:uppercase;font-weight:700;font-family:${fontFamily};">Lapsed</div><div style="font-size:18px;font-weight:900;color:#f43f5e;font-family:${fontFamily};">${fmt(lc.lapsed || 0)}</div></div>
+              <div style="background:#fff;padding:12px 16px;">
+                <table width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td width="25%" align="left"><div style="font-size:8px;color:#94a3b8;text-transform:uppercase;font-weight:700;font-family:${fontFamily};">Active</div><div style="font-size:18px;font-weight:900;color:#0ea5e9;font-family:${fontFamily};">${fmt(lc.active || 0)}</div></td>
+                    <td width="25%" align="left"><div style="font-size:8px;color:#94a3b8;text-transform:uppercase;font-weight:700;font-family:${fontFamily};">New</div><div style="font-size:18px;font-weight:900;color:#10b981;font-family:${fontFamily};">${fmt(lc.new || 0)}</div></td>
+                    <td width="25%" align="left"><div style="font-size:8px;color:#94a3b8;text-transform:uppercase;font-weight:700;font-family:${fontFamily};">Recov</div><div style="font-size:18px;font-weight:900;color:#8b5cf6;font-family:${fontFamily};">${fmt(lc.recovered || 0)}</div></td>
+                    <td width="25%" align="left"><div style="font-size:8px;color:#94a3b8;text-transform:uppercase;font-weight:700;font-family:${fontFamily};">Lapsed</div><div style="font-size:18px;font-weight:900;color:#f43f5e;font-family:${fontFamily};">${fmt(lc.lapsed || 0)}</div></td>
+                  </tr>
+                </table>
               </div>
             </div>`;
         }
@@ -417,10 +433,14 @@ function renderAnalyticsBlockHtml(
               <div style="background:linear-gradient(135deg,#3b82f6,#8b5cf6);padding:10px 16px;">
                 <div style="font-size:10px;font-weight:800;color:#dbeafe;text-transform:uppercase;letter-spacing:1px;font-family:${fontFamily};">Donor Acquisition</div>
               </div>
-              <div style="background:#fff;padding:12px 16px;display:flex;gap:16px;">
-                <div style="flex:1;"><div style="font-size:8px;color:#94a3b8;text-transform:uppercase;font-weight:700;font-family:${fontFamily};">New Donors</div><div style="font-size:18px;font-weight:900;color:#10b981;font-family:${fontFamily};">${fmt(data.newDonors || 0)}</div></div>
-                <div style="flex:1;"><div style="font-size:8px;color:#94a3b8;text-transform:uppercase;font-weight:700;font-family:${fontFamily};">Recovered</div><div style="font-size:18px;font-weight:900;color:#8b5cf6;font-family:${fontFamily};">${fmt(data.recoveredDonors || 0)}</div></div>
-                <div style="flex:1;"><div style="font-size:8px;color:#94a3b8;text-transform:uppercase;font-weight:700;font-family:${fontFamily};">Lapsed</div><div style="font-size:18px;font-weight:900;color:#f43f5e;font-family:${fontFamily};">${fmt(data.lapsedDonors || 0)}</div></div>
+              <div style="background:#fff;padding:12px 16px;">
+                <table width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td width="33%" align="left"><div style="font-size:8px;color:#94a3b8;text-transform:uppercase;font-weight:700;font-family:${fontFamily};">New Donors</div><div style="font-size:18px;font-weight:900;color:#10b981;font-family:${fontFamily};">${fmt(data.newDonors || 0)}</div></td>
+                    <td width="33%" align="left"><div style="font-size:8px;color:#94a3b8;text-transform:uppercase;font-weight:700;font-family:${fontFamily};">Recovered</div><div style="font-size:18px;font-weight:900;color:#8b5cf6;font-family:${fontFamily};">${fmt(data.recoveredDonors || 0)}</div></td>
+                    <td width="33%" align="left"><div style="font-size:8px;color:#94a3b8;text-transform:uppercase;font-weight:700;font-family:${fontFamily};">Lapsed</div><div style="font-size:18px;font-weight:900;color:#f43f5e;font-family:${fontFamily};">${fmt(data.lapsedDonors || 0)}</div></td>
+                  </tr>
+                </table>
               </div>
             </div>`;
         }
@@ -428,22 +448,30 @@ function renderAnalyticsBlockHtml(
             const funds: { name: string; amount: number; pct: number }[] = data.funds || [];
             const fundRows = funds.map(f => {
                 return `<tr><td style="padding:4px 0;">
-                  <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px;">
-                    <span style="font-weight:600;color:#334155;font-family:${fontFamily};">${f.name}</span>
-                    <span style="font-weight:800;color:#0f172a;font-family:${fontFamily};">${fmt(f.amount, true)}</span>
-                  </div>
+                  <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:4px;">
+                    <tr>
+                      <td align="left" style="font-size:11px;font-weight:600;color:#334155;font-family:${fontFamily};">${f.name}</td>
+                      <td align="right" style="font-size:11px;font-weight:800;color:#0f172a;font-family:${fontFamily};">${fmt(f.amount, true)}</td>
+                    </tr>
+                  </table>
                   <div style="background:#f1f5f9;border-radius:4px;height:6px;width:100%;">
                     <div style="background:#0ea5e9;height:100%;border-radius:4px;width:${f.pct}%;"></div>
                   </div>
                 </td></tr>`;
             }).join('');
             return `<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:16px;">
-              <div style="background:linear-gradient(135deg,#0284c7,#0369a1);padding:10px 16px;display:flex;justify-content:space-between;align-items:center;">
-                <div>
-                  <div style="font-size:10px;font-weight:800;color:#bae6fd;text-transform:uppercase;letter-spacing:1px;font-family:${fontFamily};">Last Week by Fund</div>
-                  <div style="font-size:9px;color:#7dd3fc;font-family:${fontFamily};">${data.weekLabel || ''}</div>
-                </div>
-                <div style="font-size:16px;font-weight:900;color:#fff;font-family:${fontFamily};">${fmt(data.weekTotal || 0, true)}</div>
+              <div style="background:linear-gradient(135deg,#0284c7,#0369a1);padding:10px 16px;">
+                <table width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td align="left" valign="middle">
+                      <div style="font-size:10px;font-weight:800;color:#bae6fd;text-transform:uppercase;letter-spacing:1px;font-family:${fontFamily};">Last Week by Fund</div>
+                      <div style="font-size:9px;color:#7dd3fc;font-family:${fontFamily};">${data.weekLabel || ''}</div>
+                    </td>
+                    <td align="right" valign="middle">
+                      <div style="font-size:16px;font-weight:900;color:#fff;font-family:${fontFamily};">${fmt(data.weekTotal || 0, true)}</div>
+                    </td>
+                  </tr>
+                </table>
               </div>
               <div style="background:#fff;padding:12px 16px;">
                 <table width="100%" cellpadding="0" cellspacing="0">${fundRows || `<tr><td style="font-size:11px;color:#94a3b8;font-family:${fontFamily};">No donations last week</td></tr>`}</table>
@@ -454,19 +482,29 @@ function renderAnalyticsBlockHtml(
             const funds: { name: string; actual: number; budget: number; pct: number }[] = data.funds || [];
             const fundRows = funds.map(f => {
                 return `<tr><td style="padding:4px 0;">
-                  <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px;">
-                    <span style="font-weight:600;color:#334155;font-family:${fontFamily};">${f.name}</span>
-                    <span style="font-weight:600;color:#64748b;font-family:${fontFamily};">${fmt(f.actual, true)} <span style="font-weight:400;font-size:9px;">of ${fmt(f.budget, true)}</span></span>
-                  </div>
+                  <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:4px;">
+                    <tr>
+                      <td align="left" style="font-size:11px;font-weight:600;color:#334155;font-family:${fontFamily};">${f.name}</td>
+                      <td align="right" style="font-size:11px;font-weight:600;color:#64748b;font-family:${fontFamily};">${fmt(f.actual, true)} <span style="font-weight:400;font-size:9px;">of ${fmt(f.budget, true)}</span></td>
+                    </tr>
+                  </table>
                   <div style="background:#f1f5f9;border-radius:4px;height:6px;width:100%;">
                     <div style="background:${f.pct >= 100 ? '#10b981' : '#6366f1'};height:100%;border-radius:4px;width:${f.pct}%;"></div>
                   </div>
                 </td></tr>`;
             }).join('');
             return `<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:16px;">
-              <div style="background:linear-gradient(135deg,#6366f1,#4338ca);padding:10px 16px;display:flex;justify-content:space-between;align-items:center;">
-                <div style="font-size:10px;font-weight:800;color:#c7d2fe;text-transform:uppercase;letter-spacing:1px;font-family:${fontFamily};">Budget Progress (${data.year || new Date().getFullYear()})</div>
-                <div style="font-size:16px;font-weight:900;color:#fff;font-family:${fontFamily};">${data.totalPct || 0}%</div>
+              <div style="background:linear-gradient(135deg,#6366f1,#4338ca);padding:10px 16px;">
+                <table width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td align="left" valign="middle">
+                      <div style="font-size:10px;font-weight:800;color:#c7d2fe;text-transform:uppercase;letter-spacing:1px;font-family:${fontFamily};">Budget Progress (${data.year || new Date().getFullYear()})</div>
+                    </td>
+                    <td align="right" valign="middle">
+                      <div style="font-size:16px;font-weight:900;color:#fff;font-family:${fontFamily};">${data.totalPct || 0}%</div>
+                    </td>
+                  </tr>
+                </table>
               </div>
               <div style="background:#fff;padding:12px 16px;">
                 <table width="100%" cellpadding="0" cellspacing="0">${fundRows || `<tr><td style="font-size:11px;color:#94a3b8;text-align:center;font-family:${fontFamily};">No budget data configured</td></tr>`}</table>
@@ -479,10 +517,14 @@ function renderAnalyticsBlockHtml(
                 <div style="font-size:10px;font-weight:800;color:#fef3c7;text-transform:uppercase;letter-spacing:1px;font-family:${fontFamily};">People Overview</div>
                 <div style="font-size:22px;font-weight:900;color:#fff;margin-top:4px;font-family:${fontFamily};">${fmt(data.total || 0)}</div>
               </div>
-              <div style="background:#fff;padding:12px 16px;display:flex;gap:24px;">
-                <div><div style="font-size:8px;color:#94a3b8;text-transform:uppercase;font-weight:700;font-family:${fontFamily};">Members</div><div style="font-size:18px;font-weight:900;color:#ea580c;font-family:${fontFamily};">${fmt(data.members || 0)}</div></div>
-                <div><div style="font-size:8px;color:#94a3b8;text-transform:uppercase;font-weight:700;font-family:${fontFamily};">New (30d)</div><div style="font-size:18px;font-weight:900;color:#10b981;font-family:${fontFamily};">${fmt(data.newThisMonth || 0)}</div></div>
-                <div><div style="font-size:8px;color:#94a3b8;text-transform:uppercase;font-weight:700;font-family:${fontFamily};">Households</div><div style="font-size:18px;font-weight:900;color:#0284c7;font-family:${fontFamily};">${fmt(data.households || 0)}</div></div>
+              <div style="background:#fff;padding:12px 16px;">
+                <table width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td width="33%" align="left"><div style="font-size:8px;color:#94a3b8;text-transform:uppercase;font-weight:700;font-family:${fontFamily};">Members</div><div style="font-size:18px;font-weight:900;color:#ea580c;font-family:${fontFamily};">${fmt(data.members || 0)}</div></td>
+                    <td width="33%" align="center"><div style="font-size:8px;color:#94a3b8;text-transform:uppercase;font-weight:700;font-family:${fontFamily};">New (30d)</div><div style="font-size:18px;font-weight:900;color:#10b981;font-family:${fontFamily};">${fmt(data.newThisMonth || 0)}</div></td>
+                    <td width="33%" align="right"><div style="font-size:8px;color:#94a3b8;text-transform:uppercase;font-weight:700;font-family:${fontFamily};">Households</div><div style="font-size:18px;font-weight:900;color:#0284c7;font-family:${fontFamily};">${fmt(data.households || 0)}</div></td>
+                  </tr>
+                </table>
               </div>
             </div>`;
         }
@@ -491,9 +533,17 @@ function renderAnalyticsBlockHtml(
             const eventsData: any[] = data.events || [];
             if (eventsData.length === 0) {
               return `<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:16px;">
-                <div style="background:linear-gradient(135deg,#f43f5e,#e11d48);padding:10px 16px;display:flex;justify-content:space-between;align-items:center;">
-                  <div style="font-size:10px;font-weight:800;color:#ffe4e6;text-transform:uppercase;letter-spacing:1px;font-family:${fontFamily};">Events Check-Ins</div>
-                  <div style="font-size:10px;color:#fda4af;font-family:${fontFamily};">${period}</div>
+                <div style="background:linear-gradient(135deg,#f43f5e,#e11d48);padding:10px 16px;">
+                  <table width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                      <td align="left" valign="middle">
+                        <div style="font-size:10px;font-weight:800;color:#ffe4e6;text-transform:uppercase;letter-spacing:1px;font-family:${fontFamily};">Events Check-Ins</div>
+                      </td>
+                      <td align="right" valign="middle">
+                        <div style="font-size:10px;color:#fda4af;font-family:${fontFamily};">${period}</div>
+                      </td>
+                    </tr>
+                  </table>
                 </div>
                 <div style="background:#fff;padding:12px 16px;font-size:11px;color:#94a3b8;text-align:center;font-family:${fontFamily};">No events data available</div>
               </div>`;
@@ -511,9 +561,17 @@ function renderAnalyticsBlockHtml(
               </tr>`;
             }).join('');
             return `<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:16px;">
-              <div style="background:linear-gradient(135deg,#f43f5e,#be123c);padding:10px 16px;display:flex;justify-content:space-between;align-items:center;">
-                <div style="font-size:10px;font-weight:800;color:#ffe4e6;text-transform:uppercase;letter-spacing:1px;font-family:${fontFamily};">Events Check-Ins</div>
-                <div style="font-size:10px;color:#fda4af;font-family:${fontFamily};">${period}</div>
+              <div style="background:linear-gradient(135deg,#f43f5e,#be123c);padding:10px 16px;">
+                <table width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td align="left" valign="middle">
+                      <div style="font-size:10px;font-weight:800;color:#ffe4e6;text-transform:uppercase;letter-spacing:1px;font-family:${fontFamily};">Events Check-Ins</div>
+                    </td>
+                    <td align="right" valign="middle">
+                      <div style="font-size:10px;color:#fda4af;font-family:${fontFamily};">${period}</div>
+                    </td>
+                  </tr>
+                </table>
               </div>
               <table width="100%" cellpadding="0" cellspacing="0" style="background:#fff;">${eventRows}</table>
             </div>`;
@@ -535,9 +593,17 @@ function renderAnalyticsBlockHtml(
                 </tr>`;
             }).join('');
             return `<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:16px;">
-              <div style="background:linear-gradient(135deg,#7c3aed,#4f46e5);padding:10px 16px;display:flex;justify-content:space-between;align-items:center;">
-                <div style="font-size:10px;font-weight:800;color:#ddd6fe;text-transform:uppercase;letter-spacing:1px;">Upcoming Services</div>
-                <div style="font-size:10px;color:#c4b5fd;">Next ${data.dayRange || 14} days</div>
+              <div style="background:linear-gradient(135deg,#7c3aed,#4f46e5);padding:10px 16px;">
+                <table width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td align="left" valign="middle">
+                      <div style="font-size:10px;font-weight:800;color:#ddd6fe;text-transform:uppercase;letter-spacing:1px;">Upcoming Services</div>
+                    </td>
+                    <td align="right" valign="middle">
+                      <div style="font-size:10px;color:#c4b5fd;">Next ${data.dayRange || 14} days</div>
+                    </td>
+                  </tr>
+                </table>
               </div>
               <table width="100%" cellpadding="0" cellspacing="0" style="background:#fff;">${rows || '<tr><td style="padding:12px 16px;font-size:11px;color:#94a3b8;text-align:center;">No upcoming services</td></tr>'}</table>
             </div>`;
@@ -561,9 +627,17 @@ function renderAnalyticsBlockHtml(
                 </tr>`;
             }).join('');
             return `<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:16px;">
-              <div style="background:linear-gradient(135deg,#4f46e5,#7c3aed);padding:10px 16px;display:flex;justify-content:space-between;align-items:center;">
-                <div style="font-size:10px;font-weight:800;color:#c7d2fe;text-transform:uppercase;letter-spacing:1px;">Church Progress</div>
-                <div style="font-size:10px;color:#a5b4fc;">Last 30 Days</div>
+              <div style="background:linear-gradient(135deg,#4f46e5,#7c3aed);padding:10px 16px;">
+                <table width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td align="left" valign="middle">
+                      <div style="font-size:10px;font-weight:800;color:#c7d2fe;text-transform:uppercase;letter-spacing:1px;">Church Progress</div>
+                    </td>
+                    <td align="right" valign="middle">
+                      <div style="font-size:10px;color:#a5b4fc;">Last 30 Days</div>
+                    </td>
+                  </tr>
+                </table>
               </div>
               <table width="100%" cellpadding="0" cellspacing="0" style="background:#fff;">${rowHtml || '<tr><td style="padding:12px 16px;font-size:11px;color:#94a3b8;text-align:center;">No progress data available</td></tr>'}</table>
             </div>`;
@@ -590,9 +664,17 @@ function renderAnalyticsBlockHtml(
                 </tr>`;
             }).join('');
             return `<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:16px;">
-              <div style="background:linear-gradient(135deg,#7c3aed,#a21caf);padding:10px 16px;display:flex;justify-content:space-between;align-items:center;">
-                <div style="font-size:10px;font-weight:800;color:#e9d5ff;text-transform:uppercase;letter-spacing:1px;">Upcoming Registrations</div>
-                <div style="font-size:10px;color:#d8b4fe;">${events.length} event${events.length !== 1 ? 's' : ''}</div>
+              <div style="background:linear-gradient(135deg,#7c3aed,#a21caf);padding:10px 16px;">
+                <table width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td align="left" valign="middle">
+                      <div style="font-size:10px;font-weight:800;color:#e9d5ff;text-transform:uppercase;letter-spacing:1px;">Upcoming Registrations</div>
+                    </td>
+                    <td align="right" valign="middle">
+                      <div style="font-size:10px;color:#d8b4fe;">${events.length} event${events.length !== 1 ? 's' : ''}</div>
+                    </td>
+                  </tr>
+                </table>
               </div>
               <table width="100%" cellpadding="0" cellspacing="0" style="background:#fff;">${rowHtml || '<tr><td style="padding:12px 16px;font-size:11px;color:#94a3b8;text-align:center;">No upcoming registration events</td></tr>'}</table>
             </div>`;
