@@ -98,7 +98,8 @@ export async function getPublicGroups(req: any, res: any) {
 
 export async function getPublicRegistrations(req: any, res: any) {
   const { churchId } = req.params;
-  const cacheKey = `${churchId}_registrations`;
+  const includeArchived = req.query.includeArchived === 'true';
+  const cacheKey = `${churchId}_registrations_${includeArchived}`;
   
   if (req.query.refresh !== 'true' && cache[cacheKey] && Date.now() - cache[cacheKey].timestamp < CACHE_TTL) {
     return res.json(cache[cacheKey].data);
@@ -109,7 +110,9 @@ export async function getPublicRegistrations(req: any, res: any) {
     
     // Filter out archived registration events
     let rawEvents = data.data || [];
-    rawEvents = rawEvents.filter((e: any) => !e.attributes?.archived_at);
+    if (!includeArchived) {
+      rawEvents = rawEvents.filter((e: any) => !e.attributes?.archived_at);
+    }
 
     const events = rawEvents.map((e: any) => ({
       id: e.id,

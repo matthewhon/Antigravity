@@ -22,6 +22,7 @@ export default function WidgetApp() {
   const iframeId = params.get('iframeId');
   const scale = params.get('scale') || '1';
   const maxItems = parseInt(params.get('maxItems') || '0', 10);
+  const includeArchived = params.get('includeArchived') === 'true';
 
   useEffect(() => {
     if (autoHeight && iframeId) {
@@ -67,7 +68,7 @@ export default function WidgetApp() {
   return (
     <div className={`min-h-screen bg-transparent p-4 font-sans ${theme === 'dark' ? 'text-slate-200' : 'text-slate-800'}`}>
       {type === 'groups' && <GroupsWidget churchId={churchId} layout={layout} color={color} gridCols={gridCols} groupType={groupType} showTags={showTags} imageRatio={imageRatio} maxItems={maxItems} />}
-      {type === 'registrations' && <RegistrationsWidget churchId={churchId} layout={layout} color={color} gridCols={gridCols} dateFilter={dateFilter} tagFilter={tagFilter} imageRatio={imageRatio} maxItems={maxItems} />}
+      {type === 'registrations' && <RegistrationsWidget churchId={churchId} layout={layout} color={color} gridCols={gridCols} dateFilter={dateFilter} tagFilter={tagFilter} imageRatio={imageRatio} maxItems={maxItems} includeArchived={includeArchived} />}
       {(type === 'events' || type === 'calendar') && <EventsWidget churchId={churchId} layout={layout} color={color} gridCols={gridCols} imageRatio={imageRatio} maxItems={maxItems} />}
     </div>
   );
@@ -142,14 +143,17 @@ function GroupsWidget({ churchId, layout, color, gridCols, groupType, showTags, 
   );
 }
 
-function RegistrationsWidget({ churchId, layout, color, gridCols, dateFilter, tagFilter, imageRatio, maxItems }: any) {
+function RegistrationsWidget({ churchId, layout, color, gridCols, dateFilter, tagFilter, imageRatio, maxItems, includeArchived }: any) {
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
 
   useEffect(() => {
-    const queryStr = window.location.search.includes('refresh=true') ? '?refresh=true' : '';
+    const queryParams = new URLSearchParams();
+    if (window.location.search.includes('refresh=true')) queryParams.append('refresh', 'true');
+    if (includeArchived) queryParams.append('includeArchived', 'true');
+    const queryStr = queryParams.toString() ? `?${queryParams.toString()}` : '';
     fetch(`${apiBaseUrl}/api/public/registrations/${churchId}${queryStr}`)
       .then(r => r.json().then(data => ({ status: r.status, ok: r.ok, data })))
       .then(({ ok, data }) => {
