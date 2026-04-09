@@ -16,7 +16,8 @@ async function sgSend(
         html: string;
     }[],
     masterApiKey: string,
-    subuserId?: string
+    subuserId?: string,
+    campaignId?: string
 ): Promise<void> {
     // Build personalizations (one per recipient)
     const personalizations = messages.map(m => ({ to: [{ email: m.to }] }));
@@ -28,6 +29,9 @@ async function sgSend(
         subject: firstMsg.subject,
         content: [{ type: 'text/html', value: firstMsg.html }],
     };
+    if (campaignId) {
+        payload.categories = [campaignId];
+    }
     if (firstMsg.replyTo) {
         payload.reply_to = { email: firstMsg.replyTo };
     }
@@ -930,7 +934,8 @@ export async function executeSend(
             await sgSend(
                 [{ to: recipientEmail, from: { email: fromEmail, name: fromName }, replyTo: campaign.replyTo || undefined, subject, html: personalizedHtml }],
                 globalApiKey,
-                subuserId
+                subuserId,
+                campaignId
             );
         }
     }
@@ -984,5 +989,111 @@ export const sendEmail = async (req: any, res: any) => {
         const log = createServerLogger(db);
         log.error(`Email send failed: ${errMsg}`, 'system', { campaignId, churchId }, churchId);
         res.status(500).json({ error: `Send failed: ${errMsg}` });
+    }
+};
+
+export const getEmailStats = async (req: any, res: any) => {
+    const db = getDb();
+    
+    res.set('Access-Control-Allow-Origin', '*');
+    if (req.method === 'OPTIONS') {
+        res.set('Access-Control-Allow-Methods', 'POST');
+        res.set('Access-Control-Allow-Headers', 'Content-Type');
+        res.status(204).send('');
+        return;
+    }
+
+    const { campaignId, churchId } = req.body || {};
+    if (!campaignId || !churchId) {
+        res.status(400).json({ error: 'Missing campaignId or churchId' });
+        return;
+    }
+
+    try {
+        const log = createServerLogger(db);
+
+        // 1. Get Campaign to identify Start Date
+        const campaignSnap = await db.collection('email_campaigns').doc(campaignId).get();
+        if (!campaignSnap.exists) {
+            return res.status(404).json({ error: 'Campaign not found' });
+        }
+        const campaign = campaignSnap.data();
+        
+        // SendGrid requires start_date in YYYY-MM-DD
+        const startDate = new Date(campaign.createdAt || Date.now()).toISOString().split('T')[0];
+
+        // 2. Load system settings (global API key)
+        const settingsSnap = await db.doc('system/settings').get();
+        const settings = settingsSnap.data() || {};
+        const globalApiKey: string = settings.sendGridApiKey || '';
+
+        if (!globalApiKey || !globalApiKey.startsWith('SG.')) {
+            return res.status(500).json({ error: 'SendGrid is not configured globally' });
+        }
+
+        // 3. Subuser check
+        const churchSnap = await db.collection('churches').doc(churchId).get();
+        const churchData = churchSnap.data() || {};
+        const tenantEmail = churchData.emailSettings || {};
+        const subuserId: string | undefined = tenantEmail.sendGridSubuserId || undefined;
+
+        // 4. Fetch Stats from SendGrid API
+        const url = new URL(`https://api.sendgrid.com/v3/categories/stats`);
+        url.searchParams.set('categories', campaignId);
+        url.searchParams.set('start_date', startDate);
+        url.searchParams.set('aggregated_by', 'day');
+
+        const headers: Record<string, string> = {
+            Authorization: `Bearer ${globalApiKey}`,
+            'Content-Type': 'application/json',
+        };
+        if (subuserId) {
+            headers['on-behalf-of'] = subuserId;
+        }
+
+        const sgRes = await fetch(url.toString(), { method: 'GET', headers });
+
+        if (!sgRes.ok) {
+            const body = await sgRes.text();
+            throw new Error(`SendGrid API error: ${sgRes.status} - ${body}`);
+        }
+
+        const data = await sgRes.json();
+        
+        // Aggregate daily data over the returned period
+        const aggregated = {
+            requests: 0,
+            delivered: 0,
+            opens: 0,
+            unique_opens: 0,
+            clicks: 0,
+            unique_clicks: 0,
+            bounces: 0,
+            spam_reports: 0,
+            unsubscribes: 0,
+            drops: 0
+        };
+
+        if (Array.isArray(data)) {
+            data.forEach((dayData: any) => {
+                const metrics = dayData.stats?.[0]?.metrics;
+                if (metrics) {
+                    aggregated.requests += metrics.requests || 0;
+                    aggregated.delivered += metrics.delivered || 0;
+                    aggregated.opens += metrics.opens || 0;
+                    aggregated.unique_opens += metrics.unique_opens || 0;
+                    aggregated.clicks += metrics.clicks || 0;
+                    aggregated.unique_clicks += metrics.unique_clicks || 0;
+                    aggregated.bounces += metrics.bounces || 0;
+                    aggregated.spam_reports += metrics.spam_reports || 0;
+                    aggregated.unsubscribes += metrics.unsubscribes || 0;
+                    aggregated.drops += metrics.drops || 0;
+                }
+            });
+        }
+
+        res.json({ success: true, stats: aggregated });
+    } catch (e: any) {
+        res.status(500).json({ error: e.message || 'Failed to fetch email statistics' });
     }
 };

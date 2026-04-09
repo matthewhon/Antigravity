@@ -12,7 +12,7 @@ import { createServer as createViteServer } from 'vite';
 import { pcoTokenExchange } from './backend/pcoTokenExchange';
 import { pcoProxy } from './backend/pcoProxy';
 import { handlePcoWebhook } from './backend/pcoWebhookHandler';
-import { sendEmail } from './backend/sendEmail';
+import { sendEmail, getEmailStats } from './backend/sendEmail';
 import { startEmailScheduler } from './backend/emailScheduler';
 import { startSyncScheduler } from './backend/syncScheduler';
 import { getDb } from './backend/firebase';
@@ -136,6 +136,7 @@ async function startServer() {
     // Email (SendGrid)
     app.post('/email/send', express.json(), sendEmail);
     app.post('/email/test', express.json(), sendEmail);
+    app.post('/email/stats', express.json(), getEmailStats);
 
     // Email provisioning — tenant Subuser + domain authentication
     app.post('/email/provision-subuser', express.json(), provisionSubuser);
