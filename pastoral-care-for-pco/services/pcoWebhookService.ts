@@ -4,7 +4,7 @@ import { db } from './firebase';
 
 // Helper to get the backend proxy URL
 const getProxyUrl = async () => {
-    if (import.meta.env.DEV) {
+    if (process.env.NODE_ENV !== 'production') {
         return '/pco/proxy';
     }
     const settings = await firestore.getSystemSettings();
