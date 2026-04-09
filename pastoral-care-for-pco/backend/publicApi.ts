@@ -106,9 +106,13 @@ export async function getPublicRegistrations(req: any, res: any) {
   }
 
   try {
-    const data = await fetchFromPco(churchId, 'https://api.planningcenteronline.com/registrations/v2/signups?per_page=100');
+    const url = includeArchived 
+      ? 'https://api.planningcenteronline.com/registrations/v2/signups?per_page=100'
+      : 'https://api.planningcenteronline.com/registrations/v2/signups?per_page=100&filter=unarchived';
+      
+    const data = await fetchFromPco(churchId, url);
     
-    // Filter out archived registration events
+    // Filter out archived registration events (fallback if attribute exists)
     let rawEvents = data.data || [];
     if (!includeArchived) {
       rawEvents = rawEvents.filter((e: any) => !e.attributes?.archived_at);
