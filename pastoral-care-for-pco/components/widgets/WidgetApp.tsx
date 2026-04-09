@@ -236,18 +236,25 @@ function RegistrationsWidget({ churchId, layout, color, gridCols, dateFilter, ta
 
   if (layout === 'simplified_list') {
     return (
-      <div className="space-y-2">
+      <div className="space-y-3">
         {filteredEvents.map(e => (
            <div 
              key={e.id} 
              onClick={() => setSelectedEvent(e)}
-             className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-4 cursor-pointer hover:border-indigo-500 dark:hover:border-indigo-500 transition flex items-center justify-between group"
+             className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 cursor-pointer hover:border-indigo-500 dark:hover:border-indigo-500 transition flex flex-col sm:flex-row sm:items-center justify-between gap-4 group shadow-sm hover:shadow-md"
            >
              <div>
-                <h3 className="font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">{e.name}</h3>
-                {e.startsAt && <span className="text-xs text-slate-500 font-medium mt-1 inline-block">{new Date(e.startsAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric'})}</span>}
+                <h3 className="font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition text-lg">{e.name}</h3>
+                {e.startsAt && (
+                   <div className="text-sm text-slate-500 dark:text-slate-400 font-medium mt-1 flex items-center gap-2">
+                       <span className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-600" />
+                       {new Date(e.startsAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                   </div>
+                )}
              </div>
-             <span className={`text-slate-300 group-hover:text-${color}-500 transition font-bold`}>→</span>
+             <button className={`shrink-0 px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-${color}-500 group-hover:bg-${color}-600 group-hover:shadow-md transition whitespace-nowrap`}>
+                More Info
+             </button>
            </div>
         ))}
       </div>
