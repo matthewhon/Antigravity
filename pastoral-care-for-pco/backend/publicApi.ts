@@ -164,6 +164,7 @@ export async function serveWidgetScript(req: any, res: any) {
   const color = req.query.color || 'indigo';
   const layout = req.query.layout || 'grid';
   const autoHeight = req.query.autoHeight === 'true';
+  const scale = req.query.scale || '1';
 
   res.setHeader('Content-Type', 'application/javascript');
   
@@ -174,7 +175,7 @@ export async function serveWidgetScript(req: any, res: any) {
   var iframeId = 'pco-widget-' + Math.random().toString(36).substr(2, 9);
   
   iframe.id = iframeId;
-  iframe.src = origin + '/?widget=true&type=${type}&churchId=${churchId}&theme=${theme}&color=${color}&layout=${layout}&autoHeight=${autoHeight}&iframeId=' + iframeId;
+  iframe.src = origin + '/?widget=true&type=${type}&churchId=${churchId}&theme=${theme}&color=${color}&layout=${layout}&autoHeight=${autoHeight}&scale=${scale}&iframeId=' + iframeId;
   iframe.style.width = '100%';
   iframe.style.height = '600px'; 
   iframe.style.border = 'none';

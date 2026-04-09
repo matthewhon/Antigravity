@@ -20,6 +20,7 @@ export default function WidgetApp() {
   const imageRatio = params.get('imageRatio') || '16:9';
   const autoHeight = params.get('autoHeight') === 'true';
   const iframeId = params.get('iframeId');
+  const scale = params.get('scale') || '1';
 
   useEffect(() => {
     if (autoHeight && iframeId) {
@@ -43,6 +44,10 @@ export default function WidgetApp() {
   useEffect(() => {
     const html = document.documentElement;
     const body = document.body;
+
+    // Apply proportional scaling to root element
+    html.style.fontSize = `${16 * parseFloat(scale)}px`;
+
     if (theme === 'dark') {
       html.classList.add('dark');
       body.classList.add('dark');
@@ -52,7 +57,7 @@ export default function WidgetApp() {
       body.classList.remove('dark');
       html.style.colorScheme = 'light';
     }
-  }, [theme]);
+  }, [theme, scale]);
 
   if (!churchId) {
     return <div className="p-4 text-center text-slate-500">Error: Missing churchId parameter.</div>;

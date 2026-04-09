@@ -19,6 +19,7 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
   const [tagFilter, setTagFilter] = useState('');
   const [imageRatio, setImageRatio] = useState('16:9'); // 16:9, 1:1
   const [autoHeight, setAutoHeight] = useState(false);  
+  const [scale, setScale] = useState<number>(1);
   const [isSyncing, setIsSyncing] = useState(false);
   const [toast, setToast] = useState('');
   const [copiedScript, setCopiedScript] = useState(false);
@@ -70,7 +71,8 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
       + (type === 'groups' ? `&showTags=${showTags}` : '')
       + (type === 'registrations' ? `&dateFilter=${dateFilter}&tagFilter=${encodeURIComponent(tagFilter)}` : '')
       + `&imageRatio=${imageRatio}`
-      + (autoHeight ? `&autoHeight=true` : '');
+      + (autoHeight ? `&autoHeight=true` : '')
+      + (scale !== 1 ? `&scale=${scale}` : '');
 
   const iframeUrl = `${domain}/?widget=true&${commonParams}`;
   const scriptUrl = `${domain}/widget.js?${commonParams}`;
@@ -149,20 +151,19 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
           <div>
              <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Layout</label>
              <div className="flex gap-2">
-               {type !== 'events' ? (
-                 <button onClick={() => setLayout('grid')} className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border transition ${layout==='grid'?'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-400':'border-slate-200 text-slate-500 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
-                   <LayoutGrid size={20} />
-                   <span className="text-[10px] uppercase font-bold tracking-widest">{type === 'registrations' ? 'Tiles' : 'Grid'}</span>
-                 </button>
-               ) : (
+               {type === 'events' && (
                  <button onClick={() => setLayout('month')} className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border transition ${layout==='month'?'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-400':'border-slate-200 text-slate-500 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
                    <LayoutGrid size={20} />
                    <span className="text-[10px] uppercase font-bold tracking-widest">Month</span>
                  </button>
                )}
+               <button onClick={() => setLayout('grid')} className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border transition ${layout==='grid'?'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-400':'border-slate-200 text-slate-500 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
+                 <LayoutGrid size={20} />
+                 <span className="text-[10px] uppercase font-bold tracking-widest">{(type === 'registrations' || type === 'events') ? 'Tiles' : 'Grid'}</span>
+               </button>
                <button onClick={() => setLayout('list')} className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border transition ${layout==='list'?'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-400':'border-slate-200 text-slate-500 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
                  <MonitorPlay size={20} />
-                 <span className="text-[10px] uppercase font-bold tracking-widest">{type === 'registrations' ? 'Detailed' : 'List'}</span>
+                 <span className="text-[10px] uppercase font-bold tracking-widest">{(type === 'registrations' || type === 'events') ? 'Detailed' : 'List'}</span>
                </button>
                {type === 'registrations' && (
                  <button onClick={() => setLayout('simplified_list')} className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border transition ${layout==='simplified_list'?'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-400':'border-slate-200 text-slate-500 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
@@ -185,9 +186,30 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
                <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Auto Height (No Scrollbar)</span>
              </label>
              <p className="text-[10px] text-slate-500 mt-2 leading-relaxed">Checking this will make the widget grow to fit all its content without showing an internal scrollbar. (Recommended to use the Script Embed for this feature)</p>
+           </div>
+
+          {/* Widget Sizing Scale Slider */}
+          <div>
+             <label className="flex items-center justify-between text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">
+                Widget Size <span className="text-indigo-600 dark:text-indigo-400">{Math.round(scale * 100)}%</span>
+             </label>
+             <input 
+                type="range" 
+                min="0.75" 
+                max="1.25" 
+                step="0.05" 
+                value={scale} 
+                onChange={e => setScale(parseFloat(e.target.value))}
+                className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer dark:bg-slate-700 accent-indigo-600"
+             />
+             <div className="flex justify-between text-[10px] text-slate-400 mt-1 font-bold">
+                <span>Smaller</span>
+                <span>Default</span>
+                <span>Larger</span>
+             </div>
           </div>
 
-          {layout === 'grid' && type !== 'events' && (
+          {layout === 'grid' && (
             <div>
                <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Grid Columns</label>
                <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-xl">
