@@ -47,8 +47,8 @@ export default function WidgetApp() {
     const html = document.documentElement;
     const body = document.body;
 
-    // Apply proportional scaling to root element
-    html.style.fontSize = `${16 * parseFloat(scale)}px`;
+    // Apply true proportional zoom to the entire DOM for the widget layout (scales images too)
+    (html.style as any).zoom = parseFloat(scale);
 
     if (theme === 'dark') {
       html.classList.add('dark');
