@@ -17,7 +17,7 @@ import { EmailCampaign, TemplateSettings, PcoList, Church, EmailUnsubscribe } fr
 import {
   Mail, Plus, ChevronDown, ChevronUp, CheckCircle, Circle, Send,
   Clock, Users, AtSign, FileText, AlignLeft, Calendar, ArrowLeft,
-  Trash2, Eye, Pencil, Loader2, X, List, UserMinus, Search, Copy, Globe
+  Trash2, Eye, Pencil, Loader2, X, List, UserMinus, Search, Copy, Globe, BarChart2
 } from 'lucide-react';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -382,7 +382,7 @@ const CampaignListView: React.FC<CampaignListViewProps> = ({
 
 // ─── Email Editor View ───────────────────────────────────────────────────────
 
-type EditorPanel = 'config' | 'builder' | 'preview';
+type EditorPanel = 'config' | 'builder' | 'preview' | 'stats';
 
 interface EmailEditorProps {
   campaign: EmailCampaign;
@@ -466,6 +466,33 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
   const [loadingLists, setLoadingLists] = useState(false);
   const [loadingGroups, setLoadingGroups] = useState(false);
   const [lastSaved, setLastSaved] = useState<number | null>(null);
+
+  const [emailStats, setEmailStats] = useState<any>(null);
+  const [loadingStats, setLoadingStats] = useState(false);
+  const [statsError, setStatsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (panel === 'stats' && localCampaign.status === 'sent') {
+      if (!emailStats && !loadingStats) {
+        setLoadingStats(true);
+        setStatsError(null);
+        const apiBaseUrl = process.env.NODE_ENV === 'production' 
+          ? 'https://pastoralcare.barnabassoftware.com' 
+          : 'http://localhost:8080';
+        fetch(`${apiBaseUrl}/email/stats`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ campaignId: localCampaign.id, churchId })
+        })
+          .then(res => res.json().then(data => {
+              if (!res.ok) throw new Error(data.error);
+              setEmailStats(data.stats);
+          }))
+          .catch(err => setStatsError(err.message))
+          .finally(() => setLoadingStats(false));
+      }
+    }
+  }, [panel, localCampaign.id, localCampaign.status, churchId, emailStats, loadingStats]);
 
   // Drawers (for block builder internals)
   const [isSettingsDrawerOpen, setIsSettingsDrawerOpen] = useState(false);
@@ -570,7 +597,7 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
         <div className="flex items-center gap-2">
           {/* Panel tabs */}
           <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-1 mr-2">
-            {(['config', 'builder', 'preview'] as EditorPanel[]).map(p => (
+            {(['config', 'builder', 'preview', 'stats'] as EditorPanel[]).map(p => (
               <button
                 key={p}
                 onClick={() => setPanel(p)}
@@ -583,6 +610,7 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
                 {p === 'config' && <AlignLeft size={12} />}
                 {p === 'builder' && <Pencil size={12} />}
                 {p === 'preview' && <Eye size={12} />}
+                {p === 'stats' && <BarChart2 size={12} />}
                 {p}
               </button>
             ))}
@@ -944,6 +972,90 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
             </div>
             <div className="max-w-2xl mx-auto shadow-xl rounded-2xl overflow-hidden">
               <EmailPreview blocks={blocks} settings={settings} churchLogoUrl={church?.logoUrl} />
+            </div>
+          </div>
+        )}
+
+        {/* Stats Panel */}
+        {panel === 'stats' && (
+          <div className="flex-1 overflow-y-auto p-8 bg-slate-100 dark:bg-slate-950">
+            <div className="max-w-4xl mx-auto space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-slate-900 dark:text-white">Email Statistics</h2>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                    SendGrid engagement data for Campaign: {localCampaign.subject || localCampaign.name}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setPanel('config')}
+                  className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
+                >
+                  <ArrowLeft size={14} /> Back to Config
+                </button>
+              </div>
+
+              {localCampaign.status !== 'sent' ? (
+                <div className="bg-white dark:bg-slate-800 rounded-xl p-8 text-center text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 shadow-sm">
+                  <BarChart2 size={32} className="mx-auto mb-3 opacity-50" />
+                  <p className="font-medium text-slate-700 dark:text-slate-300">Campaign Not Sent</p>
+                  <p className="text-sm mt-1">This email has not been sent yet. Stats will be available after it is dispatched.</p>
+                </div>
+              ) : loadingStats ? (
+                <div className="bg-white dark:bg-slate-800 rounded-xl p-12 flex flex-col items-center border border-slate-200 dark:border-slate-700 shadow-sm">
+                  <Loader2 size={32} className="animate-spin text-indigo-600 mb-4" />
+                  <p className="text-slate-600 dark:text-slate-400 font-medium">Fetching statistics from SendGrid...</p>
+                </div>
+              ) : statsError ? (
+                <div className="bg-red-50 dark:bg-red-900/20 rounded-xl p-6 border border-red-200 dark:border-red-900 text-red-700 dark:text-red-400 flex flex-col items-center text-center">
+                  <p className="font-semibold mb-2">Could not retrieve stats</p>
+                  <p className="text-sm opacity-90">{statsError}</p>
+                </div>
+              ) : emailStats && (emailStats.requests > 0 || emailStats.delivered > 0 || emailStats.opens > 0) ? (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="bg-white dark:bg-slate-800 rounded-xl p-5 border border-slate-200 dark:border-slate-700 shadow-sm">
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Delivered</p>
+                    <p className="text-3xl font-bold text-slate-900 dark:text-white mt-1">{emailStats.delivered.toLocaleString()}</p>
+                  </div>
+                  <div className="bg-white dark:bg-slate-800 rounded-xl p-5 border border-slate-200 dark:border-slate-700 shadow-sm">
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Unique Opens</p>
+                    <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-500 mt-1">{emailStats.unique_opens.toLocaleString()}</p>
+                    {emailStats.delivered > 0 && <p className="text-xs text-slate-500 mt-1">{Math.round((emailStats.unique_opens / emailStats.delivered) * 100)}% Open Rate</p>}
+                  </div>
+                  <div className="bg-white dark:bg-slate-800 rounded-xl p-5 border border-slate-200 dark:border-slate-700 shadow-sm">
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Clicks</p>
+                    <p className="text-3xl font-bold text-indigo-600 dark:text-indigo-500 mt-1">{emailStats.clicks.toLocaleString()}</p>
+                    {emailStats.unique_opens > 0 && <p className="text-xs text-slate-500 mt-1">{Math.round((emailStats.clicks / emailStats.unique_opens) * 100)}% Click-to-Open Rate</p>}
+                  </div>
+                  <div className="bg-white dark:bg-slate-800 rounded-xl p-5 border border-slate-200 dark:border-slate-700 shadow-sm">
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Bounces</p>
+                    <p className="text-3xl font-bold text-rose-600 dark:text-rose-500 mt-1">{emailStats.bounces.toLocaleString()}</p>
+                  </div>
+                  <div className="bg-white dark:bg-slate-800 rounded-xl p-5 border border-slate-200 dark:border-slate-700 shadow-sm col-span-2">
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Other Metrics</p>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <p className="text-xs text-slate-500">Unsubscribes</p>
+                        <p className="text-lg font-bold text-slate-700 dark:text-slate-300">{emailStats.unsubscribes.toLocaleString()}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-500">Spam Reports</p>
+                        <p className="text-lg font-bold text-slate-700 dark:text-slate-300">{emailStats.spam_reports.toLocaleString()}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-500">Drops</p>
+                        <p className="text-lg font-bold text-slate-700 dark:text-slate-300">{emailStats.drops.toLocaleString()}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-white dark:bg-slate-800 rounded-xl p-8 text-center text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 shadow-sm">
+                  <BarChart2 size={32} className="mx-auto mb-3 opacity-30" />
+                  <p className="font-medium text-slate-700 dark:text-slate-300">No data available</p>
+                  <p className="text-sm mt-1 max-w-sm mx-auto">Either this campaign was sent before stats tracking was enabled, or SendGrid has not processed the data yet.</p>
+                </div>
+              )}
             </div>
           </div>
         )}
