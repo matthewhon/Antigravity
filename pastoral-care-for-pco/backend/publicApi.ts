@@ -105,7 +105,7 @@ export async function getPublicRegistrations(req: any, res: any) {
   }
 
   try {
-    const data = await fetchFromPco(churchId, 'https://api.planningcenteronline.com/registrations/v2/events?per_page=100');
+    const data = await fetchFromPco(churchId, 'https://api.planningcenteronline.com/registrations/v2/signups?per_page=100');
     
     // Filter out archived registration events
     let rawEvents = data.data || [];
