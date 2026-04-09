@@ -473,7 +473,7 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
 
   useEffect(() => {
     if (panel === 'stats' && localCampaign.status === 'sent') {
-      if (!emailStats && !loadingStats) {
+      if (!emailStats && !loadingStats && statsError === null) {
         setLoadingStats(true);
         setStatsError(null);
         const apiBaseUrl = process.env.NODE_ENV === 'production' 
@@ -492,7 +492,7 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
           .finally(() => setLoadingStats(false));
       }
     }
-  }, [panel, localCampaign.id, localCampaign.status, churchId, emailStats, loadingStats]);
+  }, [panel, localCampaign.id, localCampaign.status, churchId, emailStats, loadingStats, statsError]);
 
   // Drawers (for block builder internals)
   const [isSettingsDrawerOpen, setIsSettingsDrawerOpen] = useState(false);
