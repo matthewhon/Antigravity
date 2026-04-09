@@ -10,6 +10,14 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
   const [theme, setTheme] = useState('light');
   const [color, setColor] = useState('indigo');
   const [layout, setLayout] = useState('grid');
+  const [gridCols, setGridCols] = useState('3');
+  const [groupType, setGroupType] = useState('');
+  const [showTags, setShowTags] = useState(true);
+  
+  // Registration specifics
+  const [dateFilter, setDateFilter] = useState('future'); // future, month, all
+  const [tagFilter, setTagFilter] = useState('');
+  const [imageRatio, setImageRatio] = useState('16:9'); // 16:9, 1:1
   
   const [isSyncing, setIsSyncing] = useState(false);
   const [toast, setToast] = useState('');
@@ -56,9 +64,14 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
   const domain = process.env.NODE_ENV === 'production' 
     ? 'https://pastoralcare.barnabassoftware.com'
     : window.location.origin;
-    
-  const iframeUrl = `${domain}/?widget=true&type=${type}&churchId=${churchId}&theme=${theme}&color=${color}&layout=${layout}`;
-  const scriptUrl = `${domain}/widget.js?type=${type}&churchId=${churchId}&theme=${theme}&color=${color}&layout=${layout}`;
+  const commonParams = `type=${type}&churchId=${churchId}&theme=${theme}&color=${color}&layout=${layout}` 
+      + (layout === 'grid' ? `&gridCols=${gridCols}` : '')
+      + (type === 'groups' && groupType ? `&groupType=${encodeURIComponent(groupType)}` : '')
+      + (type === 'groups' ? `&showTags=${showTags}` : '')
+      + (type === 'registrations' ? `&dateFilter=${dateFilter}&tagFilter=${encodeURIComponent(tagFilter)}&imageRatio=${imageRatio}` : '');
+
+  const iframeUrl = `${domain}/?widget=true&${commonParams}`;
+  const scriptUrl = `${domain}/widget.js?${commonParams}`;
 
   const iframeEmbedCode = `<iframe src="${iframeUrl}" width="100%" height="800" style="border:none; border-radius:12px; overflow:hidden;" allow="clipboard-write"></iframe>`;
   const scriptEmbedCode = `<script src="${scriptUrl}" async></script>`;
@@ -110,7 +123,11 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
               ].map(opt => (
                 <button 
                   key={opt.id}
-                  onClick={() => setType(opt.id)}
+                  onClick={() => {
+                    setType(opt.id);
+                    if (opt.id === 'events') setLayout('month');
+                    else if (layout === 'month') setLayout('grid');
+                  }}
                   className={`text-left px-4 py-2.5 rounded-lg border text-sm font-semibold transition ${type === opt.id ? 'bg-indigo-50 dark:bg-indigo-900/30 border-indigo-200 text-indigo-700 dark:text-indigo-400 dark:border-indigo-800' : 'bg-transparent border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-slate-300'}`}
                 >
                   {opt.label}
@@ -130,16 +147,102 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
           <div>
              <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Layout</label>
              <div className="flex gap-2">
-               <button onClick={() => setLayout('grid')} className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border transition ${layout==='grid'?'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-400':'border-slate-200 text-slate-500 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
-                 <LayoutGrid size={20} />
-                 <span className="text-[10px] uppercase font-bold tracking-widest">Grid</span>
-               </button>
+               {type !== 'events' ? (
+                 <button onClick={() => setLayout('grid')} className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border transition ${layout==='grid'?'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-400':'border-slate-200 text-slate-500 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
+                   <LayoutGrid size={20} />
+                   <span className="text-[10px] uppercase font-bold tracking-widest">{type === 'registrations' ? 'Tiles' : 'Grid'}</span>
+                 </button>
+               ) : (
+                 <button onClick={() => setLayout('month')} className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border transition ${layout==='month'?'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-400':'border-slate-200 text-slate-500 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
+                   <LayoutGrid size={20} />
+                   <span className="text-[10px] uppercase font-bold tracking-widest">Month</span>
+                 </button>
+               )}
                <button onClick={() => setLayout('list')} className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border transition ${layout==='list'?'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-400':'border-slate-200 text-slate-500 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
                  <MonitorPlay size={20} />
-                 <span className="text-[10px] uppercase font-bold tracking-widest">List</span>
+                 <span className="text-[10px] uppercase font-bold tracking-widest">{type === 'registrations' ? 'Detailed' : 'List'}</span>
                </button>
+               {type === 'registrations' && (
+                 <button onClick={() => setLayout('simplified_list')} className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border transition ${layout==='simplified_list'?'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-400':'border-slate-200 text-slate-500 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
+                   <MonitorPlay size={20} />
+                   <span className="text-[10px] uppercase font-bold tracking-widest">Simple</span>
+                 </button>
+               )}
              </div>
           </div>
+
+          {layout === 'grid' && type !== 'events' && (
+            <div>
+               <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Grid Columns</label>
+               <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-xl">
+                 {['2', '3', '4'].map(cols => (
+                   <button key={cols} onClick={() => setGridCols(cols)} className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition ${gridCols===cols?'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white':'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>{cols}</button>
+                 ))}
+               </div>
+            </div>
+          )}
+
+          {type === 'registrations' && ( layout === 'grid' || layout === 'list' ) && (
+            <div>
+               <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Image Ratio</label>
+               <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-xl">
+                 <button onClick={() => setImageRatio('16:9')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition ${imageRatio==='16:9'?'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white':'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>16:9 Widescreen</button>
+                 <button onClick={() => setImageRatio('1:1')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition ${imageRatio==='1:1'?'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white':'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>1:1 Square</button>
+               </div>
+            </div>
+          )}
+
+          {type === 'groups' && (
+            <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Filter Group Type</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. Adult, Youth (optional)" 
+                  value={groupType} 
+                  onChange={e => setGroupType(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                />
+              </div>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  checked={showTags} 
+                  onChange={e => setShowTags(e.target.checked)}
+                  className="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+                />
+                <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Show Tags</span>
+              </label>
+            </div>
+          )}
+
+          {type === 'registrations' && (
+            <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+              <div>
+                 <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Date Filter</label>
+                 <select 
+                    value={dateFilter}
+                    onChange={e => setDateFilter(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                 >
+                    <option value="future">Future Events</option>
+                    <option value="month">This Month</option>
+                    <option value="all">All Registrations</option>
+                 </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Filter By Tags</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. Women, Men, Kids" 
+                  value={tagFilter} 
+                  onChange={e => setTagFilter(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                />
+                <p className="text-[10px] text-slate-400 mt-1">Leave empty to show all tags.</p>
+              </div>
+            </div>
+          )}
 
           <div>
              <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Accent Color</label>
