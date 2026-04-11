@@ -628,6 +628,27 @@ export function startEmailScheduler(db: any): void {
                         log.info(`[Scheduler] Refreshed ${count} dynamic block(s) for campaign ${campaignId}`, 'system', { campaignId }, churchId);
                     }
 
+                    // 1.5 Auto-refresh PCO Smart Lists (if applicable) BEFORE send
+                    if (campaign.toListId) {
+                        try {
+                            log.info(`[Scheduler] Triggering PCO list refresh for list ${campaign.toListId}`, 'system', { campaignId }, churchId);
+                            const churchSnap = await db.collection('churches').doc(churchId).get();
+                            const token = churchSnap.data()?.pcoAccessToken;
+                            if (token) {
+                                // PCO API: POST /people/v2/lists/{id}/run
+                                await fetch(`https://api.planningcenteronline.com/people/v2/lists/${campaign.toListId}/run`, {
+                                    method: 'POST',
+                                    headers: { Authorization: `Bearer ${token}` }
+                                });
+                                // Wait 4 seconds for PCO to process the list before fetching members
+                                log.info(`[Scheduler] Waiting 4s for PCO list ${campaign.toListId} to process...`, 'system', { campaignId }, churchId);
+                                await new Promise(r => setTimeout(r, 4000));
+                            }
+                        } catch (e: any) {
+                            log.warn(`[Scheduler] Failed to trigger PCO list refresh: ${e.message}`, 'system', { campaignId }, churchId);
+                        }
+                    }
+
                     // 2. Execute send (skip status update if recurring)
                     const isRecurring = !!campaign.recurringFrequency;
                     const result = await executeSend(db as any, campaignId, churchId, undefined, isRecurring);

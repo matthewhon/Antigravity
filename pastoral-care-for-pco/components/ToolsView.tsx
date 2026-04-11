@@ -513,7 +513,7 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
 
   // Load PCO Lists when "To" section is opened on the Lists tab
   useEffect(() => {
-    if (openSection === 'to' && toTab === 'lists' && pcoLists.length === 0) {
+    if (openSection === 'to' && toTab === 'lists') {
       setLoadingLists(true);
       pcoService.getPeopleLists(churchId).then(raw => {
         const mapped: PcoList[] = (raw || []).map((item: any) => ({
@@ -526,11 +526,11 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
         setLoadingLists(false);
       }).catch(() => setLoadingLists(false));
     }
-  }, [openSection, toTab, churchId, pcoLists.length]);
+  }, [openSection, toTab, churchId]);
 
   // Load PCO Groups when the Groups tab is selected
   useEffect(() => {
-    if (openSection === 'to' && toTab === 'groups' && pcoGroups.length === 0) {
+    if (openSection === 'to' && toTab === 'groups') {
       setLoadingGroups(true);
       pcoService.getGroups(churchId).then(raw => {
         const mapped = (raw || []).map((item: any) => ({
@@ -542,7 +542,7 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
         setLoadingGroups(false);
       }).catch(() => setLoadingGroups(false));
     }
-  }, [openSection, toTab, churchId, pcoGroups.length]);
+  }, [openSection, toTab, churchId]);
 
   const toggleSection = (id: string) => setOpenSection(prev => prev === id ? null : id);
 

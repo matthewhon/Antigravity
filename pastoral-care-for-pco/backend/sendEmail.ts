@@ -339,33 +339,65 @@ function renderAnalyticsBlockHtml(
 
     switch (widgetId) {
         case 'giving_cumulative_ytd': {
-            const months: { label: string; actual: number | null; budget: number; isPast: boolean }[] = data.months || [];
-            const maxVal = months.length > 0 ? Math.max(...months.map(m => Math.max(m.actual || 0, m.budget))) : 1;
-            const bars = months.map(pt => {
-                const actualH = pt.actual !== null ? Math.max(2, Math.round((pt.actual / maxVal) * 56)) : 0;
-                return `<td valign="bottom" style="text-align:center;padding:0 1px;">
-                  <div style="background:#34d399;width:100%;height:${actualH}px;border-radius:2px 2px 0 0;${!pt.isPast ? 'opacity:0.4;' : ''}"></div>
-                  <div style="font-size:7px;color:#94a3b8;margin-top:2px;">${pt.label.charAt(0)}</div>
-                </td>`;
-            }).join('');
-            return `<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:16px;">
-              <div style="background:linear-gradient(135deg,#059669,#10b981);padding:10px 16px;">
-                <table width="100%" cellpadding="0" cellspacing="0">
-                  <tr>
-                    <td align="left" valign="middle">
-                      <div style="font-size:10px;font-weight:800;color:#a7f3d0;text-transform:uppercase;letter-spacing:1px;">Cumulative Giving YTD</div>
-                      ${data.fundFilter ? `<div style="font-size:9px;color:#6ee7b7;margin-top:2px;">${data.fundFilter}</div>` : ''}
-                    </td>
-                    <td align="right" valign="middle">
-                      <div style="font-size:16px;font-weight:900;color:#fff;">${fmt(data.totalYTD || 0, true)}</div>
-                    </td>
-                  </tr>
-                </table>
-              </div>
-              <div style="background:#fff;padding:8px 16px;">
-                <table width="100%" cellpadding="0" cellspacing="0"><tr>${bars}</tr></table>
-              </div>
-            </div>`;
+            if (data.months && data.months.length > 0) {
+                const months: { label: string; actual: number | null; budget: number; isPast: boolean }[] = data.months;
+                const maxVal = Math.max(...months.map(m => Math.max(m.actual || 0, m.budget)), 1);
+                const bars = months.map(pt => {
+                    const actualH = pt.actual !== null ? Math.max(2, Math.round((pt.actual / maxVal) * 56)) : 0;
+                    return `<td valign="bottom" style="text-align:center;padding:0 1px;">
+                      <div style="background:#34d399;width:100%;height:${actualH}px;border-radius:2px 2px 0 0;${!pt.isPast ? 'opacity:0.4;' : ''}"></div>
+                      <div style="font-size:7px;color:#94a3b8;margin-top:2px;">${pt.label.charAt(0)}</div>
+                    </td>`;
+                }).join('');
+                return `<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:16px;">
+                  <div style="background:linear-gradient(135deg,#059669,#10b981);padding:10px 16px;">
+                    <table width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td align="left" valign="middle">
+                          <div style="font-size:10px;font-weight:800;color:#a7f3d0;text-transform:uppercase;letter-spacing:1px;font-family:${fontFamily};">Cumulative Giving YTD</div>
+                          ${data.fundFilter ? `<div style="font-size:10px;color:#a7f3d0;margin-top:2px;font-family:${fontFamily};">${data.fundFilter}</div>` : ''}
+                        </td>
+                        <td align="right" valign="middle">
+                          <div style="font-size:16px;font-weight:900;color:#fff;font-family:${fontFamily};">${fmt(data.totalYTD || 0, true)}</div>
+                          ${data.hasBudget && data.totalAnnualBudget > 0 ? `<div style="font-size:10px;color:#a7f3d0;margin-top:2px;font-family:${fontFamily};">of ${fmt(data.totalAnnualBudget, true)} budget</div>` : ''}
+                        </td>
+                      </tr>
+                    </table>
+                  </div>
+                  <div style="background:#fff;padding:8px 16px;">
+                    <table width="100%" cellpadding="0" cellspacing="0"><tr>${bars}</tr></table>
+                  </div>
+                </div>`;
+            } else {
+                // Legacy fallback for old email drafts that still use data.cumulative
+                const cumulative: { date: string; amount: number }[] = data.cumulative || [];
+                const maxVal = cumulative.length > 0 ? cumulative[cumulative.length - 1].amount : 1;
+                const bars = cumulative.map(pt => {
+                    const h = Math.max(2, Math.round((pt.amount / maxVal) * 56));
+                    return `<td valign="bottom" style="text-align:center;padding:0 1px;">
+                      <div style="background:#34d399;width:100%;height:${h}px;border-radius:2px 2px 0 0;"></div>
+                      <div style="font-size:7px;color:#94a3b8;margin-top:2px;">${pt.date.slice(5)}</div>
+                    </td>`;
+                }).join('');
+                return `<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:16px;">
+                  <div style="background:linear-gradient(135deg,#059669,#10b981);padding:10px 16px;">
+                    <table width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td align="left" valign="middle">
+                          <div style="font-size:10px;font-weight:800;color:#a7f3d0;text-transform:uppercase;letter-spacing:1px;font-family:${fontFamily};">Cumulative Giving YTD</div>
+                          ${data.fundFilter ? `<div style="font-size:10px;color:#a7f3d0;margin-top:2px;font-family:${fontFamily};">${data.fundFilter}</div>` : ''}
+                        </td>
+                        <td align="right" valign="middle">
+                          <div style="font-size:16px;font-weight:900;color:#fff;font-family:${fontFamily};">${fmt(data.totalYTD || 0, true)}</div>
+                        </td>
+                      </tr>
+                    </table>
+                  </div>
+                  <div style="background:#fff;padding:8px 16px;">
+                    <table width="100%" cellpadding="0" cellspacing="0"><tr>${bars || '<td><div style="font-size:11px;color:#94a3b8;text-align:center;">No data</div></td>'}</tr></table>
+                  </div>
+                </div>`;
+            }
         }
         case 'giving_key_metrics':
             return `<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:16px;">
