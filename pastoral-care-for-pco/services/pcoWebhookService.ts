@@ -57,16 +57,42 @@ export const initializeWebhooks = async (churchId: string) => {
 
     // PCO Webhooks v2 event topic names
     const topics = [
+        // People
         'people.v2.events.person.created',
         'people.v2.events.person.updated',
         'people.v2.events.person.destroyed', // To automatically remove deleted people
+        'people.v2.events.household.created',
+        'people.v2.events.household.updated',
+        'people.v2.events.household.destroyed',
+
+        // Giving
         'giving.v2.events.donation.created',
+        'giving.v2.events.donation.updated',
+        'giving.v2.events.donation.destroyed',
+        'giving.v2.events.fund.created',
+        'giving.v2.events.fund.updated',
+        'giving.v2.events.fund.destroyed',
+        'giving.v2.events.recurring_donation.created',
+        'giving.v2.events.recurring_donation.updated',
+        'giving.v2.events.recurring_donation.destroyed',
+
+        // Services
+        'services.v2.events.plan_person.created',
         'services.v2.events.plan_person.updated',
-        // Real-time incremental sync — avoids full re-syncs after first load
+        'services.v2.events.plan_person.destroyed',
+        'services.v2.events.needed_position.created',
+        'services.v2.events.needed_position.updated',
+        'services.v2.events.needed_position.destroyed',
+        'services.v2.events.plan.created',
+        'services.v2.events.plan.updated',
+        'services.v2.events.plan.destroyed',
+
+        // Check-Ins
         'check_ins.v2.events.check_in.created',
+        'check_ins.v2.events.check_in.destroyed',
+
+        // Groups
         'groups.v2.events.group_attendance.created',
-        
-        // Group and Membership changes
         'groups.v2.events.group.created',
         'groups.v2.events.group.updated',
         'groups.v2.events.group.destroyed',
