@@ -606,41 +606,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                         </div>
                     </div>
 
-                    {/* Book Management & Indexing */}
-                    <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm mt-8">
-                        <div className="flex justify-between items-center mb-6">
-                            <div>
-                                <h3 className="text-lg font-black text-slate-900 dark:text-white">📚 Book Management & Indexing</h3>
-                                <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-1">Scripture Library Feature</p>
-                            </div>
-                            <span className="text-[9px] font-black bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/30">BETA</span>
-                        </div>
 
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl">
-                                <div>
-                                    <p className="text-xs font-bold text-slate-900 dark:text-white">Enable Scripture Library</p>
-                                    <p className="text-[10px] text-slate-400 mt-0.5">Show the 📚 Library tab in the navigation for all users. When off, only the system owner can access it.</p>
-                                </div>
-                                <button
-                                    onClick={() => handleChange('enableLibrary', !settings.enableLibrary)}
-                                    className={`ml-6 flex-none w-12 h-6 rounded-full p-1 transition-colors ${settings.enableLibrary ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'}`}
-                                >
-                                    <div className={`w-4 h-4 bg-white rounded-full transition-transform ${settings.enableLibrary ? 'translate-x-6' : ''}`}></div>
-                                </button>
-                            </div>
-
-                            <div className="flex justify-end pt-2">
-                                <button
-                                    onClick={handleSave}
-                                    disabled={isSaving}
-                                    className="bg-indigo-600 text-white px-5 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-700 transition-all disabled:opacity-50"
-                                >
-                                    {isSaving ? 'Saving...' : 'Save'}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
                 </div>
             </div>
         )}
