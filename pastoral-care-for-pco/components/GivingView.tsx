@@ -62,7 +62,7 @@ const TOOLTIP_STYLE = {
 };
 
 const getWidgetSpan = (id: string) => {
-    if (['keyMetrics', 'trends', 'fundPerformance', 'cumulativeYTD', 'donorLifecycle', 'trendsComparison', 'benchmark_giving_avg', 'budgetProgress'].includes(id)) return 'col-span-1 md:col-span-2 lg:col-span-2';
+    if (['keyMetrics', 'trends', 'fundPerformance', 'cumulativeYTD', 'donorLifecycle', 'trendsComparison', 'benchmark_giving_avg', 'budgetProgress', 'givingVsBudget'].includes(id)) return 'col-span-1 md:col-span-2 lg:col-span-2';
     return 'col-span-1';
 };
 
@@ -583,14 +583,20 @@ export const GivingView: React.FC<GivingViewProps> = ({
               const totalPct = totalBudget > 0 ? Math.min((totalActual / totalBudget) * 100, 100) : 0;
 
               // Pace-aware colour logic:
-              // Expected YTD = sum of monthly budget amounts through the current month
+              // Expected YTD = sum of passed monthly budgets + (current month budget * (current day / days in month))
               const currentMonth = activeYear === now.getFullYear() ? now.getMonth() : (activeYear < now.getFullYear() ? 11 : -1);
-              const totalExpectedYTD = currentMonth >= 0
-                  ? yearBudgets.reduce((s, b) => {
-                      const monthlySum = b.monthlyAmounts.slice(0, currentMonth + 1).reduce((a, v) => a + v, 0);
-                      return s + monthlySum;
-                  }, 0)
-                  : 0;
+              const currentDay = activeYear === now.getFullYear() ? now.getDate() : (activeYear < now.getFullYear() ? 31 : 0);
+              const daysInCurrentMonth = activeYear === now.getFullYear() ? new Date(activeYear, currentMonth + 1, 0).getDate() : 31;
+              const monthFraction = activeYear === now.getFullYear() ? (currentDay / daysInCurrentMonth) : (activeYear < now.getFullYear() ? 1 : 0);
+
+              const getExpectedYTD = (amounts: number[]) => {
+                  if (currentMonth < 0) return 0;
+                  const pastSum = amounts.slice(0, currentMonth).reduce((a, v) => a + v, 0);
+                  const currentMonthAmount = amounts[currentMonth] || 0;
+                  return pastSum + (currentMonthAmount * monthFraction);
+              };
+
+              const totalExpectedYTD = yearBudgets.reduce((s, b) => s + getExpectedYTD(b.monthlyAmounts), 0);
               const expectedPct = totalBudget > 0 ? Math.min((totalExpectedYTD / totalBudget) * 100, 100) : 0;
               // paceRatio: how actual giving compares to where we should be this month (% of expected)
               const paceRatio = totalExpectedYTD > 0 ? (totalActual / totalExpectedYTD) * 100 : 100;
@@ -599,8 +605,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
                   ratio >= 90 ? '#10b981' : ratio >= 80 ? '#f59e0b' : '#f43f5e';
               const totalColor = statusColor(paceRatio);
               // Per-fund expected YTD helper
-              const fundExpectedYTD = (b: typeof yearBudgets[0]) =>
-                  currentMonth >= 0 ? b.monthlyAmounts.slice(0, currentMonth + 1).reduce((a, v) => a + v, 0) : 0;
+              const fundExpectedYTD = (b: typeof yearBudgets[0]) => getExpectedYTD(b.monthlyAmounts);
 
               return (
                   <WidgetWrapper

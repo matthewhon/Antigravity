@@ -1169,6 +1169,16 @@ export const getEmailStats = async (req: any, res: any) => {
 
         if (!sgRes.ok) {
             const body = await sgRes.text();
+            if (sgRes.status === 404 && body.includes('category does not exist')) {
+                return res.json({
+                    success: true,
+                    stats: {
+                        requests: 0, delivered: 0, opens: 0, unique_opens: 0,
+                        clicks: 0, unique_clicks: 0, bounces: 0, spam_reports: 0,
+                        unsubscribes: 0, drops: 0
+                    }
+                });
+            }
             throw new Error(`SendGrid API error: ${sgRes.status} - ${body}`);
         }
 
