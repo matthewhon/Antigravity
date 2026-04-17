@@ -498,3 +498,136 @@ export const checkA2pStatus = async (req: any, res: any) => {
         return res.status(500).json({ error: e.message || 'Status check failed' });
     }
 };
+
+// ─── POST /api/messaging/create-customer-profile ────────────────────────────
+// Programmatically creates a Twilio Trust Hub Customer Profile Bundle for the
+// church's sub-account. This is required before A2P brand registration can
+// succeed. Steps:
+//   1. Create EndUser (business contact info)
+//   2. Create CustomerProfile bundle (using the A2P policy SID)
+//   3. Assign EndUser → CustomerProfile
+//   4. Submit CustomerProfile for Twilio review
+//   5. Save the BU... SID to Firestore → smsSettings.twilioCustomerProfileSid
+
+// Twilio's well-known policy SID for A2P 10DLC Secondary Customer Profiles.
+// This is the standard policy used by Twilio ISVs for customer profiles.
+const A2P_POLICY_SID = 'RNdfbf3fae0e1107f8aded0e7cead80bf5';
+
+export const createCustomerProfile = async (req: any, res: any) => {
+    res.set('Access-Control-Allow-Origin', '*');
+
+    const { churchId } = req.body || {};
+    if (!churchId) return res.status(400).json({ error: 'Missing churchId' });
+
+    const db  = getDb();
+    const log = createServerLogger(db);
+
+    try {
+        const { accountSid, authToken } = await getMasterCredentials(db);
+        const master = getMasterClient(accountSid, authToken);
+
+        const churchSnap = await db.collection('churches').doc(churchId).get();
+        if (!churchSnap.exists) return res.status(404).json({ error: 'Church not found' });
+        const sms = churchSnap.data()?.smsSettings || {};
+
+        // Validate required fields
+        const required: { key: string; label: string }[] = [
+            { key: 'a2pBusinessName',     label: 'Legal Business Name' },
+            { key: 'a2pEin',              label: 'Federal EIN' },
+            { key: 'a2pWebsite',          label: 'Website' },
+            { key: 'a2pContactFirstName', label: 'Contact First Name' },
+            { key: 'a2pContactLastName',  label: 'Contact Last Name' },
+            { key: 'a2pContactEmail',     label: 'Contact Email' },
+            { key: 'a2pContactPhone',     label: 'Contact Phone' },
+            { key: 'a2pAddress',          label: 'Street Address' },
+            { key: 'a2pCity',             label: 'City' },
+            { key: 'a2pState',            label: 'State' },
+            { key: 'a2pZip',              label: 'ZIP Code' },
+        ];
+        const missing = required.filter(r => !sms[r.key]).map(r => r.label);
+        if (missing.length) {
+            return res.status(400).json({
+                error: `Missing required fields: ${missing.join(', ')}. Save the form first.`,
+            });
+        }
+
+        // ── Step 1: Create EndUser (business info + authorised rep combined) ──
+        const endUser = await (master as any).trusthub.v1.endUsers.create({
+            friendlyName: `${sms.a2pContactFirstName} ${sms.a2pContactLastName} – ${sms.a2pBusinessName}`,
+            type: 'customer_profile_business_information',
+            attributes: {
+                business_name:                  sms.a2pBusinessName,
+                business_registration_identifier: 'EIN',
+                business_registration_number:   sms.a2pEin,
+                business_type:                  sms.a2pBusinessType || 'Non-profit Corporation',
+                business_industry:              sms.a2pVertical     || 'RELIGIOUS',
+                business_regions_of_operation:  'USA',
+                website_url:                    sms.a2pWebsite,
+                // Address
+                street:      sms.a2pAddress,
+                city:        sms.a2pCity,
+                region:      sms.a2pState,
+                postal_code: sms.a2pZip,
+                iso_country: 'US',
+                // Authorised rep
+                first_name:    sms.a2pContactFirstName,
+                last_name:     sms.a2pContactLastName,
+                email:         sms.a2pContactEmail,
+                phone_number:  sms.a2pContactPhone,
+                job_position:  'Director',
+            },
+        });
+
+        log.info(`[createCustomerProfile] Created EndUser ${endUser.sid} for ${churchId}`, 'system', { churchId }, churchId);
+
+        // ── Step 2: Create the CustomerProfile bundle ─────────────────────────
+        const profile = await (master as any).trusthub.v1.customerProfiles.create({
+            friendlyName: sms.a2pBusinessName,
+            email:        sms.a2pContactEmail,
+            policySid:    A2P_POLICY_SID,
+        });
+
+        log.info(`[createCustomerProfile] Created CustomerProfile ${profile.sid} for ${churchId}`, 'system', { churchId }, churchId);
+
+        // ── Step 3: Assign the EndUser to the CustomerProfile ─────────────────
+        await (master as any).trusthub.v1
+            .customerProfiles(profile.sid)
+            .customerProfilesEntityAssignments
+            .create({ objectSid: endUser.sid });
+
+        log.info(`[createCustomerProfile] Assigned EndUser ${endUser.sid} → Profile ${profile.sid}`, 'system', { churchId }, churchId);
+
+        // ── Step 4: Submit the profile for Twilio review ───────────────────────
+        await (master as any).trusthub.v1
+            .customerProfiles(profile.sid)
+            .update({ status: 'pending-review' });
+
+        log.info(`[createCustomerProfile] Profile ${profile.sid} submitted for review`, 'system', { churchId }, churchId);
+
+        // ── Step 5: Save to Firestore ──────────────────────────────────────────
+        await db.collection('churches').doc(churchId).update({
+            'smsSettings.twilioCustomerProfileSid':     profile.sid,
+            'smsSettings.twilioEndUserSid':             endUser.sid,
+            'smsSettings.twilioCustomerProfileStatus':  'pending-review',
+            'smsSettings.twilioCustomerProfileCreatedAt': Date.now(),
+        });
+
+        return res.json({
+            success:    true,
+            profileSid: profile.sid,
+            endUserSid: endUser.sid,
+            status:     'pending-review',
+            message:    'Customer Profile Bundle created and submitted for Twilio review. ' +
+                        'Approval is typically same-day. Once approved, click "Submit to Twilio" ' +
+                        'to complete A2P brand registration.',
+        });
+
+    } catch (e: any) {
+        log.error(`[createCustomerProfile] Failed for ${churchId}: ${e.message}`, 'system', { churchId }, churchId);
+        return res.status(500).json({
+            error: e.message || 'Failed to create Customer Profile',
+            // Twilio errors have a numeric code
+            twilioCode: (e as any).code || null,
+        });
+    }
+};

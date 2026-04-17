@@ -14,6 +14,7 @@ interface DayEntry {
     dayOfWeek: string;    // "SUN"
     dayNum: string;       // "13"
     monthAbbr: string;    // "APR"
+    /** Service plans on this day (empty if it's a giving-only day) */
     services: {
         id: string;
         name: string;
@@ -22,6 +23,8 @@ interface DayEntry {
     }[];
     totalHeadcount: number;
     givingAmount: number;
+    /** True if there are no services — the entry came from a giving batch date */
+    isGivingOnly: boolean;
     isToday: boolean;
 }
 
@@ -42,15 +45,13 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
         const now = new Date();
         const todayKey = toLocalDateKey(now);
 
-        // ── 1. Build giving totals from the raw DetailedDonation[] ──────────────
-        // We bypass givingAnalytics.trends (which is filter-scoped and may exclude
-        // service dates outside the currently selected giving window). Instead we
-        // scan ALL donations so every service day shows real giving data.
+        // ── 1. Build giving totals from raw DetailedDonation[] ──────────────────
+        // Uses the donation's `date` field (YYYY-MM-DD) which corresponds to the
+        // PCO batch creation date / payment received date.
         const givingByDate: Record<string, number> = {};
         donations.forEach(d => {
-            // d.date is "YYYY-MM-DD" or a full ISO string — take the date part only.
             const key = (d.date || '').slice(0, 10);
-            if (key.length === 10) {
+            if (key.length === 10 && key <= todayKey) {
                 givingByDate[key] = (givingByDate[key] || 0) + d.amount;
             }
         });
@@ -107,19 +108,32 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
             });
         });
 
-        // ── 4. 5 most-recent days, newest first ──────────────────────────────────
-        const recentKeys = Object.keys(plansByDate).sort().reverse().slice(0, 5);
+        // ── 4. Merge service dates + giving-batch-only dates ─────────────────────
+        // Any date that has giving but no corresponding service still gets a row.
+        const allDateKeys = new Set<string>([
+            ...Object.keys(plansByDate),
+            ...Object.keys(givingByDate),
+        ]);
+
+        // ── 5. 5 most-recent past days, newest first ─────────────────────────────
+        const recentKeys = Array.from(allDateKeys)
+            .filter(k => k <= todayKey)
+            .sort()
+            .reverse()
+            .slice(0, 15);
 
         return recentKeys.map(key => {
             const d = new Date(key + 'T12:00:00'); // noon prevents DST day drift
+            const services = plansByDate[key] || [];
             return {
                 dateKey: key,
                 dayOfWeek: d.toLocaleDateString(undefined, { weekday: 'short' }).toUpperCase(),
                 dayNum: String(d.getDate()),
                 monthAbbr: d.toLocaleDateString(undefined, { month: 'short' }).toUpperCase(),
-                services: plansByDate[key] || [],
+                services,
                 totalHeadcount: headcountByDate[key] || 0,
                 givingAmount: givingByDate[key] || 0,
+                isGivingOnly: services.length === 0,
                 isToday: key === todayKey,
             };
         });
@@ -145,10 +159,10 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
             <div className="relative z-10 flex items-center justify-between mb-5">
                 <div>
                     <h4 className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">
-                        Services Timeline
+                        Church Timeline
                     </h4>
                     <p className="text-[9px] font-bold text-indigo-400 uppercase tracking-widest mt-0.5">
-                        Last 5 Service Days · Most Recent First
+                        Last 15 Days · Services &amp; Giving · Most Recent First
                     </p>
                 </div>
                 <span className="text-lg">🗓️</span>
@@ -157,9 +171,9 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
             {isEmpty ? (
                 <div className="flex-1 flex flex-col items-center justify-center text-center py-8">
                     <div className="text-4xl mb-3 grayscale opacity-20">📅</div>
-                    <p className="text-xs font-bold text-slate-400 dark:text-slate-500">No Recent Services</p>
+                    <p className="text-xs font-bold text-slate-400 dark:text-slate-500">No Recent Activity</p>
                     <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 max-w-[160px]">
-                        Sync Planning Center services to populate this timeline.
+                        Sync Planning Center services and giving to populate this timeline.
                     </p>
                 </div>
             ) : (
@@ -172,7 +186,9 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
                             const isFirst = idx === 0; // most recent
                             const dotCls = isFirst
                                 ? 'bg-indigo-500 ring-2 ring-indigo-200 dark:ring-indigo-800 shadow shadow-indigo-300 dark:shadow-indigo-700'
-                                : 'bg-slate-300 dark:bg-slate-600';
+                                : day.isGivingOnly
+                                    ? 'bg-emerald-400 dark:bg-emerald-600'
+                                    : 'bg-slate-300 dark:bg-slate-600';
 
                             return (
                                 <div key={day.dateKey} className="flex items-start gap-4">
@@ -185,9 +201,13 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
                                     <div className={`shrink-0 w-10 flex flex-col items-center rounded-xl py-1 border ${
                                         isFirst
                                             ? 'bg-indigo-500 border-indigo-500'
-                                            : 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-100 dark:border-indigo-800/40'
+                                            : day.isGivingOnly
+                                                ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/40'
+                                                : 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-100 dark:border-indigo-800/40'
                                     }`}>
-                                        <span className={`text-[7px] font-black uppercase tracking-widest ${isFirst ? 'text-indigo-200' : 'text-rose-500'}`}>
+                                        <span className={`text-[7px] font-black uppercase tracking-widest ${
+                                            isFirst ? 'text-indigo-200' : day.isGivingOnly ? 'text-emerald-500' : 'text-rose-500'
+                                        }`}>
                                             {day.monthAbbr}
                                         </span>
                                         <span className={`text-base font-black leading-none ${isFirst ? 'text-white' : 'text-slate-900 dark:text-white'}`}>
@@ -202,41 +222,55 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
                                     <div className={`flex-1 min-w-0 rounded-2xl border p-3 transition-all ${
                                         isFirst
                                             ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800'
-                                            : 'bg-slate-50 dark:bg-slate-900/50 border-slate-100 dark:border-slate-800 hover:border-indigo-200 dark:hover:border-indigo-800'
+                                            : day.isGivingOnly
+                                                ? 'bg-emerald-50/60 dark:bg-emerald-900/10 border-emerald-100 dark:border-emerald-900/30'
+                                                : 'bg-slate-50 dark:bg-slate-900/50 border-slate-100 dark:border-slate-800 hover:border-indigo-200 dark:hover:border-indigo-800'
                                     }`}>
-                                        {/* Service rows */}
+                                        {/* Service rows — or giving-only label */}
                                         <div className="space-y-1 mb-2.5">
-                                            {day.services.map(svc => (
-                                                <div key={svc.id} className="flex items-center justify-between gap-2">
-                                                    <div className="flex items-center gap-2 min-w-0">
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0" />
-                                                        <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300 truncate">
-                                                            {svc.name}
-                                                        </span>
-                                                    </div>
-                                                    {svc.time && (
-                                                        <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 whitespace-nowrap shrink-0">
-                                                            {svc.time}
-                                                        </span>
-                                                    )}
+                                            {day.isGivingOnly ? (
+                                                <div className="flex items-center gap-2">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                                                    <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
+                                                        Giving Batch
+                                                    </span>
+                                                    <span className="text-[9px] text-slate-400 dark:text-slate-500">· no service</span>
                                                 </div>
-                                            ))}
+                                            ) : (
+                                                day.services.map(svc => (
+                                                    <div key={svc.id} className="flex items-center justify-between gap-2">
+                                                        <div className="flex items-center gap-2 min-w-0">
+                                                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0" />
+                                                            <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300 truncate">
+                                                                {svc.name}
+                                                            </span>
+                                                        </div>
+                                                        {svc.time && (
+                                                            <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 whitespace-nowrap shrink-0">
+                                                                {svc.time}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                ))
+                                            )}
                                         </div>
 
                                         {/* Stat pills */}
                                         <div className="flex flex-wrap items-center gap-1.5">
-                                            {/* Headcount */}
-                                            {day.totalHeadcount > 0 ? (
-                                                <span className="inline-flex items-center gap-1 bg-violet-50 dark:bg-violet-900/20 border border-violet-100 dark:border-violet-800/30 px-2 py-0.5 rounded-lg text-[9px]">
-                                                    <span>👥</span>
-                                                    <span className="font-black text-violet-700 dark:text-violet-400">{day.totalHeadcount.toLocaleString()}</span>
-                                                    <span className="text-violet-400 dark:text-violet-500 font-medium">attended</span>
-                                                </span>
-                                            ) : (
-                                                <span className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded-lg text-[9px] text-slate-400">
-                                                    <span>👥</span>
-                                                    <span>No headcount</span>
-                                                </span>
+                                            {/* Headcount — only shown for service days */}
+                                            {!day.isGivingOnly && (
+                                                day.totalHeadcount > 0 ? (
+                                                    <span className="inline-flex items-center gap-1 bg-violet-50 dark:bg-violet-900/20 border border-violet-100 dark:border-violet-800/30 px-2 py-0.5 rounded-lg text-[9px]">
+                                                        <span>👥</span>
+                                                        <span className="font-black text-violet-700 dark:text-violet-400">{day.totalHeadcount.toLocaleString()}</span>
+                                                        <span className="text-violet-400 dark:text-violet-500 font-medium">attended</span>
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded-lg text-[9px] text-slate-400">
+                                                        <span>👥</span>
+                                                        <span>No headcount</span>
+                                                    </span>
+                                                )
                                             )}
 
                                             {/* Giving */}
@@ -250,8 +284,8 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
                                                 </span>
                                             )}
 
-                                            {/* Volunteers */}
-                                            {(() => {
+                                            {/* Volunteers — only for service days */}
+                                            {!day.isGivingOnly && (() => {
                                                 const v = day.services.reduce((s, sv) => s + sv.volunteersScheduled, 0);
                                                 return v > 0 ? (
                                                     <span className="inline-flex items-center gap-1 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800/30 px-2 py-0.5 rounded-lg text-[9px]">
