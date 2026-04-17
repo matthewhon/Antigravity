@@ -2343,24 +2343,52 @@ const SmsSetupWizard: React.FC<{
 
                 {step === 'pick-number' && (
                     <>
+                        {/* Header + location context */}
                         <h2 className="text-xl font-black text-slate-900 dark:text-white mb-1">Pick a Number</h2>
-                        <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Select the number that will be your church's SMS identity.</p>
+                        {numbers.length > 0 && (() => {
+                            const sample = numbers[0];
+                            const loc = [sample.locality, sample.region].filter(Boolean).join(', ');
+                            return (
+                                <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+                                    Showing <span className="font-semibold text-slate-700 dark:text-slate-200">{numbers.length} local number{numbers.length !== 1 ? 's' : ''}</span>
+                                    {loc ? <> in <span className="font-semibold text-violet-600 dark:text-violet-400">{loc}</span></> : <> for area code <span className="font-semibold text-violet-600 dark:text-violet-400">{areaCode}</span></>}
+                                    . Select the one that will be your church's SMS identity.
+                                </p>
+                            );
+                        })()}
+                        {numbers.length === 0 && (
+                            <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Select the number that will be your church's SMS identity.</p>
+                        )}
 
                         <div className="space-y-2 mb-5">
                             {numbers.length === 0 ? (
                                 <p className="text-sm text-slate-500 text-center py-8">No numbers found for area code {areaCode}. Try a different code.</p>
-                            ) : numbers.map(n => (
+                            ) : numbers.map(n => {
+                                const cityState = [n.locality, n.region].filter(Boolean).join(', ');
+                                return (
                                 <label
                                     key={n.phoneNumber}
-                                    className={`flex items-center gap-3 p-3 rounded-2xl border-2 cursor-pointer transition ${selectedNumber === n.phoneNumber ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20' : 'border-slate-200 dark:border-slate-700 hover:border-violet-300'}`}
+                                    className={`flex items-center gap-3 p-4 rounded-2xl border-2 cursor-pointer transition ${selectedNumber === n.phoneNumber ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20' : 'border-slate-200 dark:border-slate-700 hover:border-violet-300 dark:hover:border-violet-600'}`}
                                 >
-                                    <input type="radio" name="number" value={n.phoneNumber} checked={selectedNumber === n.phoneNumber} onChange={() => setSelectedNumber(n.phoneNumber)} className="accent-violet-600" />
-                                    <div>
-                                        <p className="font-black text-slate-900 dark:text-white">{n.friendlyName}</p>
-                                        <p className="text-xs text-slate-500">{n.locality}, {n.region}</p>
+                                    <input type="radio" name="number" value={n.phoneNumber} checked={selectedNumber === n.phoneNumber} onChange={() => setSelectedNumber(n.phoneNumber)} className="accent-violet-600 mt-0.5 shrink-0" />
+                                    <div className="flex-1 min-w-0">
+                                        <p className="font-black text-lg text-slate-900 dark:text-white tracking-wide">{n.friendlyName}</p>
+                                        {cityState ? (
+                                            <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold">
+                                                📍 {cityState}
+                                            </span>
+                                        ) : (
+                                            <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-xs">
+                                                📍 Area code {areaCode}
+                                            </span>
+                                        )}
                                     </div>
+                                    {selectedNumber === n.phoneNumber && (
+                                        <CheckCircle size={18} className="text-violet-600 shrink-0" />
+                                    )}
                                 </label>
-                            ))}
+                                );
+                            })}
                         </div>
 
                         <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Sender Name (shown in message headers)</label>

@@ -98,10 +98,38 @@ export const provisionTwilioNumber = async (req: any, res: any) => {
             log.info(`Created Twilio sub-account ${subAccountSid} for church ${churchId}`, 'system', { churchId, subAccountSid }, churchId);
         }
 
-        // 3. Determine inbound webhook URL (use Cloud Run URL from env, or localhost for dev)
-        const baseUrl = process.env.SERVER_BASE_URL || `http://localhost:${process.env.PORT || 8080}`;
+        // 3. Determine inbound webhook URL
+        //    Priority: Firestore twilioWebhookBaseUrl → Firestore apiBaseUrl → SERVER_BASE_URL env → error
+        const sysSnap = await db.doc('system/settings').get();
+        const sysData = sysSnap.data() || {};
+        const baseUrl = (
+            sysData.twilioWebhookBaseUrl ||
+            sysData.apiBaseUrl ||
+            process.env.SERVER_BASE_URL ||
+            ''
+        ).replace(/\/$/, ''); // strip trailing slash
+
+        if (!baseUrl) {
+            throw new Error(
+                'Webhook Base URL is not configured. ' +
+                'Set "twilioWebhookBaseUrl" or "apiBaseUrl" in App Config → Configuration → Twilio SMS, or set the SERVER_BASE_URL environment variable.'
+            );
+        }
+        if (baseUrl.startsWith('http://localhost') || baseUrl.startsWith('http://127.')) {
+            throw new Error(
+                `Webhook Base URL "${baseUrl}" is a localhost address — Twilio requires a publicly ` +
+                'reachable HTTPS URL. Set the correct backend URL in App Config → Configuration → Twilio SMS → Webhook Base URL.'
+            );
+        }
+        if (!baseUrl.startsWith('https://')) {
+            throw new Error(
+                `Webhook Base URL "${baseUrl}" must use HTTPS. Twilio will not deliver webhooks to plain HTTP or localhost addresses.`
+            );
+        }
+
         const inboundUrl     = `${baseUrl}/api/messaging/inbound`;
         const statusCallback = `${baseUrl}/api/messaging/status`;
+
 
         // 4. Purchase the phone number under the sub-account
         const subClient = twilio(subAccountSid, subAccountAuthToken);
