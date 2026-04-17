@@ -358,6 +358,8 @@ const App: React.FC = () => {
           'giving': 'Giving',
           'finance': 'Finance',
           'metrics': 'Metrics',
+          'metrics-input': 'Metrics',
+          'metrics-settings': 'Metrics',
           'messaging': 'Messaging',
       };
       
@@ -1058,6 +1060,35 @@ const App: React.FC = () => {
                 censusData={censusData}
                 peopleData={peopleDashboardData}
                 church={church}
+                activePage="Dashboard"
+                onUpdateChurch={(updates) => {
+                    firestore.updateChurch(church.id, updates);
+                    setChurch({ ...church, ...updates });
+                }}
+            />
+        )}
+        {view === 'metrics-input' && (
+            <MetricsView 
+                churchId={church.id}
+                currentUser={user}
+                censusData={censusData}
+                peopleData={peopleDashboardData}
+                church={church}
+                activePage="Input"
+                onUpdateChurch={(updates) => {
+                    firestore.updateChurch(church.id, updates);
+                    setChurch({ ...church, ...updates });
+                }}
+            />
+        )}
+        {view === 'metrics-settings' && (
+            <MetricsView 
+                churchId={church.id}
+                currentUser={user}
+                censusData={censusData}
+                peopleData={peopleDashboardData}
+                church={church}
+                activePage="Settings"
                 onUpdateChurch={(updates) => {
                     firestore.updateChurch(church.id, updates);
                     setChurch({ ...church, ...updates });

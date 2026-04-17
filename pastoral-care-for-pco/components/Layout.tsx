@@ -19,6 +19,7 @@ interface LayoutProps {
   onRefreshUser?: () => void;
   isSyncing?: boolean;
   enableLibrary?: boolean;
+  metricsSubViews?: { label: string; view: string; icon: string }[];
 }
 
 const Layout: React.FC<LayoutProps> = ({ 
@@ -131,12 +132,45 @@ const Layout: React.FC<LayoutProps> = ({
                 )}
 
                 {hasPermission('metrics') && (
-                  <NavItem 
-                    icon="📈" 
-                    label="Metrics" 
-                    active={currentView === 'metrics'} 
-                    onClick={() => onNavigate('metrics')} 
-                  />
+                  <div className="relative group shrink-0">
+                    {/* Parent trigger */}
+                    <button
+                      onClick={() => onNavigate('metrics')}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all border ${
+                        currentView.startsWith('metrics')
+                          ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 ring-1 ring-indigo-500 border-transparent'
+                          : 'text-slate-400 border-transparent hover:bg-slate-800 hover:text-white hover:border-slate-700'
+                      }`}
+                    >
+                      <span className="text-base">📈</span>
+                      <span className="text-[10px] font-black uppercase tracking-widest">Metrics</span>
+                      <svg className="w-3 h-3 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M6 9l6 6 6-6"/></svg>
+                    </button>
+
+                    {/* Hover dropdown */}
+                    <div className="absolute left-0 top-full pt-2 z-50 hidden group-hover:block">
+                      <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl shadow-black/40 p-2 flex flex-col gap-1 min-w-[170px]">
+                        {[
+                          { view: 'metrics',          icon: '📊', label: 'Dashboard'   },
+                          { view: 'metrics-input',    icon: '✏️',  label: 'Input Data'  },
+                          { view: 'metrics-settings', icon: '⚙️',  label: 'Configure'   },
+                        ].map(item => (
+                          <button
+                            key={item.view}
+                            onClick={() => onNavigate(item.view)}
+                            className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest w-full text-left transition-all ${
+                              currentView === item.view
+                                ? 'bg-indigo-600 text-white'
+                                : 'text-slate-300 hover:bg-slate-700 hover:text-white'
+                            }`}
+                          >
+                            <span className="text-sm">{item.icon}</span>
+                            {item.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 )}
 
                 {hasPermission('tools') && (

@@ -18,8 +18,12 @@ interface MetricsViewProps {
 
 type TimeFilter = 'Week' | 'Month' | 'Quarter' | 'Year';
 
-export const MetricsView: React.FC<MetricsViewProps> = ({ churchId, currentUser, censusData, peopleData, church, onUpdateChurch }) => {
-    const [activeTab, setActiveTab] = useState<'Dashboard' | 'Input' | 'Settings'>('Dashboard');
+interface MetricsViewPropsExtended extends MetricsViewProps {
+    activePage?: 'Dashboard' | 'Input' | 'Settings';
+}
+
+export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, currentUser, censusData, peopleData, church, onUpdateChurch, activePage = 'Dashboard' }) => {
+    const activeTab = activePage;
     const [definitions, setDefinitions] = useState<MetricDefinition[]>([]);
     const [ministries, setMinistries] = useState<Ministry[]>([]);
     const [entries, setEntries] = useState<MetricEntry[]>([]);
@@ -465,23 +469,15 @@ export const MetricsView: React.FC<MetricsViewProps> = ({ churchId, currentUser,
 
     if (isLoading) return <div className="p-10 text-center text-slate-400">Loading Metrics...</div>;
 
+    const pageTitle = activeTab === 'Dashboard' ? 'Metrics Dashboard' : activeTab === 'Input' ? 'Input Data' : 'Configure Metrics';
+    const pageSubtitle = activeTab === 'Dashboard' ? 'Track Custom Data Points' : activeTab === 'Input' ? 'Enter Ministry Data' : 'Manage Ministries & Metrics';
+
     return (
         <div className="space-y-8 animate-in fade-in">
             <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div>
-                    <h3 className="text-4xl font-black tracking-tighter text-slate-900 dark:text-white">Metrics Module</h3>
-                    <p className="text-slate-400 dark:text-slate-500 font-medium uppercase text-[10px] tracking-widest mt-1">Track Custom Data Points</p>
-                </div>
-                <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl gap-1">
-                    {['Dashboard', 'Input', 'Settings'].map(tab => (
-                        <button 
-                            key={tab}
-                            onClick={() => setActiveTab(tab as any)}
-                            className={`px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-300' : 'text-slate-500 dark:text-slate-400 hover:bg-white/50 dark:hover:bg-slate-700/50'}`}
-                        >
-                            {tab}
-                        </button>
-                    ))}
+                    <h3 className="text-4xl font-black tracking-tighter text-slate-900 dark:text-white">{pageTitle}</h3>
+                    <p className="text-slate-400 dark:text-slate-500 font-medium uppercase text-[10px] tracking-widest mt-1">{pageSubtitle}</p>
                 </div>
             </header>
 
@@ -617,7 +613,7 @@ export const MetricsView: React.FC<MetricsViewProps> = ({ churchId, currentUser,
                         {widgetOrder.length === 0 && (
                             <div className="col-span-full text-center py-20 bg-slate-50 dark:bg-slate-900 rounded-[3rem] border border-dashed border-slate-200 dark:border-slate-700">
                                 <p className="text-slate-400 font-bold mb-2">Dashboard Empty</p>
-                                <button onClick={() => setActiveTab('Settings')} className="text-indigo-600 font-black text-xs uppercase tracking-widest hover:underline">Configure widgets in Settings</button>
+                                <p className="text-indigo-600 font-black text-xs uppercase tracking-widest">Use Metrics → Configure in the nav to add widgets</p>
                             </div>
                         )}
                     </div>

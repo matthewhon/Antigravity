@@ -20,13 +20,23 @@ function getMasterClient(accountSid: string, authToken: string) {
 }
 
 // ─── GET /api/messaging/available-numbers ────────────────────────────────────
-// Returns available local numbers for a given US area code.
+// Supports three search modes:
+//   1. ?areaCode=615           – traditional area code search
+//   2. ?city=Nashville&state=TN – city + state (uses Twilio inLocality/inRegion)
+//   3. ?state=TN               – state-only (useful when no city results found)
+//
+// When city+state returns 0 results the handler automatically retries with
+// state-only so the caller always gets numbers back.
 
 export const getAvailableNumbers = async (req: any, res: any) => {
     res.set('Access-Control-Allow-Origin', '*');
-    const { areaCode, churchId } = req.query;
-    if (!churchId || !areaCode) {
-        return res.status(400).json({ error: 'Missing churchId or areaCode' });
+    const { areaCode, city, state, churchId } = req.query as Record<string, string>;
+
+    if (!churchId) {
+        return res.status(400).json({ error: 'Missing churchId' });
+    }
+    if (!areaCode && !state && !city) {
+        return res.status(400).json({ error: 'Provide areaCode, or city+state, or state.' });
     }
 
     const db  = getDb();
@@ -35,21 +45,58 @@ export const getAvailableNumbers = async (req: any, res: any) => {
     try {
         const { accountSid, authToken } = await getMasterCredentials(db);
         const master = getMasterClient(accountSid, authToken);
+        const phoneApi = master.availablePhoneNumbers('US').local;
 
-        const numbers = await master.availablePhoneNumbers('US')
-            .local.list({ areaCode: Number(areaCode), smsEnabled: true, limit: 10 });
+        let numbers: any[] = [];
+        let searchMode = '';
+
+        if (areaCode) {
+            // ── Mode 1: area code ────────────────────────────────────────
+            searchMode = `area code ${areaCode}`;
+            numbers = await phoneApi.list({
+                areaCode:   Number(areaCode),
+                smsEnabled: true,
+                limit:      15,
+            });
+        } else {
+            // ── Mode 2: city + state ─────────────────────────────────────
+            const filterCity  = (city  || '').trim();
+            const filterState = (state || '').trim().toUpperCase();
+
+            if (filterCity) {
+                searchMode = `${filterCity}, ${filterState}`;
+                numbers = await phoneApi.list({
+                    inLocality: filterCity,
+                    inRegion:   filterState,
+                    smsEnabled: true,
+                    limit:      15,
+                });
+            }
+
+            // ── Auto-expand: if city search found nothing, try state-wide ──
+            if (numbers.length === 0 && filterState) {
+                searchMode = `state ${filterState}`;
+                numbers = await phoneApi.list({
+                    inRegion:   filterState,
+                    smsEnabled: true,
+                    limit:      15,
+                });
+            }
+        }
 
         const formatted = numbers.map(n => ({
-            phoneNumber:    n.phoneNumber,
-            friendlyName:   n.friendlyName,
-            locality:       n.locality,
-            region:         n.region,
-            isoCountry:     n.isoCountry,
+            phoneNumber:  n.phoneNumber,
+            friendlyName: n.friendlyName,
+            locality:     n.locality,
+            region:       n.region,
+            isoCountry:   n.isoCountry,
         }));
 
-        return res.json({ success: true, numbers: formatted });
+        log.info(`[twilioProvisioning] Found ${formatted.length} numbers for ${searchMode}`, 'system', { searchMode }, '');
+        return res.json({ success: true, numbers: formatted, searchMode });
+
     } catch (e: any) {
-        log.error(`[twilioProvisioning] getAvailableNumbers failed: ${e.message}`, 'system', { areaCode }, '');
+        log.error(`[twilioProvisioning] getAvailableNumbers failed: ${e.message}`, 'system', { areaCode, city, state }, '');
         return res.status(500).json({ error: e.message || 'Failed to fetch available numbers' });
     }
 };

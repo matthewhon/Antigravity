@@ -2264,24 +2264,52 @@ const SmsSetupWizard: React.FC<{
     onComplete: () => void;
     onBack: () => void;
 }> = ({ churchId, church, onComplete, onBack }) => {
-    const [step, setStep]             = useState<'area-code' | 'pick-number' | 'done'>('area-code');
-    const [areaCode, setAreaCode]     = useState(church.zip?.slice(0, 3) || '');
-    const [numbers, setNumbers]       = useState<{ phoneNumber: string; friendlyName: string; locality: string; region: string }[]>([]);
+    const [step, setStep]               = useState<'search' | 'pick-number' | 'done'>('search');
+    const [searchMode, setSearchMode]   = useState<'area-code' | 'city-state'>('city-state');
+    const [areaCode, setAreaCode]       = useState(church.zip?.slice(0, 3) || '');
+    const [city, setCity]               = useState(church.city || '');
+    const [stateAbbr, setStateAbbr]     = useState(church.state || '');
+    const [numbers, setNumbers]         = useState<{ phoneNumber: string; friendlyName: string; locality: string; region: string }[]>([]);
+    const [resolvedSearch, setResolvedSearch] = useState('');   // what Twilio actually searched
     const [loadingNums, setLoadingNums] = useState(false);
     const [selectedNumber, setSelectedNumber] = useState('');
-    const [senderName, setSenderName] = useState(church.name || '');
-    const [provisioning, setProvisioning]     = useState(false);
-    const [error, setError]           = useState('');
+    const [senderName, setSenderName]   = useState(church.name || '');
+    const [provisioning, setProvisioning] = useState(false);
+    const [error, setError]             = useState('');
+
+    const US_STATES = [
+        ['AL','Alabama'],['AK','Alaska'],['AZ','Arizona'],['AR','Arkansas'],['CA','California'],
+        ['CO','Colorado'],['CT','Connecticut'],['DE','Delaware'],['FL','Florida'],['GA','Georgia'],
+        ['HI','Hawaii'],['ID','Idaho'],['IL','Illinois'],['IN','Indiana'],['IA','Iowa'],
+        ['KS','Kansas'],['KY','Kentucky'],['LA','Louisiana'],['ME','Maine'],['MD','Maryland'],
+        ['MA','Massachusetts'],['MI','Michigan'],['MN','Minnesota'],['MS','Mississippi'],['MO','Missouri'],
+        ['MT','Montana'],['NE','Nebraska'],['NV','Nevada'],['NH','New Hampshire'],['NJ','New Jersey'],
+        ['NM','New Mexico'],['NY','New York'],['NC','North Carolina'],['ND','North Dakota'],['OH','Ohio'],
+        ['OK','Oklahoma'],['OR','Oregon'],['PA','Pennsylvania'],['RI','Rhode Island'],['SC','South Carolina'],
+        ['SD','South Dakota'],['TN','Tennessee'],['TX','Texas'],['UT','Utah'],['VT','Vermont'],
+        ['VA','Virginia'],['WA','Washington'],['WV','West Virginia'],['WI','Wisconsin'],['WY','Wyoming'],
+    ];
 
     const fetchNumbers = async () => {
-        if (!areaCode || areaCode.length < 3) { setError('Please enter a 3-digit area code.'); return; }
         setError('');
         setLoadingNums(true);
         try {
-            const res = await fetch(`${API_BASE}/api/messaging/available-numbers?churchId=${churchId}&areaCode=${areaCode}`);
+            let url = `${API_BASE}/api/messaging/available-numbers?churchId=${encodeURIComponent(churchId)}`;
+
+            if (searchMode === 'area-code') {
+                if (!areaCode || areaCode.length < 3) { setError('Please enter a 3-digit area code.'); setLoadingNums(false); return; }
+                url += `&areaCode=${encodeURIComponent(areaCode)}`;
+            } else {
+                if (!stateAbbr) { setError('Please select a state.'); setLoadingNums(false); return; }
+                if (city.trim()) url += `&city=${encodeURIComponent(city.trim())}`;
+                url += `&state=${encodeURIComponent(stateAbbr)}`;
+            }
+
+            const res  = await fetch(url);
             const data = await res.json();
             if (!data.success) throw new Error(data.error || 'Failed to fetch numbers');
             setNumbers(data.numbers || []);
+            setResolvedSearch(data.searchMode || '');
             setStep('pick-number');
         } catch (e: any) {
             setError(e.message || 'Failed to fetch numbers');
@@ -2310,6 +2338,10 @@ const SmsSetupWizard: React.FC<{
         }
     };
 
+    const canSearch = searchMode === 'area-code'
+        ? areaCode.length === 3
+        : !!stateAbbr;
+
     return (
         <div className="p-6 max-w-xl mx-auto mt-8">
             <button onClick={onBack} className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 mb-6">
@@ -2317,24 +2349,79 @@ const SmsSetupWizard: React.FC<{
             </button>
 
             <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 p-8 shadow-sm">
-                {step === 'area-code' && (
+                {step === 'search' && (
                     <>
-                        <h2 className="text-xl font-black text-slate-900 dark:text-white mb-1">Choose Your Area Code</h2>
-                        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">We'll find available local numbers in that area.</p>
-                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Area Code (3 digits)</label>
-                        <input
-                            type="text"
-                            maxLength={3}
-                            value={areaCode}
-                            onChange={e => setAreaCode(e.target.value.replace(/\D/g, ''))}
-                            placeholder="e.g. 615"
-                            className="w-full text-2xl font-black border-2 border-slate-200 dark:border-slate-600 rounded-2xl px-5 py-4 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500 mb-2 tracking-widest"
-                        />
-                        {error && <p className="text-sm text-red-500 mb-3">{error}</p>}
+                        <h2 className="text-xl font-black text-slate-900 dark:text-white mb-1">Find a Local Number</h2>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mb-5">Search by city &amp; state, or enter an area code directly.</p>
+
+                        {/* Mode toggle */}
+                        <div className="flex rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 mb-5">
+                            {(['city-state', 'area-code'] as const).map(mode => (
+                                <button
+                                    key={mode}
+                                    onClick={() => { setSearchMode(mode); setError(''); }}
+                                    className={`flex-1 py-2 text-xs font-black uppercase tracking-widest transition ${
+                                        searchMode === mode
+                                            ? 'bg-violet-600 text-white'
+                                            : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'
+                                    }`}
+                                >
+                                    {mode === 'city-state' ? '🏙 City & State' : '# Area Code'}
+                                </button>
+                            ))}
+                        </div>
+
+                        {searchMode === 'city-state' && (
+                            <div className="space-y-3">
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">City <span className="font-normal normal-case">(optional)</span></label>
+                                    <input
+                                        type="text"
+                                        value={city}
+                                        onChange={e => setCity(e.target.value)}
+                                        onKeyDown={e => e.key === 'Enter' && canSearch && fetchNumbers()}
+                                        placeholder="e.g. Nashville"
+                                        className="w-full text-base font-semibold border-2 border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500"
+                                    />
+                                    <p className="text-[10px] text-slate-400 mt-1">Leave blank to search across the whole state.</p>
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">State <span className="text-red-400">*</span></label>
+                                    <select
+                                        value={stateAbbr}
+                                        onChange={e => setStateAbbr(e.target.value)}
+                                        className="w-full text-base border-2 border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500 appearance-none"
+                                    >
+                                        <option value="">Select a state…</option>
+                                        {US_STATES.map(([abbr, name]) => (
+                                            <option key={abbr} value={abbr}>{name} ({abbr})</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+                        )}
+
+                        {searchMode === 'area-code' && (
+                            <div>
+                                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Area Code (3 digits)</label>
+                                <input
+                                    type="text"
+                                    maxLength={3}
+                                    value={areaCode}
+                                    onChange={e => setAreaCode(e.target.value.replace(/\D/g, ''))}
+                                    onKeyDown={e => e.key === 'Enter' && canSearch && fetchNumbers()}
+                                    placeholder="e.g. 615"
+                                    className="w-full text-2xl font-black border-2 border-slate-200 dark:border-slate-600 rounded-2xl px-5 py-4 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500 tracking-widest"
+                                />
+                            </div>
+                        )}
+
+                        {error && <p className="text-sm text-red-500 mt-3">{error}</p>}
+
                         <button
                             onClick={fetchNumbers}
-                            disabled={loadingNums || areaCode.length < 3}
-                            className="w-full py-3 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white font-black rounded-2xl transition mt-4 flex items-center justify-center gap-2"
+                            disabled={loadingNums || !canSearch}
+                            className="w-full py-3 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white font-black rounded-2xl transition mt-5 flex items-center justify-center gap-2"
                         >
                             {loadingNums ? <><Loader2 size={16} className="animate-spin" /> Searching…</> : 'Find Available Numbers →'}
                         </button>
@@ -2345,24 +2432,23 @@ const SmsSetupWizard: React.FC<{
                     <>
                         {/* Header + location context */}
                         <h2 className="text-xl font-black text-slate-900 dark:text-white mb-1">Pick a Number</h2>
-                        {numbers.length > 0 && (() => {
-                            const sample = numbers[0];
-                            const loc = [sample.locality, sample.region].filter(Boolean).join(', ');
-                            return (
-                                <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-                                    Showing <span className="font-semibold text-slate-700 dark:text-slate-200">{numbers.length} local number{numbers.length !== 1 ? 's' : ''}</span>
-                                    {loc ? <> in <span className="font-semibold text-violet-600 dark:text-violet-400">{loc}</span></> : <> for area code <span className="font-semibold text-violet-600 dark:text-violet-400">{areaCode}</span></>}
-                                    . Select the one that will be your church's SMS identity.
-                                </p>
-                            );
-                        })()}
-                        {numbers.length === 0 && (
-                            <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Select the number that will be your church's SMS identity.</p>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">
+                            Showing <span className="font-semibold text-slate-700 dark:text-slate-200">{numbers.length} local number{numbers.length !== 1 ? 's' : ''}</span>
+                            {resolvedSearch ? <> for <span className="font-semibold text-violet-600 dark:text-violet-400">{resolvedSearch}</span></> : ''}
+                            {numbers.length === 0 ? '. Try a broader search.' : '. Select the one that will be your church\'s SMS identity.'}
+                        </p>
+                        {city && resolvedSearch && !resolvedSearch.toLowerCase().includes(city.toLowerCase()) && (
+                            <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl px-3 py-2 mb-3 mt-2">
+                                ⚠️ No numbers found in <strong>{city}</strong> — showing numbers across <strong>{resolvedSearch.replace('state ', '')}</strong> instead.
+                            </p>
                         )}
 
                         <div className="space-y-2 mb-5">
                             {numbers.length === 0 ? (
-                                <p className="text-sm text-slate-500 text-center py-8">No numbers found for area code {areaCode}. Try a different code.</p>
+                                <div className="text-center py-10">
+                                    <p className="text-slate-500 dark:text-slate-400 text-sm mb-3">No numbers available for this search.</p>
+                                    <button onClick={() => setStep('search')} className="text-violet-600 dark:text-violet-400 text-sm font-semibold hover:underline">← Try a different search</button>
+                                </div>
                             ) : numbers.map(n => {
                                 const cityState = [n.locality, n.region].filter(Boolean).join(', ');
                                 return (
@@ -2403,7 +2489,7 @@ const SmsSetupWizard: React.FC<{
                         {error && <p className="text-sm text-red-500 mb-3">{error}</p>}
 
                         <div className="flex gap-2">
-                            <button onClick={() => setStep('area-code')} className="flex-1 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 transition">← Back</button>
+                            <button onClick={() => setStep('search')} className="flex-1 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 transition">← Search Again</button>
                             <button
                                 onClick={provision}
                                 disabled={provisioning || !selectedNumber}
