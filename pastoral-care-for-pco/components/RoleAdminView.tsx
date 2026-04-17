@@ -153,7 +153,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   const [isA2pSubmitting, setIsA2pSubmitting] = useState(false);
   const [isA2pChecking, setIsA2pChecking] = useState(false);
   const [isCreatingProfile, setIsCreatingProfile] = useState(false);
-  const [a2pResult, setA2pResult] = useState<{ success: boolean; message: string; brandSid?: string; failureReason?: string | null; twilioStatus?: string; needsBundle?: boolean } | null>(null);
+  const [a2pResult, setA2pResult] = useState<{ success: boolean; message: string; brandSid?: string; failureReason?: string | null; twilioStatus?: string; needsBundle?: boolean; needsPrimaryProfile?: boolean } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
@@ -1946,6 +1946,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                             ? data.message
                             : (data.error || 'Profile creation failed'),
                         needsBundle: !data.success,
+                        needsPrimaryProfile: !!data.needsPrimaryProfile,
                     });
                 } catch (e: any) {
                     setA2pResult({ success: false, message: e.message || 'Profile creation failed', needsBundle: true });
@@ -2396,7 +2397,86 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 {a2pResult && (
                                     a2pResult.needsBundle ? (
                                         // ── Customer Profile Bundle Required ─────────────────────────────
-                                        <div className="mt-5 space-y-4">
+                                        a2pResult.needsPrimaryProfile ? (
+                                            // ── Platform-level one-time setup required ────────────────────
+                                            <div className="mt-5 space-y-4">
+                                                <div className="p-5 rounded-xl border bg-rose-50 dark:bg-rose-900/20 border-rose-200 dark:border-rose-800">
+                                                    <div className="flex items-start gap-3">
+                                                        <span className="shrink-0 text-xl mt-0.5">🏗️</span>
+                                                        <div>
+                                                            <p className="text-xs font-black text-rose-800 dark:text-rose-300 mb-1">
+                                                                Platform setup required (one-time, done by you)
+                                                            </p>
+                                                            <p className="text-[10px] text-rose-700 dark:text-rose-400 leading-relaxed">
+                                                                Twilio requires the <strong>master Twilio account</strong> (Barnabas Software) to have an approved{' '}
+                                                                <strong>Primary Customer Profile</strong> before any church Secondary Profiles can be created. This is a
+                                                                one-time platform setup — not something each church does.
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="p-5 rounded-xl border bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 space-y-4">
+                                                    <p className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400">
+                                                        ↓ Complete this one-time platform setup in the Twilio Console
+                                                    </p>
+                                                    {([
+                                                        {
+                                                            step: '1',
+                                                            title: 'Log into the MASTER Twilio account',
+                                                            desc: 'Go to console.twilio.com and sign in as the platform owner. Make sure you are on the root/master account — NOT a sub-account.',
+                                                            link: 'https://console.twilio.com',
+                                                            linkLabel: 'Open Twilio Console →',
+                                                        },
+                                                        {
+                                                            step: '2',
+                                                            title: 'Open Trust Hub → Customer Profiles',
+                                                            desc: 'In the left sidebar: Messaging → Regulatory Compliance → Customer Profiles. This section manages business identity for the platform.',
+                                                            link: 'https://console.twilio.com/us1/develop/sms/regulatory-compliance/customer-profiles',
+                                                            linkLabel: 'Open Customer Profiles →',
+                                                        },
+                                                        {
+                                                            step: '3',
+                                                            title: 'Create a Primary Business Profile for Barnabas Software',
+                                                            desc: 'Click "Create new" → Business → fill in your platform company details (Barnabas Software legal name, EIN, website, address, authorized rep). Submit for Twilio review.',
+                                                            link: null,
+                                                            linkLabel: null,
+                                                        },
+                                                        {
+                                                            step: '4',
+                                                            title: 'Wait for Twilio approval (same-day)',
+                                                            desc: 'Once the Primary Profile status shows TWILIO_APPROVED, come back here and click "🪄 Create & Submit Profile" again. Church Secondary Profiles will then work.',
+                                                            link: null,
+                                                            linkLabel: null,
+                                                        },
+                                                    ] as { step: string; title: string; desc: string; link: string | null; linkLabel: string | null }[]).map(({ step, title, desc, link, linkLabel }) => (
+                                                        <div key={step} className="flex items-start gap-3">
+                                                            <div className="w-6 h-6 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-black text-[10px] shrink-0 mt-0.5">{step}</div>
+                                                            <div className="min-w-0">
+                                                                <p className="text-xs font-bold text-slate-900 dark:text-white">{title}</p>
+                                                                <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">{desc}</p>
+                                                                {link && linkLabel && (
+                                                                    <a href={link} target="_blank" rel="noopener noreferrer"
+                                                                        className="inline-block mt-1.5 text-[10px] font-bold text-indigo-600 dark:text-indigo-400 underline hover:text-indigo-800 dark:hover:text-indigo-200 transition">
+                                                                        {linkLabel}
+                                                                    </a>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                    <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
+                                                        <button
+                                                            onClick={handleCreateProfile}
+                                                            disabled={isCreatingProfile}
+                                                            className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition whitespace-nowrap"
+                                                        >
+                                                            {isCreatingProfile ? '📡 Retrying…' : '🔄 Retry After Approval'}
+                                                        </button>
+                                                        <p className="text-[9px] text-slate-400 mt-1.5">Click after your Primary Profile is approved in Twilio Console.</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="mt-5 space-y-4">
                                             {/* Explanation banner */}
                                             <div className="p-4 rounded-xl border bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800">
                                                 <div className="flex items-start gap-2">

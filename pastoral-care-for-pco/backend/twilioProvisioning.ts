@@ -648,9 +648,17 @@ export const createCustomerProfile = async (req: any, res: any) => {
 
     } catch (e: any) {
         log.error(`[createCustomerProfile] Failed for ${churchId}: ${e.message}`, 'system', { churchId }, churchId);
+
+        const msg: string = (e.message || '').toLowerCase();
+        const needsPrimaryProfile =
+            msg.includes('no primary customer profile') ||
+            msg.includes('primary customer profile') ||
+            (e as any).code === 20429;
+
         return res.status(500).json({
             error: e.message || 'Failed to create Customer Profile',
             twilioCode: (e as any).code || null,
+            needsPrimaryProfile,
         });
     }
 };
