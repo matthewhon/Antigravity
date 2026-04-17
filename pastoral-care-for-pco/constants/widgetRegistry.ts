@@ -113,6 +113,8 @@ export const GIVING_WIDGETS: WidgetDefinition[] = [
     { id: 'lifecycleInactive', label: 'Inactive List', icon: '💤' },
     { id: 'lifecycleSecond', label: 'Second Time List', icon: '2️⃣' },
     { id: 'lastWeekFunds', label: 'Last Week by Fund', icon: '📅' },
+    { id: 'givingByStatus', label: 'Giving By Status', icon: '🏷️' },
+    { id: 'givingAgeDemographics', label: 'Giving - Age Demographics', icon: '🎂' },
 ];
 
 export const PASTORAL_CHURCH_WIDGETS: WidgetDefinition[] = [

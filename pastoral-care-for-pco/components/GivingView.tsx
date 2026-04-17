@@ -63,7 +63,7 @@ const TOOLTIP_STYLE = {
 };
 
 const getWidgetSpan = (id: string) => {
-    if (['keyMetrics', 'trends', 'fundPerformance', 'cumulativeYTD', 'donorLifecycle', 'trendsComparison', 'benchmark_giving_avg', 'budgetProgress', 'givingVsBudget'].includes(id)) return 'col-span-1 md:col-span-2 lg:col-span-2';
+    if (['keyMetrics', 'trends', 'fundPerformance', 'cumulativeYTD', 'donorLifecycle', 'trendsComparison', 'benchmark_giving_avg', 'budgetProgress', 'givingVsBudget', 'givingByStatus', 'givingAgeDemographics'].includes(id)) return 'col-span-1 md:col-span-2 lg:col-span-2';
     return 'col-span-1';
 };
 
@@ -457,6 +457,96 @@ export const GivingView: React.FC<GivingViewProps> = ({
       }
       return dataPoints;
   }, [donations, budgets, cumulativeFundFilter, budgetYear]);
+
+  // --- Giving Age Demographics ---
+  // Sum donation amounts per age bucket for donors who gave in the current filter period
+  const givingAgeDemoData = useMemo(() => {
+    const AGE_RANGES = [
+      { label: 'Under 18', min: 0,   max: 17  },
+      { label: '18–25',    min: 18,  max: 25  },
+      { label: '26–35',    min: 26,  max: 35  },
+      { label: '36–50',    min: 36,  max: 50  },
+      { label: '51–65',    min: 51,  max: 65  },
+      { label: '65+',      min: 66,  max: 999 },
+    ];
+    const AGE_COLORS = ['#8b5cf6', '#6366f1', '#06b6d4', '#10b981', '#f59e0b', '#f43f5e'];
+
+    const { startDate, endDate } = getDateRangeForFilter(filter);
+    const currentYear = new Date().getFullYear();
+
+    // Sum donations per donor in the current period
+    const periodTotals = new Map<string, number>();
+    donations.forEach(d => {
+      const dDate = new Date(d.date);
+      if (dDate >= startDate && dDate <= endDate) {
+        periodTotals.set(d.donorId, (periodTotals.get(d.donorId) || 0) + d.amount);
+      }
+    });
+
+    // Build a lookup map from people for quick access
+    const peopleMap = new Map(people.map(p => [p.id, p]));
+
+    // Bucket amounts by age
+    const buckets: Record<string, number> = {};
+    AGE_RANGES.forEach(r => { buckets[r.label] = 0; });
+    let unknownTotal = 0;
+
+    periodTotals.forEach((amount, donorId) => {
+      const person = peopleMap.get(donorId);
+      if (!person?.birthdate) {
+        unknownTotal += amount;
+        return;
+      }
+      const birthYear = parseInt(person.birthdate.split('-')[0], 10);
+      if (isNaN(birthYear)) { unknownTotal += amount; return; }
+      const age = currentYear - birthYear;
+      const bucket = AGE_RANGES.find(r => age >= r.min && age <= r.max);
+      if (bucket) buckets[bucket.label] += amount;
+      else unknownTotal += amount;
+    });
+
+    const rows = AGE_RANGES.map((r, i) => ({
+      label:  r.label,
+      amount: buckets[r.label],
+      color:  AGE_COLORS[i],
+    })).filter(r => r.amount > 0);
+
+    if (unknownTotal > 0) {
+      rows.push({ label: 'Unknown Age', amount: unknownTotal, color: '#94a3b8' });
+    }
+
+    return rows;
+  }, [donations, people, filter, dateRange]);
+
+  // --- Giving By Status ---
+  // For each lifecycle status, sum donations made within the current filter period
+  // (lifecycle classification still uses all-time data via analytics.lists)
+  const givingByStatusData = useMemo(() => {
+    if (!analytics) return [];
+    const { startDate, endDate } = getDateRangeForFilter(filter);
+
+    // Build a map of donorId -> total given in the current period
+    const periodTotals = new Map<string, number>();
+    donations.forEach(d => {
+      const dDate = new Date(d.date);
+      if (dDate >= startDate && dDate <= endDate) {
+        periodTotals.set(d.donorId, (periodTotals.get(d.donorId) || 0) + d.amount);
+      }
+    });
+
+    const sumForList = (list: { id: string }[]) =>
+      list.reduce((s, donor) => s + (periodTotals.get(donor.id) || 0), 0);
+
+    const rows = [
+      { name: 'Active Donors',      amount: sumForList(analytics.lists?.active || []),      color: '#10b981' },
+      { name: 'New Donors',         amount: sumForList(analytics.lists?.new || []),          color: '#6366f1' },
+      { name: 'Occasional Donors',  amount: sumForList(analytics.lists?.occasional || []),   color: '#f59e0b' },
+      { name: 'Recovered Donors',   amount: sumForList(analytics.lists?.recovered || []),    color: '#06b6d4' },
+      { name: 'Second Time Donors', amount: sumForList(analytics.lists?.secondTime || []),   color: '#8b5cf6' },
+    ];
+
+    return rows.filter(r => r.amount > 0).sort((a, b) => b.amount - a.amount);
+  }, [analytics, donations, filter, dateRange]);
 
   const acquisitionData = useMemo(() => {
       const donorFirstGift = new Map<string, number>();
@@ -1042,6 +1132,152 @@ export const GivingView: React.FC<GivingViewProps> = ({
                                                   <div
                                                       className="h-full rounded-full transition-all duration-700"
                                                       style={{ width: `${pct}%`, backgroundColor: color, opacity: 0.85 }}
+                                                  />
+                                              </div>
+                                          </div>
+                                      );
+                                  })}
+                              </div>
+                          </div>
+                      )}
+                  </WidgetWrapper>
+              );
+          }
+          case 'givingAgeDemographics': {
+              const ageTotal = givingAgeDemoData.reduce((s, r) => s + r.amount, 0);
+              return (
+                  <WidgetWrapper
+                      title="Giving — Age Demographics"
+                      onRemove={() => handleRemoveWidget(id)}
+                      source="People & Giving"
+                  >
+                      {givingAgeDemoData.length === 0 ? (
+                          <div className="flex flex-col items-center justify-center h-32 text-center space-y-2">
+                              <div className="text-3xl opacity-30">🎂</div>
+                              <p className="text-xs font-bold text-slate-400 dark:text-slate-500">No age data available</p>
+                              <p className="text-[10px] text-slate-400 dark:text-slate-500">Make sure donors have birthdates in PCO and giving data is synced.</p>
+                          </div>
+                      ) : (
+                          <div className="space-y-5">
+                              {/* Hero total */}
+                              <div className="flex items-center justify-between px-1">
+                                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Total Given This Period</p>
+                                  <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400">${ageTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                              </div>
+                              {/* Bar chart rows */}
+                              <div className="h-48">
+                                  <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={1}>
+                                      <BarChart
+                                          data={givingAgeDemoData.map(r => ({ name: r.label, Amount: r.amount, fill: r.color }))}
+                                          layout="vertical"
+                                          margin={{ left: 8, right: 16, top: 4, bottom: 4 }}
+                                      >
+                                          <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={gridColor} />
+                                          <XAxis
+                                              type="number"
+                                              axisLine={false}
+                                              tickLine={false}
+                                              tick={{ fontSize: 9, fill: axisColor }}
+                                              tickFormatter={(v: number) => `$${v >= 1000 ? `${Math.round(v / 1000)}k` : v}`}
+                                          />
+                                          <YAxis
+                                              dataKey="name"
+                                              type="category"
+                                              axisLine={false}
+                                              tickLine={false}
+                                              tick={{ fontSize: 10, fontWeight: 700, fill: axisColor }}
+                                              width={76}
+                                          />
+                                          <Tooltip
+                                              contentStyle={TOOLTIP_STYLE}
+                                              itemStyle={{ color: '#fff' }}
+                                              cursor={{ fill: currentTheme === 'dark' ? '#334155' : '#f8fafc' }}
+                                              formatter={(value: number) => [`$${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, 'Given']}
+                                          />
+                                          <Bar dataKey="Amount" radius={[0, 4, 4, 0]} barSize={18}>
+                                              {givingAgeDemoData.map((entry, index) => (
+                                                  <Cell key={`cell-${index}`} fill={entry.color} />
+                                              ))}
+                                          </Bar>
+                                      </BarChart>
+                                  </ResponsiveContainer>
+                              </div>
+                              {/* % breakdown pills */}
+                              <div className="flex flex-wrap gap-2 pt-1">
+                                  {givingAgeDemoData.map(row => {
+                                      const pct = ageTotal > 0 ? Math.round((row.amount / ageTotal) * 100) : 0;
+                                      return (
+                                          <span
+                                              key={row.label}
+                                              className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full"
+                                              style={{ backgroundColor: `${row.color}22`, color: row.color }}
+                                          >
+                                              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: row.color }} />
+                                              {row.label} · {pct}%
+                                          </span>
+                                      );
+                                  })}
+                              </div>
+                          </div>
+                      )}
+                  </WidgetWrapper>
+              );
+          }
+          case 'givingByStatus': {
+              const total = givingByStatusData.reduce((s, r) => s + r.amount, 0);
+              const STATUS_LABELS: Record<string, string> = {
+                  'Active Donors': 'Consistent givers in the active window',
+                  'New Donors': 'First gift within the new-donor window',
+                  'Occasional Donors': 'Gave recently but below active threshold',
+                  'Recovered Donors': 'Returned after a long gap',
+                  'Second Time Donors': 'Second gift within the early window',
+              };
+              return (
+                  <WidgetWrapper
+                      title="Giving By Status"
+                      onRemove={() => handleRemoveWidget(id)}
+                      source="Donor Lifecycle"
+                  >
+                      {givingByStatusData.length === 0 ? (
+                          <div className="flex flex-col items-center justify-center h-32 text-center space-y-2">
+                              <div className="text-3xl opacity-30">🏷️</div>
+                              <p className="text-xs font-bold text-slate-400 dark:text-slate-500">No giving data in this period</p>
+                          </div>
+                      ) : (
+                          <div className="space-y-4">
+                              {/* Period total hero */}
+                              <div className="flex items-center justify-between px-1 mb-2">
+                                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Total Given This Period</p>
+                                  <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400">${total.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                              </div>
+                              {/* Status rows */}
+                              <div className="space-y-3">
+                                  {givingByStatusData.map(row => {
+                                      const pct = total > 0 ? (row.amount / total) * 100 : 0;
+                                      return (
+                                          <div key={row.name} className="space-y-1.5">
+                                              <div className="flex items-center justify-between">
+                                                  <div className="flex items-center gap-2">
+                                                      <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: row.color }} />
+                                                      <div>
+                                                          <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{row.name}</span>
+                                                          <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-tight">{STATUS_LABELS[row.name]}</p>
+                                                      </div>
+                                                  </div>
+                                                  <div className="flex items-center gap-3 flex-shrink-0 ml-2">
+                                                      <span className="text-xs font-black text-slate-800 dark:text-white">${row.amount.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                                                      <span
+                                                          className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                                                          style={{ backgroundColor: `${row.color}22`, color: row.color }}
+                                                      >
+                                                          {Math.round(pct)}%
+                                                      </span>
+                                                  </div>
+                                              </div>
+                                              <div className="relative h-2.5 bg-slate-100 dark:bg-slate-700/60 rounded-full overflow-hidden">
+                                                  <div
+                                                      className="h-full rounded-full transition-all duration-700"
+                                                      style={{ width: `${pct}%`, backgroundColor: row.color, opacity: 0.85 }}
                                                   />
                                               </div>
                                           </div>
