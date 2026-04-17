@@ -442,9 +442,28 @@ export interface SystemSettings {
     sendGridFromName?: string;  // Default "From Name" if campaign doesn't specify one
     // Scripture Library feature flag
     enableLibrary?: boolean;
-    // Twilio Master Account (used only to create per-church sub-accounts)
+    // ── Twilio SMS (Master Account) ───────────────────────────────────────────
+    /** Twilio master Account SID – used to create per-church sub-accounts */
     twilioMasterAccountSid?: string;
+    /** Twilio master Auth Token */
     twilioMasterAuthToken?: string;
+    /**
+     * Base URL where the backend is reachable by Twilio's webhook callbacks.
+     * Defaults to apiBaseUrl.  Example: https://api.pastoralcare.barnabassoftware.com
+     */
+    twilioWebhookBaseUrl?: string;
+    /** Cost per SMS segment in USD, used for the in-app usage estimate (default 0.0079) */
+    twilioSegmentCostUsd?: number;
+    /** Cost per MMS segment in USD (default 0.0200) */
+    twilioMmsSegmentCostUsd?: number;
+    /** When true, require A2P 10DLC brand + campaign registration before provisioning numbers */
+    twilioRequireA2PRegistration?: boolean;
+    /** When true, perform a Carrier Lookup on every inbound number (adds ~$0.005/lookup) */
+    twilioEnableCarrierLookup?: boolean;
+    /** Twilio API Key SID (alternative to Auth Token for tighter scope) */
+    twilioApiKeySid?: string;
+    /** Twilio API Key Secret */
+    twilioApiKeySecret?: string;
 }
 
 export interface TemplateSettings {

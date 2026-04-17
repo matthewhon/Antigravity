@@ -383,7 +383,6 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                         className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
                                     />
                                 </div>
-                            </div>
                         </div>
 
                         {/* SendGrid */}
@@ -398,7 +397,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                             </div>
                             <p className="text-[10px] text-slate-400 mb-4 leading-relaxed">
                                 This is the <strong>master</strong> SendGrid account. Each church tenant gets an isolated Subuser for reputation separation.
-                                Tenants configure their From address in <strong>Settings & Administration → Mail Settings</strong>.
+                                Tenants configure their From address in <strong>Settings &amp; Administration → Mail Settings</strong>.
                             </p>
                             <div className="space-y-4">
                                 <div>
@@ -451,6 +450,182 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                 </div>
                             </div>
                         </div>
+
+                        {/* ── Twilio SMS ── */}
+                        <div className="pt-6 border-t border-slate-100 dark:border-slate-800">
+                            <div className="flex justify-between items-center mb-2">
+                                <h4 className="text-xs font-bold text-indigo-600 dark:text-indigo-400">Twilio SMS (Master Account)</h4>
+                                {settings.twilioMasterAccountSid?.startsWith('AC') && settings.twilioMasterAuthToken ? (
+                                    <span className="text-[9px] font-black bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">CONFIGURED</span>
+                                ) : (
+                                    <span className="text-[9px] font-black bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/30">INCOMPLETE</span>
+                                )}
+                            </div>
+                            <p className="text-[10px] text-slate-400 mb-4 leading-relaxed">
+                                The <strong>master</strong> Twilio account is used to provision per-church sub-accounts and phone numbers. 
+                                Tenants never share credentials — each church gets an isolated sub-account for billing and reputation separation.
+                            </p>
+
+                            <div className="space-y-4">
+                                {/* Account SID */}
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Account SID</label>
+                                    <input
+                                        type="text"
+                                        value={settings.twilioMasterAccountSid || ''}
+                                        onChange={e => handleChange('twilioMasterAccountSid', e.target.value)}
+                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                        placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                                    />
+                                    <p className="text-[9px] text-slate-400 mt-1.5">
+                                        Found in your <a href="https://console.twilio.com/" target="_blank" rel="noopener noreferrer" className="underline text-indigo-400 hover:text-indigo-300">Twilio Console</a> → Account Info.
+                                    </p>
+                                </div>
+
+                                {/* Auth Token */}
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Auth Token</label>
+                                    <input
+                                        type="password"
+                                        value={settings.twilioMasterAuthToken || ''}
+                                        onChange={e => handleChange('twilioMasterAuthToken', e.target.value)}
+                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                        placeholder="●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●"
+                                    />
+                                    <p className="text-[9px] text-slate-400 mt-1.5">
+                                        Keep this secret. Prefer an API Key pair below for tighter scope — this is only needed if you don't use API Keys.
+                                    </p>
+                                </div>
+
+                                {/* API Key pair (optional, tighter scope than Auth Token) */}
+                                <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
+                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">API Key SID <span className="normal-case font-normal text-slate-400">(optional, preferred)</span></label>
+                                    <p className="text-[9px] text-slate-400 mb-2">Create scoped API Keys in Console → Account → API Keys &amp; Tokens. Recommended over the Auth Token.</p>
+                                    <div className="grid grid-cols-1 gap-3">
+                                        <input
+                                            type="text"
+                                            value={settings.twilioApiKeySid || ''}
+                                            onChange={e => handleChange('twilioApiKeySid', e.target.value)}
+                                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                            placeholder="SKxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                                        />
+                                        <input
+                                            type="password"
+                                            value={settings.twilioApiKeySecret || ''}
+                                            onChange={e => handleChange('twilioApiKeySecret', e.target.value)}
+                                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                            placeholder="API Key Secret"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Webhook base URL */}
+                                <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
+                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Webhook Base URL</label>
+                                    <input
+                                        type="text"
+                                        value={settings.twilioWebhookBaseUrl || ''}
+                                        onChange={e => handleChange('twilioWebhookBaseUrl', e.target.value)}
+                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                        placeholder={settings.apiBaseUrl || DEFAULT_API_URL}
+                                    />
+                                    <p className="text-[9px] text-slate-400 mt-1.5">
+                                        Defaults to Backend API URL above. Twilio will send inbound SMS + status callbacks here.
+                                        The generated webhook URLs are:<br/>
+                                        <code className="text-[9px]">{`{base}/api/messaging/inbound`}</code><br/>
+                                        <code className="text-[9px]">{`{base}/api/messaging/status`}</code>
+                                    </p>
+
+                                    {/* Live webhook URL display */}
+                                    {(settings.twilioWebhookBaseUrl || settings.apiBaseUrl) && (
+                                        <div className="mt-3 space-y-1.5">
+                                            {['/api/messaging/inbound', '/api/messaging/status'].map(path => {
+                                                const base = (settings.twilioWebhookBaseUrl || settings.apiBaseUrl || DEFAULT_API_URL).replace(/\/$/, '');
+                                                const url  = base + path;
+                                                return (
+                                                    <div key={path} className="bg-slate-100 dark:bg-slate-800 rounded-lg px-3 py-1.5 flex items-center justify-between gap-2">
+                                                        <code className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 truncate">{url}</code>
+                                                        <button
+                                                            onClick={() => navigator.clipboard.writeText(url)}
+                                                            className="text-slate-400 hover:text-indigo-500 transition-colors shrink-0 text-xs"
+                                                            title="Copy"
+                                                        >📋</button>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Per-segment pricing */}
+                                <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
+                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Usage Estimate Pricing <span className="normal-case font-normal">(USD)</span></label>
+                                    <p className="text-[9px] text-slate-400 mb-3">Used only for the in-app cost estimate in the Analytics tab. Actual billing is in your Twilio Console.</p>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-[9px] font-bold text-slate-500 mb-1">SMS per segment</label>
+                                            <div className="relative">
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">$</span>
+                                                <input
+                                                    type="number"
+                                                    step="0.0001"
+                                                    min="0"
+                                                    value={settings.twilioSegmentCostUsd ?? 0.0079}
+                                                    onChange={e => handleChange('twilioSegmentCostUsd', parseFloat(e.target.value) || 0.0079)}
+                                                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-7 pr-3 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-[9px] font-bold text-slate-500 mb-1">MMS per segment</label>
+                                            <div className="relative">
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">$</span>
+                                                <input
+                                                    type="number"
+                                                    step="0.001"
+                                                    min="0"
+                                                    value={settings.twilioMmsSegmentCostUsd ?? 0.02}
+                                                    onChange={e => handleChange('twilioMmsSegmentCostUsd', parseFloat(e.target.value) || 0.02)}
+                                                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-7 pr-3 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Feature toggles */}
+                                <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-3">
+                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Feature Flags</label>
+
+                                    <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">
+                                        <div>
+                                            <p className="text-xs font-bold text-slate-900 dark:text-white">Require A2P 10DLC Registration</p>
+                                            <p className="text-[10px] text-slate-400 leading-snug mt-0.5">Block number provisioning until the tenant has a registered Brand + Campaign. Required for US carrier compliance at scale.</p>
+                                        </div>
+                                        <button
+                                            onClick={() => handleChange('twilioRequireA2PRegistration', !settings.twilioRequireA2PRegistration)}
+                                            className={`ml-4 shrink-0 w-12 h-6 rounded-full p-1 transition-colors ${settings.twilioRequireA2PRegistration ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'}`}
+                                        >
+                                            <div className={`w-4 h-4 bg-white rounded-full transition-transform ${settings.twilioRequireA2PRegistration ? 'translate-x-6' : ''}`} />
+                                        </button>
+                                    </div>
+
+                                    <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">
+                                        <div>
+                                            <p className="text-xs font-bold text-slate-900 dark:text-white">Carrier Lookup on Inbound Numbers</p>
+                                            <p className="text-[10px] text-slate-400 leading-snug mt-0.5">Enrich every inbound sender with carrier + line-type data via Twilio Lookup. Adds ~$0.005 per unique number.</p>
+                                        </div>
+                                        <button
+                                            onClick={() => handleChange('twilioEnableCarrierLookup', !settings.twilioEnableCarrierLookup)}
+                                            className={`ml-4 shrink-0 w-12 h-6 rounded-full p-1 transition-colors ${settings.twilioEnableCarrierLookup ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'}`}
+                                        >
+                                            <div className={`w-4 h-4 bg-white rounded-full transition-transform ${settings.twilioEnableCarrierLookup ? 'translate-x-6' : ''}`} />
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     </div>
                 </div>
 
