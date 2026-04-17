@@ -875,6 +875,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                     <p className="text-[10px] text-slate-500 dark:text-slate-400">Contribute anonymized stats to global benchmarks</p>
                                 </div>
                                 <button 
+                                    title="Toggle metric sharing"
                                     onClick={() => handleChange('metricsSharingEnabled', !formData.metricsSharingEnabled)}
                                     className={`w-12 h-6 rounded-full p-1 transition-colors ${formData.metricsSharingEnabled ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'}`}
                                 >
@@ -1058,7 +1059,8 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 <div className="flex-1">
                                     <label className="block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-2">Daily Time</label>
                                     <input 
-                                        type="time" 
+                                        type="time"
+                                        title="Daily sync time"
                                         value={formData.scheduledSyncTime || ''}
                                         onChange={e => handleChange('scheduledSyncTime', e.target.value)}
                                         className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 font-mono text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-all"

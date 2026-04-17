@@ -545,6 +545,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                         source="Future Schedule"
                         headerControl={
                             <select 
+                                title="Filter upcoming plans"
                                 value={upcomingPlansFilter} 
                                 onChange={(e) => setUpcomingPlansFilter(e.target.value as any)}
                                 className="bg-slate-100 dark:bg-slate-800 border-none text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 rounded-lg py-1 px-2 cursor-pointer outline-none focus:ring-2 focus:ring-indigo-500"
@@ -886,6 +887,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                         source="PCO Check-Ins"
                         headerControl={
                             <select 
+                                title="Filter check-in period"
                                 value={checkinFilter} 
                                 onChange={(e) => setCheckinFilter(e.target.value as CheckinTrendFilter)}
                                 className="bg-slate-100 dark:bg-slate-800 border-none text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 rounded-lg py-1 px-2 cursor-pointer outline-none focus:ring-2 focus:ring-indigo-500"

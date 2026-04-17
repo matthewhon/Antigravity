@@ -1310,6 +1310,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                 <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl">
                     <span className="text-[8px] font-black uppercase tracking-widest text-slate-400 px-2">Location:</span>
                     <select 
+                        title="Select community location"
                         value={selectedLocationId || ''} 
                         onChange={(e) => setSelectedLocationId(e.target.value)}
                         className="bg-white dark:bg-slate-700 text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl border-none outline-none text-indigo-600 dark:text-indigo-300"
@@ -1450,6 +1451,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                           <div>
                               <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Type</label>
                               <select 
+                                title="Care entry type"
                                 value={newNote.type} 
                                 onChange={(e) => setNewNote({...newNote, type: e.target.value as any})}
                                 className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
@@ -1466,6 +1468,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                               <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Date</label>
                               <input 
                                 type="date" 
+                                title="Entry date"
                                 value={newNote.date} 
                                 onChange={(e) => setNewNote({...newNote, date: e.target.value})}
                                 className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
@@ -1487,6 +1490,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                           <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Follow-up Date (Optional)</label>
                           <input 
                             type="date" 
+                            title="Follow-up date"
                             value={newNote.followUpDate || ''} 
                             onChange={(e) => setNewNote({...newNote, followUpDate: e.target.value})}
                             className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
@@ -1538,6 +1542,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                       <div className="flex items-center gap-3 p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800">
                           <input 
                             type="checkbox" 
+                            title="Mark as public prayer request"
                             checked={newPrayer.isPublic} 
                             onChange={(e) => setNewPrayer({...newPrayer, isPublic: e.target.checked})}
                             className="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"

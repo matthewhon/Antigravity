@@ -29,7 +29,7 @@ export const WidgetWrapper: React.FC<WidgetWrapperProps> = ({ title, onRemove, c
       </div>
       <div className="flex items-center gap-3 print:hidden">
           {headerControl}
-          <button onClick={onRemove} className="text-slate-300 dark:text-slate-600 hover:text-rose-500 dark:hover:text-rose-500 transition-colors">
+          <button onClick={onRemove} title="Remove widget" className="text-slate-300 dark:text-slate-600 hover:text-rose-500 dark:hover:text-rose-500 transition-colors">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
           </button>
       </div>
@@ -123,7 +123,7 @@ export const DonorListWidget: React.FC<{ title: string; donors: LifecycleDonor[]
                     <h4 className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">{title}</h4>
                     <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${theme} print:border print:bg-white`}>{donors.length}</span>
                 </div>
-                <button onClick={onRemove} className="text-slate-300 dark:text-slate-600 hover:text-rose-500 transition-colors print:hidden">
+                <button onClick={onRemove} title="Remove widget" className="text-slate-300 dark:text-slate-600 hover:text-rose-500 transition-colors print:hidden">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                 </button>
             </div>
