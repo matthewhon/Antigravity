@@ -13,7 +13,8 @@ import { PollsManager } from './PollsManager';
 import { WebsiteWidgetsManager } from './WebsiteWidgetsManager';
 
 import { PcoImportModal } from './PcoImportModal';
-import { EmailCampaign, TemplateSettings, PcoList, Church, EmailUnsubscribe } from '../types';
+import MessagingModule from './MessagingModule';
+import { EmailCampaign, TemplateSettings, PcoList, Church, User, EmailUnsubscribe } from '../types';
 import {
   Mail, Plus, ChevronDown, ChevronUp, CheckCircle, Circle, Send,
   Clock, Users, AtSign, FileText, AlignLeft, Calendar, ArrowLeft,
@@ -1194,10 +1195,10 @@ const SendTestModal: React.FC<SendTestModalProps> = ({ onConfirm, onCancel, isSe
   );
 };
 
-export const ToolsView: React.FC<{ churchId: string; church?: Church; 
-currentUserId?: string; onUpdateChurch?: (updates: Partial<Church>) => void }> = ({ churchId, church, currentUserId, 
-onUpdateChurch }) => {
-  const [activeTab, setActiveTab] = useState<'emails' | 'polls' | 'unsubscribers'>('emails');
+export const ToolsView: React.FC<{ churchId: string; church?: Church;
+currentUserId?: string; currentUser?: User; onUpdateChurch?: (updates: Partial<Church>) => void }> = ({ churchId, church, currentUserId,
+currentUser, onUpdateChurch }) => {
+  const [activeTab, setActiveTab] = useState<'emails' | 'polls' | 'unsubscribers' | 'messaging'>('emails');
   const [campaigns, setCampaigns] = useState<EmailCampaign[]>([]);
   const [activeCampaign, setActiveCampaign] = useState<EmailCampaign | null>(null);
   const [previewCampaign, setPreviewCampaign] = useState<EmailCampaign | null>(null);
@@ -1454,6 +1455,16 @@ onUpdateChurch }) => {
           <List size={14} /> Polls
         </button>
         <button
+          onClick={() => setActiveTab('messaging')}
+          className={`flex items-center gap-2 px-4 py-2 -mb-px text-sm font-semibold border-b-2 transition shrink-0 ${
+            activeTab === 'messaging'
+              ? 'border-violet-600 text-violet-600 dark:text-violet-400 dark:border-violet-400'
+              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
+          }`}
+        >
+          💬 SMS
+        </button>
+        <button
           onClick={() => setActiveTab('unsubscribers')}
           className={`flex items-center gap-2 px-4 py-2 -mb-px text-sm font-semibold border-b-2 transition shrink-0 ${
             activeTab === 'unsubscribers'
@@ -1565,6 +1576,23 @@ onUpdateChurch }) => {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ─── Messaging (SMS) Tab ──────────────────────────────────────────── */}
+      {activeTab === 'messaging' && church && currentUser && (
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <MessagingModule
+            churchId={churchId}
+            church={church}
+            currentUser={currentUser}
+            onUpdateChurch={onUpdateChurch || (() => {})}
+          />
+        </div>
+      )}
+      {activeTab === 'messaging' && (!church || !currentUser) && (
+        <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">
+          Unable to load Messaging — church or user context missing.
         </div>
       )}
 

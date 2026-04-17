@@ -22,7 +22,6 @@ import LibraryView from './components/LibraryView';
 import WelcomeLayoutModal from './components/WelcomeLayoutModal';
 import { PublicPollView } from './components/PublicPollView';
 import { ToolsView } from './components/ToolsView';
-import MessagingModule from './components/MessagingModule';
 import { 
   User, Church, PeopleDashboardData, GivingAnalytics, GroupsDashboardData, 
   ServicesDashboardData, AttendanceData, CensusStats, BudgetRecord, PcoFund, 
@@ -1098,20 +1097,7 @@ const App: React.FC = () => {
                 <LibraryView churchId={church.id} />
             </div>
         )}
-        {view === 'tools' && <ToolsView churchId={church.id} church={church} currentUserId={user.id} onUpdateChurch={(updates) => { firestore.updateChurch(church.id, updates); setChurch({ ...church, ...updates }); }} />}
-        {view === 'messaging' && (
-            <div className="flex flex-col h-full -m-6 lg:-m-10">
-                <MessagingModule
-                    churchId={church.id}
-                    church={church}
-                    currentUser={user}
-                    onUpdateChurch={(updates) => {
-                        firestore.updateChurch(church.id, updates);
-                        setChurch({ ...church, ...updates });
-                    }}
-                />
-            </div>
-        )}
+        {view === 'tools' && <ToolsView churchId={church.id} church={church} currentUserId={user.id} currentUser={user} onUpdateChurch={(updates) => { firestore.updateChurch(church.id, updates); setChurch({ ...church, ...updates }); }} />}
     </Layout>
     </>
   );

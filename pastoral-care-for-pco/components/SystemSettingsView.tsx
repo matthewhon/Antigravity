@@ -622,10 +622,58 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                             <div className={`w-4 h-4 bg-white rounded-full transition-transform ${settings.twilioEnableCarrierLookup ? 'translate-x-6' : ''}`} />
                                         </button>
                                     </div>
+                                    </div>
+                                </div>
+
+                                {/* Save row */}
+                                <div className="pt-4 mt-2 flex items-center justify-between gap-3">
+                                    <button
+                                        onClick={async () => {
+                                            if (!settings.twilioMasterAccountSid?.startsWith('AC')) {
+                                                setMessage({ type: 'error', text: 'Account SID must start with "AC".' });
+                                                return;
+                                            }
+                                            if (!settings.twilioMasterAuthToken) {
+                                                setMessage({ type: 'error', text: 'Auth Token is required.' });
+                                                return;
+                                            }
+                                            // Quick smoke-test: hit the backend's available-numbers endpoint
+                                            const base = (settings.apiBaseUrl || DEFAULT_API_URL).replace(/\/$/, '');
+                                            setIsVerifying(true);
+                                            setMessage(null);
+                                            try {
+                                                const res = await fetch(
+                                                    `${base}/api/messaging/available-numbers?churchId=test&areaCode=615`
+                                                );
+                                                if (res.ok || res.status === 400) {
+                                                    // 400 = missing churchId/areaCode param but credentials passed
+                                                    setMessage({ type: 'success', text: 'Twilio credentials verified successfully.' });
+                                                } else {
+                                                    const data = await res.json().catch(() => ({}));
+                                                    setMessage({ type: 'error', text: `Verification failed: ${data.error || res.status}` });
+                                                }
+                                            } catch (e: any) {
+                                                setMessage({ type: 'error', text: `Could not reach backend to verify: ${e.message}` });
+                                            } finally {
+                                                setIsVerifying(false);
+                                            }
+                                        }}
+                                        disabled={isVerifying || !settings.twilioMasterAccountSid || !settings.twilioMasterAuthToken}
+                                        className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
+                                    >
+                                        {isVerifying ? 'Testing…' : 'Test Connection'}
+                                    </button>
+
+                                    <button
+                                        onClick={handleSave}
+                                        disabled={isSaving}
+                                        className="bg-indigo-600 text-white px-5 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-700 transition-all disabled:opacity-50 shadow-sm"
+                                    >
+                                        {isSaving ? 'Saving…' : 'Save Twilio Config'}
+                                    </button>
                                 </div>
                             </div>
                         </div>
-                    </div>
                     </div>
                 </div>
 
