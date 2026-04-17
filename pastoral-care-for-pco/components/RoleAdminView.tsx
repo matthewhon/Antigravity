@@ -258,7 +258,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
 
   const ALL_ROLES: UserRole[] = [
     'Church Admin', 'Pastor', 'Pastor AI', 'People', 'Services',
-    'Groups', 'Giving', 'Finance', 'Pastoral Care', 'Metrics', 'System Administration'
+    'Groups', 'Giving', 'Finance', 'Pastoral Care', 'Metrics', 'Messaging', 'System Administration'
   ];
 
   const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
@@ -272,6 +272,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
     'Finance':               'Full financials including fund budgets',
     'Pastoral Care':         'Access to pastoral care log & prayer requests',
     'Metrics':               'View aggregated analytics & benchmarks',
+    'Messaging':             'Access to SMS messaging, campaigns & inbox',
     'System Administration': 'Platform-wide system settings (super admin)',
   };
 

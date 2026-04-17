@@ -148,6 +148,16 @@ const Layout: React.FC<LayoutProps> = ({
                   />
                 )}
 
+                {hasPermission('messaging') && (
+                  <NavItem 
+                    icon="💬" 
+                    label="Messaging" 
+                    active={currentView === 'messaging'} 
+                    onClick={() => onNavigate('messaging')}
+                    highlight="emerald"
+                  />
+                )}
+
                 {canSeeLibrary && (
                     <NavItem 
                         icon="📚" 

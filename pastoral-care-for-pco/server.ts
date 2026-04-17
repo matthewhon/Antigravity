@@ -19,6 +19,11 @@ import { getDb } from './backend/firebase';
 import { handleGeminiProxy } from './backend/geminiProxy';
 import { provisionSubuser, authenticateDomain, verifyDomain, diagnoseDomain } from './backend/emailProvisioning';
 import { getPublicGroups, getPublicRegistrations, getPublicEvents, serveWidgetScript } from './backend/publicApi.js';
+import { getAvailableNumbers, provisionTwilioNumber, releaseTwilioNumber, registerA2p } from './backend/twilioProvisioning';
+import { handleInboundSms } from './backend/twilioInbound';
+import { sendIndividual, sendBulk } from './backend/twilioSend';
+import { handleStatusCallback } from './backend/twilioWebhookStatus';
+import { startSmsCampaignScheduler } from './backend/smsCampaignScheduler';
 
 // Fix for bundled CJS environment
 const __dirname = process.cwd();
@@ -149,6 +154,20 @@ async function startServer() {
     app.get('/api/public/registrations/:churchId', getPublicRegistrations);
     app.get('/api/public/events/:churchId', getPublicEvents);
     app.get('/widget.js', serveWidgetScript);
+
+    // ─── SMS / Messaging Endpoints ────────────────────────────────────────────
+    // Twilio inbound webhook — use raw body so Twilio's x-www-form-urlencoded POST parses correctly
+    app.post('/api/messaging/inbound', express.urlencoded({ extended: false }), handleInboundSms);
+    // Twilio delivery status callback
+    app.post('/api/messaging/status', express.urlencoded({ extended: false }), handleStatusCallback);
+    // Provisioning
+    app.get('/api/messaging/available-numbers', express.json(), getAvailableNumbers);
+    app.post('/api/messaging/provision', express.json(), provisionTwilioNumber);
+    app.post('/api/messaging/release', express.json(), releaseTwilioNumber);
+    app.post('/api/messaging/a2p-register', express.json(), registerA2p);
+    // Sending
+    app.post('/api/messaging/send-individual', express.json(), sendIndividual);
+    app.post('/api/messaging/send-bulk', express.json(), sendBulk);
 
     // ─── Public Unsubscribe (no auth required) ───────────────────────────────
     // Token = base64url(churchId:email)
@@ -402,6 +421,12 @@ async function startServer() {
         startSyncScheduler(db as any);
       } catch (e) {
         console.warn('[SyncScheduler] Could not start scheduler:', e);
+      }
+      try {
+        const db = getDb();
+        startSmsCampaignScheduler(db as any);
+      } catch (e) {
+        console.warn('[SmsScheduler] Could not start scheduler:', e);
       }
     });
 

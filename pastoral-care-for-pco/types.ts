@@ -1,5 +1,5 @@
 
-export type UserRole = 'Church Admin' | 'Pastor' | 'Pastor AI' | 'People' | 'Services' | 'Groups' | 'Giving' | 'Finance' | 'Pastoral Care' | 'Metrics' | 'System Administration';
+export type UserRole = 'Church Admin' | 'Pastor' | 'Pastor AI' | 'People' | 'Services' | 'Groups' | 'Giving' | 'Finance' | 'Pastoral Care' | 'Metrics' | 'System Administration' | 'Messaging';
 
 export interface User {
     id: string;
@@ -88,6 +88,8 @@ export interface Church {
     allowSignups?: boolean;
     scheduledSyncTime?: string;
     communityLocations?: CommunityLocation[];
+    /** SMS / Twilio settings for this church */
+    smsSettings?: SmsSettings;
     /** Church-wide logo URL (stored in Firebase Storage, used as default in email templates) */
     logoUrl?: string;
     /** PCO List ID used to identify regular attenders of the church */
@@ -440,6 +442,9 @@ export interface SystemSettings {
     sendGridFromName?: string;  // Default "From Name" if campaign doesn't specify one
     // Scripture Library feature flag
     enableLibrary?: boolean;
+    // Twilio Master Account (used only to create per-church sub-accounts)
+    twilioMasterAccountSid?: string;
+    twilioMasterAuthToken?: string;
 }
 
 export interface TemplateSettings {
@@ -753,4 +758,219 @@ export interface RiskChangeRecord {
     oldCategory: string;    // 'Healthy' | 'At Risk' | 'Disconnected'
     newCategory: string;
     timestamp: number;
+}
+
+// ─── SMS / Messaging Module ───────────────────────────────────────────────────
+
+export interface SmsSettings {
+    /** Whether SMS module is enabled for this tenant */
+    smsEnabled?: boolean;
+    /** Twilio Sub-Account SID for this church */
+    twilioSubAccountSid?: string;
+    /** Twilio Sub-Account Auth Token */
+    twilioSubAccountAuthToken?: string;
+    /** E.164 Twilio number assigned to this church, e.g. +15551234567 */
+    twilioPhoneNumber?: string;
+    /** Twilio Phone Number SID */
+    twilioPhoneSid?: string;
+    /** A2P 10DLC registration status */
+    twilioA2pStatus?: 'not_started' | 'pending' | 'approved' | 'failed';
+    /** Twilio Brand Registration SID */
+    twilioBrandSid?: string;
+    /** Twilio Messaging Service Campaign SID */
+    twilioCampaignSid?: string;
+    /** Display name used as sender context */
+    senderName?: string;
+}
+
+export type SmsDirection = 'inbound' | 'outbound';
+export type SmsStatus =
+    | 'queued'
+    | 'sent'
+    | 'delivered'
+    | 'failed'
+    | 'undelivered'
+    | 'received';
+
+export interface SmsMessage {
+    id: string;
+    conversationId: string;
+    churchId: string;
+    direction: SmsDirection;
+    body: string;
+    mediaUrls?: string[];
+    status: SmsStatus;
+    errorCode?: string | null;
+    twilioSid?: string | null;
+    /** userId of the staff member who sent it (outbound), or null for inbound / auto-reply */
+    sentBy?: string | null;
+    sentByName?: string | null;
+    /** Campaign that triggered this message, if any */
+    campaignId?: string | null;
+    createdAt: number;          // epoch ms
+    deliveredAt?: number | null;
+}
+
+export interface SmsConversation {
+    id: string;                 // `${churchId}_${e164phone_no_plus}`
+    churchId: string;
+    /** Linked PCO People person ID, if we found a match by phone */
+    personId?: string | null;
+    personName?: string | null;
+    personAvatar?: string | null;
+    /** E.164 phone number of the contact */
+    phoneNumber: string;
+    lastMessageAt: number;
+    lastMessageBody?: string;
+    lastMessageDirection?: SmsDirection;
+    /** Unread count for inbox badge */
+    unreadCount: number;
+    /** True if the contact replied STOP or was manually opted out */
+    isOptedOut: boolean;
+    /** Staff user ID assigned to handle this thread */
+    assignedTo?: string | null;
+    tags?: string[];
+    /** Named inbox this conversation belongs to (multi-inbox) */
+    inboxId?: string | null;
+}
+
+export type SmsCampaignStatus = 'draft' | 'scheduled' | 'sending' | 'sent' | 'failed';
+
+export interface SmsCampaign {
+    id: string;
+    churchId: string;
+    name: string;
+    status: SmsCampaignStatus;
+    body: string;
+    mediaUrls?: string[];
+    // Recipients — one of listId, groupId, or toPhones
+    toListId?: string | null;
+    toListName?: string | null;
+    toGroupId?: string | null;
+    toGroupName?: string | null;
+    /** Flat array of E.164 numbers for ad-hoc sends */
+    toPhones?: string[];
+    // Scheduling
+    sendAt?: string | null;       // ISO string for UI display
+    scheduledAt?: number | null;  // epoch ms — authoritative trigger for the scheduler
+    sentAt?: number | null;
+    recurringFrequency?: 'daily' | 'weekly' | 'monthly' | null;
+    lastSentAt?: number | null;
+    sentHistory?: { sentAt: number; recipientCount: number }[];
+    // Analytics
+    recipientCount?: number;
+    deliveredCount?: number;
+    failedCount?: number;
+    optOutCount?: number;
+    // Retry
+    retryCount?: number;
+    lastError?: string | null;
+    // Metadata
+    sentBy?: string | null;
+    sentByName?: string | null;
+    createdAt: number;
+    updatedAt: number;
+}
+
+export interface SmsKeyword {
+    id: string;
+    churchId: string;
+    /** The trigger word (stored uppercase), e.g. "YOUTH" */
+    keyword: string;
+    /** Auto-reply message body */
+    replyMessage: string;
+    /** Optionally add the replying contact to this PCO list */
+    addToListId?: string | null;
+    addToListName?: string | null;
+    isActive: boolean;
+    matchCount: number;
+    createdAt: number;
+}
+
+export interface SmsOptOut {
+    id: string;               // `${churchId}_${e164phone_no_plus}`
+    churchId: string;
+    phoneNumber: string;      // E.164
+    optedOutAt: number;
+    campaignId?: string | null;
+    source: 'STOP_reply' | 'manual' | 'admin';
+}
+
+export interface SmsInbox {
+    id: string;
+    churchId: string;
+    /** Display name, e.g. "Youth Ministry" or "Main Office" */
+    name: string;
+    assignedUserIds: string[];
+    isDefault: boolean;
+}
+
+export interface SmsUsageRecord {
+    id: string;
+    churchId: string;
+    campaignId?: string | null;
+    conversationId?: string | null;
+    toPhone: string;
+    segments: number;
+    isMms: boolean;
+    costUsd: number;
+    twilioSid: string;
+    createdAt: number;
+}
+
+export interface SmsUsageSummary {
+    id: string;             // `${churchId}_${YYYY_MM}`
+    churchId: string;
+    month: string;          // e.g. "2026_04"
+    totalMessages: number;
+    totalSegments: number;
+    totalCostUsd: number;
+    lastUpdated: number;
+}
+
+// ─── Workflows ───────────────────────────────────────────────────────────────
+
+export interface SmsWorkflowStep {
+    id: string;             // uuid
+    order: number;
+    /** Days to wait after the previous step (0 = send immediately / same day). */
+    delayDays: number;
+    message: string;
+    mediaUrls?: string[];
+}
+
+export type SmsWorkflowTrigger = 'keyword' | 'manual' | 'list_add';
+
+export interface SmsWorkflow {
+    id: string;
+    churchId: string;
+    name: string;
+    description?: string;
+    trigger: SmsWorkflowTrigger;
+    /** When trigger = 'keyword', the keyword doc id that fires this workflow */
+    triggerKeywordId?: string | null;
+    triggerKeywordWord?: string | null;
+    /** When trigger = 'list_add', the PCO list id */
+    triggerListId?: string | null;
+    triggerListName?: string | null;
+    steps: SmsWorkflowStep[];
+    isActive: boolean;
+    enrolledCount: number;
+    completedCount: number;
+    createdAt: number;
+    updatedAt: number;
+}
+
+export interface SmsWorkflowEnrollment {
+    id: string;          // `${workflowId}_${e164phone}`
+    churchId: string;
+    workflowId: string;
+    phoneNumber: string;
+    personName?: string | null;
+    personId?: string | null;
+    currentStep: number;
+    nextSendAt: number;  // epoch ms
+    completed: boolean;
+    enrolledAt: number;
+    lastStepSentAt?: number | null;
 }
