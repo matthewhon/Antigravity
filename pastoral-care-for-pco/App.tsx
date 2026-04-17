@@ -349,6 +349,10 @@ const App: React.FC = () => {
       if (v === 'dashboard') return true;
       if (v === 'settings') return user.roles.includes('Church Admin');
       if (v === 'pastoral') return user.roles.includes('Pastor') || user.roles.includes('Pastoral Care');
+      if (v === 'pastoral-membership') return user.roles.includes('Pastor') || user.roles.includes('Pastoral Care');
+      if (v === 'pastoral-community') return user.roles.includes('Pastor') || user.roles.includes('Pastoral Care');
+      if (v === 'pastoral-care') return user.roles.includes('Pastor') || user.roles.includes('Pastoral Care');
+      if (v === 'pastoral-calendar') return user.roles.includes('Pastor') || user.roles.includes('Pastoral Care');
       if (v === 'pastor-ai') return user.roles.includes('Pastor AI') || user.roles.includes('Pastor');
       
       const roleMap: Record<string, string> = {
@@ -1011,7 +1015,7 @@ const App: React.FC = () => {
                 onSaveBudget={handleSaveBudget}
             />
         )}
-        {view === 'pastoral' && (
+        {(view === 'pastoral' || view === 'pastoral-membership' || view === 'pastoral-community' || view === 'pastoral-care' || view === 'pastoral-calendar') && (
             <PastoralView 
                 user={user}
                 church={church}
@@ -1023,6 +1027,13 @@ const App: React.FC = () => {
                 censusData={censusData}
                 churchConfig={{ city: church.city, state: church.state }}
                 censusError={censusError}
+                activePage={
+                    view === 'pastoral-membership' ? 'Membership' :
+                    view === 'pastoral-community'  ? 'Community'  :
+                    view === 'pastoral-care'       ? 'Care'       :
+                    view === 'pastoral-calendar'   ? 'Calendar'   :
+                    'Church'
+                }
                 churchWidgets={user.widgetPreferences?.['pastoral_church'] || getDefaultWidgets('pastoral')}
                 membershipWidgets={user.widgetPreferences?.['pastoral_membership'] || getDefaultWidgets('pastoral_membership')}
                 communityWidgets={user.widgetPreferences?.['pastoral_community'] || getDefaultWidgets('pastoral_community')}

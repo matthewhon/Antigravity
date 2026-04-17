@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Church, User } from '../types';
 import UserProfileModal from './UserProfileModal';
 import { AppLogo } from './AppLogo';
@@ -38,6 +38,16 @@ const Layout: React.FC<LayoutProps> = ({
 }) => {
   const canSeeLibrary = user.email === LIBRARY_OWNER_EMAIL || enableLibrary === true;
   const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [metricsOpen, setMetricsOpen] = useState(false);
+  const metricsRef = useRef<HTMLDivElement>(null);
+  const [careOpen, setCareOpen] = useState(false);
+  const careRef = useRef<HTMLDivElement>(null);
+
+  const getDropdownStyle = (ref: React.RefObject<HTMLDivElement>) => {
+    if (!ref.current) return {};
+    const rect = ref.current.getBoundingClientRect();
+    return { top: rect.bottom + 8, left: rect.left };
+  };
 
   if (!user) return null;
 
@@ -123,17 +133,34 @@ const Layout: React.FC<LayoutProps> = ({
                 )}
 
                 {hasPermission('pastoral') && (
-                  <NavItem 
-                    icon="🕊️" 
-                    label="Care" 
-                    active={currentView === 'pastoral'} 
-                    onClick={() => onNavigate('pastoral')} 
-                  />
+                  <div
+                    ref={careRef}
+                    className="relative shrink-0"
+                    onMouseEnter={() => setCareOpen(true)}
+                    onMouseLeave={() => setCareOpen(false)}
+                  >
+                    <button
+                      onClick={() => onNavigate('pastoral')}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all border ${
+                        currentView.startsWith('pastoral')
+                          ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 ring-1 ring-indigo-500 border-transparent'
+                          : 'text-slate-400 border-transparent hover:bg-slate-800 hover:text-white hover:border-slate-700'
+                      }`}
+                    >
+                      <span className="text-base">🕊️</span>
+                      <span className="text-[10px] font-black uppercase tracking-widest">Care</span>
+                      <svg className="w-3 h-3 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M6 9l6 6 6-6"/></svg>
+                    </button>
+                  </div>
                 )}
 
                 {hasPermission('metrics') && (
-                  <div className="relative group shrink-0">
-                    {/* Parent trigger */}
+                  <div
+                    ref={metricsRef}
+                    className="relative shrink-0"
+                    onMouseEnter={() => setMetricsOpen(true)}
+                    onMouseLeave={() => setMetricsOpen(false)}
+                  >
                     <button
                       onClick={() => onNavigate('metrics')}
                       className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all border ${
@@ -146,29 +173,69 @@ const Layout: React.FC<LayoutProps> = ({
                       <span className="text-[10px] font-black uppercase tracking-widest">Metrics</span>
                       <svg className="w-3 h-3 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M6 9l6 6 6-6"/></svg>
                     </button>
+                  </div>
+                )}
 
-                    {/* Hover dropdown */}
-                    <div className="absolute left-0 top-full pt-2 z-50 hidden group-hover:block">
-                      <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl shadow-black/40 p-2 flex flex-col gap-1 min-w-[170px]">
-                        {[
-                          { view: 'metrics',          icon: '📊', label: 'Dashboard'   },
-                          { view: 'metrics-input',    icon: '✏️',  label: 'Input Data'  },
-                          { view: 'metrics-settings', icon: '⚙️',  label: 'Configure'   },
-                        ].map(item => (
-                          <button
-                            key={item.view}
-                            onClick={() => onNavigate(item.view)}
-                            className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest w-full text-left transition-all ${
-                              currentView === item.view
-                                ? 'bg-indigo-600 text-white'
-                                : 'text-slate-300 hover:bg-slate-700 hover:text-white'
-                            }`}
-                          >
-                            <span className="text-sm">{item.icon}</span>
-                            {item.label}
-                          </button>
-                        ))}
-                      </div>
+                {/* Metrics dropdown — rendered via fixed position to escape overflow-x-auto clipping */}
+                {metricsOpen && hasPermission('metrics') && (
+                  <div
+                    className="fixed z-[9999]"
+                    style={getDropdownStyle(metricsRef)}
+                    onMouseEnter={() => setMetricsOpen(true)}
+                    onMouseLeave={() => setMetricsOpen(false)}
+                  >
+                    <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl shadow-black/40 p-2 flex flex-col gap-1 min-w-[180px]">
+                      {[
+                        { view: 'metrics',          icon: '📊', label: 'Dashboard'  },
+                        { view: 'metrics-input',    icon: '✏️',  label: 'Input Data' },
+                        { view: 'metrics-settings', icon: '⚙️',  label: 'Configure'  },
+                      ].map(item => (
+                        <button
+                          key={item.view}
+                          onClick={() => { onNavigate(item.view); setMetricsOpen(false); }}
+                          className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest w-full text-left transition-all ${
+                            currentView === item.view
+                              ? 'bg-indigo-600 text-white'
+                              : 'text-slate-300 hover:bg-slate-700 hover:text-white'
+                          }`}
+                        >
+                          <span className="text-sm">{item.icon}</span>
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Care dropdown — fixed position to escape overflow-x-auto clipping */}
+                {careOpen && hasPermission('pastoral') && (
+                  <div
+                    className="fixed z-[9999]"
+                    style={getDropdownStyle(careRef)}
+                    onMouseEnter={() => setCareOpen(true)}
+                    onMouseLeave={() => setCareOpen(false)}
+                  >
+                    <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl shadow-black/40 p-2 flex flex-col gap-1 min-w-[180px]">
+                      {[
+                        { view: 'pastoral',            icon: '⛪',  label: 'Church'     },
+                        { view: 'pastoral-membership', icon: '👥', label: 'Membership'  },
+                        { view: 'pastoral-community',  icon: '🏙️', label: 'Community'  },
+                        { view: 'pastoral-care',       icon: '🕊️', label: 'Care'       },
+                        { view: 'pastoral-calendar',   icon: '📅', label: 'Calendar'   },
+                      ].map(item => (
+                        <button
+                          key={item.view}
+                          onClick={() => { onNavigate(item.view); setCareOpen(false); }}
+                          className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest w-full text-left transition-all ${
+                            currentView === item.view
+                              ? 'bg-indigo-600 text-white'
+                              : 'text-slate-300 hover:bg-slate-700 hover:text-white'
+                          }`}
+                        >
+                          <span className="text-sm">{item.icon}</span>
+                          {item.label}
+                        </button>
+                      ))}
                     </div>
                   </div>
                 )}

@@ -20,13 +20,16 @@ function getMasterClient(accountSid: string, authToken: string) {
 }
 
 // ─── GET /api/messaging/available-numbers ────────────────────────────────────
-// Supports three search modes:
-//   1. ?areaCode=615           – traditional area code search
-//   2. ?city=Nashville&state=TN – city + state (uses Twilio inLocality/inRegion)
-//   3. ?state=TN               – state-only (useful when no city results found)
+// Cascading locality search — always tries to stay as close to the city as possible.
 //
-// When city+state returns 0 results the handler automatically retries with
-// state-only so the caller always gets numbers back.
+// City+state search cascade:
+//   1. Exact city + state   (inLocality + inRegion)
+//   2. If 0: city only      (inLocality, any state)  – maybe the spelling differs by state
+//   3. If still 0: returns 0 results + canExpand=true  (frontend offers a manual "try state" button)
+//
+// Area code search: straightforward, returns up to 100.
+//
+// Returns full result set (up to 100); frontend handles paging.
 
 export const getAvailableNumbers = async (req: any, res: any) => {
     res.set('Access-Control-Allow-Origin', '*');
@@ -47,39 +50,58 @@ export const getAvailableNumbers = async (req: any, res: any) => {
         const master = getMasterClient(accountSid, authToken);
         const phoneApi = master.availablePhoneNumbers('US').local;
 
+        const FETCH_LIMIT = 100; // Twilio allows up to 1000 but 100 is plenty for UX
+
         let numbers: any[] = [];
-        let searchMode = '';
+        let searchMode     = '';
+        let canExpand      = false;   // true when city search returned 0 — frontend shows manual "try state" button
 
         if (areaCode) {
-            // ── Mode 1: area code ────────────────────────────────────────
+            // ── Area Code mode ────────────────────────────────────────────
             searchMode = `area code ${areaCode}`;
             numbers = await phoneApi.list({
                 areaCode:   Number(areaCode),
                 smsEnabled: true,
-                limit:      15,
+                limit:      FETCH_LIMIT,
             });
+
         } else {
-            // ── Mode 2: city + state ─────────────────────────────────────
             const filterCity  = (city  || '').trim();
             const filterState = (state || '').trim().toUpperCase();
 
-            if (filterCity) {
+            if (filterCity && filterState) {
+                // ── Step 1: exact city + state ────────────────────────────
                 searchMode = `${filterCity}, ${filterState}`;
                 numbers = await phoneApi.list({
-                    inLocality: filterCity,
-                    inRegion:   filterState,
-                    smsEnabled: true,
-                    limit:      15,
+                    inLocality:  filterCity,
+                    inRegion:    filterState,
+                    smsEnabled:  true,
+                    limit:       FETCH_LIMIT,
                 });
-            }
 
-            // ── Auto-expand: if city search found nothing, try state-wide ──
-            if (numbers.length === 0 && filterState) {
+                if (numbers.length === 0) {
+                    // ── Step 2: city only (any state) — handles spelling variants ──
+                    searchMode = `${filterCity} (any state)`;
+                    numbers = await phoneApi.list({
+                        inLocality:  filterCity,
+                        smsEnabled:  true,
+                        limit:       FETCH_LIMIT,
+                    });
+                }
+
+                // ── Step 3: still 0 — don't auto-expand, let user decide ──
+                if (numbers.length === 0) {
+                    searchMode = `${filterCity}, ${filterState}`;
+                    canExpand  = true;   // frontend should offer "Search all of {state}" button
+                }
+
+            } else if (filterState) {
+                // ── State-only search (explicit) ──────────────────────────
                 searchMode = `state ${filterState}`;
                 numbers = await phoneApi.list({
                     inRegion:   filterState,
                     smsEnabled: true,
-                    limit:      15,
+                    limit:      FETCH_LIMIT,
                 });
             }
         }
@@ -92,8 +114,8 @@ export const getAvailableNumbers = async (req: any, res: any) => {
             isoCountry:   n.isoCountry,
         }));
 
-        log.info(`[twilioProvisioning] Found ${formatted.length} numbers for ${searchMode}`, 'system', { searchMode }, '');
-        return res.json({ success: true, numbers: formatted, searchMode });
+        log.info(`[twilioProvisioning] Found ${formatted.length} numbers for "${searchMode}"`, 'system', { searchMode, canExpand }, '');
+        return res.json({ success: true, numbers: formatted, searchMode, canExpand, total: formatted.length });
 
     } catch (e: any) {
         log.error(`[twilioProvisioning] getAvailableNumbers failed: ${e.message}`, 'system', { areaCode, city, state }, '');

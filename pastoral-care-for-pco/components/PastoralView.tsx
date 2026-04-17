@@ -40,6 +40,7 @@ interface PastoralViewProps {
   censusData?: CensusStats | null;
   churchConfig: { city?: string, state?: string };
   censusError?: string;
+  activePage?: 'Church' | 'Membership' | 'Community' | 'Care' | 'Calendar';
   // Per-tab widget preferences
   churchWidgets: string[];
   membershipWidgets: string[];
@@ -219,11 +220,12 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
   onUpdateMembershipWidgets,
   onUpdateCommunityWidgets,
   onUpdateCareWidgets,
+  activePage,
   allowedWidgetIds,
   googleMapsApiKey,
   onUpdateTheme
 }) => {
-  const [activeTab, setActiveTab] = useState<'Church' | 'Membership' | 'Community' | 'Care' | 'Calendar'>('Church');
+  const activeTab = activePage ?? 'Church';
   const [locationCensusMap, setLocationCensusMap] = useState<Record<string, CensusStats>>({});
   const [locationErrorMap, setLocationErrorMap] = useState<Record<string, string>>({});
   const [isFetchingAllCensus, setIsFetchingAllCensus] = useState(false);
@@ -1303,17 +1305,6 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
         </div>
         
         <div className="flex items-center gap-4">
-            <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl">
-                {['Church', 'Membership', 'Community', 'Care', 'Calendar'].map(tab => (
-                    <button 
-                        key={tab}
-                        onClick={() => setActiveTab(tab as any)}
-                        className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-300' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
-                    >
-                        {tab}
-                    </button>
-                ))}
-            </div>
 
             {activeTab === 'Community' && church.communityLocations && church.communityLocations.length > 0 && (
                 <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl">

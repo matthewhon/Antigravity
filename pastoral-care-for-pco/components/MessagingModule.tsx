@@ -2270,7 +2270,10 @@ const SmsSetupWizard: React.FC<{
     const [city, setCity]               = useState(church.city || '');
     const [stateAbbr, setStateAbbr]     = useState(church.state || '');
     const [numbers, setNumbers]         = useState<{ phoneNumber: string; friendlyName: string; locality: string; region: string }[]>([]);
-    const [resolvedSearch, setResolvedSearch] = useState('');   // what Twilio actually searched
+    const [resolvedSearch, setResolvedSearch] = useState('');
+    const [canExpand, setCanExpand]     = useState(false); // backend says 0 city results, offer state search
+    const [page, setPage]               = useState(0);
+    const PAGE_SIZE                     = 10;
     const [loadingNums, setLoadingNums] = useState(false);
     const [selectedNumber, setSelectedNumber] = useState('');
     const [senderName, setSenderName]   = useState(church.name || '');
@@ -2290,7 +2293,7 @@ const SmsSetupWizard: React.FC<{
         ['VA','Virginia'],['WA','Washington'],['WV','West Virginia'],['WI','Wisconsin'],['WY','Wyoming'],
     ];
 
-    const fetchNumbers = async () => {
+    const fetchNumbers = async (expandToState = false) => {
         setError('');
         setLoadingNums(true);
         try {
@@ -2301,7 +2304,7 @@ const SmsSetupWizard: React.FC<{
                 url += `&areaCode=${encodeURIComponent(areaCode)}`;
             } else {
                 if (!stateAbbr) { setError('Please select a state.'); setLoadingNums(false); return; }
-                if (city.trim()) url += `&city=${encodeURIComponent(city.trim())}`;
+                if (!expandToState && city.trim()) url += `&city=${encodeURIComponent(city.trim())}`;
                 url += `&state=${encodeURIComponent(stateAbbr)}`;
             }
 
@@ -2310,6 +2313,8 @@ const SmsSetupWizard: React.FC<{
             if (!data.success) throw new Error(data.error || 'Failed to fetch numbers');
             setNumbers(data.numbers || []);
             setResolvedSearch(data.searchMode || '');
+            setCanExpand(!!data.canExpand);
+            setPage(0);
             setStep('pick-number');
         } catch (e: any) {
             setError(e.message || 'Failed to fetch numbers');
@@ -2428,78 +2433,133 @@ const SmsSetupWizard: React.FC<{
                     </>
                 )}
 
-                {step === 'pick-number' && (
+                {step === 'pick-number' && (() => {
+                    const totalPages  = Math.ceil(numbers.length / PAGE_SIZE);
+                    const pageNumbers = numbers.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
+                    return (
                     <>
-                        {/* Header + location context */}
-                        <h2 className="text-xl font-black text-slate-900 dark:text-white mb-1">Pick a Number</h2>
-                        <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">
-                            Showing <span className="font-semibold text-slate-700 dark:text-slate-200">{numbers.length} local number{numbers.length !== 1 ? 's' : ''}</span>
-                            {resolvedSearch ? <> for <span className="font-semibold text-violet-600 dark:text-violet-400">{resolvedSearch}</span></> : ''}
-                            {numbers.length === 0 ? '. Try a broader search.' : '. Select the one that will be your church\'s SMS identity.'}
+                        {/* Header */}
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                            <h2 className="text-xl font-black text-slate-900 dark:text-white">Pick a Number</h2>
+                            {numbers.length > 0 && (
+                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-full shrink-0">
+                                    {numbers.length} found
+                                </span>
+                            )}
+                        </div>
+
+                        {/* Results context */}
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">
+                            {numbers.length > 0
+                                ? <>Numbers for <span className="font-semibold text-violet-600 dark:text-violet-400">{resolvedSearch}</span>.</>
+                                : <>No numbers found for <span className="font-semibold text-violet-600 dark:text-violet-400">{resolvedSearch}</span>.</>
+                            }
                         </p>
-                        {city && resolvedSearch && !resolvedSearch.toLowerCase().includes(city.toLowerCase()) && (
-                            <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl px-3 py-2 mb-3 mt-2">
-                                ⚠️ No numbers found in <strong>{city}</strong> — showing numbers across <strong>{resolvedSearch.replace('state ', '')}</strong> instead.
+
+                        {/* Cross-state fallback notice (city found in a different state) */}
+                        {numbers.length > 0 && city && resolvedSearch.includes('(any state)') && (
+                            <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl px-3 py-2 mb-3">
+                                ℹ️ No numbers found in <strong>{city}, {stateAbbr}</strong> — showing numbers for <strong>{city}</strong> in another state instead.
                             </p>
                         )}
 
-                        <div className="space-y-2 mb-5">
-                            {numbers.length === 0 ? (
-                                <div className="text-center py-10">
-                                    <p className="text-slate-500 dark:text-slate-400 text-sm mb-3">No numbers available for this search.</p>
-                                    <button onClick={() => setStep('search')} className="text-violet-600 dark:text-violet-400 text-sm font-semibold hover:underline">← Try a different search</button>
-                                </div>
-                            ) : numbers.map(n => {
-                                const cityState = [n.locality, n.region].filter(Boolean).join(', ');
-                                return (
-                                <label
-                                    key={n.phoneNumber}
-                                    className={`flex items-center gap-3 p-4 rounded-2xl border-2 cursor-pointer transition ${selectedNumber === n.phoneNumber ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20' : 'border-slate-200 dark:border-slate-700 hover:border-violet-300 dark:hover:border-violet-600'}`}
+                        {/* canExpand: city search returned 0, offer explicit state-wide search */}
+                        {canExpand && (
+                            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl p-4 mb-4 text-center">
+                                <p className="text-sm text-amber-700 dark:text-amber-400 font-semibold mb-1">No local numbers found for "{city}"</p>
+                                <p className="text-xs text-amber-600 dark:text-amber-500 mb-3">Twilio doesn't have numbers available in that specific city. Would you like to search across all of {stateAbbr}?</p>
+                                <button
+                                    onClick={() => fetchNumbers(true)}
+                                    disabled={loadingNums}
+                                    className="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-black rounded-xl transition flex items-center gap-2 mx-auto"
                                 >
-                                    <input type="radio" name="number" value={n.phoneNumber} checked={selectedNumber === n.phoneNumber} onChange={() => setSelectedNumber(n.phoneNumber)} className="accent-violet-600 mt-0.5 shrink-0" />
-                                    <div className="flex-1 min-w-0">
-                                        <p className="font-black text-lg text-slate-900 dark:text-white tracking-wide">{n.friendlyName}</p>
-                                        {cityState ? (
-                                            <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold">
-                                                📍 {cityState}
-                                            </span>
-                                        ) : (
-                                            <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-xs">
-                                                📍 Area code {areaCode}
-                                            </span>
-                                        )}
-                                    </div>
-                                    {selectedNumber === n.phoneNumber && (
-                                        <CheckCircle size={18} className="text-violet-600 shrink-0" />
-                                    )}
-                                </label>
-                                );
-                            })}
-                        </div>
+                                    {loadingNums ? <><Loader2 size={12} className="animate-spin" /> Searching…</> : `Search all of ${stateAbbr} →`}
+                                </button>
+                            </div>
+                        )}
 
-                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Sender Name (shown in message headers)</label>
-                        <input
-                            type="text"
-                            value={senderName}
-                            onChange={e => setSenderName(e.target.value)}
-                            className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 mb-4"
-                            placeholder="Grace Community Church"
-                        />
+                        {/* Number list */}
+                        {numbers.length > 0 && (
+                            <div className="space-y-2 mb-3">
+                                {pageNumbers.map(n => {
+                                    const cityState = [n.locality, n.region].filter(Boolean).join(', ');
+                                    return (
+                                        <label
+                                            key={n.phoneNumber}
+                                            className={`flex items-center gap-3 p-4 rounded-2xl border-2 cursor-pointer transition ${selectedNumber === n.phoneNumber ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20' : 'border-slate-200 dark:border-slate-700 hover:border-violet-300 dark:hover:border-violet-600'}`}
+                                        >
+                                            <input type="radio" name="number" value={n.phoneNumber} checked={selectedNumber === n.phoneNumber} onChange={() => setSelectedNumber(n.phoneNumber)} className="accent-violet-600 mt-0.5 shrink-0" />
+                                            <div className="flex-1 min-w-0">
+                                                <p className="font-black text-lg text-slate-900 dark:text-white tracking-wide">{n.friendlyName}</p>
+                                                <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold">
+                                                    📍 {cityState || `Area code ${areaCode}`}
+                                                </span>
+                                            </div>
+                                            {selectedNumber === n.phoneNumber && (
+                                                <CheckCircle size={18} className="text-violet-600 shrink-0" />
+                                            )}
+                                        </label>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        {/* Pagination */}
+                        {totalPages > 1 && (
+                            <div className="flex items-center justify-between mb-4 bg-slate-50 dark:bg-slate-800/60 rounded-xl px-3 py-2">
+                                <button
+                                    onClick={() => { setPage(p => Math.max(0, p - 1)); setSelectedNumber(''); }}
+                                    disabled={page === 0}
+                                    className="flex items-center gap-1 text-xs font-bold text-slate-600 dark:text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 disabled:opacity-30 transition"
+                                >
+                                    ← Prev
+                                </button>
+                                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                    Page {page + 1} of {totalPages}
+                                    <span className="text-slate-400 dark:text-slate-500 ml-1">({numbers.length} total)</span>
+                                </span>
+                                <button
+                                    onClick={() => { setPage(p => Math.min(totalPages - 1, p + 1)); setSelectedNumber(''); }}
+                                    disabled={page >= totalPages - 1}
+                                    className="flex items-center gap-1 text-xs font-bold text-slate-600 dark:text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 disabled:opacity-30 transition"
+                                >
+                                    Next →
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Sender Name */}
+                        {numbers.length > 0 && (
+                            <>
+                                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Sender Name (shown in message headers)</label>
+                                <input
+                                    type="text"
+                                    value={senderName}
+                                    onChange={e => setSenderName(e.target.value)}
+                                    className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 mb-4"
+                                    placeholder="Grace Community Church"
+                                />
+                            </>
+                        )}
 
                         {error && <p className="text-sm text-red-500 mb-3">{error}</p>}
 
                         <div className="flex gap-2">
                             <button onClick={() => setStep('search')} className="flex-1 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 transition">← Search Again</button>
-                            <button
-                                onClick={provision}
-                                disabled={provisioning || !selectedNumber}
-                                className="flex-1 py-2.5 text-sm font-black bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-xl transition flex items-center justify-center gap-2"
-                            >
-                                {provisioning ? <><Loader2 size={14} className="animate-spin" />Provisioning…</> : 'Claim Number →'}
-                            </button>
+                            {numbers.length > 0 && (
+                                <button
+                                    onClick={provision}
+                                    disabled={provisioning || !selectedNumber}
+                                    className="flex-1 py-2.5 text-sm font-black bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-xl transition flex items-center justify-center gap-2"
+                                >
+                                    {provisioning ? <><Loader2 size={14} className="animate-spin" />Provisioning…</> : 'Claim Number →'}
+                                </button>
+                            )}
                         </div>
                     </>
-                )}
+                    );
+                })()}
 
                 {step === 'done' && (
                     <div className="text-center py-4">
