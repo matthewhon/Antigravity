@@ -64,7 +64,7 @@ function timeAgo(ts: number): string {
 const Toast: React.FC<{ msg: string; type: 'success' | 'error'; onClose: () => void }> = ({ msg, type, onClose }) => (
     <div className={`fixed top-5 left-1/2 -translate-x-1/2 z-[200] flex items-center gap-3 px-5 py-3 rounded-2xl shadow-2xl text-sm font-semibold text-white transition-all ${type === 'success' ? 'bg-emerald-600' : 'bg-red-600'}`}>
         {msg}
-        <button onClick={onClose} className="ml-1 opacity-70 hover:opacity-100"><X size={14} /></button>
+        <button onClick={onClose} title="Close notification" className="ml-1 opacity-70 hover:opacity-100"><X size={14} /></button>
     </div>
 );
 
@@ -106,12 +106,15 @@ const ScheduleModal: React.FC<{
                     value={dateTime}
                     onChange={e => setDateTime(e.target.value)}
                     min={new Date().toISOString().slice(0, 16)}
+                    title="Send date and time"
+                    placeholder="Select date and time"
                     className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 mb-4"
                 />
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Repeat</label>
                 <select
                     value={frequency}
                     onChange={e => setFrequency(e.target.value as any)}
+                    title="Repeat frequency"
                     className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 mb-6"
                 >
                     <option value="none">Does not repeat</option>
@@ -196,7 +199,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shrink-0">
                 <div className="flex items-center gap-3">
-                    <button onClick={onBack} className="p-1.5 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+                    <button onClick={onBack} title="Back to campaigns" className="p-1.5 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition">
                         <ArrowLeft size={18} />
                     </button>
                     <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
@@ -270,6 +273,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                     <div className="flex items-center gap-2 text-sm text-slate-400"><Loader2 size={13} className="animate-spin" /> Loading lists…</div>
                                 ) : (
                                     <select
+                                        title="Select a PCO list"
                                         className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
                                         value={local.toListId || ''}
                                         onChange={e => {
@@ -290,6 +294,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                     <div className="flex items-center gap-2 text-sm text-slate-400"><Loader2 size={13} className="animate-spin" /> Loading groups…</div>
                                 ) : (
                                     <select
+                                        title="Select a PCO group"
                                         className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
                                         value={local.toGroupId || ''}
                                         onChange={e => {
@@ -674,7 +679,7 @@ const NewMessageComposer: React.FC<{
                     <h2 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
                         <Edit3 size={18} className="text-violet-500" /> New Message
                     </h2>
-                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition">
+                    <button onClick={onClose} title="Close" className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition">
                         <X size={20} />
                     </button>
                 </div>
@@ -742,7 +747,7 @@ const NewMessageComposer: React.FC<{
                                         <p className="font-bold text-sm text-violet-700 dark:text-violet-300">{selectedList.name}</p>
                                         <p className="text-xs text-violet-500">{selectedList.total_people.toLocaleString()} people</p>
                                     </div>
-                                    <button onClick={() => setSelectedList(null)} className="text-violet-400 hover:text-violet-600 transition"><X size={16} /></button>
+                                    <button onClick={() => setSelectedList(null)} title="Clear selected list" className="text-violet-400 hover:text-violet-600 transition"><X size={16} /></button>
                                 </div>
                             ) : (
                                 <div className="border-2 border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
@@ -783,7 +788,7 @@ const NewMessageComposer: React.FC<{
                                         <p className="font-bold text-sm text-violet-700 dark:text-violet-300">{selectedGroup.name}</p>
                                         <p className="text-xs text-violet-500">{selectedGroup.memberCount.toLocaleString()} members</p>
                                     </div>
-                                    <button onClick={() => setSelectedGroup(null)} className="text-violet-400 hover:text-violet-600 transition"><X size={16} /></button>
+                                    <button onClick={() => setSelectedGroup(null)} title="Clear selected group" className="text-violet-400 hover:text-violet-600 transition"><X size={16} /></button>
                                 </div>
                             ) : (
                                 <div className="border-2 border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
@@ -1202,6 +1207,7 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingL
                         <select
                             value={addToListId}
                             onChange={e => setAddToListId(e.target.value)}
+                            title="Add to PCO list"
                             className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
                         >
                             <option value="">— Don't add to a list —</option>
@@ -1218,6 +1224,7 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingL
                     </div>
                     <button
                         onClick={() => setIsActive(v => !v)}
+                        title={isActive ? 'Deactivate keyword' : 'Activate keyword'}
                         className={`relative w-12 h-6 rounded-full transition-colors ${isActive ? 'bg-violet-600' : 'bg-slate-300 dark:bg-slate-600'}`}
                     >
                         <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${isActive ? 'translate-x-6' : 'translate-x-0'}`} />
@@ -1894,9 +1901,9 @@ const StepRow: React.FC<{
                     <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Step {index + 1}</span>
                 </div>
                 <div className="flex items-center gap-1">
-                    <button onClick={onMoveUp} disabled={index === 0} className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 disabled:opacity-30 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition"><ChevronDown size={14} className="rotate-180" /></button>
-                    <button onClick={onMoveDown} disabled={index === total - 1} className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 disabled:opacity-30 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition"><ChevronDown size={14} /></button>
-                    <button onClick={onDelete} className="p-1 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition"><Trash2 size={14} /></button>
+                    <button onClick={onMoveUp} disabled={index === 0} title="Move step up" className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 disabled:opacity-30 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition"><ChevronDown size={14} className="rotate-180" /></button>
+                    <button onClick={onMoveDown} disabled={index === total - 1} title="Move step down" className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 disabled:opacity-30 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition"><ChevronDown size={14} /></button>
+                    <button onClick={onDelete} title="Delete step" className="p-1 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition"><Trash2 size={14} /></button>
                 </div>
             </div>
 
@@ -1912,6 +1919,8 @@ const StepRow: React.FC<{
                         max={365}
                         value={step.delayDays}
                         onChange={e => onChange({ delayDays: Math.max(0, parseInt(e.target.value) || 0) })}
+                        title="Delay in days"
+                        placeholder="0"
                         className="w-16 text-center text-sm font-black border border-slate-200 dark:border-slate-600 rounded-xl px-2 py-1.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
                     />
                     <span className="text-xs text-slate-500 dark:text-slate-400">
@@ -2035,7 +2044,7 @@ const WorkflowEditor: React.FC<{
             {/* Editor header */}
             <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shrink-0">
                 <div className="flex items-center gap-3">
-                    <button onClick={onBack} className="p-1.5 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+                    <button onClick={onBack} title="Back to workflows" className="p-1.5 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition">
                         <ArrowLeft size={18} />
                     </button>
                     <div className="text-sm text-slate-500 dark:text-slate-400">
@@ -2130,6 +2139,7 @@ const WorkflowEditor: React.FC<{
                                             const kw = keywords.find(k => k.id === e.target.value);
                                             patch({ triggerKeywordId: e.target.value || null, triggerKeywordWord: kw?.keyword || null });
                                         }}
+                                        title="Trigger keyword"
                                         className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
                                     >
                                         <option value="">— Select a keyword —</option>
@@ -2152,6 +2162,7 @@ const WorkflowEditor: React.FC<{
                                         const l = pcoLists.find(x => x.id === e.target.value);
                                         patch({ triggerListId: e.target.value || null, triggerListName: l?.name || null });
                                     }}
+                                    title="Trigger PCO list"
                                     className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
                                 >
                                     <option value="">— Select a list —</option>
@@ -2300,7 +2311,7 @@ const EnrollmentPane: React.FC<{
                         <h3 className="text-base font-black text-slate-900 dark:text-white">Enroll Contact</h3>
                         <p className="text-xs text-slate-500 dark:text-slate-400">{workflow.name}</p>
                     </div>
-                    <button onClick={onClose} className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition"><X size={16} /></button>
+                    <button onClick={onClose} title="Close" className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition"><X size={16} /></button>
                 </div>
 
                 {/* Enroll form */}
@@ -2775,6 +2786,7 @@ const SmsSetupWizard: React.FC<{
                                     <select
                                         value={stateAbbr}
                                         onChange={e => setStateAbbr(e.target.value)}
+                                        title="State"
                                         className="w-full text-base border-2 border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500 appearance-none"
                                     >
                                         <option value="">Select a state…</option>
