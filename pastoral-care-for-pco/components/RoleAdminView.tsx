@@ -2550,7 +2550,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                 </div>
                                             )}
                                         </div>
-
+                                        )
                                     ) : (
                                         // ── Standard success / error feedback ────────────────────────────
                                         <div className={`mt-5 p-4 rounded-xl border text-xs ${
