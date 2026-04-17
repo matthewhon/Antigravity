@@ -152,7 +152,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   const [smsMessage, setSmsMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isA2pSubmitting, setIsA2pSubmitting] = useState(false);
   const [isA2pChecking, setIsA2pChecking] = useState(false);
-  const [a2pResult, setA2pResult] = useState<{ success: boolean; message: string; brandSid?: string; failureReason?: string | null; twilioStatus?: string } | null>(null);
+  const [a2pResult, setA2pResult] = useState<{ success: boolean; message: string; brandSid?: string; failureReason?: string | null; twilioStatus?: string; needsBundle?: boolean } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
@@ -1878,11 +1878,14 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                     if (data.brandSid) {
                         setSmsForm(prev => ({ ...prev, twilioBrandSid: data.brandSid, twilioA2pStatus: 'pending' }));
                     }
+                    // Detect the "needs Customer Profile Bundle" path
+                    const needsBundle = !data.success && data.status === 'pending' && !data.brandSid;
                     setA2pResult({
                         success: data.success,
                         message: data.message || (data.error || 'Unknown response'),
                         brandSid: data.brandSid,
                         twilioStatus: data.status,
+                        needsBundle,
                     });
                 } catch (e: any) {
                     setA2pResult({ success: false, message: e.message || 'Submission failed' });
@@ -2356,33 +2359,137 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
 
                                 {/* Result feedback */}
                                 {a2pResult && (
-                                    <div className={`mt-5 p-4 rounded-xl border text-xs ${
-                                        a2pResult.success
-                                            ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300'
-                                            : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300'
-                                    }`}>
-                                        <div className="flex items-start gap-2">
-                                            <span className="shrink-0 text-base mt-0.5">{a2pResult.success ? '✅' : '⚠️'}</span>
-                                            <div className="min-w-0">
-                                                <p className="font-bold mb-1">{a2pResult.message}</p>
-                                                {a2pResult.brandSid && (
-                                                    <p className="font-mono text-[10px] text-slate-500 dark:text-slate-400">
-                                                        Brand SID: <strong>{a2pResult.brandSid}</strong>
-                                                    </p>
-                                                )}
-                                                {a2pResult.twilioStatus && (
-                                                    <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
-                                                        Twilio status: <strong>{a2pResult.twilioStatus}</strong>
-                                                    </p>
-                                                )}
-                                                {a2pResult.failureReason && (
-                                                    <p className="text-[10px] text-rose-500 dark:text-rose-400 mt-0.5 font-bold">
-                                                        Failure reason: {a2pResult.failureReason}
-                                                    </p>
-                                                )}
+                                    a2pResult.needsBundle ? (
+                                        // ── Customer Profile Bundle Required ─────────────────────────────
+                                        <div className="mt-5 space-y-4">
+                                            <div className="p-4 rounded-xl border bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800">
+                                                <div className="flex items-start gap-2">
+                                                    <span className="shrink-0 text-lg mt-0.5">📋</span>
+                                                    <div>
+                                                        <p className="text-xs font-black text-amber-800 dark:text-amber-300 mb-1">
+                                                            One more step required: Twilio Customer Profile Bundle
+                                                        </p>
+                                                        <p className="text-[10px] text-amber-700 dark:text-amber-400 leading-relaxed">
+                                                            Your registration data has been saved. Twilio's API requires a verified
+                                                            <strong> Customer Profile Bundle</strong> (business identity verification)
+                                                            before it can submit your brand to The Campaign Registry. This is a
+                                                            one-time setup done in the Twilio Console.
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="p-5 rounded-xl border bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 space-y-4">
+                                                <p className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400">↓ Complete these steps in Twilio Console</p>
+
+                                                {([
+                                                    {
+                                                        step: '1',
+                                                        title: 'Open your Twilio Sub-Account',
+                                                        desc: 'Log into console.twilio.com. In the top menu, switch to your church\'s sub-account (not the master account). The sub-account SID starts with AC…',
+                                                        link: 'https://console.twilio.com',
+                                                        linkLabel: 'Open Twilio Console →',
+                                                    },
+                                                    {
+                                                        step: '2',
+                                                        title: 'Go to Regulatory Compliance (Trust Hub)',
+                                                        desc: 'In the left sidebar navigate to: Messaging → Regulatory Compliance (Trust Hub). This is where Twilio manages business identity.',
+                                                        link: 'https://console.twilio.com/us1/develop/sms/regulatory-compliance/end-users',
+                                                        linkLabel: 'Open Trust Hub →',
+                                                    },
+                                                    {
+                                                        step: '3',
+                                                        title: 'Create a Business Profile (Customer Profile)',
+                                                        desc: 'Click "Create new" → select "Business" → fill in your legal church name, EIN, address, website, and authorized contact. Use the exact same values you entered in Step 2 above.',
+                                                        link: 'https://console.twilio.com/us1/develop/sms/regulatory-compliance/end-users/create',
+                                                        linkLabel: 'Create Business Profile →',
+                                                    },
+                                                    {
+                                                        step: '4',
+                                                        title: 'Submit for Twilio Review',
+                                                        desc: 'Once saved, click "Submit for review". Twilio will verify your business identity (usually same-day). The profile status must reach TWILIO_APPROVED before continuing.',
+                                                        link: null,
+                                                        linkLabel: null,
+                                                    },
+                                                    {
+                                                        step: '5',
+                                                        title: 'Copy the Bundle SID and paste it here',
+                                                        desc: 'After approval, Twilio gives you a Customer Profile Bundle SID (starts with BU…). Copy it, paste it into the field below, save, then click "Re-Submit to Twilio" above.',
+                                                        link: null,
+                                                        linkLabel: null,
+                                                    },
+                                                ] as { step: string; title: string; desc: string; link: string | null; linkLabel: string | null }[]).map(({ step, title, desc, link, linkLabel }) => (
+                                                    <div key={step} className="flex items-start gap-3">
+                                                        <div className="w-6 h-6 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-black text-[10px] shrink-0 mt-0.5">{step}</div>
+                                                        <div className="min-w-0">
+                                                            <p className="text-xs font-bold text-slate-900 dark:text-white">{title}</p>
+                                                            <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">{desc}</p>
+                                                            {link && linkLabel && (
+                                                                <a href={link} target="_blank" rel="noopener noreferrer"
+                                                                    className="inline-block mt-1.5 text-[10px] font-bold text-indigo-600 dark:text-indigo-400 underline hover:text-indigo-800 dark:hover:text-indigo-200 transition">
+                                                                    {linkLabel}
+                                                                </a>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ))}
+
+                                                {/* Bundle SID input */}
+                                                <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+                                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">
+                                                        Customer Profile Bundle SID <span className="text-rose-500">*</span>
+                                                        <span className="normal-case font-normal text-slate-400"> · paste from Twilio Console after approval</span>
+                                                    </label>
+                                                    <div className="flex gap-2">
+                                                        <input
+                                                            type="text"
+                                                            value={smsForm.twilioCustomerProfileSid || ''}
+                                                            onChange={e => handleSmsChange('twilioCustomerProfileSid', e.target.value)}
+                                                            placeholder="BU…"
+                                                            className="flex-1 bg-white dark:bg-slate-800 border-2 border-indigo-300 dark:border-indigo-700 rounded-xl px-4 py-2.5 text-sm font-mono text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
+                                                        />
+                                                        <button
+                                                            onClick={handleSubmitToTwilio}
+                                                            disabled={!smsForm.twilioCustomerProfileSid || isA2pSubmitting}
+                                                            className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition whitespace-nowrap"
+                                                        >
+                                                            {isA2pSubmitting ? '📡 Submitting…' : '🔄 Re-Submit'}
+                                                        </button>
+                                                    </div>
+                                                    <p className="text-[9px] text-slate-400 mt-1.5">Starts with <strong>BU</strong>. Found in Twilio Console → Trust Hub → Customer Profiles → your profile → SID field.</p>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
+                                    ) : (
+                                        // ── Standard success / error feedback ────────────────────────────
+                                        <div className={`mt-5 p-4 rounded-xl border text-xs ${
+                                            a2pResult.success
+                                                ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300'
+                                                : 'bg-rose-50 dark:bg-rose-900/20 border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300'
+                                        }`}>
+                                            <div className="flex items-start gap-2">
+                                                <span className="shrink-0 text-base mt-0.5">{a2pResult.success ? '✅' : '❌'}</span>
+                                                <div className="min-w-0">
+                                                    <p className="font-bold mb-1">{a2pResult.message}</p>
+                                                    {a2pResult.brandSid && (
+                                                        <p className="font-mono text-[10px] text-slate-500 dark:text-slate-400">
+                                                            Brand SID: <strong>{a2pResult.brandSid}</strong>
+                                                        </p>
+                                                    )}
+                                                    {a2pResult.twilioStatus && (
+                                                        <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                                            Twilio status: <strong>{a2pResult.twilioStatus}</strong>
+                                                        </p>
+                                                    )}
+                                                    {a2pResult.failureReason && (
+                                                        <p className="text-[10px] text-rose-500 dark:text-rose-400 mt-0.5 font-bold">
+                                                            Failure reason: {a2pResult.failureReason}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )
                                 )}
                             </div>
 

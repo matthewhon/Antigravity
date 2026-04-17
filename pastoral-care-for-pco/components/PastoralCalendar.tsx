@@ -205,13 +205,18 @@ export const PastoralCalendar: React.FC<PastoralCalendarProps> = ({ people }) =>
                                                     <div className="flex items-center gap-4">
                                                         <div className="text-2xl">{getEventIcon(event.type)}</div>
                                                         <div>
-                                                            <p className="font-bold text-sm">
+                                                            <p className="font-bold text-sm flex items-center gap-2">
                                                                 {event.personName}
-                                                                <span className="opacity-60 font-normal ml-2">
+                                                                <span className="opacity-60 font-normal">
                                                                     {event.type === 'birthday' ? `turning ${event.years}` : 
                                                                      event.type === 'anniversary' ? `${event.years} years` : 
                                                                      `${event.years} years ago`}
                                                                 </span>
+                                                                {event.type === 'birthday' && (event.years ?? 99) < 18 && (
+                                                                    <span className="text-[9px] font-black bg-rose-500 text-white px-1.5 py-0.5 rounded-full uppercase tracking-wider">
+                                                                        Age {event.years}
+                                                                    </span>
+                                                                )}
                                                             </p>
                                                             {event.householdName && (
                                                                 <p className="text-[10px] font-bold opacity-60 uppercase tracking-widest mt-0.5">
@@ -263,10 +268,15 @@ export const PastoralCalendar: React.FC<PastoralCalendarProps> = ({ people }) =>
                                         <div 
                                             key={event.id} 
                                             className={`px-2 py-1 rounded-lg border text-[10px] font-bold truncate flex items-center gap-1.5 ${getEventColor(event.type)}`}
-                                            title={`${event.personName} - ${event.type} (${event.years} years)`}
+                                            title={`${event.personName} - ${event.type === 'birthday' && (event.years ?? 99) < 18 ? `turning ${event.years} 🎂 (minor)` : `${event.years} years`}`}
                                         >
                                             <span>{getEventIcon(event.type)}</span>
                                             <span className="truncate">{event.personName}</span>
+                                            {event.type === 'birthday' && (event.years ?? 99) < 18 && (
+                                                <span className="flex-shrink-0 font-black bg-rose-500 text-white px-1 rounded-full leading-tight" style={{fontSize: '8px'}}>
+                                                    {event.years}
+                                                </span>
+                                            )}
                                         </div>
                                     ))}
                                 </div>

@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { differenceInYears, parseISO, isValid } from 'date-fns';
 import { LifecycleDonor, PcoPerson, PastoralNote, PrayerRequest } from '../types';
 
 interface WidgetWrapperProps {
@@ -210,13 +211,22 @@ export const PersonList: React.FC<{ people: PcoPerson[]; type: string }> = ({ pe
             </div>
           </div>
         </div>
-        <div className="text-right flex-shrink-0">
+        <div className="text-right flex-shrink-0 flex flex-col items-end gap-1">
           <span className="text-[9px] font-black text-indigo-500 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 print:bg-transparent print:border print:border-slate-200 px-2 py-1 rounded-lg uppercase tracking-widest">
             {type === 'birthday' ? (p.birthdate?.split('-').slice(1).join('/') || 'Upcoming') : 
              type === 'anniversary' ? (p.anniversary?.split('-').slice(1).join('/') || 'Soon') : 
              type === 'recent' ? (new Date(p.createdAt).toLocaleDateString(undefined, {month:'short', day:'numeric'})) :
              'New'}
           </span>
+          {type === 'birthday' && (() => {
+            const bd = p.birthdate ? parseISO(p.birthdate) : null;
+            const age = bd && isValid(bd) ? differenceInYears(new Date(), bd) : null;
+            return age !== null && age < 18 ? (
+              <span className="text-[8px] font-black bg-rose-500 text-white px-1.5 py-0.5 rounded-full uppercase tracking-wider">
+                Age {age + 1}
+              </span>
+            ) : null;
+          })()}
         </div>
       </div>
     ))}
