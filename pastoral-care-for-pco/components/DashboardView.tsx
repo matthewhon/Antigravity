@@ -15,6 +15,7 @@ import { WidgetWrapper, StatCard } from './SharedUI';
 import { RiskDistributionWidget } from './RiskWidgets';
 import { calculateChurchRisk, DEFAULT_CHURCH_RISK_SETTINGS } from '../services/riskService';
 import { PastorAIView } from './PastorAIView';
+import { ServicesTimelineWidget } from './ServicesTimelineWidget';
 
 interface DashboardViewProps {
   user: User;
@@ -454,6 +455,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   </WidgetWrapper>
               ) : null;
 
+          case 'services_timeline':
+              return (
+                  <ServicesTimelineWidget
+                      servicesData={servicesData}
+                      givingAnalytics={givingAnalytics}
+                      onRemove={() => handleRemoveWidget(id)}
+                  />
+              );
+
           default:
               return null;
       }
@@ -503,7 +513,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {safeVisibleWidgets.map((id, index) => {
                 let spanClass = "col-span-1";
-                if (['people_stats', 'keyMetrics', 'ai_insights'].includes(id)) {
+                if (['people_stats', 'keyMetrics', 'ai_insights', 'services_timeline'].includes(id)) {
                     spanClass = "col-span-1 md:col-span-2 lg:col-span-2";
                 }
                 return (

@@ -128,7 +128,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
 }) => {
   const [users, setUsers] = useState<User[]>([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'Team' | 'Organization' | 'Planning Center' | 'Community' | 'Widget Directory' | 'Risk Profiles' | 'Subscription' | 'Mail Settings'>('Team');
+  const [activeTab, setActiveTab] = useState<'Team' | 'Organization' | 'Planning Center' | 'Community' | 'Widget Directory' | 'Risk Profiles' | 'Subscription' | 'Mail Settings' | 'SMS'>('Team');
 
   // Mail Settings state
   const [mailMode, setMailMode] = useState<'shared' | 'custom'>(church.emailSettings?.mode || 'shared');
@@ -144,6 +144,12 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   const [mailDiagEmail, setMailDiagEmail] = useState('');
   const [mailDiagChecks, setMailDiagChecks] = useState<{ label: string; status: 'pass' | 'fail' | 'warn'; detail: string }[] | null>(null);
   const [formData, setFormData] = useState<Partial<Church>>(church);
+
+  // SMS Settings state
+  const [smsSubTab, setSmsSubTab] = useState<'a2p' | 'optout'>('a2p');
+  const [smsForm, setSmsForm] = useState<NonNullable<Church['smsSettings']>>(church.smsSettings || {});
+  const [isSmsSaving, setIsSmsSaving] = useState(false);
+  const [smsMessage, setSmsMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
@@ -171,10 +177,15 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   }, [church]);
 
   useEffect(() => {
-      if (initialTab && ['Team', 'Organization', 'Planning Center', 'Community', 'Widget Directory', 'Risk Profiles', 'Subscription', 'Mail Settings'].includes(initialTab)) {
+      if (initialTab && ['Team', 'Organization', 'Planning Center', 'Community', 'Widget Directory', 'Risk Profiles', 'Subscription', 'Mail Settings', 'SMS'].includes(initialTab)) {
           setActiveTab(initialTab as any);
       }
   }, [initialTab]);
+
+  // Keep SMS form in sync when church prop changes
+  useEffect(() => {
+      setSmsForm(church.smsSettings || {});
+  }, [church.smsSettings]);
 
   // Sync mail state when church prop changes
   useEffect(() => {
@@ -578,7 +589,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
             </div>
             
             <div className="flex bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl gap-1 overflow-x-auto max-w-full">
-                {['Team', 'Organization', 'Planning Center', 'Community', 'Mail Settings', 'Widget Directory', 'Risk Profiles', 'Subscription'].map(tab => (
+                {['Team', 'Organization', 'Planning Center', 'Community', 'Mail Settings', 'SMS', 'Widget Directory', 'Risk Profiles', 'Subscription'].map(tab => (
                     <button 
                         key={tab}
                         onClick={() => setActiveTab(tab as any)}
@@ -1807,6 +1818,569 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                             <li>The <strong>Custom Domain</strong> option improves deliverability by authenticating your brand with DKIM/SPF through SendGrid's domain authentication.</li>
                             <li>Individual email campaigns can still override the From name and address on a per-campaign basis.</li>
                         </ul>
+                    </div>
+                </div>
+            );
+        })()}
+
+        {activeTab === 'SMS' && (() => {
+            const A2P_STATUS_COLORS: Record<string, string> = {
+                approved: 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30',
+                pending:  'bg-amber-500/10  text-amber-600  dark:text-amber-400  border border-amber-500/30',
+                failed:   'bg-rose-500/20   text-rose-600   dark:text-rose-400   border border-rose-500/30',
+                not_started: 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400',
+            };
+            const statusLabel: Record<string, string> = {
+                approved: '✓ Approved',
+                pending: '⏳ Pending Review',
+                failed: '✗ Failed',
+                not_started: 'Not Started',
+            };
+            const a2pStatus = smsForm.twilioA2pStatus || 'not_started';
+
+            const handleSmsChange = (key: keyof NonNullable<Church['smsSettings']>, value: any) => {
+                setSmsForm(prev => ({ ...prev, [key]: value }));
+            };
+
+            const handleSmsSave = async () => {
+                if (!onUpdateChurch) return;
+                setIsSmsSaving(true);
+                setSmsMessage(null);
+                try {
+                    await onUpdateChurch({ smsSettings: smsForm });
+                    setSmsMessage({ type: 'success', text: 'SMS settings saved successfully.' });
+                    setTimeout(() => setSmsMessage(null), 4000);
+                } catch (e: any) {
+                    setSmsMessage({ type: 'error', text: 'Failed to save: ' + e.message });
+                } finally {
+                    setIsSmsSaving(false);
+                }
+            };
+
+            const inputCn = 'w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-colors';
+            const labelCn = 'block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-2';
+
+            return (
+                <div className="space-y-6">
+                    {/* Header */}
+                    <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm">
+                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+                            <div>
+                                <h3 className="text-xl font-black text-slate-900 dark:text-white">SMS Settings</h3>
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mt-1">
+                                    A2P 10DLC Registration &amp; Messaging Compliance
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full ${A2P_STATUS_COLORS[a2pStatus]}`}>
+                                    A2P: {statusLabel[a2pStatus]}
+                                </span>
+                                {smsForm.twilioPhoneNumber && (
+                                    <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-1.5 rounded-full border border-emerald-100 dark:border-emerald-900/30">
+                                        📱 {smsForm.twilioPhoneNumber}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Sub-tab switcher */}
+                        <div className="flex bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl gap-1 w-fit">
+                            {(['a2p', 'optout'] as const).map(st => (
+                                <button
+                                    key={st}
+                                    onClick={() => setSmsSubTab(st)}
+                                    className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${
+                                        smsSubTab === st
+                                            ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-300'
+                                            : 'text-slate-500 dark:text-slate-400 hover:bg-white/50 dark:hover:bg-slate-700/50'
+                                    }`}
+                                >
+                                    {st === 'a2p' ? '📋 A2P 10DLC Registration' : '🔕 Opt-Out & Sender ID'}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* ── A2P 10DLC Sub-tab ─────────────────────────────────────────── */}
+                    {smsSubTab === 'a2p' && (
+                        <div className="space-y-6">
+
+                            {/* Step 0: What is A2P 10DLC */}
+                            <div className="bg-indigo-900/10 dark:bg-indigo-900/20 p-6 rounded-2xl border border-indigo-500/20">
+                                <h4 className="font-bold text-indigo-400 mb-3 text-sm">📡 What is A2P 10DLC?</h4>
+                                <ul className="text-xs text-slate-400 space-y-1.5 list-disc list-inside leading-relaxed">
+                                    <li><strong>A2P</strong> = Application-to-Person messaging. This is how your church texts members from software.</li>
+                                    <li><strong>10DLC</strong> = 10-Digit Long Code. These are standard US phone numbers (not shortcodes) registered for A2P use.</li>
+                                    <li>The FCC and US carriers require that every A2P sender register a <strong>Brand</strong> (your organization) and a <strong>Campaign</strong> (your use case) through The Campaign Registry (TCR).</li>
+                                    <li>Without registration, carriers will <strong>filter or block</strong> your messages at scale.</li>
+                                    <li>Approval typically takes <strong>1–5 business days</strong> after all information is submitted.</li>
+                                </ul>
+                            </div>
+
+                            {/* Step 1: Twilio Sub-Account & Phone */}
+                            <div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800">
+                                <div className="flex items-center gap-3 mb-6">
+                                    <div className="w-8 h-8 rounded-xl bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-black text-sm">1</div>
+                                    <h4 className="text-sm font-black text-slate-900 dark:text-white">Twilio Sub-Account (Auto-Provisioned)</h4>
+                                </div>
+                                <p className="text-[10px] text-slate-400 mb-6 leading-relaxed">
+                                    Each church gets an isolated Twilio Sub-Account. These are filled automatically by the platform when your account is provisioned. Do not edit unless instructed by support.
+                                </p>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className={labelCn}>Sub-Account SID</label>
+                                        <input type="text" value={smsForm.twilioSubAccountSid || ''} readOnly
+                                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 font-mono text-xs text-slate-500 dark:text-slate-400 cursor-default"
+                                            placeholder="AC... (auto-filled)"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className={labelCn}>Assigned Phone Number</label>
+                                        <input type="text" value={smsForm.twilioPhoneNumber || ''} readOnly
+                                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 font-mono text-xs text-slate-500 dark:text-slate-400 cursor-default"
+                                            placeholder="+1... (auto-filled)"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className={labelCn}>Messaging Service SID</label>
+                                        <input type="text" value={smsForm.twilioMessagingServiceSid || ''}
+                                            onChange={e => handleSmsChange('twilioMessagingServiceSid', e.target.value)}
+                                            className={inputCn}
+                                            placeholder="MG... (enter after creating in Twilio Console)"
+                                        />
+                                        <p className="text-[9px] text-slate-400 mt-1.5">Create in <a href="https://console.twilio.com/us1/develop/sms/services" target="_blank" rel="noopener noreferrer" className="underline text-indigo-400 hover:text-indigo-300">Twilio Console → Messaging → Services</a>. Attach your phone number to this service.</p>
+                                    </div>
+                                    <div>
+                                        <label className={labelCn}>A2P Brand SID</label>
+                                        <input type="text" value={smsForm.twilioBrandSid || ''}
+                                            onChange={e => handleSmsChange('twilioBrandSid', e.target.value)}
+                                            className={inputCn}
+                                            placeholder="BN..."
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className={labelCn}>A2P Campaign SID</label>
+                                        <input type="text" value={smsForm.twilioCampaignSid || ''}
+                                            onChange={e => handleSmsChange('twilioCampaignSid', e.target.value)}
+                                            className={inputCn}
+                                            placeholder="QE..."
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className={labelCn}>A2P Status</label>
+                                        <select value={smsForm.twilioA2pStatus || 'not_started'}
+                                            onChange={e => handleSmsChange('twilioA2pStatus', e.target.value as any)}
+                                            className={inputCn}
+                                        >
+                                            <option value="not_started">Not Started</option>
+                                            <option value="pending">Pending Review</option>
+                                            <option value="approved">Approved</option>
+                                            <option value="failed">Failed</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Step 2: Brand Registration */}
+                            <div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800">
+                                <div className="flex items-center gap-3 mb-6">
+                                    <div className="w-8 h-8 rounded-xl bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-black text-sm">2</div>
+                                    <div>
+                                        <h4 className="text-sm font-black text-slate-900 dark:text-white">Brand Registration (TCR)</h4>
+                                        <p className="text-[10px] text-slate-400 mt-0.5">Register your organization with The Campaign Registry. Use the exact legal name on your EIN filing.</p>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                    <div className="md:col-span-2">
+                                        <label className={labelCn}>Legal Business Name <span className="text-rose-500">*</span></label>
+                                        <input type="text" value={smsForm.a2pBusinessName || ''}
+                                            onChange={e => handleSmsChange('a2pBusinessName', e.target.value)}
+                                            className={inputCn} placeholder="Grace Community Church"
+                                        />
+                                        <p className="text-[9px] text-slate-400 mt-1.5">Must match your IRS EIN registration exactly. Churches are typically registered as non-profit corporations.</p>
+                                    </div>
+                                    <div>
+                                        <label className={labelCn}>Federal EIN <span className="text-rose-500">*</span></label>
+                                        <input type="text" value={smsForm.a2pEin || ''}
+                                            onChange={e => handleSmsChange('a2pEin', e.target.value)}
+                                            className={inputCn} placeholder="12-3456789"
+                                        />
+                                        <p className="text-[9px] text-slate-400 mt-1.5">Your church's Employer Identification Number. Find it on your IRS determination letter or Form 990.</p>
+                                    </div>
+                                    <div>
+                                        <label className={labelCn}>Business Type <span className="text-rose-500">*</span></label>
+                                        <select value={smsForm.a2pBusinessType || ''}
+                                            onChange={e => handleSmsChange('a2pBusinessType', e.target.value as any)}
+                                            className={inputCn}
+                                        >
+                                            <option value="">— Select —</option>
+                                            <option value="Non-profit Corporation">Non-profit Corporation ✝ (most churches)</option>
+                                            <option value="Corporation">Corporation</option>
+                                            <option value="LLC">LLC</option>
+                                            <option value="Partnership">Partnership</option>
+                                            <option value="Sole Proprietorship">Sole Proprietorship</option>
+                                            <option value="Co-operative">Co-operative</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className={labelCn}>Industry Vertical <span className="text-rose-500">*</span></label>
+                                        <select value={smsForm.a2pVertical || ''}
+                                            onChange={e => handleSmsChange('a2pVertical', e.target.value)}
+                                            className={inputCn}
+                                        >
+                                            <option value="">— Select —</option>
+                                            <option value="RELIGIOUS">Religious / Non-Profit</option>
+                                            <option value="EDUCATION">Education</option>
+                                            <option value="NONPROFIT">Non-Profit</option>
+                                            <option value="COMMUNITY">Community / Local Government</option>
+                                            <option value="HEALTHCARE">Healthcare</option>
+                                            <option value="OTHER">Other</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className={labelCn}>Church Website <span className="text-rose-500">*</span></label>
+                                        <input type="url" value={smsForm.a2pWebsite || ''}
+                                            onChange={e => handleSmsChange('a2pWebsite', e.target.value)}
+                                            className={inputCn} placeholder="https://www.mychurch.org"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Address */}
+                                <div className="mt-5 pt-5 border-t border-slate-100 dark:border-slate-800">
+                                    <label className="block text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest mb-3">Registered Address</label>
+                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                        <div className="md:col-span-4">
+                                            <label className={labelCn}>Street Address</label>
+                                            <input type="text" value={smsForm.a2pAddress || ''}
+                                                onChange={e => handleSmsChange('a2pAddress', e.target.value)}
+                                                className={inputCn} placeholder="123 Main St"
+                                            />
+                                        </div>
+                                        <div className="md:col-span-2">
+                                            <label className={labelCn}>City</label>
+                                            <input type="text" value={smsForm.a2pCity || ''}
+                                                onChange={e => handleSmsChange('a2pCity', e.target.value)}
+                                                className={inputCn}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className={labelCn}>State</label>
+                                            <input type="text" value={smsForm.a2pState || ''}
+                                                onChange={e => handleSmsChange('a2pState', e.target.value)}
+                                                className={inputCn} placeholder="TN" maxLength={2}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className={labelCn}>ZIP</label>
+                                            <input type="text" value={smsForm.a2pZip || ''}
+                                                onChange={e => handleSmsChange('a2pZip', e.target.value)}
+                                                className={inputCn} placeholder="37201"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Contact */}
+                                <div className="mt-5 pt-5 border-t border-slate-100 dark:border-slate-800">
+                                    <label className="block text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest mb-3">Authorized Contact</label>
+                                    <p className="text-[10px] text-slate-400 mb-4">This person will be the TCR point-of-contact. An executive at the organization (e.g., Senior Pastor, Executive Director) is preferred.</p>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className={labelCn}>First Name</label>
+                                            <input type="text" value={smsForm.a2pContactFirstName || ''}
+                                                onChange={e => handleSmsChange('a2pContactFirstName', e.target.value)}
+                                                className={inputCn}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className={labelCn}>Last Name</label>
+                                            <input type="text" value={smsForm.a2pContactLastName || ''}
+                                                onChange={e => handleSmsChange('a2pContactLastName', e.target.value)}
+                                                className={inputCn}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className={labelCn}>Email</label>
+                                            <input type="email" value={smsForm.a2pContactEmail || ''}
+                                                onChange={e => handleSmsChange('a2pContactEmail', e.target.value)}
+                                                className={inputCn} placeholder="pastor@mychurch.org"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className={labelCn}>Phone</label>
+                                            <input type="tel" value={smsForm.a2pContactPhone || ''}
+                                                onChange={e => handleSmsChange('a2pContactPhone', e.target.value)}
+                                                className={inputCn} placeholder="+16155551234"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Step 3: Campaign Registration */}
+                            <div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800">
+                                <div className="flex items-center gap-3 mb-6">
+                                    <div className="w-8 h-8 rounded-xl bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-black text-sm">3</div>
+                                    <div>
+                                        <h4 className="text-sm font-black text-slate-900 dark:text-white">Campaign Registration (Use Case)</h4>
+                                        <p className="text-[10px] text-slate-400 mt-0.5">Tell the carriers what types of messages you'll send and how recipients opt in.</p>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-5">
+                                    <div>
+                                        <label className={labelCn}>Use Case Category <span className="text-rose-500">*</span></label>
+                                        <select value={smsForm.a2pUseCaseCategory || ''}
+                                            onChange={e => handleSmsChange('a2pUseCaseCategory', e.target.value)}
+                                            className={inputCn}
+                                        >
+                                            <option value="">— Select —</option>
+                                            <option value="MIXED">Mixed — General church communications (recommended for most churches)</option>
+                                            <option value="MARKETING">Marketing — Event announcements, seasonal campaigns</option>
+                                            <option value="PUBLIC_SERVICE_ANNOUNCEMENT">Public Service Announcement — Community alerts</option>
+                                            <option value="CUSTOMER_CARE">Customer Care — Pastoral follow-up &amp; support</option>
+                                            <option value="POLLING_VOTING">Polling / Voting — Member polls</option>
+                                            <option value="2FA">2FA — Authentication codes only</option>
+                                        </select>
+                                        <p className="text-[9px] text-slate-400 mt-1.5"><strong>MIXED</strong> is the most common choice for churches — it covers service reminders, event invites, prayer requests, and pastoral care in one campaign.</p>
+                                    </div>
+
+                                    <div>
+                                        <label className={labelCn}>Campaign Description <span className="text-rose-500">*</span> <span className="normal-case font-normal">({(smsForm.a2pDescription || '').length}/400 chars)</span></label>
+                                        <textarea
+                                            value={smsForm.a2pDescription || ''}
+                                            onChange={e => handleSmsChange('a2pDescription', e.target.value)}
+                                            rows={3}
+                                            maxLength={400}
+                                            className={inputCn + ' resize-none'}
+                                            placeholder="{Church Name} uses SMS to send weekly service reminders, event announcements, prayer requests, and pastoral follow-ups to congregation members who have opted in."
+                                        />
+                                        <p className="text-[9px] text-slate-400 mt-1.5">Be specific. Mention all message types. Carriers reject vague descriptions.</p>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                        <div>
+                                            <label className={labelCn}>Sample Message 1 <span className="text-rose-500">*</span></label>
+                                            <textarea
+                                                value={smsForm.a2pSampleMessage1 || ''}
+                                                onChange={e => handleSmsChange('a2pSampleMessage1', e.target.value)}
+                                                rows={3}
+                                                className={inputCn + ' resize-none'}
+                                                placeholder="Hi [First Name], Sunday service at Grace Church starts at 10 AM. We can't wait to worship with you! Reply STOP to unsubscribe."
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className={labelCn}>Sample Message 2 <span className="text-rose-500">*</span></label>
+                                            <textarea
+                                                value={smsForm.a2pSampleMessage2 || ''}
+                                                onChange={e => handleSmsChange('a2pSampleMessage2', e.target.value)}
+                                                rows={3}
+                                                className={inputCn + ' resize-none'}
+                                                placeholder="Grace Church: Don't miss our Fall Festival this Saturday at 3 PM. Bring the family! Details: gracechurch.com/events. Reply STOP to opt out."
+                                            />
+                                        </div>
+                                    </div>
+                                    <p className="text-[9px] text-slate-400">Sample messages must include a compliant opt-out instruction (e.g., "Reply STOP to unsubscribe").</p>
+
+                                    {/* Opt-In Methods */}
+                                    <div className="pt-5 border-t border-slate-100 dark:border-slate-800">
+                                        <label className="block text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest mb-3">Opt-In Methods</label>
+                                        <p className="text-[10px] text-slate-400 mb-4">Select all ways members can opt in to receive your messages. You must honestly represent how consent is collected.</p>
+                                        <div className="space-y-3">
+                                            {[
+                                                { key: 'a2pOptInWebForm' as const, label: 'Online Web Form', desc: 'Subscribers check a box or submit a form on your website agreeing to receive texts.' },
+                                                { key: 'a2pOptInSmsKeyword' as const, label: 'Text-to-Join Keyword', desc: 'Subscribers text a keyword (e.g., "JOIN") to your number to opt in.' },
+                                                { key: 'a2pOptInPaperVoice' as const, label: 'Paper Form / Verbal', desc: 'Contact cards, connection cards, or verbal opt-in collected at services/events.' },
+                                            ].map(({ key, label, desc }) => (
+                                                <div key={key} className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 cursor-pointer"
+                                                    onClick={() => handleSmsChange(key, !smsForm[key])}
+                                                >
+                                                    <div className={`mt-0.5 w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
+                                                        smsForm[key] ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300 dark:border-slate-600'
+                                                    }`}>
+                                                        {smsForm[key] && <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>}
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-xs font-bold text-slate-900 dark:text-white">{label}</p>
+                                                        <p className="text-[10px] text-slate-400 mt-0.5">{desc}</p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="mt-4">
+                                            <label className={labelCn}>Opt-In Process Description</label>
+                                            <textarea
+                                                value={smsForm.a2pOptInDescription || ''}
+                                                onChange={e => handleSmsChange('a2pOptInDescription', e.target.value)}
+                                                rows={2}
+                                                className={inputCn + ' resize-none'}
+                                                placeholder="Members fill out a connection card at Sunday services or sign up on our website at mychurch.org/connect. They explicitly check a box to receive text updates."
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Checklist */}
+                            <div className="bg-amber-50 dark:bg-amber-900/10 p-6 rounded-2xl border border-amber-200 dark:border-amber-800">
+                                <h4 className="font-bold text-amber-800 dark:text-amber-400 mb-3 text-sm">⚠ Compliance Checklist Before Submitting</h4>
+                                <ul className="text-xs text-amber-900 dark:text-amber-300 space-y-1.5 list-disc list-inside leading-relaxed">
+                                    <li>Business name matches your IRS EIN records exactly.</li>
+                                    <li>EIN is valid and active (Form 990 / IRS determination letter on file).</li>
+                                    <li>All sample messages include an opt-out instruction ("Reply STOP to unsubscribe").</li>
+                                    <li>Only message types that match your campaign description will be sent.</li>
+                                    <li>You have documented consent from all recipients before sending.</li>
+                                    <li>Your website privacy policy discloses that you send SMS messages.</li>
+                                    <li>The Messaging Service SID has your phone number attached in the Twilio Console.</li>
+                                </ul>
+                            </div>
+
+                        </div>
+                    )}
+
+                    {/* ── Opt-Out & Sender ID Sub-tab ───────────────────────────────────── */}
+                    {smsSubTab === 'optout' && (
+                        <div className="space-y-6">
+
+                            {/* Sender Identity */}
+                            <div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800">
+                                <h4 className="text-sm font-black text-slate-900 dark:text-white mb-1">Sender Identity</h4>
+                                <p className="text-[10px] text-slate-400 mb-6 leading-relaxed">Controls how your church identifies itself in outbound messages.</p>
+
+                                <div className="space-y-5">
+                                    <div>
+                                        <label className={labelCn}>Sender / Display Name</label>
+                                        <input type="text" value={smsForm.senderName || ''}
+                                            onChange={e => handleSmsChange('senderName', e.target.value)}
+                                            className={inputCn} placeholder="Grace Church"
+                                        />
+                                        <p className="text-[9px] text-slate-400 mt-1.5">Used in the app to identify who sent the message. On carrier-delivered SMS, recipients see your phone number — carriers do not pass a display name.</p>
+                                    </div>
+
+                                    <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+                                        <div>
+                                            <p className="text-xs font-bold text-slate-900 dark:text-white">Prefix Messages with Church Name</p>
+                                            <p className="text-[10px] text-slate-400 mt-0.5">Automatically prepend &quot;&#123;Church Name&#125;:&quot; to the start of every outbound SMS. Helps recipients immediately recognize who is texting them.</p>
+                                        </div>
+                                        <button
+                                            onClick={() => handleSmsChange('prefixMessagesWithName', !smsForm.prefixMessagesWithName)}
+                                            className={`ml-4 shrink-0 w-12 h-6 rounded-full p-1 transition-colors ${smsForm.prefixMessagesWithName ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'}`}
+                                        >
+                                            <div className={`w-4 h-4 bg-white rounded-full transition-transform ${smsForm.prefixMessagesWithName ? 'translate-x-6' : ''}`} />
+                                        </button>
+                                    </div>
+
+                                    <div>
+                                        <label className={labelCn}>Message Footer <span className="normal-case font-normal text-slate-400">(appended to every message)</span></label>
+                                        <input type="text" value={smsForm.messageFooter || ''}
+                                            onChange={e => handleSmsChange('messageFooter', e.target.value)}
+                                            className={inputCn} placeholder="Reply STOP to unsubscribe"
+                                        />
+                                        <p className="text-[9px] text-slate-400 mt-1.5">If set, this text is automatically appended to every outbound message. The TCPA requires opt-out instructions on marketing messages. Leave blank to manage manually.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Auto-Reply Messages */}
+                            <div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800">
+                                <h4 className="text-sm font-black text-slate-900 dark:text-white mb-1">Keyword Auto-Replies</h4>
+                                <p className="text-[10px] text-slate-400 mb-2 leading-relaxed">
+                                    Twilio automatically handles STOP, START, and HELP keywords per CTIA guidelines. You can customize the response messages below.
+                                    If left blank, Twilio sends its default carrier-compliant responses.
+                                </p>
+                                <div className="p-3 bg-indigo-50 dark:bg-indigo-900/10 border border-indigo-100 dark:border-indigo-900/30 rounded-xl mb-6">
+                                    <p className="text-[10px] text-indigo-700 dark:text-indigo-400">
+                                        <strong>Important:</strong> Your STOP response must include your organization name and confirmation of opt-out.
+                                        Your START response must confirm re-enrollment. Your HELP response must include a contact method.
+                                        These are <strong>CTIA-mandated</strong> requirements.
+                                    </p>
+                                </div>
+
+                                <div className="space-y-6">
+                                    <div>
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <span className="bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full">STOP</span>
+                                            <label className={labelCn + ' mb-0'}>Opt-Out Confirmation Message</label>
+                                        </div>
+                                        <textarea
+                                            value={smsForm.optOutMessage || ''}
+                                            onChange={e => handleSmsChange('optOutMessage', e.target.value)}
+                                            rows={3}
+                                            className={inputCn + ' resize-none'}
+                                            placeholder={`${smsForm.senderName || church.name || 'Grace Church'}: You have been unsubscribed and will receive no further messages. Reply START to re-subscribe.`}
+                                        />
+                                        <p className="text-[9px] text-slate-400 mt-1.5">Sent when a contact replies STOP. Must include your church name and confirmation of opt-out. Max 160 chars recommended.</p>
+                                    </div>
+
+                                    <div>
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <span className="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full">START</span>
+                                            <label className={labelCn + ' mb-0'}>Opt-In Confirmation Message</label>
+                                        </div>
+                                        <textarea
+                                            value={smsForm.optInMessage || ''}
+                                            onChange={e => handleSmsChange('optInMessage', e.target.value)}
+                                            rows={3}
+                                            className={inputCn + ' resize-none'}
+                                            placeholder={`${smsForm.senderName || church.name || 'Grace Church'}: Welcome back! You're subscribed again and will receive messages from us. Reply STOP at any time to unsubscribe.`}
+                                        />
+                                        <p className="text-[9px] text-slate-400 mt-1.5">Sent when a contact replies START after previously opting out. Must confirm re-enrollment.</p>
+                                    </div>
+
+                                    <div>
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <span className="bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full">HELP</span>
+                                            <label className={labelCn + ' mb-0'}>Help Response Message</label>
+                                        </div>
+                                        <textarea
+                                            value={smsForm.helpMessage || ''}
+                                            onChange={e => handleSmsChange('helpMessage', e.target.value)}
+                                            rows={3}
+                                            className={inputCn + ' resize-none'}
+                                            placeholder={`${smsForm.senderName || church.name || 'Grace Church'}: For help, call us at ${church.phone || '(555) 555-5555'} or visit ${church.website || 'www.mychurch.org'}. Reply STOP to unsubscribe.`}
+                                        />
+                                        <p className="text-[9px] text-slate-400 mt-1.5">Sent when a contact replies HELP. Must include a contact method (phone, email, or website).</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* TCPA / CTIA guidance */}
+                            <div className="bg-indigo-900/10 dark:bg-indigo-900/20 p-6 rounded-2xl border border-indigo-500/20">
+                                <h4 className="font-bold text-indigo-400 mb-3 text-sm">⚖️ TCPA & CTIA Compliance Notes</h4>
+                                <ul className="text-xs text-slate-400 space-y-1.5 list-disc list-inside leading-relaxed">
+                                    <li>Always honor STOP requests immediately and do not send further messages.</li>
+                                    <li>Maintain a record of all opt-outs. Our system automatically tracks these.</li>
+                                    <li>You must obtain prior express written consent before sending marketing messages.</li>
+                                    <li>Include your church name and opt-out instructions in every marketing message.</li>
+                                    <li>HELP and STOP must always work, even after opting out.</li>
+                                    <li>Under TCPA, violations can carry fines of $500–$1,500 per message — compliance is critical.</li>
+                                    <li>Consult legal counsel for advice specific to your ministry context.</li>
+                                </ul>
+                            </div>
+
+                        </div>
+                    )}
+
+                    {/* Save Bar */}
+                    {smsMessage && (
+                        <div className={`p-4 rounded-xl text-xs font-bold flex items-center gap-2 ${
+                            smsMessage.type === 'success' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' : 'bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400'
+                        }`}>
+                            <span>{smsMessage.type === 'success' ? '✓' : '⚠️'}</span>
+                            {smsMessage.text}
+                        </div>
+                    )}
+
+                    <div className="flex justify-end">
+                        <button
+                            onClick={handleSmsSave}
+                            disabled={isSmsSaving}
+                            className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-8 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30"
+                        >
+                            {isSmsSaving ? 'Saving…' : 'Save SMS Settings'}
+                        </button>
                     </div>
                 </div>
             );

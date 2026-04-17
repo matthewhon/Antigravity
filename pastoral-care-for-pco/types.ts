@@ -792,14 +792,76 @@ export interface SmsSettings {
     twilioPhoneNumber?: string;
     /** Twilio Phone Number SID */
     twilioPhoneSid?: string;
+
+    // ── A2P 10DLC Brand Registration ──────────────────────────────────────────
     /** A2P 10DLC registration status */
     twilioA2pStatus?: 'not_started' | 'pending' | 'approved' | 'failed';
-    /** Twilio Brand Registration SID */
+    /** Twilio Brand Registration SID (e.g. BN...) */
     twilioBrandSid?: string;
-    /** Twilio Messaging Service Campaign SID */
+    /** Twilio Messaging Service Campaign SID (e.g. QE...) */
     twilioCampaignSid?: string;
-    /** Display name used as sender context */
+    /** Twilio Messaging Service SID (e.g. MG...) — required for campaigns */
+    twilioMessagingServiceSid?: string;
+    /** Legal business name (must match IRS / EIN records) */
+    a2pBusinessName?: string;
+    /** Federal Employer Identification Number (EIN) e.g. 12-3456789 */
+    a2pEin?: string;
+    /** Business type for 10DLC registration */
+    a2pBusinessType?: 'Sole Proprietorship' | 'Partnership' | 'LLC' | 'Co-operative' | 'Non-profit Corporation' | 'Corporation';
+    /** Industry vertical for TCR brand registration */
+    a2pVertical?: string;
+    /** Website URL submitted during brand registration */
+    a2pWebsite?: string;
+    /** Stock ticker (only for publicly traded entities) */
+    a2pStockTicker?: string;
+    /** Stock exchange (only for publicly traded entities) */
+    a2pStockExchange?: string;
+    /** Contact first name for brand registration */
+    a2pContactFirstName?: string;
+    /** Contact last name */
+    a2pContactLastName?: string;
+    /** Contact email */
+    a2pContactEmail?: string;
+    /** Contact phone (E.164) */
+    a2pContactPhone?: string;
+    /** Street address for brand registration */
+    a2pAddress?: string;
+    /** City */
+    a2pCity?: string;
+    /** 2-letter state code */
+    a2pState?: string;
+    /** ZIP code */
+    a2pZip?: string;
+    /** Use case / campaign type e.g. "MIXED" | "2FA" | "CUSTOMER_CARE" | "DELIVERY_NOTIFICATION" | "MARKETING" | "MIXED" | "POLLING_VOTING" | "PUBLIC_SERVICE_ANNOUNCEMENT" | "SECURITY_ALERT" */
+    a2pUseCaseCategory?: string;
+    /** Short description of how the church uses SMS (140 chars max) */
+    a2pDescription?: string;
+    /** Sample message 1 submitted to TCR */
+    a2pSampleMessage1?: string;
+    /** Sample message 2 submitted to TCR */
+    a2pSampleMessage2?: string;
+    /** Whether subscribers can opt in via a web form */
+    a2pOptInWebForm?: boolean;
+    /** Whether subscribers opt in via a text-to-join keyword */
+    a2pOptInSmsKeyword?: boolean;
+    /** Whether subscribers opt in via a paper / verbal process */
+    a2pOptInPaperVoice?: boolean;
+    /** Freeform description of opt-in process */
+    a2pOptInDescription?: string;
+
+    // ── Opt-Out / Sender ID Settings ──────────────────────────────────────────
+    /** Display name used as sender context in message headers */
     senderName?: string;
+    /** Custom opt-out reply (STOP keyword auto-response). If blank, Twilio's default is used. */
+    optOutMessage?: string;
+    /** Custom opt-in / double-opt-in reply (START keyword) */
+    optInMessage?: string;
+    /** Custom help reply (HELP keyword) */
+    helpMessage?: string;
+    /** Whether to prepend the church name to every outbound message */
+    prefixMessagesWithName?: boolean;
+    /** Footer text appended to every outbound SMS (e.g. "Reply STOP to unsubscribe") */
+    messageFooter?: string;
 }
 
 export type SmsDirection = 'inbound' | 'outbound';

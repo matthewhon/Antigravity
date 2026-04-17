@@ -14,6 +14,7 @@ import { CommunityComparison } from './CommunityComparison';
 
 interface PeopleViewProps {
   data: PeopleDashboardData;
+  activePage?: 'overview' | 'households' | 'risk';
   overviewWidgets: string[];
   householdWidgets: string[];
   riskWidgets: string[];
@@ -29,7 +30,6 @@ interface PeopleViewProps {
   isSyncing?: boolean;
   pcoConnected: boolean;
   churchId?: string;
-  /** Base URL of the Express server — required to call /pco/sync correctly in production */
   apiBaseUrl?: string;
   onUpdateTheme?: (theme: 'traditional' | 'dark') => void;
   currentTheme?: 'traditional' | 'dark';
@@ -65,6 +65,7 @@ const TOOLTIP_STYLE = {
 
 export const PeopleView: React.FC<PeopleViewProps> = ({ 
   data, 
+  activePage,
   overviewWidgets = [], 
   householdWidgets = [],
   riskWidgets = [],
@@ -87,7 +88,7 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
   churchId,
   apiBaseUrl,
 }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'households' | 'risk'>('overview');
+  const activeTab = activePage ?? 'overview';
 
   // ---- Registrations: show Firestore cache instantly, then trigger server-side sync ----
   const [regEvents, setRegEvents] = useState<PcoRegistrationEvent[]>([]);
@@ -845,12 +846,7 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
                 </button>
             )}
 
-            <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl">
-                <button onClick={() => setActiveTab('overview')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'overview' ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-300' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}>Overview</button>
-                <button onClick={() => setActiveTab('households')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'households' ? 'bg-white dark:bg-slate-700 shadow-sm text-emerald-600 dark:text-emerald-300' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}>Households</button>
-                <button onClick={() => setActiveTab('risk')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'risk' ? 'bg-white dark:bg-slate-700 shadow-sm text-amber-600 dark:text-amber-300' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}>Risk Profiles</button>
-            </div>
-            
+
             <WidgetsController 
                 availableWidgets={availableWidgets} 
                 visibleWidgets={safeVisibleWidgets} 

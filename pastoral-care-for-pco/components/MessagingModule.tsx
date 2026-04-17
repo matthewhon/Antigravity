@@ -12,7 +12,7 @@ import {
     Eye, Pencil, ChevronDown, CheckCircle, Circle, Loader2, X,
     Calendar, Phone, Search, RefreshCw, Settings, Key, AlertTriangle,
     Inbox, BarChart3, Copy, Zap, MessageCircle, TrendingUp, TrendingDown,
-    Activity, DollarSign, UserX
+    Activity, DollarSign, UserX, Edit3, UserCheck, List, Layers
 } from 'lucide-react';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -507,6 +507,367 @@ const CampaignList: React.FC<{
     );
 };
 
+// ─── New Message Composer ────────────────────────────────────────────────────
+
+type RecipientMode = 'individual' | 'list' | 'group';
+
+const NewMessageComposer: React.FC<{
+    churchId: string;
+    currentUser: User;
+    onClose: () => void;
+    onSent: () => void;
+}> = ({ churchId, currentUser, onClose, onSent }) => {
+    const [mode, setMode]             = useState<RecipientMode>('individual');
+    const [body, setBody]             = useState('');
+    const [sending, setSending]       = useState(false);
+    const [error, setError]           = useState('');
+    const [sentCount, setSentCount]   = useState<number | null>(null);
+
+    // Individual
+    const [phone, setPhone]           = useState('');
+    const [recipientName, setRecipientName] = useState('');
+
+    // PCO Lists
+    const [pcoLists, setPcoLists]     = useState<{ id: string; name: string; total_people: number }[]>([]);
+    const [listSearch, setListSearch] = useState('');
+    const [selectedList, setSelectedList] = useState<{ id: string; name: string; total_people: number } | null>(null);
+    const [loadingLists, setLoadingLists] = useState(false);
+
+    // PCO Groups
+    const [pcoGroups, setPcoGroups]   = useState<{ id: string; name: string; memberCount: number }[]>([]);
+    const [groupSearch, setGroupSearch] = useState('');
+    const [selectedGroup, setSelectedGroup] = useState<{ id: string; name: string; memberCount: number } | null>(null);
+    const [loadingGroups, setLoadingGroups] = useState(false);
+
+    const MAX_CHARS  = 1600;
+    const segCount   = Math.ceil((body.length || 1) / 160);
+    const charLeft   = MAX_CHARS - body.length;
+
+    // Load PCO lists when mode switches
+    useEffect(() => {
+        if (mode !== 'list' || pcoLists.length > 0) return;
+        setLoadingLists(true);
+        pcoService.getPeopleLists(churchId)
+            .then(raw => setPcoLists(raw.map((l: any) => ({
+                id:          l.id,
+                name:        l.attributes?.name || l.name || 'Unnamed List',
+                total_people: l.attributes?.total_people ?? l.total_people ?? 0,
+            }))))
+            .catch(() => {})
+            .finally(() => setLoadingLists(false));
+    }, [mode]);
+
+    // Load PCO groups when mode switches
+    useEffect(() => {
+        if (mode !== 'group' || pcoGroups.length > 0) return;
+        setLoadingGroups(true);
+        pcoService.getGroups(churchId)
+            .then((raw: any[]) => setPcoGroups(raw.map(x => ({
+                id:          x.id,
+                name:        x.attributes?.name || x.name || 'Unnamed Group',
+                memberCount: x.attributes?.members_count ?? x.attributes?.member_count ?? x.memberCount ?? 0,
+            }))))
+            .catch(() => {})
+            .finally(() => setLoadingGroups(false));
+    }, [mode]);
+
+    const filteredLists  = pcoLists.filter(l  => l.name.toLowerCase().includes(listSearch.toLowerCase()));
+    const filteredGroups = pcoGroups.filter(g => g.name.toLowerCase().includes(groupSearch.toLowerCase()));
+
+    const canSend = body.trim().length > 0 && (
+        (mode === 'individual' && phone.replace(/\D/g, '').length >= 10) ||
+        (mode === 'list'       && !!selectedList) ||
+        (mode === 'group'      && !!selectedGroup)
+    );
+
+    const handleSend = async () => {
+        if (!canSend || sending) return;
+        setError('');
+        setSending(true);
+        try {
+            if (mode === 'individual') {
+                const res = await fetch(`${API_BASE}/api/messaging/send-individual`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        churchId,
+                        toPhone:     phone.replace(/[^\d+]/g, ''),
+                        body,
+                        sentBy:      currentUser.id,
+                        sentByName:  currentUser.name,
+                        personName:  recipientName.trim() || undefined,
+                    }),
+                });
+                const data = await res.json();
+                if (!data.success) throw new Error(data.error || 'Send failed');
+                setSentCount(1);
+            } else if (mode === 'list' && selectedList) {
+                // Reuse the campaign API with pcoListId targeting
+                const res = await fetch(`${API_BASE}/api/messaging/send-to-list`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        churchId,
+                        pcoListId:   selectedList.id,
+                        listName:    selectedList.name,
+                        body,
+                        sentBy:      currentUser.id,
+                        sentByName:  currentUser.name,
+                    }),
+                });
+                const data = await res.json();
+                if (!data.success) throw new Error(data.error || 'Send failed');
+                setSentCount(data.sent || selectedList.total_people);
+            } else if (mode === 'group' && selectedGroup) {
+                const res = await fetch(`${API_BASE}/api/messaging/send-to-group`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        churchId,
+                        pcoGroupId:  selectedGroup.id,
+                        groupName:   selectedGroup.name,
+                        body,
+                        sentBy:      currentUser.id,
+                        sentByName:  currentUser.name,
+                    }),
+                });
+                const data = await res.json();
+                if (!data.success) throw new Error(data.error || 'Send failed');
+                setSentCount(data.sent || selectedGroup.memberCount);
+            }
+        } catch (e: any) {
+            setError(e.message || 'Send failed');
+        } finally {
+            setSending(false);
+        }
+    };
+
+    // Success screen
+    if (sentCount !== null) {
+        return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 w-full max-w-sm text-center shadow-2xl">
+                    <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <CheckCircle size={32} className="text-emerald-600" />
+                    </div>
+                    <h3 className="text-lg font-black text-slate-900 dark:text-white mb-1">Message Sent!</h3>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+                        {sentCount === 1
+                            ? 'Your message was delivered.'
+                            : `Queued for ${sentCount.toLocaleString()} recipient${sentCount !== 1 ? 's' : ''}.`
+                        }
+                    </p>
+                    <button onClick={onSent} className="w-full py-3 bg-violet-600 hover:bg-violet-700 text-white font-black rounded-2xl transition">
+                        Done
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh]">
+
+                {/* Header */}
+                <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-slate-200 dark:border-slate-700 shrink-0">
+                    <h2 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
+                        <Edit3 size={18} className="text-violet-500" /> New Message
+                    </h2>
+                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition">
+                        <X size={20} />
+                    </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+
+                    {/* Recipient Mode */}
+                    <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Send To</p>
+                        <div className="grid grid-cols-3 gap-2">
+                            {([
+                                { key: 'individual', icon: <UserCheck size={16} />, label: 'Individual' },
+                                { key: 'list',       icon: <List     size={16} />, label: 'PCO List'   },
+                                { key: 'group',      icon: <Layers   size={16} />, label: 'PCO Group'  },
+                            ] as { key: RecipientMode; icon: React.ReactNode; label: string }[]).map(opt => (
+                                <button
+                                    key={opt.key}
+                                    onClick={() => setMode(opt.key)}
+                                    className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-2xl border-2 transition text-xs font-black ${
+                                        mode === opt.key
+                                            ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20 text-violet-600 dark:text-violet-400'
+                                            : 'border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-violet-300'
+                                    }`}
+                                >
+                                    {opt.icon}
+                                    {opt.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Individual fields */}
+                    {mode === 'individual' && (
+                        <div className="space-y-3">
+                            <div>
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">Phone Number <span className="text-red-400">*</span></label>
+                                <input
+                                    type="tel"
+                                    value={phone}
+                                    onChange={e => setPhone(e.target.value)}
+                                    placeholder="+1 (615) 555-0100"
+                                    className="w-full text-sm border-2 border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">Name <span className="font-normal normal-case text-slate-400">(optional)</span></label>
+                                <input
+                                    type="text"
+                                    value={recipientName}
+                                    onChange={e => setRecipientName(e.target.value)}
+                                    placeholder="Jane Smith"
+                                    className="w-full text-sm border-2 border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500"
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* PCO List picker */}
+                    {mode === 'list' && (
+                        <div>
+                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Select Planning Center List</label>
+                            {selectedList ? (
+                                <div className="flex items-center justify-between p-3 bg-violet-50 dark:bg-violet-900/20 border-2 border-violet-500 rounded-2xl">
+                                    <div>
+                                        <p className="font-bold text-sm text-violet-700 dark:text-violet-300">{selectedList.name}</p>
+                                        <p className="text-xs text-violet-500">{selectedList.total_people.toLocaleString()} people</p>
+                                    </div>
+                                    <button onClick={() => setSelectedList(null)} className="text-violet-400 hover:text-violet-600 transition"><X size={16} /></button>
+                                </div>
+                            ) : (
+                                <div className="border-2 border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
+                                    <div className="relative">
+                                        <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                        <input
+                                            type="text"
+                                            placeholder="Search lists…"
+                                            value={listSearch}
+                                            onChange={e => setListSearch(e.target.value)}
+                                            className="w-full pl-8 pr-3 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
+                                        />
+                                    </div>
+                                    <div className="max-h-40 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-700">
+                                        {loadingLists ? (
+                                            <div className="flex justify-center py-4"><Loader2 size={16} className="animate-spin text-slate-400" /></div>
+                                        ) : filteredLists.length === 0 ? (
+                                            <p className="text-center text-sm text-slate-400 py-4">No lists found</p>
+                                        ) : filteredLists.map(l => (
+                                            <button key={l.id} onClick={() => setSelectedList(l)} className="w-full text-left px-4 py-2.5 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition flex items-center justify-between">
+                                                <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">{l.name}</span>
+                                                <span className="text-xs text-slate-400">{l.total_people.toLocaleString()}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* PCO Group picker */}
+                    {mode === 'group' && (
+                        <div>
+                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Select Planning Center Group</label>
+                            {selectedGroup ? (
+                                <div className="flex items-center justify-between p-3 bg-violet-50 dark:bg-violet-900/20 border-2 border-violet-500 rounded-2xl">
+                                    <div>
+                                        <p className="font-bold text-sm text-violet-700 dark:text-violet-300">{selectedGroup.name}</p>
+                                        <p className="text-xs text-violet-500">{selectedGroup.memberCount.toLocaleString()} members</p>
+                                    </div>
+                                    <button onClick={() => setSelectedGroup(null)} className="text-violet-400 hover:text-violet-600 transition"><X size={16} /></button>
+                                </div>
+                            ) : (
+                                <div className="border-2 border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
+                                    <div className="relative">
+                                        <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                        <input
+                                            type="text"
+                                            placeholder="Search groups…"
+                                            value={groupSearch}
+                                            onChange={e => setGroupSearch(e.target.value)}
+                                            className="w-full pl-8 pr-3 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
+                                        />
+                                    </div>
+                                    <div className="max-h-40 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-700">
+                                        {loadingGroups ? (
+                                            <div className="flex justify-center py-4"><Loader2 size={16} className="animate-spin text-slate-400" /></div>
+                                        ) : filteredGroups.length === 0 ? (
+                                            <p className="text-center text-sm text-slate-400 py-4">No groups found</p>
+                                        ) : filteredGroups.map(g => (
+                                            <button key={g.id} onClick={() => setSelectedGroup(g)} className="w-full text-left px-4 py-2.5 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition flex items-center justify-between">
+                                                <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">{g.name}</span>
+                                                <span className="text-xs text-slate-400">{g.memberCount.toLocaleString()}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Message editor */}
+                    <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Message</label>
+                            <span className={`text-[10px] font-semibold ${
+                                charLeft < 0 ? 'text-red-500' : charLeft < 50 ? 'text-amber-500' : 'text-slate-400'
+                            }`}>
+                                {body.length}/{MAX_CHARS} · {segCount} segment{segCount !== 1 ? 's' : ''}
+                            </span>
+                        </div>
+                        <textarea
+                            rows={5}
+                            value={body}
+                            onChange={e => setBody(e.target.value)}
+                            maxLength={MAX_CHARS}
+                            placeholder={mode === 'individual'
+                                ? 'Type your message…'
+                                : 'Type your message… Use {firstName} to personalize.'}
+                            className="w-full text-sm border-2 border-slate-200 dark:border-slate-600 rounded-xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500 resize-none"
+                        />
+                        {mode !== 'individual' && (
+                            <p className="text-[10px] text-slate-400 mt-1">Merge tags: <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">{'{firstName}'}</code> <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">{'{lastName}'}</code> <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">{'{fullName}'}</code></p>
+                        )}
+                    </div>
+
+                    {error && (
+                        <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl px-4 py-3">
+                            <AlertTriangle size={14} className="shrink-0" />{error}
+                        </div>
+                    )}
+                </div>
+
+                {/* Footer */}
+                <div className="px-6 pb-6 pt-4 border-t border-slate-200 dark:border-slate-700 shrink-0 flex gap-3">
+                    <button onClick={onClose} className="flex-1 py-3 text-sm font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-2xl transition">
+                        Cancel
+                    </button>
+                    <button
+                        onClick={handleSend}
+                        disabled={!canSend || sending}
+                        className="flex-[2] py-3 text-sm font-black bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-2xl transition flex items-center justify-center gap-2"
+                    >
+                        {sending
+                            ? <><Loader2 size={16} className="animate-spin" /> Sending…</>
+                            : mode === 'individual'
+                                ? <><Send size={15} /> Send Message</>
+                                : <><Send size={15} /> Send to {mode === 'list' ? selectedList?.name : selectedGroup?.name}</>}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // ─── Inbox ────────────────────────────────────────────────────────────────────
 
 const SmsInbox: React.FC<{
@@ -521,6 +882,7 @@ const SmsInbox: React.FC<{
     const [loadingMsgs, setLoadingMsgs]     = useState(false);
     const [isSending, setIsSending]         = useState(false);
     const [search, setSearch]               = useState('');
+    const [showComposer, setShowComposer]   = useState(false);
 
     // Load conversations
     useEffect(() => {
@@ -585,12 +947,30 @@ const SmsInbox: React.FC<{
 
     return (
         <div className="flex h-full">
+            {/* New Message Composer modal */}
+            {showComposer && (
+                <NewMessageComposer
+                    churchId={churchId}
+                    currentUser={currentUser}
+                    onClose={() => setShowComposer(false)}
+                    onSent={() => setShowComposer(false)}
+                />
+            )}
+
             {/* Conversation list */}
             <div className="w-[320px] shrink-0 border-r border-slate-200 dark:border-slate-700 flex flex-col bg-white dark:bg-slate-900">
                 <div className="p-4 border-b border-slate-200 dark:border-slate-700">
-                    <h2 className="font-black text-slate-900 dark:text-white text-sm mb-3 flex items-center gap-2">
-                        <Inbox size={16} className="text-violet-500" /> Inbox
-                    </h2>
+                    <div className="flex items-center justify-between mb-3">
+                        <h2 className="font-black text-slate-900 dark:text-white text-sm flex items-center gap-2">
+                            <Inbox size={16} className="text-violet-500" /> Inbox
+                        </h2>
+                        <button
+                            onClick={() => setShowComposer(true)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition shadow-sm"
+                        >
+                            <Plus size={12} /> New
+                        </button>
+                    </div>
                     <div className="relative">
                         <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                         <input

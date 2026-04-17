@@ -7,6 +7,7 @@ export const DASHBOARD_WIDGETS: WidgetDefinition[] = [
     { id: 'keyMetrics', label: 'Giving Metrics', icon: '💰' },
     { id: 'groups_stats', label: 'Groups Stats', icon: '📂' },
     { id: 'services_stats', label: 'Services Stats', icon: '🎹' },
+    { id: 'services_timeline', label: 'Services Timeline', icon: '🗓️' },
     { id: 'churchRisk', label: 'Church Health', icon: '🏥' },
     { id: 'church_progress', label: 'Church Progress', icon: '📈' },
     { id: 'people_engagement', label: 'Engagement', icon: '📊' },

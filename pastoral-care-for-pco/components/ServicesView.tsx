@@ -18,6 +18,7 @@ interface ServicesViewProps {
   filter: ServicesFilter;
   onFilterChange: (filter: ServicesFilter) => void;
   pcoConnected: boolean;
+  activePage?: 'Overview' | 'Attendance' | 'Teams';
   overviewWidgets: string[];
   attendanceWidgets: string[];
   teamsWidgets: string[];
@@ -50,6 +51,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
   filter, 
   onFilterChange, 
   pcoConnected, 
+  activePage,
   overviewWidgets,
   attendanceWidgets, 
   teamsWidgets, 
@@ -65,7 +67,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
   globalStats, 
   churchId
 }) => {
-  const [activeTab, setActiveTab] = useState<'Overview' | 'Attendance' | 'Teams'>('Overview');
+  const activeTab = activePage ?? 'Overview';
   const [upcomingPlansFilter, setUpcomingPlansFilter] = useState<'7 Days' | '14 Days' | '30 Days'>('14 Days');
   const [checkinFilter, setCheckinFilter] = useState<CheckinTrendFilter>('Current Month');
   const [expandedPlanId, setExpandedPlanId] = useState<string | null>(null);
@@ -1298,11 +1300,6 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                 </button>
             )}
 
-            <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl">
-                <button onClick={() => setActiveTab('Overview')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'Overview' ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-300' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}>Overview</button>
-                <button onClick={() => setActiveTab('Attendance')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'Attendance' ? 'bg-white dark:bg-slate-700 shadow-sm text-emerald-600 dark:text-emerald-300' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}>Attendance</button>
-                <button onClick={() => setActiveTab('Teams')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'Teams' ? 'bg-white dark:bg-slate-700 shadow-sm text-amber-600 dark:text-amber-300' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}>Teams</button>
-            </div>
 
             <div className="flex items-center bg-white dark:bg-slate-800 p-1.5 rounded-xl border border-slate-200 dark:border-slate-700">
                 <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest pl-2 pr-2">Period</span>

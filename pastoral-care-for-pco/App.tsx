@@ -357,8 +357,12 @@ const App: React.FC = () => {
       
       const roleMap: Record<string, string> = {
           'people': 'People',
+          'people-households': 'People',
+          'people-risk': 'People',
           'groups': 'Groups',
           'services': 'Services',
+          'services-attendance': 'Services',
+          'services-teams': 'Services',
           'giving': 'Giving',
           'finance': 'Finance',
           'metrics': 'Metrics',
@@ -899,9 +903,14 @@ const App: React.FC = () => {
                 churchName={church.name}
             />
         )}
-        {view === 'people' && (
+        {(view === 'people' || view === 'people-households' || view === 'people-risk') && (
             <PeopleView 
                 data={peopleDashboardData}
+                activePage={
+                    view === 'people-households' ? 'households' :
+                    view === 'people-risk'       ? 'risk'       :
+                    'overview'
+                }
                 overviewWidgets={widgets}
                 householdWidgets={user.widgetPreferences?.['people_households'] || getDefaultWidgets('people_households')}
                 riskWidgets={user.widgetPreferences?.['people_risk'] || getDefaultWidgets('people_risk')}
@@ -946,13 +955,18 @@ const App: React.FC = () => {
                 groupRiskSettings={church.groupRiskSettings}
             />
         )}
-        {view === 'services' && (
+        {(view === 'services' || view === 'services-attendance' || view === 'services-teams') && (
             <ServicesView 
                 data={servicesData}
                 isLoading={!servicesData}
                 filter={servicesFilter}
                 onFilterChange={setServicesFilter}
                 pcoConnected={church.pcoConnected}
+                activePage={
+                    view === 'services-attendance' ? 'Attendance' :
+                    view === 'services-teams'      ? 'Teams'      :
+                    'Overview'
+                }
                 overviewWidgets={user.widgetPreferences?.['services_overview'] || getDefaultWidgets('services_overview')}
                 attendanceWidgets={user.widgetPreferences?.['services_attendance'] || getDefaultWidgets('services_attendance')}
                 teamsWidgets={user.widgetPreferences?.['services_teams'] || getDefaultWidgets('services_teams')}
