@@ -22,6 +22,7 @@ interface GivingViewProps {
   onFilterChange: (filter: GivingFilter) => void;
   dateRange?: { start: string, end: string };
   onDateRangeChange?: (range: { start: string, end: string }) => void;
+  activePage?: 'overview' | 'donor' | 'budgets' | 'donations' | 'reports';
   overviewWidgets: string[];
   donorWidgets: string[];
   onUpdateOverviewWidgets: (widgets: string[]) => void;
@@ -73,6 +74,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
   onFilterChange, 
   dateRange, 
   onDateRangeChange, 
+  activePage,
   overviewWidgets,
   donorWidgets,
   onUpdateOverviewWidgets,
@@ -93,7 +95,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
   currentTheme,
   globalStats
 }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'donor' | 'budgets' | 'donations' | 'reports'>('overview');
+  const activeTab = activePage ?? 'overview';
   
   // Widget Local States
   const [cvpFilter, setCvpFilter] = useState<GivingFilter>('Month');
@@ -1145,14 +1147,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
                     </button>
                 )}
 
-                <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl">
-                    <button onClick={() => setActiveTab('overview')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'overview' ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-300' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}>Overview</button>
-                    <button onClick={() => setActiveTab('donor')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'donor' ? 'bg-white dark:bg-slate-700 shadow-sm text-rose-600 dark:text-rose-300' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}>Donor</button>
-                    <button onClick={() => setActiveTab('budgets')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'budgets' ? 'bg-white dark:bg-slate-700 shadow-sm text-emerald-600 dark:text-emerald-300' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}>Budgets</button>
-                    <button onClick={() => setActiveTab('donations')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'donations' ? 'bg-white dark:bg-slate-700 shadow-sm text-violet-600 dark:text-violet-300' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}>Donations</button>
-                    <button onClick={() => setActiveTab('reports')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'reports' ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-800 dark:text-white' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}>Reports</button>
-                </div>
-                
+
                 {(activeTab === 'overview' || activeTab === 'donor') && (
                     <WidgetsController 
                         availableWidgets={availableWidgets} 

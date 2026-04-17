@@ -364,6 +364,10 @@ const App: React.FC = () => {
           'services-attendance': 'Services',
           'services-teams': 'Services',
           'giving': 'Giving',
+          'giving-donor': 'Giving',
+          'giving-budgets': 'Giving',
+          'giving-donations': 'Giving',
+          'giving-reports': 'Giving',
           'finance': 'Finance',
           'metrics': 'Metrics',
           'metrics-input': 'Metrics',
@@ -371,7 +375,8 @@ const App: React.FC = () => {
           'messaging': 'Messaging',
       };
       
-      if (v === 'tools') return true; // Let the view itself handle specific tab permissions if needed, or allow all church users
+      // Tools sub-routes: accessible to all church users (same as base 'tools')
+      if (v === 'tools' || v.startsWith('tools-')) return true;
 
       const requiredRole = roleMap[v];
       return requiredRole ? user.roles.includes(requiredRole as any) : false;
@@ -994,7 +999,7 @@ const App: React.FC = () => {
                 churchId={church.id}
             />
         )}
-        {view === 'giving' && (
+        {(view === 'giving' || view === 'giving-donor' || view === 'giving-budgets' || view === 'giving-donations' || view === 'giving-reports') && (
             <GivingView 
                 analytics={givingAnalyticsData}
                 filter={givingFilter}
@@ -1002,6 +1007,13 @@ const App: React.FC = () => {
                 dateRange={givingFilter === 'Custom' ? givingDateRange : undefined}
                 onDateRangeChange={setGivingDateRange}
                 pcoConnected={church.pcoConnected}
+                activePage={
+                    view === 'giving-donor'     ? 'donor'     :
+                    view === 'giving-budgets'   ? 'budgets'   :
+                    view === 'giving-donations' ? 'donations' :
+                    view === 'giving-reports'   ? 'reports'   :
+                    'overview'
+                }
                 overviewWidgets={user.widgetPreferences?.['giving_overview'] || getDefaultWidgets('giving_overview')}
                 donorWidgets={user.widgetPreferences?.['giving_donors'] || getDefaultWidgets('giving_donors')}
                 onUpdateOverviewWidgets={(w) => {
@@ -1153,7 +1165,20 @@ const App: React.FC = () => {
                 <LibraryView churchId={church.id} />
             </div>
         )}
-        {view === 'tools' && <ToolsView churchId={church.id} church={church} currentUserId={user.id} currentUser={user} onUpdateChurch={(updates) => { firestore.updateChurch(church.id, updates); setChurch({ ...church, ...updates }); }} />}
+        {(view === 'tools' || view.startsWith('tools-')) && <ToolsView
+            churchId={church.id}
+            church={church}
+            currentUserId={user.id}
+            currentUser={user}
+            activePage={
+                view === 'tools-emails'        ? 'emails'        :
+                view === 'tools-polls'         ? 'polls'         :
+                view === 'tools-messaging'     ? 'messaging'     :
+                view === 'tools-unsubscribers' ? 'unsubscribers' :
+                'website'
+            }
+            onUpdateChurch={(updates) => { firestore.updateChurch(church.id, updates); setChurch({ ...church, ...updates }); }}
+        />}
     </Layout>
     </>
   );

@@ -1422,66 +1422,7 @@ currentUser, onUpdateChurch }) => {
 
   return (
     <div className="flex flex-col h-full relative">
-      {/* ─── Tab Switcher ─────────────────────────────────────────────── */}
-      <div className="shrink-0 flex items-center gap-1 px-5 pt-4 pb-0 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 overflow-x-auto no-scrollbar">
-        <button
-          onClick={() => setActiveTab('website')}
-          className={`flex items-center gap-2 px-4 py-2 -mb-px text-sm font-semibold border-b-2 transition shrink-0 ${
-            activeTab === 'website'
-              ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400'
-              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
-          }`}
-        >
-          <Globe size={14} /> Website
-        </button>
-        <button
-          onClick={() => setActiveTab('emails')}
-          className={`flex items-center gap-2 px-4 py-2 -mb-px text-sm font-semibold border-b-2 transition shrink-0 ${
-            activeTab === 'emails'
-              ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400'
-              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
-          }`}
-        >
-          <Mail size={14} /> Emails
-        </button>
-        <button
-          onClick={() => setActiveTab('polls')}
-          className={`flex items-center gap-2 px-4 py-2 -mb-px text-sm font-semibold border-b-2 transition shrink-0 ${
-            activeTab === 'polls'
-              ? 'border-violet-600 text-violet-600 dark:text-violet-400 dark:border-violet-400'
-              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
-          }`}
-        >
-          <List size={14} /> Polls
-        </button>
-        <button
-          onClick={() => setActiveTab('messaging')}
-          className={`flex items-center gap-2 px-4 py-2 -mb-px text-sm font-semibold border-b-2 transition shrink-0 ${
-            activeTab === 'messaging'
-              ? 'border-violet-600 text-violet-600 dark:text-violet-400 dark:border-violet-400'
-              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
-          }`}
-        >
-          💬 SMS
-        </button>
-        <button
-          onClick={() => setActiveTab('unsubscribers')}
-          className={`flex items-center gap-2 px-4 py-2 -mb-px text-sm font-semibold border-b-2 transition shrink-0 ${
-            activeTab === 'unsubscribers'
-              ? 'border-red-500 text-red-600 dark:text-red-400 dark:border-red-400'
-              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
-          }`}
-        >
-          <UserMinus size={14} /> Unsubscribers
-          {unsubscribers.length > 0 && (
-            <span className="text-xs px-1.5 py-0.5 rounded-full font-semibold bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400">
-              {unsubscribers.length}
-            </span>
-          )}
-        </button>
-      </div>
-
-      {/* ─── Website Tab ───────────────────────────────────────────────── */}
+{/* ─── Website Tab ───────────────────────────────────────────────── */}
       {activeTab === 'website' && (
         <div className="flex-1 overflow-hidden p-6 max-w-[1400px] mx-auto w-full h-full">
            <WebsiteWidgetsManager churchId={churchId} />
