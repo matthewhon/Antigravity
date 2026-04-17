@@ -18,11 +18,11 @@ import { DonationReport } from './DonationReport';
 interface GivingViewProps {
   analytics: GivingAnalytics | null;
   pcoConnected: boolean;
+  activePage?: 'overview' | 'donor' | 'budgets' | 'donations' | 'reports';
   filter: GivingFilter;
   onFilterChange: (filter: GivingFilter) => void;
   dateRange?: { start: string, end: string };
   onDateRangeChange?: (range: { start: string, end: string }) => void;
-  activePage?: 'overview' | 'donor' | 'budgets' | 'donations' | 'reports';
   overviewWidgets: string[];
   donorWidgets: string[];
   onUpdateOverviewWidgets: (widgets: string[]) => void;
@@ -70,11 +70,11 @@ const getWidgetSpan = (id: string) => {
 export const GivingView: React.FC<GivingViewProps> = ({ 
   analytics, 
   pcoConnected, 
+  activePage,
   filter, 
   onFilterChange, 
   dateRange, 
   onDateRangeChange, 
-  activePage,
   overviewWidgets,
   donorWidgets,
   onUpdateOverviewWidgets,

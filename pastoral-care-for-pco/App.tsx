@@ -375,8 +375,7 @@ const App: React.FC = () => {
           'messaging': 'Messaging',
       };
       
-      // Tools sub-routes: accessible to all church users (same as base 'tools')
-      if (v === 'tools' || v.startsWith('tools-')) return true;
+      if (v === 'tools') return true; // Let the view itself handle specific tab permissions if needed, or allow all church users
 
       const requiredRole = roleMap[v];
       return requiredRole ? user.roles.includes(requiredRole as any) : false;
@@ -1165,20 +1164,7 @@ const App: React.FC = () => {
                 <LibraryView churchId={church.id} />
             </div>
         )}
-        {(view === 'tools' || view.startsWith('tools-')) && <ToolsView
-            churchId={church.id}
-            church={church}
-            currentUserId={user.id}
-            currentUser={user}
-            activePage={
-                view === 'tools-emails'        ? 'emails'        :
-                view === 'tools-polls'         ? 'polls'         :
-                view === 'tools-messaging'     ? 'messaging'     :
-                view === 'tools-unsubscribers' ? 'unsubscribers' :
-                'website'
-            }
-            onUpdateChurch={(updates) => { firestore.updateChurch(church.id, updates); setChurch({ ...church, ...updates }); }}
-        />}
+        {view === 'tools' && <ToolsView churchId={church.id} church={church} currentUserId={user.id} currentUser={user} onUpdateChurch={(updates) => { firestore.updateChurch(church.id, updates); setChurch({ ...church, ...updates }); }} />}
     </Layout>
     </>
   );

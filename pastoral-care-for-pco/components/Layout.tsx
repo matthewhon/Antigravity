@@ -48,8 +48,6 @@ const Layout: React.FC<LayoutProps> = ({
   const servicesRef = useRef<HTMLDivElement>(null);
   const [givingOpen, setGivingOpen] = useState(false);
   const givingRef = useRef<HTMLDivElement>(null);
-  const [toolsOpen, setToolsOpen] = useState(false);
-  const toolsRef = useRef<HTMLDivElement>(null);
 
   const getDropdownStyle = (ref: React.RefObject<HTMLDivElement>) => {
     if (!ref.current) return {};
@@ -349,28 +347,6 @@ const Layout: React.FC<LayoutProps> = ({
                   </div>
                 )}
 
-                {hasPermission('tools') && (
-                  <div
-                    ref={toolsRef}
-                    className="relative shrink-0"
-                    onMouseEnter={() => setToolsOpen(true)}
-                    onMouseLeave={() => setToolsOpen(false)}
-                  >
-                    <button
-                      onClick={() => onNavigate('tools')}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all border ${
-                        currentView.startsWith('tools')
-                          ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 ring-1 ring-indigo-500 border-transparent'
-                          : 'text-slate-400 border-transparent hover:bg-slate-800 hover:text-white hover:border-slate-700'
-                      }`}
-                    >
-                      <span className="text-base">🧰</span>
-                      <span className="text-[10px] font-black uppercase tracking-widest">Tools</span>
-                      <svg className="w-3 h-3 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M6 9l6 6 6-6"/></svg>
-                    </button>
-                  </div>
-                )}
-
                 {/* Giving dropdown */}
                 {givingOpen && hasPermission('giving') && (
                   <div
@@ -381,11 +357,11 @@ const Layout: React.FC<LayoutProps> = ({
                   >
                     <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl shadow-black/40 p-2 flex flex-col gap-1 min-w-[180px]">
                       {[
-                        { view: 'giving',            icon: '📊', label: 'Overview'  },
-                        { view: 'giving-donor',      icon: '🤝', label: 'Donors'    },
-                        { view: 'giving-budgets',    icon: '🎯', label: 'Budgets'   },
-                        { view: 'giving-donations',  icon: '💳', label: 'Donations' },
-                        { view: 'giving-reports',    icon: '📄', label: 'Reports'   },
+                        { view: 'giving',            icon: '📊', label: 'Overview'   },
+                        { view: 'giving-donor',      icon: '👥', label: 'Donors'     },
+                        { view: 'giving-budgets',    icon: '💼', label: 'Budgets'    },
+                        { view: 'giving-donations',  icon: '📝', label: 'Donations'  },
+                        { view: 'giving-reports',    icon: '📄', label: 'Reports'    },
                       ].map(item => (
                         <button
                           key={item.view}
@@ -404,37 +380,13 @@ const Layout: React.FC<LayoutProps> = ({
                   </div>
                 )}
 
-                {/* Tools dropdown */}
-                {toolsOpen && hasPermission('tools') && (
-                  <div
-                    className="fixed z-[9999]"
-                    style={getDropdownStyle(toolsRef)}
-                    onMouseEnter={() => setToolsOpen(true)}
-                    onMouseLeave={() => setToolsOpen(false)}
-                  >
-                    <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl shadow-black/40 p-2 flex flex-col gap-1 min-w-[180px]">
-                      {[
-                        { view: 'tools',               icon: '🌐', label: 'Website'       },
-                        { view: 'tools-emails',        icon: '✉️',  label: 'Emails'        },
-                        { view: 'tools-polls',         icon: '📊', label: 'Polls'         },
-                        { view: 'tools-messaging',     icon: '💬', label: 'SMS'           },
-                        { view: 'tools-unsubscribers', icon: '🚫', label: 'Unsubscribers' },
-                      ].map(item => (
-                        <button
-                          key={item.view}
-                          onClick={() => { onNavigate(item.view); setToolsOpen(false); }}
-                          className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest w-full text-left transition-all ${
-                            currentView === item.view
-                              ? 'bg-indigo-600 text-white'
-                              : 'text-slate-300 hover:bg-slate-700 hover:text-white'
-                          }`}
-                        >
-                          <span className="text-sm">{item.icon}</span>
-                          {item.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                {hasPermission('tools') && (
+                  <NavItem 
+                    icon="🧰" 
+                    label="Tools" 
+                    active={currentView === 'tools'} 
+                    onClick={() => onNavigate('tools')} 
+                  />
                 )}
 
 
