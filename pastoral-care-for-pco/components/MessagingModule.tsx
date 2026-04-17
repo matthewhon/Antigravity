@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { db as firebaseDb } from '../services/firebase';
 import {
     collection, doc, onSnapshot, addDoc, updateDoc, deleteDoc,
@@ -12,7 +12,8 @@ import {
     Eye, Pencil, ChevronDown, CheckCircle, Circle, Loader2, X,
     Calendar, Phone, Search, RefreshCw, Settings, Key, AlertTriangle,
     Inbox, BarChart3, Copy, Zap, MessageCircle, TrendingUp, TrendingDown,
-    Activity, DollarSign, UserX, Edit3, UserCheck, List, Layers
+    Activity, DollarSign, UserX, Edit3, UserCheck, List, Layers,
+    Smile, Image as ImageIcon, Link, Sparkles, ChevronRight, RotateCcw
 } from 'lucide-react';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -29,12 +30,49 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
 
 const SEGMENT_NOTE = 'SMS segments: 1 segment = 160 chars. Merge tags like {firstName} count toward length.';
 
+const ALL_MERGE_TAGS: { tag: string; label: string }[] = [
+    { tag: '{firstName}',   label: 'First Name'   },
+    { tag: '{lastName}',    label: 'Last Name'    },
+    { tag: '{fullName}',    label: 'Full Name'    },
+    { tag: '{email}',       label: 'Email'        },
+    { tag: '{phone}',       label: 'Phone'        },
+    { tag: '{city}',        label: 'City'         },
+    { tag: '{state}',       label: 'State'        },
+    { tag: '{birthday}',    label: 'Birthday'     },
+    { tag: '{anniversary}', label: 'Anniversary'  },
+];
+
+const COMMON_EMOJIS = [
+    '😊','🙏','❤️','✝️','🎉','👋','📖','⭐','🔥','💫',
+    '🌟','🕊️','🏠','📅','📣','💬','🎵','🤝','💜','🌈',
+];
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function countSegments(body: string): number {
     if (!body) return 0;
     if (body.length <= 160) return 1;
     return Math.ceil(body.length / 153);
+}
+
+/** Call the Gemini AI proxy to suggest a shorter SMS message. */
+async function getSmsAiSuggestion(messageBody: string): Promise<string> {
+    const res = await fetch('/ai/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            model: 'gemini-2.5-flash',
+            prompt: `You are an SMS copywriting expert for a church. 
+Rewrite the following SMS message to be shorter (ideally under 160 characters — 1 SMS segment) while keeping the full meaning, warmth, and any merge tags like {firstName}, {email}, {phone}, {city}, {state}, {birthday}, {anniversary} exactly as-is.
+Return ONLY the rewritten message text, no explanation or quotes.
+
+Original message:
+${messageBody}`,
+        }),
+    });
+    if (!res.ok) throw new Error('AI request failed');
+    const data = await res.json();
+    return (data.text || '').trim();
 }
 
 function formatPhone(phone: string): string {
@@ -158,6 +196,16 @@ const CampaignComposer: React.FC<ComposerProps> = ({
     const [showSchedule, setShowSchedule]   = useState(false);
     const [lastSaved, setLastSaved]         = useState<number | null>(null);
 
+    // Composer extras
+    const [showEmojis, setShowEmojis]   = useState(false);
+    const [showLinkDlg, setShowLinkDlg] = useState(false);
+    const [linkUrl, setLinkUrl]         = useState('');
+    const [imageUrl, setImageUrl]       = useState((local.mediaUrls && local.mediaUrls[0]) || '');
+    const [aiSuggestion, setAiSuggestion]   = useState('');
+    const [aiLoading, setAiLoading]         = useState(false);
+    const [showAiPanel, setShowAiPanel]     = useState(false);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+
     const segments = countSegments(local.body || '');
     const canSend  = !!(local.body?.trim()) && !!(local.toListId || local.toGroupId);
 
@@ -165,6 +213,38 @@ const CampaignComposer: React.FC<ComposerProps> = ({
         setLocal(prev => ({ ...prev, ...patch }));
         onSave(patch).then(() => setLastSaved(Date.now()));
     }, [onSave]);
+
+    /** Insert text at cursor position in the textarea */
+    const insertAtCursor = (text: string) => {
+        const el = textareaRef.current;
+        if (!el) { update({ body: (local.body || '') + text }); return; }
+        const start = el.selectionStart ?? (local.body || '').length;
+        const end   = el.selectionEnd   ?? start;
+        const before = (local.body || '').slice(0, start);
+        const after  = (local.body || '').slice(end);
+        const newBody = before + text + after;
+        update({ body: newBody });
+        requestAnimationFrame(() => {
+            el.focus();
+            const pos = start + text.length;
+            el.setSelectionRange(pos, pos);
+        });
+    };
+
+    const handleAiSuggest = async () => {
+        if (!local.body?.trim()) return;
+        setAiLoading(true);
+        setShowAiPanel(true);
+        setAiSuggestion('');
+        try {
+            const suggestion = await getSmsAiSuggestion(local.body);
+            setAiSuggestion(suggestion);
+        } catch {
+            setAiSuggestion('Unable to get AI suggestion. Please try again.');
+        } finally {
+            setAiLoading(false);
+        }
+    };
 
     useEffect(() => {
         setLoadingLists(true);
@@ -350,12 +430,145 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                 </span>
                             </div>
                             <textarea
+                                ref={textareaRef}
                                 rows={8}
                                 value={local.body || ''}
                                 onChange={e => update({ body: e.target.value })}
                                 placeholder="Type your message here…"
                                 className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none font-medium leading-relaxed"
                             />
+                            {/* Composer toolbar */}
+                            <div className="flex items-center gap-1 mt-2 flex-wrap">
+                                {/* Emoji picker */}
+                                <div className="relative">
+                                    <button
+                                        type="button"
+                                        title="Insert emoji"
+                                        onClick={() => { setShowEmojis(v => !v); setShowLinkDlg(false); }}
+                                        className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition"
+                                    >
+                                        <Smile size={13} /> Emoji
+                                    </button>
+                                    {showEmojis && (
+                                        <div className="absolute top-full left-0 mt-1 z-30 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-3 grid grid-cols-10 gap-1 min-w-[260px]">
+                                            {COMMON_EMOJIS.map(em => (
+                                                <button key={em} onClick={() => { insertAtCursor(em); setShowEmojis(false); }}
+                                                    className="text-xl hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg p-1 transition leading-none"
+                                                    title={em}>
+                                                    {em}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                                {/* Link inserter */}
+                                <div className="relative">
+                                    <button
+                                        type="button"
+                                        title="Insert link"
+                                        onClick={() => { setShowLinkDlg(v => !v); setShowEmojis(false); }}
+                                        className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition"
+                                    >
+                                        <Link size={13} /> Link
+                                    </button>
+                                    {showLinkDlg && (
+                                        <div className="absolute top-full left-0 mt-1 z-30 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-3 w-72">
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Insert Link URL</p>
+                                            <div className="flex gap-2">
+                                                <input
+                                                    type="url"
+                                                    value={linkUrl}
+                                                    onChange={e => setLinkUrl(e.target.value)}
+                                                    placeholder="https://example.com"
+                                                    className="flex-1 text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                                />
+                                                <button
+                                                    onClick={() => { if (linkUrl.trim()) { insertAtCursor(' ' + linkUrl.trim()); setLinkUrl(''); setShowLinkDlg(false); } }}
+                                                    className="px-3 py-2 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold rounded-xl transition"
+                                                >Insert</button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                                {/* Image URL */}
+                                <button
+                                    type="button"
+                                    title="Attach image (MMS)"
+                                    onClick={() => {
+                                        const url = window.prompt('Enter image URL (MMS — may incur additional carrier fees):');
+                                        if (url) { setImageUrl(url); update({ mediaUrls: [url] }); }
+                                    }}
+                                    className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition ${
+                                        imageUrl ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
+                                        : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700'
+                                    }`}
+                                >
+                                    <ImageIcon size={13} /> {imageUrl ? 'Image ✓' : 'Image'}
+                                </button>
+                                {imageUrl && (
+                                    <button
+                                        type="button"
+                                        title="Remove image"
+                                        onClick={() => { setImageUrl(''); update({ mediaUrls: [] }); }}
+                                        className="p-1.5 text-red-400 hover:text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition"
+                                    >
+                                        <X size={13} />
+                                    </button>
+                                )}
+                                <div className="flex-1" />
+                                {/* AI Helper */}
+                                <button
+                                    type="button"
+                                    title="AI SMS helper — suggest shorter message"
+                                    onClick={handleAiSuggest}
+                                    disabled={!local.body?.trim() || aiLoading}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-700 hover:bg-violet-100 dark:hover:bg-violet-900/40 disabled:opacity-50 transition"
+                                >
+                                    {aiLoading ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+                                    AI Shorten
+                                </button>
+                            </div>
+                            {/* Image preview */}
+                            {imageUrl && (
+                                <div className="mt-2 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 max-w-[200px]">
+                                    <img src={imageUrl} alt="MMS attachment" className="w-full h-auto object-cover" onError={() => setImageUrl('')} />
+                                </div>
+                            )}
+                            {/* AI suggestion panel */}
+                            {showAiPanel && (
+                                <div className="mt-3 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700 rounded-2xl p-4">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-violet-500 flex items-center gap-1.5"><Sparkles size={11} /> AI Suggestion</span>
+                                        <button onClick={() => setShowAiPanel(false)} title="Dismiss AI suggestion" className="text-violet-400 hover:text-violet-600"><X size={14} /></button>
+                                    </div>
+                                    {aiLoading ? (
+                                        <div className="flex items-center gap-2 text-sm text-violet-500"><Loader2 size={14} className="animate-spin" /> Analyzing your message…</div>
+                                    ) : (
+                                        <>
+                                            <p className="text-sm text-violet-800 dark:text-violet-200 leading-relaxed whitespace-pre-wrap mb-3">{aiSuggestion}</p>
+                                            <div className="flex items-center gap-2">
+                                                <span className={`text-xs font-bold ${ countSegments(aiSuggestion) > 1 ? 'text-amber-600' : 'text-emerald-600' }`}>
+                                                    {aiSuggestion.length} chars · {countSegments(aiSuggestion)} seg
+                                                </span>
+                                                <div className="flex-1" />
+                                                <button
+                                                    onClick={() => { update({ body: aiSuggestion }); setShowAiPanel(false); }}
+                                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-violet-600 hover:bg-violet-700 text-white rounded-xl transition"
+                                                >
+                                                    <ChevronRight size={12} /> Use This
+                                                </button>
+                                                <button
+                                                    onClick={handleAiSuggest}
+                                                    title="Regenerate AI suggestion"
+                                                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 rounded-xl hover:bg-violet-200 transition"
+                                                >
+                                                    <RotateCcw size={11} /> Retry
+                                                </button>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            )}
                             <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">{SEGMENT_NOTE}</p>
                         </div>
 
@@ -363,24 +576,39 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                         <div>
                             <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Merge Tags</label>
                             <div className="flex flex-wrap gap-2">
-                                {['{firstName}', '{lastName}', '{fullName}'].map(tag => (
+                                {ALL_MERGE_TAGS.map(({ tag, label }) => (
                                     <button
                                         key={tag}
-                                        onClick={() => update({ body: (local.body || '') + tag })}
+                                        title={`Insert ${label} merge tag`}
+                                        onClick={() => insertAtCursor(tag)}
                                         className="px-3 py-1.5 text-xs font-mono font-semibold bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 rounded-xl hover:bg-violet-100 dark:hover:bg-violet-900/40 border border-violet-200 dark:border-violet-800 transition"
                                     >
                                         {tag}
                                     </button>
                                 ))}
                             </div>
+                            <p className="text-[10px] text-slate-400 mt-1.5">
+                                Tags will be replaced with each recipient's actual data at send time.
+                            </p>
                         </div>
 
                         {/* Phone preview */}
                         <div>
                             <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">Preview</label>
                             <div className="bg-slate-100 dark:bg-slate-800 rounded-3xl p-4 max-w-[260px] shadow-inner">
+                                {imageUrl && (
+                                    <div className="mb-2 rounded-xl overflow-hidden max-w-[220px]">
+                                        <img src={imageUrl} alt="MMS preview" className="w-full h-auto object-cover" />
+                                    </div>
+                                )}
                                 <div className="bg-violet-600 text-white text-sm px-3 py-2 rounded-2xl rounded-bl-sm shadow-sm max-w-[220px] leading-relaxed whitespace-pre-wrap break-words font-medium">
-                                    {(local.body || '').replace('{firstName}', 'John').replace('{lastName}', 'Smith').replace('{fullName}', 'John Smith') || <span className="opacity-50 italic">Your message will appear here…</span>}
+                                    {(local.body || '')
+                                        .replace('{firstName}', 'John').replace('{lastName}', 'Smith')
+                                        .replace('{fullName}', 'John Smith').replace('{email}', 'john@example.com')
+                                        .replace('{phone}', '(615) 555-0100').replace('{city}', 'Nashville')
+                                        .replace('{state}', 'TN').replace('{birthday}', 'Jan 15')
+                                        .replace('{anniversary}', 'Jun 10')
+                                    || <span className="opacity-50 italic">Your message will appear here…</span>}
                                 </div>
                             </div>
                         </div>
@@ -528,9 +756,14 @@ const NewMessageComposer: React.FC<{
     const [error, setError]           = useState('');
     const [sentCount, setSentCount]   = useState<number | null>(null);
 
-    // Individual
-    const [phone, setPhone]           = useState('');
-    const [recipientName, setRecipientName] = useState('');
+    // Individual — PCO person search
+    const [personSearch, setPersonSearch]     = useState('');
+    const [personResults, setPersonResults]   = useState<{ id: string; name: string; phone?: string; avatar?: string | null; membership?: string | null }[]>([]);
+    const [personLoading, setPersonLoading]   = useState(false);
+    const [selectedPerson, setSelectedPerson] = useState<{ id: string; name: string; phone: string; avatar?: string | null } | null>(null);
+    const [manualEntry, setManualEntry]       = useState(false);
+    const [phone, setPhone]                   = useState('');
+    const [recipientName, setRecipientName]   = useState('');
 
     // PCO Lists
     const [pcoLists, setPcoLists]     = useState<{ id: string; name: string; total_people: number }[]>([]);
@@ -544,11 +777,72 @@ const NewMessageComposer: React.FC<{
     const [selectedGroup, setSelectedGroup] = useState<{ id: string; name: string; memberCount: number } | null>(null);
     const [loadingGroups, setLoadingGroups] = useState(false);
 
+    // Composer extras
+    const [showEmojisNM, setShowEmojisNM]     = useState(false);
+    const [showLinkDlgNM, setShowLinkDlgNM]   = useState(false);
+    const [linkUrlNM, setLinkUrlNM]           = useState('');
+    const [imageUrlNM, setImageUrlNM]         = useState('');
+    const [aiSuggestionNM, setAiSuggestionNM] = useState('');
+    const [aiLoadingNM, setAiLoadingNM]       = useState(false);
+    const [showAiPanelNM, setShowAiPanelNM]   = useState(false);
+    const textareaRefNM = useRef<HTMLTextAreaElement>(null);
+
     const MAX_CHARS  = 1600;
     const segCount   = Math.ceil((body.length || 1) / 160);
     const charLeft   = MAX_CHARS - body.length;
 
-    // Load PCO lists when mode switches
+    const insertAtCursorNM = (text: string) => {
+        const el = textareaRefNM.current;
+        if (!el) { setBody(b => b + text); return; }
+        const start = el.selectionStart ?? body.length;
+        const end   = el.selectionEnd ?? start;
+        const newBody = body.slice(0, start) + text + body.slice(end);
+        setBody(newBody);
+        requestAnimationFrame(() => {
+            el.focus();
+            const pos = start + text.length;
+            el.setSelectionRange(pos, pos);
+        });
+    };
+
+    const handleAiSuggestNM = async () => {
+        if (!body.trim()) return;
+        setAiLoadingNM(true);
+        setShowAiPanelNM(true);
+        setAiSuggestionNM('');
+        try {
+            const suggestion = await getSmsAiSuggestion(body);
+            setAiSuggestionNM(suggestion);
+        } catch {
+            setAiSuggestionNM('Unable to get AI suggestion. Please try again.');
+        } finally {
+            setAiLoadingNM(false);
+        }
+    };
+
+    // Debounced people search (fires when personSearch changes)
+    useEffect(() => {
+        if (mode !== 'individual' || manualEntry) return;
+        const q = personSearch.trim();
+        if (q.length < 2) { setPersonResults([]); return; }
+        setPersonLoading(true);
+        // Search locally from Firestore cache — query by name prefix
+        const isPhone = /^[\d\s+()\-]{4,}$/.test(q);
+        const col = collection(firebaseDb, 'people');
+        const constraints = isPhone
+            ? [where('churchId', '==', churchId), where('phone', '>=', q), where('phone', '<=', q + '\uffff'), limit(10)]
+            : [where('churchId', '==', churchId), where('name', '>=', q), where('name', '<=', q + '\uffff'), limit(10)];
+        getDocs(query(col, ...constraints as any))
+            .then(snap => {
+                setPersonResults(snap.docs.map(d => {
+                    const p = d.data() as any;
+                    return { id: d.id, name: p.name || '', phone: p.phone || '', avatar: p.avatar || null, membership: p.membership || null };
+                }));
+            })
+            .catch(() => setPersonResults([]))
+            .finally(() => setPersonLoading(false));
+    }, [personSearch, mode, manualEntry, churchId]);
+
     useEffect(() => {
         if (mode !== 'list' || pcoLists.length > 0) return;
         setLoadingLists(true);
@@ -580,10 +874,24 @@ const NewMessageComposer: React.FC<{
     const filteredGroups = pcoGroups.filter(g => g.name.toLowerCase().includes(groupSearch.toLowerCase()));
 
     const canSend = body.trim().length > 0 && (
-        (mode === 'individual' && phone.replace(/\D/g, '').length >= 10) ||
-        (mode === 'list'       && !!selectedList) ||
-        (mode === 'group'      && !!selectedGroup)
+        (mode === 'individual' && (
+            (selectedPerson && selectedPerson.phone.replace(/\D/g,'').length >= 10) ||
+            (manualEntry && phone.replace(/\D/g,'').length >= 10)
+        )) ||
+        (mode === 'list'  && !!selectedList) ||
+        (mode === 'group' && !!selectedGroup)
     );
+
+    /** Safe JSON parser — reads raw text first so non-JSON bodies never throw a parse error. */
+    const safeJson = async (res: Response): Promise<any> => {
+        const text = await res.text();
+        try {
+            return JSON.parse(text);
+        } catch {
+            // Server returned HTML (e.g. a 404 or 500 error page) — surface the HTTP status
+            throw new Error(`Server error ${res.status}: ${text.slice(0, 120) || res.statusText}`);
+        }
+    };
 
     const handleSend = async () => {
         if (!canSend || sending) return;
@@ -591,23 +899,25 @@ const NewMessageComposer: React.FC<{
         setSending(true);
         try {
             if (mode === 'individual') {
+                const toPhone = selectedPerson ? selectedPerson.phone : phone;
+                const toName  = selectedPerson ? selectedPerson.name  : recipientName.trim();
                 const res = await fetch(`${API_BASE}/api/messaging/send-individual`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         churchId,
-                        toPhone:     phone.replace(/[^\d+]/g, ''),
+                        toPhone:    toPhone.replace(/[^\d+]/g, ''),
                         body,
-                        sentBy:      currentUser.id,
-                        sentByName:  currentUser.name,
-                        personName:  recipientName.trim() || undefined,
+                        sentBy:     currentUser.id,
+                        sentByName: currentUser.name,
+                        personName: toName || undefined,
+                        personId:   selectedPerson?.id || undefined,
                     }),
                 });
-                const data = await res.json();
-                if (!data.success) throw new Error(data.error || 'Send failed');
+                const data = await safeJson(res);
+                if (!data.success) throw new Error(data.error || `Send failed (HTTP ${res.status})`);
                 setSentCount(1);
             } else if (mode === 'list' && selectedList) {
-                // Reuse the campaign API with pcoListId targeting
                 const res = await fetch(`${API_BASE}/api/messaging/send-to-list`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -620,8 +930,8 @@ const NewMessageComposer: React.FC<{
                         sentByName:  currentUser.name,
                     }),
                 });
-                const data = await res.json();
-                if (!data.success) throw new Error(data.error || 'Send failed');
+                const data = await safeJson(res);
+                if (!data.success) throw new Error(data.error || `Send failed (HTTP ${res.status})`);
                 setSentCount(data.sent || selectedList.total_people);
             } else if (mode === 'group' && selectedGroup) {
                 const res = await fetch(`${API_BASE}/api/messaging/send-to-group`, {
@@ -636,8 +946,8 @@ const NewMessageComposer: React.FC<{
                         sentByName:  currentUser.name,
                     }),
                 });
-                const data = await res.json();
-                if (!data.success) throw new Error(data.error || 'Send failed');
+                const data = await safeJson(res);
+                if (!data.success) throw new Error(data.error || `Send failed (HTTP ${res.status})`);
                 setSentCount(data.sent || selectedGroup.memberCount);
             }
         } catch (e: any) {
@@ -711,29 +1021,124 @@ const NewMessageComposer: React.FC<{
                         </div>
                     </div>
 
-                    {/* Individual fields */}
+                    {/* Individual — PCO person search */}
                     {mode === 'individual' && (
                         <div className="space-y-3">
-                            <div>
-                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">Phone Number <span className="text-red-400">*</span></label>
-                                <input
-                                    type="tel"
-                                    value={phone}
-                                    onChange={e => setPhone(e.target.value)}
-                                    placeholder="+1 (615) 555-0100"
-                                    className="w-full text-sm border-2 border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500"
-                                />
-                            </div>
-                            <div>
-                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">Name <span className="font-normal normal-case text-slate-400">(optional)</span></label>
-                                <input
-                                    type="text"
-                                    value={recipientName}
-                                    onChange={e => setRecipientName(e.target.value)}
-                                    placeholder="Jane Smith"
-                                    className="w-full text-sm border-2 border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500"
-                                />
-                            </div>
+                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">Recipient</label>
+
+                            {/* Selected person card */}
+                            {selectedPerson ? (
+                                <div className="flex items-center gap-3 p-3 bg-violet-50 dark:bg-violet-900/20 border-2 border-violet-500 rounded-2xl">
+                                    <div className="w-10 h-10 rounded-full bg-violet-200 dark:bg-violet-800 overflow-hidden flex items-center justify-center shrink-0">
+                                        {selectedPerson.avatar
+                                            ? <img src={selectedPerson.avatar} alt={selectedPerson.name} className="w-full h-full object-cover" />
+                                            : <span className="text-sm font-black text-violet-600 dark:text-violet-300">{selectedPerson.name.charAt(0)}</span>
+                                        }
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-bold text-violet-800 dark:text-violet-200 truncate">{selectedPerson.name}</p>
+                                        <p className="text-xs text-violet-500 font-mono">{formatPhone(selectedPerson.phone)}</p>
+                                    </div>
+                                    <button
+                                        onClick={() => { setSelectedPerson(null); setPersonSearch(''); setManualEntry(false); }}
+                                        title="Change recipient"
+                                        className="text-violet-400 hover:text-violet-600 transition shrink-0"
+                                    >
+                                        <X size={16} />
+                                    </button>
+                                </div>
+                            ) : manualEntry ? (
+                                /* Manual phone entry */
+                                <div className="space-y-2">
+                                    <div className="relative">
+                                        <Phone size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                        <input
+                                            type="tel"
+                                            value={phone}
+                                            onChange={e => setPhone(e.target.value)}
+                                            placeholder="+1 (615) 555-0100"
+                                            autoFocus
+                                            className="w-full pl-8 pr-3 text-sm border-2 border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500"
+                                        />
+                                    </div>
+                                    <div className="relative">
+                                        <UserCheck size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                        <input
+                                            type="text"
+                                            value={recipientName}
+                                            onChange={e => setRecipientName(e.target.value)}
+                                            placeholder="Name (optional)"
+                                            className="w-full pl-8 pr-3 text-sm border-2 border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500"
+                                        />
+                                    </div>
+                                    <button
+                                        onClick={() => { setManualEntry(false); setPhone(''); setRecipientName(''); }}
+                                        className="text-xs text-violet-500 hover:text-violet-700 font-semibold"
+                                    >← Search PCO people instead</button>
+                                </div>
+                            ) : (
+                                /* Search box */
+                                <div>
+                                    <div className="relative">
+                                        <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                        {personLoading && <Loader2 size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-violet-400 animate-spin" />}
+                                        <input
+                                            type="text"
+                                            value={personSearch}
+                                            onChange={e => setPersonSearch(e.target.value)}
+                                            placeholder="Search by name or phone number…"
+                                            autoFocus
+                                            className="w-full pl-8 pr-8 text-sm border-2 border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500"
+                                        />
+                                    </div>
+                                    {/* Results dropdown */}
+                                    {personResults.length > 0 && (
+                                        <div className="mt-1 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden shadow-lg max-h-48 overflow-y-auto">
+                                            {personResults.map(p => (
+                                                <button
+                                                    key={p.id}
+                                                    onClick={() => {
+                                                        if (!p.phone) return;
+                                                        setSelectedPerson({ id: p.id, name: p.name, phone: p.phone, avatar: p.avatar });
+                                                        setPersonSearch('');
+                                                        setPersonResults([]);
+                                                    }}
+                                                    disabled={!p.phone}
+                                                    className={`w-full flex items-center gap-3 px-3 py-2.5 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition text-left ${
+                                                        !p.phone ? 'opacity-40 cursor-not-allowed' : ''
+                                                    }`}
+                                                >
+                                                    <div className="w-8 h-8 rounded-full bg-violet-100 dark:bg-violet-900/40 overflow-hidden flex items-center justify-center shrink-0">
+                                                        {p.avatar
+                                                            ? <img src={p.avatar} alt={p.name} className="w-full h-full object-cover" />
+                                                            : <span className="text-xs font-black text-violet-600 dark:text-violet-300">{p.name.charAt(0)}</span>
+                                                        }
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">{p.name}</p>
+                                                        <p className="text-xs text-slate-400 truncate">
+                                                            {p.phone ? formatPhone(p.phone) : <span className="text-amber-500 text-[10px]">No phone number</span>}
+                                                            {p.membership && <span className="ml-2 text-[10px] text-slate-400">· {p.membership}</span>}
+                                                        </p>
+                                                    </div>
+                                                    {p.phone && <ChevronRight size={14} className="text-violet-400 shrink-0" />}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                    {personSearch.trim().length >= 2 && !personLoading && personResults.length === 0 && (
+                                        <p className="text-xs text-slate-400 text-center py-2">
+                                            No PCO people found matching &ldquo;{personSearch}&rdquo;
+                                        </p>
+                                    )}
+                                    <button
+                                        onClick={() => setManualEntry(true)}
+                                        className="mt-2 text-xs text-slate-400 hover:text-violet-600 font-semibold transition"
+                                    >
+                                        + Enter phone number manually
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -830,17 +1235,123 @@ const NewMessageComposer: React.FC<{
                             </span>
                         </div>
                         <textarea
+                            ref={textareaRefNM}
                             rows={5}
                             value={body}
                             onChange={e => setBody(e.target.value)}
                             maxLength={MAX_CHARS}
                             placeholder={mode === 'individual'
                                 ? 'Type your message…'
-                                : 'Type your message… Use {firstName} to personalize.'}
+                                : 'Type your message… Use merge tags to personalize.'}
                             className="w-full text-sm border-2 border-slate-200 dark:border-slate-600 rounded-xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500 resize-none"
                         />
+                        {/* Composer toolbar */}
+                        <div className="flex items-center gap-1 mt-2 flex-wrap">
+                            {/* Emoji */}
+                            <div className="relative">
+                                <button type="button" title="Insert emoji"
+                                    onClick={() => { setShowEmojisNM(v => !v); setShowLinkDlgNM(false); }}
+                                    className="flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition"
+                                ><Smile size={12} /> Emoji</button>
+                                {showEmojisNM && (
+                                    <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-3 grid grid-cols-10 gap-1 min-w-[260px]">
+                                        {COMMON_EMOJIS.map(em => (
+                                            <button key={em} onClick={() => { insertAtCursorNM(em); setShowEmojisNM(false); }}
+                                                className="text-xl hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg p-1 transition leading-none" title={em}>{em}</button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                            {/* Link */}
+                            <div className="relative">
+                                <button type="button" title="Insert link"
+                                    onClick={() => { setShowLinkDlgNM(v => !v); setShowEmojisNM(false); }}
+                                    className="flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition"
+                                ><Link size={12} /> Link</button>
+                                {showLinkDlgNM && (
+                                    <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-3 w-72">
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Insert Link URL</p>
+                                        <div className="flex gap-2">
+                                            <input type="url" value={linkUrlNM} onChange={e => setLinkUrlNM(e.target.value)}
+                                                placeholder="https://example.com"
+                                                className="flex-1 text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                            />
+                                            <button onClick={() => { if (linkUrlNM.trim()) { insertAtCursorNM(' ' + linkUrlNM.trim()); setLinkUrlNM(''); setShowLinkDlgNM(false); } }}
+                                                className="px-3 py-2 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold rounded-xl transition">Insert</button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                            {/* Image */}
+                            <button type="button" title="Attach image (MMS)" onClick={() => {
+                                const url = window.prompt('Enter image URL (MMS):');
+                                if (url) setImageUrlNM(url);
+                            }} className={`flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-lg border transition ${
+                                imageUrlNM ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
+                                : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700'
+                            }`}>
+                                <ImageIcon size={12} /> {imageUrlNM ? 'Image ✓' : 'Image'}
+                            </button>
+                            {imageUrlNM && (
+                                <button type="button" title="Remove image" onClick={() => setImageUrlNM('')}
+                                    className="p-1 text-red-400 hover:text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition"><X size={12} /></button>
+                            )}
+                            <div className="flex-1" />
+                            {/* AI Helper */}
+                            <button type="button" title="AI SMS helper" onClick={handleAiSuggestNM}
+                                disabled={!body.trim() || aiLoadingNM}
+                                className="flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-700 hover:bg-violet-100 dark:hover:bg-violet-900/40 disabled:opacity-50 transition"
+                            >
+                                {aiLoadingNM ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />} AI Shorten
+                            </button>
+                        </div>
+                        {/* Image preview NM */}
+                        {imageUrlNM && (
+                            <div className="mt-2 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 max-w-[180px]">
+                                <img src={imageUrlNM} alt="MMS attachment" className="w-full h-auto object-cover" onError={() => setImageUrlNM('')} />
+                            </div>
+                        )}
+                        {/* AI panel NM */}
+                        {showAiPanelNM && (
+                            <div className="mt-3 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700 rounded-2xl p-3">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-violet-500 flex items-center gap-1"><Sparkles size={10} /> AI Suggestion</span>
+                                    <button onClick={() => setShowAiPanelNM(false)} title="Dismiss" className="text-violet-400 hover:text-violet-600"><X size={13} /></button>
+                                </div>
+                                {aiLoadingNM ? (
+                                    <div className="flex items-center gap-2 text-sm text-violet-500"><Loader2 size={13} className="animate-spin" /> Analyzing…</div>
+                                ) : (
+                                    <>
+                                        <p className="text-sm text-violet-800 dark:text-violet-200 leading-relaxed whitespace-pre-wrap mb-2">{aiSuggestionNM}</p>
+                                        <div className="flex items-center gap-2">
+                                            <span className={`text-xs font-bold ${ countSegments(aiSuggestionNM) > 1 ? 'text-amber-600' : 'text-emerald-600' }`}>
+                                                {aiSuggestionNM.length} chars · {countSegments(aiSuggestionNM)} seg
+                                            </span>
+                                            <div className="flex-1" />
+                                            <button onClick={() => { setBody(aiSuggestionNM); setShowAiPanelNM(false); }}
+                                                className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold bg-violet-600 hover:bg-violet-700 text-white rounded-xl transition"
+                                            ><ChevronRight size={11} /> Use This</button>
+                                            <button onClick={handleAiSuggestNM} title="Retry" className="flex items-center gap-1 px-2 py-1.5 text-xs font-semibold bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 rounded-xl hover:bg-violet-200 transition">
+                                                <RotateCcw size={10} /> Retry
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        )}
+                        {/* Merge tags hint */}
                         {mode !== 'individual' && (
-                            <p className="text-[10px] text-slate-400 mt-1">Merge tags: <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">{'{firstName}'}</code> <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">{'{lastName}'}</code> <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">{'{fullName}'}</code></p>
+                            <div className="mt-2">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Merge Tags</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {ALL_MERGE_TAGS.map(({ tag, label }) => (
+                                        <button key={tag} type="button" title={`Insert ${label}`}
+                                            onClick={() => insertAtCursorNM(tag)}
+                                            className="px-2 py-1 text-[10px] font-mono font-semibold bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 rounded-lg hover:bg-violet-100 dark:hover:bg-violet-900/40 border border-violet-200 dark:border-violet-800 transition"
+                                        >{tag}</button>
+                                    ))}
+                                </div>
+                            </div>
                         )}
                     </div>
 
@@ -1118,9 +1629,10 @@ interface KeywordModalProps {
     onSave: (kw: Omit<SmsKeyword, 'id' | 'matchCount' | 'createdAt'>) => Promise<void>;
     onClose: () => void;
     isBusy: boolean;
+    saveError?: string;
 }
 
-const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingLists, onSave, onClose, isBusy }) => {
+const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingLists, onSave, onClose, isBusy, saveError }) => {
     const [keyword, setKeyword]           = useState(initial?.keyword || '');
     const [replyMessage, setReplyMessage] = useState(initial?.replyMessage || '');
     const [addToListId, setAddToListId]   = useState(initial?.addToListId || '');
@@ -1232,6 +1744,12 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingL
                 </div>
 
                 {error && <p className="text-sm text-red-500 mb-3">{error}</p>}
+                {saveError && !error && (
+                    <div className="flex items-start gap-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl px-3 py-2.5 mb-3">
+                        <AlertTriangle size={13} className="shrink-0 mt-0.5" />
+                        <span>{saveError}</span>
+                    </div>
+                )}
 
                 <div className="flex gap-2">
                     <button onClick={onClose} className="flex-1 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 transition">Cancel</button>
@@ -1251,9 +1769,11 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingL
 const SmsKeywordsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
     const [keywords, setKeywords]   = useState<SmsKeyword[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [editKw, setEditKw]       = useState<SmsKeyword | null | 'new'>('new' as any);
+    const [listError, setListError] = useState<string | null>(null);
+    const [editKw, setEditKw]       = useState<SmsKeyword | null>(null);
     const [modalOpen, setModalOpen] = useState(false);
     const [isBusy, setIsBusy]       = useState(false);
+    const [saveError, setSaveError] = useState<string | null>(null);
     const [pcoLists, setPcoLists]   = useState<{ id: string; name: string; total_people: number }[]>([]);
     const [loadingLists, setLoadingLists] = useState(false);
 
@@ -1264,10 +1784,27 @@ const SmsKeywordsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
             where('churchId', '==', churchId),
             orderBy('createdAt', 'desc')
         );
-        const unsub = onSnapshot(q, snap => {
-            setKeywords(snap.docs.map(d => ({ id: d.id, ...d.data() } as SmsKeyword)));
-            setIsLoading(false);
-        });
+        const unsub = onSnapshot(
+            q,
+            snap => {
+                setKeywords(snap.docs.map(d => ({ id: d.id, ...d.data() } as SmsKeyword)));
+                setIsLoading(false);
+                setListError(null);
+            },
+            (err: any) => {
+                console.error('[SmsKeywords] onSnapshot error:', err);
+                setIsLoading(false);
+                // Missing composite index shows up as code 'failed-precondition'
+                if (err?.code === 'failed-precondition' || (err?.message || '').toLowerCase().includes('index')) {
+                    setListError(
+                        'A Firestore index is required to display keywords. ' +
+                        'Open the browser console, click the index creation link in the error, then reload this page.'
+                    );
+                } else {
+                    setListError('Failed to load keywords: ' + (err?.message || String(err)));
+                }
+            }
+        );
         return unsub;
     }, [churchId]);
 
@@ -1286,14 +1823,16 @@ const SmsKeywordsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
 
     const handleSave = async (data: Omit<SmsKeyword, 'id' | 'matchCount' | 'createdAt'>) => {
         setIsBusy(true);
+        setSaveError(null);
         try {
-            const editing = editKw !== 'new' ? editKw as SmsKeyword : null;
-            if (editing) {
-                await updateDoc(doc(firebaseDb, 'smsKeywords', editing.id), {
+            if (editKw) {
+                // Editing existing keyword
+                await updateDoc(doc(firebaseDb, 'smsKeywords', editKw.id), {
                     ...data,
                     churchId,
                 });
             } else {
+                // Creating new keyword
                 const now = Date.now();
                 await addDoc(collection(firebaseDb, 'smsKeywords'), {
                     ...data,
@@ -1305,7 +1844,12 @@ const SmsKeywordsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
             setModalOpen(false);
             setEditKw(null);
         } catch (e: any) {
-            alert('Failed to save keyword: ' + e.message);
+            console.error('[SmsKeywords] Save error:', e);
+            setSaveError(
+                e?.code === 'permission-denied'
+                    ? 'Permission denied — check your Firestore security rules for the smsKeywords collection.'
+                    : 'Failed to save keyword: ' + (e?.message || String(e))
+            );
         } finally {
             setIsBusy(false);
         }
@@ -1320,8 +1864,8 @@ const SmsKeywordsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
         await deleteDoc(doc(firebaseDb, 'smsKeywords', kw.id));
     };
 
-    const openNew = () => { setEditKw('new' as any); setModalOpen(true); };
-    const openEdit = (kw: SmsKeyword) => { setEditKw(kw); setModalOpen(true); };
+    const openNew = () => { setSaveError(null); setEditKw(null); setModalOpen(true); };
+    const openEdit = (kw: SmsKeyword) => { setSaveError(null); setEditKw(kw); setModalOpen(true); };
 
     return (
         <div className="p-6 max-w-4xl mx-auto">
@@ -1352,9 +1896,15 @@ const SmsKeywordsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
             </div>
 
             {/* List */}
+            {listError && (
+                <div className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl px-4 py-3 mb-4">
+                    <AlertTriangle size={14} className="shrink-0 mt-0.5 text-amber-500" />
+                    <span>{listError}</span>
+                </div>
+            )}
             {isLoading ? (
                 <div className="flex items-center justify-center h-40 text-slate-400"><Loader2 size={20} className="animate-spin mr-2" /> Loading keywords…</div>
-            ) : keywords.length === 0 ? (
+            ) : keywords.length === 0 && !listError ? (
                 <div className="text-center py-20 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
                     <Key size={40} className="mx-auto text-slate-300 dark:text-slate-600 mb-3" />
                     <p className="text-slate-600 dark:text-slate-400 font-semibold">No keywords yet</p>
@@ -1432,12 +1982,13 @@ const SmsKeywordsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
             {/* Keyword modal */}
             {modalOpen && (
                 <KeywordModal
-                    initial={editKw !== 'new' ? editKw as SmsKeyword : null}
+                    initial={editKw}
                     pcoLists={pcoLists}
                     loadingLists={loadingLists}
                     onSave={handleSave}
-                    onClose={() => { setModalOpen(false); setEditKw(null); }}
+                    onClose={() => { setModalOpen(false); setEditKw(null); setSaveError(null); }}
                     isBusy={isBusy}
+                    saveError={saveError || undefined}
                 />
             )}
         </div>

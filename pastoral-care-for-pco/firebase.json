@@ -1,5 +1,10 @@
 {
+  "firestore": {
+    "database": "pcforpco",
+    "indexes": "firestore.indexes.json"
+  },
   "storage": {
     "rules": "storage.rules"
   }
 }
+
