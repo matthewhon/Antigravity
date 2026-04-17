@@ -826,18 +826,23 @@ const NewMessageComposer: React.FC<{
         const q = personSearch.trim();
         if (q.length < 2) { setPersonResults([]); return; }
         setPersonLoading(true);
-        // Search locally from Firestore cache — query by name prefix
+        // Search the Firestore people cache — only surface people who have a phone on file.
+        // Fetch a larger window (25) so the client-side phone filter still leaves useful results.
         const isPhone = /^[\d\s+()\-]{4,}$/.test(q);
         const col = collection(firebaseDb, 'people');
         const constraints = isPhone
-            ? [where('churchId', '==', churchId), where('phone', '>=', q), where('phone', '<=', q + '\uffff'), limit(10)]
-            : [where('churchId', '==', churchId), where('name', '>=', q), where('name', '<=', q + '\uffff'), limit(10)];
+            ? [where('churchId', '==', churchId), where('phone', '>=', q), where('phone', '<=', q + '\uffff'), limit(20)]
+            : [where('churchId', '==', churchId), where('name', '>=', q), where('name', '<=', q + '\uffff'), limit(25)];
         getDocs(query(col, ...constraints as any))
             .then(snap => {
-                setPersonResults(snap.docs.map(d => {
-                    const p = d.data() as any;
-                    return { id: d.id, name: p.name || '', phone: p.phone || '', avatar: p.avatar || null, membership: p.membership || null };
-                }));
+                const results = snap.docs
+                    .map(d => {
+                        const p = d.data() as any;
+                        return { id: d.id, name: p.name || '', phone: (p.phone || '').trim(), avatar: p.avatar || null, membership: p.membership || null };
+                    })
+                    // Only show people with a valid phone number — no point surfacing un-textable contacts
+                    .filter(p => p.phone && p.phone.replace(/\D/g, '').length >= 10);
+                setPersonResults(results);
             })
             .catch(() => setPersonResults([]))
             .finally(() => setPersonLoading(false));
@@ -1572,10 +1577,18 @@ const SmsInbox: React.FC<{
                                                 ))}
                                             </div>
                                         )}
-                                        <div className={`text-[10px] mt-1 ${msg.direction === 'outbound' ? 'text-violet-200' : 'text-slate-400'}`}>
+                                        <div className={`text-[10px] mt-1 flex items-center gap-1 flex-wrap ${msg.direction === 'outbound' ? 'text-violet-200' : 'text-slate-400'}`}>
                                             {new Date(msg.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
                                             {msg.direction === 'outbound' && msg.sentByName && ` · ${msg.sentByName}`}
-                                            {msg.direction === 'outbound' && msg.status && ` · ${msg.status}`}
+                                            {msg.direction === 'outbound' && msg.status && (() => {
+                                                const s = msg.status;
+                                                if (s === 'delivered')    return <span className="text-emerald-300 font-semibold" title="Delivered">✓✓ delivered</span>;
+                                                if (s === 'sent')         return <span className="text-violet-300" title="Accepted by carrier">✓ sent</span>;
+                                                if (s === 'queued')       return <span className="text-violet-300/70" title="Queued by Twilio">· queued</span>;
+                                                if (s === 'failed')       return <span className="text-red-400 font-bold" title="Failed — not delivered">⚠ failed</span>;
+                                                if (s === 'undelivered')  return <span className="text-red-400 font-bold" title="Undelivered — carrier rejected">⚠ undelivered</span>;
+                                                return <span className="opacity-60">· {s}</span>;
+                                            })()}
                                         </div>
                                     </div>
                                 </div>

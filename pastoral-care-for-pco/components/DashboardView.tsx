@@ -459,10 +459,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               return (
                   <ServicesTimelineWidget
                       servicesData={servicesData}
-                      givingAnalytics={givingAnalytics}
+                      donations={donations}
                       onRemove={() => handleRemoveWidget(id)}
                   />
               );
+
 
           default:
               return null;

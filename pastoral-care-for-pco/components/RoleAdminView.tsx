@@ -150,6 +150,9 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   const [smsForm, setSmsForm] = useState<NonNullable<Church['smsSettings']>>(church.smsSettings || {});
   const [isSmsSaving, setIsSmsSaving] = useState(false);
   const [smsMessage, setSmsMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [isA2pSubmitting, setIsA2pSubmitting] = useState(false);
+  const [isA2pChecking, setIsA2pChecking] = useState(false);
+  const [a2pResult, setA2pResult] = useState<{ success: boolean; message: string; brandSid?: string; failureReason?: string | null; twilioStatus?: string } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
@@ -1857,6 +1860,63 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                 }
             };
 
+            // ── Submit A2P registration to Twilio (saves first, then submits) ──
+            const handleSubmitToTwilio = async () => {
+                if (!onUpdateChurch) return;
+                setIsA2pSubmitting(true);
+                setA2pResult(null);
+                try {
+                    // Save form data to Firestore first so the backend reads fresh fields
+                    await onUpdateChurch({ smsSettings: smsForm });
+                    // Then call the A2P register endpoint
+                    const res = await fetch('/api/messaging/a2p-register', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ churchId }),
+                    });
+                    const data = await res.json();
+                    if (data.brandSid) {
+                        setSmsForm(prev => ({ ...prev, twilioBrandSid: data.brandSid, twilioA2pStatus: 'pending' }));
+                    }
+                    setA2pResult({
+                        success: data.success,
+                        message: data.message || (data.error || 'Unknown response'),
+                        brandSid: data.brandSid,
+                        twilioStatus: data.status,
+                    });
+                } catch (e: any) {
+                    setA2pResult({ success: false, message: e.message || 'Submission failed' });
+                } finally {
+                    setIsA2pSubmitting(false);
+                }
+            };
+
+            // ── Check live A2P status from Twilio ──────────────────────────────
+            const handleCheckA2pStatus = async () => {
+                setIsA2pChecking(true);
+                setA2pResult(null);
+                try {
+                    const res = await fetch(`/api/messaging/a2p-status?churchId=${encodeURIComponent(churchId)}`);
+                    const data = await res.json();
+                    if (data.status) {
+                        setSmsForm(prev => ({ ...prev, twilioA2pStatus: data.status as any }));
+                    }
+                    setA2pResult({
+                        success: data.success ?? true,
+                        message: data.failureReason
+                            ? `Twilio status: ${data.twilioStatus}. Reason: ${data.failureReason}`
+                            : `Twilio status: ${data.twilioStatus || data.status}. Checked at ${new Date(data.checkedAt || Date.now()).toLocaleTimeString()}.`,
+                        brandSid: data.brandSid,
+                        twilioStatus: data.twilioStatus || data.status,
+                        failureReason: data.failureReason,
+                    });
+                } catch (e: any) {
+                    setA2pResult({ success: false, message: e.message || 'Status check failed' });
+                } finally {
+                    setIsA2pChecking(false);
+                }
+            };
+
             const inputCn = 'w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-colors';
             const labelCn = 'block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-2';
 
@@ -1871,10 +1931,19 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                     A2P 10DLC Registration &amp; Messaging Compliance
                                 </p>
                             </div>
-                            <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-3">
                                 <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full ${A2P_STATUS_COLORS[a2pStatus]}`}>
                                     A2P: {statusLabel[a2pStatus]}
                                 </span>
+                                {smsForm.twilioBrandSid && (
+                                    <button
+                                        onClick={handleCheckA2pStatus}
+                                        disabled={isA2pChecking}
+                                        className="text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-600 dark:hover:text-indigo-400 border border-slate-200 dark:border-slate-700 transition-all disabled:opacity-50"
+                                    >
+                                        {isA2pChecking ? '⏳ Checking…' : '🔄 Check Status'}
+                                    </button>
+                                )}
                                 {smsForm.twilioPhoneNumber && (
                                     <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-1.5 rounded-full border border-emerald-100 dark:border-emerald-900/30">
                                         📱 {smsForm.twilioPhoneNumber}
@@ -1955,8 +2024,9 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         <input type="text" value={smsForm.twilioBrandSid || ''}
                                             onChange={e => handleSmsChange('twilioBrandSid', e.target.value)}
                                             className={inputCn}
-                                            placeholder="BN..."
+                                            placeholder="BN... (auto-filled after submission)"
                                         />
+                                        <p className="text-[9px] text-slate-400 mt-1.5">Returned by Twilio after brand registration. Auto-populated when you use &quot;Submit to Twilio&quot; below.</p>
                                     </div>
                                     <div>
                                         <label className={labelCn}>A2P Campaign SID</label>
@@ -1966,17 +2036,38 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             placeholder="QE..."
                                         />
                                     </div>
+                                    {/* Live A2P Status — read from Firestore / Twilio, not a manual dropdown */}
                                     <div>
-                                        <label className={labelCn}>A2P Status</label>
-                                        <select value={smsForm.twilioA2pStatus || 'not_started'}
-                                            onChange={e => handleSmsChange('twilioA2pStatus', e.target.value as any)}
-                                            className={inputCn}
-                                        >
-                                            <option value="not_started">Not Started</option>
-                                            <option value="pending">Pending Review</option>
-                                            <option value="approved">Approved</option>
-                                            <option value="failed">Failed</option>
-                                        </select>
+                                        <label className={labelCn}>A2P Registration Status</label>
+                                        <div className={`flex items-center gap-3 px-4 py-2.5 rounded-xl border ${
+                                            a2pStatus === 'approved'   ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800' :
+                                            a2pStatus === 'pending'    ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800' :
+                                            a2pStatus === 'failed'     ? 'bg-rose-50 dark:bg-rose-900/20 border-rose-200 dark:border-rose-800' :
+                                            'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+                                        }`}>
+                                            <span className={`text-sm ${
+                                                a2pStatus === 'approved' ? '✅' :
+                                                a2pStatus === 'pending'  ? '⏳' :
+                                                a2pStatus === 'failed'   ? '❌' : ''
+                                            }`}>
+                                                {a2pStatus === 'approved' ? '✅' : a2pStatus === 'pending' ? '⏳' : a2pStatus === 'failed' ? '❌' : '⬜'}
+                                            </span>
+                                            <span className={`text-xs font-black ${
+                                                a2pStatus === 'approved'   ? 'text-emerald-700 dark:text-emerald-300' :
+                                                a2pStatus === 'pending'    ? 'text-amber-700 dark:text-amber-300' :
+                                                a2pStatus === 'failed'     ? 'text-rose-700 dark:text-rose-300' :
+                                                'text-slate-500 dark:text-slate-400'
+                                            }`}>
+                                                {statusLabel[a2pStatus]}
+                                            </span>
+                                            <span className="text-[9px] text-slate-400 dark:text-slate-500 ml-auto">
+                                                {a2pStatus === 'not_started' ? 'Submit to Twilio to begin' :
+                                                 a2pStatus === 'pending'     ? 'Awaiting Twilio review (1–5 days)' :
+                                                 a2pStatus === 'approved'    ? 'Registration complete ✓' :
+                                                 'Check failure reason below'}
+                                            </span>
+                                        </div>
+                                        <p className="text-[9px] text-slate-400 mt-1.5">Status is synced from Twilio. Click <strong>Check Status</strong> in the header to refresh.</p>
                                     </div>
                                 </div>
                             </div>
@@ -2223,7 +2314,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 </div>
                             </div>
 
-                            {/* Checklist */}
+                            {/* Compliance checklist */}
                             <div className="bg-amber-50 dark:bg-amber-900/10 p-6 rounded-2xl border border-amber-200 dark:border-amber-800">
                                 <h4 className="font-bold text-amber-800 dark:text-amber-400 mb-3 text-sm">⚠ Compliance Checklist Before Submitting</h4>
                                 <ul className="text-xs text-amber-900 dark:text-amber-300 space-y-1.5 list-disc list-inside leading-relaxed">
@@ -2235,6 +2326,64 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                     <li>Your website privacy policy discloses that you send SMS messages.</li>
                                     <li>The Messaging Service SID has your phone number attached in the Twilio Console.</li>
                                 </ul>
+                            </div>
+
+                            {/* ── Submit to Twilio Action ────────────────────────────────── */}
+                            <div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800">
+                                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
+                                    <div>
+                                        <h4 className="text-sm font-black text-slate-900 dark:text-white mb-1">Submit A2P Registration to Twilio</h4>
+                                        <p className="text-[10px] text-slate-400 leading-relaxed max-w-lg">
+                                            Clicking <strong>Submit to Twilio</strong> will save your settings and submit your brand
+                                            registration directly to Twilio / The Campaign Registry (TCR). You will receive a Brand SID
+                                            and status will change to <em>Pending Review</em>. Approval takes 1–5 business days.
+                                        </p>
+                                        {a2pStatus === 'approved' && (
+                                            <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold mt-2">✅ Your registration is already approved — no action needed.</p>
+                                        )}
+                                    </div>
+                                    <div className="flex flex-col items-end gap-3 shrink-0">
+                                        <button
+                                            onClick={handleSubmitToTwilio}
+                                            disabled={isA2pSubmitting || isSmsSaving || a2pStatus === 'approved'}
+                                            className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-8 py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30 whitespace-nowrap"
+                                        >
+                                            {isA2pSubmitting ? '📡 Submitting to Twilio…' : a2pStatus === 'pending' ? '🔄 Re-Submit to Twilio' : '📡 Submit to Twilio'}
+                                        </button>
+                                        <p className="text-[9px] text-slate-400">Settings are saved first, then submitted.</p>
+                                    </div>
+                                </div>
+
+                                {/* Result feedback */}
+                                {a2pResult && (
+                                    <div className={`mt-5 p-4 rounded-xl border text-xs ${
+                                        a2pResult.success
+                                            ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300'
+                                            : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300'
+                                    }`}>
+                                        <div className="flex items-start gap-2">
+                                            <span className="shrink-0 text-base mt-0.5">{a2pResult.success ? '✅' : '⚠️'}</span>
+                                            <div className="min-w-0">
+                                                <p className="font-bold mb-1">{a2pResult.message}</p>
+                                                {a2pResult.brandSid && (
+                                                    <p className="font-mono text-[10px] text-slate-500 dark:text-slate-400">
+                                                        Brand SID: <strong>{a2pResult.brandSid}</strong>
+                                                    </p>
+                                                )}
+                                                {a2pResult.twilioStatus && (
+                                                    <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                                        Twilio status: <strong>{a2pResult.twilioStatus}</strong>
+                                                    </p>
+                                                )}
+                                                {a2pResult.failureReason && (
+                                                    <p className="text-[10px] text-rose-500 dark:text-rose-400 mt-0.5 font-bold">
+                                                        Failure reason: {a2pResult.failureReason}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                         </div>

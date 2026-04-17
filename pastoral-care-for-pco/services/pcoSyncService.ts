@@ -238,6 +238,24 @@ export const syncPeopleData = async (churchId: string) => {
             };
 
 
+            // ── Phone Numbers ───────────────────────────────────────────────
+            // Extract all phone numbers for this person from the included array.
+            // Priority: mobile/cell → home → work → first available.
+            const personPhoneNumbers = (included || [])
+                .filter(i => i.type === 'PhoneNumber' && rels?.phone_numbers?.data?.some((r: any) => r.id === i.id))
+                .map(ph => ({
+                    number:   ph.attributes.number   || '',
+                    location: ph.attributes.location || 'mobile', // 'mobile' | 'home' | 'work' | 'other'
+                    primary:  ph.attributes.primary  ?? false,
+                }));
+
+            // Pick a single canonical phone: prefer primary, then mobile, then first available.
+            const primaryPhone =
+                personPhoneNumbers.find(ph => ph.primary) ||
+                personPhoneNumbers.find(ph => ['mobile', 'cell'].includes((ph.location || '').toLowerCase())) ||
+                personPhoneNumbers[0] ||
+                null;
+
             return {
                 id: p.id,
                 churchId,
@@ -257,6 +275,10 @@ export const syncPeopleData = async (churchId: string) => {
                 // ── Households (FIXED) ──────────────────────────────────────────
                 householdId,
                 householdName,
+                // ── Phone ───────────────────────────────────────────────────────
+                /** Canonical phone number for SMS (E.164 or formatted). Null if none on file. */
+                phone: primaryPhone ? primaryPhone.number : null,
+                phoneNumbers: personPhoneNumbers,
                 // ── Addresses ──────────────────────────────────────────────────
                 addresses: (included || [])
                     .filter(i => i.type === 'Address' && rels?.addresses?.data?.some((r: any) => r.id === i.id))

@@ -848,6 +848,16 @@ export interface SmsSettings {
     a2pOptInPaperVoice?: boolean;
     /** Freeform description of opt-in process */
     a2pOptInDescription?: string;
+    /** Epoch ms when A2P form was submitted to Twilio */
+    a2pSubmittedAt?: number;
+    /** Epoch ms of last Twilio status check */
+    a2pLastStatusCheck?: number;
+    /** Failure reason returned by Twilio (if status = failed) */
+    a2pFailureReason?: string | null;
+    /** Twilio Customer Profile Bundle SID — required for full brand registration */
+    twilioCustomerProfileSid?: string;
+    /** Twilio A2P Profile Bundle SID — required for full brand registration */
+    twilioA2pProfileSid?: string;
 
     // ── Opt-Out / Sender ID Settings ──────────────────────────────────────────
     /** Display name used as sender context in message headers */

@@ -277,17 +277,17 @@ export const releaseTwilioNumber = async (req: any, res: any) => {
 };
 
 // ─── POST /api/messaging/a2p-register ───────────────────────────────────────
-// Submits A2P 10DLC brand + campaign registration for the church's sub-account.
-// NOTE: A2P registration is an asynchronous process. We submit and store the
-// pending SIDs; status is checked via a separate status poll endpoint.
+// Submits A2P 10DLC brand registration for the church's sub-account.
+// Reads all brand fields from Firestore (saved via handleSmsSave first).
+// Twilio Brand Registration is async — we store the brandSid and mark pending.
+// Use checkA2pStatus to poll Twilio for the live status.
 
 export const registerA2p = async (req: any, res: any) => {
     res.set('Access-Control-Allow-Origin', '*');
 
-    const { churchId, brandInfo } = req.body || {};
-    // brandInfo: { legalName, ein, website, contactPhone, contactEmail, vertical }
-    if (!churchId || !brandInfo) {
-        return res.status(400).json({ error: 'Missing churchId or brandInfo' });
+    const { churchId } = req.body || {};
+    if (!churchId) {
+        return res.status(400).json({ error: 'Missing churchId' });
     }
 
     const db  = getDb();
@@ -300,52 +300,201 @@ export const registerA2p = async (req: any, res: any) => {
         const churchSnap = await db.collection('churches').doc(churchId).get();
         if (!churchSnap.exists) return res.status(404).json({ error: 'Church not found' });
         const smsSettings = churchSnap.data()?.smsSettings || {};
-        const { twilioSubAccountSid } = smsSettings;
 
-        if (!twilioSubAccountSid) {
-            return res.status(400).json({ error: 'No Twilio sub-account provisioned for this church. Complete number setup first.' });
+        if (!smsSettings.twilioSubAccountSid) {
+            return res.status(400).json({
+                error: 'No Twilio sub-account provisioned for this church. Complete number setup first.',
+            });
         }
 
-        // Submit A2P brand registration via the master account acting on behalf of sub-account
-        // Twilio A2P 10DLC: Create a BrandRegistration object
-        const brand = await (master as any).messaging.v1.brandRegistrations.create({
-            customerProfileBundleSid: '', // Placeholder — full regulatory bundle flow needed for production
-            a2PProfileBundleSid: '',
-            // We surface a simplified version: Twilio's "Starter" use case doesn't require a bundle
-            // For the MVP, we set the status manually and note the church must complete Twilio's
-            // Business Profile in the console if they need high-volume (15,000+ msg/day).
-        });
+        // Validate required brand fields are saved in Firestore
+        const required: { key: string; label: string }[] = [
+            { key: 'a2pBusinessName',     label: 'Legal Business Name' },
+            { key: 'a2pEin',              label: 'Federal EIN' },
+            { key: 'a2pBusinessType',     label: 'Business Type' },
+            { key: 'a2pVertical',         label: 'Industry Vertical' },
+            { key: 'a2pWebsite',          label: 'Website' },
+            { key: 'a2pContactFirstName', label: 'Contact First Name' },
+            { key: 'a2pContactLastName',  label: 'Contact Last Name' },
+            { key: 'a2pContactEmail',     label: 'Contact Email' },
+            { key: 'a2pContactPhone',     label: 'Contact Phone' },
+            { key: 'a2pAddress',          label: 'Street Address' },
+            { key: 'a2pCity',             label: 'City' },
+            { key: 'a2pState',            label: 'State' },
+            { key: 'a2pZip',              label: 'ZIP Code' },
+        ];
+        const missing = required.filter(r => !smsSettings[r.key]).map(r => r.label);
+        if (missing.length > 0) {
+            return res.status(400).json({
+                error: `Missing required fields: ${missing.join(', ')}. Save the form first, then submit.`,
+            });
+        }
 
-        const brandSid = brand?.sid || 'PENDING';
+        // ── Submit Brand Registration to Twilio ──────────────────────────────────
+        // Twilio messaging.v1.brandRegistrations — uses Customer Profile Bundle if available.
+        // For low-volume non-profits without a bundle, Twilio still accepts the create()
+        // with empty bundle SIDs (returns an error code we surface to the admin).
+        let brandSid: string;
 
+        try {
+            const brand = await (master as any).messaging.v1.brandRegistrations.create({
+                customerProfileBundleSid: smsSettings.twilioCustomerProfileSid || '',
+                a2PProfileBundleSid:      smsSettings.twilioA2pProfileSid      || '',
+                friendlyName:             smsSettings.a2pBusinessName,
+                email:                    smsSettings.a2pContactEmail,
+                phone:                    smsSettings.a2pContactPhone,
+                website:                  smsSettings.a2pWebsite,
+            });
+            brandSid = brand.sid;
+        } catch (twilioErr: any) {
+            // Twilio requires a completed Customer Profile Bundle for full registration.
+            // If missing, mark as pending and direct the admin to the Twilio Console.
+            log.warn(
+                `[registerA2p] Twilio API error for ${churchId}: ${twilioErr.message}`,
+                'system', { churchId, code: twilioErr.code }, churchId
+            );
+
+            await db.collection('churches').doc(churchId).update({
+                'smsSettings.twilioA2pStatus': 'pending',
+                'smsSettings.a2pSubmittedAt':  Date.now(),
+            });
+
+            return res.json({
+                success: false,
+                status:  'pending',
+                message:
+                    'Registration info saved to Firestore. To complete A2P submission, your Twilio account ' +
+                    'must have a verified Customer Profile Bundle. Please complete the Business Profile in ' +
+                    'the Twilio Console (Console → Messaging → Regulatory Compliance), then enter the ' +
+                    'Bundle SID here and re-submit. Low-volume sending continues in the meantime.',
+                twilioError: twilioErr.message,
+                twilioCode:  twilioErr.code,
+            });
+        }
+
+        // ── Save brandSid and mark pending ──────────────────────────────────────
         await db.collection('churches').doc(churchId).update({
-            'smsSettings.twilioA2pStatus': 'pending',
             'smsSettings.twilioBrandSid':  brandSid,
-        });
-
-        log.info(`A2P brand registration submitted for church ${churchId}: ${brandSid}`, 'system', { churchId, brandSid }, churchId);
-
-        return res.json({
-            success: true,
-            brandSid,
-            status:  'pending',
-            message: 'A2P brand registration submitted. This typically takes 3–5 business days for approval.',
-        });
-    } catch (e: any) {
-        // A2P API is complex — log and return a helpful message
-        log.warn(`[twilioProvisioning] registerA2p: ${e.message}`, 'system', { churchId }, churchId);
-
-        // For MVP: If A2P API fails (e.g. missing bundle), we mark status as 'pending' with
-        // a note that the church needs to complete registration in the Twilio console.
-        await db.collection('churches').doc(churchId).update({
             'smsSettings.twilioA2pStatus': 'pending',
-        }).catch(() => {});
+            'smsSettings.a2pSubmittedAt':  Date.now(),
+        });
+
+        log.info(
+            `[registerA2p] Brand submitted for ${churchId}: SID=${brandSid}`,
+            'system', { churchId, brandSid }, churchId
+        );
 
         return res.json({
-            success: false,
-            status:  'pending',
-            message: 'Please complete A2P registration in the Twilio Console. Low-volume (trial) sending is available in the meantime.',
-            error:   e.message,
+            success:  true,
+            brandSid,
+            status:   'pending',
+            message:  'Brand registration submitted to Twilio. Approval typically takes 1–5 business days. Use "Check Status" to refresh.',
         });
+
+    } catch (e: any) {
+        log.error(
+            `[registerA2p] Unexpected error for ${churchId}: ${e.message}`,
+            'system', { churchId }, churchId
+        );
+        return res.status(500).json({ error: e.message || 'A2P registration failed' });
+    }
+};
+
+// ─── GET /api/messaging/a2p-status ──────────────────────────────────────────
+// Fetches the live A2P brand registration status from Twilio and syncs it
+// back to Firestore. Returns brand details + failure reason if applicable.
+
+export const checkA2pStatus = async (req: any, res: any) => {
+    res.set('Access-Control-Allow-Origin', '*');
+
+    // Support both ?churchId= query param and POST body
+    const { churchId } = ({ ...req.query, ...req.body } as Record<string, string>);
+    if (!churchId) return res.status(400).json({ error: 'Missing churchId' });
+
+    const db  = getDb();
+    const log = createServerLogger(db);
+
+    try {
+        const { accountSid, authToken } = await getMasterCredentials(db);
+        const master = getMasterClient(accountSid, authToken);
+
+        const churchSnap = await db.collection('churches').doc(churchId).get();
+        if (!churchSnap.exists) return res.status(404).json({ error: 'Church not found' });
+        const smsSettings = churchSnap.data()?.smsSettings || {};
+
+        const brandSid = smsSettings.twilioBrandSid as string | undefined;
+
+        if (!brandSid) {
+            return res.json({
+                status:   'not_started',
+                message:  'No brand SID on file. Submit the A2P registration first.',
+                brandSid: null,
+                failureReason: null,
+            });
+        }
+
+        // ── Fetch brand status from Twilio ───────────────────────────────────────
+        let twilioStatus   = 'pending';
+        let failureReason: string | null = null;
+        let brandDetails: any = {};
+
+        try {
+            const brandReg = await (master as any).messaging.v1.brandRegistrations(brandSid).fetch();
+            twilioStatus   = (brandReg.status || 'pending').toLowerCase();
+            failureReason  = brandReg.failureReason || null;
+            brandDetails   = {
+                brandType:   brandReg.brandType,
+                identity:    brandReg.identity,
+                cspId:       brandReg.cspId,
+                dateCreated: brandReg.dateCreated,
+                dateUpdated: brandReg.dateUpdated,
+            };
+        } catch (twErr: any) {
+            log.warn(
+                `[checkA2pStatus] Could not fetch brand ${brandSid}: ${twErr.message}`,
+                'system', { churchId, brandSid }, churchId
+            );
+            failureReason = `Twilio API error: ${twErr.message}`;
+        }
+
+        // Map Twilio's status string → our enum
+        const mappedStatus: 'not_started' | 'pending' | 'approved' | 'failed' =
+            twilioStatus === 'approved'    ? 'approved' :
+            twilioStatus === 'failed'      ? 'failed'   :
+            twilioStatus === 'in_review'   ? 'pending'  :
+            twilioStatus === 'pending'     ? 'pending'  :
+            twilioStatus === 'unverified'  ? 'pending'  :
+            'pending';
+
+        // ── Sync back to Firestore ───────────────────────────────────────────────
+        const updates: Record<string, any> = {
+            'smsSettings.twilioA2pStatus':    mappedStatus,
+            'smsSettings.a2pLastStatusCheck': Date.now(),
+        };
+        if (failureReason) updates['smsSettings.a2pFailureReason'] = failureReason;
+
+        await db.collection('churches').doc(churchId).update(updates);
+
+        log.info(
+            `[checkA2pStatus] Brand ${brandSid} → ${twilioStatus} (${mappedStatus}) for ${churchId}`,
+            'system', { churchId, brandSid, mappedStatus }, churchId
+        );
+
+        return res.json({
+            success:       true,
+            status:        mappedStatus,
+            twilioStatus,
+            brandSid,
+            failureReason,
+            brandDetails,
+            checkedAt:     Date.now(),
+        });
+
+    } catch (e: any) {
+        log.error(
+            `[checkA2pStatus] Error for ${churchId}: ${e.message}`,
+            'system', { churchId }, churchId
+        );
+        return res.status(500).json({ error: e.message || 'Status check failed' });
     }
 };

@@ -32,6 +32,24 @@ function resolveMergeTags(body: string, person: { personName?: string }): string
         .replace(/\{fullName\}/gi,  person.personName || '');
 }
 
+/** Get the public base URL for webhooks from Firestore system settings or env. */
+async function getStatusCallbackUrl(db: any): Promise<string | null> {
+    try {
+        const snap = await db.doc('system/settings').get();
+        const data = snap.data() || {};
+        const base = (
+            data.twilioWebhookBaseUrl ||
+            data.apiBaseUrl           ||
+            process.env.SERVER_BASE_URL ||
+            ''
+        ).replace(/\/$/, '');
+        if (!base || !base.startsWith('https://')) return null;
+        return `${base}/api/messaging/status`;
+    } catch {
+        return null;
+    }
+}
+
 /** Get sub-account Twilio client for a church. */
 async function getSubClient(db: any, churchId: string): Promise<{ client: any; fromNumber: string }> {
     const snap = await db.collection('churches').doc(churchId).get();
@@ -109,9 +127,14 @@ export const sendIndividual = async (req: any, res: any) => {
         const isMms    = (mediaUrls as string[]).length > 0;
         const segments = isMms ? 1 : countSegments(body);
 
-        // Send via Twilio
+        // Send via Twilio — include statusCallback so Twilio posts delivery updates
+        const statusCallbackUrl = await getStatusCallbackUrl(db);
         const msgParams: any = { from: fromNumber, to, body };
         if (isMms) msgParams.mediaUrl = mediaUrls;
+        if (statusCallbackUrl) {
+            msgParams.statusCallback       = statusCallbackUrl;
+            msgParams.statusCallbackMethod = 'POST';
+        }
 
         const msg = await client.messages.create(msgParams);
 
@@ -143,7 +166,7 @@ export const sendIndividual = async (req: any, res: any) => {
             direction:      'outbound',
             body,
             mediaUrls:      mediaUrls || [],
-            status:         'sent',
+            status:         msg.status || 'queued',   // real status from Twilio; updated via webhook
             twilioSid:      msg.sid,
             sentBy:         sentBy     || null,
             sentByName:     sentByName || null,
@@ -202,8 +225,18 @@ export async function sendBulkInternal(params: {
             const segments = isMms ? 1 : countSegments(resolved);
 
             try {
+                // Lazily fetch statusCallback URL once for the whole batch
+                if (typeof (sendBulkInternal as any)._cbUrl === 'undefined') {
+                    (sendBulkInternal as any)._cbUrl = await getStatusCallbackUrl(db);
+                }
+                const cbUrl = (sendBulkInternal as any)._cbUrl as string | null;
+
                 const msgParams: any = { from: fromNumber, to, body: resolved };
                 if (isMms) msgParams.mediaUrl = mediaUrls;
+                if (cbUrl) {
+                    msgParams.statusCallback       = cbUrl;
+                    msgParams.statusCallbackMethod = 'POST';
+                }
 
                 const msg = await client.messages.create(msgParams);
 
@@ -223,7 +256,7 @@ export async function sendBulkInternal(params: {
                 await convRef.collection('messages').doc(messageId).set({
                     id: messageId, conversationId: convId, churchId,
                     direction: 'outbound', body: resolved,
-                    mediaUrls: mediaUrls || [], status: 'sent',
+                    mediaUrls: mediaUrls || [], status: msg.status || 'queued',
                     twilioSid: msg.sid, sentBy: sentBy || null,
                     sentByName: sentByName || null,
                     campaignId: campaignId || null, createdAt: now,
