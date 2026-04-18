@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { db as firebaseDb } from '../services/firebase';
 import {
     collection, doc, onSnapshot, addDoc, updateDoc, deleteDoc,
     query, where, orderBy, limit, getDocs, getDoc, setDoc,
-    Timestamp, collectionGroup
+    Timestamp, collectionGroup, arrayUnion, arrayRemove
 } from 'firebase/firestore';
 import { pcoService } from '../services/pcoService';
 import { SmsCampaign, SmsConversation, SmsMessage, SmsKeyword, SmsOptOut, SmsWorkflow, SmsWorkflowStep, SmsWorkflowEnrollment, SmsTag, Church, User, WorkflowChannelType } from '../types';
@@ -1507,6 +1507,13 @@ const SmsInbox: React.FC<{
     const [tagFilter, setTagFilter]     = useState<string | null>(null); // tag id to filter by
     const [showTagPicker, setShowTagPicker] = useState(false);
 
+    // Toast
+    const [inboxToast, setInboxToast]   = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+    const showInboxToast = (msg: string, type: 'success' | 'error' = 'success') => {
+        setInboxToast({ msg, type });
+        setTimeout(() => setInboxToast(null), 4000);
+    };
+
     // Load church tags
     useEffect(() => {
         const q = query(
@@ -1553,14 +1560,25 @@ const SmsInbox: React.FC<{
 
     // Toggle a tag on the active conversation
     const handleToggleConvTag = async (conv: SmsConversation, tagId: string) => {
-        const current: string[] = conv.tags || [];
-        const next = current.includes(tagId)
-            ? current.filter(t => t !== tagId)
-            : [...current, tagId];
-        await updateDoc(doc(firebaseDb, 'smsConversations', conv.id), { tags: next }).catch(() => {});
-        // If it's the active conversation, keep the activeConv in sync
+        const isOn = (conv.tags || []).includes(tagId);
+        // Optimistically update local activeConv immediately so the UI reflects the change
+        const next = isOn
+            ? (conv.tags || []).filter(t => t !== tagId)
+            : [...(conv.tags || []), tagId];
         if (activeConv?.id === conv.id) {
             setActiveConv(prev => prev ? { ...prev, tags: next } : prev);
+        }
+        try {
+            await updateDoc(
+                doc(firebaseDb, 'smsConversations', conv.id),
+                { tags: isOn ? arrayRemove(tagId) : arrayUnion(tagId) }
+            );
+        } catch (err: any) {
+            // Revert the optimistic update on failure
+            if (activeConv?.id === conv.id) {
+                setActiveConv(prev => prev ? { ...prev, tags: conv.tags || [] } : prev);
+            }
+            showInboxToast('Failed to save tag: ' + (err?.message || 'Unknown error'), 'error');
         }
     };
 
@@ -1598,6 +1616,8 @@ const SmsInbox: React.FC<{
 
     return (
         <div className="flex h-full">
+            {/* Inbox Toast */}
+            {inboxToast && <Toast msg={inboxToast.msg} type={inboxToast.type} onClose={() => setInboxToast(null)} />}
             {/* New Message Composer modal */}
             {showComposer && (
                 <NewMessageComposer
@@ -2961,6 +2981,108 @@ const CHANNEL_CONFIG: Record<WorkflowChannelType, { label: string; icon: React.R
 
 // ─── Step Editor Row ─────────────────────────────────────────────────────────
 
+// ─── Staff Step Editor (extracted to avoid hooks-in-IIFE violation) ─────────
+
+const StaffStepEditor: React.FC<{
+    step: SmsWorkflowStep;
+    onChange: (patch: Partial<SmsWorkflowStep>) => void;
+    pcoLists: { id: string; name: string }[];
+    pcoGroups: { id: string; name: string }[];
+}> = ({ step, onChange, pcoLists, pcoGroups }) => {
+    const isEmail    = step.channelType === 'staff_email';
+    const targetType = step.staffTargetType ?? 'individuals';
+    const recipients = step.staffRecipients ?? [];
+    const [addName, setAddName]       = useState('');
+    const [addContact, setAddContact] = useState('');
+
+    const addRecipient = () => {
+        if (!addName.trim() && !addContact.trim()) return;
+        const rec = isEmail
+            ? { name: addName.trim() || addContact.trim(), email: addContact.trim() }
+            : { name: addName.trim() || addContact.trim(), phone: addContact.trim() };
+        onChange({ staffRecipients: [...recipients, rec] });
+        setAddName(''); setAddContact('');
+    };
+
+    return (
+        <div className={`space-y-3 p-4 rounded-2xl border ${isEmail ? 'bg-rose-50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-800' : 'bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800'}`}>
+            {/* Info */}
+            <div className={`flex items-start gap-2 text-xs ${isEmail ? 'text-rose-700 dark:text-rose-300' : 'text-amber-700 dark:text-amber-300'}`}>
+                <Users size={13} className='mt-0.5 shrink-0' />
+                <span><strong>Internal step</strong> — notifies <strong>staff</strong> only. Use {'{contact.firstName}'}, {'{contact.phone}'}, {'{contact.email}'} for the enrolled person.</span>
+            </div>
+            {/* Who to notify */}
+            <div>
+                <p className='text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5'>Notify</p>
+                <div className='flex rounded-xl overflow-hidden border border-slate-200 dark:border-slate-600'>
+                    {(['individuals', 'list', 'group'] as const).map(t => (
+                        <button key={t} type='button' onClick={() => onChange({ staffTargetType: t })}
+                            className={`flex-1 py-1.5 text-xs font-bold transition border-r last:border-r-0 border-slate-200 dark:border-slate-600 ${targetType === t ? (isEmail ? 'bg-rose-500 text-white' : 'bg-amber-500 text-white') : 'bg-white dark:bg-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-600'}`}>
+                            {t === 'individuals' ? 'Specific People' : t === 'list' ? 'PCO List' : 'PCO Group'}
+                        </button>
+                    ))}
+                </div>
+            </div>
+            {/* Specific individuals */}
+            {targetType === 'individuals' && (
+                <div className='space-y-2'>
+                    {recipients.map((r, ri) => (
+                        <div key={ri} className='flex items-center justify-between bg-white/60 dark:bg-slate-700/40 rounded-xl px-3 py-2'>
+                            <div><p className='text-xs font-semibold text-slate-800 dark:text-slate-200'>{r.name}</p><p className='text-[10px] text-slate-500'>{r.email || r.phone}</p></div>
+                            <button type='button' onClick={() => onChange({ staffRecipients: recipients.filter((_, i) => i !== ri) })} className='p-1 text-slate-400 hover:text-red-500 rounded' title='Remove'><Trash2 size={12} /></button>
+                        </div>
+                    ))}
+                    <div className='flex gap-2'>
+                        <input type='text' value={addName} onChange={e => setAddName(e.target.value)} placeholder='Name' className='flex-1 text-xs border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400' />
+                        <input type={isEmail ? 'email' : 'tel'} value={addContact} onChange={e => setAddContact(e.target.value)} onKeyDown={e => e.key === 'Enter' && addRecipient()} placeholder={isEmail ? 'Email' : 'Phone'} className='flex-1 text-xs border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400' />
+                        <button type='button' onClick={addRecipient} className={`px-3 py-2 rounded-xl text-white text-xs font-bold ${isEmail ? 'bg-rose-500 hover:bg-rose-600' : 'bg-amber-500 hover:bg-amber-600'}`}><Plus size={13} /></button>
+                    </div>
+                    {recipients.length === 0 && <p className='text-[10px] text-slate-400 text-center'>No recipients — add at least one.</p>}
+                </div>
+            )}
+            {/* PCO List */}
+            {targetType === 'list' && (
+                <div>
+                    <label className='block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5'>PCO List</label>
+                    <select value={step.staffListId || ''} onChange={e => { const l = pcoLists.find(x => x.id === e.target.value); onChange({ staffListId: e.target.value || null, staffListName: l?.name || null }); }} title='Staff PCO list' className='w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-400 text-slate-900 dark:text-white'>
+                        <option value=''>- Select a list -</option>
+                        {pcoLists.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                    </select>
+                    <p className='text-[10px] text-slate-400 mt-1'>All members with a valid {isEmail ? 'email' : 'phone'} are notified.</p>
+                </div>
+            )}
+            {/* PCO Group */}
+            {targetType === 'group' && (
+                <div>
+                    <label className='block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5'>PCO Group</label>
+                    <select value={step.staffGroupId || ''} onChange={e => { const g = pcoGroups.find(x => x.id === e.target.value); onChange({ staffGroupId: e.target.value || null, staffGroupName: g?.name || null }); }} title='Staff PCO group' className='w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-400 text-slate-900 dark:text-white'>
+                        <option value=''>- Select a group -</option>
+                        {pcoGroups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                    </select>
+                    <p className='text-[10px] text-slate-400 mt-1'>All members with a valid {isEmail ? 'email' : 'phone'} are notified.</p>
+                </div>
+            )}
+            {/* Content */}
+            {isEmail ? (
+                <div className='space-y-2'>
+                    <input type='text' value={step.emailSubject || ''} onChange={e => onChange({ emailSubject: e.target.value })} placeholder='Subject: Action needed - {contact.firstName} is at Step 3' className='w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-400' />
+                    <textarea rows={5} value={step.emailBody || ''} onChange={e => onChange({ emailBody: e.target.value })} placeholder={'Hi team,\nJust a heads-up: {contact.firstName} ({contact.phone}) is progressing through the workflow.'} className='w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-400 resize-none' />
+                </div>
+            ) : (
+                <textarea rows={3} value={step.message} onChange={e => onChange({ message: e.target.value })} placeholder='FYI: {contact.firstName} ({contact.phone}) just hit this workflow step. Please reach out!' className='w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none' />
+            )}
+            {/* Contact merge tags */}
+            <div className='flex gap-1.5 flex-wrap'>
+                {['{contact.firstName}','{contact.lastName}','{contact.name}','{contact.phone}','{contact.email}'].map(t => (
+                    <button key={t} type='button' onClick={() => isEmail ? onChange({ emailBody: (step.emailBody || '') + t }) : onChange({ message: step.message + t })}
+                        className={`px-2 py-0.5 text-[10px] font-mono font-semibold rounded-lg border transition ${isEmail ? 'bg-rose-50 dark:bg-rose-900/20 text-rose-700 border-rose-200 hover:bg-rose-100' : 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 border-amber-200 hover:bg-amber-100'}`}
+                    >{t}</button>
+                ))}
+            </div>
+        </div>
+    );
+};
+
 const StepRow: React.FC<{
     step: SmsWorkflowStep;
     index: number;
@@ -3205,104 +3327,14 @@ const StepRow: React.FC<{
                         </div>
                     )}
                 </div>
-            )}
 
-            {/* Staff SMS / Staff Email: internal notification step */}
-            {(channel === 'staff_sms' || channel === 'staff_email') && (() => {
-                const isEmail = channel === 'staff_email';
-                const targetType = step.staffTargetType ?? 'individuals';
-                const recipients = step.staffRecipients ?? [];
-                const [addName, setAddName] = React.useState('');
-                const [addContact, setAddContact] = React.useState('');
-                const addRecipient = () => {
-                    if (!addName.trim() && !addContact.trim()) return;
-                    onChange({ staffRecipients: [...recipients, isEmail ? { name: addName.trim() || addContact.trim(), email: addContact.trim() } : { name: addName.trim() || addContact.trim(), phone: addContact.trim() }] });
-                    setAddName(''); setAddContact('');
-                };
-                return (
-                    <div className={`space-y-3 p-4 rounded-2xl border ${isEmail ? 'bg-rose-50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-800' : 'bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800'}`}>
-                        {/* Info */}
-                        <div className={`flex items-start gap-2 text-xs ${isEmail ? 'text-rose-700 dark:text-rose-300' : 'text-amber-700 dark:text-amber-300'}`}>
-                            <Users size={13} className='mt-0.5 shrink-0' />
-                            <span><strong>Internal step</strong> — notifies <strong>staff</strong> only. Use {'{contact.firstName}'}, {'{contact.phone}'}, {'{contact.email}'} for the enrolled person.</span>
-                        </div>
-                        {/* Who to notify */}
-                        <div>
-                            <p className='text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5'>Notify</p>
-                            <div className='flex rounded-xl overflow-hidden border border-slate-200 dark:border-slate-600'>
-                                {(['individuals', 'list', 'group'] as const).map(t => (
-                                    <button key={t} type='button' onClick={() => onChange({ staffTargetType: t })}
-                                        className={`flex-1 py-1.5 text-xs font-bold transition border-r last:border-r-0 border-slate-200 dark:border-slate-600 ${targetType === t ? (isEmail ? 'bg-rose-500 text-white' : 'bg-amber-500 text-white') : 'bg-white dark:bg-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-600'}`}>
-                                        {t === 'individuals' ? 'Specific People' : t === 'list' ? 'PCO List' : 'PCO Group'}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                        {/* Specific individuals */}
-                        {targetType === 'individuals' && (
-                            <div className='space-y-2'>
-                                {recipients.map((r, ri) => (
-                                    <div key={ri} className='flex items-center justify-between bg-white/60 dark:bg-slate-700/40 rounded-xl px-3 py-2'>
-                                        <div><p className='text-xs font-semibold text-slate-800 dark:text-slate-200'>{r.name}</p><p className='text-[10px] text-slate-500'>{r.email || r.phone}</p></div>
-                                        <button type='button' onClick={() => onChange({ staffRecipients: recipients.filter((_, i) => i !== ri) })} className='p-1 text-slate-400 hover:text-red-500 rounded' title='Remove'><Trash2 size={12} /></button>
-                                    </div>
-                                ))}
-                                <div className='flex gap-2'>
-                                    <input type='text' value={addName} onChange={e => setAddName(e.target.value)} placeholder='Name' className='flex-1 text-xs border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400' />
-                                    <input type={isEmail ? 'email' : 'tel'} value={addContact} onChange={e => setAddContact(e.target.value)} onKeyDown={e => e.key === 'Enter' && addRecipient()} placeholder={isEmail ? 'Email' : 'Phone'} className='flex-1 text-xs border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400' />
-                                    <button type='button' onClick={addRecipient} className={`px-3 py-2 rounded-xl text-white text-xs font-bold ${isEmail ? 'bg-rose-500 hover:bg-rose-600' : 'bg-amber-500 hover:bg-amber-600'}`}><Plus size={13} /></button>
-                                </div>
-                                {recipients.length === 0 && <p className='text-[10px] text-slate-400 text-center'>No recipients — add at least one.</p>}
-                            </div>
-                        )}
-                        {/* PCO List */}
-                        {targetType === 'list' && (
-                            <div>
-                                <label className='block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5'>PCO List</label>
-                                <select value={step.staffListId || ''} onChange={e => { const l = pcoLists.find(x => x.id === e.target.value); onChange({ staffListId: e.target.value || null, staffListName: l?.name || null }); }} title='Staff PCO list' className='w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-400 text-slate-900 dark:text-white'>
-                                    <option value=''>— Select a list —</option>
-                                    {pcoLists.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-                                </select>
-                                <p className='text-[10px] text-slate-400 mt-1'>All members with a valid {isEmail ? 'email' : 'phone'} are notified.</p>
-                            </div>
-                        )}
-                        {/* PCO Group */}
-                        {targetType === 'group' && (
-                            <div>
-                                <label className='block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5'>PCO Group</label>
-                                <select value={step.staffGroupId || ''} onChange={e => { const g = pcoGroups.find(x => x.id === e.target.value); onChange({ staffGroupId: e.target.value || null, staffGroupName: g?.name || null }); }} title='Staff PCO group' className='w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-400 text-slate-900 dark:text-white'>
-                                    <option value=''>— Select a group —</option>
-                                    {pcoGroups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-                                </select>
-                                <p className='text-[10px] text-slate-400 mt-1'>All members with a valid {isEmail ? 'email' : 'phone'} are notified.</p>
-                            </div>
-                        )}
-                        {/* Content */}
-                        {isEmail ? (
-                            <div className='space-y-2'>
-                                <input type='text' value={step.emailSubject || ''} onChange={e => onChange({ emailSubject: e.target.value })} placeholder='Subject: Action needed — {contact.firstName} is at Step 3' className='w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-400' />
-                                <textarea rows={5} value={step.emailBody || ''} onChange={e => onChange({ emailBody: e.target.value })} placeholder={'Hi team,\n\nJust a heads-up: {contact.firstName} ({contact.phone}) is progressing through the workflow. Please follow up today.'} className='w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-400 resize-none' />
-                            </div>
-                        ) : (
-                            <textarea rows={3} value={step.message} onChange={e => onChange({ message: e.target.value })} placeholder='FYI: {contact.firstName} ({contact.phone}) just hit this workflow step. Please reach out!' className='w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none' />
-                        )}
-                        {/* Contact merge tags */}
-                        <div className='flex gap-1.5 flex-wrap'>
-                            {['{contact.firstName}','{contact.lastName}','{contact.name}','{contact.phone}','{contact.email}'].map(t => (
-                                <button key={t} type='button' onClick={() => isEmail ? onChange({ emailBody: (step.emailBody || '') + t }) : onChange({ message: step.message + t })}
-                                    className={`px-2 py-0.5 text-[10px] font-mono font-semibold rounded-lg border transition ${isEmail ? 'bg-rose-50 dark:bg-rose-900/20 text-rose-700 border-rose-200 hover:bg-rose-100' : 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 border-amber-200 hover:bg-amber-100'}`}
-                                >{t}</button>
-                            ))}
-                        </div>
-                    </div>
-                );
-            })()}
+            )}
+            {(channel === 'staff_sms' || channel === 'staff_email') && (
+                <StaffStepEditor step={step} onChange={onChange} pcoLists={pcoLists} pcoGroups={pcoGroups} />
+            )}
         </div>
     );
 };
-
-// ─── AI Workflow Builder Panel ──────────────────────────────────────────────────
-
 const EXAMPLE_PROMPTS = [
     'Send a text once a day for 5 days with a Bible verse about prayer. On the last day, remind them the church is praying for them.',
     'Create a 3-step new visitor follow-up: a welcome text on day 0, an email on day 3 about getting connected, and an SMS on day 7 inviting them back.',
