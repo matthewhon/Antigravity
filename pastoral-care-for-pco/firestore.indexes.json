@@ -12,6 +12,14 @@
       "collectionGroup": "people",
       "queryScope": "COLLECTION",
       "fields": [
+        { "fieldPath": "churchId",   "order": "ASCENDING" },
+        { "fieldPath": "nameLower",  "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "people",
+      "queryScope": "COLLECTION",
+      "fields": [
         { "fieldPath": "churchId", "order": "ASCENDING" },
         { "fieldPath": "phone",    "order": "ASCENDING" }
       ]
@@ -79,6 +87,14 @@
         { "fieldPath": "churchId",  "order": "ASCENDING" },
         { "fieldPath": "isActive",  "order": "ASCENDING" },
         { "fieldPath": "trigger",   "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "smsTags",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "churchId",  "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
       ]
     }
   ],
