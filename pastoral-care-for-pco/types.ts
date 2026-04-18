@@ -1,4 +1,4 @@
-
+﻿
 export type UserRole = 'Church Admin' | 'Pastor' | 'Pastor AI' | 'People' | 'Services' | 'Groups' | 'Giving' | 'Finance' | 'Pastoral Care' | 'Metrics' | 'System Administration' | 'Messaging';
 
 export interface User {
@@ -442,8 +442,8 @@ export interface SystemSettings {
     sendGridFromName?: string;  // Default "From Name" if campaign doesn't specify one
     // Scripture Library feature flag
     enableLibrary?: boolean;
-    // ── Twilio SMS (Master Account) ───────────────────────────────────────────
-    /** Twilio master Account SID – used to create per-church sub-accounts */
+    // -- Twilio SMS (Master Account) -------------------------------------------
+    /** Twilio master Account SID � used to create per-church sub-accounts */
     twilioMasterAccountSid?: string;
     /** Twilio master Auth Token */
     twilioMasterAuthToken?: string;
@@ -526,7 +526,7 @@ export interface EmailCampaign {
     templateSettings?: TemplateSettings;
     // Scheduling
     sendAt?: string | null;         // ISO string display value set by UI
-    scheduledAt?: number | null;    // Epoch ms — authoritative trigger for the scheduler
+    scheduledAt?: number | null;    // Epoch ms � authoritative trigger for the scheduler
     sentAt?: number | null;
     recurringFrequency?: 'daily' | 'weekly' | 'monthly' | null;
     lastSentAt?: number | null;
@@ -654,7 +654,7 @@ export interface PcoRegistrationEvent {
     visibility?: string | null;    // 'public' | 'private' | 'link_only'
     registrationType?: string | null; // 'detailed' | 'simple'
     // Dates
-    startsAt?: string | null;      // ISO — first event date
+    startsAt?: string | null;      // ISO � first event date
     endsAt?: string | null;
     openAt?: string | null;        // when registration opens
     closeAt?: string | null;       // when registration closes
@@ -712,7 +712,7 @@ export interface PcoRegistrationCampus {
     lastSynced: number;
 }
 
-// ─── Poll Module ──────────────────────────────────────────────────────────────
+// --- Poll Module --------------------------------------------------------------
 
 export type PollQuestionType = 'single_choice' | 'multiple_choice' | 'text' | 'rating' | 'yes_no';
 
@@ -721,7 +721,7 @@ export interface PollQuestion {
     type: PollQuestionType;
     text: string;
     required: boolean;
-    /** Answer choices — used for single_choice and multiple_choice */
+    /** Answer choices � used for single_choice and multiple_choice */
     options?: string[];
     /** Maximum value for rating questions (e.g. 5 or 10) */
     ratingMax?: number;
@@ -748,7 +748,7 @@ export interface Poll {
     showResultsToRespondents: boolean;
     /** Optional epoch ms timestamp at which the poll auto-closes */
     closesAt?: number | null;
-    /** Denormalized total response count — incremented on each submission */
+    /** Denormalized total response count � incremented on each submission */
     totalResponses: number;
     createdAt: number;
     updatedAt: number;
@@ -761,7 +761,7 @@ export interface PollResponse {
     churchId: string;
     respondentName?: string;
     respondentEmail?: string;
-    /** Map of PollQuestion.id → answer value or array of values */
+    /** Map of PollQuestion.id ? answer value or array of values */
     answers: Record<string, string | string[]>;
     submittedAt: number;
     /** Random token generated client-side; stored in localStorage to surface to admin */
@@ -779,7 +779,7 @@ export interface RiskChangeRecord {
     timestamp: number;
 }
 
-// ─── SMS / Messaging Module ───────────────────────────────────────────────────
+// --- SMS / Messaging Module ---------------------------------------------------
 
 export interface SmsSettings {
     /** Whether SMS module is enabled for this tenant */
@@ -793,14 +793,14 @@ export interface SmsSettings {
     /** Twilio Phone Number SID */
     twilioPhoneSid?: string;
 
-    // ── A2P 10DLC Brand Registration ──────────────────────────────────────────
+    // -- A2P 10DLC Brand Registration ------------------------------------------
     /** A2P 10DLC registration status */
     twilioA2pStatus?: 'not_started' | 'pending' | 'approved' | 'failed';
     /** Twilio Brand Registration SID (e.g. BN...) */
     twilioBrandSid?: string;
     /** Twilio Messaging Service Campaign SID (e.g. QE...) */
     twilioCampaignSid?: string;
-    /** Twilio Messaging Service SID (e.g. MG...) — required for campaigns */
+    /** Twilio Messaging Service SID (e.g. MG...) � required for campaigns */
     twilioMessagingServiceSid?: string;
     /** Legal business name (must match IRS / EIN records) */
     a2pBusinessName?: string;
@@ -854,12 +854,12 @@ export interface SmsSettings {
     a2pLastStatusCheck?: number;
     /** Failure reason returned by Twilio (if status = failed) */
     a2pFailureReason?: string | null;
-    /** Twilio Customer Profile Bundle SID — required for full brand registration */
+    /** Twilio Customer Profile Bundle SID � required for full brand registration */
     twilioCustomerProfileSid?: string;
-    /** Twilio A2P Profile Bundle SID — required for full brand registration */
+    /** Twilio A2P Profile Bundle SID � required for full brand registration */
     twilioA2pProfileSid?: string;
 
-    // ── Opt-Out / Sender ID Settings ──────────────────────────────────────────
+    // -- Opt-Out / Sender ID Settings ------------------------------------------
     /** Display name used as sender context in message headers */
     senderName?: string;
     /** Custom opt-out reply (STOP keyword auto-response). If blank, Twilio's default is used. */
@@ -934,7 +934,7 @@ export interface SmsCampaign {
     status: SmsCampaignStatus;
     body: string;
     mediaUrls?: string[];
-    // Recipients — one of listId, groupId, or toPhones
+    // Recipients � one of listId, groupId, or toPhones
     toListId?: string | null;
     toListName?: string | null;
     toGroupId?: string | null;
@@ -943,7 +943,7 @@ export interface SmsCampaign {
     toPhones?: string[];
     // Scheduling
     sendAt?: string | null;       // ISO string for UI display
-    scheduledAt?: number | null;  // epoch ms — authoritative trigger for the scheduler
+    scheduledAt?: number | null;  // epoch ms � authoritative trigger for the scheduler
     sentAt?: number | null;
     recurringFrequency?: 'daily' | 'weekly' | 'monthly' | null;
     lastSentAt?: number | null;
@@ -968,7 +968,7 @@ export interface SmsTag {
     churchId: string;
     /** Display name, e.g. "Prayer Request" */
     name: string;
-    /** Optional emoji prefix, e.g. "🙏" */
+    /** Optional emoji prefix, e.g. "??" */
     emoji?: string;
     /** Color theme for tag chip UI */
     color: 'violet' | 'blue' | 'emerald' | 'amber' | 'red' | 'pink';
@@ -1033,7 +1033,7 @@ export interface SmsUsageSummary {
     lastUpdated: number;
 }
 
-// ─── Workflows ───────────────────────────────────────────────────────────────
+// --- Workflows ---------------------------------------------------------------
 
 /** Channel used for a single workflow step. */
 export type WorkflowChannelType = 'sms' | 'mms' | 'email' | 'staff_sms' | 'staff_email';
@@ -1045,26 +1045,26 @@ export interface SmsWorkflowStep {
     delayDays: number;
     /**
      * Timing mode for this step (default = 'relative').
-     * - 'relative'     → fire delayDays after the previous step completes.
-     * - 'day_of_week'  → fire on the next occurrence of scheduleDayOfWeek after the previous step.
-     * - 'day_of_month' → fire on the next calendar date matching scheduleDayOfMonth.
+     * - 'relative'     ? fire delayDays after the previous step completes.
+     * - 'day_of_week'  ? fire on the next occurrence of scheduleDayOfWeek after the previous step.
+     * - 'day_of_month' ? fire on the next calendar date matching scheduleDayOfMonth.
      */
     scheduleType?: 'relative' | 'day_of_week' | 'day_of_month';
-    /** 0 = Sunday … 6 = Saturday. Used when scheduleType = 'day_of_week'. Default: 1 (Monday). */
+    /** 0 = Sunday � 6 = Saturday. Used when scheduleType = 'day_of_week'. Default: 1 (Monday). */
     scheduleDayOfWeek?: number;
-    /** 1–31. Used when scheduleType = 'day_of_month'. */
+    /** 1�31. Used when scheduleType = 'day_of_month'. */
     scheduleDayOfMonth?: number;
     /** Send time in 'HH:MM' 24-hour format. Used for day_of_week and day_of_month modes. Default '09:00'. */
     scheduleTime?: string;
     /** Channel type for this step. Defaults to 'sms'. */
     channelType: WorkflowChannelType;
-    // ── SMS / MMS ──────────────────────────────────────────────────────────────
+    // -- SMS / MMS --------------------------------------------------------------
     message: string;
     mediaUrls?: string[];   // MMS attachments
-    // ── Email ──────────────────────────────────────────────────────────────────
+    // -- Email ------------------------------------------------------------------
     emailSubject?: string;
     emailBody?: string;     // HTML or plain text body for the email step
-    // ── Staff Reminder (staff_sms | staff_email) ─────────────────────────────────────────
+    // -- Staff Reminder (staff_sms | staff_email) -----------------------------------------
     /** How the staff recipients are resolved. 'individuals' = named list, 'list' = PCO List, 'group' = PCO Group */
     staffTargetType?: 'individuals' | 'list' | 'group';
     /** Explicit staff recipients when staffTargetType = 'individuals' */
@@ -1097,7 +1097,7 @@ export interface SmsWorkflow {
      * 0 = send on the event day (default), 7 = send 1 week early, etc.
      */
     triggerDayOffset?: number;
-    /** Legacy flat step array — kept in sync by the editor for the scheduler */
+    /** Legacy flat step array � kept in sync by the editor for the scheduler */
     steps: SmsWorkflowStep[];
     /**
      * New node-based workflow structure used by the editor.
@@ -1126,7 +1126,7 @@ export interface SmsWorkflowEnrollment {
     lastStepSentAt?: number | null;
 }
 
-// ─── New Node-Based Workflow Model ────────────────────────────────────────────
+// --- New Node-Based Workflow Model --------------------------------------------
 
 /**
  * Condition types available in a branch node.
@@ -1136,7 +1136,7 @@ export interface SmsWorkflowEnrollment {
 export type WorkflowBranchConditionType = 'replied' | 'email_opened' | 'tag_applied' | 'custom';
 
 /**
- * An *action* node — sends a message to the contact (or staff).
+ * An *action* node � sends a message to the contact (or staff).
  * Equivalent to the legacy SmsWorkflowStep but without timing fields
  * (timing lives in a separate DelayNode that precedes this node).
  */
@@ -1145,13 +1145,13 @@ export interface WorkflowActionNode {
     id: string;
     order: number;
     channelType: WorkflowChannelType;
-    // ── SMS / MMS ──────────────────────────────────────────────────────────
+    // -- SMS / MMS ----------------------------------------------------------
     message: string;
     mediaUrls?: string[];
-    // ── Email ──────────────────────────────────────────────────────────────
+    // -- Email --------------------------------------------------------------
     emailSubject?: string;
     emailBody?: string;
-    // ── Staff Reminder ─────────────────────────────────────────────────────
+    // -- Staff Reminder -----------------------------------------------------
     staffTargetType?: 'individuals' | 'list' | 'group';
     staffRecipients?: { name: string; phone?: string; email?: string }[];
     staffListId?: string | null;
@@ -1161,7 +1161,7 @@ export interface WorkflowActionNode {
 }
 
 /**
- * A *delay* node — a pure wait period; no message is sent.
+ * A *delay* node � a pure wait period; no message is sent.
  * Sits in the timeline between action nodes to control timing.
  */
 export interface WorkflowDelayNode {
@@ -1171,16 +1171,16 @@ export interface WorkflowDelayNode {
     /** Days to wait in 'relative' mode. */
     delayDays: number;
     scheduleType?: 'relative' | 'day_of_week' | 'day_of_month';
-    /** 0 = Sunday … 6 = Saturday. Used when scheduleType = 'day_of_week'. */
+    /** 0 = Sunday � 6 = Saturday. Used when scheduleType = 'day_of_week'. */
     scheduleDayOfWeek?: number;
-    /** 1–31. Used when scheduleType = 'day_of_month'. */
+    /** 1�31. Used when scheduleType = 'day_of_month'. */
     scheduleDayOfMonth?: number;
     /** 'HH:MM' 24-hour send time for day_of_week / day_of_month modes. */
     scheduleTime?: string;
 }
 
 /**
- * A *branch* node — evaluates a condition and routes the enrollment
+ * A *branch* node � evaluates a condition and routes the enrollment
  * to either the `thenNodes` (condition true) or `elseNodes` (condition false) path.
  * Single-level only; no nested branches.
  */

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { db as firebaseDb } from '../services/firebase';
 import { storage } from '../services/firebase';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
@@ -19,14 +19,14 @@ import {
     Mail, Tag, Filter, Hash, Upload, ExternalLink, GitBranch, Info
 } from 'lucide-react';
 
-// â”€â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Constants ──────────────────────────────────────────────────────────────
 
-const API_BASE = ''; // Relative â€” same origin
+const API_BASE = ''; // Relative — same origin
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
     draft:     { label: 'Draft',    color: 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300' },
     scheduled: { label: 'Scheduled',color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' },
-    sending:   { label: 'Sendingâ€¦', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
+    sending:   { label: 'Sending…', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
     sent:      { label: 'Sent',     color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' },
     failed:    { label: 'Failed',   color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
 };
@@ -46,11 +46,11 @@ const ALL_MERGE_TAGS: { tag: string; label: string }[] = [
 ];
 
 const COMMON_EMOJIS = [
-    'ðŸ˜Š','ðŸ™','â¤ï¸','âœï¸','ðŸŽ‰','ðŸ‘‹','ðŸ“–','â­','ðŸ”¥','ðŸ’«',
-    'ðŸŒŸ','ðŸ•Šï¸','ðŸ ','ðŸ“…','ðŸ“£','ðŸ’¬','ðŸŽµ','ðŸ¤','ðŸ’œ','ðŸŒˆ',
+    '😊','🙏','❤️','✝️','🎉','👋','📖','⭐','🔥','💫',
+    '🌟','🕊️','🏠','📅','📣','💬','🎵','🤝','💜','🌈',
 ];
 
-// â”€â”€â”€ Tag colour map â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Tag colour map ───────────────────────────────────────────────────────────
 
 const TAG_COLOR_MAP: Record<SmsTag['color'], { bg: string; text: string; border: string; dot: string }> = {
     violet:  { bg: 'bg-violet-100 dark:bg-violet-900/40',  text: 'text-violet-700 dark:text-violet-300',  border: 'border-violet-300 dark:border-violet-700',  dot: 'bg-violet-500' },
@@ -82,7 +82,7 @@ const SmsTagChip: React.FC<{ tag: SmsTag; onRemove?: () => void; size?: 'sm' | '
     );
 };
 
-// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 
 function countSegments(body: string): number {
@@ -99,7 +99,7 @@ async function getSmsAiSuggestion(messageBody: string): Promise<string> {
         body: JSON.stringify({
             model: 'gemini-2.5-flash',
             prompt: `You are an SMS copywriting expert for a church. 
-Rewrite the following SMS message to be shorter (ideally under 160 characters â€” 1 SMS segment) while keeping the full meaning, warmth, and any merge tags like {firstName}, {email}, {phone}, {city}, {state}, {birthday}, {anniversary} exactly as-is.
+Rewrite the following SMS message to be shorter (ideally under 160 characters — 1 SMS segment) while keeping the full meaning, warmth, and any merge tags like {firstName}, {email}, {phone}, {city}, {state}, {birthday}, {anniversary} exactly as-is.
 Return ONLY the rewritten message text, no explanation or quotes.
 
 Original message:
@@ -146,7 +146,7 @@ You must respond with ONLY a valid JSON object (no markdown, no explanation) mat
 Guidelines:
 - Use warm, pastoral, encouraging language appropriate for a church audience.
 - For SMS steps, keep "message" under 160 characters when possible (1 segment).
-- Include real content (actual Bible verses, actual prayer encouragements, etc.) â€” do NOT use placeholders like "[verse here]".
+- Include real content (actual Bible verses, actual prayer encouragements, etc.) — do NOT use placeholders like "[verse here]".
 - Use {firstName} to personalise messages where natural.
 - delayDays for the first step is always 0. For subsequent steps, use the delay the user specified or infer a sensible one (e.g. 1 day between daily texts).
 - If the user asks for emails, set channelType to "email" and provide both emailSubject and emailBody.
@@ -177,10 +177,10 @@ ${prompt}`;
 function formatPhone(phone: string): string {
     const digits = phone.replace(/\D/g, '');
     if (digits.length === 11 && digits.startsWith('1')) {
-        return `(${digits.slice(1, 4)}) ${digits.slice(4, 7)}â€“${digits.slice(7)}`;
+        return `(${digits.slice(1, 4)}) ${digits.slice(4, 7)}–${digits.slice(7)}`;
     }
     if (digits.length === 10) {
-        return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}â€“${digits.slice(6)}`;
+        return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}–${digits.slice(6)}`;
     }
     return phone;
 }
@@ -196,7 +196,7 @@ function timeAgo(ts: number): string {
     return `${days}d ago`;
 }
 
-// â”€â”€â”€ Sub-components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Sub-components ──────────────────────────────────────────────────────────
 
 const Toast: React.FC<{ msg: string; type: 'success' | 'error'; onClose: () => void }> = ({ msg, type, onClose }) => (
     <div className={`fixed top-5 left-1/2 -translate-x-1/2 z-[200] flex items-center gap-3 px-5 py-3 rounded-2xl shadow-2xl text-sm font-semibold text-white transition-all ${type === 'success' ? 'bg-emerald-600' : 'bg-red-600'}`}>
@@ -205,7 +205,7 @@ const Toast: React.FC<{ msg: string; type: 'success' | 'error'; onClose: () => v
     </div>
 );
 
-// â”€â”€â”€ Schedule Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Schedule Modal ──────────────────────────────────────────────────────────
 
 const ScheduleModal: React.FC<{
     onConfirm: (scheduledAt: number, recurringFrequency?: 'daily' | 'weekly' | 'monthly') => void;
@@ -262,7 +262,7 @@ const ScheduleModal: React.FC<{
                 <div className="flex gap-2">
                     <button onClick={onCancel} className="flex-1 py-2.5 text-sm text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition font-semibold">Cancel</button>
                     <button onClick={handleConfirm} disabled={isBusy} className="flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-semibold bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-xl transition">
-                        {isBusy ? <><Loader2 size={13} className="animate-spin" />Schedulingâ€¦</> : <><Calendar size={13} />Schedule</>}
+                        {isBusy ? <><Loader2 size={13} className="animate-spin" />Scheduling…</> : <><Calendar size={13} />Schedule</>}
                     </button>
                 </div>
             </div>
@@ -270,7 +270,7 @@ const ScheduleModal: React.FC<{
     );
 };
 
-// â”€â”€â”€ Campaign Composer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Campaign Composer ────────────────────────────────────────────────────────
 
 interface ComposerProps {
     campaign: SmsCampaign;
@@ -407,12 +407,12 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                         disabled={!canSend || isSending}
                         className={`flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-xl transition ${canSend && !isSending ? 'bg-violet-600 hover:bg-violet-700 text-white shadow-md shadow-violet-200 dark:shadow-violet-900/40' : 'bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed'}`}
                     >
-                        {isSending ? <><Loader2 size={14} className="animate-spin" />Sendingâ€¦</> : <><Send size={14} />Send Now</>}
+                        {isSending ? <><Loader2 size={14} className="animate-spin" />Sending…</> : <><Send size={14} />Send Now</>}
                     </button>
                 </div>
             </div>
 
-            {/* Body â€” side by side on large screens */}
+            {/* Body — side by side on large screens */}
             <div className="flex flex-1 overflow-hidden">
                 {/* Left: Config column */}
                 <div className="w-[420px] shrink-0 overflow-y-auto border-r border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 p-5 space-y-4">
@@ -449,7 +449,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                             <>
                                 <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">Recipients missing a phone number will be skipped and logged.</p>
                                 {loadingLists ? (
-                                    <div className="flex items-center gap-2 text-sm text-slate-400"><Loader2 size={13} className="animate-spin" /> Loading listsâ€¦</div>
+                                    <div className="flex items-center gap-2 text-sm text-slate-400"><Loader2 size={13} className="animate-spin" /> Loading lists…</div>
                                 ) : (
                                     <select
                                         title="Select a PCO list"
@@ -460,7 +460,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                             update({ toListId: sel?.id ?? null, toListName: sel?.name, toGroupId: null, toGroupName: undefined });
                                         }}
                                     >
-                                        <option value="">â€” Select a PCO List â€”</option>
+                                        <option value="">— Select a PCO List —</option>
                                         {pcoLists.map(l => <option key={l.id} value={l.id}>{l.name} ({l.total_people})</option>)}
                                     </select>
                                 )}
@@ -470,7 +470,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                         {toTab === 'groups' && (
                             <>
                                 {loadingGroups ? (
-                                    <div className="flex items-center gap-2 text-sm text-slate-400"><Loader2 size={13} className="animate-spin" /> Loading groupsâ€¦</div>
+                                    <div className="flex items-center gap-2 text-sm text-slate-400"><Loader2 size={13} className="animate-spin" /> Loading groups…</div>
                                 ) : (
                                     <select
                                         title="Select a PCO group"
@@ -481,7 +481,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                             update({ toGroupId: sel?.id ?? null, toGroupName: sel?.name, toListId: null, toListName: undefined });
                                         }}
                                     >
-                                        <option value="">â€” Select a PCO Group â€”</option>
+                                        <option value="">— Select a PCO Group —</option>
                                         {pcoGroups.map(g => <option key={g.id} value={g.id}>{g.name}{g.memberCount > 0 ? ` (${g.memberCount})` : ''}</option>)}
                                     </select>
                                 )}
@@ -501,10 +501,10 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Send Results</p>
                             <div className="grid grid-cols-2 gap-3">
                                 {[
-                                    { label: 'Sent', value: local.deliveredCount ?? 'â€”', color: 'text-emerald-600' },
-                                    { label: 'Failed', value: local.failedCount ?? 'â€”', color: 'text-red-500' },
-                                    { label: 'Opt-Outs', value: local.optOutCount ?? 'â€”', color: 'text-amber-600' },
-                                    { label: 'Total', value: local.recipientCount ?? 'â€”', color: 'text-slate-700 dark:text-slate-300' },
+                                    { label: 'Sent', value: local.deliveredCount ?? '—', color: 'text-emerald-600' },
+                                    { label: 'Failed', value: local.failedCount ?? '—', color: 'text-red-500' },
+                                    { label: 'Opt-Outs', value: local.optOutCount ?? '—', color: 'text-amber-600' },
+                                    { label: 'Total', value: local.recipientCount ?? '—', color: 'text-slate-700 dark:text-slate-300' },
                                 ].map(s => (
                                     <div key={s.label} className="text-center p-2 bg-slate-50 dark:bg-slate-900/50 rounded-xl">
                                         <p className={`text-xl font-black ${s.color}`}>{s.value}</p>
@@ -525,7 +525,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                             <div className="flex items-center justify-between mb-2">
                                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Message</label>
                                 <span className={`text-xs font-bold ${segments > 3 ? 'text-red-500' : segments > 1 ? 'text-amber-600' : 'text-slate-400'}`}>
-                                    {local.body?.length ?? 0} chars Â· {segments} segment{segments !== 1 ? 's' : ''}
+                                    {local.body?.length ?? 0} chars · {segments} segment{segments !== 1 ? 's' : ''}
                                 </span>
                             </div>
                             <textarea
@@ -533,7 +533,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                 rows={8}
                                 value={local.body || ''}
                                 onChange={e => update({ body: e.target.value })}
-                                placeholder="Type your message hereâ€¦"
+                                placeholder="Type your message here…"
                                 className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none font-medium leading-relaxed"
                             />
                             {/* Composer toolbar */}
@@ -594,7 +594,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                     type="button"
                                     title="Attach image (MMS)"
                                     onClick={() => {
-                                        const url = window.prompt('Enter image URL (MMS â€” may incur additional carrier fees):');
+                                        const url = window.prompt('Enter image URL (MMS — may incur additional carrier fees):');
                                         if (url) { setImageUrl(url); update({ mediaUrls: [url] }); }
                                     }}
                                     className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition ${
@@ -602,7 +602,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                         : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700'
                                     }`}
                                 >
-                                    <ImageIcon size={13} /> {imageUrl ? 'Image âœ“' : 'Image'}
+                                    <ImageIcon size={13} /> {imageUrl ? 'Image ✓' : 'Image'}
                                 </button>
                                 {imageUrl && (
                                     <button
@@ -618,7 +618,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                 {/* AI Helper */}
                                 <button
                                     type="button"
-                                    title="AI SMS helper â€” suggest shorter message"
+                                    title="AI SMS helper — suggest shorter message"
                                     onClick={handleAiSuggest}
                                     disabled={!local.body?.trim() || aiLoading}
                                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-700 hover:bg-violet-100 dark:hover:bg-violet-900/40 disabled:opacity-50 transition"
@@ -641,13 +641,13 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                         <button onClick={() => setShowAiPanel(false)} title="Dismiss AI suggestion" className="text-violet-400 hover:text-violet-600"><X size={14} /></button>
                                     </div>
                                     {aiLoading ? (
-                                        <div className="flex items-center gap-2 text-sm text-violet-500"><Loader2 size={14} className="animate-spin" /> Analyzing your messageâ€¦</div>
+                                        <div className="flex items-center gap-2 text-sm text-violet-500"><Loader2 size={14} className="animate-spin" /> Analyzing your message…</div>
                                     ) : (
                                         <>
                                             <p className="text-sm text-violet-800 dark:text-violet-200 leading-relaxed whitespace-pre-wrap mb-3">{aiSuggestion}</p>
                                             <div className="flex items-center gap-2">
                                                 <span className={`text-xs font-bold ${ countSegments(aiSuggestion) > 1 ? 'text-amber-600' : 'text-emerald-600' }`}>
-                                                    {aiSuggestion.length} chars Â· {countSegments(aiSuggestion)} seg
+                                                    {aiSuggestion.length} chars · {countSegments(aiSuggestion)} seg
                                                 </span>
                                                 <div className="flex-1" />
                                                 <button
@@ -707,7 +707,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                         .replace('{phone}', '(615) 555-0100').replace('{city}', 'Nashville')
                                         .replace('{state}', 'TN').replace('{birthday}', 'Jan 15')
                                         .replace('{anniversary}', 'Jun 10')
-                                    || <span className="opacity-50 italic">Your message will appear hereâ€¦</span>}
+                                    || <span className="opacity-50 italic">Your message will appear here…</span>}
                                 </div>
                             </div>
                         </div>
@@ -733,7 +733,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
     );
 };
 
-// â”€â”€â”€ Campaign List â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Campaign List ────────────────────────────────────────────────────────────
 
 const CampaignList: React.FC<{
     campaigns: SmsCampaign[];
@@ -782,7 +782,7 @@ const CampaignList: React.FC<{
 
             {/* List */}
             {isLoading ? (
-                <div className="flex items-center justify-center h-40 text-slate-400"><Loader2 size={22} className="animate-spin mr-2" /> Loading campaignsâ€¦</div>
+                <div className="flex items-center justify-center h-40 text-slate-400"><Loader2 size={22} className="animate-spin mr-2" /> Loading campaigns…</div>
             ) : filtered.length === 0 ? (
                 <div className="text-center py-20 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
                     <MessageSquare size={40} className="mx-auto text-slate-300 dark:text-slate-600 mb-3" />
@@ -809,20 +809,20 @@ const CampaignList: React.FC<{
                                 <div className="flex-grow min-w-0">
                                     <div className="font-bold text-slate-900 dark:text-white truncate">{c.name}</div>
                                     <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 flex flex-wrap gap-x-2">
-                                        {c.toListName && <span>Â· List: {c.toListName}</span>}
-                                        {c.toGroupName && <span>Â· Group: {c.toGroupName}</span>}
+                                        {c.toListName && <span>· List: {c.toListName}</span>}
+                                        {c.toGroupName && <span>· Group: {c.toGroupName}</span>}
                                         {c.status === 'sent' && c.sentAt && (
                                             <span className="text-emerald-600 dark:text-emerald-400">
-                                                Â· Sent {new Date(c.sentAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} Â· {c.deliveredCount ?? 0} delivered
+                                                · Sent {new Date(c.sentAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · {c.deliveredCount ?? 0} delivered
                                             </span>
                                         )}
                                         {c.status === 'scheduled' && c.scheduledAt && (
                                             <span className="text-amber-600 dark:text-amber-400">
-                                                {c.recurringFrequency ? `Â· Repeats ${c.recurringFrequency}. Next: ` : 'Â· Scheduled: '}
+                                                {c.recurringFrequency ? `· Repeats ${c.recurringFrequency}. Next: ` : '· Scheduled: '}
                                                 {new Date(c.scheduledAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                                             </span>
                                         )}
-                                        {c.status === 'failed' && c.lastError && <span className="text-red-500">Â· Failed</span>}
+                                        {c.status === 'failed' && c.lastError && <span className="text-red-500">· Failed</span>}
                                     </div>
                                 </div>
                                 <span className={`text-xs font-bold px-2.5 py-1 rounded-full shrink-0 ${si.color}`}>{si.label}</span>
@@ -839,7 +839,7 @@ const CampaignList: React.FC<{
     );
 };
 
-// â”€â”€â”€ New Message Composer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── New Message Composer ────────────────────────────────────────────────────
 
 type RecipientMode = 'individual' | 'list' | 'group';
 
@@ -855,7 +855,7 @@ const NewMessageComposer: React.FC<{
     const [error, setError]           = useState('');
     const [sentCount, setSentCount]   = useState<number | null>(null);
 
-    // Individual â€” PCO person search
+    // Individual — PCO person search
     const [personSearch, setPersonSearch]     = useState('');
     const [personResults, setPersonResults]   = useState<{ id: string; name: string; phone?: string; avatar?: string | null; membership?: string | null }[]>([]);
     const [personLoading, setPersonLoading]   = useState(false);
@@ -974,8 +974,8 @@ const NewMessageComposer: React.FC<{
             );
         } else {
             // Case-insensitive name search: try both original-case and lowercase prefix
-            // Most Firestore caches store `name` as 'First Last' â€” try both capitalisation variants
-            const qCap = q.charAt(0).toUpperCase() + q.slice(1).toLowerCase(); // 'jo' â†’ 'Jo'
+            // Most Firestore caches store `name` as 'First Last' — try both capitalisation variants
+            const qCap = q.charAt(0).toUpperCase() + q.slice(1).toLowerCase(); // 'jo' → 'Jo'
             queries.push(
                 // Original prefix (catches exact or Title-Case typing)
                 getDocs(query(col, where('churchId', '==', churchId), where('name', '>=', q),    where('name', '<=', q + '\uffff'),    limit(25))),
@@ -1052,13 +1052,13 @@ const NewMessageComposer: React.FC<{
         (mode === 'group' && !!selectedGroup)
     );
 
-    /** Safe JSON parser â€” reads raw text first so non-JSON bodies never throw a parse error. */
+    /** Safe JSON parser — reads raw text first so non-JSON bodies never throw a parse error. */
     const safeJson = async (res: Response): Promise<any> => {
         const text = await res.text();
         try {
             return JSON.parse(text);
         } catch {
-            // Server returned HTML (e.g. a 404 or 500 error page) â€” surface the HTTP status
+            // Server returned HTML (e.g. a 404 or 500 error page) — surface the HTTP status
             throw new Error(`Server error ${res.status}: ${text.slice(0, 120) || res.statusText}`);
         }
     };
@@ -1194,7 +1194,7 @@ const NewMessageComposer: React.FC<{
                         </div>
                     </div>
 
-                    {/* Individual â€” PCO person search */}
+                    {/* Individual — PCO person search */}
                     {mode === 'individual' && (
                         <div className="space-y-3">
                             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">Recipient</label>
@@ -1247,7 +1247,7 @@ const NewMessageComposer: React.FC<{
                                     <button
                                         onClick={() => { setManualEntry(false); setPhone(''); setRecipientName(''); }}
                                         className="text-xs text-violet-500 hover:text-violet-700 font-semibold"
-                                    >â† Search PCO people instead</button>
+                                    >← Search PCO people instead</button>
                                 </div>
                             ) : (
                                 /* Search box */
@@ -1259,7 +1259,7 @@ const NewMessageComposer: React.FC<{
                                             type="text"
                                             value={personSearch}
                                             onChange={e => setPersonSearch(e.target.value)}
-                                            placeholder="Search by name or phone numberâ€¦"
+                                            placeholder="Search by name or phone number…"
                                             autoFocus
                                             className="w-full pl-8 pr-8 text-sm border-2 border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500"
                                         />
@@ -1291,7 +1291,7 @@ const NewMessageComposer: React.FC<{
                                                         <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">{p.name}</p>
                                                         <p className="text-xs text-slate-400 truncate">
                                                             {p.phone ? formatPhone(p.phone) : <span className="text-amber-500 text-[10px]">No phone number</span>}
-                                                            {p.membership && <span className="ml-2 text-[10px] text-slate-400">Â· {p.membership}</span>}
+                                                            {p.membership && <span className="ml-2 text-[10px] text-slate-400">· {p.membership}</span>}
                                                         </p>
                                                     </div>
                                                     {p.phone && <ChevronRight size={14} className="text-violet-400 shrink-0" />}
@@ -1333,7 +1333,7 @@ const NewMessageComposer: React.FC<{
                                         <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                                         <input
                                             type="text"
-                                            placeholder="Search listsâ€¦"
+                                            placeholder="Search lists…"
                                             value={listSearch}
                                             onChange={e => setListSearch(e.target.value)}
                                             className="w-full pl-8 pr-3 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
@@ -1374,7 +1374,7 @@ const NewMessageComposer: React.FC<{
                                         <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                                         <input
                                             type="text"
-                                            placeholder="Search groupsâ€¦"
+                                            placeholder="Search groups…"
                                             value={groupSearch}
                                             onChange={e => setGroupSearch(e.target.value)}
                                             className="w-full pl-8 pr-3 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
@@ -1404,7 +1404,7 @@ const NewMessageComposer: React.FC<{
                             <span className={`text-[10px] font-semibold ${
                                 charLeft < 0 ? 'text-red-500' : charLeft < 50 ? 'text-amber-500' : 'text-slate-400'
                             }`}>
-                                {body.length}/{MAX_CHARS} Â· {segCount} segment{segCount !== 1 ? 's' : ''}
+                                {body.length}/{MAX_CHARS} · {segCount} segment{segCount !== 1 ? 's' : ''}
                             </span>
                         </div>
                         <textarea
@@ -1414,8 +1414,8 @@ const NewMessageComposer: React.FC<{
                             onChange={e => setBody(e.target.value)}
                             maxLength={MAX_CHARS}
                             placeholder={mode === 'individual'
-                                ? 'Type your messageâ€¦'
-                                : 'Type your messageâ€¦ Use merge tags to personalize.'}
+                                ? 'Type your message…'
+                                : 'Type your message… Use merge tags to personalize.'}
                             className="w-full text-sm border-2 border-slate-200 dark:border-slate-600 rounded-xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500 resize-none"
                         />
                         {/* Composer toolbar */}
@@ -1485,7 +1485,7 @@ const NewMessageComposer: React.FC<{
                                             <div onClick={() => fileInputRefNM.current?.click()} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleImageFileUpload(f); }} className="flex flex-col items-center justify-center gap-2 py-8 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl cursor-pointer hover:border-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/10 transition">
                                                 <Upload size={24} className="text-slate-400" />
                                                 <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">Click or drag &amp; drop</p>
-                                                <p className="text-[10px] text-slate-400">JPG, PNG, GIF, WebP â€” max 5 MB</p>
+                                                <p className="text-[10px] text-slate-400">JPG, PNG, GIF, WebP — max 5 MB</p>
                                             </div>
                                             {imageUploadProgress !== null && (<div className="space-y-1"><div className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden" title={`Uploading: ${imageUploadProgress}%`} aria-label={`Upload progress: ${imageUploadProgress}%`}><div className="h-full bg-violet-500 rounded-full transition-all" style={{ width: `${imageUploadProgress}%` }} /></div><p className="text-[10px] text-slate-400 text-right">{imageUploadProgress}%</p></div>)}
                                             {imageUploadError && <p className="text-xs text-red-500">{imageUploadError}</p>}
@@ -1510,13 +1510,13 @@ const NewMessageComposer: React.FC<{
                                     <button onClick={() => setShowAiPanelNM(false)} title="Dismiss" className="text-violet-400 hover:text-violet-600"><X size={13} /></button>
                                 </div>
                                 {aiLoadingNM ? (
-                                    <div className="flex items-center gap-2 text-sm text-violet-500"><Loader2 size={13} className="animate-spin" /> Analyzingâ€¦</div>
+                                    <div className="flex items-center gap-2 text-sm text-violet-500"><Loader2 size={13} className="animate-spin" /> Analyzing…</div>
                                 ) : (
                                     <>
                                         <p className="text-sm text-violet-800 dark:text-violet-200 leading-relaxed whitespace-pre-wrap mb-2">{aiSuggestionNM}</p>
                                         <div className="flex items-center gap-2">
                                             <span className={`text-xs font-bold ${ countSegments(aiSuggestionNM) > 1 ? 'text-amber-600' : 'text-emerald-600' }`}>
-                                                {aiSuggestionNM.length} chars Â· {countSegments(aiSuggestionNM)} seg
+                                                {aiSuggestionNM.length} chars · {countSegments(aiSuggestionNM)} seg
                                             </span>
                                             <div className="flex-1" />
                                             <button onClick={() => { setBody(aiSuggestionNM); setShowAiPanelNM(false); }}
@@ -1564,7 +1564,7 @@ const NewMessageComposer: React.FC<{
                         className="flex-[2] py-3 text-sm font-black bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-2xl transition flex items-center justify-center gap-2"
                     >
                         {sending
-                            ? <><Loader2 size={16} className="animate-spin" /> Sendingâ€¦</>
+                            ? <><Loader2 size={16} className="animate-spin" /> Sending…</>
                             : mode === 'individual'
                                 ? <><Send size={15} /> Send Message</>
                                 : <><Send size={15} /> Send to {mode === 'list' ? selectedList?.name : selectedGroup?.name}</>}
@@ -1575,7 +1575,7 @@ const NewMessageComposer: React.FC<{
     );
 };
 
-// â”€â”€â”€ Inbox â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Inbox ────────────────────────────────────────────────────────────────────
 
 const SmsInbox: React.FC<{
     churchId: string;
@@ -1735,7 +1735,7 @@ const SmsInbox: React.FC<{
                         <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                         <input
                             type="text"
-                            placeholder="Searchâ€¦"
+                            placeholder="Search…"
                             value={search}
                             onChange={e => setSearch(e.target.value)}
                             className="w-full pl-8 pr-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
@@ -1819,7 +1819,7 @@ const SmsInbox: React.FC<{
                                             {conv.personName && <p className={`text-[10px] ${ isUnread ? 'text-slate-500' : 'text-slate-400' }`}>{formatPhone(conv.phoneNumber)}</p>}
                                             <p className={`text-xs truncate mt-0.5 ${
                                                 isUnread ? 'text-slate-600 dark:text-slate-300 font-medium' : 'text-slate-400 dark:text-slate-500'
-                                            }`}>{conv.lastMessageBody || 'â€¦'}</p>
+                                            }`}>{conv.lastMessageBody || '…'}</p>
                                             {/* Tag chips */}
                                             {convTags.length > 0 && (
                                                 <div className="flex flex-wrap gap-1 mt-1">
@@ -1954,15 +1954,15 @@ const SmsInbox: React.FC<{
                                         )}
                                         <div className={`text-[10px] mt-1 flex items-center gap-1 flex-wrap ${msg.direction === 'outbound' ? 'text-violet-200' : 'text-slate-400'}`}>
                                             {new Date(msg.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
-                                            {msg.direction === 'outbound' && msg.sentByName && ` Â· ${msg.sentByName}`}
+                                            {msg.direction === 'outbound' && msg.sentByName && ` · ${msg.sentByName}`}
                                             {msg.direction === 'outbound' && msg.status && (() => {
                                                 const s = msg.status;
-                                                if (s === 'delivered')    return <span className="text-emerald-300 font-semibold" title="Delivered">âœ“âœ“ delivered</span>;
-                                                if (s === 'sent')         return <span className="text-violet-300" title="Accepted by carrier">âœ“ sent</span>;
-                                                if (s === 'queued')       return <span className="text-violet-300/70" title="Queued by Twilio">Â· queued</span>;
-                                                if (s === 'failed')       return <span className="text-red-400 font-bold" title="Failed â€” not delivered">âš  failed</span>;
-                                                if (s === 'undelivered')  return <span className="text-red-400 font-bold" title="Undelivered â€” carrier rejected">âš  undelivered</span>;
-                                                return <span className="opacity-60">Â· {s}</span>;
+                                                if (s === 'delivered')    return <span className="text-emerald-300 font-semibold" title="Delivered">✓✓ delivered</span>;
+                                                if (s === 'sent')         return <span className="text-violet-300" title="Accepted by carrier">✓ sent</span>;
+                                                if (s === 'queued')       return <span className="text-violet-300/70" title="Queued by Twilio">· queued</span>;
+                                                if (s === 'failed')       return <span className="text-red-400 font-bold" title="Failed — not delivered">⚠ failed</span>;
+                                                if (s === 'undelivered')  return <span className="text-red-400 font-bold" title="Undelivered — carrier rejected">⚠ undelivered</span>;
+                                                return <span className="opacity-60">· {s}</span>;
                                             })()}
                                         </div>
                                     </div>
@@ -1983,7 +1983,7 @@ const SmsInbox: React.FC<{
                                     rows={2}
                                     value={replyBody}
                                     onChange={e => setReplyBody(e.target.value)}
-                                    placeholder="Type a replyâ€¦"
+                                    placeholder="Type a reply…"
                                     onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendReply(); }}}
                                     className="flex-1 text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
                                 />
@@ -2008,7 +2008,7 @@ const SmsInbox: React.FC<{
     );
 };
 
-// â”€â”€â”€ SMS Keywords Manager â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── SMS Keywords Manager ────────────────────────────────────────────────────
 
 interface KeywordModalProps {
     initial?: SmsKeyword | null;
@@ -2079,14 +2079,14 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingL
                     <div className="flex items-center justify-between mb-2">
                         <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Auto-Reply Message</label>
                         <span className={`text-xs font-bold ${segs > 3 ? 'text-red-500' : segs > 1 ? 'text-amber-600' : 'text-slate-400'}`}>
-                            {replyMessage.length} chars Â· {segs} seg{segs !== 1 ? 's' : ''}
+                            {replyMessage.length} chars · {segs} seg{segs !== 1 ? 's' : ''}
                         </span>
                     </div>
                     <textarea
                         rows={4}
                         value={replyMessage}
                         onChange={e => setReplyMessage(e.target.value)}
-                        placeholder={`Thanks for texting ${keyword || 'YOUTH'}! Here's what you need to knowâ€¦`}
+                        placeholder={`Thanks for texting ${keyword || 'YOUTH'}! Here's what you need to know…`}
                         className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
                     />
 
@@ -2105,7 +2105,7 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingL
                     <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Add to PCO List (optional)</label>
                     <p className="text-[10px] text-slate-400 mb-2">When a match occurs, automatically add the sender to this Planning Center list.</p>
                     {loadingLists ? (
-                        <div className="flex items-center gap-2 text-sm text-slate-400"><Loader2 size={13} className="animate-spin" /> Loadingâ€¦</div>
+                        <div className="flex items-center gap-2 text-sm text-slate-400"><Loader2 size={13} className="animate-spin" /> Loading…</div>
                     ) : (
                         <select
                             value={addToListId}
@@ -2113,7 +2113,7 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingL
                             title="Add to PCO list"
                             className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
                         >
-                            <option value="">â€” Don't add to a list â€”</option>
+                            <option value="">— Don't add to a list —</option>
                             {pcoLists.map(l => <option key={l.id} value={l.id}>{l.name} ({l.total_people})</option>)}
                         </select>
                     )}
@@ -2181,7 +2181,7 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingL
                         disabled={isBusy}
                         className="flex-1 py-2.5 text-sm font-black bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-xl transition flex items-center justify-center gap-2"
                     >
-                        {isBusy ? <><Loader2 size={14} className="animate-spin" />Savingâ€¦</> : <><CheckCircle size={14} />{isEdit ? 'Save Changes' : 'Create Keyword'}</>}
+                        {isBusy ? <><Loader2 size={14} className="animate-spin" />Saving…</> : <><CheckCircle size={14} />{isEdit ? 'Save Changes' : 'Create Keyword'}</>}
                     </button>
                 </div>
             </div>
@@ -2308,7 +2308,7 @@ const SmsKeywordsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
             console.error('[SmsKeywords] Save error:', e);
             setSaveError(
                 e?.code === 'permission-denied'
-                    ? 'Permission denied â€” check your Firestore security rules for the smsKeywords collection.'
+                    ? 'Permission denied — check your Firestore security rules for the smsKeywords collection.'
                     : 'Failed to save keyword: ' + (e?.message || String(e))
             );
         } finally {
@@ -2357,7 +2357,7 @@ const SmsKeywordsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
             setEditTag(null);
         } catch (e: any) {
             const msg = e?.code === 'permission-denied'
-                ? 'Permission denied â€” check your Firestore security rules for the smsTags collection.'
+                ? 'Permission denied — check your Firestore security rules for the smsTags collection.'
                 : 'Failed to save tag: ' + (e?.message || String(e));
             alert(msg);
         } finally {
@@ -2399,12 +2399,12 @@ const SmsKeywordsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
                 )}
             </div>
 
-            {/* â”€â”€â”€ KEYWORDS section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+            {/* ─── KEYWORDS section ─────────────────────────────────────────── */}
             {activeSection === 'keywords' && (
             <>
             {/* How it works banner */}
             <div className="flex items-start gap-4 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-2xl p-4 mb-6">
-                <div className="text-3xl">ðŸ’¡</div>
+                <div className="text-3xl">💡</div>
                 <div>
                     <p className="text-sm font-bold text-violet-800 dark:text-violet-200 mb-1">How Keywords Work</p>
                     <p className="text-xs text-violet-700 dark:text-violet-300 leading-relaxed">
@@ -2421,7 +2421,7 @@ const SmsKeywordsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
                 </div>
             )}
             {isLoading ? (
-                <div className="flex items-center justify-center h-40 text-slate-400"><Loader2 size={20} className="animate-spin mr-2" /> Loading keywordsâ€¦</div>
+                <div className="flex items-center justify-center h-40 text-slate-400"><Loader2 size={20} className="animate-spin mr-2" /> Loading keywords…</div>
             ) : keywords.length === 0 && !listError ? (
                 <div className="text-center py-20 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
                     <Key size={40} className="mx-auto text-slate-300 dark:text-slate-600 mb-3" />
@@ -2451,7 +2451,7 @@ const SmsKeywordsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
                                 <div className="flex items-center flex-wrap gap-x-3 gap-y-1 mt-0.5">
                                     {kw.addToListName && (
                                         <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1">
-                                            <Users size={10} /> â†’ {kw.addToListName}
+                                            <Users size={10} /> → {kw.addToListName}
                                         </span>
                                     )}
                                     {kwTags.map(t => (
@@ -2505,16 +2505,16 @@ const SmsKeywordsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
             </>
             )}
 
-            {/* â”€â”€â”€ TAGS section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+            {/* ─── TAGS section ─────────────────────────────────────────────── */}
             {activeSection === 'tags' && (
             <>
             <div className="flex items-start gap-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-2xl p-4 mb-6">
-                <div className="text-3xl">ðŸ·ï¸</div>
+                <div className="text-3xl">🏷️</div>
                 <div>
                     <p className="text-sm font-bold text-emerald-800 dark:text-emerald-200 mb-1">Conversation Tags</p>
                     <p className="text-xs text-emerald-700 dark:text-emerald-300 leading-relaxed">
                         Tags let you categorise and filter SMS conversations. Apply them manually from any conversation, or automatically when a keyword is matched. Create tags like{' '}
-                        <span className="font-bold">Prayer Request ðŸ™</span>,{' '}<span className="font-bold">Service Times ðŸ“…</span>, or{' '}<span className="font-bold">Pastoral Care â¤ï¸</span>.
+                        <span className="font-bold">Prayer Request 🙏</span>,{' '}<span className="font-bold">Service Times 📅</span>, or{' '}<span className="font-bold">Pastoral Care ❤️</span>.
                     </p>
                 </div>
             </div>
@@ -2610,7 +2610,7 @@ const SmsKeywordsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
                                 type="text"
                                 value={tagEmoji}
                                 onChange={e => setTagEmoji(e.target.value)}
-                                placeholder="ðŸ™"
+                                placeholder="🙏"
                                 maxLength={4}
                                 className="w-24 text-xl border-2 border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500 text-center"
                             />
@@ -2652,7 +2652,7 @@ const SmsKeywordsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
                                 disabled={tagBusy || !tagName.trim()}
                                 className="flex-1 py-2.5 text-sm font-black bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-xl transition flex items-center justify-center gap-2"
                             >
-                                {tagBusy ? <><Loader2 size={14} className="animate-spin" />Savingâ€¦</> : <><CheckCircle size={14} />{editTag ? 'Save' : 'Create Tag'}</>}
+                                {tagBusy ? <><Loader2 size={14} className="animate-spin" />Saving…</> : <><CheckCircle size={14} />{editTag ? 'Save' : 'Create Tag'}</>}
                             </button>
                         </div>
                     </div>
@@ -2662,7 +2662,7 @@ const SmsKeywordsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
     );
 };
 
-// â”€â”€â”€ Analytics Dashboard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Analytics Dashboard ──────────────────────────────────────────────────
 
 interface UsageSummary {
     totalSent: number;
@@ -2828,7 +2828,7 @@ const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[] }> = (
     if (isLoading) {
         return (
             <div className="flex items-center justify-center h-64 text-slate-400">
-                <Loader2 size={22} className="animate-spin mr-2" /> Loading analyticsâ€¦
+                <Loader2 size={22} className="animate-spin mr-2" /> Loading analytics…
             </div>
         );
     }
@@ -2915,9 +2915,9 @@ const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[] }> = (
                                         <div className="w-full flex flex-col items-center group relative">
                                             {/* Tooltip */}
                                             <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-800 dark:bg-slate-700 text-white text-[10px] font-bold px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition whitespace-nowrap pointer-events-none z-10">
-                                                {m.sent.toLocaleString()} sent Â· {m.delivered.toLocaleString()} delivered
+                                                {m.sent.toLocaleString()} sent · {m.delivered.toLocaleString()} delivered
                                             </div>
-                                            {/* Bar outer â€” fixed 120px, dynamic fill via CSS vars */}
+                                            {/* Bar outer — fixed 120px, dynamic fill via CSS vars */}
                                             <div
                                                 className="w-full h-[120px] bg-slate-100 dark:bg-slate-700 rounded-xl overflow-hidden"
                                                 role="img"
@@ -3007,9 +3007,9 @@ const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[] }> = (
                                             <div className="min-w-0">
                                                 <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{c.name}</p>
                                                 <p className="text-[10px] text-slate-400 mt-0.5">
-                                                    {c.sentAt ? new Date(c.sentAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'â€”'}
-                                                    {c.toListName ? ` Â· ${c.toListName}` : ''}
-                                                    {c.toGroupName ? ` Â· ${c.toGroupName}` : ''}
+                                                    {c.sentAt ? new Date(c.sentAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                                                    {c.toListName ? ` · ${c.toListName}` : ''}
+                                                    {c.toGroupName ? ` · ${c.toGroupName}` : ''}
                                                 </p>
                                             </div>
                                             <div className="flex items-center gap-4 shrink-0 text-right">
@@ -3080,11 +3080,11 @@ const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[] }> = (
                     <p className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4">Quick Stats</p>
                     <div className="space-y-3">
                         {[
-                            { label: 'Avg. recipients per campaign', value: summary && summary.totalBulk > 0 ? Math.round(summary.totalSent / summary.totalBulk).toLocaleString() : 'â€”' },
-                            { label: 'Total 2-way conversations', value: summary?.totalReplies.toLocaleString() ?? 'â€”' },
-                            { label: 'Total opt-outs (all time)', value: summary?.totalOptOuts.toLocaleString() ?? 'â€”' },
-                            { label: 'Campaigns sent', value: summary?.totalBulk.toLocaleString() ?? 'â€”' },
-                            { label: 'Est. cost per delivered msg', value: summary && summary.totalDelivered > 0 ? `$${((summary.estimatedCostUsd / summary.totalDelivered)).toFixed(4)}` : 'â€”' },
+                            { label: 'Avg. recipients per campaign', value: summary && summary.totalBulk > 0 ? Math.round(summary.totalSent / summary.totalBulk).toLocaleString() : '—' },
+                            { label: 'Total 2-way conversations', value: summary?.totalReplies.toLocaleString() ?? '—' },
+                            { label: 'Total opt-outs (all time)', value: summary?.totalOptOuts.toLocaleString() ?? '—' },
+                            { label: 'Campaigns sent', value: summary?.totalBulk.toLocaleString() ?? '—' },
+                            { label: 'Est. cost per delivered msg', value: summary && summary.totalDelivered > 0 ? `$${((summary.estimatedCostUsd / summary.totalDelivered)).toFixed(4)}` : '—' },
                         ].map(row => (
                             <div key={row.label} className="flex items-center justify-between py-1.5 border-b border-slate-100 dark:border-slate-700 last:border-0">
                                 <span className="text-xs text-slate-500 dark:text-slate-400">{row.label}</span>
@@ -3098,7 +3098,7 @@ const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[] }> = (
     );
 };
 
-// â”€â”€â”€ Workflows Manager â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Workflows Manager ──────────────────────────────────────────────────
 
 // ---- tiny uuid (no dep) ----
 function uid(): string {
@@ -3114,9 +3114,9 @@ const CHANNEL_CONFIG: Record<WorkflowChannelType, { label: string; icon: React.R
     staff_email:{ label: 'Staff Email',icon: <Mail size={13} />,           color: 'bg-rose-500 text-white hover:bg-rose-600',       badge: 'bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300'         },
 };
 
-// â”€â”€â”€ Step Editor Row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Step Editor Row ─────────────────────────────────────────────────────────
 
-// â”€â”€â”€ Staff Step Editor (extracted to avoid hooks-in-IIFE violation) â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Staff Step Editor (extracted to avoid hooks-in-IIFE violation) ─────────
 
 const StaffStepEditor: React.FC<{
     step: WorkflowActionNode;
@@ -3144,7 +3144,7 @@ const StaffStepEditor: React.FC<{
             {/* Info */}
             <div className={`flex items-start gap-2 text-xs ${isEmail ? 'text-rose-700 dark:text-rose-300' : 'text-amber-700 dark:text-amber-300'}`}>
                 <Users size={13} className='mt-0.5 shrink-0' />
-                <span><strong>Internal step</strong> â€” notifies <strong>staff</strong> only. Use {'{contact.firstName}'}, {'{contact.phone}'}, {'{contact.email}'} for the enrolled person.</span>
+                <span><strong>Internal step</strong> — notifies <strong>staff</strong> only. Use {'{contact.firstName}'}, {'{contact.phone}'}, {'{contact.email}'} for the enrolled person.</span>
             </div>
             {/* Who to notify */}
             <div>
@@ -3172,7 +3172,7 @@ const StaffStepEditor: React.FC<{
                         <input type={isEmail ? 'email' : 'tel'} value={addContact} onChange={e => setAddContact(e.target.value)} onKeyDown={e => e.key === 'Enter' && addRecipient()} placeholder={isEmail ? 'Email' : 'Phone'} className='flex-1 text-xs border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400' />
                         <button type='button' title='Add recipient' onClick={addRecipient} className={`px-3 py-2 rounded-xl text-white text-xs font-bold ${isEmail ? 'bg-rose-500 hover:bg-rose-600' : 'bg-amber-500 hover:bg-amber-600'}`}><Plus size={13} /></button>
                     </div>
-                    {recipients.length === 0 && <p className='text-[10px] text-slate-400 text-center'>No recipients â€” add at least one.</p>}
+                    {recipients.length === 0 && <p className='text-[10px] text-slate-400 text-center'>No recipients — add at least one.</p>}
                 </div>
             )}
             {/* PCO List */}
@@ -3218,9 +3218,9 @@ const StaffStepEditor: React.FC<{
     );
 };
 
-// â”€â”€â”€ Step timing helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Step timing helpers ─────────────────────────────────────────────────────
 
-/** Convert HH:MM (24-hour) â†’ H:MM AM/PM */
+/** Convert HH:MM (24-hour) → H:MM AM/PM */
 function fmt12(hhmm: string): string {
     const [h, m] = hhmm.split(':').map(Number);
     const ampm = h < 12 ? 'AM' : 'PM';
@@ -3249,7 +3249,7 @@ function stepTimingLabel(node: WorkflowDelayNode): string {
         : `after ${node.delayDays} day${node.delayDays !== 1 ? 's' : ''}`;
 }
 
-// ─── Delay Node Card ──────────────────────────────────────────────────────────
+// --- Delay Node Card ----------------------------------------------------------
 
 const DelayNodeCard: React.FC<{
     node: WorkflowDelayNode;
@@ -3274,9 +3274,9 @@ const DelayNodeCard: React.FC<{
             {/* Schedule type toggle */}
             <div className="flex rounded-xl overflow-hidden border border-amber-200 dark:border-amber-700">
                 {([
-                    { id: 'relative',     label: '⏱ Relative'  },
-                    { id: 'day_of_week',  label: '📅 Weekday'   },
-                    { id: 'day_of_month', label: '🗓 Month Day' },
+                    { id: 'relative',     label: '? Relative'  },
+                    { id: 'day_of_week',  label: '?? Weekday'   },
+                    { id: 'day_of_month', label: '?? Month Day' },
                 ] as const).map(({ id, label }) => (
                     <button key={id} type="button" onClick={() => onChange({ scheduleType: id })}
                         className={`flex-1 py-1.5 text-[10px] font-bold transition border-r last:border-r-0 border-amber-200 dark:border-amber-700 ${
@@ -3350,7 +3350,7 @@ const DelayNodeCard: React.FC<{
     );
 };
 
-// ─── Branch Node Card ─────────────────────────────────────────────────────────
+// --- Branch Node Card ---------------------------------------------------------
 
 const BranchNodeCard: React.FC<{
     node: WorkflowBranchNode;
@@ -3394,7 +3394,7 @@ const BranchNodeCard: React.FC<{
                 <div className="flex items-center gap-2 min-w-0">
                     <GitBranch size={14} className="text-blue-500 shrink-0" />
                     <span className="text-xs font-black uppercase tracking-widest text-blue-600 dark:text-blue-400 shrink-0">Branch</span>
-                    <span className="text-xs text-slate-400 shrink-0">—</span>
+                    <span className="text-xs text-slate-400 shrink-0">�</span>
                     <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 truncate">IF: {conditionSummary()}</span>
                 </div>
                 <div className="flex items-center gap-1 shrink-0 ml-2">
@@ -3417,10 +3417,10 @@ const BranchNodeCard: React.FC<{
                         {/* Condition type picker */}
                         <div className="flex rounded-xl overflow-hidden border border-slate-200 dark:border-slate-600">
                             {([
-                                { id: 'replied',      label: '💬 Replied'     },
-                                { id: 'email_opened', label: '📧 Email Opened'},
-                                { id: 'tag_applied',  label: '🏷 Tag Applied' },
-                                { id: 'custom',       label: '✏️ Custom'       },
+                                { id: 'replied',      label: '?? Replied'     },
+                                { id: 'email_opened', label: '?? Email Opened'},
+                                { id: 'tag_applied',  label: '?? Tag Applied' },
+                                { id: 'custom',       label: '?? Custom'       },
                             ] as const).map(({ id, label }) => (
                                 <button key={id} type="button" onClick={() => onChange({ conditionType: id })}
                                     className={`flex-1 py-1.5 text-[10px] font-bold transition border-r last:border-r-0 border-slate-200 dark:border-slate-600 ${
@@ -3438,7 +3438,7 @@ const BranchNodeCard: React.FC<{
                                 }}
                                 className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                             >
-                                <option value="">— Select a tag —</option>
+                                <option value="">� Select a tag �</option>
                                 {smsTags.map(t => <option key={t.id} value={t.id}>{t.emoji} {t.name}</option>)}
                             </select>
                         )}
@@ -3558,7 +3558,7 @@ const ActionNodeCard: React.FC<{
                 </div>
             </div>
 
-            {/* Channel picker — full layout for normal steps, compact for sub-steps inside branches */}
+            {/* Channel picker � full layout for normal steps, compact for sub-steps inside branches */}
             {!isSubStep ? (
                 <div>
                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Channel</p>
@@ -3592,20 +3592,20 @@ const ActionNodeCard: React.FC<{
                     ))}
                 </div>
             )}
-            {/* â”€â”€ SMS fields â”€â”€ */}
+            {/* ── SMS fields ── */}
             {channel === 'sms' && (
                 <div>
                     <div className="flex items-center justify-between mb-1.5">
                         <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Message</label>
                         <span className={`text-[10px] font-bold ${
                             segs > 3 ? 'text-red-500' : segs > 1 ? 'text-amber-600' : 'text-slate-400'
-                        }`}>{step.message.length} chars Â· {segs} seg{segs !== 1 ? 's' : ''}</span>
+                        }`}>{step.message.length} chars · {segs} seg{segs !== 1 ? 's' : ''}</span>
                     </div>
                     <textarea
                         rows={3}
                         value={step.message}
                         onChange={e => onChange({ message: e.target.value })}
-                        placeholder="Type your messageâ€¦ Use {firstName} for personalisation."
+                        placeholder="Type your message… Use {firstName} for personalisation."
                         className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
                     />
                     <div className="flex gap-1.5 mt-1.5 flex-wrap">
@@ -3631,7 +3631,7 @@ const ActionNodeCard: React.FC<{
                 </div>
             )}
 
-            {/* â”€â”€ MMS fields â”€â”€ */}
+            {/* ── MMS fields ── */}
             {channel === 'mms' && (
                 <div className="space-y-3">
                     <div>
@@ -3639,13 +3639,13 @@ const ActionNodeCard: React.FC<{
                             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Message</label>
                             <span className={`text-[10px] font-bold ${
                                 segs > 3 ? 'text-red-500' : segs > 1 ? 'text-amber-600' : 'text-slate-400'
-                            }`}>{step.message.length} chars Â· {segs} seg{segs !== 1 ? 's' : ''}</span>
+                            }`}>{step.message.length} chars · {segs} seg{segs !== 1 ? 's' : ''}</span>
                         </div>
                         <textarea
                             rows={3}
                             value={step.message}
                             onChange={e => onChange({ message: e.target.value })}
-                            placeholder="Caption for the imageâ€¦ Use {firstName} for personalisation."
+                            placeholder="Caption for the image… Use {firstName} for personalisation."
                             className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                         />
                         <div className="flex gap-1.5 mt-1.5 flex-wrap">
@@ -3665,7 +3665,7 @@ const ActionNodeCard: React.FC<{
                             placeholder="https://example.com/image.jpg"
                             className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
-                        <p className="text-[10px] text-slate-400 mt-1">Publicly accessible URL â€” JPG, PNG, GIF, or WebP. MMS may incur additional carrier fees.</p>
+                        <p className="text-[10px] text-slate-400 mt-1">Publicly accessible URL — JPG, PNG, GIF, or WebP. MMS may incur additional carrier fees.</p>
                     </div>
                     {mmsUrl && (
                         <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 max-w-[180px]">
@@ -3675,7 +3675,7 @@ const ActionNodeCard: React.FC<{
                 </div>
             )}
 
-            {/* â”€â”€ Email fields â”€â”€ */}
+            {/* ── Email fields ── */}
             {channel === 'email' && (
                 <div className="space-y-3">
                     <div className="flex items-start gap-2 p-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl text-xs text-emerald-700 dark:text-emerald-300">
@@ -3688,7 +3688,7 @@ const ActionNodeCard: React.FC<{
                             type="text"
                             value={step.emailSubject || ''}
                             onChange={e => onChange({ emailSubject: e.target.value })}
-                            placeholder="e.g. Welcome to Grace Church! ðŸ™"
+                            placeholder="e.g. Welcome to Grace Church! 🙏"
                             className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                         />
                     </div>
@@ -3701,7 +3701,7 @@ const ActionNodeCard: React.FC<{
                             rows={6}
                             value={step.emailBody || ''}
                             onChange={e => onChange({ emailBody: e.target.value })}
-                            placeholder={`Dear {firstName},\n\nWe're so glad you joined usâ€¦`}
+                            placeholder={`Dear {firstName},\n\nWe're so glad you joined us…`}
                             className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none font-medium leading-relaxed"
                         />
                         <div className="flex gap-1.5 mt-1.5 flex-wrap">
@@ -3793,7 +3793,7 @@ const AiWorkflowBuilderPanel: React.FC<{
                         </div>
                         <div>
                             <h2 className="text-white font-black text-base">AI Workflow Builder</h2>
-                            <p className="text-violet-200 text-xs">Describe your workflow â€” AI writes every step for you</p>
+                            <p className="text-violet-200 text-xs">Describe your workflow — AI writes every step for you</p>
                         </div>
                     </div>
                     <button onClick={onClose} title="Close" className="p-1.5 rounded-xl text-white/70 hover:text-white hover:bg-white/20 transition">
@@ -3815,7 +3815,7 @@ const AiWorkflowBuilderPanel: React.FC<{
                             placeholder="e.g. Send a text once a day for 5 days with a Bible verse about prayer. On the last day, remind them the church has them on the prayer list."
                             className="w-full text-sm border-2 border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500 dark:focus:border-violet-400 resize-none leading-relaxed"
                         />
-                        <p className="text-[10px] text-slate-400 mt-1.5">Tip: âŒ˜ / Ctrl + Enter to generate</p>
+                        <p className="text-[10px] text-slate-400 mt-1.5">Tip: ⌘ / Ctrl + Enter to generate</p>
                     </div>
 
                     {/* Example prompts */}
@@ -3846,7 +3846,7 @@ const AiWorkflowBuilderPanel: React.FC<{
                                 <Loader2 size={48} className="absolute inset-0 m-auto text-violet-400 animate-spin opacity-40" />
                             </div>
                             <div className="text-center">
-                                <p className="font-bold text-slate-700 dark:text-slate-300">Building your workflowâ€¦</p>
+                                <p className="font-bold text-slate-700 dark:text-slate-300">Building your workflow…</p>
                                 <p className="text-xs mt-1">AI is writing every step with real content</p>
                             </div>
                         </div>
@@ -3930,7 +3930,7 @@ const AiWorkflowBuilderPanel: React.FC<{
                                 disabled={loading || !prompt.trim()}
                                 className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-sm font-bold rounded-xl transition shadow-md shadow-violet-200 dark:shadow-violet-900/40"
                             >
-                                {loading ? <><Loader2 size={14} className="animate-spin" /> Generatingâ€¦</> : <><Sparkles size={14} /> Generate Workflow</>}
+                                {loading ? <><Loader2 size={14} className="animate-spin" /> Generating…</> : <><Sparkles size={14} /> Generate Workflow</>}
                             </button>
                         </>
                     )}
@@ -3940,7 +3940,7 @@ const AiWorkflowBuilderPanel: React.FC<{
     );
 };
 
-// â”€â”€â”€ Workflow Editor â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Workflow Editor ─────────────────────────────────────────────────────────
 
 const WorkflowEditor: React.FC<{
     initial: SmsWorkflow | null;
@@ -3954,7 +3954,7 @@ const WorkflowEditor: React.FC<{
     isBusy: boolean;
 }> = ({ initial, churchId, keywords, pcoLists, pcoGroups, smsTags, onSave, onBack, isBusy }) => {
 
-    /** Convert legacy flat SmsWorkflowStep[] → WorkflowNode[]. */
+    /** Convert legacy flat SmsWorkflowStep[] ? WorkflowNode[]. */
     const stepsToNodes = (steps: SmsWorkflowStep[]): WorkflowNode[] => {
         const nodes: WorkflowNode[] = [];
         steps.forEach((s, i) => {
@@ -3990,7 +3990,7 @@ const WorkflowEditor: React.FC<{
         return nodes;
     };
 
-    /** Flatten WorkflowNode[] → SmsWorkflowStep[] for backward-compat (scheduler reads this). */
+    /** Flatten WorkflowNode[] ? SmsWorkflowStep[] for backward-compat (scheduler reads this). */
     const nodesToSteps = (nodes: WorkflowNode[]): SmsWorkflowStep[] => {
         const steps: SmsWorkflowStep[] = [];
         let pendingDelay: WorkflowDelayNode | null = null;
@@ -4034,7 +4034,7 @@ const WorkflowEditor: React.FC<{
         return steps;
     };
 
-    /** Build the initial nodes — either from saved nodes, or convert from legacy steps. */
+    /** Build the initial nodes � either from saved nodes, or convert from legacy steps. */
     const buildInitialNodes = (): WorkflowNode[] => {
         if (initial?.nodes && initial.nodes.length > 0) return initial.nodes;
         if (initial?.steps && initial.steps.length > 0) return stepsToNodes(initial.steps);
@@ -4086,7 +4086,7 @@ const WorkflowEditor: React.FC<{
 
     const patch = (p: Partial<SmsWorkflow>) => setWf(prev => ({ ...prev, ...p }));
 
-    // ── Node CRUD helpers ─────────────────────────────────────────────────────
+    // -- Node CRUD helpers -----------------------------------------------------
 
     const reorder = (ns: WorkflowNode[]) => ns.map((n, i) => ({ ...n, order: i }));
 
@@ -4117,7 +4117,7 @@ const WorkflowEditor: React.FC<{
             return reorder(arr);
         });
 
-    // ── Validation helper ─────────────────────────────────────────────────────
+    // -- Validation helper -----------------------------------------------------
 
     const validateActionNode = (an: WorkflowActionNode): string | null => {
         const ch = an.channelType ?? 'sms';
@@ -4258,7 +4258,7 @@ const WorkflowEditor: React.FC<{
                         <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Trigger</p>
                         <p className="text-xs text-slate-500 dark:text-slate-400">What event starts enrolling a contact into this workflow?</p>
 
-                        {/* Row 1 â€” basic triggers */}
+                        {/* Row 1 — basic triggers */}
                         <div className="grid grid-cols-3 gap-2">
                             {(['manual', 'keyword', 'list_add'] as const).map(t => (
                                 <button
@@ -4269,14 +4269,14 @@ const WorkflowEditor: React.FC<{
                                     }`}
                                 >
                                     <p className="text-xs font-black text-slate-900 dark:text-white mb-0.5">
-                                        {t === 'manual' ? 'âœï¸ Manual' : t === 'keyword' ? 'ðŸ’¬ Keyword' : 'ðŸ“ List Add'}
+                                        {t === 'manual' ? '✍️ Manual' : t === 'keyword' ? '💬 Keyword' : '📝 List Add'}
                                     </p>
                                     <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">{triggerLabel[t]}</p>
                                 </button>
                             ))}
                         </div>
 
-                        {/* Row 2 â€” date-based triggers */}
+                        {/* Row 2 — date-based triggers */}
                         <div className="grid grid-cols-2 gap-2">
                             {(['birthday', 'anniversary'] as const).map(t => (
                                 <button
@@ -4289,7 +4289,7 @@ const WorkflowEditor: React.FC<{
                                     }`}
                                 >
                                     <p className="text-xs font-black text-slate-900 dark:text-white mb-0.5">
-                                        {t === 'birthday' ? 'ðŸŽ‚ Birthday' : 'ðŸ’ Anniversary'}
+                                        {t === 'birthday' ? '🎂 Birthday' : '💍 Anniversary'}
                                     </p>
                                     <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">{triggerLabel[t]}</p>
                                 </button>
@@ -4312,7 +4312,7 @@ const WorkflowEditor: React.FC<{
                                         title="Trigger keyword"
                                         className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
                                     >
-                                        <option value="">â€” Select a keyword â€”</option>
+                                        <option value="">— Select a keyword —</option>
                                         {keywords.filter(k => k.isActive).map(k => (
                                             <option key={k.id} value={k.id}>{k.keyword}</option>
                                         ))}
@@ -4335,7 +4335,7 @@ const WorkflowEditor: React.FC<{
                                     title="Trigger PCO list"
                                     className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
                                 >
-                                    <option value="">â€” Select a list â€”</option>
+                                    <option value="">— Select a list —</option>
                                     {pcoLists.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
                                 </select>
                                 <p className="text-[10px] text-slate-400 mt-1">Contacts are enrolled whenever the scheduler detects them added to this list.</p>
@@ -4375,7 +4375,7 @@ const WorkflowEditor: React.FC<{
                                 </div>
                                 {/* Info banner */}
                                 <div className="flex items-start gap-2.5 p-3.5 bg-pink-50 dark:bg-pink-900/20 border border-pink-200 dark:border-pink-800 rounded-xl">
-                                    <span className="text-lg shrink-0 mt-0.5">{wf.trigger === 'birthday' ? 'ðŸŽ‚' : 'ðŸ’'}</span>
+                                    <span className="text-lg shrink-0 mt-0.5">{wf.trigger === 'birthday' ? '🎂' : '💍'}</span>
                                     <div className="text-xs text-pink-700 dark:text-pink-300 leading-relaxed">
                                         <p className="font-bold mb-0.5">
                                             Automatically fires every year
@@ -4501,7 +4501,7 @@ const WorkflowEditor: React.FC<{
     );
 };
 
-// â”€â”€â”€ Enrollment Pane â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Enrollment Pane ─────────────────────────────────────────────────────────
 
 const EnrollmentPane: React.FC<{
     workflow: SmsWorkflow;
@@ -4602,7 +4602,7 @@ const EnrollmentPane: React.FC<{
                         disabled={!phone.trim() || enrolling}
                         className="w-full py-2.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-sm font-bold rounded-xl transition flex items-center justify-center gap-2"
                     >
-                        {enrolling ? <><Loader2 size={13} className="animate-spin" />Enrollingâ€¦</> : <><Plus size={13} />Enroll in Workflow</>}
+                        {enrolling ? <><Loader2 size={13} className="animate-spin" />Enrolling…</> : <><Plus size={13} />Enroll in Workflow</>}
                     </button>
                 </div>
 
@@ -4620,7 +4620,7 @@ const EnrollmentPane: React.FC<{
                                         <p className="text-sm font-bold text-slate-900 dark:text-white">{en.personName || formatPhone(en.phoneNumber)}</p>
                                         {en.personName && <p className="text-[10px] text-slate-400">{formatPhone(en.phoneNumber)}</p>}
                                         <p className="text-[10px] text-slate-500 mt-0.5">
-                                            Step {en.currentStep + 1} of {workflow.steps.length} Â· enrolled {timeAgo(en.enrolledAt)}
+                                            Step {en.currentStep + 1} of {workflow.steps.length} · enrolled {timeAgo(en.enrolledAt)}
                                         </p>
                                     </div>
                                     <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${
@@ -4636,7 +4636,7 @@ const EnrollmentPane: React.FC<{
     );
 };
 
-// â”€â”€â”€ Workflows List + Manager â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Workflows List + Manager ─────────────────────────────────────────────────
 
 const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
     const [workflows, setWorkflows] = useState<SmsWorkflow[]>([]);
@@ -4708,11 +4708,11 @@ const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
     const openEdit = (wf: SmsWorkflow) => { setEditing(wf); setViewMode('editor'); };
 
     const TRIGGER_BADGE: Record<string, { label: string; color: string; icon: string }> = {
-        manual:      { label: 'Manual',      color: 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300',    icon: 'âœï¸' },
-        keyword:     { label: 'Keyword',     color: 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300', icon: 'ðŸ’¬' },
-        list_add:    { label: 'List Add',    color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300',      icon: 'ðŸ“' },
-        birthday:    { label: 'Birthday',    color: 'bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300',      icon: 'ðŸŽ‚' },
-        anniversary: { label: 'Anniversary', color: 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300',      icon: 'ðŸ’' },
+        manual:      { label: 'Manual',      color: 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300',    icon: '✍️' },
+        keyword:     { label: 'Keyword',     color: 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300', icon: '💬' },
+        list_add:    { label: 'List Add',    color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300',      icon: '📝' },
+        birthday:    { label: 'Birthday',    color: 'bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300',      icon: '🎂' },
+        anniversary: { label: 'Anniversary', color: 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300',      icon: '💍' },
     };
 
     // Show editor view
@@ -4744,7 +4744,7 @@ const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
                         <Zap size={26} className="text-violet-500" /> Workflows
                     </h1>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                        Automated drip sequences â€” the right message at the right time.
+                        Automated drip sequences — the right message at the right time.
                     </p>
                 </div>
                 <button onClick={openNew} className="flex items-center gap-2 px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold rounded-xl transition shadow-md shadow-violet-200 dark:shadow-violet-900/40">
@@ -4754,18 +4754,18 @@ const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
 
             {/* Explainer */}
             <div className="flex items-start gap-4 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-2xl p-4 mb-6">
-                <div className="text-3xl">âš¡</div>
+                <div className="text-3xl">⚡</div>
                 <div>
                     <p className="text-sm font-bold text-violet-800 dark:text-violet-200 mb-1">How Workflows Work</p>
                     <p className="text-xs text-violet-700 dark:text-violet-300 leading-relaxed">
-                        Build a multi-step message sequence with custom delays between each step. Triggered automatically by a keyword text, a PCO List add, a <strong>ðŸŽ‚ birthday</strong>, or a <strong>ðŸ’ anniversary</strong> â€” or manually by staff. Once enrolled, contacts move through each step on schedule. Birthday and anniversary workflows auto-enroll the right people every year.
+                        Build a multi-step message sequence with custom delays between each step. Triggered automatically by a keyword text, a PCO List add, a <strong>🎂 birthday</strong>, or a <strong>💍 anniversary</strong> — or manually by staff. Once enrolled, contacts move through each step on schedule. Birthday and anniversary workflows auto-enroll the right people every year.
                     </p>
                 </div>
             </div>
 
             {/* Workflow cards */}
             {isLoading ? (
-                <div className="flex items-center justify-center h-40 text-slate-400"><Loader2 size={20} className="animate-spin mr-2" />Loading workflowsâ€¦</div>
+                <div className="flex items-center justify-center h-40 text-slate-400"><Loader2 size={20} className="animate-spin mr-2" />Loading workflows…</div>
             ) : workflows.length === 0 ? (
                 <div className="text-center py-20 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
                     <Zap size={40} className="mx-auto text-slate-300 dark:text-slate-600 mb-3" />
@@ -4900,7 +4900,7 @@ const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
     );
 };
 
-// â”€â”€â”€ SMS Setup Banner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── SMS Setup Banner ────────────────────────────────────────────────────────
 
 const SmsSetupBanner: React.FC<{ onSetup: () => void }> = ({ onSetup }) => (
     <div className="p-6 max-w-2xl mx-auto mt-12">
@@ -4914,9 +4914,9 @@ const SmsSetupBanner: React.FC<{ onSetup: () => void }> = ({ onSetup }) => (
             </p>
             <div className="grid grid-cols-3 gap-4 mb-8 text-center">
                 {[
-                    { icon: 'ðŸ“±', title: 'Local Number', desc: 'Pick an area code' },
-                    { icon: 'ðŸ“£', title: 'Bulk Texts', desc: 'Reach entire lists' },
-                    { icon: 'ðŸ’¬', title: '2-Way Inbox', desc: 'Real conversations' },
+                    { icon: '📱', title: 'Local Number', desc: 'Pick an area code' },
+                    { icon: '📣', title: 'Bulk Texts', desc: 'Reach entire lists' },
+                    { icon: '💬', title: '2-Way Inbox', desc: 'Real conversations' },
                 ].map(f => (
                     <div key={f.title} className="bg-white/10 rounded-2xl p-3">
                         <div className="text-2xl mb-1">{f.icon}</div>
@@ -4929,13 +4929,13 @@ const SmsSetupBanner: React.FC<{ onSetup: () => void }> = ({ onSetup }) => (
                 onClick={onSetup}
                 className="px-8 py-3 bg-white text-violet-700 font-black rounded-2xl hover:bg-violet-50 transition text-sm shadow-lg"
             >
-                Get Started â†’
+                Get Started →
             </button>
         </div>
     </div>
 );
 
-// â”€â”€â”€ Setup Wizard (Inline) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Setup Wizard (Inline) ────────────────────────────────────────────────────
 
 const SmsSetupWizard: React.FC<{
     churchId: string;
@@ -5050,7 +5050,7 @@ const SmsSetupWizard: React.FC<{
                                             : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'
                                     }`}
                                 >
-                                    {mode === 'city-state' ? 'ðŸ™ City & State' : '# Area Code'}
+                                    {mode === 'city-state' ? '🏙 City & State' : '# Area Code'}
                                 </button>
                             ))}
                         </div>
@@ -5077,7 +5077,7 @@ const SmsSetupWizard: React.FC<{
                                         title="State"
                                         className="w-full text-base border-2 border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500 appearance-none"
                                     >
-                                        <option value="">Select a stateâ€¦</option>
+                                        <option value="">Select a state…</option>
                                         {US_STATES.map(([abbr, name]) => (
                                             <option key={abbr} value={abbr}>{name} ({abbr})</option>
                                         ))}
@@ -5108,7 +5108,7 @@ const SmsSetupWizard: React.FC<{
                             disabled={loadingNums || !canSearch}
                             className="w-full py-3 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white font-black rounded-2xl transition mt-5 flex items-center justify-center gap-2"
                         >
-                            {loadingNums ? <><Loader2 size={16} className="animate-spin" /> Searchingâ€¦</> : 'Find Available Numbers â†’'}
+                            {loadingNums ? <><Loader2 size={16} className="animate-spin" /> Searching…</> : 'Find Available Numbers →'}
                         </button>
                     </>
                 )}
@@ -5140,7 +5140,7 @@ const SmsSetupWizard: React.FC<{
                         {/* Cross-state fallback notice (city found in a different state) */}
                         {numbers.length > 0 && city && resolvedSearch.includes('(any state)') && (
                             <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl px-3 py-2 mb-3">
-                                â„¹ï¸ No numbers found in <strong>{city}, {stateAbbr}</strong> â€” showing numbers for <strong>{city}</strong> in another state instead.
+                                ℹ️ No numbers found in <strong>{city}, {stateAbbr}</strong> — showing numbers for <strong>{city}</strong> in another state instead.
                             </p>
                         )}
 
@@ -5154,7 +5154,7 @@ const SmsSetupWizard: React.FC<{
                                     disabled={loadingNums}
                                     className="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-black rounded-xl transition flex items-center gap-2 mx-auto"
                                 >
-                                    {loadingNums ? <><Loader2 size={12} className="animate-spin" /> Searchingâ€¦</> : `Search all of ${stateAbbr} â†’`}
+                                    {loadingNums ? <><Loader2 size={12} className="animate-spin" /> Searching…</> : `Search all of ${stateAbbr} →`}
                                 </button>
                             </div>
                         )}
@@ -5173,7 +5173,7 @@ const SmsSetupWizard: React.FC<{
                                             <div className="flex-1 min-w-0">
                                                 <p className="font-black text-lg text-slate-900 dark:text-white tracking-wide">{n.friendlyName}</p>
                                                 <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold">
-                                                    ðŸ“ {cityState || `Area code ${areaCode}`}
+                                                    📍 {cityState || `Area code ${areaCode}`}
                                                 </span>
                                             </div>
                                             {selectedNumber === n.phoneNumber && (
@@ -5193,7 +5193,7 @@ const SmsSetupWizard: React.FC<{
                                     disabled={page === 0}
                                     className="flex items-center gap-1 text-xs font-bold text-slate-600 dark:text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 disabled:opacity-30 transition"
                                 >
-                                    â† Prev
+                                    ← Prev
                                 </button>
                                 <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
                                     Page {page + 1} of {totalPages}
@@ -5204,7 +5204,7 @@ const SmsSetupWizard: React.FC<{
                                     disabled={page >= totalPages - 1}
                                     className="flex items-center gap-1 text-xs font-bold text-slate-600 dark:text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 disabled:opacity-30 transition"
                                 >
-                                    Next â†’
+                                    Next →
                                 </button>
                             </div>
                         )}
@@ -5226,14 +5226,14 @@ const SmsSetupWizard: React.FC<{
                         {error && <p className="text-sm text-red-500 mb-3">{error}</p>}
 
                         <div className="flex gap-2">
-                            <button onClick={() => setStep('search')} className="flex-1 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 transition">â† Search Again</button>
+                            <button onClick={() => setStep('search')} className="flex-1 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 transition">← Search Again</button>
                             {numbers.length > 0 && (
                                 <button
                                     onClick={provision}
                                     disabled={provisioning || !selectedNumber}
                                     className="flex-1 py-2.5 text-sm font-black bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-xl transition flex items-center justify-center gap-2"
                                 >
-                                    {provisioning ? <><Loader2 size={14} className="animate-spin" />Provisioningâ€¦</> : 'Claim Number â†’'}
+                                    {provisioning ? <><Loader2 size={14} className="animate-spin" />Provisioning…</> : 'Claim Number →'}
                                 </button>
                             )}
                         </div>
@@ -5246,7 +5246,7 @@ const SmsSetupWizard: React.FC<{
                         <div className="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mx-auto mb-4">
                             <CheckCircle size={32} className="text-emerald-600" />
                         </div>
-                        <h2 className="text-xl font-black text-slate-900 dark:text-white mb-2">You're All Set! ðŸŽ‰</h2>
+                        <h2 className="text-xl font-black text-slate-900 dark:text-white mb-2">You're All Set! 🎉</h2>
                         <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
                             Your church phone number has been provisioned. You can now send text campaigns and receive replies in your inbox.
                         </p>
@@ -5254,7 +5254,7 @@ const SmsSetupWizard: React.FC<{
                             <strong>Next step:</strong> For high-volume sending (more than 200 msgs/day), complete A2P 10DLC brand registration in your Twilio Console to avoid carrier filtering.
                         </div>
                         <button onClick={onComplete} className="px-8 py-3 bg-violet-600 hover:bg-violet-700 text-white font-black rounded-2xl transition">
-                            Start Messaging â†’
+                            Start Messaging →
                         </button>
                     </div>
                 )}
@@ -5263,7 +5263,7 @@ const SmsSetupWizard: React.FC<{
     );
 };
 
-// â”€â”€â”€ Main MessagingModule â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Main MessagingModule ─────────────────────────────────────────────────────
 
 interface MessagingModuleProps {
     churchId:    string;
@@ -5378,11 +5378,11 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
             recurringFrequency: recurringFrequency ?? null,
             updatedAt: Date.now(),
         });
-        showToast('Campaign scheduled âœ“');
+        showToast('Campaign scheduled ✓');
         setActiveCampaign(null);
     };
 
-    // â”€â”€ Not yet set up â”€â”€
+    // ── Not yet set up ──
     if (!smsEnabled && !showSetup) {
         return <SmsSetupBanner onSetup={() => setShowSetup(true)} />;
     }
@@ -5430,7 +5430,7 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                         <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-full px-3 py-1.5">
                             <Phone size={12} />
                             {formatPhone(church.smsSettings.twilioPhoneNumber)}
-                            <span className="text-[10px] opacity-70">Â· SMS Active</span>
+                            <span className="text-[10px] opacity-70">· SMS Active</span>
                         </div>
                     )}
                 </div>
