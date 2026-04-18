@@ -177,6 +177,129 @@ async function startServer() {
     app.post('/api/messaging/send-individual', express.json(), sendIndividual);
     app.post('/api/messaging/send-bulk', express.json(), sendBulk);
 
+    // ─── SMS Agent: Website Scanner ─────────────────────────────────────────────
+    // Fetches a church website URL server-side, extracts visible text, and uses
+    // Gemini to pull out structured church information for the knowledge base.
+    app.post('/api/messaging/scan-website', express.json(), async (req: any, res: any) => {
+      const { url } = req.body || {};
+      if (!url || typeof url !== 'string') {
+        return res.status(400).json({ error: 'Missing url' });
+      }
+
+      // Validate the URL
+      let parsedUrl: URL;
+      try {
+        parsedUrl = new URL(url);
+        if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+          return res.status(400).json({ error: 'Only http and https URLs are supported.' });
+        }
+      } catch {
+        return res.status(400).json({ error: 'Invalid URL format.' });
+      }
+
+      try {
+        // 1. Fetch the page server-side (avoids browser CORS restrictions)
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
+        let html = '';
+        try {
+          const pageRes = await fetch(parsedUrl.toString(), {
+            signal: controller.signal,
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (compatible; PastoralCareBot/1.0; +https://pastoralcare.barnabassoftware.com)',
+              'Accept': 'text/html,application/xhtml+xml',
+            },
+          });
+          clearTimeout(timeout);
+          if (!pageRes.ok) {
+            return res.status(400).json({ error: `Website returned HTTP ${pageRes.status}. Please check the URL.` });
+          }
+          html = await pageRes.text();
+        } catch (fetchErr: any) {
+          clearTimeout(timeout);
+          if (fetchErr.name === 'AbortError') {
+            return res.status(400).json({ error: 'The website took too long to respond (10s timeout).' });
+          }
+          return res.status(400).json({ error: `Could not reach the website: ${fetchErr.message}` });
+        }
+
+        // 2. Strip HTML to plain text — remove scripts, styles, hidden elements, then tags
+        const plainText = html
+          .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+          .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+          .replace(/<!--[\s\S]*?-->/g, ' ')
+          .replace(/<[^>]+>/g, ' ')           // strip all remaining tags
+          .replace(/&nbsp;/g, ' ')
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&quot;/g, '"')
+          .replace(/&#39;/g, "'")
+          .replace(/\s{3,}/g, '\n')           // collapse whitespace
+          .trim()
+          .slice(0, 12000);                   // cap at ~12k chars to stay within token budget
+
+        if (plainText.length < 50) {
+          return res.status(400).json({ error: 'Could not extract readable text from the page. Try a different URL (e.g. the About or Contact page).' });
+        }
+
+        // 3. Use Gemini to extract structured church info
+        const { GoogleGenAI } = await import('@google/genai');
+        const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+        if (!apiKey) {
+          return res.status(500).json({ error: 'AI service not configured on server.' });
+        }
+        const ai = new GoogleGenAI({ apiKey });
+
+        const extractPrompt = `You are extracting structured information about a church from website content.
+Read the text below and extract the following fields. For each field, return the actual value found on the page.
+If a field is not clearly present on the page, omit it from the JSON (do not make up data).
+Return ONLY a valid JSON object with these keys (all optional):
+{
+  "address": "Full physical street address of the church",
+  "serviceTimes": "All service times and schedules (e.g. Sundays 9am & 11am, Wednesdays 7pm)",
+  "pastor": "Lead pastor or senior pastor name and any brief bio",
+  "ministries": "Ministries offered (youth, worship, mens/womens groups, missions, etc.)",
+  "classes": "Small groups, discipleship classes, Alpha course, Bible studies, etc.",
+  "locations": "Names and addresses of all campus or meeting locations",
+  "website": "${parsedUrl.origin}",
+  "phone": "Main church phone number",
+  "customFacts": "Any other important church info: parking, childcare, special programs, FAQs, social media, etc."
+}
+
+WEBSITE TEXT:
+${plainText}
+
+Return ONLY the JSON object, no markdown, no explanation:`;
+
+        const aiResponse = await ai.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: extractPrompt,
+        });
+
+        const raw = (aiResponse.text || '').trim()
+          .replace(/^```[a-z]*\n?/i, '')
+          .replace(/\n?```$/i, '')
+          .trim();
+
+        let extracted: Record<string, string> = {};
+        try {
+          extracted = JSON.parse(raw);
+        } catch {
+          return res.status(500).json({ error: 'AI returned unexpected format. Please try again or enter details manually.' });
+        }
+
+        // Ensure website is always set
+        extracted.website = extracted.website || parsedUrl.origin;
+
+        return res.json({ success: true, extracted });
+      } catch (e: any) {
+        console.error('[ScanWebsite] Error:', e?.message || e);
+        return res.status(500).json({ error: e?.message || 'An unexpected error occurred.' });
+      }
+    });
+
+
     // ─── Public Unsubscribe (no auth required) ───────────────────────────────
     // Token = base64url(churchId:email)
 
