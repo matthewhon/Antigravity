@@ -1041,8 +1041,21 @@ export type WorkflowChannelType = 'sms' | 'mms' | 'email' | 'staff_sms' | 'staff
 export interface SmsWorkflowStep {
     id: string;             // uuid
     order: number;
-    /** Days to wait after the previous step (0 = send immediately / same day). */
+    /** Days to wait after the previous step (0 = send immediately). Only used when scheduleType = 'relative'. */
     delayDays: number;
+    /**
+     * Timing mode for this step (default = 'relative').
+     * - 'relative'     → fire delayDays after the previous step completes.
+     * - 'day_of_week'  → fire on the next occurrence of scheduleDayOfWeek after the previous step.
+     * - 'day_of_month' → fire on the next calendar date matching scheduleDayOfMonth.
+     */
+    scheduleType?: 'relative' | 'day_of_week' | 'day_of_month';
+    /** 0 = Sunday … 6 = Saturday. Used when scheduleType = 'day_of_week'. Default: 1 (Monday). */
+    scheduleDayOfWeek?: number;
+    /** 1–31. Used when scheduleType = 'day_of_month'. */
+    scheduleDayOfMonth?: number;
+    /** Send time in 'HH:MM' 24-hour format. Used for day_of_week and day_of_month modes. Default '09:00'. */
+    scheduleTime?: string;
     /** Channel type for this step. Defaults to 'sms'. */
     channelType: WorkflowChannelType;
     // ── SMS / MMS ──────────────────────────────────────────────────────────────

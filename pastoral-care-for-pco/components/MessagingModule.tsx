@@ -1,5 +1,7 @@
-﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { db as firebaseDb } from '../services/firebase';
+import { storage } from '../services/firebase';
+import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import {
     collection, doc, onSnapshot, addDoc, updateDoc, deleteDoc,
     query, where, orderBy, limit, getDocs, getDoc, setDoc,
@@ -14,7 +16,7 @@ import {
     Inbox, BarChart3, Copy, Zap, MessageCircle, TrendingUp, TrendingDown,
     Activity, DollarSign, UserX, Edit3, UserCheck, List, Layers,
     Smile, Image as ImageIcon, Link, Sparkles, ChevronRight, RotateCcw,
-    Mail, Tag, Filter, Hash
+    Mail, Tag, Filter, Hash, Upload, ExternalLink
 } from 'lucide-react';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -878,11 +880,17 @@ const NewMessageComposer: React.FC<{
     const [showEmojisNM, setShowEmojisNM]     = useState(false);
     const [showLinkDlgNM, setShowLinkDlgNM]   = useState(false);
     const [linkUrlNM, setLinkUrlNM]           = useState('');
-    const [imageUrlNM, setImageUrlNM]         = useState('');
+    const [imageUrlNM, setImageUrlNM]         = useState(''); // final publicly-accessible URL (MMS)
     const [aiSuggestionNM, setAiSuggestionNM] = useState('');
     const [aiLoadingNM, setAiLoadingNM]       = useState(false);
     const [showAiPanelNM, setShowAiPanelNM]   = useState(false);
-    const textareaRefNM = useRef<HTMLTextAreaElement>(null);
+    const [showImagePanelNM, setShowImagePanelNM] = useState(false); // expanded image panel
+    const [imageUploadProgress, setImageUploadProgress] = useState<number | null>(null); // 0-100
+    const [imageUploadError, setImageUploadError]       = useState('');
+    const [urlInputNM, setUrlInputNM]         = useState(''); // manual URL tab input
+    const [imageTab, setImageTab]             = useState<'upload' | 'url'>('upload');
+    const fileInputRefNM = useRef<HTMLInputElement>(null);
+    const textareaRefNM  = useRef<HTMLTextAreaElement>(null);
 
     const MAX_CHARS  = 1600;
     const segCount   = Math.ceil((body.length || 1) / 160);
@@ -915,6 +923,33 @@ const NewMessageComposer: React.FC<{
         } finally {
             setAiLoadingNM(false);
         }
+    };
+
+    /** Upload a File to Firebase Storage and set imageUrlNM on completion. */
+    const handleImageFileUpload = (file: File) => {
+        if (!file.type.startsWith('image/')) {
+            setImageUploadError('Please select an image file (JPG, PNG, GIF, WebP).');
+            return;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+            setImageUploadError('Image must be under 5 MB.');
+            return;
+        }
+        setImageUploadError('');
+        setImageUploadProgress(0);
+        const path = `mms/${churchId}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+        const sRef  = storageRef(storage, path);
+        const task  = uploadBytesResumable(sRef, file);
+        task.on(
+            'state_changed',
+            snap => setImageUploadProgress(Math.round((snap.bytesTransferred / snap.totalBytes) * 100)),
+            err  => { setImageUploadError('Upload failed: ' + err.message); setImageUploadProgress(null); },
+            async () => {
+                const url = await getDownloadURL(task.snapshot.ref);
+                setImageUrlNM(url);
+                setImageUploadProgress(null);
+            }
+        );
     };
 
     // Debounced people search (fires when personSearch changes)
@@ -1010,6 +1045,7 @@ const NewMessageComposer: React.FC<{
                         churchId,
                         toPhone:    toPhone.replace(/[^\d+]/g, ''),
                         body,
+                        mediaUrls:  imageUrlNM ? [imageUrlNM] : undefined,
                         sentBy:     currentUser.id,
                         sentByName: currentUser.name,
                         personName: toName || undefined,
@@ -1028,6 +1064,7 @@ const NewMessageComposer: React.FC<{
                         pcoListId:   selectedList.id,
                         listName:    selectedList.name,
                         body,
+                        mediaUrls:   imageUrlNM ? [imageUrlNM] : undefined,
                         sentBy:      currentUser.id,
                         sentByName:  currentUser.name,
                     }),
@@ -1044,6 +1081,7 @@ const NewMessageComposer: React.FC<{
                         pcoGroupId:  selectedGroup.id,
                         groupName:   selectedGroup.name,
                         body,
+                        mediaUrls:   imageUrlNM ? [imageUrlNM] : undefined,
                         sentBy:      currentUser.id,
                         sentByName:  currentUser.name,
                     }),
@@ -1084,7 +1122,7 @@ const NewMessageComposer: React.FC<{
 
     return (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[95vh]">
 
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-slate-200 dark:border-slate-700 shrink-0">
@@ -1384,33 +1422,51 @@ const NewMessageComposer: React.FC<{
                                     </div>
                                 )}
                             </div>
-                            {/* Image */}
-                            <button type="button" title="Attach image (MMS)" onClick={() => {
-                                const url = window.prompt('Enter image URL (MMS):');
-                                if (url) setImageUrlNM(url);
-                            }} className={`flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-lg border transition ${
-                                imageUrlNM ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
-                                : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700'
-                            }`}>
-                                <ImageIcon size={12} /> {imageUrlNM ? 'Image ✓' : 'Image'}
-                            </button>
+                            {/* Image / MMS */}
+                            <button type="button" title="Attach image (MMS)"
+                                onClick={() => { setShowImagePanelNM(v => !v); setShowEmojisNM(false); setShowLinkDlgNM(false); }}
+                                className={`flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-lg border transition ${imageUrlNM ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700' : showImagePanelNM ? 'bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 border-violet-300 dark:border-violet-700' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700'}`}
+                            ><ImageIcon size={12} /> {imageUrlNM ? 'Image \u2713' : 'Image (MMS)'}</button>
                             {imageUrlNM && (
-                                <button type="button" title="Remove image" onClick={() => setImageUrlNM('')}
-                                    className="p-1 text-red-400 hover:text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition"><X size={12} /></button>
+                                <button type="button" title="Remove image" onClick={() => { setImageUrlNM(''); setShowImagePanelNM(false); }} className="p-1 text-red-400 hover:text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition"><X size={12} /></button>
                             )}
                             <div className="flex-1" />
                             {/* AI Helper */}
                             <button type="button" title="AI SMS helper" onClick={handleAiSuggestNM}
                                 disabled={!body.trim() || aiLoadingNM}
                                 className="flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-700 hover:bg-violet-100 dark:hover:bg-violet-900/40 disabled:opacity-50 transition"
-                            >
-                                {aiLoadingNM ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />} AI Shorten
-                            </button>
+                            >{aiLoadingNM ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />} AI Shorten</button>
                         </div>
-                        {/* Image preview NM */}
-                        {imageUrlNM && (
-                            <div className="mt-2 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 max-w-[180px]">
-                                <img src={imageUrlNM} alt="MMS attachment" className="w-full h-auto object-cover" onError={() => setImageUrlNM('')} />
+                        {/* Image upload panel */}
+                        {showImagePanelNM && (
+                            <div className="mt-3 border-2 border-violet-200 dark:border-violet-700 rounded-2xl overflow-hidden">
+                                <div className="flex border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+                                    {(['upload', 'url'] as const).map(tab => (
+                                        <button key={tab} type="button" onClick={() => setImageTab(tab)} className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest transition ${imageTab === tab ? 'text-violet-600 dark:text-violet-300 border-b-2 border-violet-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>{tab === 'upload' ? '\uD83D\uDCC1 Upload File' : '\uD83D\uDD17 Paste URL'}</button>
+                                    ))}
+                                </div>
+                                <div className="p-4 bg-white dark:bg-slate-900 space-y-3">
+                                    {imageTab === 'upload' ? (
+                                        <>
+                                            <input ref={fileInputRefNM} type="file" accept="image/*" aria-label="Upload image for MMS" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleImageFileUpload(f); }} />
+                                            <div onClick={() => fileInputRefNM.current?.click()} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleImageFileUpload(f); }} className="flex flex-col items-center justify-center gap-2 py-8 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl cursor-pointer hover:border-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/10 transition">
+                                                <Upload size={24} className="text-slate-400" />
+                                                <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">Click or drag &amp; drop</p>
+                                                <p className="text-[10px] text-slate-400">JPG, PNG, GIF, WebP — max 5 MB</p>
+                                            </div>
+                                            {imageUploadProgress !== null && (<div className="space-y-1"><div className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden" role="progressbar" aria-valuenow={imageUploadProgress} aria-valuemin={0} aria-valuemax={100}><div className="h-full bg-violet-500 rounded-full transition-all" style={{ width: `${imageUploadProgress}%` }} /></div><p className="text-[10px] text-slate-400 text-right">{imageUploadProgress}%</p></div>)}
+                                            {imageUploadError && <p className="text-xs text-red-500">{imageUploadError}</p>}
+                                        </>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            <div className="flex gap-2">
+                                                <input type="url" value={urlInputNM} onChange={e => setUrlInputNM(e.target.value)} placeholder="https://example.com/photo.jpg" className="flex-1 text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500" />
+                                                <button type="button" onClick={() => { if (urlInputNM.trim()) { setImageUrlNM(urlInputNM.trim()); setUrlInputNM(''); } }} disabled={!urlInputNM.trim()} className="px-3 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition">Use URL</button>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {imageUrlNM && (<div className="flex items-center gap-3 p-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl"><img src={imageUrlNM} alt="MMS preview" className="w-16 h-16 object-cover rounded-lg shrink-0" onError={() => setImageUrlNM('')} /><div className="flex-1 min-w-0"><p className="text-xs font-bold text-emerald-700 dark:text-emerald-300">Image attached</p><p className="text-[10px] text-emerald-600 truncate">{imageUrlNM}</p></div><button type="button" title="Remove image" onClick={() => setImageUrlNM('')} className="text-red-400 hover:text-red-600 shrink-0"><X size={14} /></button></div>)}
+                                </div>
                             </div>
                         )}
                         {/* AI panel NM */}
@@ -2153,15 +2209,31 @@ const SmsKeywordsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
     }, [churchId]);
 
     // Load tags
+    const [tagLoadError, setTagLoadError] = useState<string | null>(null);
     useEffect(() => {
         const q = query(
             collection(firebaseDb, 'smsTags'),
             where('churchId', '==', churchId),
             orderBy('createdAt', 'asc')
         );
-        return onSnapshot(q, snap => {
-            setTags(snap.docs.map(d => ({ id: d.id, ...d.data() } as SmsTag)));
-        });
+        return onSnapshot(
+            q,
+            snap => {
+                setTags(snap.docs.map(d => ({ id: d.id, ...d.data() } as SmsTag)));
+                setTagLoadError(null);
+            },
+            (err: any) => {
+                console.error('[SmsTags] onSnapshot error:', err);
+                if (err?.code === 'failed-precondition' || (err?.message || '').toLowerCase().includes('index')) {
+                    setTagLoadError(
+                        'A Firestore composite index is required for the smsTags collection. ' +
+                        'Open the browser console, click the index creation link in the error, then reload.'
+                    );
+                } else {
+                    setTagLoadError('Failed to load tags: ' + (err?.message || String(err)));
+                }
+            }
+        );
     }, [churchId]);
 
     // Load PCO lists for the modal picker
@@ -2231,15 +2303,30 @@ const SmsKeywordsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
         setTagBusy(true);
         try {
             if (editTag) {
-                await updateDoc(doc(firebaseDb, 'smsTags', editTag.id), { name: tagName.trim(), emoji: tagEmoji.trim() || null, color: tagColor });
+                const updatePayload: any = { name: tagName.trim(), color: tagColor };
+                if (tagEmoji.trim()) updatePayload.emoji = tagEmoji.trim();
+                else updatePayload.emoji = null; // clear it if user removed the emoji
+                await updateDoc(doc(firebaseDb, 'smsTags', editTag.id), updatePayload);
             } else {
-                await addDoc(collection(firebaseDb, 'smsTags'), {
-                    churchId, name: tagName.trim(), emoji: tagEmoji.trim() || null, color: tagColor, createdAt: Date.now(),
-                });
+                const newTag: any = {
+                    churchId,
+                    name:      tagName.trim(),
+                    color:     tagColor,
+                    createdAt: Date.now(),
+                };
+                if (tagEmoji.trim()) newTag.emoji = tagEmoji.trim();
+                await addDoc(collection(firebaseDb, 'smsTags'), newTag);
             }
             setTagModalOpen(false);
+            setTagName('');
+            setTagEmoji('');
+            setTagColor('violet');
+            setEditTag(null);
         } catch (e: any) {
-            alert('Failed to save tag: ' + e.message);
+            const msg = e?.code === 'permission-denied'
+                ? 'Permission denied — check your Firestore security rules for the smsTags collection.'
+                : 'Failed to save tag: ' + (e?.message || String(e));
+            alert(msg);
         } finally {
             setTagBusy(false);
         }
@@ -2398,6 +2485,13 @@ const SmsKeywordsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
                     </p>
                 </div>
             </div>
+
+            {tagLoadError && (
+                <div className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl px-4 py-3 mb-4">
+                    <AlertTriangle size={14} className="shrink-0 mt-0.5 text-amber-500" />
+                    <span>{tagLoadError}</span>
+                </div>
+            )}
 
             {tags.length === 0 ? (
                 <div className="text-center py-20 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
@@ -2591,7 +2685,7 @@ const StatCard: React.FC<{
 };
 
 const MiniBar: React.FC<{ pct: number; color?: string }> = ({ pct, color = 'bg-violet-500' }) => (
-    <div className="w-full h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+    <div className="w-full h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden" role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100}>
         <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${Math.min(100, Math.max(0, pct))}%` }} />
     </div>
 );
@@ -2787,7 +2881,12 @@ const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[] }> = (
                                                 {m.sent.toLocaleString()} sent · {m.delivered.toLocaleString()} delivered
                                             </div>
                                             {/* Bar outer */}
-                                            <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-xl overflow-hidden" style={{ height: '120px' }}>
+                                            <div
+                                                className="w-full bg-slate-100 dark:bg-slate-700 rounded-xl overflow-hidden"
+                                                style={{ height: '120px' }}
+                                                role="img"
+                                                aria-label={`${m.label}: ${m.sent} sent, ${m.delivered} delivered`}
+                                            >
                                                 {/* Sent fill */}
                                                 <div
                                                     className="w-full bg-violet-200 dark:bg-violet-900/40 rounded-xl transition-all duration-500 flex flex-col justify-end"
@@ -3035,7 +3134,7 @@ const StaffStepEditor: React.FC<{
                     <div className='flex gap-2'>
                         <input type='text' value={addName} onChange={e => setAddName(e.target.value)} placeholder='Name' className='flex-1 text-xs border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400' />
                         <input type={isEmail ? 'email' : 'tel'} value={addContact} onChange={e => setAddContact(e.target.value)} onKeyDown={e => e.key === 'Enter' && addRecipient()} placeholder={isEmail ? 'Email' : 'Phone'} className='flex-1 text-xs border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400' />
-                        <button type='button' onClick={addRecipient} className={`px-3 py-2 rounded-xl text-white text-xs font-bold ${isEmail ? 'bg-rose-500 hover:bg-rose-600' : 'bg-amber-500 hover:bg-amber-600'}`}><Plus size={13} /></button>
+                        <button type='button' title='Add recipient' onClick={addRecipient} className={`px-3 py-2 rounded-xl text-white text-xs font-bold ${isEmail ? 'bg-rose-500 hover:bg-rose-600' : 'bg-amber-500 hover:bg-amber-600'}`}><Plus size={13} /></button>
                     </div>
                     {recipients.length === 0 && <p className='text-[10px] text-slate-400 text-center'>No recipients — add at least one.</p>}
                 </div>
@@ -3083,6 +3182,37 @@ const StaffStepEditor: React.FC<{
     );
 };
 
+// ─── Step timing helpers ─────────────────────────────────────────────────────
+
+/** Convert HH:MM (24-hour) → H:MM AM/PM */
+function fmt12(hhmm: string): string {
+    const [h, m] = hhmm.split(':').map(Number);
+    const ampm = h < 12 ? 'AM' : 'PM';
+    return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${ampm}`;
+}
+
+const DOW_LABELS_LONG  = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const DOW_LABELS_SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const ORDINAL_SUFFIX   = (n: number) => n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th';
+
+/** Human-readable timing label used in the connector between steps. */
+function stepTimingLabel(step: SmsWorkflowStep): string {
+    const sType = step.scheduleType ?? 'relative';
+    if (sType === 'day_of_week') {
+        const day  = DOW_LABELS_LONG[step.scheduleDayOfWeek ?? 1];
+        const time = step.scheduleTime ? ` at ${fmt12(step.scheduleTime)}` : '';
+        return `next ${day}${time}`;
+    }
+    if (sType === 'day_of_month') {
+        const d    = step.scheduleDayOfMonth ?? 1;
+        const time = step.scheduleTime ? ` at ${fmt12(step.scheduleTime)}` : '';
+        return `on the ${d}${ORDINAL_SUFFIX(d)}${time}`;
+    }
+    return step.delayDays === 0
+        ? 'immediately'
+        : `after ${step.delayDays} day${step.delayDays !== 1 ? 's' : ''}`;
+}
+
 const StepRow: React.FC<{
     step: SmsWorkflowStep;
     index: number;
@@ -3094,8 +3224,9 @@ const StepRow: React.FC<{
     pcoLists: { id: string; name: string }[];
     pcoGroups: { id: string; name: string }[];
 }> = ({ step, index, total, onChange, onDelete, onMoveUp, onMoveDown, pcoLists, pcoGroups }) => {
-    const channel = step.channelType ?? 'sms';
-    const segs = countSegments(step.message);
+    const channel   = step.channelType  ?? 'sms';
+    const schedType  = step.scheduleType ?? 'relative';
+    const segs       = countSegments(step.message);
     const [mmsUrl, setMmsUrl] = React.useState((step.mediaUrls && step.mediaUrls[0]) || '');
 
     // Keep mmsUrl in sync when external step changes (e.g. on first load)
@@ -3167,26 +3298,106 @@ const StepRow: React.FC<{
                 </div>
             </div>
 
-            {/* Delay */}
-            <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-400">
-                    <Clock size={13} className="text-violet-400" /> Send after
+            {/* ── Timing ───────────────────────────────────────────────────── */}
+            <div className="space-y-2.5">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Timing</p>
+
+                {/* Mode toggle */}
+                <div className="flex rounded-xl overflow-hidden border border-slate-200 dark:border-slate-600">
+                    {([
+                        { id: 'relative',     label: '⏱ Relative'  },
+                        { id: 'day_of_week',  label: '📅 Weekday'   },
+                        { id: 'day_of_month', label: '🗓 Month Day' },
+                    ] as const).map(({ id, label }) => (
+                        <button
+                            key={id}
+                            type="button"
+                            onClick={() => onChange({ scheduleType: id })}
+                            title={`Schedule mode: ${label}`}
+                            className={`flex-1 py-1.5 text-[10px] font-bold transition border-r last:border-r-0 border-slate-200 dark:border-slate-600 ${
+                                schedType === id
+                                    ? 'bg-violet-600 text-white'
+                                    : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-violet-50 dark:hover:bg-slate-600'
+                            }`}
+                        >{label}</button>
+                    ))}
                 </div>
-                <div className="flex items-center gap-2">
-                    <input
-                        type="number"
-                        min={0}
-                        max={365}
-                        value={step.delayDays}
-                        onChange={e => onChange({ delayDays: Math.max(0, parseInt(e.target.value) || 0) })}
-                        title="Delay in days"
-                        placeholder="0"
-                        className="w-16 text-center text-sm font-black border border-slate-200 dark:border-slate-600 rounded-xl px-2 py-1.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
-                    />
-                    <span className="text-xs text-slate-500 dark:text-slate-400">
-                        {step.delayDays === 0 ? 'days (immediate)' : `day${step.delayDays !== 1 ? 's' : ''}`}
-                    </span>
-                </div>
+
+                {/* ── Relative mode ─────────────────────────────────────────── */}
+                {schedType === 'relative' && (
+                    <div className="flex items-center gap-2">
+                        <Clock size={12} className="text-violet-400 shrink-0" />
+                        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Send after</span>
+                        <input
+                            type="number"
+                            min={0}
+                            max={365}
+                            value={step.delayDays}
+                            onChange={e => onChange({ delayDays: Math.max(0, parseInt(e.target.value) || 0) })}
+                            title="Delay in days"
+                            placeholder="0"
+                            className="w-16 text-center text-sm font-black border border-slate-200 dark:border-slate-600 rounded-xl px-2 py-1.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                        />
+                        <span className="text-xs text-slate-500 dark:text-slate-400">
+                            {step.delayDays === 0 ? 'days (immediate)' : `day${step.delayDays !== 1 ? 's' : ''}`}
+                        </span>
+                    </div>
+                )}
+
+                {/* ── Day-of-week mode ──────────────────────────────────────── */}
+                {schedType === 'day_of_week' && (
+                    <div className="space-y-1.5">
+                        <p className="text-[10px] text-slate-400">Fire on the next occurrence of:</p>
+                        <div className="flex gap-1">
+                            {DOW_LABELS_SHORT.map((d, i) => (
+                                <button
+                                    key={i}
+                                    type="button"
+                                    onClick={() => onChange({ scheduleDayOfWeek: i })}
+                                    title={DOW_LABELS_LONG[i]}
+                                    className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition ${
+                                        (step.scheduleDayOfWeek ?? 1) === i
+                                            ? 'bg-violet-600 text-white shadow-sm'
+                                            : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-violet-100 dark:hover:bg-violet-900/30'
+                                    }`}
+                                >{d}</button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* ── Day-of-month mode ─────────────────────────────────────── */}
+                {schedType === 'day_of_month' && (
+                    <div className="space-y-1.5">
+                        <p className="text-[10px] text-slate-400">Fire on the next occurrence of:</p>
+                        <select
+                            value={step.scheduleDayOfMonth ?? 1}
+                            onChange={e => onChange({ scheduleDayOfMonth: Number(e.target.value) })}
+                            title="Day of month"
+                            className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                        >
+                            {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
+                                <option key={d} value={d}>{d}{ORDINAL_SUFFIX(d)} of the month</option>
+                            ))}
+                        </select>
+                    </div>
+                )}
+
+                {/* ── Time picker (day_of_week / day_of_month only) ─────────── */}
+                {schedType !== 'relative' && (
+                    <div className="flex items-center gap-2">
+                        <Clock size={12} className="text-violet-400 shrink-0" />
+                        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Send at</span>
+                        <input
+                            type="time"
+                            value={step.scheduleTime ?? '09:00'}
+                            onChange={e => onChange({ scheduleTime: e.target.value })}
+                            title="Send time (24-hour)"
+                            className="text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-1.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                        />
+                        <span className="text-[10px] text-slate-400">server time</span>
+                    </div>
+                )}
             </div>
 
             {/* ── SMS fields ── */}
@@ -3592,7 +3803,7 @@ const WorkflowEditor: React.FC<{
     const patch = (p: Partial<SmsWorkflow>) => setWf(prev => ({ ...prev, ...p }));
 
     const addStep = () => {
-        const steps = [...wf.steps, { id: uid(), order: wf.steps.length, delayDays: 1, channelType: 'sms' as WorkflowChannelType, message: '' }];
+        const steps = [...wf.steps, { id: uid(), order: wf.steps.length, delayDays: 1, scheduleType: 'relative' as const, channelType: 'sms' as WorkflowChannelType, message: '' }];
         patch({ steps });
     };
 
@@ -3901,7 +4112,7 @@ const WorkflowEditor: React.FC<{
                                         <div className="flex items-center gap-3 mb-2 ml-3">
                                             <div className="w-0.5 h-6 bg-violet-200 dark:bg-violet-800 ml-2.5" />
                                             <span className="text-[10px] text-slate-400 font-semibold">
-                                                {step.delayDays === 0 ? 'immediately after' : `wait ${step.delayDays} day${step.delayDays !== 1 ? 's' : ''}`}
+                                                {stepTimingLabel(step)}
                                             </span>
                                         </div>
                                     )}
@@ -4305,7 +4516,12 @@ const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
                                                     <div className="flex items-center gap-1 shrink-0">
                                                         <div className="h-px w-4 bg-violet-200 dark:bg-violet-800" />
                                                         <span className="text-[9px] text-slate-400 whitespace-nowrap">
-                                                            {step.delayDays === 0 ? 'same day' : `+${step.delayDays}d`}
+                                                            {(() => {
+                                                                const st = step.scheduleType ?? 'relative';
+                                                                if (st === 'day_of_week')  return DOW_LABELS_SHORT[step.scheduleDayOfWeek ?? 1];
+                                                                if (st === 'day_of_month') return `${step.scheduleDayOfMonth ?? 1}${ORDINAL_SUFFIX(step.scheduleDayOfMonth ?? 1)}`;
+                                                                return step.delayDays === 0 ? 'now' : `+${step.delayDays}d`;
+                                                            })()}
                                                         </span>
                                                         <div className="h-px w-4 bg-violet-200 dark:bg-violet-800" />
                                                     </div>

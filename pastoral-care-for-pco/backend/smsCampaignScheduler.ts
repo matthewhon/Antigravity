@@ -266,6 +266,60 @@ async function runBirthdayAnniversaryScanner(db: any): Promise<void> {
     }
 }
 
+// ─── Scheduled-Day Calculator ─────────────────────────────────────────────────────────
+
+/**
+ * Compute when `step` should fire, given the previous step (or enrollment) completed at `fromMs`.
+ *
+ * Modes:
+ *  - 'relative'     → fromMs + delayDays × 86 400 000 ms
+ *  - 'day_of_week'  → next occurrence of scheduleDayOfWeek (0=Sun…6=Sat) strictly after fromMs,
+ *                     at scheduleTime (HH:MM 24 h, default 09:00), server local time.
+ *  - 'day_of_month' → next calendar date matching scheduleDayOfMonth (1–31) strictly after fromMs,
+ *                     at scheduleTime, server local time. If the target day doesn't exist in a
+ *                     given month (e.g. the 31st in April) that month is skipped.
+ */
+function calcNextSendAt(step: any, fromMs: number): number {
+    const scheduleType: string = step.scheduleType || 'relative';
+    const timeParts = (step.scheduleTime || '09:00').split(':').map(Number);
+    const schedHours   = timeParts[0] ?? 9;
+    const schedMinutes = timeParts[1] ?? 0;
+
+    if (scheduleType === 'day_of_week') {
+        const targetDay: number = step.scheduleDayOfWeek ?? 1; // default: Monday
+        // Walk from the day AFTER fromMs until we hit the target weekday.
+        const candidate = new Date(fromMs);
+        candidate.setDate(candidate.getDate() + 1);
+        candidate.setHours(0, 0, 0, 0);
+        while (candidate.getDay() !== targetDay) {
+            candidate.setDate(candidate.getDate() + 1);
+        }
+        candidate.setHours(schedHours, schedMinutes, 0, 0);
+        return candidate.getTime();
+    }
+
+    if (scheduleType === 'day_of_month') {
+        const targetDate: number = step.scheduleDayOfMonth ?? 1; // 1–31
+        // Try the target day in the current month first; if already past, advance month by month.
+        const ref = new Date(fromMs);
+        let year  = ref.getFullYear();
+        let month = ref.getMonth(); // 0-based
+        while (true) {
+            const daysInMonth  = new Date(year, month + 1, 0).getDate();
+            if (targetDate <= daysInMonth) {
+                const candidate = new Date(year, month, targetDate, schedHours, schedMinutes, 0, 0);
+                if (candidate.getTime() > fromMs) return candidate.getTime();
+            }
+            // Target day doesn't exist this month, or is already past — try the next month.
+            month++;
+            if (month > 11) { month = 0; year++; }
+        }
+    }
+
+    // Default: relative offset
+    return fromMs + (step.delayDays || 0) * 86_400_000;
+}
+
 // ─── Workflow Step Executor ───────────────────────────────────────────────────
 
 /**
@@ -392,9 +446,7 @@ async function runWorkflowStepExecutor(db: any): Promise<void> {
                 let nextSendAt = now;
 
                 if (!isComplete) {
-                    const nextStepData = steps[nextStep];
-                    const delayMs = (nextStepData.delayDays || 0) * 86_400_000;
-                    nextSendAt = now + delayMs;
+                    nextSendAt = calcNextSendAt(steps[nextStep], now);
                 }
 
                 await db.collection('smsWorkflowEnrollments').doc(enrollId).update({
