@@ -21,15 +21,32 @@ function countSegments(body: string): number {
     return Math.ceil(body.length / 153);
 }
 
+/** All data about a person used for merge-tag resolution. */
+export interface PersonInfo {
+    personName?: string;
+    email?:      string;
+    phone?:      string;
+    birthday?:   string;  // e.g. "Jan 15" or "January 15"
+    anniversary?: string; // e.g. "Jun 10"
+    city?:       string;
+    state?:      string;
+}
+
 /** Replace merge tags with person-specific values. */
-function resolveMergeTags(body: string, person: { personName?: string }): string {
+function resolveMergeTags(body: string, person: PersonInfo): string {
     const parts = (person.personName || '').split(' ');
     const firstName = parts[0] || '';
     const lastName  = parts.slice(1).join(' ') || '';
     return body
-        .replace(/\{firstName\}/gi, firstName)
-        .replace(/\{lastName\}/gi,  lastName)
-        .replace(/\{fullName\}/gi,  person.personName || '');
+        .replace(/\{firstName\}/gi,   firstName)
+        .replace(/\{lastName\}/gi,    lastName)
+        .replace(/\{fullName\}/gi,    person.personName || '')
+        .replace(/\{email\}/gi,       person.email      || '')
+        .replace(/\{phone\}/gi,       person.phone      || '')
+        .replace(/\{birthday\}/gi,    person.birthday   || '')
+        .replace(/\{anniversary\}/gi, person.anniversary || '')
+        .replace(/\{city\}/gi,        person.city       || '')
+        .replace(/\{state\}/gi,       person.state      || '');
 }
 
 /** Get the public base URL for webhooks from Firestore system settings or env. */
@@ -194,9 +211,9 @@ export async function sendBulkInternal(params: {
     mediaUrls?:  string[];
     sentBy?:     string;
     sentByName?: string;
-    personMap?:  Record<string, { personName: string }>;
+    personMap?:  Record<string, PersonInfo>;
 }): Promise<{ sent: number; failed: number; optedOut: number; skipped: number; errors: { phone: string; error: string }[] }> {
-    const { db, churchId, campaignId, phones, body, mediaUrls = [], sentBy, sentByName, personMap = {} } = params;
+    const { db, churchId, campaignId, phones, body, mediaUrls = [], sentBy, sentByName, personMap = {} } = params as any;
     const log   = createServerLogger(db);
     const isMms = (mediaUrls as string[]).length > 0;
     const { client, fromNumber } = await getSubClient(db, churchId);

@@ -963,6 +963,18 @@ export interface SmsCampaign {
     updatedAt: number;
 }
 
+export interface SmsTag {
+    id: string;
+    churchId: string;
+    /** Display name, e.g. "Prayer Request" */
+    name: string;
+    /** Optional emoji prefix, e.g. "🙏" */
+    emoji?: string;
+    /** Color theme for tag chip UI */
+    color: 'violet' | 'blue' | 'emerald' | 'amber' | 'red' | 'pink';
+    createdAt: number;
+}
+
 export interface SmsKeyword {
     id: string;
     churchId: string;
@@ -973,6 +985,8 @@ export interface SmsKeyword {
     /** Optionally add the replying contact to this PCO list */
     addToListId?: string | null;
     addToListName?: string | null;
+    /** Tag IDs (SmsTag.id) to automatically apply to the conversation when this keyword matches */
+    autoTagIds?: string[];
     isActive: boolean;
     matchCount: number;
     createdAt: number;
@@ -1021,16 +1035,36 @@ export interface SmsUsageSummary {
 
 // ─── Workflows ───────────────────────────────────────────────────────────────
 
+/** Channel used for a single workflow step. */
+export type WorkflowChannelType = 'sms' | 'mms' | 'email' | 'staff_sms' | 'staff_email';
+
 export interface SmsWorkflowStep {
     id: string;             // uuid
     order: number;
     /** Days to wait after the previous step (0 = send immediately / same day). */
     delayDays: number;
+    /** Channel type for this step. Defaults to 'sms'. */
+    channelType: WorkflowChannelType;
+    // ── SMS / MMS ──────────────────────────────────────────────────────────────
     message: string;
-    mediaUrls?: string[];
+    mediaUrls?: string[];   // MMS attachments
+    // ── Email ──────────────────────────────────────────────────────────────────
+    emailSubject?: string;
+    emailBody?: string;     // HTML or plain text body for the email step
+    // ── Staff Reminder (staff_sms | staff_email) ─────────────────────────────────────────
+    /** How the staff recipients are resolved. 'individuals' = named list, 'list' = PCO List, 'group' = PCO Group */
+    staffTargetType?: 'individuals' | 'list' | 'group';
+    /** Explicit staff recipients when staffTargetType = 'individuals' */
+    staffRecipients?: { name: string; phone?: string; email?: string }[];
+    /** PCO List ID for bulk staff target */
+    staffListId?: string | null;
+    staffListName?: string | null;
+    /** PCO Group ID for bulk staff target */
+    staffGroupId?: string | null;
+    staffGroupName?: string | null;
 }
 
-export type SmsWorkflowTrigger = 'keyword' | 'manual' | 'list_add';
+export type SmsWorkflowTrigger = 'keyword' | 'manual' | 'list_add' | 'birthday' | 'anniversary';
 
 export interface SmsWorkflow {
     id: string;
@@ -1044,6 +1078,12 @@ export interface SmsWorkflow {
     /** When trigger = 'list_add', the PCO list id */
     triggerListId?: string | null;
     triggerListName?: string | null;
+    /**
+     * For 'birthday' and 'anniversary' triggers:
+     * Number of days BEFORE the event to send Step 1.
+     * 0 = send on the event day (default), 7 = send 1 week early, etc.
+     */
+    triggerDayOffset?: number;
     steps: SmsWorkflowStep[];
     isActive: boolean;
     enrolledCount: number;

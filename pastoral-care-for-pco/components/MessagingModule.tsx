@@ -6,14 +6,15 @@ import {
     Timestamp, collectionGroup
 } from 'firebase/firestore';
 import { pcoService } from '../services/pcoService';
-import { SmsCampaign, SmsConversation, SmsMessage, SmsKeyword, SmsOptOut, SmsWorkflow, SmsWorkflowStep, SmsWorkflowEnrollment, Church, User } from '../types';
+import { SmsCampaign, SmsConversation, SmsMessage, SmsKeyword, SmsOptOut, SmsWorkflow, SmsWorkflowStep, SmsWorkflowEnrollment, SmsTag, Church, User, WorkflowChannelType } from '../types';
 import {
     MessageSquare, Send, Clock, Users, Plus, ArrowLeft, Trash2,
     Eye, Pencil, ChevronDown, CheckCircle, Circle, Loader2, X,
     Calendar, Phone, Search, RefreshCw, Settings, Key, AlertTriangle,
     Inbox, BarChart3, Copy, Zap, MessageCircle, TrendingUp, TrendingDown,
     Activity, DollarSign, UserX, Edit3, UserCheck, List, Layers,
-    Smile, Image as ImageIcon, Link, Sparkles, ChevronRight, RotateCcw
+    Smile, Image as ImageIcon, Link, Sparkles, ChevronRight, RotateCcw,
+    Mail, Tag, Filter, Hash
 } from 'lucide-react';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -47,7 +48,40 @@ const COMMON_EMOJIS = [
     '🌟','🕊️','🏠','📅','📣','💬','🎵','🤝','💜','🌈',
 ];
 
+// ─── Tag colour map ───────────────────────────────────────────────────────────
+
+const TAG_COLOR_MAP: Record<SmsTag['color'], { bg: string; text: string; border: string; dot: string }> = {
+    violet:  { bg: 'bg-violet-100 dark:bg-violet-900/40',  text: 'text-violet-700 dark:text-violet-300',  border: 'border-violet-300 dark:border-violet-700',  dot: 'bg-violet-500' },
+    blue:    { bg: 'bg-blue-100 dark:bg-blue-900/40',       text: 'text-blue-700 dark:text-blue-300',       border: 'border-blue-300 dark:border-blue-700',       dot: 'bg-blue-500' },
+    emerald: { bg: 'bg-emerald-100 dark:bg-emerald-900/40', text: 'text-emerald-700 dark:text-emerald-300', border: 'border-emerald-300 dark:border-emerald-700', dot: 'bg-emerald-500' },
+    amber:   { bg: 'bg-amber-100 dark:bg-amber-900/40',     text: 'text-amber-700 dark:text-amber-300',     border: 'border-amber-300 dark:border-amber-700',     dot: 'bg-amber-500' },
+    red:     { bg: 'bg-red-100 dark:bg-red-900/40',         text: 'text-red-700 dark:text-red-300',         border: 'border-red-300 dark:border-red-700',         dot: 'bg-red-500' },
+    pink:    { bg: 'bg-pink-100 dark:bg-pink-900/40',       text: 'text-pink-700 dark:text-pink-300',       border: 'border-pink-300 dark:border-pink-700',       dot: 'bg-pink-500' },
+};
+
+const SmsTagChip: React.FC<{ tag: SmsTag; onRemove?: () => void; size?: 'sm' | 'xs' }> = ({ tag, onRemove, size = 'xs' }) => {
+    const c = TAG_COLOR_MAP[tag.color] || TAG_COLOR_MAP.violet;
+    const sizeClass = size === 'sm' ? 'px-2.5 py-1 text-xs' : 'px-1.5 py-0.5 text-[10px]';
+    return (
+        <span className={`inline-flex items-center gap-1 rounded-full border font-semibold ${sizeClass} ${c.bg} ${c.text} ${c.border}`}>
+            {tag.emoji && <span>{tag.emoji}</span>}
+            {tag.name}
+            {onRemove && (
+                <button
+                    type="button"
+                    onClick={e => { e.stopPropagation(); onRemove(); }}
+                    title={`Remove ${tag.name} tag`}
+                    className="ml-0.5 opacity-60 hover:opacity-100 transition"
+                >
+                    <X size={9} />
+                </button>
+            )}
+        </span>
+    );
+};
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
 
 function countSegments(body: string): number {
     if (!body) return 0;
@@ -73,6 +107,69 @@ ${messageBody}`,
     if (!res.ok) throw new Error('AI request failed');
     const data = await res.json();
     return (data.text || '').trim();
+}
+
+/** Shape the AI returns for a generated workflow. */
+interface AiWorkflowDraft {
+    name: string;
+    description: string;
+    steps: {
+        channelType: 'sms' | 'mms' | 'email';
+        delayDays: number;
+        message?: string;
+        emailSubject?: string;
+        emailBody?: string;
+    }[];
+}
+
+/** Call the AI to build a full workflow from a natural-language prompt. */
+async function generateWorkflowWithAi(prompt: string): Promise<AiWorkflowDraft> {
+    const systemPrompt = `You are an expert church communications strategist helping a pastor build automated message workflows.
+The user will describe the workflow they want in plain English.
+You must respond with ONLY a valid JSON object (no markdown, no explanation) matching this exact schema:
+{
+  "name": string,          // Short, descriptive workflow name
+  "description": string,   // 1-2 sentence description of what the workflow does
+  "steps": [
+    {
+      "channelType": "sms" | "mms" | "email",
+      "delayDays": number,     // Days to wait after the previous step. Step 0 is always 0.
+      "message": string,       // Required for sms and mms steps. Keep SMS under 160 chars. Use {firstName} for personalisation.
+      "emailSubject": string,  // Required only for email steps
+      "emailBody": string      // Required only for email steps. Use {firstName} for personalisation.
+    }
+  ]
+}
+
+Guidelines:
+- Use warm, pastoral, encouraging language appropriate for a church audience.
+- For SMS steps, keep "message" under 160 characters when possible (1 segment).
+- Include real content (actual Bible verses, actual prayer encouragements, etc.) — do NOT use placeholders like "[verse here]".
+- Use {firstName} to personalise messages where natural.
+- delayDays for the first step is always 0. For subsequent steps, use the delay the user specified or infer a sensible one (e.g. 1 day between daily texts).
+- If the user asks for emails, set channelType to "email" and provide both emailSubject and emailBody.
+- If the user asks for texts, set channelType to "sms".
+- If the user asks for picture/image messages, set channelType to "mms" and still write a message caption.
+- Infer the number of steps and channel mix from the user's description.
+
+User's workflow request:
+${prompt}`;
+
+    const res = await fetch('/ai/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'gemini-2.5-flash', prompt: systemPrompt }),
+    });
+    if (!res.ok) throw new Error('AI request failed');
+    const data = await res.json();
+    const raw = (data.text || '').trim();
+    // Strip any accidental markdown code fences
+    const cleaned = raw.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/i, '').trim();
+    try {
+        return JSON.parse(cleaned) as AiWorkflowDraft;
+    } catch {
+        throw new Error('AI returned an unexpected format. Please try again.');
+    }
 }
 
 function formatPhone(phone: string): string {
@@ -1405,13 +1502,30 @@ const SmsInbox: React.FC<{
     const [search, setSearch]               = useState('');
     const [showComposer, setShowComposer]   = useState(false);
 
+    // Tags
+    const [tags, setTags]               = useState<SmsTag[]>([]);
+    const [tagFilter, setTagFilter]     = useState<string | null>(null); // tag id to filter by
+    const [showTagPicker, setShowTagPicker] = useState(false);
+
+    // Load church tags
+    useEffect(() => {
+        const q = query(
+            collection(firebaseDb, 'smsTags'),
+            where('churchId', '==', churchId),
+            orderBy('createdAt', 'asc')
+        );
+        return onSnapshot(q, snap => {
+            setTags(snap.docs.map(d => ({ id: d.id, ...d.data() } as SmsTag)));
+        });
+    }, [churchId]);
+
     // Load conversations
     useEffect(() => {
         const q = query(
             collection(firebaseDb, 'smsConversations'),
             where('churchId', '==', churchId),
             orderBy('lastMessageAt', 'desc'),
-            limit(50)
+            limit(100)
         );
         const unsub = onSnapshot(q, snap => {
             setConversations(snap.docs.map(d => ({ id: d.id, ...d.data() } as SmsConversation)));
@@ -1437,11 +1551,27 @@ const SmsInbox: React.FC<{
         return unsub;
     }, [activeConv?.id]);
 
-    const filtered = conversations.filter(c =>
-        !search || c.phoneNumber.includes(search) || (c.personName || '').toLowerCase().includes(search.toLowerCase())
-    );
+    // Toggle a tag on the active conversation
+    const handleToggleConvTag = async (conv: SmsConversation, tagId: string) => {
+        const current: string[] = conv.tags || [];
+        const next = current.includes(tagId)
+            ? current.filter(t => t !== tagId)
+            : [...current, tagId];
+        await updateDoc(doc(firebaseDb, 'smsConversations', conv.id), { tags: next }).catch(() => {});
+        // If it's the active conversation, keep the activeConv in sync
+        if (activeConv?.id === conv.id) {
+            setActiveConv(prev => prev ? { ...prev, tags: next } : prev);
+        }
+    };
+
+    const filtered = conversations.filter(c => {
+        const matchSearch = !search || c.phoneNumber.includes(search) || (c.personName || '').toLowerCase().includes(search.toLowerCase());
+        const matchTag = !tagFilter || (c.tags || []).includes(tagFilter);
+        return matchSearch && matchTag;
+    });
 
     const handleSendReply = async () => {
+
         if (!replyBody.trim() || !activeConv || isSending) return;
         setIsSending(true);
         try {
@@ -1492,7 +1622,7 @@ const SmsInbox: React.FC<{
                             <Plus size={12} /> New
                         </button>
                     </div>
-                    <div className="relative">
+                    <div className="relative mb-2">
                         <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                         <input
                             type="text"
@@ -1502,43 +1632,111 @@ const SmsInbox: React.FC<{
                             className="w-full pl-8 pr-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
                         />
                     </div>
+
+                    {/* Tag filter chips */}
+                    {tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mt-1">
+                            <button
+                                onClick={() => setTagFilter(null)}
+                                className={`px-2 py-0.5 text-[10px] font-bold rounded-full border transition ${
+                                    tagFilter === null
+                                        ? 'bg-violet-600 text-white border-violet-600'
+                                        : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-violet-400'
+                                }`}
+                            >All</button>
+                            {tags.map(t => {
+                                const c = TAG_COLOR_MAP[t.color] || TAG_COLOR_MAP.violet;
+                                const isActive = tagFilter === t.id;
+                                return (
+                                    <button
+                                        key={t.id}
+                                        onClick={() => setTagFilter(isActive ? null : t.id)}
+                                        className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full border transition ${
+                                            isActive ? `${c.bg} ${c.text} ${c.border}` : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-violet-400'
+                                        }`}
+                                    >
+                                        {t.emoji && <span>{t.emoji}</span>}
+                                        {t.name}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
                 <div className="flex-1 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-700/60">
                     {filtered.length === 0 && (
                         <div className="text-center py-12 text-slate-400">
                             <MessageCircle size={28} className="mx-auto mb-2 opacity-40" />
-                            <p className="text-sm">No conversations yet</p>
+                            <p className="text-sm">{tagFilter ? 'No conversations with this tag' : 'No conversations yet'}</p>
                         </div>
                     )}
-                    {filtered.map(conv => (
-                        <button
-                            key={conv.id}
-                            className={`w-full text-left px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800 transition ${activeConv?.id === conv.id ? 'bg-violet-50 dark:bg-violet-900/20' : ''}`}
-                            onClick={() => setActiveConv(conv)}
-                        >
-                            <div className="flex items-start justify-between gap-2">
-                                <div className="flex items-center gap-2.5 min-w-0">
-                                    <div className="w-9 h-9 rounded-full bg-violet-100 dark:bg-violet-900/40 text-violet-600 dark:text-violet-300 flex items-center justify-center font-black text-sm shrink-0">
-                                        {(conv.personName || conv.phoneNumber).charAt(0).toUpperCase()}
+                    {filtered.map(conv => {
+                        const isUnread = (conv.unreadCount || 0) > 0;
+                        const isActive = activeConv?.id === conv.id;
+                        const convTags = tags.filter(t => (conv.tags || []).includes(t.id));
+                        return (
+                            <button
+                                key={conv.id}
+                                className={`w-full text-left px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800 transition relative ${
+                                    isActive ? 'bg-violet-50 dark:bg-violet-900/20' : ''
+                                }`}
+                                onClick={() => setActiveConv(conv)}
+                            >
+                                {/* Unread left accent bar */}
+                                {isUnread && !isActive && (
+                                    <span className="absolute left-0 top-2 bottom-2 w-0.5 bg-violet-500 rounded-full" />
+                                )}
+                                <div className="flex items-start justify-between gap-2">
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                        {conv.personAvatar ? (
+                                            <img
+                                                src={conv.personAvatar}
+                                                alt={conv.personName || conv.phoneNumber}
+                                                className="w-9 h-9 rounded-full object-cover shrink-0 ring-2 ring-white dark:ring-slate-900"
+                                                onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; (e.currentTarget.nextElementSibling as HTMLElement)!.style.display = 'flex'; }}
+                                            />
+                                        ) : null}
+                                        <div className={`w-9 h-9 rounded-full text-violet-600 dark:text-violet-300 items-center justify-center font-black text-sm shrink-0 ${
+                                            isUnread
+                                                ? 'bg-violet-200 dark:bg-violet-700'
+                                                : 'bg-violet-100 dark:bg-violet-900/40'
+                                        } ${conv.personAvatar ? 'hidden' : 'flex'}`}>
+                                            {(conv.personName || conv.phoneNumber).charAt(0).toUpperCase()}
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className={`text-sm truncate ${
+                                                isUnread ? 'font-black text-slate-900 dark:text-white' : 'font-semibold text-slate-700 dark:text-slate-200'
+                                            }`}>{conv.personName || formatPhone(conv.phoneNumber)}</p>
+                                            {conv.personName && <p className={`text-[10px] ${ isUnread ? 'text-slate-500' : 'text-slate-400' }`}>{formatPhone(conv.phoneNumber)}</p>}
+                                            <p className={`text-xs truncate mt-0.5 ${
+                                                isUnread ? 'text-slate-600 dark:text-slate-300 font-medium' : 'text-slate-400 dark:text-slate-500'
+                                            }`}>{conv.lastMessageBody || '…'}</p>
+                                            {/* Tag chips */}
+                                            {convTags.length > 0 && (
+                                                <div className="flex flex-wrap gap-1 mt-1">
+                                                    {convTags.slice(0, 3).map(t => (
+                                                        <SmsTagChip key={t.id} tag={t} />
+                                                    ))}
+                                                    {convTags.length > 3 && (
+                                                        <span className="text-[10px] text-slate-400 font-semibold">+{convTags.length - 3}</span>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
-                                    <div className="min-w-0">
-                                        <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{conv.personName || formatPhone(conv.phoneNumber)}</p>
-                                        {conv.personName && <p className="text-[10px] text-slate-400">{formatPhone(conv.phoneNumber)}</p>}
-                                        <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">{conv.lastMessageBody || '…'}</p>
+                                    <div className="shrink-0 flex flex-col items-end gap-1">
+                                        <span className={`text-[10px] ${ isUnread ? 'text-violet-500 font-semibold' : 'text-slate-400' }`}>{timeAgo(conv.lastMessageAt)}</span>
+                                        {isUnread && (
+                                            <span className="min-w-[18px] h-[18px] bg-violet-600 text-white text-[10px] font-black rounded-full flex items-center justify-center px-1">
+                                                {conv.unreadCount}
+                                            </span>
+                                        )}
+                                        {conv.isOptedOut && <span className="text-[9px] text-red-500 font-bold">OPT-OUT</span>}
                                     </div>
                                 </div>
-                                <div className="shrink-0 flex flex-col items-end gap-1">
-                                    <span className="text-[10px] text-slate-400">{timeAgo(conv.lastMessageAt)}</span>
-                                    {(conv.unreadCount || 0) > 0 && (
-                                        <span className="w-4.5 h-4.5 bg-violet-600 text-white text-[10px] font-black rounded-full flex items-center justify-center px-1.5">
-                                            {conv.unreadCount}
-                                        </span>
-                                    )}
-                                    {conv.isOptedOut && <span className="text-[9px] text-red-500 font-bold">OPT-OUT</span>}
-                                </div>
-                            </div>
-                        </button>
-                    ))}
+                            </button>
+                        );
+                    })}
                 </div>
             </div>
 
@@ -1547,15 +1745,83 @@ const SmsInbox: React.FC<{
                 <div className="flex-1 flex flex-col">
                     {/* Thread header */}
                     <div className="px-5 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-violet-100 dark:bg-violet-900/40 text-violet-600 dark:text-violet-300 flex items-center justify-center font-black text-sm">
-                            {(activeConv.personName || activeConv.phoneNumber).charAt(0).toUpperCase()}
+                        <div className="relative shrink-0">
+                            {activeConv.personAvatar ? (
+                                <img
+                                    src={activeConv.personAvatar}
+                                    alt={activeConv.personName || activeConv.phoneNumber}
+                                    className="w-9 h-9 rounded-full object-cover ring-2 ring-violet-100 dark:ring-violet-900/40"
+                                    onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; (e.currentTarget.nextElementSibling as HTMLElement)!.style.display = 'flex'; }}
+                                />
+                            ) : null}
+                            <div className={`w-9 h-9 rounded-full bg-violet-100 dark:bg-violet-900/40 text-violet-600 dark:text-violet-300 items-center justify-center font-black text-sm ${activeConv.personAvatar ? 'hidden' : 'flex'}`}>
+                                {(activeConv.personName || activeConv.phoneNumber).charAt(0).toUpperCase()}
+                            </div>
                         </div>
-                        <div>
+                        <div className="flex-1 min-w-0">
                             <p className="font-bold text-slate-900 dark:text-white text-sm">{activeConv.personName || formatPhone(activeConv.phoneNumber)}</p>
                             <p className="text-xs text-slate-400">{formatPhone(activeConv.phoneNumber)}</p>
                         </div>
                         {activeConv.isOptedOut && (
-                            <span className="ml-2 text-xs font-bold text-red-500 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-full px-2 py-0.5">OPTED OUT</span>
+                            <span className="text-xs font-bold text-red-500 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-full px-2 py-0.5">OPTED OUT</span>
+                        )}
+                        {/* Active tags on conversation */}
+                        {tags.filter(t => (activeConv.tags || []).includes(t.id)).map(t => (
+                            <SmsTagChip
+                                key={t.id}
+                                tag={t}
+                                size="sm"
+                                onRemove={() => handleToggleConvTag(activeConv, t.id)}
+                            />
+                        ))}
+                        {/* Tag picker button */}
+                        {tags.length > 0 && (
+                            <div className="relative shrink-0">
+                                <button
+                                    onClick={() => setShowTagPicker(v => !v)}
+                                    title="Add or remove tags"
+                                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:border-violet-400 hover:text-violet-600 dark:hover:text-violet-300 transition"
+                                >
+                                    <Tag size={12} /> Tags
+                                </button>
+                                {showTagPicker && (
+                                    <div
+                                        className="absolute right-0 top-full mt-2 z-40 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-3 w-56"
+                                        onClick={e => e.stopPropagation()}
+                                    >
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Tag This Conversation</p>
+                                        <div className="space-y-1">
+                                            {tags.map(t => {
+                                                const isOn = (activeConv.tags || []).includes(t.id);
+                                                const c = TAG_COLOR_MAP[t.color] || TAG_COLOR_MAP.violet;
+                                                return (
+                                                    <button
+                                                        key={t.id}
+                                                        onClick={() => handleToggleConvTag(activeConv, t.id)}
+                                                        className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl transition text-sm font-semibold ${
+                                                            isOn
+                                                                ? `${c.bg} ${c.text}`
+                                                                : 'hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
+                                                        }`}
+                                                    >
+                                                        <span className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                                                            isOn ? `${c.dot.replace('bg-', 'border-')} ${c.dot}` : 'border-slate-300 dark:border-slate-600'
+                                                        }`}>
+                                                            {isOn && <CheckCircle size={10} className="text-white" />}
+                                                        </span>
+                                                        {t.emoji && <span>{t.emoji}</span>}
+                                                        {t.name}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                        <button
+                                            onClick={() => setShowTagPicker(false)}
+                                            className="w-full mt-2 py-1.5 text-xs font-bold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition"
+                                        >Done</button>
+                                    </div>
+                                )}
+                            </div>
                         )}
                     </div>
 
@@ -1639,17 +1905,19 @@ interface KeywordModalProps {
     initial?: SmsKeyword | null;
     pcoLists: { id: string; name: string; total_people: number }[];
     loadingLists: boolean;
+    tags: SmsTag[];
     onSave: (kw: Omit<SmsKeyword, 'id' | 'matchCount' | 'createdAt'>) => Promise<void>;
     onClose: () => void;
     isBusy: boolean;
     saveError?: string;
 }
 
-const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingLists, onSave, onClose, isBusy, saveError }) => {
+const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingLists, tags, onSave, onClose, isBusy, saveError }) => {
     const [keyword, setKeyword]           = useState(initial?.keyword || '');
     const [replyMessage, setReplyMessage] = useState(initial?.replyMessage || '');
     const [addToListId, setAddToListId]   = useState(initial?.addToListId || '');
     const [isActive, setIsActive]         = useState(initial?.isActive ?? true);
+    const [autoTagIds, setAutoTagIds]     = useState<string[]>(initial?.autoTagIds || []);
     const [error, setError]               = useState('');
 
     const segs    = countSegments(replyMessage);
@@ -1668,6 +1936,7 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingL
             replyMessage:  replyMessage.trim(),
             addToListId:   addToListId || null,
             addToListName: selectedList?.name || null,
+            autoTagIds:    autoTagIds.length > 0 ? autoTagIds : [],
             isActive,
         });
     };
@@ -1741,6 +2010,38 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingL
                     )}
                 </div>
 
+                {/* Auto-tag conversations */}
+                {tags.length > 0 && (
+                    <div className="mb-4">
+                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Auto-Tag Conversations</label>
+                        <p className="text-[10px] text-slate-400 mb-2">When this keyword matches, automatically apply these tags to the conversation.</p>
+                        <div className="flex flex-wrap gap-2">
+                            {tags.map(t => {
+                                const isOn = autoTagIds.includes(t.id);
+                                const c = TAG_COLOR_MAP[t.color] || TAG_COLOR_MAP.violet;
+                                return (
+                                    <button
+                                        key={t.id}
+                                        type="button"
+                                        onClick={() => setAutoTagIds(prev =>
+                                            isOn ? prev.filter(id => id !== t.id) : [...prev, t.id]
+                                        )}
+                                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border-2 transition ${
+                                            isOn
+                                                ? `${c.bg} ${c.text} ${c.border}`
+                                                : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-violet-300'
+                                        }`}
+                                    >
+                                        {isOn && <CheckCircle size={11} />}
+                                        {t.emoji && <span>{t.emoji}</span>}
+                                        {t.name}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+
                 {/* Active toggle */}
                 <div className="flex items-center justify-between mb-5 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">
                     <div>
@@ -1790,6 +2091,16 @@ const SmsKeywordsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
     const [pcoLists, setPcoLists]   = useState<{ id: string; name: string; total_people: number }[]>([]);
     const [loadingLists, setLoadingLists] = useState(false);
 
+    // Tags
+    const [tags, setTags]                       = useState<SmsTag[]>([]);
+    const [tagModalOpen, setTagModalOpen]       = useState(false);
+    const [editTag, setEditTag]                 = useState<SmsTag | null>(null);
+    const [tagName, setTagName]                 = useState('');
+    const [tagEmoji, setTagEmoji]               = useState('');
+    const [tagColor, setTagColor]               = useState<SmsTag['color']>('violet');
+    const [tagBusy, setTagBusy]                 = useState(false);
+    const [activeSection, setActiveSection]     = useState<'keywords' | 'tags'>('keywords');
+
     // Real-time keyword listener
     useEffect(() => {
         const q = query(
@@ -1819,6 +2130,18 @@ const SmsKeywordsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
             }
         );
         return unsub;
+    }, [churchId]);
+
+    // Load tags
+    useEffect(() => {
+        const q = query(
+            collection(firebaseDb, 'smsTags'),
+            where('churchId', '==', churchId),
+            orderBy('createdAt', 'asc')
+        );
+        return onSnapshot(q, snap => {
+            setTags(snap.docs.map(d => ({ id: d.id, ...d.data() } as SmsTag)));
+        });
     }, [churchId]);
 
     // Load PCO lists for the modal picker
@@ -1880,23 +2203,65 @@ const SmsKeywordsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
     const openNew = () => { setSaveError(null); setEditKw(null); setModalOpen(true); };
     const openEdit = (kw: SmsKeyword) => { setSaveError(null); setEditKw(kw); setModalOpen(true); };
 
+    // Tag CRUD
+    const openNewTag = () => { setEditTag(null); setTagName(''); setTagEmoji(''); setTagColor('violet'); setTagModalOpen(true); };
+    const openEditTag = (t: SmsTag) => { setEditTag(t); setTagName(t.name); setTagEmoji(t.emoji || ''); setTagColor(t.color); setTagModalOpen(true); };
+    const handleSaveTag = async () => {
+        if (!tagName.trim()) return;
+        setTagBusy(true);
+        try {
+            if (editTag) {
+                await updateDoc(doc(firebaseDb, 'smsTags', editTag.id), { name: tagName.trim(), emoji: tagEmoji.trim() || null, color: tagColor });
+            } else {
+                await addDoc(collection(firebaseDb, 'smsTags'), {
+                    churchId, name: tagName.trim(), emoji: tagEmoji.trim() || null, color: tagColor, createdAt: Date.now(),
+                });
+            }
+            setTagModalOpen(false);
+        } catch (e: any) {
+            alert('Failed to save tag: ' + e.message);
+        } finally {
+            setTagBusy(false);
+        }
+    };
+    const handleDeleteTag = async (t: SmsTag) => {
+        if (!window.confirm(`Delete tag "${t.name}"? It will be removed from all conversations.`)) return;
+        await deleteDoc(doc(firebaseDb, 'smsTags', t.id));
+    };
+
     return (
         <div className="p-6 max-w-4xl mx-auto">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-6">
-                <div>
-                    <h1 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-3">
-                        <Key size={26} className="text-violet-500" /> Keywords
-                    </h1>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                        Auto-reply when someone texts a trigger word. Great for RSVP flows, info requests, and more.
-                    </p>
+            {/* Section toggle */}
+            <div className="flex items-center gap-4 mb-6">
+                <div className="flex gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
+                    <button
+                        onClick={() => setActiveSection('keywords')}
+                        className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-semibold transition ${
+                            activeSection === 'keywords' ? 'bg-white dark:bg-slate-700 text-violet-600 dark:text-violet-300 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'
+                        }`}
+                    ><Key size={13} /> Keywords</button>
+                    <button
+                        onClick={() => setActiveSection('tags')}
+                        className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-semibold transition ${
+                            activeSection === 'tags' ? 'bg-white dark:bg-slate-700 text-violet-600 dark:text-violet-300 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'
+                        }`}
+                    ><Tag size={13} /> Tags</button>
                 </div>
-                <button onClick={openNew} className="flex items-center gap-2 px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold rounded-xl transition shadow-md shadow-violet-200 dark:shadow-violet-900/40">
-                    <Plus size={16} /> New Keyword
-                </button>
+                {activeSection === 'keywords' && (
+                    <button onClick={openNew} className="ml-auto flex items-center gap-2 px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold rounded-xl transition shadow-md shadow-violet-200 dark:shadow-violet-900/40">
+                        <Plus size={16} /> New Keyword
+                    </button>
+                )}
+                {activeSection === 'tags' && (
+                    <button onClick={openNewTag} className="ml-auto flex items-center gap-2 px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold rounded-xl transition shadow-md shadow-violet-200 dark:shadow-violet-900/40">
+                        <Plus size={16} /> New Tag
+                    </button>
+                )}
             </div>
 
+            {/* ─── KEYWORDS section ─────────────────────────────────────────── */}
+            {activeSection === 'keywords' && (
+            <>
             {/* How it works banner */}
             <div className="flex items-start gap-4 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-2xl p-4 mb-6">
                 <div className="text-3xl">💡</div>
@@ -1928,7 +2293,9 @@ const SmsKeywordsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
                 </div>
             ) : (
                 <div className="space-y-3">
-                    {keywords.map(kw => (
+                    {keywords.map(kw => {
+                        const kwTags = tags.filter(t => (kw.autoTagIds || []).includes(t.id));
+                        return (
                         <div
                             key={kw.id}
                             className="flex items-center gap-4 p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl hover:border-violet-200 dark:hover:border-violet-700 transition group"
@@ -1941,12 +2308,15 @@ const SmsKeywordsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
                             {/* Reply preview */}
                             <div className="flex-1 min-w-0">
                                 <p className="text-sm text-slate-700 dark:text-slate-300 truncate">{kw.replyMessage}</p>
-                                <div className="flex items-center gap-3 mt-0.5">
+                                <div className="flex items-center flex-wrap gap-x-3 gap-y-1 mt-0.5">
                                     {kw.addToListName && (
                                         <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1">
                                             <Users size={10} /> → {kw.addToListName}
                                         </span>
                                     )}
+                                    {kwTags.map(t => (
+                                        <SmsTagChip key={t.id} tag={t} />
+                                    ))}
                                     <span className="text-[10px] text-slate-400">
                                         {new Date(kw.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                                     </span>
@@ -1980,7 +2350,8 @@ const SmsKeywordsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
                                 </div>
                             </div>
                         </div>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
 
@@ -1991,6 +2362,65 @@ const SmsKeywordsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
                     <strong>Reserved words:</strong> STOP, STOPALL, UNSUBSCRIBE, CANCEL, END, QUIT, HELP, and START are reserved by carriers and cannot be used as custom keywords. These responses are handled automatically.
                 </span>
             </div>
+            </>
+            )}
+
+            {/* ─── TAGS section ─────────────────────────────────────────────── */}
+            {activeSection === 'tags' && (
+            <>
+            <div className="flex items-start gap-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-2xl p-4 mb-6">
+                <div className="text-3xl">🏷️</div>
+                <div>
+                    <p className="text-sm font-bold text-emerald-800 dark:text-emerald-200 mb-1">Conversation Tags</p>
+                    <p className="text-xs text-emerald-700 dark:text-emerald-300 leading-relaxed">
+                        Tags let you categorise and filter SMS conversations. Apply them manually from any conversation, or automatically when a keyword is matched. Create tags like{' '}
+                        <span className="font-bold">Prayer Request 🙏</span>,{' '}<span className="font-bold">Service Times 📅</span>, or{' '}<span className="font-bold">Pastoral Care ❤️</span>.
+                    </p>
+                </div>
+            </div>
+
+            {tags.length === 0 ? (
+                <div className="text-center py-20 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
+                    <Tag size={40} className="mx-auto text-slate-300 dark:text-slate-600 mb-3" />
+                    <p className="text-slate-600 dark:text-slate-400 font-semibold">No tags yet</p>
+                    <p className="text-sm text-slate-400 dark:text-slate-500 mt-1 mb-4">Tags help you track conversations by topic.</p>
+                    <button onClick={openNewTag} className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold rounded-xl transition">
+                        <span className="flex items-center gap-1.5"><Plus size={14} /> New Tag</span>
+                    </button>
+                </div>
+            ) : (
+                <div className="space-y-3">
+                    {tags.map(t => {
+                        const c = TAG_COLOR_MAP[t.color] || TAG_COLOR_MAP.violet;
+                        return (
+                            <div key={t.id} className="flex items-center gap-4 p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl hover:border-violet-200 dark:hover:border-violet-700 transition group">
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0 ${c.bg}`}>
+                                    {t.emoji || <Tag size={18} className={c.text} />}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2">
+                                        <p className={`font-bold text-sm ${c.text}`}>{t.name}</p>
+                                        <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full border capitalize ${c.bg} ${c.text} ${c.border}`}>{t.color}</span>
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 mt-0.5">
+                                        Created {new Date(t.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                                    <button onClick={() => openEditTag(t)} className="p-1.5 text-slate-400 hover:text-violet-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition" title="Edit tag">
+                                        <Pencil size={14} />
+                                    </button>
+                                    <button onClick={() => handleDeleteTag(t)} className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition" title="Delete tag">
+                                        <Trash2 size={14} />
+                                    </button>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+            </>
+            )}
 
             {/* Keyword modal */}
             {modalOpen && (
@@ -1998,11 +2428,88 @@ const SmsKeywordsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
                     initial={editKw}
                     pcoLists={pcoLists}
                     loadingLists={loadingLists}
+                    tags={tags}
                     onSave={handleSave}
                     onClose={() => { setModalOpen(false); setEditKw(null); setSaveError(null); }}
                     isBusy={isBusy}
                     saveError={saveError || undefined}
                 />
+            )}
+
+            {/* Tag modal */}
+            {tagModalOpen && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setTagModalOpen(false)}>
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl p-7 w-full max-w-sm mx-4" onClick={e => e.stopPropagation()}>
+                        <h3 className="text-lg font-black text-slate-900 dark:text-white mb-5 flex items-center gap-2">
+                            <Tag size={18} className="text-violet-500" /> {editTag ? 'Edit Tag' : 'New Tag'}
+                        </h3>
+
+                        <div className="mb-4">
+                            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Tag Name</label>
+                            <input
+                                type="text"
+                                value={tagName}
+                                onChange={e => setTagName(e.target.value)}
+                                placeholder="e.g. Prayer Request"
+                                maxLength={40}
+                                autoFocus
+                                className="w-full text-sm border-2 border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500"
+                            />
+                        </div>
+
+                        <div className="mb-4">
+                            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Emoji (optional)</label>
+                            <input
+                                type="text"
+                                value={tagEmoji}
+                                onChange={e => setTagEmoji(e.target.value)}
+                                placeholder="🙏"
+                                maxLength={4}
+                                className="w-24 text-xl border-2 border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500 text-center"
+                            />
+                        </div>
+
+                        <div className="mb-6">
+                            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Color</label>
+                            <div className="flex gap-2 flex-wrap">
+                                {(Object.keys(TAG_COLOR_MAP) as SmsTag['color'][]).map(color => {
+                                    const c = TAG_COLOR_MAP[color];
+                                    return (
+                                        <button
+                                            key={color}
+                                            type="button"
+                                            onClick={() => setTagColor(color)}
+                                            title={color}
+                                            className={`w-8 h-8 rounded-full border-4 transition ${
+                                                tagColor === color ? 'border-slate-900 dark:border-white scale-110' : 'border-transparent hover:scale-105'
+                                            } ${c.dot}`}
+                                        />
+                                    );
+                                })}
+                            </div>
+                            {tagName && (
+                                <div className="mt-3">
+                                    <p className="text-[10px] text-slate-400 mb-1">Preview:</p>
+                                    <SmsTagChip
+                                        tag={{ id: '', churchId: '', name: tagName, emoji: tagEmoji || undefined, color: tagColor, createdAt: 0 }}
+                                        size="sm"
+                                    />
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex gap-2">
+                            <button onClick={() => setTagModalOpen(false)} className="flex-1 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 transition">Cancel</button>
+                            <button
+                                onClick={handleSaveTag}
+                                disabled={tagBusy || !tagName.trim()}
+                                className="flex-1 py-2.5 text-sm font-black bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-xl transition flex items-center justify-center gap-2"
+                            >
+                                {tagBusy ? <><Loader2 size={14} className="animate-spin" />Saving…</> : <><CheckCircle size={14} />{editTag ? 'Save' : 'Create Tag'}</>}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );
@@ -2443,6 +2950,15 @@ function uid(): string {
     return Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10);
 }
 
+// Channel metadata
+const CHANNEL_CONFIG: Record<WorkflowChannelType, { label: string; icon: React.ReactNode; color: string; badge: string }> = {
+    sms:        { label: 'SMS',        icon: <MessageSquare size={13} />, color: 'bg-violet-600 text-white hover:bg-violet-700',   badge: 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300' },
+    mms:        { label: 'MMS',        icon: <ImageIcon size={13} />,     color: 'bg-blue-600 text-white hover:bg-blue-700',       badge: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'       },
+    email:      { label: 'Email',      icon: <Mail size={13} />,           color: 'bg-emerald-600 text-white hover:bg-emerald-700', badge: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
+    staff_sms:  { label: 'Staff SMS',  icon: <Users size={13} />,          color: 'bg-amber-500 text-white hover:bg-amber-600',     badge: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300'     },
+    staff_email:{ label: 'Staff Email',icon: <Mail size={13} />,           color: 'bg-rose-500 text-white hover:bg-rose-600',       badge: 'bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300'         },
+};
+
 // ─── Step Editor Row ─────────────────────────────────────────────────────────
 
 const StepRow: React.FC<{
@@ -2453,8 +2969,22 @@ const StepRow: React.FC<{
     onDelete: () => void;
     onMoveUp: () => void;
     onMoveDown: () => void;
-}> = ({ step, index, total, onChange, onDelete, onMoveUp, onMoveDown }) => {
+    pcoLists: { id: string; name: string }[];
+    pcoGroups: { id: string; name: string }[];
+}> = ({ step, index, total, onChange, onDelete, onMoveUp, onMoveDown, pcoLists, pcoGroups }) => {
+    const channel = step.channelType ?? 'sms';
     const segs = countSegments(step.message);
+    const [mmsUrl, setMmsUrl] = React.useState((step.mediaUrls && step.mediaUrls[0]) || '');
+
+    // Keep mmsUrl in sync when external step changes (e.g. on first load)
+    React.useEffect(() => {
+        setMmsUrl((step.mediaUrls && step.mediaUrls[0]) || '');
+    }, [step.id]);
+
+    const handleMmsUrl = (url: string) => {
+        setMmsUrl(url);
+        onChange({ mediaUrls: url ? [url] : [] });
+    };
 
     return (
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 space-y-3">
@@ -2468,6 +2998,50 @@ const StepRow: React.FC<{
                     <button onClick={onMoveUp} disabled={index === 0} title="Move step up" className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 disabled:opacity-30 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition"><ChevronDown size={14} className="rotate-180" /></button>
                     <button onClick={onMoveDown} disabled={index === total - 1} title="Move step down" className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 disabled:opacity-30 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition"><ChevronDown size={14} /></button>
                     <button onClick={onDelete} title="Delete step" className="p-1 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition"><Trash2 size={14} /></button>
+                </div>
+            </div>
+
+            {/* Channel picker — split into two rows: Contact | Staff */}
+            <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Channel</p>
+                {/* Contact channels */}
+                <div className="flex rounded-t-xl overflow-hidden border border-b-0 border-slate-200 dark:border-slate-600">
+                    {(['sms', 'mms', 'email'] as WorkflowChannelType[]).map(ch => (
+                        <button
+                            key={ch}
+                            type="button"
+                            onClick={() => onChange({ channelType: ch })}
+                            title={`Use ${CHANNEL_CONFIG[ch].label} channel`}
+                            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-bold transition border-r last:border-r-0 border-slate-200 dark:border-slate-600 ${
+                                channel === ch
+                                    ? CHANNEL_CONFIG[ch].color
+                                    : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-600'
+                            }`}
+                        >
+                            {CHANNEL_CONFIG[ch].icon} {CHANNEL_CONFIG[ch].label}
+                        </button>
+                    ))}
+                </div>
+                {/* Staff channels */}
+                <div className="flex rounded-b-xl overflow-hidden border border-slate-200 dark:border-slate-600">
+                    {(['staff_sms', 'staff_email'] as WorkflowChannelType[]).map(ch => (
+                        <button
+                            key={ch}
+                            type="button"
+                            onClick={() => onChange({ channelType: ch })}
+                            title={`Use ${CHANNEL_CONFIG[ch].label} channel`}
+                            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-bold transition border-r last:border-r-0 border-slate-200 dark:border-slate-600 ${
+                                channel === ch
+                                    ? CHANNEL_CONFIG[ch].color
+                                    : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-600'
+                            }`}
+                        >
+                            {CHANNEL_CONFIG[ch].icon} {CHANNEL_CONFIG[ch].label}
+                            {(ch === 'staff_sms' || ch === 'staff_email') && (
+                                <span className="text-[8px] opacity-60 ml-0.5">(internal)</span>
+                            )}
+                        </button>
+                    ))}
                 </div>
             </div>
 
@@ -2493,41 +3067,440 @@ const StepRow: React.FC<{
                 </div>
             </div>
 
-            {/* Message */}
-            <div>
-                <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Message</label>
-                    <span className={`text-[10px] font-bold ${
-                        segs > 3 ? 'text-red-500' : segs > 1 ? 'text-amber-600' : 'text-slate-400'
-                    }`}>{step.message.length} chars · {segs} seg{segs !== 1 ? 's' : ''}</span>
-                </div>
-                <textarea
-                    rows={3}
-                    value={step.message}
-                    onChange={e => onChange({ message: e.target.value })}
-                    placeholder="Type your message… Use {firstName} for personalization."
-                    className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
-                />
-                {/* Merge tag buttons */}
-                <div className="flex gap-1.5 mt-1.5">
-                    {['{firstName}', '{lastName}'].map(t => (
-                        <button
-                            key={t}
-                            onClick={() => onChange({ message: step.message + t })}
-                            className="px-2 py-0.5 text-[10px] font-mono font-semibold bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 rounded-lg border border-violet-200 dark:border-violet-800 hover:bg-violet-100 transition"
-                        >{t}</button>
-                    ))}
-                </div>
-            </div>
-
-            {/* Bubble preview */}
-            {step.message.trim() && (
-                <div className="bg-slate-100 dark:bg-slate-900/40 rounded-2xl p-3 flex justify-end">
-                    <div className="bg-violet-600 text-white text-xs px-3 py-2 rounded-2xl rounded-br-sm max-w-[85%] leading-relaxed whitespace-pre-wrap break-words">
-                        {step.message.replace('{firstName}', 'John').replace('{lastName}', 'Smith')}
+            {/* ── SMS fields ── */}
+            {channel === 'sms' && (
+                <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Message</label>
+                        <span className={`text-[10px] font-bold ${
+                            segs > 3 ? 'text-red-500' : segs > 1 ? 'text-amber-600' : 'text-slate-400'
+                        }`}>{step.message.length} chars · {segs} seg{segs !== 1 ? 's' : ''}</span>
                     </div>
+                    <textarea
+                        rows={3}
+                        value={step.message}
+                        onChange={e => onChange({ message: e.target.value })}
+                        placeholder="Type your message… Use {firstName} for personalisation."
+                        className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
+                    />
+                    <div className="flex gap-1.5 mt-1.5 flex-wrap">
+                        {ALL_MERGE_TAGS.map(({ tag }) => (
+                            <button key={tag} onClick={() => onChange({ message: step.message + tag })}
+                                className="px-2 py-0.5 text-[10px] font-mono font-semibold bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 rounded-lg border border-violet-200 dark:border-violet-800 hover:bg-violet-100 transition"
+                            >{tag}</button>
+                        ))}
+                    </div>
+                    {step.message.trim() && (
+                        <div className="bg-slate-100 dark:bg-slate-900/40 rounded-2xl p-3 flex justify-end mt-2">
+                            <div className="bg-violet-600 text-white text-xs px-3 py-2 rounded-2xl rounded-br-sm max-w-[85%] leading-relaxed whitespace-pre-wrap break-words">
+                                {step.message
+                                    .split('{firstName}').join('John').split('{lastName}').join('Smith')
+                                    .split('{fullName}').join('John Smith').split('{email}').join('john@example.com')
+                                    .split('{phone}').join('(615) 555-0100').split('{birthday}').join('Jan 15')
+                                    .split('{anniversary}').join('Jun 10').split('{city}').join('Nashville')
+                                    .split('{state}').join('TN')
+                                }
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
+
+            {/* ── MMS fields ── */}
+            {channel === 'mms' && (
+                <div className="space-y-3">
+                    <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Message</label>
+                            <span className={`text-[10px] font-bold ${
+                                segs > 3 ? 'text-red-500' : segs > 1 ? 'text-amber-600' : 'text-slate-400'
+                            }`}>{step.message.length} chars · {segs} seg{segs !== 1 ? 's' : ''}</span>
+                        </div>
+                        <textarea
+                            rows={3}
+                            value={step.message}
+                            onChange={e => onChange({ message: e.target.value })}
+                            placeholder="Caption for the image… Use {firstName} for personalisation."
+                            className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                        />
+                        <div className="flex gap-1.5 mt-1.5 flex-wrap">
+                            {ALL_MERGE_TAGS.map(({ tag }) => (
+                                <button key={tag} onClick={() => onChange({ message: step.message + tag })}
+                                    className="px-2 py-0.5 text-[10px] font-mono font-semibold bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-lg border border-blue-200 dark:border-blue-800 hover:bg-blue-100 transition"
+                                >{tag}</button>
+                            ))}
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Image URL (MMS)</label>
+                        <input
+                            type="url"
+                            value={mmsUrl}
+                            onChange={e => handleMmsUrl(e.target.value)}
+                            placeholder="https://example.com/image.jpg"
+                            className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <p className="text-[10px] text-slate-400 mt-1">Publicly accessible URL — JPG, PNG, GIF, or WebP. MMS may incur additional carrier fees.</p>
+                    </div>
+                    {mmsUrl && (
+                        <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 max-w-[180px]">
+                            <img src={mmsUrl} alt="MMS preview" className="w-full h-auto object-cover" onError={() => handleMmsUrl('')} />
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* ── Email fields ── */}
+            {channel === 'email' && (
+                <div className="space-y-3">
+                    <div className="flex items-start gap-2 p-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl text-xs text-emerald-700 dark:text-emerald-300">
+                        <Mail size={13} className="mt-0.5 shrink-0" />
+                        <span>Email steps are sent using your church's Email settings (from name, address, template). The recipient must have an email on file in Planning Center.</span>
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Subject Line</label>
+                        <input
+                            type="text"
+                            value={step.emailSubject || ''}
+                            onChange={e => onChange({ emailSubject: e.target.value })}
+                            placeholder="e.g. Welcome to Grace Church! 🙏"
+                            className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                    </div>
+                    <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Email Body</label>
+                            <span className="text-[10px] text-slate-400">{(step.emailBody || '').length} chars</span>
+                        </div>
+                        <textarea
+                            rows={6}
+                            value={step.emailBody || ''}
+                            onChange={e => onChange({ emailBody: e.target.value })}
+                            placeholder={`Dear {firstName},\n\nWe're so glad you joined us…`}
+                            className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none font-medium leading-relaxed"
+                        />
+                        <div className="flex gap-1.5 mt-1.5 flex-wrap">
+                            {ALL_MERGE_TAGS.map(({ tag }) => (
+                                <button key={tag} onClick={() => onChange({ emailBody: (step.emailBody || '') + tag })}
+                                    className="px-2 py-0.5 text-[10px] font-mono font-semibold bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 rounded-lg border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 transition"
+                                >{tag}</button>
+                            ))}
+                        </div>
+                    </div>
+                    {(step.emailSubject?.trim() || step.emailBody?.trim()) && (
+                        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
+                            <div className="bg-slate-50 dark:bg-slate-800 px-4 py-2 border-b border-slate-200 dark:border-slate-700">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Preview</p>
+                                <p className="text-xs font-bold text-slate-700 dark:text-slate-200">{step.emailSubject?.replace('{firstName}', 'John') || '(no subject)'}</p>
+                            </div>
+                            <div className="px-4 py-3 text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
+                                {(step.emailBody || '')
+                                    .split('{firstName}').join('John').split('{lastName}').join('Smith')
+                                    .split('{fullName}').join('John Smith').split('{email}').join('john@example.com')
+                                    .split('{phone}').join('(615) 555-0100').split('{birthday}').join('Jan 15')
+                                    .split('{anniversary}').join('Jun 10').split('{city}').join('Nashville')
+                                    .split('{state}').join('TN')
+                                || <span className="opacity-40 italic">No body yet</span>}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Staff SMS / Staff Email: internal notification step */}
+            {(channel === 'staff_sms' || channel === 'staff_email') && (() => {
+                const isEmail = channel === 'staff_email';
+                const targetType = step.staffTargetType ?? 'individuals';
+                const recipients = step.staffRecipients ?? [];
+                const [addName, setAddName] = React.useState('');
+                const [addContact, setAddContact] = React.useState('');
+                const addRecipient = () => {
+                    if (!addName.trim() && !addContact.trim()) return;
+                    onChange({ staffRecipients: [...recipients, isEmail ? { name: addName.trim() || addContact.trim(), email: addContact.trim() } : { name: addName.trim() || addContact.trim(), phone: addContact.trim() }] });
+                    setAddName(''); setAddContact('');
+                };
+                return (
+                    <div className={`space-y-3 p-4 rounded-2xl border ${isEmail ? 'bg-rose-50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-800' : 'bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800'}`}>
+                        {/* Info */}
+                        <div className={`flex items-start gap-2 text-xs ${isEmail ? 'text-rose-700 dark:text-rose-300' : 'text-amber-700 dark:text-amber-300'}`}>
+                            <Users size={13} className='mt-0.5 shrink-0' />
+                            <span><strong>Internal step</strong> — notifies <strong>staff</strong> only. Use {'{contact.firstName}'}, {'{contact.phone}'}, {'{contact.email}'} for the enrolled person.</span>
+                        </div>
+                        {/* Who to notify */}
+                        <div>
+                            <p className='text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5'>Notify</p>
+                            <div className='flex rounded-xl overflow-hidden border border-slate-200 dark:border-slate-600'>
+                                {(['individuals', 'list', 'group'] as const).map(t => (
+                                    <button key={t} type='button' onClick={() => onChange({ staffTargetType: t })}
+                                        className={`flex-1 py-1.5 text-xs font-bold transition border-r last:border-r-0 border-slate-200 dark:border-slate-600 ${targetType === t ? (isEmail ? 'bg-rose-500 text-white' : 'bg-amber-500 text-white') : 'bg-white dark:bg-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-600'}`}>
+                                        {t === 'individuals' ? 'Specific People' : t === 'list' ? 'PCO List' : 'PCO Group'}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        {/* Specific individuals */}
+                        {targetType === 'individuals' && (
+                            <div className='space-y-2'>
+                                {recipients.map((r, ri) => (
+                                    <div key={ri} className='flex items-center justify-between bg-white/60 dark:bg-slate-700/40 rounded-xl px-3 py-2'>
+                                        <div><p className='text-xs font-semibold text-slate-800 dark:text-slate-200'>{r.name}</p><p className='text-[10px] text-slate-500'>{r.email || r.phone}</p></div>
+                                        <button type='button' onClick={() => onChange({ staffRecipients: recipients.filter((_, i) => i !== ri) })} className='p-1 text-slate-400 hover:text-red-500 rounded' title='Remove'><Trash2 size={12} /></button>
+                                    </div>
+                                ))}
+                                <div className='flex gap-2'>
+                                    <input type='text' value={addName} onChange={e => setAddName(e.target.value)} placeholder='Name' className='flex-1 text-xs border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400' />
+                                    <input type={isEmail ? 'email' : 'tel'} value={addContact} onChange={e => setAddContact(e.target.value)} onKeyDown={e => e.key === 'Enter' && addRecipient()} placeholder={isEmail ? 'Email' : 'Phone'} className='flex-1 text-xs border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400' />
+                                    <button type='button' onClick={addRecipient} className={`px-3 py-2 rounded-xl text-white text-xs font-bold ${isEmail ? 'bg-rose-500 hover:bg-rose-600' : 'bg-amber-500 hover:bg-amber-600'}`}><Plus size={13} /></button>
+                                </div>
+                                {recipients.length === 0 && <p className='text-[10px] text-slate-400 text-center'>No recipients — add at least one.</p>}
+                            </div>
+                        )}
+                        {/* PCO List */}
+                        {targetType === 'list' && (
+                            <div>
+                                <label className='block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5'>PCO List</label>
+                                <select value={step.staffListId || ''} onChange={e => { const l = pcoLists.find(x => x.id === e.target.value); onChange({ staffListId: e.target.value || null, staffListName: l?.name || null }); }} title='Staff PCO list' className='w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-400 text-slate-900 dark:text-white'>
+                                    <option value=''>— Select a list —</option>
+                                    {pcoLists.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                                </select>
+                                <p className='text-[10px] text-slate-400 mt-1'>All members with a valid {isEmail ? 'email' : 'phone'} are notified.</p>
+                            </div>
+                        )}
+                        {/* PCO Group */}
+                        {targetType === 'group' && (
+                            <div>
+                                <label className='block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5'>PCO Group</label>
+                                <select value={step.staffGroupId || ''} onChange={e => { const g = pcoGroups.find(x => x.id === e.target.value); onChange({ staffGroupId: e.target.value || null, staffGroupName: g?.name || null }); }} title='Staff PCO group' className='w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-400 text-slate-900 dark:text-white'>
+                                    <option value=''>— Select a group —</option>
+                                    {pcoGroups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                                </select>
+                                <p className='text-[10px] text-slate-400 mt-1'>All members with a valid {isEmail ? 'email' : 'phone'} are notified.</p>
+                            </div>
+                        )}
+                        {/* Content */}
+                        {isEmail ? (
+                            <div className='space-y-2'>
+                                <input type='text' value={step.emailSubject || ''} onChange={e => onChange({ emailSubject: e.target.value })} placeholder='Subject: Action needed — {contact.firstName} is at Step 3' className='w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-400' />
+                                <textarea rows={5} value={step.emailBody || ''} onChange={e => onChange({ emailBody: e.target.value })} placeholder={'Hi team,\n\nJust a heads-up: {contact.firstName} ({contact.phone}) is progressing through the workflow. Please follow up today.'} className='w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-400 resize-none' />
+                            </div>
+                        ) : (
+                            <textarea rows={3} value={step.message} onChange={e => onChange({ message: e.target.value })} placeholder='FYI: {contact.firstName} ({contact.phone}) just hit this workflow step. Please reach out!' className='w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none' />
+                        )}
+                        {/* Contact merge tags */}
+                        <div className='flex gap-1.5 flex-wrap'>
+                            {['{contact.firstName}','{contact.lastName}','{contact.name}','{contact.phone}','{contact.email}'].map(t => (
+                                <button key={t} type='button' onClick={() => isEmail ? onChange({ emailBody: (step.emailBody || '') + t }) : onChange({ message: step.message + t })}
+                                    className={`px-2 py-0.5 text-[10px] font-mono font-semibold rounded-lg border transition ${isEmail ? 'bg-rose-50 dark:bg-rose-900/20 text-rose-700 border-rose-200 hover:bg-rose-100' : 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 border-amber-200 hover:bg-amber-100'}`}
+                                >{t}</button>
+                            ))}
+                        </div>
+                    </div>
+                );
+            })()}
+        </div>
+    );
+};
+
+// ─── AI Workflow Builder Panel ──────────────────────────────────────────────────
+
+const EXAMPLE_PROMPTS = [
+    'Send a text once a day for 5 days with a Bible verse about prayer. On the last day, remind them the church is praying for them.',
+    'Create a 3-step new visitor follow-up: a welcome text on day 0, an email on day 3 about getting connected, and an SMS on day 7 inviting them back.',
+    'Build a 7-day Easter devotional series with daily SMS scripture and a final email summarising the Resurrection story.',
+    'Send 4 weekly SMS giving encouragements reminding donors of the church mission.',
+];
+
+const AiWorkflowBuilderPanel: React.FC<{
+    onApply: (draft: AiWorkflowDraft) => void;
+    onClose: () => void;
+}> = ({ onApply, onClose }) => {
+    const [prompt, setPrompt]  = useState('');
+    const [loading, setLoading] = useState(false);
+    const [error, setError]    = useState('');
+    const [draft, setDraft]    = useState<AiWorkflowDraft | null>(null);
+
+    const handleGenerate = async () => {
+        if (!prompt.trim()) return;
+        setLoading(true);
+        setError('');
+        setDraft(null);
+        try {
+            const result = await generateWorkflowWithAi(prompt);
+            setDraft(result);
+        } catch (e: any) {
+            setError(e.message || 'Generation failed. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') handleGenerate();
+    };
+
+    const chBadgeClass: Record<string, string> = {
+        sms:   'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300',
+        mms:   'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
+        email: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
+    };
+
+    return (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
+            <div
+                className="relative w-full max-w-2xl bg-white dark:bg-slate-900 flex flex-col shadow-2xl overflow-hidden rounded-3xl max-h-[90vh]"
+                onClick={e => e.stopPropagation()}
+            >
+                {/* Header */}
+                <div className="shrink-0 px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between bg-gradient-to-r from-violet-600 to-purple-600">
+                    <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 bg-white/20 rounded-2xl flex items-center justify-center text-white">
+                            <Sparkles size={18} />
+                        </div>
+                        <div>
+                            <h2 className="text-white font-black text-base">AI Workflow Builder</h2>
+                            <p className="text-violet-200 text-xs">Describe your workflow — AI writes every step for you</p>
+                        </div>
+                    </div>
+                    <button onClick={onClose} title="Close" className="p-1.5 rounded-xl text-white/70 hover:text-white hover:bg-white/20 transition">
+                        <X size={18} />
+                    </button>
+                </div>
+
+                {/* Body */}
+                <div className="flex-1 overflow-y-auto p-6 space-y-5">
+
+                    {/* Prompt input */}
+                    <div>
+                        <label className="block text-xs font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">Describe Your Workflow</label>
+                        <textarea
+                            rows={4}
+                            value={prompt}
+                            onChange={e => setPrompt(e.target.value)}
+                            onKeyDown={handleKeyDown}
+                            placeholder="e.g. Send a text once a day for 5 days with a Bible verse about prayer. On the last day, remind them the church has them on the prayer list."
+                            className="w-full text-sm border-2 border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500 dark:focus:border-violet-400 resize-none leading-relaxed"
+                        />
+                        <p className="text-[10px] text-slate-400 mt-1.5">Tip: ⌘ / Ctrl + Enter to generate</p>
+                    </div>
+
+                    {/* Example prompts */}
+                    {!draft && !loading && (
+                        <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Try an example</p>
+                            <div className="space-y-2">
+                                {EXAMPLE_PROMPTS.map((ep, i) => (
+                                    <button
+                                        key={i}
+                                        onClick={() => setPrompt(ep)}
+                                        className="w-full text-left text-xs text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-violet-50 dark:hover:bg-violet-900/20 hover:text-violet-700 dark:hover:text-violet-300 border border-slate-200 dark:border-slate-700 hover:border-violet-300 dark:hover:border-violet-700 rounded-xl px-3 py-2.5 transition leading-relaxed"
+                                    >
+                                        "{ep}"
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Loading state */}
+                    {loading && (
+                        <div className="flex flex-col items-center justify-center py-16 gap-4 text-slate-400">
+                            <div className="relative">
+                                <div className="w-16 h-16 rounded-full bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
+                                    <Sparkles size={28} className="text-violet-500 animate-pulse" />
+                                </div>
+                                <Loader2 size={48} className="absolute inset-0 m-auto text-violet-400 animate-spin opacity-40" />
+                            </div>
+                            <div className="text-center">
+                                <p className="font-bold text-slate-700 dark:text-slate-300">Building your workflow…</p>
+                                <p className="text-xs mt-1">AI is writing every step with real content</p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Error */}
+                    {error && (
+                        <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl p-4">
+                            <AlertTriangle size={16} className="shrink-0" /> {error}
+                        </div>
+                    )}
+
+                    {/* Draft preview */}
+                    {draft && !loading && (
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Generated Workflow</p>
+                                    <h3 className="font-black text-slate-900 dark:text-white text-base">{draft.name}</h3>
+                                    {draft.description && <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{draft.description}</p>}
+                                </div>
+                                <span className="text-xs font-bold bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 px-2.5 py-1 rounded-full">{draft.steps.length} step{draft.steps.length !== 1 ? 's' : ''}</span>
+                            </div>
+
+                            {/* Step cards */}
+                            <div className="space-y-3">
+                                {draft.steps.map((step, idx) => (
+                                    <div key={idx} className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <span className="w-6 h-6 rounded-full bg-violet-600 text-white text-[10px] font-black flex items-center justify-center shrink-0">{idx + 1}</span>
+                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide ${chBadgeClass[step.channelType] ?? chBadgeClass.sms}`}>{step.channelType.toUpperCase()}</span>
+                                            <span className="text-[10px] text-slate-400">
+                                                {idx === 0 ? 'Sends immediately' : `After ${step.delayDays} day${step.delayDays !== 1 ? 's' : ''}`}
+                                            </span>
+                                        </div>
+                                        {step.channelType === 'email' ? (
+                                            <div className="space-y-1">
+                                                <p className="text-xs font-bold text-slate-700 dark:text-slate-200">Subject: {step.emailSubject}</p>
+                                                <p className="text-xs text-slate-600 dark:text-slate-400 whitespace-pre-wrap leading-relaxed line-clamp-4">{step.emailBody}</p>
+                                            </div>
+                                        ) : (
+                                            <div className="flex justify-end">
+                                                <div className="bg-violet-600 text-white text-xs px-3 py-2 rounded-2xl rounded-br-sm max-w-[90%] leading-relaxed whitespace-pre-wrap break-words font-medium shadow-sm">
+                                                    {step.message}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Footer */}
+                <div className="shrink-0 px-6 py-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex items-center gap-3">
+                    {draft && !loading ? (
+                        <>
+                            <button
+                                onClick={handleGenerate}
+                                disabled={loading || !prompt.trim()}
+                                className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-xl border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                            >
+                                <RotateCcw size={13} /> Regenerate
+                            </button>
+                            <div className="flex-1" />
+                            <button onClick={onClose} className="px-4 py-2.5 text-sm font-semibold rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition">Cancel</button>
+                            <button
+                                onClick={() => { onApply(draft); onClose(); }}
+                                className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold rounded-xl transition shadow-md shadow-violet-200 dark:shadow-violet-900/40"
+                            >
+                                <ChevronRight size={15} /> Apply to Editor
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <div className="flex-1" />
+                            <button onClick={onClose} className="px-4 py-2.5 text-sm font-semibold rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition">Cancel</button>
+                            <button
+                                onClick={handleGenerate}
+                                disabled={loading || !prompt.trim()}
+                                className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-sm font-bold rounded-xl transition shadow-md shadow-violet-200 dark:shadow-violet-900/40"
+                            >
+                                {loading ? <><Loader2 size={14} className="animate-spin" /> Generating…</> : <><Sparkles size={14} /> Generate Workflow</>}
+                            </button>
+                        </>
+                    )}
+                </div>
+            </div>
         </div>
     );
 };
@@ -2539,10 +3512,11 @@ const WorkflowEditor: React.FC<{
     churchId: string;
     keywords: SmsKeyword[];
     pcoLists: { id: string; name: string }[];
+    pcoGroups: { id: string; name: string }[];
     onSave: (wf: SmsWorkflow) => Promise<void>;
     onBack: () => void;
     isBusy: boolean;
-}> = ({ initial, churchId, keywords, pcoLists, onSave, onBack, isBusy }) => {
+}> = ({ initial, churchId, keywords, pcoLists, pcoGroups, onSave, onBack, isBusy }) => {
     const makeBlank = (): SmsWorkflow => ({
         id: uid(),
         churchId,
@@ -2553,7 +3527,7 @@ const WorkflowEditor: React.FC<{
         triggerKeywordWord: null,
         triggerListId: null,
         triggerListName: null,
-        steps: [{ id: uid(), order: 0, delayDays: 0, message: '' }],
+        steps: [{ id: uid(), order: 0, delayDays: 0, channelType: 'sms', message: '' }],
         isActive: true,
         enrolledCount: 0,
         completedCount: 0,
@@ -2563,11 +3537,30 @@ const WorkflowEditor: React.FC<{
 
     const [wf, setWf] = useState<SmsWorkflow>(initial ?? makeBlank());
     const [error, setError] = useState('');
+    const [showAiBuilder, setShowAiBuilder] = useState(false);
+
+    const handleApplyAiDraft = (draft: AiWorkflowDraft) => {
+        const steps: SmsWorkflowStep[] = draft.steps.map((s, i) => ({
+            id: uid(),
+            order: i,
+            delayDays: i === 0 ? 0 : (s.delayDays ?? 1),
+            channelType: (s.channelType ?? 'sms') as WorkflowChannelType,
+            message: s.message || '',
+            emailSubject: s.emailSubject,
+            emailBody: s.emailBody,
+        }));
+        setWf(prev => ({
+            ...prev,
+            name: draft.name || prev.name,
+            description: draft.description || prev.description,
+            steps,
+        }));
+    };
 
     const patch = (p: Partial<SmsWorkflow>) => setWf(prev => ({ ...prev, ...p }));
 
     const addStep = () => {
-        const steps = [...wf.steps, { id: uid(), order: wf.steps.length, delayDays: 1, message: '' }];
+        const steps = [...wf.steps, { id: uid(), order: wf.steps.length, delayDays: 1, channelType: 'sms' as WorkflowChannelType, message: '' }];
         patch({ steps });
     };
 
@@ -2590,17 +3583,45 @@ const WorkflowEditor: React.FC<{
     const handleSave = async () => {
         if (!wf.name.trim()) { setError('Workflow name is required.'); return; }
         if (wf.steps.length === 0) { setError('Add at least one step.'); return; }
-        if (wf.steps.some(s => !s.message.trim())) { setError('All steps must have a message.'); return; }
-        if (wf.trigger === 'keyword' && !wf.triggerKeywordId) { setError('Select a keyword trigger.'); return; }
-        if (wf.trigger === 'list_add' && !wf.triggerListId) { setError('Select a PCO list trigger.'); return; }
+        const badStep = wf.steps.find(s => {
+            const ch = s.channelType ?? 'sms';
+            if (ch === 'email') return !s.emailSubject?.trim() || !s.emailBody?.trim();
+            if (ch === 'staff_email') {
+                if (!s.emailSubject?.trim() || !s.emailBody?.trim()) return true;
+                // must have at least one target
+                const tt = s.staffTargetType ?? 'individuals';
+                if (tt === 'individuals') return !s.staffRecipients?.length;
+                if (tt === 'list') return !s.staffListId;
+                if (tt === 'group') return !s.staffGroupId;
+            }
+            if (ch === 'staff_sms') {
+                if (!s.message.trim()) return true;
+                const tt = s.staffTargetType ?? 'individuals';
+                if (tt === 'individuals') return !s.staffRecipients?.length;
+                if (tt === 'list') return !s.staffListId;
+                if (tt === 'group') return !s.staffGroupId;
+            }
+            return !s.message.trim();
+        });
+        if (badStep) {
+            const ch = badStep.channelType ?? 'sms';
+            if (ch === 'staff_email' || ch === 'email') setError('All Email steps need a subject, body, and at least one recipient or target.');
+            else if (ch === 'staff_sms') setError('All Staff SMS steps need a message and at least one recipient or target.');
+            else setError('All SMS / MMS steps must have a message.');
+            return;
+        }
+        if (wf.trigger === 'keyword'  && !wf.triggerKeywordId) { setError('Select a keyword trigger.'); return; }
+        if (wf.trigger === 'list_add' && !wf.triggerListId)     { setError('Select a PCO list trigger.'); return; }
         setError('');
         await onSave({ ...wf, updatedAt: Date.now() });
     };
 
     const triggerLabel: Record<string, string> = {
-        manual: 'Staff manually enrolls a contact',
-        keyword: 'Contact texts a keyword',
-        list_add: 'Contact added to a PCO List',
+        manual:      'Staff manually enrolls a contact',
+        keyword:     'Contact texts a keyword',
+        list_add:    'Contact added to a PCO List',
+        birthday:    'Fires each year on birthdays',
+        anniversary: 'Fires each year on anniversaries',
     };
 
     return (
@@ -2618,6 +3639,14 @@ const WorkflowEditor: React.FC<{
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
+                    {/* AI Builder button */}
+                    <button
+                        onClick={() => setShowAiBuilder(true)}
+                        title="Build this workflow with AI"
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl border border-violet-300 dark:border-violet-600 bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 hover:bg-violet-100 dark:hover:bg-violet-900/40 transition"
+                    >
+                        <Sparkles size={12} /> AI Build
+                    </button>
                     {/* Active toggle */}
                     <button
                         onClick={() => patch({ isActive: !wf.isActive })}
@@ -2638,6 +3667,14 @@ const WorkflowEditor: React.FC<{
                     </button>
                 </div>
             </div>
+
+            {/* AI Builder modal */}
+            {showAiBuilder && (
+                <AiWorkflowBuilderPanel
+                    onApply={handleApplyAiDraft}
+                    onClose={() => setShowAiBuilder(false)}
+                />
+            )}
 
             {/* Editor body */}
             <div className="flex-1 overflow-y-auto">
@@ -2673,6 +3710,7 @@ const WorkflowEditor: React.FC<{
                         <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Trigger</p>
                         <p className="text-xs text-slate-500 dark:text-slate-400">What event starts enrolling a contact into this workflow?</p>
 
+                        {/* Row 1 — basic triggers */}
                         <div className="grid grid-cols-3 gap-2">
                             {(['manual', 'keyword', 'list_add'] as const).map(t => (
                                 <button
@@ -2684,6 +3722,26 @@ const WorkflowEditor: React.FC<{
                                 >
                                     <p className="text-xs font-black text-slate-900 dark:text-white mb-0.5">
                                         {t === 'manual' ? '✍️ Manual' : t === 'keyword' ? '💬 Keyword' : '📝 List Add'}
+                                    </p>
+                                    <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">{triggerLabel[t]}</p>
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Row 2 — date-based triggers */}
+                        <div className="grid grid-cols-2 gap-2">
+                            {(['birthday', 'anniversary'] as const).map(t => (
+                                <button
+                                    key={t}
+                                    onClick={() => patch({ trigger: t })}
+                                    className={`p-3 rounded-xl border-2 text-left transition ${
+                                        wf.trigger === t
+                                            ? 'border-pink-500 bg-pink-50 dark:bg-pink-900/20'
+                                            : 'border-slate-200 dark:border-slate-700 hover:border-pink-300'
+                                    }`}
+                                >
+                                    <p className="text-xs font-black text-slate-900 dark:text-white mb-0.5">
+                                        {t === 'birthday' ? '🎂 Birthday' : '💍 Anniversary'}
                                     </p>
                                     <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">{triggerLabel[t]}</p>
                                 </button>
@@ -2736,6 +3794,52 @@ const WorkflowEditor: React.FC<{
                             </div>
                         )}
 
+                        {/* Birthday / Anniversary options */}
+                        {(wf.trigger === 'birthday' || wf.trigger === 'anniversary') && (
+                            <div className="space-y-3">
+                                {/* Day offset */}
+                                <div>
+                                    <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
+                                        Send how many days before?
+                                    </label>
+                                    <div className="flex items-center gap-3">
+                                        <select
+                                            value={wf.triggerDayOffset ?? 0}
+                                            onChange={e => patch({ triggerDayOffset: Number(e.target.value) })}
+                                            title="Days before event to send"
+                                            className="w-48 text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-pink-500"
+                                        >
+                                            <option value={0}>On the day (0 days before)</option>
+                                            <option value={1}>1 day before</option>
+                                            <option value={2}>2 days before</option>
+                                            <option value={3}>3 days before</option>
+                                            <option value={7}>1 week before</option>
+                                            <option value={14}>2 weeks before</option>
+                                            <option value={30}>1 month before</option>
+                                        </select>
+                                        <span className="text-xs text-slate-400">
+                                            Step 1 fires {(wf.triggerDayOffset ?? 0) === 0
+                                                ? `on their ${wf.trigger}`
+                                                : `${wf.triggerDayOffset} day${wf.triggerDayOffset !== 1 ? 's' : ''} before their ${wf.trigger}`
+                                            }
+                                        </span>
+                                    </div>
+                                </div>
+                                {/* Info banner */}
+                                <div className="flex items-start gap-2.5 p-3.5 bg-pink-50 dark:bg-pink-900/20 border border-pink-200 dark:border-pink-800 rounded-xl">
+                                    <span className="text-lg shrink-0 mt-0.5">{wf.trigger === 'birthday' ? '🎂' : '💍'}</span>
+                                    <div className="text-xs text-pink-700 dark:text-pink-300 leading-relaxed">
+                                        <p className="font-bold mb-0.5">
+                                            Automatically fires every year
+                                        </p>
+                                        <p>
+                                            The daily scanner checks all people in your Planning Center database each morning and enrolls anyone whose {wf.trigger} matches today's date{(wf.triggerDayOffset ?? 0) > 0 ? ` (adjusted ${wf.triggerDayOffset} day${wf.triggerDayOffset !== 1 ? 's' : ''} early)` : ''}. Each person is only enrolled once per calendar year. Use <span className="font-mono bg-pink-100 dark:bg-pink-900/40 px-1 rounded">{'{'}birthday{'}'}</span> or <span className="font-mono bg-pink-100 dark:bg-pink-900/40 px-1 rounded">{'{'}firstName{'}'}</span> in your message to personalize it.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {wf.trigger === 'manual' && (
                             <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl text-xs text-blue-700 dark:text-blue-300">
                                 <Users size={13} className="mt-0.5 shrink-0" />
@@ -2777,6 +3881,8 @@ const WorkflowEditor: React.FC<{
                                         onDelete={() => deleteStep(idx)}
                                         onMoveUp={() => moveStep(idx, 'up')}
                                         onMoveDown={() => moveStep(idx, 'down')}
+                                        pcoLists={pcoLists}
+                                        pcoGroups={pcoGroups}
                                     />
                                 </div>
                             ))}
@@ -2946,6 +4052,7 @@ const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
     const [workflows, setWorkflows] = useState<SmsWorkflow[]>([]);
     const [keywords, setKeywords]   = useState<SmsKeyword[]>([]);
     const [pcoLists, setPcoLists]   = useState<{ id: string; name: string }[]>([]);
+    const [pcoGroups, setPcoGroups] = useState<{ id: string; name: string }[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [editing, setEditing]     = useState<SmsWorkflow | null | 'new'>('new' as any);
     const [viewMode, setViewMode]   = useState<'list' | 'editor'>('list');
@@ -2966,12 +4073,15 @@ const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
         return unsub;
     }, [churchId]);
 
-    // Load keywords and PCO lists for the editor
+    // Load keywords, PCO lists and PCO groups for the editor
     useEffect(() => {
         getDocs(query(collection(firebaseDb, 'smsKeywords'), where('churchId', '==', churchId)))
             .then(snap => setKeywords(snap.docs.map(d => ({ id: d.id, ...d.data() } as SmsKeyword))));
         pcoService.getPeopleLists(churchId)
             .then((raw: any[]) => setPcoLists(raw.map(r => ({ id: r.id, name: r.attributes?.name || 'Unnamed' }))))
+            .catch(() => {});
+        pcoService.getGroups(churchId)
+            .then((raw: any[]) => setPcoGroups(raw.map(r => ({ id: r.id, name: r.attributes?.name || 'Unnamed' }))))
             .catch(() => {});
     }, [churchId]);
 
@@ -3005,9 +4115,11 @@ const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
     const openEdit = (wf: SmsWorkflow) => { setEditing(wf); setViewMode('editor'); };
 
     const TRIGGER_BADGE: Record<string, { label: string; color: string; icon: string }> = {
-        manual:   { label: 'Manual',   color: 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300',  icon: '✍️' },
-        keyword:  { label: 'Keyword',  color: 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300', icon: '💬' },
-        list_add: { label: 'List Add', color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300',   icon: '📝' },
+        manual:      { label: 'Manual',      color: 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300',    icon: '✍️' },
+        keyword:     { label: 'Keyword',     color: 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300', icon: '💬' },
+        list_add:    { label: 'List Add',    color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300',      icon: '📝' },
+        birthday:    { label: 'Birthday',    color: 'bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300',      icon: '🎂' },
+        anniversary: { label: 'Anniversary', color: 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300',      icon: '💍' },
     };
 
     // Show editor view
@@ -3019,6 +4131,7 @@ const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
                     churchId={churchId}
                     keywords={keywords}
                     pcoLists={pcoLists}
+                    pcoGroups={pcoGroups}
                     onSave={handleSave}
                     onBack={() => setViewMode('list')}
                     isBusy={isBusy}
@@ -3051,7 +4164,7 @@ const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
                 <div>
                     <p className="text-sm font-bold text-violet-800 dark:text-violet-200 mb-1">How Workflows Work</p>
                     <p className="text-xs text-violet-700 dark:text-violet-300 leading-relaxed">
-                        Build a multi-step message sequence with custom delays between each step. Triggered automatically by a keyword text, a PCO List add, or manually by staff. Once enrolled, contacts move through each step on schedule — and stop automatically if they reply STOP.
+                        Build a multi-step message sequence with custom delays between each step. Triggered automatically by a keyword text, a PCO List add, a <strong>🎂 birthday</strong>, or a <strong>💍 anniversary</strong> — or manually by staff. Once enrolled, contacts move through each step on schedule. Birthday and anniversary workflows auto-enroll the right people every year.
                     </p>
                 </div>
             </div>
@@ -3091,6 +4204,18 @@ const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
                                                 <span className="text-xs text-slate-500 dark:text-slate-400">
                                                     {wf.steps.length} step{wf.steps.length !== 1 ? 's' : ''}
                                                 </span>
+                                                {/* Per-step channel badges */}
+                                                <div className="flex gap-1 flex-wrap">
+                                                    {wf.steps.map((s, si) => {
+                                                        const ch = s.channelType ?? 'sms';
+                                                        const cfg = CHANNEL_CONFIG[ch];
+                                                        return (
+                                                            <span key={si} className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${cfg.badge}`}>
+                                                                {cfg.label}
+                                                            </span>
+                                                        );
+                                                    })}
+                                                </div>
                                                 {wf.trigger === 'keyword' && wf.triggerKeywordWord && (
                                                     <span className="text-[10px] font-mono font-bold text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/30 px-1.5 py-0.5 rounded">{wf.triggerKeywordWord}</span>
                                                 )}

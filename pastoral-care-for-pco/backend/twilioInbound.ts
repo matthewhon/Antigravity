@@ -182,6 +182,19 @@ export const handleInboundSms = async (req: any, res: any) => {
                 matchCount: (kw.matchCount || 0) + 1,
             });
 
+            // Auto-tag the conversation if the keyword has tag IDs configured
+            if (Array.isArray(kw.autoTagIds) && kw.autoTagIds.length > 0) {
+                try {
+                    const { FieldValue } = require('firebase-admin/firestore');
+                    await convRef.update({
+                        tags: FieldValue.arrayUnion(...kw.autoTagIds),
+                    });
+                    log.info(`[Inbound SMS] Auto-tagged conversation ${convId} with tags: ${kw.autoTagIds.join(', ')}`, 'system', { churchId, keyword: kw.keyword, autoTagIds: kw.autoTagIds }, churchId);
+                } catch (tagErr: any) {
+                    log.warn(`[Inbound SMS] Failed to auto-tag conversation: ${tagErr.message}`, 'system', { churchId, convId }, churchId);
+                }
+            }
+
             // Optionally add person to a PCO list
             if (kw.addToListId && personMatch?.personId) {
                 log.info(`[Inbound SMS] Keyword "${kw.keyword}" matched — would add ${personMatch.personId} to list ${kw.addToListId}`, 'system', { churchId, keyword: kw.keyword }, churchId);
@@ -206,6 +219,7 @@ export const handleInboundSms = async (req: any, res: any) => {
 
             log.info(`[Inbound SMS] Keyword "${kw.keyword}" matched from ${from} for church ${churchId}`, 'system', { churchId, keyword: kw.keyword }, churchId);
         }
+
 
         res.set('Content-Type', 'text/xml');
         return res.status(200).send(twiml);

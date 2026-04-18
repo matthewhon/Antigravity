@@ -55,6 +55,31 @@
         { "fieldPath": "churchId",  "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "smsWorkflowEnrollments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "completed",  "order": "ASCENDING" },
+        { "fieldPath": "nextSendAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "smsWorkflowEnrollments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "workflowId", "order": "ASCENDING" },
+        { "fieldPath": "enrolledAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "smsWorkflows",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "churchId",  "order": "ASCENDING" },
+        { "fieldPath": "isActive",  "order": "ASCENDING" },
+        { "fieldPath": "trigger",   "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
