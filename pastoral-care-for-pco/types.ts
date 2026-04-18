@@ -1266,3 +1266,34 @@ export interface WorkflowBranchNode {
 
 /** Discriminated union of all workflow node types. */
 export type WorkflowNode = WorkflowActionNode | WorkflowDelayNode | WorkflowBranchNode;
+
+// ─── Multi-Number Support ────────────────────────────────────────────────────
+
+/**
+ * A Twilio phone number provisioned for a specific church.
+ * One church may own multiple numbers (e.g. main line, youth line).
+ * Stored in the `twilioNumbers` Firestore collection.
+ */
+export interface TwilioPhoneNumber {
+    id: string;
+    churchId: string;
+    /** E.164 phone number, e.g. "+16155550100" */
+    phoneNumber: string;
+    /** Twilio SID for this number */
+    phoneSid: string;
+    /** Human-friendly label shown in the inbox switcher (e.g. "Main Line", "Youth Ministry") */
+    friendlyLabel: string;
+    /** Whether this is the church's primary/default number */
+    isDefault: boolean;
+    /** Whether SMS is enabled for this number */
+    smsEnabled: boolean;
+    /**
+     * User IDs allowed to see and send from this number.
+     * Empty array = visible to all users in the church.
+     */
+    allowedUserIds: string[];
+    /** Optional display name shown in outbound message headers */
+    senderName?: string;
+    createdAt: number;
+    updatedAt: number;
+}
