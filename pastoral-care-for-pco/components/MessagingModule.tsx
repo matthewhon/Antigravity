@@ -6037,9 +6037,46 @@ const SmsAgentTab: React.FC<{
     const [testOutput, setTestOutput] = useState('');
     const [testLoading, setTestLoading] = useState(false);
 
+    // Website scanner
+    const [scanUrl, setScanUrl]         = useState(church.smsSettings?.a2pWebsite || church.website || '');
+    const [scanLoading, setScanLoading] = useState(false);
+    const [scanResult, setScanResult]   = useState<Record<string, string> | null>(null);
+    const [scanError, setScanError]     = useState('');
+
     const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
         setToast({ msg, type }); setTimeout(() => setToast(null), 3500);
     };
+
+    const handleScanWebsite = async () => {
+        const url = scanUrl.trim();
+        if (!url) return;
+        setScanLoading(true); setScanResult(null); setScanError('');
+        try {
+            const res = await fetch('/api/messaging/scan-website', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url }),
+            });
+            const data = await res.json();
+            if (!res.ok || data.error) {
+                setScanError(data.error || 'Scan failed. Please try again.');
+            } else {
+                setScanResult(data.extracted || {});
+            }
+        } catch {
+            setScanError('Could not reach the server. Please try again.');
+        } finally {
+            setScanLoading(false);
+        }
+    };
+
+    const handleApplyScanResult = () => {
+        if (!scanResult) return;
+        setKb(prev => ({ ...prev, ...scanResult }));
+        setScanResult(null);
+        showToast('Fields applied — review and save the knowledge base.');
+    };
+
 
     // Load knowledge base on mount
     useEffect(() => {
@@ -6245,6 +6282,75 @@ Write the reply:`;
                     </button>
                 )}
             </div>
+
+            {/* Scan from website card */}
+            {isAdmin && (
+                <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 space-y-4">
+                    <div>
+                        <p className="font-bold text-slate-900 dark:text-white text-sm flex items-center gap-2">
+                            <Globe2 size={15} className="text-emerald-500" /> Scan from Website
+                        </p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                            Enter your church website URL and we'll automatically extract service times, location, pastor info, ministries, and more.
+                        </p>
+                    </div>
+                    <div className="flex gap-3">
+                        <input
+                            type="url"
+                            value={scanUrl}
+                            onChange={e => setScanUrl(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter') handleScanWebsite(); }}
+                            placeholder="https://www.gracechurch.org"
+                            className="flex-1 text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                        <button
+                            onClick={handleScanWebsite}
+                            disabled={!scanUrl.trim() || scanLoading}
+                            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-sm font-bold rounded-xl transition"
+                        >
+                            {scanLoading ? <Loader2 size={14} className="animate-spin" /> : <Globe2 size={14} />}
+                            {scanLoading ? 'Scanning…' : 'Scan'}
+                        </button>
+                    </div>
+
+                    {scanError && (
+                        <div className="flex items-start gap-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl px-3 py-2">
+                            <AlertTriangle size={12} className="shrink-0 mt-0.5" /> {scanError}
+                        </div>
+                    )}
+
+                    {scanResult && (
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                                    <CheckCircle size={10} /> Extracted from website
+                                </p>
+                                <button
+                                    onClick={handleApplyScanResult}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition"
+                                >
+                                    <ChevronRight size={11} /> Apply to Knowledge Base
+                                </button>
+                            </div>
+                            <div className="bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl p-4 space-y-2 max-h-64 overflow-y-auto">
+                                {Object.entries(scanResult).filter(([, v]) => v && String(v).trim()).map(([key, value]) => (
+                                    <div key={key}>
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{key}</p>
+                                        <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">{String(value)}</p>
+                                    </div>
+                                ))}
+                                {Object.values(scanResult).filter(v => v && String(v).trim()).length === 0 && (
+                                    <p className="text-xs text-slate-400">No structured data could be extracted from this page. Try the church's About or Contact page instead.</p>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500">
+                        Tip: If the home page has limited info, try scanning the church's About, Contact, or Services page directly.
+                    </p>
+                </div>
+            )}
 
             {/* Test preview */}
             <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 space-y-4">
