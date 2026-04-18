@@ -872,6 +872,20 @@ export interface SmsSettings {
     prefixMessagesWithName?: boolean;
     /** Footer text appended to every outbound SMS (e.g. "Reply STOP to unsubscribe") */
     messageFooter?: string;
+    /** Whether the SMS AI Agent is enabled for this tenant */
+    smsAgentEnabled?: boolean;
+
+    // -- Prayer Request Detection (NLP) ----------------------------------------
+    /**
+     * When true, inbound messages are scanned for natural-language prayer request
+     * patterns. Matching conversations are automatically tagged "Needs Prayer".
+     */
+    prayerDetectionEnabled?: boolean;
+    /**
+     * The clarifying reply sent when a *generic* prayer ask is detected
+     * (e.g. "Will you pray for me?"). Defaults to "What would you like prayer for?"
+     */
+    prayerClarifyingReply?: string;
 }
 
 export type SmsDirection = 'inbound' | 'outbound';
@@ -927,6 +941,14 @@ export interface SmsConversation {
     toPhoneNumber?: string | null;
     /** Named inbox this conversation belongs to (legacy — same value as twilioNumberId) */
     inboxId?: string | null;
+    /**
+     * Prayer detection follow-up state.
+     * Set to 'awaiting_prayer_detail' after the system sends the clarifying reply
+     * "What would you like prayer for?" for a generic ask.
+     * The next inbound message from this contact will be treated as the prayer detail
+     * and will trigger the "Needs Prayer" tag.
+     */
+    prayerFollowUpState?: 'awaiting_prayer_detail' | null;
 }
 
 export type SmsCampaignStatus = 'draft' | 'scheduled' | 'sending' | 'sent' | 'failed';
@@ -979,6 +1001,12 @@ export interface SmsTag {
     emoji?: string;
     /** Color theme for tag chip UI */
     color: 'violet' | 'blue' | 'emerald' | 'amber' | 'red' | 'pink';
+    /**
+     * Optional auto-reply message sent when this tag is applied to a conversation.
+     * Fires on manual tag application from the inbox, or when a keyword's autoTagIds
+     * includes this tag's ID. Only fires once per conversation per tag application.
+     */
+    autoReplyMessage?: string;
     createdAt: number;
 }
 
@@ -1076,6 +1104,55 @@ export interface SmsUsageSummary {
     totalSegments: number;
     totalCostUsd: number;
     lastUpdated: number;
+}
+
+// --- SMS AI Agent -----------------------------------------------------------
+
+/**
+ * Church-specific knowledge base used to ground the SMS AI Agent.
+ * One document per church, stored at smsAgentKnowledge/{churchId}.
+ */
+export interface SmsAgentKnowledge {
+    id: string;           // churchId
+    churchId: string;
+    /** Physical address of the main campus */
+    address?: string;
+    /** Service schedule, e.g. "Sundays 9am & 11am, Wednesdays 7pm" */
+    serviceTimes?: string;
+    /** Lead pastor name and bio snippet */
+    pastor?: string;
+    /** Ministries offered (prose or bullet list) */
+    ministries?: string;
+    /** Classes, small groups, discipleship programs */
+    classes?: string;
+    /** Additional campus or meeting locations */
+    locations?: string;
+    /** Church website URL */
+    website?: string;
+    /** Main phone number */
+    phone?: string;
+    /** Catch-all freeform facts the admin wants the agent to know */
+    customFacts?: string;
+    updatedAt: number;
+    updatedBy: string;
+}
+
+/**
+ * An AI-suggested reply stored in the
+ * smsConversations/{convId}/aiSuggestions sub-collection.
+ * Staff can accept (pre-fills compose box) or dismiss.
+ */
+export interface SmsAiSuggestion {
+    id: string;
+    conversationId: string;
+    churchId: string;
+    /** The inbound message ID this suggestion was generated for */
+    inboundMessageId: string;
+    /** The AI-generated reply body */
+    suggestedBody: string;
+    /** pending = not yet acted on | accepted = staff sent it | dismissed = staff dismissed */
+    status: 'pending' | 'accepted' | 'dismissed';
+    createdAt: number;
 }
 
 // --- Workflows ---------------------------------------------------------------

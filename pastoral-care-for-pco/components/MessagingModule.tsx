@@ -8,7 +8,7 @@ import {
     Timestamp, collectionGroup, arrayUnion, arrayRemove
 } from 'firebase/firestore';
 import { pcoService } from '../services/pcoService';
-import { SmsCampaign, SmsConversation, SmsMessage, SmsKeyword, SmsOptOut, SmsWorkflow, SmsWorkflowStep, SmsWorkflowEnrollment, SmsTag, Church, User, WorkflowChannelType, WorkflowNode, WorkflowActionNode, WorkflowDelayNode, WorkflowBranchNode, WorkflowBranchConditionType, TwilioPhoneNumber } from '../types';
+import { SmsCampaign, SmsConversation, SmsMessage, SmsKeyword, SmsOptOut, SmsWorkflow, SmsWorkflowStep, SmsWorkflowEnrollment, SmsTag, Church, User, WorkflowChannelType, WorkflowNode, WorkflowActionNode, WorkflowDelayNode, WorkflowBranchNode, WorkflowBranchConditionType, TwilioPhoneNumber, SmsAgentKnowledge, SmsAiSuggestion } from '../types';
 import {
     MessageSquare, Send, Clock, Users, Plus, ArrowLeft, Trash2,
     Eye, Pencil, ChevronDown, CheckCircle, Circle, Loader2, X,
@@ -1598,6 +1598,10 @@ const SmsInbox: React.FC<{
     const [tagFilter, setTagFilter]     = useState<string | null>(null); // tag id to filter by
     const [showTagPicker, setShowTagPicker] = useState(false);
 
+    // AI Agent suggestions
+    const [aiSuggestions, setAiSuggestions] = useState<SmsAiSuggestion[]>([]);
+    const smsAgentEnabled = !!(church.smsSettings?.smsAgentEnabled);
+
     // Toast
     const [inboxToast, setInboxToast]   = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
     const showInboxToast = (msg: string, type: 'success' | 'error' = 'success') => {
@@ -1652,7 +1656,19 @@ const SmsInbox: React.FC<{
         });
         // Mark as read
         updateDoc(doc(firebaseDb, 'smsConversations', activeConv.id), { unreadCount: 0 }).catch(() => {});
-        return unsub;
+
+        // Load AI suggestions for this conversation (real-time)
+        const sugQ = query(
+            collection(firebaseDb, 'smsConversations', activeConv.id, 'aiSuggestions'),
+            where('status', '==', 'pending'),
+            orderBy('createdAt', 'desc'),
+            limit(3)
+        );
+        const unsubSug = onSnapshot(sugQ, snap => {
+            setAiSuggestions(snap.docs.map(d => ({ id: d.id, ...d.data() } as SmsAiSuggestion)));
+        }, () => setAiSuggestions([]));
+
+        return () => { unsub(); unsubSug(); };
     }, [activeConv?.id]);
 
     // Toggle a tag on the active conversation
@@ -1670,6 +1686,28 @@ const SmsInbox: React.FC<{
                 doc(firebaseDb, 'smsConversations', conv.id),
                 { tags: isOn ? arrayRemove(tagId) : arrayUnion(tagId) }
             );
+
+            // If the tag was just applied (not removed), check for an auto-reply message
+            if (!isOn) {
+                const tagObj = tags.find(t => t.id === tagId);
+                if (tagObj?.autoReplyMessage?.trim()) {
+                    try {
+                        await fetch(`${API_BASE}/api/messaging/send-individual`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                churchId,
+                                toPhone: conv.phoneNumber,
+                                body: tagObj.autoReplyMessage.trim(),
+                                sentBy: null,
+                                sentByName: `Auto-Reply (${tagObj.name})`,
+                            }),
+                        });
+                    } catch (replyErr: any) {
+                        console.warn('[Tags] Failed to send tag auto-reply:', replyErr);
+                    }
+                }
+            }
         } catch (err: any) {
             // Revert the optimistic update on failure
             if (activeConv?.id === conv.id) {
@@ -1981,6 +2019,49 @@ const SmsInbox: React.FC<{
 
                     {/* Reply box */}
                     <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+                        {/* AI Suggested Replies panel */}
+                        {smsAgentEnabled && !activeConv.isOptedOut && aiSuggestions.length > 0 && (
+                            <div className="mb-3 space-y-2">
+                                <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-violet-500">
+                                    <Sparkles size={10} /> AI Suggested Replies
+                                </div>
+                                {aiSuggestions.map(sug => (
+                                    <div
+                                        key={sug.id}
+                                        className="flex items-start gap-2 p-3 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700 rounded-xl group"
+                                    >
+                                        <p className="flex-1 text-sm text-violet-900 dark:text-violet-100 leading-snug">{sug.suggestedBody}</p>
+                                        <div className="flex items-center gap-1 shrink-0">
+                                            <button
+                                                title="Use this reply"
+                                                onClick={async () => {
+                                                    setReplyBody(sug.suggestedBody);
+                                                    await updateDoc(
+                                                        doc(firebaseDb, 'smsConversations', activeConv.id, 'aiSuggestions', sug.id),
+                                                        { status: 'accepted' }
+                                                    ).catch(() => {});
+                                                }}
+                                                className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition"
+                                            >
+                                                <ChevronRight size={10} /> Use
+                                            </button>
+                                            <button
+                                                title="Dismiss suggestion"
+                                                onClick={async () => {
+                                                    await updateDoc(
+                                                        doc(firebaseDb, 'smsConversations', activeConv.id, 'aiSuggestions', sug.id),
+                                                        { status: 'dismissed' }
+                                                    ).catch(() => {});
+                                                }}
+                                                className="p-1 text-violet-400 hover:text-violet-600 rounded-lg hover:bg-violet-100 dark:hover:bg-violet-900/40 transition"
+                                            >
+                                                <X size={11} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                         {activeConv.isOptedOut ? (
                             <div className="flex items-center gap-2 text-xs text-red-500 font-semibold p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
                                 <AlertTriangle size={13} /> This contact has opted out. You cannot send them messages.
@@ -2197,7 +2278,12 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingL
     );
 };
 
-const SmsKeywordsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
+const SmsKeywordsManager: React.FC<{
+    churchId: string;
+    church: Church;
+    currentUser: User;
+    onUpdateChurch?: (updates: Partial<Church>) => void;
+}> = ({ churchId, church, currentUser, onUpdateChurch }) => {
     const [keywords, setKeywords]   = useState<SmsKeyword[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [listError, setListError] = useState<string | null>(null);
@@ -2215,6 +2301,7 @@ const SmsKeywordsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
     const [tagName, setTagName]                 = useState('');
     const [tagEmoji, setTagEmoji]               = useState('');
     const [tagColor, setTagColor]               = useState<SmsTag['color']>('violet');
+    const [tagAutoReply, setTagAutoReply]        = useState('');
     const [tagBusy, setTagBusy]                 = useState(false);
     const [activeSection, setActiveSection]     = useState<'keywords' | 'tags'>('keywords');
 
@@ -2337,8 +2424,8 @@ const SmsKeywordsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
     const openEdit = (kw: SmsKeyword) => { setSaveError(null); setEditKw(kw); setModalOpen(true); };
 
     // Tag CRUD
-    const openNewTag = () => { setEditTag(null); setTagName(''); setTagEmoji(''); setTagColor('violet'); setTagModalOpen(true); };
-    const openEditTag = (t: SmsTag) => { setEditTag(t); setTagName(t.name); setTagEmoji(t.emoji || ''); setTagColor(t.color); setTagModalOpen(true); };
+    const openNewTag = () => { setEditTag(null); setTagName(''); setTagEmoji(''); setTagColor('violet'); setTagAutoReply(''); setTagModalOpen(true); };
+    const openEditTag = (t: SmsTag) => { setEditTag(t); setTagName(t.name); setTagEmoji(t.emoji || ''); setTagColor(t.color); setTagAutoReply(t.autoReplyMessage || ''); setTagModalOpen(true); };
     const handleSaveTag = async () => {
         if (!tagName.trim()) return;
         setTagBusy(true);
@@ -2347,6 +2434,8 @@ const SmsKeywordsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
                 const updatePayload: any = { name: tagName.trim(), color: tagColor };
                 if (tagEmoji.trim()) updatePayload.emoji = tagEmoji.trim();
                 else updatePayload.emoji = null; // clear it if user removed the emoji
+                if (tagAutoReply.trim()) updatePayload.autoReplyMessage = tagAutoReply.trim();
+                else updatePayload.autoReplyMessage = null; // clear if removed
                 await updateDoc(doc(firebaseDb, 'smsTags', editTag.id), updatePayload);
             } else {
                 const newTag: any = {
@@ -2356,12 +2445,14 @@ const SmsKeywordsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
                     createdAt: Date.now(),
                 };
                 if (tagEmoji.trim()) newTag.emoji = tagEmoji.trim();
+                if (tagAutoReply.trim()) newTag.autoReplyMessage = tagAutoReply.trim();
                 await addDoc(collection(firebaseDb, 'smsTags'), newTag);
             }
             setTagModalOpen(false);
             setTagName('');
             setTagEmoji('');
             setTagColor('violet');
+            setTagAutoReply('');
             setEditTag(null);
         } catch (e: any) {
             const msg = e?.code === 'permission-denied'
@@ -2553,12 +2644,20 @@ const SmsKeywordsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
                                     {t.emoji || <Tag size={18} className={c.text} />}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-2 flex-wrap">
                                         <p className={`font-bold text-sm ${c.text}`}>{t.name}</p>
                                         <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full border capitalize ${c.bg} ${c.text} ${c.border}`}>{t.color}</span>
+                                        {t.autoReplyMessage && (
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-700">
+                                                <MessageSquare size={9} /> Auto-Reply
+                                            </span>
+                                        )}
                                     </div>
                                     <p className="text-[10px] text-slate-400 mt-0.5">
-                                        Created {new Date(t.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                        {t.autoReplyMessage
+                                            ? <span className="text-slate-500 dark:text-slate-400 truncate block max-w-xs">↩ "{t.autoReplyMessage}"</span>
+                                            : <span>Created {new Date(t.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                                        }
                                     </p>
                                 </div>
                                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
@@ -2576,6 +2675,166 @@ const SmsKeywordsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
             )}
             </>
             )}
+
+            {/* ─── PRAYER REQUEST DETECTION ─────────────────────────────────── */}
+            {(() => {
+                const isAdmin = currentUser.roles.includes('Church Admin') || currentUser.roles.includes('System Administration');
+                const prayerEnabled = !!(church.smsSettings?.prayerDetectionEnabled);
+                const [draftReply, setDraftReply] = React.useState(church.smsSettings?.prayerClarifyingReply || '');
+                const [prayerSaving, setPrayerSaving] = React.useState(false);
+
+                const handleTogglePrayer = async () => {
+                    if (!onUpdateChurch) return;
+                    setPrayerSaving(true);
+                    try {
+                        await onUpdateChurch({
+                            smsSettings: {
+                                ...church.smsSettings,
+                                prayerDetectionEnabled: !prayerEnabled,
+                            },
+                        });
+                    } finally {
+                        setPrayerSaving(false);
+                    }
+                };
+
+                const handleSaveReply = async () => {
+                    if (!onUpdateChurch) return;
+                    setPrayerSaving(true);
+                    try {
+                        await onUpdateChurch({
+                            smsSettings: {
+                                ...church.smsSettings,
+                                prayerClarifyingReply: draftReply.trim() || undefined,
+                            },
+                        });
+                    } finally {
+                        setPrayerSaving(false);
+                    }
+                };
+
+                return (
+                    <div className="mt-8 border-t border-slate-200 dark:border-slate-700 pt-8">
+                        {/* Header */}
+                        <div className="flex items-start justify-between gap-4 mb-4">
+                            <div className="flex items-start gap-3">
+                                <div className="w-10 h-10 rounded-2xl bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center text-xl shrink-0">
+                                    🙏
+                                </div>
+                                <div>
+                                    <h3 className="text-sm font-black text-slate-900 dark:text-white">Prayer Request Detection</h3>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed max-w-lg">
+                                        Automatically recognises natural-language prayer requests in incoming SMS messages
+                                        and tags the conversation{' '}
+                                        <span className="font-semibold text-violet-600 dark:text-violet-400">🙏 Needs Prayer</span>{' '}
+                                        in your Inbox. Generic asks (e.g. &ldquo;Will you pray for me?&rdquo;) trigger a clarifying reply first.
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Toggle — admin only */}
+                            {isAdmin ? (
+                                <button
+                                    onClick={handleTogglePrayer}
+                                    disabled={prayerSaving}
+                                    title={prayerEnabled ? 'Disable prayer detection' : 'Enable prayer detection'}
+                                    className={`relative shrink-0 w-12 h-6 rounded-full transition-colors disabled:opacity-60 ${
+                                        prayerEnabled ? 'bg-violet-600' : 'bg-slate-300 dark:bg-slate-600'
+                                    }`}
+                                >
+                                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                                        prayerEnabled ? 'translate-x-6' : 'translate-x-0'
+                                    }`} />
+                                </button>
+                            ) : (
+                                <span className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${
+                                    prayerEnabled
+                                        ? 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300'
+                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
+                                }`}>
+                                    {prayerEnabled ? 'On' : 'Off'}
+                                </span>
+                            )}
+                        </div>
+
+                        {/* How It Works preview boxes */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
+                            <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4">
+                                <p className="text-xs font-black text-slate-700 dark:text-slate-200 mb-2 flex items-center gap-1.5">
+                                    <MessageSquare size={12} className="text-violet-500" /> Specific Request
+                                </p>
+                                <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed italic">
+                                    &ldquo;Please pray for my mom&rsquo;s surgery&rdquo;
+                                </p>
+                                <div className="mt-2 flex items-center gap-1.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                                    <CheckCircle size={11} /> Tagged <span className="font-bold ml-0.5">🙏 Needs Prayer</span> immediately
+                                </div>
+                            </div>
+                            <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4">
+                                <p className="text-xs font-black text-slate-700 dark:text-slate-200 mb-2 flex items-center gap-1.5">
+                                    <MessageSquare size={12} className="text-amber-500" /> Generic Ask
+                                </p>
+                                <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed italic">
+                                    &ldquo;Will you pray for me?&rdquo;
+                                </p>
+                                <div className="mt-2 flex flex-col gap-1">
+                                    <div className="flex items-center gap-1.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
+                                        <MessageSquare size={11} /> Clarifying reply sent first
+                                    </div>
+                                    <div className="flex items-center gap-1.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                                        <CheckCircle size={11} /> On reply → tagged <span className="font-bold ml-0.5">🙏 Needs Prayer</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Clarifying reply customisation — only visible when enabled & admin */}
+                        {isAdmin && prayerEnabled && (
+                            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4">
+                                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">
+                                    Clarifying Reply Message
+                                </label>
+                                <p className="text-[10px] text-slate-400 mb-3">
+                                    Sent when a generic ask is detected. Leave blank to use the default.
+                                </p>
+                                <div className="flex gap-2 items-end">
+                                    <input
+                                        type="text"
+                                        value={draftReply}
+                                        onChange={e => setDraftReply(e.target.value)}
+                                        placeholder="What would you like prayer for?"
+                                        maxLength={160}
+                                        className="flex-1 text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                    />
+                                    <button
+                                        onClick={handleSaveReply}
+                                        disabled={prayerSaving || draftReply.trim() === (church.smsSettings?.prayerClarifyingReply || '')}
+                                        className="px-3 py-2 text-xs font-bold bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-xl transition flex items-center gap-1.5 shrink-0"
+                                    >
+                                        {prayerSaving ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle size={12} />}
+                                        Save
+                                    </button>
+                                </div>
+                                {/* Bubble preview */}
+                                <div className="mt-3 bg-slate-50 dark:bg-slate-900/60 rounded-2xl p-3 flex justify-end">
+                                    <div className="bg-violet-600 text-white text-xs px-3 py-2 rounded-2xl rounded-br-sm max-w-[85%] leading-relaxed">
+                                        {draftReply.trim() || 'What would you like prayer for?'}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Info note */}
+                        <div className="mt-4 flex items-start gap-2 text-[10px] text-slate-400 dark:text-slate-500">
+                            <Info size={11} className="shrink-0 mt-0.5 text-violet-400" />
+                            <span>
+                                The <span className="font-semibold">🙏 Needs Prayer</span> tag is created automatically the first time a prayer request is detected.
+                                Keyword-based auto-replies always take priority over prayer detection.
+                            </span>
+                        </div>
+                    </div>
+                );
+            })()}
 
             {/* Keyword modal */}
             {modalOpen && (
@@ -2624,7 +2883,7 @@ const SmsKeywordsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
                             />
                         </div>
 
-                        <div className="mb-6">
+                        <div className="mb-4">
                             <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Color</label>
                             <div className="flex gap-2 flex-wrap">
                                 {(Object.keys(TAG_COLOR_MAP) as SmsTag['color'][]).map(color => {
@@ -2649,6 +2908,28 @@ const SmsKeywordsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
                                         tag={{ id: '', churchId: '', name: tagName, emoji: tagEmoji || undefined, color: tagColor, createdAt: 0 }}
                                         size="sm"
                                     />
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Auto-reply message */}
+                        <div className="mb-6">
+                            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">
+                                Auto-Reply Message <span className="text-slate-300 dark:text-slate-600 normal-case font-normal tracking-normal">(optional)</span>
+                            </label>
+                            <p className="text-[10px] text-slate-400 mb-2">When this tag is applied to a conversation, automatically send this SMS reply to the contact.</p>
+                            <textarea
+                                rows={3}
+                                value={tagAutoReply}
+                                onChange={e => setTagAutoReply(e.target.value)}
+                                placeholder={`Thanks for reaching out! We've tagged your message as "${tagName || 'this tag'}" and will follow up soon.`}
+                                className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
+                            />
+                            {tagAutoReply.trim() && (
+                                <div className="mt-2 bg-slate-100 dark:bg-slate-800/60 rounded-2xl p-3 flex justify-end">
+                                    <div className="bg-violet-600 text-white text-xs px-3 py-2 rounded-2xl rounded-br-sm max-w-[85%] leading-relaxed whitespace-pre-wrap break-words">
+                                        {tagAutoReply}
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -5733,6 +6014,286 @@ const NumberManager: React.FC<{
     );
 };
 
+// ─── SMS Agent Tab ────────────────────────────────────────────────────────────
+// Admin panel: toggle + knowledge base editor + test-message preview.
+
+const SmsAgentTab: React.FC<{
+    churchId: string;
+    church: Church;
+    currentUser: User;
+    onUpdateChurch?: (updates: Partial<Church>) => void;
+}> = ({ churchId, church, currentUser, onUpdateChurch }) => {
+    const isAdmin = currentUser.roles.includes('Church Admin') || currentUser.roles.includes('System Administration');
+    const agentEnabled = !!(church.smsSettings?.smsAgentEnabled);
+
+    const [kb, setKb]               = useState<Partial<SmsAgentKnowledge>>({});
+    const [kbLoading, setKbLoading] = useState(true);
+    const [saving, setSaving]       = useState(false);
+    const [savedAt, setSavedAt]     = useState<number | null>(null);
+    const [toast, setToast]         = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+
+    // Test preview
+    const [testInput, setTestInput]   = useState('');
+    const [testOutput, setTestOutput] = useState('');
+    const [testLoading, setTestLoading] = useState(false);
+
+    const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
+        setToast({ msg, type }); setTimeout(() => setToast(null), 3500);
+    };
+
+    // Load knowledge base on mount
+    useEffect(() => {
+        getDoc(doc(firebaseDb, 'smsAgentKnowledge', churchId)).then(snap => {
+            if (snap.exists()) setKb(snap.data() as SmsAgentKnowledge);
+            setKbLoading(false);
+        }).catch(() => setKbLoading(false));
+    }, [churchId]);
+
+    const handleToggleAgent = async () => {
+        const next = !agentEnabled;
+        try {
+            const churchRef = doc(firebaseDb, 'churches', churchId);
+            await updateDoc(churchRef, { 'smsSettings.smsAgentEnabled': next });
+            if (onUpdateChurch) onUpdateChurch({ smsSettings: { ...church.smsSettings, smsAgentEnabled: next } });
+            showToast(next ? '✓ SMS Agent enabled' : 'SMS Agent disabled');
+        } catch {
+            showToast('Failed to update setting', 'error');
+        }
+    };
+
+    const handleSaveKb = async () => {
+        setSaving(true);
+        try {
+            await setDoc(doc(firebaseDb, 'smsAgentKnowledge', churchId), {
+                id: churchId,
+                churchId,
+                ...kb,
+                updatedAt: Date.now(),
+                updatedBy: currentUser.name,
+            }, { merge: true });
+            setSavedAt(Date.now());
+            showToast('Knowledge base saved ✓');
+        } catch {
+            showToast('Save failed', 'error');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleTestMessage = async () => {
+        if (!testInput.trim()) return;
+        setTestLoading(true); setTestOutput('');
+        try {
+            const systemPrompt = `You are a friendly, warm church receptionist for ${church.name}.
+Your job is to compose a helpful, natural reply to an incoming SMS from a visitor or member.
+Only answer based on the church facts below. If the answer is not in the facts, reply with something like "Let me check on that and get back to you!"
+Keep replies under 160 characters when possible (1 SMS segment). Return ONLY the reply text.
+
+CHURCH FACTS:
+${kb.address       ? `Address: ${kb.address}`           : ''}
+${kb.serviceTimes  ? `Service Times: ${kb.serviceTimes}` : ''}
+${kb.pastor        ? `Lead Pastor: ${kb.pastor}`         : ''}
+${kb.ministries    ? `Ministries: ${kb.ministries}`      : ''}
+${kb.classes       ? `Classes: ${kb.classes}`            : ''}
+${kb.locations     ? `Locations: ${kb.locations}`        : ''}
+${kb.website       ? `Website: ${kb.website}`            : ''}
+${kb.phone         ? `Phone: ${kb.phone}`                : ''}
+${kb.customFacts   ? `Other Info: ${kb.customFacts}`     : ''}
+
+INCOMING MESSAGE:
+"${testInput}"
+
+Write the reply:`;
+            const res = await fetch('/ai/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ model: 'gemini-2.5-flash', prompt: systemPrompt }),
+            });
+            const data = await res.json();
+            setTestOutput((data.text || '').trim() || 'No reply generated.');
+        } catch {
+            setTestOutput('Error: could not reach AI service.');
+        } finally {
+            setTestLoading(false);
+        }
+    };
+
+    const field = (
+        key: keyof SmsAgentKnowledge,
+        label: string,
+        placeholder: string,
+        multiline = false
+    ) => (
+        <div>
+            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-1.5">{label}</label>
+            {multiline ? (
+                <textarea
+                    rows={3}
+                    value={(kb as any)[key] || ''}
+                    onChange={e => setKb(prev => ({ ...prev, [key]: e.target.value }))}
+                    placeholder={placeholder}
+                    disabled={!isAdmin}
+                    className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none disabled:opacity-50"
+                />
+            ) : (
+                <input
+                    type="text"
+                    value={(kb as any)[key] || ''}
+                    onChange={e => setKb(prev => ({ ...prev, [key]: e.target.value }))}
+                    placeholder={placeholder}
+                    disabled={!isAdmin}
+                    className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 disabled:opacity-50"
+                />
+            )}
+        </div>
+    );
+
+    return (
+        <div className="max-w-3xl mx-auto p-6 space-y-8">
+            {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+
+            {/* Header */}
+            <div>
+                <h1 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-3">
+                    <Sparkles size={24} className="text-violet-500" /> SMS AI Agent
+                </h1>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                    When enabled, the agent analyzes every incoming SMS and suggests a contextual reply for your staff — drawing from your church knowledge base below.
+                </p>
+            </div>
+
+            {/* Toggle card */}
+            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <p className="font-bold text-slate-900 dark:text-white text-sm">Agent Status</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                            {agentEnabled
+                                ? 'Active — AI suggestions appear in the SMS inbox for every inbound message.'
+                                : 'Off — no AI suggestions will be generated.'}
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                            agentEnabled ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                                         : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
+                        }`}>{agentEnabled ? 'Active' : 'Off'}</span>
+                        {isAdmin && (
+                            <button
+                                onClick={handleToggleAgent}
+                                title={agentEnabled ? 'Disable SMS Agent' : 'Enable SMS Agent'}
+                                className={`relative w-14 h-7 rounded-full transition-colors ${
+                                    agentEnabled ? 'bg-violet-600' : 'bg-slate-300 dark:bg-slate-600'
+                                }`}
+                            >
+                                <span className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow transition-transform ${
+                                    agentEnabled ? 'translate-x-7' : 'translate-x-0'
+                                }`} />
+                            </button>
+                        )}
+                    </div>
+                </div>
+                {agentEnabled && Object.values(kb).filter(v => v && typeof v === 'string' && v.trim()).length === 0 && (
+                    <div className="mt-3 flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl px-3 py-2">
+                        <AlertTriangle size={13} className="shrink-0 mt-0.5" />
+                        The agent is active but your knowledge base is empty. Fill in the fields below so it can give helpful, accurate replies.
+                    </div>
+                )}
+            </div>
+
+            {/* Knowledge base editor */}
+            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 space-y-5">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <p className="font-bold text-slate-900 dark:text-white text-sm">Church Knowledge Base</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                            Everything the agent knows about your church. Be as detailed as you like.
+                        </p>
+                    </div>
+                    {savedAt && (
+                        <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                            <CheckCircle size={11} /> Saved
+                        </span>
+                    )}
+                </div>
+
+                {kbLoading ? (
+                    <div className="flex items-center gap-2 text-slate-400 text-sm"><Loader2 size={16} className="animate-spin" /> Loading…</div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {field('address',      'Church Address',          '123 Main St, Nashville, TN 37201')}
+                        {field('pastor',       'Lead Pastor',             'Pastor John Smith')}
+                        {field('serviceTimes', 'Service Times',           'Sundays 9am & 11am, Wednesdays 7pm', true)}
+                        {field('locations',    'Campus / Meeting Locations', 'Main campus, East campus…', true)}
+                        {field('ministries',   'Ministries Offered',        "Youth, Worship, Men's / Women's\u2026", true)}
+                        {field('classes',      'Classes & Small Groups',    'Life Groups, Alpha Course, Discipleship 101…', true)}
+                        {field('website',      'Website',                   'https://www.gracechurch.org')}
+                        {field('phone',        'Main Phone',                '(615) 555-0100')}
+                        <div className="md:col-span-2">
+                            {field('customFacts', 'Additional Facts', 'Parking info, childcare details, special events, FAQs…', true)}
+                        </div>
+                    </div>
+                )}
+
+                {isAdmin && !kbLoading && (
+                    <button
+                        onClick={handleSaveKb}
+                        disabled={saving}
+                        className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-sm font-bold rounded-xl transition"
+                    >
+                        {saving ? <><Loader2 size={14} className="animate-spin" /> Saving…</> : <><CheckCircle size={14} /> Save Knowledge Base</>}
+                    </button>
+                )}
+            </div>
+
+            {/* Test preview */}
+            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 space-y-4">
+                <div>
+                    <p className="font-bold text-slate-900 dark:text-white text-sm flex items-center gap-2"><Zap size={15} className="text-amber-500" /> Test a Message</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                        Type a sample SMS and preview what the agent would reply — no message is sent.
+                    </p>
+                </div>
+                <div className="flex gap-3">
+                    <input
+                        type="text"
+                        value={testInput}
+                        onChange={e => setTestInput(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') handleTestMessage(); }}
+                        placeholder='e.g. "What time is Sunday service?"'
+                        className="flex-1 text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                    />
+                    <button
+                        onClick={handleTestMessage}
+                        disabled={!testInput.trim() || testLoading}
+                        className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-sm font-bold rounded-xl transition"
+                    >
+                        {testLoading ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                        Test
+                    </button>
+                </div>
+                {testOutput && (
+                    <div className="space-y-2">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-violet-500">Agent Reply Preview</p>
+                        <div className="bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700 rounded-xl p-4">
+                            <p className="text-sm text-violet-900 dark:text-violet-100 leading-relaxed">{testOutput}</p>
+                            <p className={`text-xs font-bold mt-2 ${ testOutput.length > 160 ? 'text-amber-600' : 'text-emerald-600' }`}>
+                                {testOutput.length} chars · {Math.ceil(testOutput.length / 160)} segment{Math.ceil(testOutput.length / 160) !== 1 ? 's' : ''}
+                            </p>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {!isAdmin && (
+                <div className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl px-4 py-3">
+                    <AlertTriangle size={13} className="shrink-0 mt-0.5" /> Only Church Administrators can edit the knowledge base and toggle the agent.
+                </div>
+            )}
+        </div>
+    );
+};
+
 // ─── Main MessagingModule ─────────────────────────────────────────────────────
 
 interface MessagingModuleProps {
@@ -5747,7 +6308,7 @@ interface MessagingModuleProps {
 const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, currentUser, onUpdateChurch, controlledTab }) => {
     const smsEnabled = church.smsSettings?.smsEnabled;
 
-    type Tab = 'campaigns' | 'inbox' | 'keywords' | 'analytics' | 'workflows';
+    type Tab = 'campaigns' | 'inbox' | 'keywords' | 'analytics' | 'workflows' | 'agent';
     const [activeTab, setActiveTab]   = useState<Tab>('campaigns');
     const effectiveTab: Tab = controlledTab ?? activeTab;
     const [campaigns, setCampaigns]   = useState<SmsCampaign[]>([]);
@@ -5935,6 +6496,7 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                             { key: 'inbox',     label: 'Inbox',     icon: <Inbox size={13} /> },
                             { key: 'keywords',  label: 'Keywords',  icon: <Key size={13} /> },
                             { key: 'analytics', label: 'Analytics', icon: <BarChart3 size={13} /> },
+                            { key: 'agent',     label: 'AI Agent',  icon: <Sparkles size={13} /> },
                         ] as const).map(t => (
                             <button
                                 key={t.key}
@@ -6045,7 +6607,12 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                 {/* Keywords tab */}
                 {effectiveTab === 'keywords' && (
                     <div className="h-full overflow-y-auto">
-                        <SmsKeywordsManager churchId={churchId} />
+                        <SmsKeywordsManager
+                            churchId={churchId}
+                            church={church}
+                            currentUser={currentUser}
+                            onUpdateChurch={onUpdateChurch}
+                        />
                     </div>
                 )}
 
@@ -6060,6 +6627,18 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                 {effectiveTab === 'analytics' && (
                     <div className="h-full overflow-y-auto">
                         <SmsAnalytics churchId={churchId} campaigns={campaigns} />
+                    </div>
+                )}
+
+                {/* AI Agent tab */}
+                {effectiveTab === 'agent' && (
+                    <div className="h-full overflow-y-auto">
+                        <SmsAgentTab
+                            churchId={churchId}
+                            church={church}
+                            currentUser={currentUser}
+                            onUpdateChurch={onUpdateChurch}
+                        />
                     </div>
                 )}
             </div>
