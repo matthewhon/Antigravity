@@ -1200,7 +1200,7 @@ currentUserId?: string; currentUser?: User; onUpdateChurch?: (updates: Partial<C
 /** When provided by a parent route, controls which tab is shown and hides the internal tab bar */
 activePage?: 'website' | 'emails' | 'polls' | 'messaging' | 'unsubscribers';
 /** When activePage='messaging', this controls the active SMS sub-tab */
-smsTab?: 'campaigns' | 'inbox' | 'keywords' | 'analytics' | 'workflows';
+smsTab?: 'campaigns' | 'inbox' | 'keywords' | 'analytics' | 'workflows' | 'agent';
 }> = ({ churchId, church, currentUserId,
 currentUser, onUpdateChurch, activePage, smsTab }) => {
   const [activeTab, setActiveTab] = useState<'website' | 'emails' | 'polls' | 'unsubscribers' | 'messaging'>('emails');

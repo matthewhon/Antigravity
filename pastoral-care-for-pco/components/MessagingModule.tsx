@@ -1600,6 +1600,7 @@ const SmsInbox: React.FC<{
 
     // AI Agent suggestions
     const [aiSuggestions, setAiSuggestions] = useState<SmsAiSuggestion[]>([]);
+    const [aiGenerating, setAiGenerating]   = useState(false);
     const smsAgentEnabled = !!(church.smsSettings?.smsAgentEnabled);
 
     // Toast
@@ -1670,6 +1671,58 @@ const SmsInbox: React.FC<{
 
         return () => { unsub(); unsubSug(); };
     }, [activeConv?.id]);
+
+    // On-demand AI suggestion — called when staff click the ✨ button
+    const handleAiSuggest = async () => {
+        if (!activeConv || aiGenerating) return;
+        setAiGenerating(true);
+        try {
+            // Load knowledge base
+            const { getDoc: gd, doc: dd } = await import('firebase/firestore');
+            const kbSnap = await gd(dd(firebaseDb, 'smsAgentKnowledge', churchId));
+            const kb = kbSnap.exists() ? (kbSnap.data() as Record<string, string>) : {};
+
+            const kbText = [
+                kb.address      && `Address: ${kb.address}`,
+                kb.serviceTimes && `Service Times: ${kb.serviceTimes}`,
+                kb.pastor       && `Lead Pastor: ${kb.pastor}`,
+                kb.ministries   && `Ministries: ${kb.ministries}`,
+                kb.classes      && `Classes/Groups: ${kb.classes}`,
+                kb.locations    && `Locations: ${kb.locations}`,
+                kb.website      && `Website: ${kb.website}`,
+                kb.phone        && `Phone: ${kb.phone}`,
+                kb.customFacts  && kb.customFacts,
+            ].filter(Boolean).join('\n');
+
+            // Last few messages for context
+            const recent = messages.slice(-6).map(m =>
+                `${m.direction === 'inbound' ? 'Contact' : 'Staff'}: ${m.body}`
+            ).join('\n');
+
+            const systemInstruction = `You are a helpful, friendly church staff assistant.
+Your job is to draft a single short SMS reply (under 160 characters if possible) on behalf of the church staff.
+Be warm, concise, and pastoral in tone.
+Do not make up information. Only use the church facts provided.
+
+CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
+
+            const res = await fetch('/ai/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    prompt: `Conversation:\n${recent}\n\nWrite a helpful SMS reply from the church staff:`,
+                    systemInstruction,
+                    model: 'gemini-2.5-flash',
+                }),
+            });
+            const data = await res.json();
+            if (data.text) setReplyBody(data.text.trim());
+        } catch {
+            // Silent fail — staff can still type manually
+        } finally {
+            setAiGenerating(false);
+        }
+    };
 
     // Toggle a tag on the active conversation
     const handleToggleConvTag = async (conv: SmsConversation, tagId: string) => {
@@ -2068,6 +2121,19 @@ const SmsInbox: React.FC<{
                             </div>
                         ) : (
                             <div className="flex items-end gap-2">
+                                {/* AI suggest button — only shown when agent is enabled */}
+                                {smsAgentEnabled && (
+                                    <button
+                                        onClick={handleAiSuggest}
+                                        disabled={aiGenerating}
+                                        title="Ask AI to suggest a reply"
+                                        className="flex items-center justify-center w-10 h-10 shrink-0 rounded-xl bg-violet-50 hover:bg-violet-100 dark:bg-violet-900/30 dark:hover:bg-violet-900/50 text-violet-600 dark:text-violet-400 border border-violet-200 dark:border-violet-700 transition disabled:opacity-50"
+                                    >
+                                        {aiGenerating
+                                            ? <Loader2 size={16} className="animate-spin" />
+                                            : <Sparkles size={16} />}
+                                    </button>
+                                )}
                                 <textarea
                                     rows={2}
                                     value={replyBody}
@@ -2830,6 +2896,82 @@ const SmsKeywordsManager: React.FC<{
                             <span>
                                 The <span className="font-semibold">🙏 Needs Prayer</span> tag is created automatically the first time a prayer request is detected.
                                 Keyword-based auto-replies always take priority over prayer detection.
+                            </span>
+                        </div>
+                    </div>
+                );
+            })()}
+
+            {/* ─── SMS AI AGENT TOGGLE ────────────────────────────────────────── */}
+            {(() => {
+                const isAdmin = currentUser.roles.includes('Church Admin') || currentUser.roles.includes('System Administration');
+                const agentOn = !!(church.smsSettings?.smsAgentEnabled);
+                const [agentSaving, setAgentSaving] = React.useState(false);
+
+                const handleToggleAgent = async () => {
+                    if (!onUpdateChurch) return;
+                    setAgentSaving(true);
+                    try {
+                        await onUpdateChurch({
+                            smsSettings: {
+                                ...church.smsSettings,
+                                smsAgentEnabled: !agentOn,
+                            },
+                        });
+                    } finally {
+                        setAgentSaving(false);
+                    }
+                };
+
+                return (
+                    <div className="mt-8 border-t border-slate-200 dark:border-slate-700 pt-8">
+                        <div className="flex items-start justify-between gap-4">
+                            <div className="flex items-start gap-3">
+                                <div className="w-10 h-10 rounded-2xl bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center shrink-0">
+                                    <Sparkles size={18} className="text-violet-600 dark:text-violet-400" />
+                                </div>
+                                <div>
+                                    <h3 className="text-sm font-black text-slate-900 dark:text-white">SMS AI Agent</h3>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed max-w-lg">
+                                        When enabled, a ✨ button appears in the Inbox reply box so staff can
+                                        request an AI-suggested reply grounded in your church knowledge base.
+                                        Incoming messages also receive an automatic AI suggestion in real time.
+                                    </p>
+                                    <p className="text-[10px] text-violet-500 dark:text-violet-400 mt-1.5">
+                                        Configure the knowledge base and test the agent in the{' '}
+                                        <span className="font-semibold">SMS → AI Agent</span> tab.
+                                    </p>
+                                </div>
+                            </div>
+
+                            {isAdmin ? (
+                                <button
+                                    onClick={handleToggleAgent}
+                                    disabled={agentSaving}
+                                    title={agentOn ? 'Disable SMS AI Agent' : 'Enable SMS AI Agent'}
+                                    className={`relative shrink-0 w-12 h-6 rounded-full transition-colors disabled:opacity-60 ${
+                                        agentOn ? 'bg-violet-600' : 'bg-slate-300 dark:bg-slate-600'
+                                    }`}
+                                >
+                                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                                        agentOn ? 'translate-x-6' : 'translate-x-0'
+                                    }`} />
+                                </button>
+                            ) : (
+                                <span className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${
+                                    agentOn
+                                        ? 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300'
+                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
+                                }`}>
+                                    {agentOn ? 'On' : 'Off'}
+                                </span>
+                            )}
+                        </div>
+
+                        <div className="mt-4 flex items-start gap-2 text-[10px] text-slate-400 dark:text-slate-500">
+                            <Info size={11} className="shrink-0 mt-0.5 text-violet-400" />
+                            <span>
+                                The AI never sends messages automatically \u2014 it only suggests replies for staff to review and edit.
                             </span>
                         </div>
                     </div>
@@ -6408,7 +6550,7 @@ interface MessagingModuleProps {
     currentUser: User;
     onUpdateChurch?: (updates: Partial<Church>) => void;
     /** When provided by a parent route, drives the active tab and hides the internal pill nav */
-    controlledTab?: 'campaigns' | 'inbox' | 'keywords' | 'analytics' | 'workflows';
+    controlledTab?: 'campaigns' | 'inbox' | 'keywords' | 'analytics' | 'workflows' | 'agent';
 }
 
 const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, currentUser, onUpdateChurch, controlledTab }) => {

@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { User, Church, RiskSettings, ChurchRiskSettings, DonorLifecycleSettings, GroupRiskSettings, CommunityLocation, UserRole } from '../types';
 import { CreateUserModal } from './CreateUserModal';
 import { firestore } from '../services/firestoreService';
-import { auth } from '../services/firebase';
+import { auth, db as firebaseDb } from '../services/firebase';
 import RiskSettingsView from './RiskSettingsView';
 import ChurchRiskSettingsView from './ChurchRiskSettingsView';
 import GroupRiskSettingsView from './GroupRiskSettingsView';
@@ -146,7 +146,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   const [formData, setFormData] = useState<Partial<Church>>(church);
 
   // SMS Settings state
-  const [smsSubTab, setSmsSubTab] = useState<'a2p' | 'optout'>('a2p');
+  const [smsSubTab, setSmsSubTab] = useState<'a2p' | 'optout' | 'numbers'>('a2p');
   const [smsForm, setSmsForm] = useState<NonNullable<Church['smsSettings']>>(church.smsSettings || {});
   const [isSmsSaving, setIsSmsSaving] = useState(false);
   const [smsMessage, setSmsMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -154,6 +154,24 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   const [isA2pChecking, setIsA2pChecking] = useState(false);
   const [isCreatingProfile, setIsCreatingProfile] = useState(false);
   const [a2pResult, setA2pResult] = useState<{ success: boolean; message: string; brandSid?: string; failureReason?: string | null; twilioStatus?: string; needsBundle?: boolean; needsPrimaryProfile?: boolean } | null>(null);
+
+  // Phone Numbers panel state (SMS → Numbers tab)
+  const [twilioNumbers, setTwilioNumbers] = useState<any[]>([]);
+  const [numLoading, setNumLoading] = useState(false);
+  const [numError, setNumError] = useState('');
+  const [numToast, setNumToast] = useState('');
+  const [showAddNumber, setShowAddNumber] = useState(false);
+  // Add-number wizard local state
+  const [addNumStep, setAddNumStep] = useState<'search' | 'pick'>('search');
+  const [addNumMode, setAddNumMode] = useState<'city-state' | 'area-code'>('city-state');
+  const [addNumCity, setAddNumCity] = useState(church.city || '');
+  const [addNumState, setAddNumState] = useState(church.state || '');
+  const [addNumAreaCode, setAddNumAreaCode] = useState('');
+  const [addNumResults, setAddNumResults] = useState<{ phoneNumber: string; friendlyName: string; locality: string; region: string }[]>([]);
+  const [addNumSelected, setAddNumSelected] = useState('');
+  const [addNumLabel, setAddNumLabel] = useState('');
+  const [addNumSender, setAddNumSender] = useState(church.name || '');
+  const [addNumBusy, setAddNumBusy] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
@@ -190,6 +208,24 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   useEffect(() => {
       setSmsForm(church.smsSettings || {});
   }, [church.smsSettings]);
+
+  // Load phone numbers directly from Firestore when 'numbers' sub-tab is opened
+  useEffect(() => {
+      if (smsSubTab !== 'numbers') return;
+      setNumLoading(true);
+      setNumError('');
+      import('firebase/firestore').then(({ collection, query, where, orderBy, getDocs }) => {
+          const q = query(
+              collection(firebaseDb, 'twilioNumbers'),
+              where('churchId', '==', churchId),
+              orderBy('createdAt', 'asc')
+          );
+          getDocs(q)
+              .then(snap => setTwilioNumbers(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
+              .catch(e => setNumError(e.message || 'Failed to load numbers'))
+              .finally(() => setNumLoading(false));
+      });
+  }, [smsSubTab, churchId]);
 
   // Sync mail state when church prop changes
   useEffect(() => {
@@ -1993,7 +2029,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
 
                         {/* Sub-tab switcher */}
                         <div className="flex bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl gap-1 w-fit">
-                            {(['a2p', 'optout'] as const).map(st => (
+                            {(['a2p', 'optout', 'numbers'] as const).map(st => (
                                 <button
                                     key={st}
                                     onClick={() => setSmsSubTab(st)}
@@ -2003,7 +2039,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             : 'text-slate-500 dark:text-slate-400 hover:bg-white/50 dark:hover:bg-slate-700/50'
                                     }`}
                                 >
-                                    {st === 'a2p' ? '📋 A2P 10DLC Registration' : '🔕 Opt-Out & Sender ID'}
+                                    {st === 'a2p' ? '📋 A2P 10DLC Registration' : st === 'optout' ? '🔕 Opt-Out & Sender ID' : '📱 Phone Numbers'}
                                 </button>
                             ))}
                         </div>
@@ -2710,7 +2746,340 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                         </div>
                     )}
 
-                    {/* Save Bar */}
+                    {/* ── Phone Numbers Sub-tab ────────────────────────────────────────── */}
+                    {smsSubTab === 'numbers' && (() => {
+                        const US_STATES = [
+                            ['AL','Alabama'],['AK','Alaska'],['AZ','Arizona'],['AR','Arkansas'],['CA','California'],
+                            ['CO','Colorado'],['CT','Connecticut'],['DE','Delaware'],['FL','Florida'],['GA','Georgia'],
+                            ['HI','Hawaii'],['ID','Idaho'],['IL','Illinois'],['IN','Indiana'],['IA','Iowa'],
+                            ['KS','Kansas'],['KY','Kentucky'],['LA','Louisiana'],['ME','Maine'],['MD','Maryland'],
+                            ['MA','Massachusetts'],['MI','Michigan'],['MN','Minnesota'],['MS','Mississippi'],['MO','Missouri'],
+                            ['MT','Montana'],['NE','Nebraska'],['NV','Nevada'],['NH','New Hampshire'],['NJ','New Jersey'],
+                            ['NM','New Mexico'],['NY','New York'],['NC','North Carolina'],['ND','North Dakota'],['OH','Ohio'],
+                            ['OK','Oklahoma'],['OR','Oregon'],['PA','Pennsylvania'],['RI','Rhode Island'],['SC','South Carolina'],
+                            ['SD','South Dakota'],['TN','Tennessee'],['TX','Texas'],['UT','Utah'],['VT','Vermont'],
+                            ['VA','Virginia'],['WA','Washington'],['WV','West Virginia'],['WI','Wisconsin'],['WY','Wyoming'],
+                        ];
+
+                        const handleSearch = async () => {
+                            setNumError('');
+                            setAddNumBusy(true);
+                            try {
+                                let url = `/api/messaging/available-numbers?churchId=${encodeURIComponent(churchId)}`;
+                                if (addNumMode === 'area-code') {
+                                    if (!addNumAreaCode || addNumAreaCode.length < 3) { setNumError('Enter a 3-digit area code.'); return; }
+                                    url += `&areaCode=${encodeURIComponent(addNumAreaCode)}`;
+                                } else {
+                                    if (!addNumState) { setNumError('Select a state.'); return; }
+                                    if (addNumCity.trim()) url += `&city=${encodeURIComponent(addNumCity.trim())}`;
+                                    url += `&state=${encodeURIComponent(addNumState)}`;
+                                }
+                                const res = await fetch(url);
+                                const data = await res.json();
+                                if (!data.success) throw new Error(data.error || 'Search failed');
+                                setAddNumResults(data.numbers || []);
+                                setAddNumStep('pick');
+                            } catch (e: any) {
+                                setNumError(e.message || 'Search failed');
+                            } finally {
+                                setAddNumBusy(false);
+                            }
+                        };
+
+                        const handleClaimNumber = async () => {
+                            if (!addNumSelected) { setNumError('Select a number first.'); return; }
+                            setNumError('');
+                            setAddNumBusy(true);
+                            try {
+                                const res = await fetch('/api/messaging/add-number', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        churchId,
+                                        phoneNumber: addNumSelected,
+                                        senderName: addNumSender,
+                                        friendlyLabel: addNumLabel || 'New Line',
+                                    }),
+                                });
+                                const data = await res.json();
+                                if (!data.success) throw new Error(data.error || 'Failed to claim number');
+                                setNumToast('✓ Number added successfully!');
+                                setShowAddNumber(false);
+                                setAddNumStep('search');
+                                setAddNumResults([]);
+                                setAddNumSelected('');
+                                setAddNumLabel('');
+                                // Reload numbers list
+                                setNumLoading(true);
+                                import('firebase/firestore').then(({ collection, query, where, orderBy, getDocs }) => {
+                                    const q = query(
+                                        collection(firebaseDb, 'twilioNumbers'),
+                                        where('churchId', '==', churchId),
+                                        orderBy('createdAt', 'asc')
+                                    );
+                                    getDocs(q)
+                                        .then(snap => setTwilioNumbers(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
+                                        .finally(() => setNumLoading(false));
+                                });
+                                setTimeout(() => setNumToast(''), 4000);
+                            } catch (e: any) {
+                                setNumError(e.message || 'Failed to add number');
+                            } finally {
+                                setAddNumBusy(false);
+                            }
+                        };
+
+                        const handleSetDefault = async (numId: string) => {
+                            setNumError('');
+                            try {
+                                const res = await fetch('/api/messaging/set-default-number', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ churchId, twilioNumberId: numId }),
+                                });
+                                const data = await res.json();
+                                if (!data.success) throw new Error(data.error || 'Failed');
+                                setNumToast('✓ Default number updated.');
+                                setTwilioNumbers(prev => prev.map(n => ({ ...n, isDefault: n.id === numId })));
+                                setTimeout(() => setNumToast(''), 3000);
+                            } catch (e: any) {
+                                setNumError(e.message || 'Failed to set default');
+                            }
+                        };
+
+                        return (
+                            <div className="space-y-6">
+
+                                {/* Header row */}
+                                <div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800">
+                                    <div className="flex items-center justify-between mb-6">
+                                        <div>
+                                            <h4 className="text-sm font-black text-slate-900 dark:text-white">Provisioned Phone Numbers</h4>
+                                            <p className="text-[10px] text-slate-400 mt-0.5">All Twilio numbers associated with this church. The default number is used for outbound replies when no inbox is specified.</p>
+                                        </div>
+                                        <button
+                                            onClick={() => { setShowAddNumber(true); setAddNumStep('search'); setAddNumResults([]); setNumError(''); }}
+                                            className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-violet-200 dark:shadow-violet-900/30"
+                                        >
+                                            <span className="text-sm leading-none">+</span> Request a Number
+                                        </button>
+                                    </div>
+
+                                    {/* Toast */}
+                                    {numToast && (
+                                        <div className="mb-4 px-4 py-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl text-xs font-bold text-emerald-700 dark:text-emerald-300">
+                                            {numToast}
+                                        </div>
+                                    )}
+                                    {numError && (
+                                        <div className="mb-4 px-4 py-3 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-xl text-xs font-bold text-rose-700 dark:text-rose-300">
+                                            {numError}
+                                        </div>
+                                    )}
+
+                                    {/* Numbers list */}
+                                    {numLoading ? (
+                                        <p className="text-xs text-slate-400 py-4 text-center">Loading numbers…</p>
+                                    ) : twilioNumbers.length === 0 ? (
+                                        <div className="py-10 text-center">
+                                            <p className="text-3xl mb-3">📱</p>
+                                            <p className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">No Numbers Provisioned</p>
+                                            <p className="text-xs text-slate-400">Use "Request a Number" to add your first Twilio number.</p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            {twilioNumbers.map((num: any) => (
+                                                <div
+                                                    key={num.id}
+                                                    className={`flex items-center gap-4 p-4 rounded-2xl border transition-all ${
+                                                        num.isDefault
+                                                            ? 'bg-violet-50 dark:bg-violet-900/10 border-violet-200 dark:border-violet-800'
+                                                            : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700'
+                                                    }`}
+                                                >
+                                                    {/* Number info */}
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <span className="font-mono font-bold text-sm text-slate-900 dark:text-white">{num.phoneNumber}</span>
+                                                            {num.friendlyLabel && (
+                                                                <span className="text-[10px] font-bold bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400 px-2 py-0.5 rounded-full">
+                                                                    {num.friendlyLabel}
+                                                                </span>
+                                                            )}
+                                                            {num.isDefault && (
+                                                                <span className="text-[9px] font-black uppercase tracking-widest bg-violet-600 text-white px-2 py-0.5 rounded-full">
+                                                                    Default
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        {num.senderName && (
+                                                            <p className="text-[10px] text-slate-400 mt-0.5">Sender: {num.senderName}</p>
+                                                        )}
+                                                    </div>
+                                                    {/* Actions */}
+                                                    {!num.isDefault && (
+                                                        <button
+                                                            onClick={() => handleSetDefault(num.id)}
+                                                            className="shrink-0 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:border-violet-400 hover:text-violet-600 dark:hover:text-violet-400 transition-all"
+                                                        >
+                                                            Set Default
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* ── Add Number Inline Wizard ─────────────────────────── */}
+                                {showAddNumber && (
+                                    <div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border-2 border-violet-300 dark:border-violet-700 shadow-xl shadow-violet-100 dark:shadow-violet-900/20">
+                                        <div className="flex items-center justify-between mb-6">
+                                            <div>
+                                                <h4 className="text-sm font-black text-slate-900 dark:text-white">Request Additional Number</h4>
+                                                <p className="text-[10px] text-slate-400 mt-0.5">Search Twilio for an available number and add it to this church's account.</p>
+                                            </div>
+                                            <button
+                                                onClick={() => { setShowAddNumber(false); setAddNumStep('search'); setAddNumResults([]); setNumError(''); }}
+                                                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-lg font-bold leading-none"
+                                                title="Close"
+                                            >
+                                                ✕
+                                            </button>
+                                        </div>
+
+                                        {addNumStep === 'search' && (
+                                            <div className="space-y-5">
+                                                {/* Mode toggle */}
+                                                <div className="flex rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 w-fit">
+                                                    {(['city-state', 'area-code'] as const).map(m => (
+                                                        <button
+                                                            key={m}
+                                                            onClick={() => setAddNumMode(m)}
+                                                            className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all ${
+                                                                addNumMode === m
+                                                                    ? 'bg-violet-600 text-white'
+                                                                    : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50'
+                                                            }`}
+                                                        >
+                                                            {m === 'city-state' ? 'City / State' : 'Area Code'}
+                                                        </button>
+                                                    ))}
+                                                </div>
+
+                                                {addNumMode === 'city-state' ? (
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                        <div>
+                                                            <label className={labelCn}>City (optional)</label>
+                                                            <input type="text" value={addNumCity} onChange={e => setAddNumCity(e.target.value)}
+                                                                className={inputCn} placeholder="Nashville" />
+                                                        </div>
+                                                        <div>
+                                                            <label className={labelCn}>State <span className="text-rose-500">*</span></label>
+                                                            <select value={addNumState} onChange={e => setAddNumState(e.target.value)} className={inputCn}>
+                                                                <option value="">— Select state —</option>
+                                                                {US_STATES.map(([abbr, name]) => (
+                                                                    <option key={abbr} value={abbr}>{name}</option>
+                                                                ))}
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div>
+                                                        <label className={labelCn}>Area Code <span className="text-rose-500">*</span></label>
+                                                        <input type="text" value={addNumAreaCode}
+                                                            onChange={e => setAddNumAreaCode(e.target.value.replace(/\D/g, '').slice(0, 3))}
+                                                            className={inputCn + ' font-mono'} placeholder="615" maxLength={3} />
+                                                    </div>
+                                                )}
+
+                                                <button
+                                                    onClick={handleSearch}
+                                                    disabled={addNumBusy}
+                                                    className="bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all"
+                                                >
+                                                    {addNumBusy ? 'Searching…' : 'Search Available Numbers'}
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        {addNumStep === 'pick' && (
+                                            <div className="space-y-5">
+                                                <div>
+                                                    <p className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-3">
+                                                        {addNumResults.length} number{addNumResults.length !== 1 ? 's' : ''} found — pick one:
+                                                    </p>
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1">
+                                                        {addNumResults.map(n => (
+                                                            <button
+                                                                key={n.phoneNumber}
+                                                                onClick={() => setAddNumSelected(n.phoneNumber)}
+                                                                className={`text-left p-3 rounded-xl border transition-all ${
+                                                                    addNumSelected === n.phoneNumber
+                                                                        ? 'bg-violet-50 dark:bg-violet-900/20 border-violet-400 dark:border-violet-600'
+                                                                        : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-violet-300'
+                                                                }`}
+                                                            >
+                                                                <p className="font-mono font-bold text-sm text-slate-900 dark:text-white">{n.friendlyName}</p>
+                                                                <p className="text-[10px] text-slate-400">{n.locality ? `${n.locality}, ` : ''}{n.region}</p>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+
+                                                {addNumResults.length > 0 && (
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                        <div>
+                                                            <label className={labelCn}>Inbox Label</label>
+                                                            <input type="text" value={addNumLabel}
+                                                                onChange={e => setAddNumLabel(e.target.value)}
+                                                                className={inputCn} placeholder="Youth Ministry" />
+                                                            <p className="text-[9px] text-slate-400 mt-1">Displayed in the inbox switcher.</p>
+                                                        </div>
+                                                        <div>
+                                                            <label className={labelCn}>Sender Name</label>
+                                                            <input type="text" value={addNumSender}
+                                                                onChange={e => setAddNumSender(e.target.value)}
+                                                                className={inputCn} placeholder={church.name} />
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                <div className="flex gap-3">
+                                                    <button
+                                                        onClick={() => { setAddNumStep('search'); setAddNumResults([]); setAddNumSelected(''); }}
+                                                        className="px-5 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 transition"
+                                                    >
+                                                        ← Search Again
+                                                    </button>
+                                                    <button
+                                                        onClick={handleClaimNumber}
+                                                        disabled={addNumBusy || !addNumSelected}
+                                                        className="flex-1 py-2.5 text-sm font-black bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-xl transition flex items-center justify-center gap-2"
+                                                    >
+                                                        {addNumBusy ? 'Claiming…' : 'Claim Number →'}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Info callout */}
+                                <div className="bg-violet-900/10 dark:bg-violet-900/20 p-6 rounded-2xl border border-violet-500/20">
+                                    <h4 className="font-bold text-violet-400 mb-3 text-sm">📱 Multi-Number Inboxes</h4>
+                                    <ul className="text-xs text-slate-400 space-y-1.5 list-disc list-inside leading-relaxed">
+                                        <li>Each number gets its own inbox in the SMS tool. You can restrict which users see each inbox.</li>
+                                        <li>The <strong>default</strong> number handles inbound replies when the conversation has no assigned inbox.</li>
+                                        <li>New numbers use the same Twilio sub-account as your primary — no extra A2P registration needed.</li>
+                                        <li>To restrict inbox access per user, use the <strong>Manage Numbers</strong> panel inside the SMS tool.</li>
+                                    </ul>
+                                </div>
+
+                            </div>
+                        );
+                    })()}
+
                     {smsMessage && (
                         <div className={`p-4 rounded-xl text-xs font-bold flex items-center gap-2 ${
                             smsMessage.type === 'success' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' : 'bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400'

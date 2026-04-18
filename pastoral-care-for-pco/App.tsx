@@ -887,6 +887,7 @@ const App: React.FC = () => {
             { label: 'Broadcast', view: 'tools-sms-campaigns', icon: <span className="text-sm">📨</span> },
             { label: 'Keywords',  view: 'tools-sms-keywords',  icon: <span className="text-sm">🔑</span> },
             { label: 'Analytics', view: 'tools-sms-analytics', icon: <span className="text-sm">📊</span> },
+            { label: 'AI Agent',  view: 'tools-sms-agent',     icon: <span className="text-sm">✨</span> },
         ] : undefined}
     >
         {view === 'dashboard' && (
@@ -1188,6 +1189,8 @@ const App: React.FC = () => {
         {view === 'tools-sms-workflows' && <ToolsView churchId={church.id} church={church} currentUserId={user.id} currentUser={user} onUpdateChurch={(updates) => { firestore.updateChurch(church.id, updates); setChurch({ ...church, ...updates }); }} activePage="messaging" smsTab="workflows" />}
         {view === 'tools-sms-keywords' && <ToolsView churchId={church.id} church={church} currentUserId={user.id} currentUser={user} onUpdateChurch={(updates) => { firestore.updateChurch(church.id, updates); setChurch({ ...church, ...updates }); }} activePage="messaging" smsTab="keywords" />}
         {view === 'tools-sms-analytics' && <ToolsView churchId={church.id} church={church} currentUserId={user.id} currentUser={user} onUpdateChurch={(updates) => { firestore.updateChurch(church.id, updates); setChurch({ ...church, ...updates }); }} activePage="messaging" smsTab="analytics" />}
+        {view === 'tools-sms-agent'    && <ToolsView churchId={church.id} church={church} currentUserId={user.id} currentUser={user} onUpdateChurch={(updates) => { firestore.updateChurch(church.id, updates); setChurch({ ...church, ...updates }); }} activePage="messaging" smsTab="agent" />}
+
     </Layout>
     </>
   );
