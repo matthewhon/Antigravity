@@ -260,6 +260,7 @@ export const syncPeopleData = async (churchId: string) => {
                 id: p.id,
                 churchId,
                 name: `${attrs.first_name} ${attrs.last_name}`,
+                nameLower: `${attrs.first_name || ''} ${attrs.last_name || ''}`.toLowerCase().trim(),
                 firstName: attrs.first_name || null,
                 lastName: attrs.last_name || null,
                 avatar: attrs.avatar || null,

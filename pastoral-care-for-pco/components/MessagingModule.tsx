@@ -958,23 +958,56 @@ const NewMessageComposer: React.FC<{
         const q = personSearch.trim();
         if (q.length < 2) { setPersonResults([]); return; }
         setPersonLoading(true);
-        // Search the Firestore people cache — only surface people who have a phone on file.
-        // Fetch a larger window (25) so the client-side phone filter still leaves useful results.
-        const isPhone = /^[\d\s+()\-]{4,}$/.test(q);
+
         const col = collection(firebaseDb, 'people');
-        const constraints = isPhone
-            ? [where('churchId', '==', churchId), where('phone', '>=', q), where('phone', '<=', q + '\uffff'), limit(20)]
-            : [where('churchId', '==', churchId), where('name', '>=', q), where('name', '<=', q + '\uffff'), limit(25)];
-        getDocs(query(col, ...constraints as any))
-            .then(snap => {
-                const results = snap.docs
-                    .map(d => {
+        const isPhone = /^[\d\s+()\-]{4,}$/.test(q);
+        const qLower  = q.toLowerCase();
+
+        // Build two queries: one exact prefix match on `name`, one on `nameLower` (if it exists),
+        // plus a phone match so both typing styles work. We run all in parallel and merge.
+        const queries: Promise<any>[] = [];
+
+        if (isPhone) {
+            // Phone prefix search
+            queries.push(
+                getDocs(query(col, where('churchId', '==', churchId), where('phone', '>=', q), where('phone', '<=', q + '\uffff'), limit(20)))
+            );
+        } else {
+            // Case-insensitive name search: try both original-case and lowercase prefix
+            // Most Firestore caches store `name` as 'First Last' — try both capitalisation variants
+            const qCap = q.charAt(0).toUpperCase() + q.slice(1).toLowerCase(); // 'jo' → 'Jo'
+            queries.push(
+                // Original prefix (catches exact or Title-Case typing)
+                getDocs(query(col, where('churchId', '==', churchId), where('name', '>=', q),    where('name', '<=', q + '\uffff'),    limit(25))),
+                // Title-case prefix (most common)
+                getDocs(query(col, where('churchId', '==', churchId), where('name', '>=', qCap), where('name', '<=', qCap + '\uffff'), limit(25))),
+                // Lowercase-stored name (nameLower field, populated by newer syncs)
+                getDocs(query(col, where('churchId', '==', churchId), where('nameLower', '>=', qLower), where('nameLower', '<=', qLower + '\uffff'), limit(25)))
+            );
+        }
+
+        Promise.allSettled(queries)
+            .then(results => {
+                const seen = new Set<string>();
+                const merged: typeof personResults = [];
+                results.forEach(r => {
+                    if (r.status !== 'fulfilled') return;
+                    r.value.docs.forEach((d: any) => {
+                        if (seen.has(d.id)) return;
+                        seen.add(d.id);
                         const p = d.data() as any;
-                        return { id: d.id, name: p.name || '', phone: (p.phone || '').trim(), avatar: p.avatar || null, membership: p.membership || null };
+                        merged.push({ id: d.id, name: p.name || '', phone: (p.phone || '').trim(), avatar: p.avatar || null, membership: p.membership || null });
+                    });
+                });
+                // Client-side case-insensitive filter to discard false positives from range edges
+                const filtered = merged
+                    .filter(p => {
+                        const matches = p.name.toLowerCase().includes(qLower) || (isPhone && p.phone.replace(/\D/g, '').includes(q.replace(/\D/g, '')));
+                        return matches && p.phone && p.phone.replace(/\D/g, '').length >= 10;
                     })
-                    // Only show people with a valid phone number — no point surfacing un-textable contacts
-                    .filter(p => p.phone && p.phone.replace(/\D/g, '').length >= 10);
-                setPersonResults(results);
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .slice(0, 20);
+                setPersonResults(filtered);
             })
             .catch(() => setPersonResults([]))
             .finally(() => setPersonLoading(false));
@@ -5061,9 +5094,9 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                     <div className="flex gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
                         {([
                             { key: 'campaigns', label: 'Campaigns', icon: <MessageSquare size={13} /> },
+                            { key: 'workflows', label: 'Workflows', icon: <Zap size={13} /> },
                             { key: 'inbox',     label: 'Inbox',     icon: <Inbox size={13} /> },
                             { key: 'keywords',  label: 'Keywords',  icon: <Key size={13} /> },
-                            { key: 'workflows', label: 'Workflows', icon: <Zap size={13} /> },
                             { key: 'analytics', label: 'Analytics', icon: <BarChart3 size={13} /> },
                         ] as const).map(t => (
                             <button
@@ -5131,7 +5164,7 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
 
                 {/* Workflows tab */}
                 {activeTab === 'workflows' && (
-                    <div className="h-full">
+                    <div className="h-full overflow-y-auto">
                         <SmsWorkflowsManager churchId={churchId} />
                     </div>
                 )}
