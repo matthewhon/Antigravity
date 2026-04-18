@@ -1196,9 +1196,15 @@ const SendTestModal: React.FC<SendTestModalProps> = ({ onConfirm, onCancel, isSe
 };
 
 export const ToolsView: React.FC<{ churchId: string; church?: Church;
-currentUserId?: string; currentUser?: User; onUpdateChurch?: (updates: Partial<Church>) => void }> = ({ churchId, church, currentUserId,
-currentUser, onUpdateChurch }) => {
-  const [activeTab, setActiveTab] = useState<'emails' | 'polls' | 'unsubscribers' | 'messaging'>('emails');
+currentUserId?: string; currentUser?: User; onUpdateChurch?: (updates: Partial<Church>) => void;
+/** When provided by a parent route, controls which tab is shown and hides the internal tab bar */
+activePage?: 'website' | 'emails' | 'polls' | 'messaging' | 'unsubscribers';
+/** When activePage='messaging', this controls the active SMS sub-tab */
+smsTab?: 'campaigns' | 'inbox' | 'keywords' | 'analytics' | 'workflows';
+}> = ({ churchId, church, currentUserId,
+currentUser, onUpdateChurch, activePage, smsTab }) => {
+  const [activeTab, setActiveTab] = useState<'website' | 'emails' | 'polls' | 'unsubscribers' | 'messaging'>('emails');
+  const effectiveTab = activePage ?? activeTab;
   const [campaigns, setCampaigns] = useState<EmailCampaign[]>([]);
   const [activeCampaign, setActiveCampaign] = useState<EmailCampaign | null>(null);
   const [previewCampaign, setPreviewCampaign] = useState<EmailCampaign | null>(null);
@@ -1422,12 +1428,13 @@ currentUser, onUpdateChurch }) => {
 
   return (
     <div className="flex flex-col h-full relative">
-      {/* ─── Tab Switcher ─────────────────────────────────────────────── */}
+      {/* ─── Tab Switcher - only shown in legacy embedded mode ──────────── */}
+      {!activePage && (
       <div className="shrink-0 flex items-center gap-1 px-5 pt-4 pb-0 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 overflow-x-auto no-scrollbar">
         <button
           onClick={() => setActiveTab('website')}
           className={`flex items-center gap-2 px-4 py-2 -mb-px text-sm font-semibold border-b-2 transition shrink-0 ${
-            activeTab === 'website'
+            effectiveTab === 'website'
               ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400'
               : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
           }`}
@@ -1437,7 +1444,7 @@ currentUser, onUpdateChurch }) => {
         <button
           onClick={() => setActiveTab('emails')}
           className={`flex items-center gap-2 px-4 py-2 -mb-px text-sm font-semibold border-b-2 transition shrink-0 ${
-            activeTab === 'emails'
+            effectiveTab === 'emails'
               ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400'
               : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
           }`}
@@ -1447,7 +1454,7 @@ currentUser, onUpdateChurch }) => {
         <button
           onClick={() => setActiveTab('polls')}
           className={`flex items-center gap-2 px-4 py-2 -mb-px text-sm font-semibold border-b-2 transition shrink-0 ${
-            activeTab === 'polls'
+            effectiveTab === 'polls'
               ? 'border-violet-600 text-violet-600 dark:text-violet-400 dark:border-violet-400'
               : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
           }`}
@@ -1457,7 +1464,7 @@ currentUser, onUpdateChurch }) => {
         <button
           onClick={() => setActiveTab('messaging')}
           className={`flex items-center gap-2 px-4 py-2 -mb-px text-sm font-semibold border-b-2 transition shrink-0 ${
-            activeTab === 'messaging'
+            effectiveTab === 'messaging'
               ? 'border-violet-600 text-violet-600 dark:text-violet-400 dark:border-violet-400'
               : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
           }`}
@@ -1467,7 +1474,7 @@ currentUser, onUpdateChurch }) => {
         <button
           onClick={() => setActiveTab('unsubscribers')}
           className={`flex items-center gap-2 px-4 py-2 -mb-px text-sm font-semibold border-b-2 transition shrink-0 ${
-            activeTab === 'unsubscribers'
+            effectiveTab === 'unsubscribers'
               ? 'border-red-500 text-red-600 dark:text-red-400 dark:border-red-400'
               : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
           }`}
@@ -1480,16 +1487,17 @@ currentUser, onUpdateChurch }) => {
           )}
         </button>
       </div>
+      )}
 
       {/* ─── Website Tab ───────────────────────────────────────────────── */}
-      {activeTab === 'website' && (
+      {effectiveTab === 'website' && (
         <div className="flex-1 overflow-hidden p-6 max-w-[1400px] mx-auto w-full h-full">
            <WebsiteWidgetsManager churchId={churchId} />
         </div>
       )}
 
       {/* ─── Unsubscribers Tab ─────────────────────────────────────────── */}
-      {activeTab === 'unsubscribers' && (
+      {effectiveTab === 'unsubscribers' && (
         <div className="flex-1 overflow-y-auto p-6 max-w-4xl mx-auto w-full">
           <div className="flex items-center justify-between mb-5">
             <div>
@@ -1580,31 +1588,32 @@ currentUser, onUpdateChurch }) => {
       )}
 
       {/* ─── Messaging (SMS) Tab ──────────────────────────────────────────── */}
-      {activeTab === 'messaging' && church && currentUser && (
+      {effectiveTab === 'messaging' && church && currentUser && (
         <div className="flex-1 min-h-0 overflow-hidden">
           <MessagingModule
             churchId={churchId}
             church={church}
             currentUser={currentUser}
             onUpdateChurch={onUpdateChurch || (() => {})}
+            controlledTab={smsTab}
           />
         </div>
       )}
-      {activeTab === 'messaging' && (!church || !currentUser) && (
+      {effectiveTab === 'messaging' && (!church || !currentUser) && (
         <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">
           Unable to load Messaging — church or user context missing.
         </div>
       )}
 
       {/* ─── Polls Tab ────────────────────────────────────────────────── */}
-      {activeTab === 'polls' && (
+      {effectiveTab === 'polls' && (
         <div className="flex-1 overflow-y-auto">
           <PollsManager churchId={churchId} currentUserId={currentUserId || ''} />
         </div>
       )}
 
       {/* ─── Emails Tab ───────────────────────────────────────────────── */}
-      {activeTab === 'emails' && (
+      {effectiveTab === 'emails' && (
         <>
       {!activeCampaign && church?.emailSettings && (
         <div className={`shrink-0 flex items-center gap-3 px-5 py-2 border-b text-xs font-medium ${

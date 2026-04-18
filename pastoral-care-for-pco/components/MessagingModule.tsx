@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { db as firebaseDb } from '../services/firebase';
 import { storage } from '../services/firebase';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
@@ -5270,13 +5270,16 @@ interface MessagingModuleProps {
     church:      Church;
     currentUser: User;
     onUpdateChurch?: (updates: Partial<Church>) => void;
+    /** When provided by a parent route, drives the active tab and hides the internal pill nav */
+    controlledTab?: 'campaigns' | 'inbox' | 'keywords' | 'analytics' | 'workflows';
 }
 
-const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, currentUser, onUpdateChurch }) => {
+const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, currentUser, onUpdateChurch, controlledTab }) => {
     const smsEnabled = church.smsSettings?.smsEnabled;
 
     type Tab = 'campaigns' | 'inbox' | 'keywords' | 'analytics' | 'workflows';
     const [activeTab, setActiveTab]   = useState<Tab>('campaigns');
+    const effectiveTab: Tab = controlledTab ?? activeTab;
     const [campaigns, setCampaigns]   = useState<SmsCampaign[]>([]);
     const [isLoading, setIsLoading]   = useState(true);
     const [activeCampaign, setActiveCampaign] = useState<SmsCampaign | null>(null);
@@ -5406,8 +5409,8 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
             {/* Toast */}
             {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
 
-            {/* Top section: tabs + phone number badge */}
-            {!activeCampaign && (
+            {/* Top section: tabs + phone number badge — only shown when tab is managed internally */}
+            {!activeCampaign && !controlledTab && (
                 <div className="flex items-center justify-between px-6 pt-2 shrink-0">
                     <div className="flex gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
                         {([
@@ -5420,7 +5423,7 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                             <button
                                 key={t.key}
                                 onClick={() => setActiveTab(t.key)}
-                                className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-semibold transition ${activeTab === t.key ? 'bg-white dark:bg-slate-700 text-violet-600 dark:text-violet-300 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                                className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-semibold transition ${effectiveTab === t.key ? 'bg-white dark:bg-slate-700 text-violet-600 dark:text-violet-300 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}
                             >
                                 {t.icon} {t.label}
                             </button>
@@ -5435,10 +5438,20 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                     )}
                 </div>
             )}
+            {/* Phone badge only — shown when tab is externally controlled */}
+            {!activeCampaign && controlledTab && church.smsSettings?.twilioPhoneNumber && (
+                <div className="flex justify-end px-6 pt-2 shrink-0">
+                    <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-full px-3 py-1.5">
+                        <Phone size={12} />
+                        {formatPhone(church.smsSettings.twilioPhoneNumber)}
+                        <span className="text-[10px] opacity-70">· SMS Active</span>
+                    </div>
+                </div>
+            )}
 
             <div className="flex-1 overflow-hidden">
                 {/* Campaigns tab */}
-                {activeTab === 'campaigns' && !activeCampaign && (
+                {effectiveTab === 'campaigns' && !activeCampaign && (
                     <div className="h-full overflow-y-auto">
                         <CampaignList
                             campaigns={campaigns}
@@ -5451,7 +5464,7 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                     </div>
                 )}
 
-                {activeTab === 'campaigns' && activeCampaign && (
+                {effectiveTab === 'campaigns' && activeCampaign && (
                     <div className="h-full">
                         <CampaignComposer
                             campaign={activeCampaign}
@@ -5467,28 +5480,28 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                 )}
 
                 {/* Inbox tab */}
-                {activeTab === 'inbox' && (
+                {effectiveTab === 'inbox' && (
                     <div className="h-full">
                         <SmsInbox churchId={churchId} currentUser={currentUser} church={church} />
                     </div>
                 )}
 
                 {/* Keywords tab */}
-                {activeTab === 'keywords' && (
+                {effectiveTab === 'keywords' && (
                     <div className="h-full overflow-y-auto">
                         <SmsKeywordsManager churchId={churchId} />
                     </div>
                 )}
 
                 {/* Workflows tab */}
-                {activeTab === 'workflows' && (
+                {effectiveTab === 'workflows' && (
                     <div className="h-full overflow-y-auto">
                         <SmsWorkflowsManager churchId={churchId} />
                     </div>
                 )}
 
                 {/* Analytics tab */}
-                {activeTab === 'analytics' && (
+                {effectiveTab === 'analytics' && (
                     <div className="h-full overflow-y-auto">
                         <SmsAnalytics churchId={churchId} campaigns={campaigns} />
                     </div>

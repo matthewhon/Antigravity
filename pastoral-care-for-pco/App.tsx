@@ -375,16 +375,18 @@ const App: React.FC = () => {
           'messaging': 'Messaging',
       };
       
-      if (v === 'tools') return true; // Let the view itself handle specific tab permissions if needed, or allow all church users
+      if (v === 'tools' || v.startsWith('tools-')) return true; // All tools sub-pages: allow all church users
 
       const requiredRole = roleMap[v];
       return requiredRole ? user.roles.includes(requiredRole as any) : false;
   };
 
   const handleNavigate = (newView: string) => {
-      if (hasPermission(newView)) {
-          setView(newView);
-          loadWidgets(user!, newView);
+      // Upgrade legacy bare 'tools' route to first sub-page
+      const resolvedView = newView === 'tools' ? 'tools-emails' : newView;
+      if (hasPermission(resolvedView)) {
+          setView(resolvedView);
+          loadWidgets(user!, resolvedView);
       }
   };
 
@@ -878,6 +880,14 @@ const App: React.FC = () => {
         onRefreshUser={() => firestore.getUserProfile(user.id).then(u => u && setUser(u))}
         isSyncing={isSyncing}
         enableLibrary={systemSettings?.enableLibrary}
+        noPadding={view.startsWith('tools')}
+        subNavItems={view.startsWith('tools-sms') ? [
+            { label: 'Inbox',     view: 'tools-sms-inbox',     icon: <span className="text-sm">📥</span> },
+            { label: 'Campaigns', view: 'tools-sms-campaigns', icon: <span className="text-sm">📨</span> },
+            { label: 'Workflows', view: 'tools-sms-workflows', icon: <span className="text-sm">⚡</span> },
+            { label: 'Keywords',  view: 'tools-sms-keywords',  icon: <span className="text-sm">🔑</span> },
+            { label: 'Analytics', view: 'tools-sms-analytics', icon: <span className="text-sm">📊</span> },
+        ] : undefined}
     >
         {view === 'dashboard' && (
             <DashboardView 
@@ -1164,7 +1174,17 @@ const App: React.FC = () => {
                 <LibraryView churchId={church.id} />
             </div>
         )}
-        {view === 'tools' && <ToolsView churchId={church.id} church={church} currentUserId={user.id} currentUser={user} onUpdateChurch={(updates) => { firestore.updateChurch(church.id, updates); setChurch({ ...church, ...updates }); }} />}
+        {/* ─── Tools: all sub-routes ─────────────────────────────────────── */}
+        {view === 'tools-emails' && <ToolsView churchId={church.id} church={church} currentUserId={user.id} currentUser={user} onUpdateChurch={(updates) => { firestore.updateChurch(church.id, updates); setChurch({ ...church, ...updates }); }} activePage="emails" />}
+        {view === 'tools-polls' && <ToolsView churchId={church.id} church={church} currentUserId={user.id} currentUser={user} onUpdateChurch={(updates) => { firestore.updateChurch(church.id, updates); setChurch({ ...church, ...updates }); }} activePage="polls" />}
+        {view === 'tools-website' && <ToolsView churchId={church.id} church={church} currentUserId={user.id} currentUser={user} onUpdateChurch={(updates) => { firestore.updateChurch(church.id, updates); setChurch({ ...church, ...updates }); }} activePage="website" />}
+        {view === 'tools-unsubscribers' && <ToolsView churchId={church.id} church={church} currentUserId={user.id} currentUser={user} onUpdateChurch={(updates) => { firestore.updateChurch(church.id, updates); setChurch({ ...church, ...updates }); }} activePage="unsubscribers" />}
+        {/* SMS sub-routes — controlledTab drives panel selection; pill-nav hidden automatically */}
+        {(view === 'tools-sms-inbox' || view === 'tools-sms') && <ToolsView churchId={church.id} church={church} currentUserId={user.id} currentUser={user} onUpdateChurch={(updates) => { firestore.updateChurch(church.id, updates); setChurch({ ...church, ...updates }); }} activePage="messaging" smsTab="inbox" />}
+        {view === 'tools-sms-campaigns' && <ToolsView churchId={church.id} church={church} currentUserId={user.id} currentUser={user} onUpdateChurch={(updates) => { firestore.updateChurch(church.id, updates); setChurch({ ...church, ...updates }); }} activePage="messaging" smsTab="campaigns" />}
+        {view === 'tools-sms-workflows' && <ToolsView churchId={church.id} church={church} currentUserId={user.id} currentUser={user} onUpdateChurch={(updates) => { firestore.updateChurch(church.id, updates); setChurch({ ...church, ...updates }); }} activePage="messaging" smsTab="workflows" />}
+        {view === 'tools-sms-keywords' && <ToolsView churchId={church.id} church={church} currentUserId={user.id} currentUser={user} onUpdateChurch={(updates) => { firestore.updateChurch(church.id, updates); setChurch({ ...church, ...updates }); }} activePage="messaging" smsTab="keywords" />}
+        {view === 'tools-sms-analytics' && <ToolsView churchId={church.id} church={church} currentUserId={user.id} currentUser={user} onUpdateChurch={(updates) => { firestore.updateChurch(church.id, updates); setChurch({ ...church, ...updates }); }} activePage="messaging" smsTab="analytics" />}
     </Layout>
     </>
   );

@@ -20,6 +20,10 @@ interface LayoutProps {
   isSyncing?: boolean;
   enableLibrary?: boolean;
   metricsSubViews?: { label: string; view: string; icon: string }[];
+  /** Secondary nav strip rendered below the context header (e.g. SMS sub-tabs) */
+  subNavItems?: { label: string; view: string; icon: React.ReactNode }[];
+  /** Remove the content padding wrapper so full-height panels can fill the space */
+  noPadding?: boolean;
 }
 
 const Layout: React.FC<LayoutProps> = ({ 
@@ -34,7 +38,9 @@ const Layout: React.FC<LayoutProps> = ({
   hasPermission,
   onRefreshUser,
   isSyncing,
-  enableLibrary
+  enableLibrary,
+  subNavItems,
+  noPadding,
 }) => {
   const canSeeLibrary = user.email === LIBRARY_OWNER_EMAIL || enableLibrary === true;
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -48,6 +54,8 @@ const Layout: React.FC<LayoutProps> = ({
   const servicesRef = useRef<HTMLDivElement>(null);
   const [givingOpen, setGivingOpen] = useState(false);
   const givingRef = useRef<HTMLDivElement>(null);
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const toolsRef = useRef<HTMLDivElement>(null);
 
   const getDropdownStyle = (ref: React.RefObject<HTMLDivElement>) => {
     if (!ref.current) return {};
@@ -381,12 +389,58 @@ const Layout: React.FC<LayoutProps> = ({
                 )}
 
                 {hasPermission('tools') && (
-                  <NavItem 
-                    icon="🧰" 
-                    label="Tools" 
-                    active={currentView === 'tools'} 
-                    onClick={() => onNavigate('tools')} 
-                  />
+                  <div
+                    ref={toolsRef}
+                    className="relative shrink-0"
+                    onMouseEnter={() => setToolsOpen(true)}
+                    onMouseLeave={() => setToolsOpen(false)}
+                  >
+                    <button
+                      onClick={() => onNavigate('tools-emails')}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all border ${
+                        currentView.startsWith('tools')
+                          ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 ring-1 ring-indigo-500 border-transparent'
+                          : 'text-slate-400 border-transparent hover:bg-slate-800 hover:text-white hover:border-slate-700'
+                      }`}
+                    >
+                      <span className="text-base">🧰</span>
+                      <span className="text-[10px] font-black uppercase tracking-widest">Tools</span>
+                      <svg className="w-3 h-3 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M6 9l6 6 6-6"/></svg>
+                    </button>
+                  </div>
+                )}
+
+                {/* Tools dropdown — fixed position to escape overflow clipping */}
+                {toolsOpen && hasPermission('tools') && (
+                  <div
+                    className="fixed z-[9999]"
+                    style={getDropdownStyle(toolsRef)}
+                    onMouseEnter={() => setToolsOpen(true)}
+                    onMouseLeave={() => setToolsOpen(false)}
+                  >
+                    <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl shadow-black/40 p-2 flex flex-col gap-1 min-w-[180px]">
+                      {[
+                        { view: 'tools-emails',        icon: '📧', label: 'Emails'        },
+                        { view: 'tools-sms-inbox',     icon: '💬', label: 'SMS'           },
+                        { view: 'tools-polls',         icon: '📊', label: 'Polls'         },
+                        { view: 'tools-website',       icon: '🌐', label: 'Website'       },
+                        { view: 'tools-unsubscribers', icon: '🛋️',  label: 'Unsubscribers' },
+                      ].map(item => (
+                        <button
+                          key={item.view}
+                          onClick={() => { onNavigate(item.view); setToolsOpen(false); }}
+                          className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest w-full text-left transition-all ${
+                            currentView === item.view || (item.view === 'tools-sms-inbox' && currentView.startsWith('tools-sms'))
+                              ? 'bg-indigo-600 text-white'
+                              : 'text-slate-300 hover:bg-slate-700 hover:text-white'
+                          }`}
+                        >
+                          <span className="text-sm">{item.icon}</span>
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 )}
 
 
@@ -511,9 +565,53 @@ const Layout: React.FC<LayoutProps> = ({
         </div>
 
         {/* Content Container */}
-        <div className="p-6 lg:p-10 max-w-[1600px] mx-auto print:p-0 print:max-w-none">
-          {children}
-        </div>
+        {noPadding ? (
+          <div className="flex-1 min-h-0 flex flex-col">
+            {/* Sub-nav strip (e.g. SMS tabs) — only when subNavItems provided */}
+            {subNavItems && subNavItems.length > 0 && (
+              <div className="shrink-0 flex items-center gap-1 px-5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 overflow-x-auto no-scrollbar">
+                {subNavItems.map(item => (
+                  <button
+                    key={item.view}
+                    onClick={() => onNavigate(item.view)}
+                    className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition shrink-0 ${
+                      currentView === item.view
+                        ? 'border-violet-600 text-violet-600 dark:text-violet-400 dark:border-violet-400'
+                        : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
+                    }`}
+                  >
+                    {item.icon}
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            )}
+            {children}
+          </div>
+        ) : (
+          <div className="p-6 lg:p-10 max-w-[1600px] mx-auto print:p-0 print:max-w-none">
+            {/* Sub-nav strip when inside padded container */}
+            {subNavItems && subNavItems.length > 0 && (
+              <div className="flex items-center gap-1 mb-4 border-b border-slate-200 dark:border-slate-700">
+                {subNavItems.map(item => (
+                  <button
+                    key={item.view}
+                    onClick={() => onNavigate(item.view)}
+                    className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition shrink-0 ${
+                      currentView === item.view
+                        ? 'border-violet-600 text-violet-600 dark:text-violet-400'
+                        : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
+                    }`}
+                  >
+                    {item.icon}
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            )}
+            {children}
+          </div>
+        )}
       </main>
 
       {/* User Profile Modal */}
