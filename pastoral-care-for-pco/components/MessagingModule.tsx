@@ -1487,7 +1487,7 @@ const NewMessageComposer: React.FC<{
                                                 <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">Click or drag &amp; drop</p>
                                                 <p className="text-[10px] text-slate-400">JPG, PNG, GIF, WebP — max 5 MB</p>
                                             </div>
-                                            {imageUploadProgress !== null && (<div className="space-y-1"><div className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden" role="progressbar" aria-valuenow={imageUploadProgress} aria-valuemin={0} aria-valuemax={100}><div className="h-full bg-violet-500 rounded-full transition-all" style={{ width: `${imageUploadProgress}%` }} /></div><p className="text-[10px] text-slate-400 text-right">{imageUploadProgress}%</p></div>)}
+                                            {imageUploadProgress !== null && (<div className="space-y-1"><div className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden" title={`Uploading: ${imageUploadProgress}%`} aria-label={`Upload progress: ${imageUploadProgress}%`}><div className="h-full bg-violet-500 rounded-full transition-all" style={{ width: `${imageUploadProgress}%` }} /></div><p className="text-[10px] text-slate-400 text-right">{imageUploadProgress}%</p></div>)}
                                             {imageUploadError && <p className="text-xs text-red-500">{imageUploadError}</p>}
                                         </>
                                     ) : (
@@ -2717,8 +2717,12 @@ const StatCard: React.FC<{
     );
 };
 
-const MiniBar: React.FC<{ pct: number; color?: string }> = ({ pct, color = 'bg-violet-500' }) => (
-    <div className="w-full h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden" role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100}>
+const MiniBar: React.FC<{ pct: number; color?: string; label?: string }> = ({ pct, color = 'bg-violet-500', label }) => (
+    <div
+        className="w-full h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden"
+        title={label ?? `${Math.round(pct)}%`}
+        aria-label={label ?? `${Math.round(pct)}%`}
+    >
         <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${Math.min(100, Math.max(0, pct))}%` }} />
     </div>
 );
@@ -2913,10 +2917,9 @@ const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[] }> = (
                                             <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-800 dark:bg-slate-700 text-white text-[10px] font-bold px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition whitespace-nowrap pointer-events-none z-10">
                                                 {m.sent.toLocaleString()} sent · {m.delivered.toLocaleString()} delivered
                                             </div>
-                                            {/* Bar outer */}
+                                            {/* Bar outer — fixed 120px, dynamic fill via CSS vars */}
                                             <div
-                                                className="w-full bg-slate-100 dark:bg-slate-700 rounded-xl overflow-hidden"
-                                                style={{ height: '120px' }}
+                                                className="w-full h-[120px] bg-slate-100 dark:bg-slate-700 rounded-xl overflow-hidden"
                                                 role="img"
                                                 aria-label={`${m.label}: ${m.sent} sent, ${m.delivered} delivered`}
                                             >
