@@ -1097,7 +1097,14 @@ export interface SmsWorkflow {
      * 0 = send on the event day (default), 7 = send 1 week early, etc.
      */
     triggerDayOffset?: number;
+    /** Legacy flat step array — kept in sync by the editor for the scheduler */
     steps: SmsWorkflowStep[];
+    /**
+     * New node-based workflow structure used by the editor.
+     * Includes Action, Delay, and Branch nodes.
+     * When present, takes precedence over `steps` for the UI.
+     */
+    nodes?: WorkflowNode[];
     isActive: boolean;
     enrolledCount: number;
     completedCount: number;
@@ -1118,3 +1125,82 @@ export interface SmsWorkflowEnrollment {
     enrolledAt: number;
     lastStepSentAt?: number | null;
 }
+
+// ─── New Node-Based Workflow Model ────────────────────────────────────────────
+
+/**
+ * Condition types available in a branch node.
+ * The scheduler currently executes the 'then' path by default;
+ * full runtime evaluation is a future enhancement.
+ */
+export type WorkflowBranchConditionType = 'replied' | 'email_opened' | 'tag_applied' | 'custom';
+
+/**
+ * An *action* node — sends a message to the contact (or staff).
+ * Equivalent to the legacy SmsWorkflowStep but without timing fields
+ * (timing lives in a separate DelayNode that precedes this node).
+ */
+export interface WorkflowActionNode {
+    nodeType: 'action';
+    id: string;
+    order: number;
+    channelType: WorkflowChannelType;
+    // ── SMS / MMS ──────────────────────────────────────────────────────────
+    message: string;
+    mediaUrls?: string[];
+    // ── Email ──────────────────────────────────────────────────────────────
+    emailSubject?: string;
+    emailBody?: string;
+    // ── Staff Reminder ─────────────────────────────────────────────────────
+    staffTargetType?: 'individuals' | 'list' | 'group';
+    staffRecipients?: { name: string; phone?: string; email?: string }[];
+    staffListId?: string | null;
+    staffListName?: string | null;
+    staffGroupId?: string | null;
+    staffGroupName?: string | null;
+}
+
+/**
+ * A *delay* node — a pure wait period; no message is sent.
+ * Sits in the timeline between action nodes to control timing.
+ */
+export interface WorkflowDelayNode {
+    nodeType: 'delay';
+    id: string;
+    order: number;
+    /** Days to wait in 'relative' mode. */
+    delayDays: number;
+    scheduleType?: 'relative' | 'day_of_week' | 'day_of_month';
+    /** 0 = Sunday … 6 = Saturday. Used when scheduleType = 'day_of_week'. */
+    scheduleDayOfWeek?: number;
+    /** 1–31. Used when scheduleType = 'day_of_month'. */
+    scheduleDayOfMonth?: number;
+    /** 'HH:MM' 24-hour send time for day_of_week / day_of_month modes. */
+    scheduleTime?: string;
+}
+
+/**
+ * A *branch* node — evaluates a condition and routes the enrollment
+ * to either the `thenNodes` (condition true) or `elseNodes` (condition false) path.
+ * Single-level only; no nested branches.
+ */
+export interface WorkflowBranchNode {
+    nodeType: 'branch';
+    id: string;
+    order: number;
+    /** Short label shown in the timeline, e.g. "Did they reply?" */
+    conditionLabel?: string;
+    conditionType: WorkflowBranchConditionType;
+    /** Tag ID when conditionType = 'tag_applied'. */
+    conditionTagId?: string | null;
+    conditionTagName?: string | null;
+    /** Freeform description when conditionType = 'custom'. */
+    conditionCustom?: string;
+    /** Action nodes executed when the condition is TRUE. */
+    thenNodes: WorkflowActionNode[];
+    /** Action nodes executed when the condition is FALSE. */
+    elseNodes: WorkflowActionNode[];
+}
+
+/** Discriminated union of all workflow node types. */
+export type WorkflowNode = WorkflowActionNode | WorkflowDelayNode | WorkflowBranchNode;

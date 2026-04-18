@@ -8,7 +8,7 @@ import {
     Timestamp, collectionGroup, arrayUnion, arrayRemove
 } from 'firebase/firestore';
 import { pcoService } from '../services/pcoService';
-import { SmsCampaign, SmsConversation, SmsMessage, SmsKeyword, SmsOptOut, SmsWorkflow, SmsWorkflowStep, SmsWorkflowEnrollment, SmsTag, Church, User, WorkflowChannelType } from '../types';
+import { SmsCampaign, SmsConversation, SmsMessage, SmsKeyword, SmsOptOut, SmsWorkflow, SmsWorkflowStep, SmsWorkflowEnrollment, SmsTag, Church, User, WorkflowChannelType, WorkflowNode, WorkflowActionNode, WorkflowDelayNode, WorkflowBranchNode, WorkflowBranchConditionType } from '../types';
 import {
     MessageSquare, Send, Clock, Users, Plus, ArrowLeft, Trash2,
     Eye, Pencil, ChevronDown, CheckCircle, Circle, Loader2, X,
@@ -16,17 +16,17 @@ import {
     Inbox, BarChart3, Copy, Zap, MessageCircle, TrendingUp, TrendingDown,
     Activity, DollarSign, UserX, Edit3, UserCheck, List, Layers,
     Smile, Image as ImageIcon, Link, Sparkles, ChevronRight, RotateCcw,
-    Mail, Tag, Filter, Hash, Upload, ExternalLink
+    Mail, Tag, Filter, Hash, Upload, ExternalLink, GitBranch, Info
 } from 'lucide-react';
 
-// ─── Constants ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-const API_BASE = ''; // Relative — same origin
+const API_BASE = ''; // Relative â€” same origin
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
     draft:     { label: 'Draft',    color: 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300' },
     scheduled: { label: 'Scheduled',color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' },
-    sending:   { label: 'Sending…', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
+    sending:   { label: 'Sendingâ€¦', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
     sent:      { label: 'Sent',     color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' },
     failed:    { label: 'Failed',   color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
 };
@@ -46,11 +46,11 @@ const ALL_MERGE_TAGS: { tag: string; label: string }[] = [
 ];
 
 const COMMON_EMOJIS = [
-    '😊','🙏','❤️','✝️','🎉','👋','📖','⭐','🔥','💫',
-    '🌟','🕊️','🏠','📅','📣','💬','🎵','🤝','💜','🌈',
+    'ðŸ˜Š','ðŸ™','â¤ï¸','âœï¸','ðŸŽ‰','ðŸ‘‹','ðŸ“–','â­','ðŸ”¥','ðŸ’«',
+    'ðŸŒŸ','ðŸ•Šï¸','ðŸ ','ðŸ“…','ðŸ“£','ðŸ’¬','ðŸŽµ','ðŸ¤','ðŸ’œ','ðŸŒˆ',
 ];
 
-// ─── Tag colour map ───────────────────────────────────────────────────────────
+// â”€â”€â”€ Tag colour map â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const TAG_COLOR_MAP: Record<SmsTag['color'], { bg: string; text: string; border: string; dot: string }> = {
     violet:  { bg: 'bg-violet-100 dark:bg-violet-900/40',  text: 'text-violet-700 dark:text-violet-300',  border: 'border-violet-300 dark:border-violet-700',  dot: 'bg-violet-500' },
@@ -82,7 +82,7 @@ const SmsTagChip: React.FC<{ tag: SmsTag; onRemove?: () => void; size?: 'sm' | '
     );
 };
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 
 function countSegments(body: string): number {
@@ -99,7 +99,7 @@ async function getSmsAiSuggestion(messageBody: string): Promise<string> {
         body: JSON.stringify({
             model: 'gemini-2.5-flash',
             prompt: `You are an SMS copywriting expert for a church. 
-Rewrite the following SMS message to be shorter (ideally under 160 characters — 1 SMS segment) while keeping the full meaning, warmth, and any merge tags like {firstName}, {email}, {phone}, {city}, {state}, {birthday}, {anniversary} exactly as-is.
+Rewrite the following SMS message to be shorter (ideally under 160 characters â€” 1 SMS segment) while keeping the full meaning, warmth, and any merge tags like {firstName}, {email}, {phone}, {city}, {state}, {birthday}, {anniversary} exactly as-is.
 Return ONLY the rewritten message text, no explanation or quotes.
 
 Original message:
@@ -146,7 +146,7 @@ You must respond with ONLY a valid JSON object (no markdown, no explanation) mat
 Guidelines:
 - Use warm, pastoral, encouraging language appropriate for a church audience.
 - For SMS steps, keep "message" under 160 characters when possible (1 segment).
-- Include real content (actual Bible verses, actual prayer encouragements, etc.) — do NOT use placeholders like "[verse here]".
+- Include real content (actual Bible verses, actual prayer encouragements, etc.) â€” do NOT use placeholders like "[verse here]".
 - Use {firstName} to personalise messages where natural.
 - delayDays for the first step is always 0. For subsequent steps, use the delay the user specified or infer a sensible one (e.g. 1 day between daily texts).
 - If the user asks for emails, set channelType to "email" and provide both emailSubject and emailBody.
@@ -177,10 +177,10 @@ ${prompt}`;
 function formatPhone(phone: string): string {
     const digits = phone.replace(/\D/g, '');
     if (digits.length === 11 && digits.startsWith('1')) {
-        return `(${digits.slice(1, 4)}) ${digits.slice(4, 7)}–${digits.slice(7)}`;
+        return `(${digits.slice(1, 4)}) ${digits.slice(4, 7)}â€“${digits.slice(7)}`;
     }
     if (digits.length === 10) {
-        return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}–${digits.slice(6)}`;
+        return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}â€“${digits.slice(6)}`;
     }
     return phone;
 }
@@ -196,7 +196,7 @@ function timeAgo(ts: number): string {
     return `${days}d ago`;
 }
 
-// ─── Sub-components ──────────────────────────────────────────────────────────
+// â”€â”€â”€ Sub-components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const Toast: React.FC<{ msg: string; type: 'success' | 'error'; onClose: () => void }> = ({ msg, type, onClose }) => (
     <div className={`fixed top-5 left-1/2 -translate-x-1/2 z-[200] flex items-center gap-3 px-5 py-3 rounded-2xl shadow-2xl text-sm font-semibold text-white transition-all ${type === 'success' ? 'bg-emerald-600' : 'bg-red-600'}`}>
@@ -205,7 +205,7 @@ const Toast: React.FC<{ msg: string; type: 'success' | 'error'; onClose: () => v
     </div>
 );
 
-// ─── Schedule Modal ──────────────────────────────────────────────────────────
+// â”€â”€â”€ Schedule Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const ScheduleModal: React.FC<{
     onConfirm: (scheduledAt: number, recurringFrequency?: 'daily' | 'weekly' | 'monthly') => void;
@@ -262,7 +262,7 @@ const ScheduleModal: React.FC<{
                 <div className="flex gap-2">
                     <button onClick={onCancel} className="flex-1 py-2.5 text-sm text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition font-semibold">Cancel</button>
                     <button onClick={handleConfirm} disabled={isBusy} className="flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-semibold bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-xl transition">
-                        {isBusy ? <><Loader2 size={13} className="animate-spin" />Scheduling…</> : <><Calendar size={13} />Schedule</>}
+                        {isBusy ? <><Loader2 size={13} className="animate-spin" />Schedulingâ€¦</> : <><Calendar size={13} />Schedule</>}
                     </button>
                 </div>
             </div>
@@ -270,7 +270,7 @@ const ScheduleModal: React.FC<{
     );
 };
 
-// ─── Campaign Composer ────────────────────────────────────────────────────────
+// â”€â”€â”€ Campaign Composer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface ComposerProps {
     campaign: SmsCampaign;
@@ -407,12 +407,12 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                         disabled={!canSend || isSending}
                         className={`flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-xl transition ${canSend && !isSending ? 'bg-violet-600 hover:bg-violet-700 text-white shadow-md shadow-violet-200 dark:shadow-violet-900/40' : 'bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed'}`}
                     >
-                        {isSending ? <><Loader2 size={14} className="animate-spin" />Sending…</> : <><Send size={14} />Send Now</>}
+                        {isSending ? <><Loader2 size={14} className="animate-spin" />Sendingâ€¦</> : <><Send size={14} />Send Now</>}
                     </button>
                 </div>
             </div>
 
-            {/* Body — side by side on large screens */}
+            {/* Body â€” side by side on large screens */}
             <div className="flex flex-1 overflow-hidden">
                 {/* Left: Config column */}
                 <div className="w-[420px] shrink-0 overflow-y-auto border-r border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 p-5 space-y-4">
@@ -449,7 +449,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                             <>
                                 <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">Recipients missing a phone number will be skipped and logged.</p>
                                 {loadingLists ? (
-                                    <div className="flex items-center gap-2 text-sm text-slate-400"><Loader2 size={13} className="animate-spin" /> Loading lists…</div>
+                                    <div className="flex items-center gap-2 text-sm text-slate-400"><Loader2 size={13} className="animate-spin" /> Loading listsâ€¦</div>
                                 ) : (
                                     <select
                                         title="Select a PCO list"
@@ -460,7 +460,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                             update({ toListId: sel?.id ?? null, toListName: sel?.name, toGroupId: null, toGroupName: undefined });
                                         }}
                                     >
-                                        <option value="">— Select a PCO List —</option>
+                                        <option value="">â€” Select a PCO List â€”</option>
                                         {pcoLists.map(l => <option key={l.id} value={l.id}>{l.name} ({l.total_people})</option>)}
                                     </select>
                                 )}
@@ -470,7 +470,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                         {toTab === 'groups' && (
                             <>
                                 {loadingGroups ? (
-                                    <div className="flex items-center gap-2 text-sm text-slate-400"><Loader2 size={13} className="animate-spin" /> Loading groups…</div>
+                                    <div className="flex items-center gap-2 text-sm text-slate-400"><Loader2 size={13} className="animate-spin" /> Loading groupsâ€¦</div>
                                 ) : (
                                     <select
                                         title="Select a PCO group"
@@ -481,7 +481,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                             update({ toGroupId: sel?.id ?? null, toGroupName: sel?.name, toListId: null, toListName: undefined });
                                         }}
                                     >
-                                        <option value="">— Select a PCO Group —</option>
+                                        <option value="">â€” Select a PCO Group â€”</option>
                                         {pcoGroups.map(g => <option key={g.id} value={g.id}>{g.name}{g.memberCount > 0 ? ` (${g.memberCount})` : ''}</option>)}
                                     </select>
                                 )}
@@ -501,10 +501,10 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Send Results</p>
                             <div className="grid grid-cols-2 gap-3">
                                 {[
-                                    { label: 'Sent', value: local.deliveredCount ?? '—', color: 'text-emerald-600' },
-                                    { label: 'Failed', value: local.failedCount ?? '—', color: 'text-red-500' },
-                                    { label: 'Opt-Outs', value: local.optOutCount ?? '—', color: 'text-amber-600' },
-                                    { label: 'Total', value: local.recipientCount ?? '—', color: 'text-slate-700 dark:text-slate-300' },
+                                    { label: 'Sent', value: local.deliveredCount ?? 'â€”', color: 'text-emerald-600' },
+                                    { label: 'Failed', value: local.failedCount ?? 'â€”', color: 'text-red-500' },
+                                    { label: 'Opt-Outs', value: local.optOutCount ?? 'â€”', color: 'text-amber-600' },
+                                    { label: 'Total', value: local.recipientCount ?? 'â€”', color: 'text-slate-700 dark:text-slate-300' },
                                 ].map(s => (
                                     <div key={s.label} className="text-center p-2 bg-slate-50 dark:bg-slate-900/50 rounded-xl">
                                         <p className={`text-xl font-black ${s.color}`}>{s.value}</p>
@@ -525,7 +525,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                             <div className="flex items-center justify-between mb-2">
                                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Message</label>
                                 <span className={`text-xs font-bold ${segments > 3 ? 'text-red-500' : segments > 1 ? 'text-amber-600' : 'text-slate-400'}`}>
-                                    {local.body?.length ?? 0} chars · {segments} segment{segments !== 1 ? 's' : ''}
+                                    {local.body?.length ?? 0} chars Â· {segments} segment{segments !== 1 ? 's' : ''}
                                 </span>
                             </div>
                             <textarea
@@ -533,7 +533,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                 rows={8}
                                 value={local.body || ''}
                                 onChange={e => update({ body: e.target.value })}
-                                placeholder="Type your message here…"
+                                placeholder="Type your message hereâ€¦"
                                 className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none font-medium leading-relaxed"
                             />
                             {/* Composer toolbar */}
@@ -594,7 +594,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                     type="button"
                                     title="Attach image (MMS)"
                                     onClick={() => {
-                                        const url = window.prompt('Enter image URL (MMS — may incur additional carrier fees):');
+                                        const url = window.prompt('Enter image URL (MMS â€” may incur additional carrier fees):');
                                         if (url) { setImageUrl(url); update({ mediaUrls: [url] }); }
                                     }}
                                     className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition ${
@@ -602,7 +602,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                         : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700'
                                     }`}
                                 >
-                                    <ImageIcon size={13} /> {imageUrl ? 'Image ✓' : 'Image'}
+                                    <ImageIcon size={13} /> {imageUrl ? 'Image âœ“' : 'Image'}
                                 </button>
                                 {imageUrl && (
                                     <button
@@ -618,7 +618,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                 {/* AI Helper */}
                                 <button
                                     type="button"
-                                    title="AI SMS helper — suggest shorter message"
+                                    title="AI SMS helper â€” suggest shorter message"
                                     onClick={handleAiSuggest}
                                     disabled={!local.body?.trim() || aiLoading}
                                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-700 hover:bg-violet-100 dark:hover:bg-violet-900/40 disabled:opacity-50 transition"
@@ -641,13 +641,13 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                         <button onClick={() => setShowAiPanel(false)} title="Dismiss AI suggestion" className="text-violet-400 hover:text-violet-600"><X size={14} /></button>
                                     </div>
                                     {aiLoading ? (
-                                        <div className="flex items-center gap-2 text-sm text-violet-500"><Loader2 size={14} className="animate-spin" /> Analyzing your message…</div>
+                                        <div className="flex items-center gap-2 text-sm text-violet-500"><Loader2 size={14} className="animate-spin" /> Analyzing your messageâ€¦</div>
                                     ) : (
                                         <>
                                             <p className="text-sm text-violet-800 dark:text-violet-200 leading-relaxed whitespace-pre-wrap mb-3">{aiSuggestion}</p>
                                             <div className="flex items-center gap-2">
                                                 <span className={`text-xs font-bold ${ countSegments(aiSuggestion) > 1 ? 'text-amber-600' : 'text-emerald-600' }`}>
-                                                    {aiSuggestion.length} chars · {countSegments(aiSuggestion)} seg
+                                                    {aiSuggestion.length} chars Â· {countSegments(aiSuggestion)} seg
                                                 </span>
                                                 <div className="flex-1" />
                                                 <button
@@ -707,7 +707,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                         .replace('{phone}', '(615) 555-0100').replace('{city}', 'Nashville')
                                         .replace('{state}', 'TN').replace('{birthday}', 'Jan 15')
                                         .replace('{anniversary}', 'Jun 10')
-                                    || <span className="opacity-50 italic">Your message will appear here…</span>}
+                                    || <span className="opacity-50 italic">Your message will appear hereâ€¦</span>}
                                 </div>
                             </div>
                         </div>
@@ -733,7 +733,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
     );
 };
 
-// ─── Campaign List ────────────────────────────────────────────────────────────
+// â”€â”€â”€ Campaign List â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const CampaignList: React.FC<{
     campaigns: SmsCampaign[];
@@ -782,7 +782,7 @@ const CampaignList: React.FC<{
 
             {/* List */}
             {isLoading ? (
-                <div className="flex items-center justify-center h-40 text-slate-400"><Loader2 size={22} className="animate-spin mr-2" /> Loading campaigns…</div>
+                <div className="flex items-center justify-center h-40 text-slate-400"><Loader2 size={22} className="animate-spin mr-2" /> Loading campaignsâ€¦</div>
             ) : filtered.length === 0 ? (
                 <div className="text-center py-20 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
                     <MessageSquare size={40} className="mx-auto text-slate-300 dark:text-slate-600 mb-3" />
@@ -809,20 +809,20 @@ const CampaignList: React.FC<{
                                 <div className="flex-grow min-w-0">
                                     <div className="font-bold text-slate-900 dark:text-white truncate">{c.name}</div>
                                     <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 flex flex-wrap gap-x-2">
-                                        {c.toListName && <span>· List: {c.toListName}</span>}
-                                        {c.toGroupName && <span>· Group: {c.toGroupName}</span>}
+                                        {c.toListName && <span>Â· List: {c.toListName}</span>}
+                                        {c.toGroupName && <span>Â· Group: {c.toGroupName}</span>}
                                         {c.status === 'sent' && c.sentAt && (
                                             <span className="text-emerald-600 dark:text-emerald-400">
-                                                · Sent {new Date(c.sentAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · {c.deliveredCount ?? 0} delivered
+                                                Â· Sent {new Date(c.sentAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} Â· {c.deliveredCount ?? 0} delivered
                                             </span>
                                         )}
                                         {c.status === 'scheduled' && c.scheduledAt && (
                                             <span className="text-amber-600 dark:text-amber-400">
-                                                {c.recurringFrequency ? `· Repeats ${c.recurringFrequency}. Next: ` : '· Scheduled: '}
+                                                {c.recurringFrequency ? `Â· Repeats ${c.recurringFrequency}. Next: ` : 'Â· Scheduled: '}
                                                 {new Date(c.scheduledAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                                             </span>
                                         )}
-                                        {c.status === 'failed' && c.lastError && <span className="text-red-500">· Failed</span>}
+                                        {c.status === 'failed' && c.lastError && <span className="text-red-500">Â· Failed</span>}
                                     </div>
                                 </div>
                                 <span className={`text-xs font-bold px-2.5 py-1 rounded-full shrink-0 ${si.color}`}>{si.label}</span>
@@ -839,7 +839,7 @@ const CampaignList: React.FC<{
     );
 };
 
-// ─── New Message Composer ────────────────────────────────────────────────────
+// â”€â”€â”€ New Message Composer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 type RecipientMode = 'individual' | 'list' | 'group';
 
@@ -855,7 +855,7 @@ const NewMessageComposer: React.FC<{
     const [error, setError]           = useState('');
     const [sentCount, setSentCount]   = useState<number | null>(null);
 
-    // Individual — PCO person search
+    // Individual â€” PCO person search
     const [personSearch, setPersonSearch]     = useState('');
     const [personResults, setPersonResults]   = useState<{ id: string; name: string; phone?: string; avatar?: string | null; membership?: string | null }[]>([]);
     const [personLoading, setPersonLoading]   = useState(false);
@@ -974,8 +974,8 @@ const NewMessageComposer: React.FC<{
             );
         } else {
             // Case-insensitive name search: try both original-case and lowercase prefix
-            // Most Firestore caches store `name` as 'First Last' — try both capitalisation variants
-            const qCap = q.charAt(0).toUpperCase() + q.slice(1).toLowerCase(); // 'jo' → 'Jo'
+            // Most Firestore caches store `name` as 'First Last' â€” try both capitalisation variants
+            const qCap = q.charAt(0).toUpperCase() + q.slice(1).toLowerCase(); // 'jo' â†’ 'Jo'
             queries.push(
                 // Original prefix (catches exact or Title-Case typing)
                 getDocs(query(col, where('churchId', '==', churchId), where('name', '>=', q),    where('name', '<=', q + '\uffff'),    limit(25))),
@@ -1052,13 +1052,13 @@ const NewMessageComposer: React.FC<{
         (mode === 'group' && !!selectedGroup)
     );
 
-    /** Safe JSON parser — reads raw text first so non-JSON bodies never throw a parse error. */
+    /** Safe JSON parser â€” reads raw text first so non-JSON bodies never throw a parse error. */
     const safeJson = async (res: Response): Promise<any> => {
         const text = await res.text();
         try {
             return JSON.parse(text);
         } catch {
-            // Server returned HTML (e.g. a 404 or 500 error page) — surface the HTTP status
+            // Server returned HTML (e.g. a 404 or 500 error page) â€” surface the HTTP status
             throw new Error(`Server error ${res.status}: ${text.slice(0, 120) || res.statusText}`);
         }
     };
@@ -1194,7 +1194,7 @@ const NewMessageComposer: React.FC<{
                         </div>
                     </div>
 
-                    {/* Individual — PCO person search */}
+                    {/* Individual â€” PCO person search */}
                     {mode === 'individual' && (
                         <div className="space-y-3">
                             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">Recipient</label>
@@ -1247,7 +1247,7 @@ const NewMessageComposer: React.FC<{
                                     <button
                                         onClick={() => { setManualEntry(false); setPhone(''); setRecipientName(''); }}
                                         className="text-xs text-violet-500 hover:text-violet-700 font-semibold"
-                                    >← Search PCO people instead</button>
+                                    >â† Search PCO people instead</button>
                                 </div>
                             ) : (
                                 /* Search box */
@@ -1259,7 +1259,7 @@ const NewMessageComposer: React.FC<{
                                             type="text"
                                             value={personSearch}
                                             onChange={e => setPersonSearch(e.target.value)}
-                                            placeholder="Search by name or phone number…"
+                                            placeholder="Search by name or phone numberâ€¦"
                                             autoFocus
                                             className="w-full pl-8 pr-8 text-sm border-2 border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500"
                                         />
@@ -1291,7 +1291,7 @@ const NewMessageComposer: React.FC<{
                                                         <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">{p.name}</p>
                                                         <p className="text-xs text-slate-400 truncate">
                                                             {p.phone ? formatPhone(p.phone) : <span className="text-amber-500 text-[10px]">No phone number</span>}
-                                                            {p.membership && <span className="ml-2 text-[10px] text-slate-400">· {p.membership}</span>}
+                                                            {p.membership && <span className="ml-2 text-[10px] text-slate-400">Â· {p.membership}</span>}
                                                         </p>
                                                     </div>
                                                     {p.phone && <ChevronRight size={14} className="text-violet-400 shrink-0" />}
@@ -1333,7 +1333,7 @@ const NewMessageComposer: React.FC<{
                                         <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                                         <input
                                             type="text"
-                                            placeholder="Search lists…"
+                                            placeholder="Search listsâ€¦"
                                             value={listSearch}
                                             onChange={e => setListSearch(e.target.value)}
                                             className="w-full pl-8 pr-3 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
@@ -1374,7 +1374,7 @@ const NewMessageComposer: React.FC<{
                                         <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                                         <input
                                             type="text"
-                                            placeholder="Search groups…"
+                                            placeholder="Search groupsâ€¦"
                                             value={groupSearch}
                                             onChange={e => setGroupSearch(e.target.value)}
                                             className="w-full pl-8 pr-3 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
@@ -1404,7 +1404,7 @@ const NewMessageComposer: React.FC<{
                             <span className={`text-[10px] font-semibold ${
                                 charLeft < 0 ? 'text-red-500' : charLeft < 50 ? 'text-amber-500' : 'text-slate-400'
                             }`}>
-                                {body.length}/{MAX_CHARS} · {segCount} segment{segCount !== 1 ? 's' : ''}
+                                {body.length}/{MAX_CHARS} Â· {segCount} segment{segCount !== 1 ? 's' : ''}
                             </span>
                         </div>
                         <textarea
@@ -1414,8 +1414,8 @@ const NewMessageComposer: React.FC<{
                             onChange={e => setBody(e.target.value)}
                             maxLength={MAX_CHARS}
                             placeholder={mode === 'individual'
-                                ? 'Type your message…'
-                                : 'Type your message… Use merge tags to personalize.'}
+                                ? 'Type your messageâ€¦'
+                                : 'Type your messageâ€¦ Use merge tags to personalize.'}
                             className="w-full text-sm border-2 border-slate-200 dark:border-slate-600 rounded-xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500 resize-none"
                         />
                         {/* Composer toolbar */}
@@ -1485,7 +1485,7 @@ const NewMessageComposer: React.FC<{
                                             <div onClick={() => fileInputRefNM.current?.click()} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleImageFileUpload(f); }} className="flex flex-col items-center justify-center gap-2 py-8 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl cursor-pointer hover:border-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/10 transition">
                                                 <Upload size={24} className="text-slate-400" />
                                                 <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">Click or drag &amp; drop</p>
-                                                <p className="text-[10px] text-slate-400">JPG, PNG, GIF, WebP — max 5 MB</p>
+                                                <p className="text-[10px] text-slate-400">JPG, PNG, GIF, WebP â€” max 5 MB</p>
                                             </div>
                                             {imageUploadProgress !== null && (<div className="space-y-1"><div className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden" title={`Uploading: ${imageUploadProgress}%`} aria-label={`Upload progress: ${imageUploadProgress}%`}><div className="h-full bg-violet-500 rounded-full transition-all" style={{ width: `${imageUploadProgress}%` }} /></div><p className="text-[10px] text-slate-400 text-right">{imageUploadProgress}%</p></div>)}
                                             {imageUploadError && <p className="text-xs text-red-500">{imageUploadError}</p>}
@@ -1510,13 +1510,13 @@ const NewMessageComposer: React.FC<{
                                     <button onClick={() => setShowAiPanelNM(false)} title="Dismiss" className="text-violet-400 hover:text-violet-600"><X size={13} /></button>
                                 </div>
                                 {aiLoadingNM ? (
-                                    <div className="flex items-center gap-2 text-sm text-violet-500"><Loader2 size={13} className="animate-spin" /> Analyzing…</div>
+                                    <div className="flex items-center gap-2 text-sm text-violet-500"><Loader2 size={13} className="animate-spin" /> Analyzingâ€¦</div>
                                 ) : (
                                     <>
                                         <p className="text-sm text-violet-800 dark:text-violet-200 leading-relaxed whitespace-pre-wrap mb-2">{aiSuggestionNM}</p>
                                         <div className="flex items-center gap-2">
                                             <span className={`text-xs font-bold ${ countSegments(aiSuggestionNM) > 1 ? 'text-amber-600' : 'text-emerald-600' }`}>
-                                                {aiSuggestionNM.length} chars · {countSegments(aiSuggestionNM)} seg
+                                                {aiSuggestionNM.length} chars Â· {countSegments(aiSuggestionNM)} seg
                                             </span>
                                             <div className="flex-1" />
                                             <button onClick={() => { setBody(aiSuggestionNM); setShowAiPanelNM(false); }}
@@ -1564,7 +1564,7 @@ const NewMessageComposer: React.FC<{
                         className="flex-[2] py-3 text-sm font-black bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-2xl transition flex items-center justify-center gap-2"
                     >
                         {sending
-                            ? <><Loader2 size={16} className="animate-spin" /> Sending…</>
+                            ? <><Loader2 size={16} className="animate-spin" /> Sendingâ€¦</>
                             : mode === 'individual'
                                 ? <><Send size={15} /> Send Message</>
                                 : <><Send size={15} /> Send to {mode === 'list' ? selectedList?.name : selectedGroup?.name}</>}
@@ -1575,7 +1575,7 @@ const NewMessageComposer: React.FC<{
     );
 };
 
-// ─── Inbox ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Inbox â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const SmsInbox: React.FC<{
     churchId: string;
@@ -1735,7 +1735,7 @@ const SmsInbox: React.FC<{
                         <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                         <input
                             type="text"
-                            placeholder="Search…"
+                            placeholder="Searchâ€¦"
                             value={search}
                             onChange={e => setSearch(e.target.value)}
                             className="w-full pl-8 pr-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
@@ -1819,7 +1819,7 @@ const SmsInbox: React.FC<{
                                             {conv.personName && <p className={`text-[10px] ${ isUnread ? 'text-slate-500' : 'text-slate-400' }`}>{formatPhone(conv.phoneNumber)}</p>}
                                             <p className={`text-xs truncate mt-0.5 ${
                                                 isUnread ? 'text-slate-600 dark:text-slate-300 font-medium' : 'text-slate-400 dark:text-slate-500'
-                                            }`}>{conv.lastMessageBody || '…'}</p>
+                                            }`}>{conv.lastMessageBody || 'â€¦'}</p>
                                             {/* Tag chips */}
                                             {convTags.length > 0 && (
                                                 <div className="flex flex-wrap gap-1 mt-1">
@@ -1954,15 +1954,15 @@ const SmsInbox: React.FC<{
                                         )}
                                         <div className={`text-[10px] mt-1 flex items-center gap-1 flex-wrap ${msg.direction === 'outbound' ? 'text-violet-200' : 'text-slate-400'}`}>
                                             {new Date(msg.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
-                                            {msg.direction === 'outbound' && msg.sentByName && ` · ${msg.sentByName}`}
+                                            {msg.direction === 'outbound' && msg.sentByName && ` Â· ${msg.sentByName}`}
                                             {msg.direction === 'outbound' && msg.status && (() => {
                                                 const s = msg.status;
-                                                if (s === 'delivered')    return <span className="text-emerald-300 font-semibold" title="Delivered">✓✓ delivered</span>;
-                                                if (s === 'sent')         return <span className="text-violet-300" title="Accepted by carrier">✓ sent</span>;
-                                                if (s === 'queued')       return <span className="text-violet-300/70" title="Queued by Twilio">· queued</span>;
-                                                if (s === 'failed')       return <span className="text-red-400 font-bold" title="Failed — not delivered">⚠ failed</span>;
-                                                if (s === 'undelivered')  return <span className="text-red-400 font-bold" title="Undelivered — carrier rejected">⚠ undelivered</span>;
-                                                return <span className="opacity-60">· {s}</span>;
+                                                if (s === 'delivered')    return <span className="text-emerald-300 font-semibold" title="Delivered">âœ“âœ“ delivered</span>;
+                                                if (s === 'sent')         return <span className="text-violet-300" title="Accepted by carrier">âœ“ sent</span>;
+                                                if (s === 'queued')       return <span className="text-violet-300/70" title="Queued by Twilio">Â· queued</span>;
+                                                if (s === 'failed')       return <span className="text-red-400 font-bold" title="Failed â€” not delivered">âš  failed</span>;
+                                                if (s === 'undelivered')  return <span className="text-red-400 font-bold" title="Undelivered â€” carrier rejected">âš  undelivered</span>;
+                                                return <span className="opacity-60">Â· {s}</span>;
                                             })()}
                                         </div>
                                     </div>
@@ -1983,7 +1983,7 @@ const SmsInbox: React.FC<{
                                     rows={2}
                                     value={replyBody}
                                     onChange={e => setReplyBody(e.target.value)}
-                                    placeholder="Type a reply…"
+                                    placeholder="Type a replyâ€¦"
                                     onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendReply(); }}}
                                     className="flex-1 text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
                                 />
@@ -2008,7 +2008,7 @@ const SmsInbox: React.FC<{
     );
 };
 
-// ─── SMS Keywords Manager ────────────────────────────────────────────────────
+// â”€â”€â”€ SMS Keywords Manager â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface KeywordModalProps {
     initial?: SmsKeyword | null;
@@ -2079,14 +2079,14 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingL
                     <div className="flex items-center justify-between mb-2">
                         <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Auto-Reply Message</label>
                         <span className={`text-xs font-bold ${segs > 3 ? 'text-red-500' : segs > 1 ? 'text-amber-600' : 'text-slate-400'}`}>
-                            {replyMessage.length} chars · {segs} seg{segs !== 1 ? 's' : ''}
+                            {replyMessage.length} chars Â· {segs} seg{segs !== 1 ? 's' : ''}
                         </span>
                     </div>
                     <textarea
                         rows={4}
                         value={replyMessage}
                         onChange={e => setReplyMessage(e.target.value)}
-                        placeholder={`Thanks for texting ${keyword || 'YOUTH'}! Here's what you need to know…`}
+                        placeholder={`Thanks for texting ${keyword || 'YOUTH'}! Here's what you need to knowâ€¦`}
                         className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
                     />
 
@@ -2105,7 +2105,7 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingL
                     <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Add to PCO List (optional)</label>
                     <p className="text-[10px] text-slate-400 mb-2">When a match occurs, automatically add the sender to this Planning Center list.</p>
                     {loadingLists ? (
-                        <div className="flex items-center gap-2 text-sm text-slate-400"><Loader2 size={13} className="animate-spin" /> Loading…</div>
+                        <div className="flex items-center gap-2 text-sm text-slate-400"><Loader2 size={13} className="animate-spin" /> Loadingâ€¦</div>
                     ) : (
                         <select
                             value={addToListId}
@@ -2113,7 +2113,7 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingL
                             title="Add to PCO list"
                             className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
                         >
-                            <option value="">— Don't add to a list —</option>
+                            <option value="">â€” Don't add to a list â€”</option>
                             {pcoLists.map(l => <option key={l.id} value={l.id}>{l.name} ({l.total_people})</option>)}
                         </select>
                     )}
@@ -2181,7 +2181,7 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingL
                         disabled={isBusy}
                         className="flex-1 py-2.5 text-sm font-black bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-xl transition flex items-center justify-center gap-2"
                     >
-                        {isBusy ? <><Loader2 size={14} className="animate-spin" />Saving…</> : <><CheckCircle size={14} />{isEdit ? 'Save Changes' : 'Create Keyword'}</>}
+                        {isBusy ? <><Loader2 size={14} className="animate-spin" />Savingâ€¦</> : <><CheckCircle size={14} />{isEdit ? 'Save Changes' : 'Create Keyword'}</>}
                     </button>
                 </div>
             </div>
@@ -2308,7 +2308,7 @@ const SmsKeywordsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
             console.error('[SmsKeywords] Save error:', e);
             setSaveError(
                 e?.code === 'permission-denied'
-                    ? 'Permission denied — check your Firestore security rules for the smsKeywords collection.'
+                    ? 'Permission denied â€” check your Firestore security rules for the smsKeywords collection.'
                     : 'Failed to save keyword: ' + (e?.message || String(e))
             );
         } finally {
@@ -2357,7 +2357,7 @@ const SmsKeywordsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
             setEditTag(null);
         } catch (e: any) {
             const msg = e?.code === 'permission-denied'
-                ? 'Permission denied — check your Firestore security rules for the smsTags collection.'
+                ? 'Permission denied â€” check your Firestore security rules for the smsTags collection.'
                 : 'Failed to save tag: ' + (e?.message || String(e));
             alert(msg);
         } finally {
@@ -2399,12 +2399,12 @@ const SmsKeywordsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
                 )}
             </div>
 
-            {/* ─── KEYWORDS section ─────────────────────────────────────────── */}
+            {/* â”€â”€â”€ KEYWORDS section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
             {activeSection === 'keywords' && (
             <>
             {/* How it works banner */}
             <div className="flex items-start gap-4 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-2xl p-4 mb-6">
-                <div className="text-3xl">💡</div>
+                <div className="text-3xl">ðŸ’¡</div>
                 <div>
                     <p className="text-sm font-bold text-violet-800 dark:text-violet-200 mb-1">How Keywords Work</p>
                     <p className="text-xs text-violet-700 dark:text-violet-300 leading-relaxed">
@@ -2421,7 +2421,7 @@ const SmsKeywordsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
                 </div>
             )}
             {isLoading ? (
-                <div className="flex items-center justify-center h-40 text-slate-400"><Loader2 size={20} className="animate-spin mr-2" /> Loading keywords…</div>
+                <div className="flex items-center justify-center h-40 text-slate-400"><Loader2 size={20} className="animate-spin mr-2" /> Loading keywordsâ€¦</div>
             ) : keywords.length === 0 && !listError ? (
                 <div className="text-center py-20 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
                     <Key size={40} className="mx-auto text-slate-300 dark:text-slate-600 mb-3" />
@@ -2451,7 +2451,7 @@ const SmsKeywordsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
                                 <div className="flex items-center flex-wrap gap-x-3 gap-y-1 mt-0.5">
                                     {kw.addToListName && (
                                         <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1">
-                                            <Users size={10} /> → {kw.addToListName}
+                                            <Users size={10} /> â†’ {kw.addToListName}
                                         </span>
                                     )}
                                     {kwTags.map(t => (
@@ -2505,16 +2505,16 @@ const SmsKeywordsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
             </>
             )}
 
-            {/* ─── TAGS section ─────────────────────────────────────────────── */}
+            {/* â”€â”€â”€ TAGS section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
             {activeSection === 'tags' && (
             <>
             <div className="flex items-start gap-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-2xl p-4 mb-6">
-                <div className="text-3xl">🏷️</div>
+                <div className="text-3xl">ðŸ·ï¸</div>
                 <div>
                     <p className="text-sm font-bold text-emerald-800 dark:text-emerald-200 mb-1">Conversation Tags</p>
                     <p className="text-xs text-emerald-700 dark:text-emerald-300 leading-relaxed">
                         Tags let you categorise and filter SMS conversations. Apply them manually from any conversation, or automatically when a keyword is matched. Create tags like{' '}
-                        <span className="font-bold">Prayer Request 🙏</span>,{' '}<span className="font-bold">Service Times 📅</span>, or{' '}<span className="font-bold">Pastoral Care ❤️</span>.
+                        <span className="font-bold">Prayer Request ðŸ™</span>,{' '}<span className="font-bold">Service Times ðŸ“…</span>, or{' '}<span className="font-bold">Pastoral Care â¤ï¸</span>.
                     </p>
                 </div>
             </div>
@@ -2610,7 +2610,7 @@ const SmsKeywordsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
                                 type="text"
                                 value={tagEmoji}
                                 onChange={e => setTagEmoji(e.target.value)}
-                                placeholder="🙏"
+                                placeholder="ðŸ™"
                                 maxLength={4}
                                 className="w-24 text-xl border-2 border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500 text-center"
                             />
@@ -2652,7 +2652,7 @@ const SmsKeywordsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
                                 disabled={tagBusy || !tagName.trim()}
                                 className="flex-1 py-2.5 text-sm font-black bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-xl transition flex items-center justify-center gap-2"
                             >
-                                {tagBusy ? <><Loader2 size={14} className="animate-spin" />Saving…</> : <><CheckCircle size={14} />{editTag ? 'Save' : 'Create Tag'}</>}
+                                {tagBusy ? <><Loader2 size={14} className="animate-spin" />Savingâ€¦</> : <><CheckCircle size={14} />{editTag ? 'Save' : 'Create Tag'}</>}
                             </button>
                         </div>
                     </div>
@@ -2662,7 +2662,7 @@ const SmsKeywordsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
     );
 };
 
-// ─── Analytics Dashboard ──────────────────────────────────────────────────
+// â”€â”€â”€ Analytics Dashboard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface UsageSummary {
     totalSent: number;
@@ -2828,7 +2828,7 @@ const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[] }> = (
     if (isLoading) {
         return (
             <div className="flex items-center justify-center h-64 text-slate-400">
-                <Loader2 size={22} className="animate-spin mr-2" /> Loading analytics…
+                <Loader2 size={22} className="animate-spin mr-2" /> Loading analyticsâ€¦
             </div>
         );
     }
@@ -2915,9 +2915,9 @@ const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[] }> = (
                                         <div className="w-full flex flex-col items-center group relative">
                                             {/* Tooltip */}
                                             <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-800 dark:bg-slate-700 text-white text-[10px] font-bold px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition whitespace-nowrap pointer-events-none z-10">
-                                                {m.sent.toLocaleString()} sent · {m.delivered.toLocaleString()} delivered
+                                                {m.sent.toLocaleString()} sent Â· {m.delivered.toLocaleString()} delivered
                                             </div>
-                                            {/* Bar outer — fixed 120px, dynamic fill via CSS vars */}
+                                            {/* Bar outer â€” fixed 120px, dynamic fill via CSS vars */}
                                             <div
                                                 className="w-full h-[120px] bg-slate-100 dark:bg-slate-700 rounded-xl overflow-hidden"
                                                 role="img"
@@ -3007,9 +3007,9 @@ const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[] }> = (
                                             <div className="min-w-0">
                                                 <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{c.name}</p>
                                                 <p className="text-[10px] text-slate-400 mt-0.5">
-                                                    {c.sentAt ? new Date(c.sentAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
-                                                    {c.toListName ? ` · ${c.toListName}` : ''}
-                                                    {c.toGroupName ? ` · ${c.toGroupName}` : ''}
+                                                    {c.sentAt ? new Date(c.sentAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'â€”'}
+                                                    {c.toListName ? ` Â· ${c.toListName}` : ''}
+                                                    {c.toGroupName ? ` Â· ${c.toGroupName}` : ''}
                                                 </p>
                                             </div>
                                             <div className="flex items-center gap-4 shrink-0 text-right">
@@ -3080,11 +3080,11 @@ const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[] }> = (
                     <p className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4">Quick Stats</p>
                     <div className="space-y-3">
                         {[
-                            { label: 'Avg. recipients per campaign', value: summary && summary.totalBulk > 0 ? Math.round(summary.totalSent / summary.totalBulk).toLocaleString() : '—' },
-                            { label: 'Total 2-way conversations', value: summary?.totalReplies.toLocaleString() ?? '—' },
-                            { label: 'Total opt-outs (all time)', value: summary?.totalOptOuts.toLocaleString() ?? '—' },
-                            { label: 'Campaigns sent', value: summary?.totalBulk.toLocaleString() ?? '—' },
-                            { label: 'Est. cost per delivered msg', value: summary && summary.totalDelivered > 0 ? `$${((summary.estimatedCostUsd / summary.totalDelivered)).toFixed(4)}` : '—' },
+                            { label: 'Avg. recipients per campaign', value: summary && summary.totalBulk > 0 ? Math.round(summary.totalSent / summary.totalBulk).toLocaleString() : 'â€”' },
+                            { label: 'Total 2-way conversations', value: summary?.totalReplies.toLocaleString() ?? 'â€”' },
+                            { label: 'Total opt-outs (all time)', value: summary?.totalOptOuts.toLocaleString() ?? 'â€”' },
+                            { label: 'Campaigns sent', value: summary?.totalBulk.toLocaleString() ?? 'â€”' },
+                            { label: 'Est. cost per delivered msg', value: summary && summary.totalDelivered > 0 ? `$${((summary.estimatedCostUsd / summary.totalDelivered)).toFixed(4)}` : 'â€”' },
                         ].map(row => (
                             <div key={row.label} className="flex items-center justify-between py-1.5 border-b border-slate-100 dark:border-slate-700 last:border-0">
                                 <span className="text-xs text-slate-500 dark:text-slate-400">{row.label}</span>
@@ -3098,7 +3098,7 @@ const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[] }> = (
     );
 };
 
-// ─── Workflows Manager ──────────────────────────────────────────────────
+// â”€â”€â”€ Workflows Manager â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // ---- tiny uuid (no dep) ----
 function uid(): string {
@@ -3114,13 +3114,13 @@ const CHANNEL_CONFIG: Record<WorkflowChannelType, { label: string; icon: React.R
     staff_email:{ label: 'Staff Email',icon: <Mail size={13} />,           color: 'bg-rose-500 text-white hover:bg-rose-600',       badge: 'bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300'         },
 };
 
-// ─── Step Editor Row ─────────────────────────────────────────────────────────
+// â”€â”€â”€ Step Editor Row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-// ─── Staff Step Editor (extracted to avoid hooks-in-IIFE violation) ─────────
+// â”€â”€â”€ Staff Step Editor (extracted to avoid hooks-in-IIFE violation) â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const StaffStepEditor: React.FC<{
-    step: SmsWorkflowStep;
-    onChange: (patch: Partial<SmsWorkflowStep>) => void;
+    step: WorkflowActionNode;
+    onChange: (patch: Partial<WorkflowActionNode>) => void;
     pcoLists: { id: string; name: string }[];
     pcoGroups: { id: string; name: string }[];
 }> = ({ step, onChange, pcoLists, pcoGroups }) => {
@@ -3144,7 +3144,7 @@ const StaffStepEditor: React.FC<{
             {/* Info */}
             <div className={`flex items-start gap-2 text-xs ${isEmail ? 'text-rose-700 dark:text-rose-300' : 'text-amber-700 dark:text-amber-300'}`}>
                 <Users size={13} className='mt-0.5 shrink-0' />
-                <span><strong>Internal step</strong> — notifies <strong>staff</strong> only. Use {'{contact.firstName}'}, {'{contact.phone}'}, {'{contact.email}'} for the enrolled person.</span>
+                <span><strong>Internal step</strong> â€” notifies <strong>staff</strong> only. Use {'{contact.firstName}'}, {'{contact.phone}'}, {'{contact.email}'} for the enrolled person.</span>
             </div>
             {/* Who to notify */}
             <div>
@@ -3172,7 +3172,7 @@ const StaffStepEditor: React.FC<{
                         <input type={isEmail ? 'email' : 'tel'} value={addContact} onChange={e => setAddContact(e.target.value)} onKeyDown={e => e.key === 'Enter' && addRecipient()} placeholder={isEmail ? 'Email' : 'Phone'} className='flex-1 text-xs border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400' />
                         <button type='button' title='Add recipient' onClick={addRecipient} className={`px-3 py-2 rounded-xl text-white text-xs font-bold ${isEmail ? 'bg-rose-500 hover:bg-rose-600' : 'bg-amber-500 hover:bg-amber-600'}`}><Plus size={13} /></button>
                     </div>
-                    {recipients.length === 0 && <p className='text-[10px] text-slate-400 text-center'>No recipients — add at least one.</p>}
+                    {recipients.length === 0 && <p className='text-[10px] text-slate-400 text-center'>No recipients â€” add at least one.</p>}
                 </div>
             )}
             {/* PCO List */}
@@ -3218,9 +3218,9 @@ const StaffStepEditor: React.FC<{
     );
 };
 
-// ─── Step timing helpers ─────────────────────────────────────────────────────
+// â”€â”€â”€ Step timing helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-/** Convert HH:MM (24-hour) → H:MM AM/PM */
+/** Convert HH:MM (24-hour) â†’ H:MM AM/PM */
 function fmt12(hhmm: string): string {
     const [h, m] = hhmm.split(':').map(Number);
     const ampm = h < 12 ? 'AM' : 'PM';
@@ -3231,37 +3231,305 @@ const DOW_LABELS_LONG  = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Fr
 const DOW_LABELS_SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const ORDINAL_SUFFIX   = (n: number) => n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th';
 
-/** Human-readable timing label used in the connector between steps. */
-function stepTimingLabel(step: SmsWorkflowStep): string {
-    const sType = step.scheduleType ?? 'relative';
+/** Human-readable timing label used in the delay connector between nodes. */
+function stepTimingLabel(node: WorkflowDelayNode): string {
+    const sType = node.scheduleType ?? 'relative';
     if (sType === 'day_of_week') {
-        const day  = DOW_LABELS_LONG[step.scheduleDayOfWeek ?? 1];
-        const time = step.scheduleTime ? ` at ${fmt12(step.scheduleTime)}` : '';
+        const day  = DOW_LABELS_LONG[node.scheduleDayOfWeek ?? 1];
+        const time = node.scheduleTime ? ` at ${fmt12(node.scheduleTime)}` : '';
         return `next ${day}${time}`;
     }
     if (sType === 'day_of_month') {
-        const d    = step.scheduleDayOfMonth ?? 1;
-        const time = step.scheduleTime ? ` at ${fmt12(step.scheduleTime)}` : '';
+        const d    = node.scheduleDayOfMonth ?? 1;
+        const time = node.scheduleTime ? ` at ${fmt12(node.scheduleTime)}` : '';
         return `on the ${d}${ORDINAL_SUFFIX(d)}${time}`;
     }
-    return step.delayDays === 0
+    return node.delayDays === 0
         ? 'immediately'
-        : `after ${step.delayDays} day${step.delayDays !== 1 ? 's' : ''}`;
+        : `after ${node.delayDays} day${node.delayDays !== 1 ? 's' : ''}`;
 }
 
-const StepRow: React.FC<{
-    step: SmsWorkflowStep;
+// ─── Delay Node Card ──────────────────────────────────────────────────────────
+
+const DelayNodeCard: React.FC<{
+    node: WorkflowDelayNode;
+    onChange: (patch: Partial<WorkflowDelayNode>) => void;
+    onDelete: () => void;
+}> = ({ node, onChange, onDelete }) => {
+    const schedType = node.scheduleType ?? 'relative';
+    const summary = stepTimingLabel(node);
+    return (
+        <div className="bg-amber-50 dark:bg-amber-950/20 border-2 border-dashed border-amber-300 dark:border-amber-700 rounded-2xl p-4 space-y-3">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <Clock size={14} className="text-amber-500" />
+                    <span className="text-xs font-black uppercase tracking-widest text-amber-600 dark:text-amber-400">Wait</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold">{summary}</span>
+                </div>
+                <button onClick={onDelete} title="Delete delay" className="p-1 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition">
+                    <Trash2 size={13} />
+                </button>
+            </div>
+            {/* Schedule type toggle */}
+            <div className="flex rounded-xl overflow-hidden border border-amber-200 dark:border-amber-700">
+                {([
+                    { id: 'relative',     label: '⏱ Relative'  },
+                    { id: 'day_of_week',  label: '📅 Weekday'   },
+                    { id: 'day_of_month', label: '🗓 Month Day' },
+                ] as const).map(({ id, label }) => (
+                    <button key={id} type="button" onClick={() => onChange({ scheduleType: id })}
+                        className={`flex-1 py-1.5 text-[10px] font-bold transition border-r last:border-r-0 border-amber-200 dark:border-amber-700 ${
+                            schedType === id ? 'bg-amber-500 text-white' : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-amber-50 dark:hover:bg-slate-600'
+                        }`}
+                    >{label}</button>
+                ))}
+            </div>
+            {/* Relative: day picker */}
+            {schedType === 'relative' && (
+                <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Wait</span>
+                    <input
+                        type="number" min={0} max={365}
+                        value={node.delayDays}
+                        onChange={e => onChange({ delayDays: Math.max(0, parseInt(e.target.value) || 0) })}
+                        title="Delay in days"
+                        className="w-16 text-center text-sm font-black border border-amber-200 dark:border-amber-700 rounded-xl px-2 py-1.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    />
+                    <span className="text-xs text-slate-500 dark:text-slate-400">
+                        {node.delayDays === 0 ? 'days (immediate)' : `day${node.delayDays !== 1 ? 's' : ''}`}
+                    </span>
+                </div>
+            )}
+            {/* Day-of-week: day button grid */}
+            {schedType === 'day_of_week' && (
+                <div className="space-y-1.5">
+                    <p className="text-[10px] text-slate-400">Fire on the next occurrence of:</p>
+                    <div className="flex gap-1">
+                        {DOW_LABELS_SHORT.map((d, i) => (
+                            <button key={i} type="button" onClick={() => onChange({ scheduleDayOfWeek: i })} title={DOW_LABELS_LONG[i]}
+                                className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition ${
+                                    (node.scheduleDayOfWeek ?? 1) === i
+                                        ? 'bg-amber-500 text-white shadow-sm'
+                                        : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-amber-100 dark:hover:bg-amber-900/30'
+                                }`}
+                            >{d}</button>
+                        ))}
+                    </div>
+                </div>
+            )}
+            {/* Day-of-month: select */}
+            {schedType === 'day_of_month' && (
+                <div className="space-y-1.5">
+                    <p className="text-[10px] text-slate-400">Fire on the next occurrence of:</p>
+                    <select value={node.scheduleDayOfMonth ?? 1}
+                        onChange={e => onChange({ scheduleDayOfMonth: Number(e.target.value) })}
+                        title="Day of month"
+                        className="w-full text-sm border border-amber-200 dark:border-amber-700 rounded-xl px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    >
+                        {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
+                            <option key={d} value={d}>{d}{ORDINAL_SUFFIX(d)} of the month</option>
+                        ))}
+                    </select>
+                </div>
+            )}
+            {/* Time picker for weekday/month-day modes */}
+            {schedType !== 'relative' && (
+                <div className="flex items-center gap-2">
+                    <Clock size={12} className="text-amber-400 shrink-0" />
+                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Send at</span>
+                    <input type="time" value={node.scheduleTime ?? '09:00'}
+                        onChange={e => onChange({ scheduleTime: e.target.value })}
+                        title="Send time (24-hour)"
+                        className="text-sm border border-amber-200 dark:border-amber-700 rounded-xl px-3 py-1.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    />
+                    <span className="text-[10px] text-slate-400">server time</span>
+                </div>
+            )}
+        </div>
+    );
+};
+
+// ─── Branch Node Card ─────────────────────────────────────────────────────────
+
+const BranchNodeCard: React.FC<{
+    node: WorkflowBranchNode;
+    onChange: (patch: Partial<WorkflowBranchNode>) => void;
+    onDelete: () => void;
+    pcoLists: { id: string; name: string }[];
+    pcoGroups: { id: string; name: string }[];
+    smsTags: SmsTag[];
+}> = ({ node, onChange, onDelete, pcoLists, pcoGroups, smsTags }) => {
+    const [expanded, setExpanded] = useState(true);
+    const condType = node.conditionType;
+
+    const addThenAction = () => onChange({
+        thenNodes: [...node.thenNodes, { nodeType: 'action', id: uid(), order: node.thenNodes.length, channelType: 'sms', message: '' }]
+    });
+    const addElseAction = () => onChange({
+        elseNodes: [...node.elseNodes, { nodeType: 'action', id: uid(), order: node.elseNodes.length, channelType: 'sms', message: '' }]
+    });
+    const updateThenNode = (idx: number, p: Partial<WorkflowActionNode>) =>
+        onChange({ thenNodes: node.thenNodes.map((n, i) => i === idx ? { ...n, ...p } : n) });
+    const deleteThenNode = (idx: number) =>
+        onChange({ thenNodes: node.thenNodes.filter((_, i) => i !== idx).map((n, i) => ({ ...n, order: i })) });
+    const updateElseNode = (idx: number, p: Partial<WorkflowActionNode>) =>
+        onChange({ elseNodes: node.elseNodes.map((n, i) => i === idx ? { ...n, ...p } : n) });
+    const deleteElseNode = (idx: number) =>
+        onChange({ elseNodes: node.elseNodes.filter((_, i) => i !== idx).map((n, i) => ({ ...n, order: i })) });
+
+    const conditionSummary = () => {
+        switch (condType) {
+            case 'replied':      return 'Contact replied to previous message';
+            case 'email_opened': return 'Contact opened previous email';
+            case 'tag_applied':  return node.conditionTagName ? `Tag "${node.conditionTagName}" applied` : 'Tag is applied';
+            case 'custom':       return node.conditionCustom || 'Custom condition';
+        }
+    };
+
+    return (
+        <div className="bg-white dark:bg-slate-800 border-2 border-blue-300 dark:border-blue-600 rounded-2xl overflow-hidden shadow-sm">
+            {/* Branch header */}
+            <div className="flex items-center justify-between px-4 py-3 bg-blue-50 dark:bg-blue-950/30 border-b border-blue-200 dark:border-blue-700">
+                <div className="flex items-center gap-2 min-w-0">
+                    <GitBranch size={14} className="text-blue-500 shrink-0" />
+                    <span className="text-xs font-black uppercase tracking-widest text-blue-600 dark:text-blue-400 shrink-0">Branch</span>
+                    <span className="text-xs text-slate-400 shrink-0">—</span>
+                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 truncate">IF: {conditionSummary()}</span>
+                </div>
+                <div className="flex items-center gap-1 shrink-0 ml-2">
+                    <button onClick={() => setExpanded(e => !e)} title={expanded ? 'Collapse' : 'Expand'}
+                        className="p-1 text-slate-400 hover:text-blue-600 rounded-lg transition">
+                        <ChevronDown size={14} className={`transition-transform ${expanded ? '' : '-rotate-90'}`} />
+                    </button>
+                    <button onClick={onDelete} title="Delete branch"
+                        className="p-1 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition">
+                        <Trash2 size={14} />
+                    </button>
+                </div>
+            </div>
+
+            {expanded && (
+                <div className="p-4 space-y-4">
+                    {/* Condition editor */}
+                    <div className="space-y-3">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Condition (IF)</p>
+                        {/* Condition type picker */}
+                        <div className="flex rounded-xl overflow-hidden border border-slate-200 dark:border-slate-600">
+                            {([
+                                { id: 'replied',      label: '💬 Replied'     },
+                                { id: 'email_opened', label: '📧 Email Opened'},
+                                { id: 'tag_applied',  label: '🏷 Tag Applied' },
+                                { id: 'custom',       label: '✏️ Custom'       },
+                            ] as const).map(({ id, label }) => (
+                                <button key={id} type="button" onClick={() => onChange({ conditionType: id })}
+                                    className={`flex-1 py-1.5 text-[10px] font-bold transition border-r last:border-r-0 border-slate-200 dark:border-slate-600 ${
+                                        condType === id ? 'bg-blue-600 text-white' : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-blue-50 dark:hover:bg-slate-600'
+                                    }`}
+                                >{label}</button>
+                            ))}
+                        </div>
+                        {/* Tag picker */}
+                        {condType === 'tag_applied' && (
+                            <select value={node.conditionTagId || ''} title="Select tag"
+                                onChange={e => {
+                                    const tag = smsTags.find(t => t.id === e.target.value);
+                                    onChange({ conditionTagId: e.target.value || null, conditionTagName: tag?.name || null });
+                                }}
+                                className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                                <option value="">— Select a tag —</option>
+                                {smsTags.map(t => <option key={t.id} value={t.id}>{t.emoji} {t.name}</option>)}
+                            </select>
+                        )}
+                        {/* Custom condition */}
+                        {condType === 'custom' && (
+                            <input type="text" value={node.conditionCustom || ''}
+                                onChange={e => onChange({ conditionCustom: e.target.value })}
+                                placeholder="Describe the condition, e.g. 'Attended Sunday service'"
+                                className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                        )}
+                        {/* Preview-phase notice */}
+                        <div className="flex items-start gap-2 text-[10px] text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-2.5">
+                            <Info size={11} className="mt-0.5 shrink-0" />
+                            <span>Branch conditions are evaluated at runtime. During this preview phase the THEN path always executes; full condition evaluation is a future update.</span>
+                        </div>
+                    </div>
+
+                    {/* Two sub-timelines: THEN / ELSE */}
+                    <div className="grid grid-cols-2 gap-3">
+                        {/* THEN path */}
+                        <div className="space-y-2">
+                            <div className="flex items-center gap-1.5">
+                                <CheckCircle size={12} className="text-emerald-500" />
+                                <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400">Then (True)</span>
+                            </div>
+                            <div className="p-2 border border-emerald-200 dark:border-emerald-800 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/10 space-y-2 min-h-[60px]">
+                                {node.thenNodes.map((an, i) => (
+                                    <div key={an.id}>
+                                        {i > 0 && <div className="w-0.5 h-3 bg-emerald-200 dark:bg-emerald-800 mx-auto" />}
+                                        <ActionNodeCard
+                                            step={an} index={i} total={node.thenNodes.length}
+                                            onChange={p => updateThenNode(i, p)}
+                                            onDelete={() => deleteThenNode(i)}
+                                            onMoveUp={() => {}} onMoveDown={() => {}}
+                                            pcoLists={pcoLists} pcoGroups={pcoGroups} isSubStep
+                                        />
+                                    </div>
+                                ))}
+                                <button onClick={addThenAction}
+                                    className="w-full py-1.5 border-2 border-dashed border-emerald-300 dark:border-emerald-700 rounded-xl text-[10px] font-bold text-emerald-500 hover:border-emerald-500 transition flex items-center justify-center gap-1">
+                                    <Plus size={10} /> Add Action
+                                </button>
+                            </div>
+                        </div>
+                        {/* ELSE path */}
+                        <div className="space-y-2">
+                            <div className="flex items-center gap-1.5">
+                                <Circle size={12} className="text-slate-400" />
+                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Else (False)</span>
+                            </div>
+                            <div className="p-2 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800/50 space-y-2 min-h-[60px]">
+                                {node.elseNodes.map((an, i) => (
+                                    <div key={an.id}>
+                                        {i > 0 && <div className="w-0.5 h-3 bg-slate-200 dark:bg-slate-700 mx-auto" />}
+                                        <ActionNodeCard
+                                            step={an} index={i} total={node.elseNodes.length}
+                                            onChange={p => updateElseNode(i, p)}
+                                            onDelete={() => deleteElseNode(i)}
+                                            onMoveUp={() => {}} onMoveDown={() => {}}
+                                            pcoLists={pcoLists} pcoGroups={pcoGroups} isSubStep
+                                        />
+                                    </div>
+                                ))}
+                                <button onClick={addElseAction}
+                                    className="w-full py-1.5 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl text-[10px] font-bold text-slate-400 hover:border-slate-500 transition flex items-center justify-center gap-1">
+                                    <Plus size={10} /> Add Action
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+const ActionNodeCard: React.FC<{
+    step: WorkflowActionNode;
     index: number;
     total: number;
-    onChange: (patch: Partial<SmsWorkflowStep>) => void;
+    onChange: (patch: Partial<WorkflowActionNode>) => void;
     onDelete: () => void;
     onMoveUp: () => void;
     onMoveDown: () => void;
     pcoLists: { id: string; name: string }[];
     pcoGroups: { id: string; name: string }[];
-}> = ({ step, index, total, onChange, onDelete, onMoveUp, onMoveDown, pcoLists, pcoGroups }) => {
+    /** When true, renders in compact mode inside a branch sub-timeline. */
+    isSubStep?: boolean;
+}> = ({ step, index, total, onChange, onDelete, onMoveUp, onMoveDown, pcoLists, pcoGroups, isSubStep }) => {
     const channel   = step.channelType  ?? 'sms';
-    const schedType  = step.scheduleType ?? 'relative';
     const segs       = countSegments(step.message);
     const [mmsUrl, setMmsUrl] = React.useState((step.mediaUrls && step.mediaUrls[0]) || '');
 
@@ -3290,166 +3558,54 @@ const StepRow: React.FC<{
                 </div>
             </div>
 
-            {/* Channel picker — split into two rows: Contact | Staff */}
-            <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Channel</p>
-                {/* Contact channels */}
-                <div className="flex rounded-t-xl overflow-hidden border border-b-0 border-slate-200 dark:border-slate-600">
-                    {(['sms', 'mms', 'email'] as WorkflowChannelType[]).map(ch => (
-                        <button
-                            key={ch}
-                            type="button"
-                            onClick={() => onChange({ channelType: ch })}
-                            title={`Use ${CHANNEL_CONFIG[ch].label} channel`}
-                            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-bold transition border-r last:border-r-0 border-slate-200 dark:border-slate-600 ${
-                                channel === ch
-                                    ? CHANNEL_CONFIG[ch].color
-                                    : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-600'
-                            }`}
-                        >
+            {/* Channel picker — full layout for normal steps, compact for sub-steps inside branches */}
+            {!isSubStep ? (
+                <div>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Channel</p>
+                    <div className="flex rounded-t-xl overflow-hidden border border-b-0 border-slate-200 dark:border-slate-600">
+                        {(['sms', 'mms', 'email'] as WorkflowChannelType[]).map(ch => (
+                            <button key={ch} type="button" onClick={() => onChange({ channelType: ch })}
+                                title={`Use ${CHANNEL_CONFIG[ch].label} channel`}
+                                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-bold transition border-r last:border-r-0 border-slate-200 dark:border-slate-600 ${channel === ch ? CHANNEL_CONFIG[ch].color : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-600'}`}>
+                                {CHANNEL_CONFIG[ch].icon} {CHANNEL_CONFIG[ch].label}
+                            </button>
+                        ))}
+                    </div>
+                    <div className="flex rounded-b-xl overflow-hidden border border-slate-200 dark:border-slate-600">
+                        {(['staff_sms', 'staff_email'] as WorkflowChannelType[]).map(ch => (
+                            <button key={ch} type="button" onClick={() => onChange({ channelType: ch })}
+                                title={`Use ${CHANNEL_CONFIG[ch].label} channel`}
+                                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-bold transition border-r last:border-r-0 border-slate-200 dark:border-slate-600 ${channel === ch ? CHANNEL_CONFIG[ch].color : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-600'}`}>
+                                {CHANNEL_CONFIG[ch].icon} {CHANNEL_CONFIG[ch].label}
+                                {(ch === 'staff_sms' || ch === 'staff_email') && <span className="text-[8px] opacity-60 ml-0.5">(internal)</span>}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            ) : (
+                <div className="flex items-center gap-1 flex-wrap">
+                    {(['sms', 'mms', 'email', 'staff_sms', 'staff_email'] as WorkflowChannelType[]).map(ch => (
+                        <button key={ch} type="button" onClick={() => onChange({ channelType: ch })} title={CHANNEL_CONFIG[ch].label}
+                            className={`flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full border transition ${channel === ch ? CHANNEL_CONFIG[ch].color + ' border-transparent' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 border-slate-200 hover:bg-slate-200'}`}>
                             {CHANNEL_CONFIG[ch].icon} {CHANNEL_CONFIG[ch].label}
                         </button>
                     ))}
                 </div>
-                {/* Staff channels */}
-                <div className="flex rounded-b-xl overflow-hidden border border-slate-200 dark:border-slate-600">
-                    {(['staff_sms', 'staff_email'] as WorkflowChannelType[]).map(ch => (
-                        <button
-                            key={ch}
-                            type="button"
-                            onClick={() => onChange({ channelType: ch })}
-                            title={`Use ${CHANNEL_CONFIG[ch].label} channel`}
-                            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-bold transition border-r last:border-r-0 border-slate-200 dark:border-slate-600 ${
-                                channel === ch
-                                    ? CHANNEL_CONFIG[ch].color
-                                    : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-600'
-                            }`}
-                        >
-                            {CHANNEL_CONFIG[ch].icon} {CHANNEL_CONFIG[ch].label}
-                            {(ch === 'staff_sms' || ch === 'staff_email') && (
-                                <span className="text-[8px] opacity-60 ml-0.5">(internal)</span>
-                            )}
-                        </button>
-                    ))}
-                </div>
-            </div>
-
-            {/* ── Timing ───────────────────────────────────────────────────── */}
-            <div className="space-y-2.5">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Timing</p>
-
-                {/* Mode toggle */}
-                <div className="flex rounded-xl overflow-hidden border border-slate-200 dark:border-slate-600">
-                    {([
-                        { id: 'relative',     label: '⏱ Relative'  },
-                        { id: 'day_of_week',  label: '📅 Weekday'   },
-                        { id: 'day_of_month', label: '🗓 Month Day' },
-                    ] as const).map(({ id, label }) => (
-                        <button
-                            key={id}
-                            type="button"
-                            onClick={() => onChange({ scheduleType: id })}
-                            title={`Schedule mode: ${label}`}
-                            className={`flex-1 py-1.5 text-[10px] font-bold transition border-r last:border-r-0 border-slate-200 dark:border-slate-600 ${
-                                schedType === id
-                                    ? 'bg-violet-600 text-white'
-                                    : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-violet-50 dark:hover:bg-slate-600'
-                            }`}
-                        >{label}</button>
-                    ))}
-                </div>
-
-                {/* ── Relative mode ─────────────────────────────────────────── */}
-                {schedType === 'relative' && (
-                    <div className="flex items-center gap-2">
-                        <Clock size={12} className="text-violet-400 shrink-0" />
-                        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Send after</span>
-                        <input
-                            type="number"
-                            min={0}
-                            max={365}
-                            value={step.delayDays}
-                            onChange={e => onChange({ delayDays: Math.max(0, parseInt(e.target.value) || 0) })}
-                            title="Delay in days"
-                            placeholder="0"
-                            className="w-16 text-center text-sm font-black border border-slate-200 dark:border-slate-600 rounded-xl px-2 py-1.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
-                        />
-                        <span className="text-xs text-slate-500 dark:text-slate-400">
-                            {step.delayDays === 0 ? 'days (immediate)' : `day${step.delayDays !== 1 ? 's' : ''}`}
-                        </span>
-                    </div>
-                )}
-
-                {/* ── Day-of-week mode ──────────────────────────────────────── */}
-                {schedType === 'day_of_week' && (
-                    <div className="space-y-1.5">
-                        <p className="text-[10px] text-slate-400">Fire on the next occurrence of:</p>
-                        <div className="flex gap-1">
-                            {DOW_LABELS_SHORT.map((d, i) => (
-                                <button
-                                    key={i}
-                                    type="button"
-                                    onClick={() => onChange({ scheduleDayOfWeek: i })}
-                                    title={DOW_LABELS_LONG[i]}
-                                    className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition ${
-                                        (step.scheduleDayOfWeek ?? 1) === i
-                                            ? 'bg-violet-600 text-white shadow-sm'
-                                            : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-violet-100 dark:hover:bg-violet-900/30'
-                                    }`}
-                                >{d}</button>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {/* ── Day-of-month mode ─────────────────────────────────────── */}
-                {schedType === 'day_of_month' && (
-                    <div className="space-y-1.5">
-                        <p className="text-[10px] text-slate-400">Fire on the next occurrence of:</p>
-                        <select
-                            value={step.scheduleDayOfMonth ?? 1}
-                            onChange={e => onChange({ scheduleDayOfMonth: Number(e.target.value) })}
-                            title="Day of month"
-                            className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
-                        >
-                            {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
-                                <option key={d} value={d}>{d}{ORDINAL_SUFFIX(d)} of the month</option>
-                            ))}
-                        </select>
-                    </div>
-                )}
-
-                {/* ── Time picker (day_of_week / day_of_month only) ─────────── */}
-                {schedType !== 'relative' && (
-                    <div className="flex items-center gap-2">
-                        <Clock size={12} className="text-violet-400 shrink-0" />
-                        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Send at</span>
-                        <input
-                            type="time"
-                            value={step.scheduleTime ?? '09:00'}
-                            onChange={e => onChange({ scheduleTime: e.target.value })}
-                            title="Send time (24-hour)"
-                            className="text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-1.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
-                        />
-                        <span className="text-[10px] text-slate-400">server time</span>
-                    </div>
-                )}
-            </div>
-
-            {/* ── SMS fields ── */}
+            )}
+            {/* â”€â”€ SMS fields â”€â”€ */}
             {channel === 'sms' && (
                 <div>
                     <div className="flex items-center justify-between mb-1.5">
                         <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Message</label>
                         <span className={`text-[10px] font-bold ${
                             segs > 3 ? 'text-red-500' : segs > 1 ? 'text-amber-600' : 'text-slate-400'
-                        }`}>{step.message.length} chars · {segs} seg{segs !== 1 ? 's' : ''}</span>
+                        }`}>{step.message.length} chars Â· {segs} seg{segs !== 1 ? 's' : ''}</span>
                     </div>
                     <textarea
                         rows={3}
                         value={step.message}
                         onChange={e => onChange({ message: e.target.value })}
-                        placeholder="Type your message… Use {firstName} for personalisation."
+                        placeholder="Type your messageâ€¦ Use {firstName} for personalisation."
                         className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
                     />
                     <div className="flex gap-1.5 mt-1.5 flex-wrap">
@@ -3475,7 +3631,7 @@ const StepRow: React.FC<{
                 </div>
             )}
 
-            {/* ── MMS fields ── */}
+            {/* â”€â”€ MMS fields â”€â”€ */}
             {channel === 'mms' && (
                 <div className="space-y-3">
                     <div>
@@ -3483,13 +3639,13 @@ const StepRow: React.FC<{
                             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Message</label>
                             <span className={`text-[10px] font-bold ${
                                 segs > 3 ? 'text-red-500' : segs > 1 ? 'text-amber-600' : 'text-slate-400'
-                            }`}>{step.message.length} chars · {segs} seg{segs !== 1 ? 's' : ''}</span>
+                            }`}>{step.message.length} chars Â· {segs} seg{segs !== 1 ? 's' : ''}</span>
                         </div>
                         <textarea
                             rows={3}
                             value={step.message}
                             onChange={e => onChange({ message: e.target.value })}
-                            placeholder="Caption for the image… Use {firstName} for personalisation."
+                            placeholder="Caption for the imageâ€¦ Use {firstName} for personalisation."
                             className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                         />
                         <div className="flex gap-1.5 mt-1.5 flex-wrap">
@@ -3509,7 +3665,7 @@ const StepRow: React.FC<{
                             placeholder="https://example.com/image.jpg"
                             className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
-                        <p className="text-[10px] text-slate-400 mt-1">Publicly accessible URL — JPG, PNG, GIF, or WebP. MMS may incur additional carrier fees.</p>
+                        <p className="text-[10px] text-slate-400 mt-1">Publicly accessible URL â€” JPG, PNG, GIF, or WebP. MMS may incur additional carrier fees.</p>
                     </div>
                     {mmsUrl && (
                         <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 max-w-[180px]">
@@ -3519,7 +3675,7 @@ const StepRow: React.FC<{
                 </div>
             )}
 
-            {/* ── Email fields ── */}
+            {/* â”€â”€ Email fields â”€â”€ */}
             {channel === 'email' && (
                 <div className="space-y-3">
                     <div className="flex items-start gap-2 p-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl text-xs text-emerald-700 dark:text-emerald-300">
@@ -3532,7 +3688,7 @@ const StepRow: React.FC<{
                             type="text"
                             value={step.emailSubject || ''}
                             onChange={e => onChange({ emailSubject: e.target.value })}
-                            placeholder="e.g. Welcome to Grace Church! 🙏"
+                            placeholder="e.g. Welcome to Grace Church! ðŸ™"
                             className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                         />
                     </div>
@@ -3545,7 +3701,7 @@ const StepRow: React.FC<{
                             rows={6}
                             value={step.emailBody || ''}
                             onChange={e => onChange({ emailBody: e.target.value })}
-                            placeholder={`Dear {firstName},\n\nWe're so glad you joined us…`}
+                            placeholder={`Dear {firstName},\n\nWe're so glad you joined usâ€¦`}
                             className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none font-medium leading-relaxed"
                         />
                         <div className="flex gap-1.5 mt-1.5 flex-wrap">
@@ -3637,7 +3793,7 @@ const AiWorkflowBuilderPanel: React.FC<{
                         </div>
                         <div>
                             <h2 className="text-white font-black text-base">AI Workflow Builder</h2>
-                            <p className="text-violet-200 text-xs">Describe your workflow — AI writes every step for you</p>
+                            <p className="text-violet-200 text-xs">Describe your workflow â€” AI writes every step for you</p>
                         </div>
                     </div>
                     <button onClick={onClose} title="Close" className="p-1.5 rounded-xl text-white/70 hover:text-white hover:bg-white/20 transition">
@@ -3659,7 +3815,7 @@ const AiWorkflowBuilderPanel: React.FC<{
                             placeholder="e.g. Send a text once a day for 5 days with a Bible verse about prayer. On the last day, remind them the church has them on the prayer list."
                             className="w-full text-sm border-2 border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500 dark:focus:border-violet-400 resize-none leading-relaxed"
                         />
-                        <p className="text-[10px] text-slate-400 mt-1.5">Tip: ⌘ / Ctrl + Enter to generate</p>
+                        <p className="text-[10px] text-slate-400 mt-1.5">Tip: âŒ˜ / Ctrl + Enter to generate</p>
                     </div>
 
                     {/* Example prompts */}
@@ -3690,7 +3846,7 @@ const AiWorkflowBuilderPanel: React.FC<{
                                 <Loader2 size={48} className="absolute inset-0 m-auto text-violet-400 animate-spin opacity-40" />
                             </div>
                             <div className="text-center">
-                                <p className="font-bold text-slate-700 dark:text-slate-300">Building your workflow…</p>
+                                <p className="font-bold text-slate-700 dark:text-slate-300">Building your workflowâ€¦</p>
                                 <p className="text-xs mt-1">AI is writing every step with real content</p>
                             </div>
                         </div>
@@ -3774,7 +3930,7 @@ const AiWorkflowBuilderPanel: React.FC<{
                                 disabled={loading || !prompt.trim()}
                                 className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-sm font-bold rounded-xl transition shadow-md shadow-violet-200 dark:shadow-violet-900/40"
                             >
-                                {loading ? <><Loader2 size={14} className="animate-spin" /> Generating…</> : <><Sparkles size={14} /> Generate Workflow</>}
+                                {loading ? <><Loader2 size={14} className="animate-spin" /> Generatingâ€¦</> : <><Sparkles size={14} /> Generate Workflow</>}
                             </button>
                         </>
                     )}
@@ -3784,7 +3940,7 @@ const AiWorkflowBuilderPanel: React.FC<{
     );
 };
 
-// ─── Workflow Editor ─────────────────────────────────────────────────────────
+// â”€â”€â”€ Workflow Editor â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const WorkflowEditor: React.FC<{
     initial: SmsWorkflow | null;
@@ -3792,10 +3948,99 @@ const WorkflowEditor: React.FC<{
     keywords: SmsKeyword[];
     pcoLists: { id: string; name: string }[];
     pcoGroups: { id: string; name: string }[];
+    smsTags: SmsTag[];
     onSave: (wf: SmsWorkflow) => Promise<void>;
     onBack: () => void;
     isBusy: boolean;
-}> = ({ initial, churchId, keywords, pcoLists, pcoGroups, onSave, onBack, isBusy }) => {
+}> = ({ initial, churchId, keywords, pcoLists, pcoGroups, smsTags, onSave, onBack, isBusy }) => {
+
+    /** Convert legacy flat SmsWorkflowStep[] → WorkflowNode[]. */
+    const stepsToNodes = (steps: SmsWorkflowStep[]): WorkflowNode[] => {
+        const nodes: WorkflowNode[] = [];
+        steps.forEach((s, i) => {
+            // If not the first step and has a delay, add a delay node first
+            if (i > 0 && (s.delayDays > 0 || s.scheduleType !== undefined)) {
+                const delay: WorkflowDelayNode = {
+                    nodeType: 'delay', id: uid(), order: nodes.length,
+                    delayDays: s.delayDays ?? 1,
+                    scheduleType: s.scheduleType,
+                    scheduleDayOfWeek: s.scheduleDayOfWeek,
+                    scheduleDayOfMonth: s.scheduleDayOfMonth,
+                    scheduleTime: s.scheduleTime,
+                };
+                nodes.push(delay);
+            }
+            // Add the action node (strip timing fields)
+            const action: WorkflowActionNode = {
+                nodeType: 'action', id: s.id, order: nodes.length,
+                channelType: s.channelType ?? 'sms',
+                message: s.message,
+                mediaUrls: s.mediaUrls,
+                emailSubject: s.emailSubject,
+                emailBody: s.emailBody,
+                staffTargetType: s.staffTargetType,
+                staffRecipients: s.staffRecipients,
+                staffListId: s.staffListId,
+                staffListName: s.staffListName,
+                staffGroupId: s.staffGroupId,
+                staffGroupName: s.staffGroupName,
+            };
+            nodes.push(action);
+        });
+        return nodes;
+    };
+
+    /** Flatten WorkflowNode[] → SmsWorkflowStep[] for backward-compat (scheduler reads this). */
+    const nodesToSteps = (nodes: WorkflowNode[]): SmsWorkflowStep[] => {
+        const steps: SmsWorkflowStep[] = [];
+        let pendingDelay: WorkflowDelayNode | null = null;
+        let order = 0;
+
+        const pushAction = (an: WorkflowActionNode, delay: WorkflowDelayNode | null) => {
+            steps.push({
+                id: an.id,
+                order: order++,
+                channelType: an.channelType,
+                message: an.message,
+                mediaUrls: an.mediaUrls,
+                emailSubject: an.emailSubject,
+                emailBody: an.emailBody,
+                staffTargetType: an.staffTargetType,
+                staffRecipients: an.staffRecipients,
+                staffListId: an.staffListId,
+                staffListName: an.staffListName,
+                staffGroupId: an.staffGroupId,
+                staffGroupName: an.staffGroupName,
+                delayDays: delay?.delayDays ?? (steps.length === 0 ? 0 : 1),
+                scheduleType: delay?.scheduleType,
+                scheduleDayOfWeek: delay?.scheduleDayOfWeek,
+                scheduleDayOfMonth: delay?.scheduleDayOfMonth,
+                scheduleTime: delay?.scheduleTime,
+            });
+        };
+
+        for (const node of nodes) {
+            if (node.nodeType === 'delay') {
+                pendingDelay = node;
+            } else if (node.nodeType === 'action') {
+                pushAction(node, pendingDelay);
+                pendingDelay = null;
+            } else if (node.nodeType === 'branch') {
+                // Emit THEN path steps as sequential; ELSE is saved in the node doc only
+                for (const an of node.thenNodes) pushAction(an, null);
+                pendingDelay = null;
+            }
+        }
+        return steps;
+    };
+
+    /** Build the initial nodes — either from saved nodes, or convert from legacy steps. */
+    const buildInitialNodes = (): WorkflowNode[] => {
+        if (initial?.nodes && initial.nodes.length > 0) return initial.nodes;
+        if (initial?.steps && initial.steps.length > 0) return stepsToNodes(initial.steps);
+        return [{ nodeType: 'action', id: uid(), order: 0, channelType: 'sms', message: '' }];
+    };
+
     const makeBlank = (): SmsWorkflow => ({
         id: uid(),
         churchId,
@@ -3806,7 +4051,8 @@ const WorkflowEditor: React.FC<{
         triggerKeywordWord: null,
         triggerListId: null,
         triggerListName: null,
-        steps: [{ id: uid(), order: 0, delayDays: 0, channelType: 'sms', message: '' }],
+        steps: [],
+        nodes: [{ nodeType: 'action', id: uid(), order: 0, channelType: 'sms', message: '' }],
         isActive: true,
         enrolledCount: 0,
         completedCount: 0,
@@ -3815,84 +4061,107 @@ const WorkflowEditor: React.FC<{
     });
 
     const [wf, setWf] = useState<SmsWorkflow>(initial ?? makeBlank());
+    const [nodes, setNodes] = useState<WorkflowNode[]>(buildInitialNodes);
     const [error, setError] = useState('');
     const [showAiBuilder, setShowAiBuilder] = useState(false);
 
     const handleApplyAiDraft = (draft: AiWorkflowDraft) => {
-        const steps: SmsWorkflowStep[] = draft.steps.map((s, i) => ({
-            id: uid(),
-            order: i,
-            delayDays: i === 0 ? 0 : (s.delayDays ?? 1),
-            channelType: (s.channelType ?? 'sms') as WorkflowChannelType,
-            message: s.message || '',
-            emailSubject: s.emailSubject,
-            emailBody: s.emailBody,
-        }));
-        setWf(prev => ({
-            ...prev,
-            name: draft.name || prev.name,
-            description: draft.description || prev.description,
-            steps,
-        }));
+        const newNodes: WorkflowNode[] = [];
+        draft.steps.forEach((s, i) => {
+            // If not the first step, insert a delay node from the draft's delayDays
+            if (i > 0 && (s.delayDays ?? 1) > 0) {
+                newNodes.push({ nodeType: 'delay', id: uid(), order: newNodes.length, delayDays: s.delayDays ?? 1 });
+            }
+            newNodes.push({
+                nodeType: 'action', id: uid(), order: newNodes.length,
+                channelType: (s.channelType ?? 'sms') as WorkflowChannelType,
+                message: s.message || '',
+                emailSubject: s.emailSubject,
+                emailBody: s.emailBody,
+            });
+        });
+        setNodes(newNodes);
+        setWf(prev => ({ ...prev, name: draft.name || prev.name, description: draft.description || prev.description }));
     };
 
     const patch = (p: Partial<SmsWorkflow>) => setWf(prev => ({ ...prev, ...p }));
 
-    const addStep = () => {
-        const steps = [...wf.steps, { id: uid(), order: wf.steps.length, delayDays: 1, scheduleType: 'relative' as const, channelType: 'sms' as WorkflowChannelType, message: '' }];
-        patch({ steps });
-    };
+    // ── Node CRUD helpers ─────────────────────────────────────────────────────
 
-    const updateStep = (idx: number, p: Partial<SmsWorkflowStep>) => {
-        const steps = wf.steps.map((s, i) => i === idx ? { ...s, ...p } : s);
-        patch({ steps });
-    };
+    const reorder = (ns: WorkflowNode[]) => ns.map((n, i) => ({ ...n, order: i }));
 
-    const deleteStep = (idx: number) => {
-        patch({ steps: wf.steps.filter((_, i) => i !== idx).map((s, i) => ({ ...s, order: i })) });
-    };
+    const addActionNode = () => setNodes(ns => reorder([...ns, {
+        nodeType: 'action', id: uid(), order: ns.length, channelType: 'sms', message: ''
+    }]));
 
-    const moveStep = (idx: number, dir: 'up' | 'down') => {
-        const steps = [...wf.steps];
-        const swap = dir === 'up' ? idx - 1 : idx + 1;
-        [steps[idx], steps[swap]] = [steps[swap], steps[idx]];
-        patch({ steps: steps.map((s, i) => ({ ...s, order: i })) });
+    const addDelayNode = () => setNodes(ns => reorder([...ns, {
+        nodeType: 'delay', id: uid(), order: ns.length, delayDays: 1, scheduleType: 'relative'
+    }]));
+
+    const addBranchNode = () => setNodes(ns => reorder([...ns, {
+        nodeType: 'branch', id: uid(), order: ns.length,
+        conditionType: 'replied', thenNodes: [], elseNodes: []
+    }]));
+
+    const updateNode = (idx: number, p: Partial<WorkflowNode>) =>
+        setNodes(ns => ns.map((n, i) => i === idx ? { ...n, ...p } as WorkflowNode : n));
+
+    const deleteNode = (idx: number) =>
+        setNodes(ns => reorder(ns.filter((_, i) => i !== idx)));
+
+    const moveNode = (idx: number, dir: 'up' | 'down') =>
+        setNodes(ns => {
+            const arr = [...ns];
+            const swap = dir === 'up' ? idx - 1 : idx + 1;
+            [arr[idx], arr[swap]] = [arr[swap], arr[idx]];
+            return reorder(arr);
+        });
+
+    // ── Validation helper ─────────────────────────────────────────────────────
+
+    const validateActionNode = (an: WorkflowActionNode): string | null => {
+        const ch = an.channelType ?? 'sms';
+        if (ch === 'email') {
+            if (!an.emailSubject?.trim() || !an.emailBody?.trim()) return 'All Email steps need a subject and body.';
+        } else if (ch === 'staff_email') {
+            if (!an.emailSubject?.trim() || !an.emailBody?.trim()) return 'All Staff Email steps need a subject and body.';
+            const tt = an.staffTargetType ?? 'individuals';
+            if (tt === 'individuals' && !an.staffRecipients?.length) return 'Staff Email step needs at least one recipient.';
+            if (tt === 'list' && !an.staffListId) return 'Staff Email step needs a list target.';
+            if (tt === 'group' && !an.staffGroupId) return 'Staff Email step needs a group target.';
+        } else if (ch === 'staff_sms') {
+            if (!an.message.trim()) return 'All Staff SMS steps must have a message.';
+            const tt = an.staffTargetType ?? 'individuals';
+            if (tt === 'individuals' && !an.staffRecipients?.length) return 'Staff SMS step needs at least one recipient.';
+            if (tt === 'list' && !an.staffListId) return 'Staff SMS step needs a list target.';
+            if (tt === 'group' && !an.staffGroupId) return 'Staff SMS step needs a group target.';
+        } else {
+            if (!an.message.trim()) return 'All SMS / MMS steps must have a message.';
+        }
+        return null;
     };
 
     const handleSave = async () => {
         if (!wf.name.trim()) { setError('Workflow name is required.'); return; }
-        if (wf.steps.length === 0) { setError('Add at least one step.'); return; }
-        const badStep = wf.steps.find(s => {
-            const ch = s.channelType ?? 'sms';
-            if (ch === 'email') return !s.emailSubject?.trim() || !s.emailBody?.trim();
-            if (ch === 'staff_email') {
-                if (!s.emailSubject?.trim() || !s.emailBody?.trim()) return true;
-                // must have at least one target
-                const tt = s.staffTargetType ?? 'individuals';
-                if (tt === 'individuals') return !s.staffRecipients?.length;
-                if (tt === 'list') return !s.staffListId;
-                if (tt === 'group') return !s.staffGroupId;
-            }
-            if (ch === 'staff_sms') {
-                if (!s.message.trim()) return true;
-                const tt = s.staffTargetType ?? 'individuals';
-                if (tt === 'individuals') return !s.staffRecipients?.length;
-                if (tt === 'list') return !s.staffListId;
-                if (tt === 'group') return !s.staffGroupId;
-            }
-            return !s.message.trim();
-        });
-        if (badStep) {
-            const ch = badStep.channelType ?? 'sms';
-            if (ch === 'staff_email' || ch === 'email') setError('All Email steps need a subject, body, and at least one recipient or target.');
-            else if (ch === 'staff_sms') setError('All Staff SMS steps need a message and at least one recipient or target.');
-            else setError('All SMS / MMS steps must have a message.');
-            return;
+        const actionNodes = nodes.filter(n => n.nodeType === 'action') as WorkflowActionNode[];
+        const branchNodes = nodes.filter(n => n.nodeType === 'branch') as WorkflowBranchNode[];
+        const allActions = [
+            ...actionNodes,
+            ...branchNodes.flatMap(b => [...b.thenNodes, ...b.elseNodes]),
+        ];
+        if (allActions.length === 0 && branchNodes.length === 0) {
+            setError('Add at least one Action step.'); return;
+        }
+        for (const an of allActions) {
+            const err = validateActionNode(an);
+            if (err) { setError(err); return; }
         }
         if (wf.trigger === 'keyword'  && !wf.triggerKeywordId) { setError('Select a keyword trigger.'); return; }
         if (wf.trigger === 'list_add' && !wf.triggerListId)     { setError('Select a PCO list trigger.'); return; }
         setError('');
-        await onSave({ ...wf, updatedAt: Date.now() });
+        // Build backward-compat flat steps for the scheduler
+        const flatSteps = nodesToSteps(nodes);
+        await onSave({ ...wf, nodes, steps: flatSteps, updatedAt: Date.now() });
     };
 
     const triggerLabel: Record<string, string> = {
@@ -3989,7 +4258,7 @@ const WorkflowEditor: React.FC<{
                         <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Trigger</p>
                         <p className="text-xs text-slate-500 dark:text-slate-400">What event starts enrolling a contact into this workflow?</p>
 
-                        {/* Row 1 — basic triggers */}
+                        {/* Row 1 â€” basic triggers */}
                         <div className="grid grid-cols-3 gap-2">
                             {(['manual', 'keyword', 'list_add'] as const).map(t => (
                                 <button
@@ -4000,14 +4269,14 @@ const WorkflowEditor: React.FC<{
                                     }`}
                                 >
                                     <p className="text-xs font-black text-slate-900 dark:text-white mb-0.5">
-                                        {t === 'manual' ? '✍️ Manual' : t === 'keyword' ? '💬 Keyword' : '📝 List Add'}
+                                        {t === 'manual' ? 'âœï¸ Manual' : t === 'keyword' ? 'ðŸ’¬ Keyword' : 'ðŸ“ List Add'}
                                     </p>
                                     <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">{triggerLabel[t]}</p>
                                 </button>
                             ))}
                         </div>
 
-                        {/* Row 2 — date-based triggers */}
+                        {/* Row 2 â€” date-based triggers */}
                         <div className="grid grid-cols-2 gap-2">
                             {(['birthday', 'anniversary'] as const).map(t => (
                                 <button
@@ -4020,7 +4289,7 @@ const WorkflowEditor: React.FC<{
                                     }`}
                                 >
                                     <p className="text-xs font-black text-slate-900 dark:text-white mb-0.5">
-                                        {t === 'birthday' ? '🎂 Birthday' : '💍 Anniversary'}
+                                        {t === 'birthday' ? 'ðŸŽ‚ Birthday' : 'ðŸ’ Anniversary'}
                                     </p>
                                     <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">{triggerLabel[t]}</p>
                                 </button>
@@ -4043,7 +4312,7 @@ const WorkflowEditor: React.FC<{
                                         title="Trigger keyword"
                                         className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
                                     >
-                                        <option value="">— Select a keyword —</option>
+                                        <option value="">â€” Select a keyword â€”</option>
                                         {keywords.filter(k => k.isActive).map(k => (
                                             <option key={k.id} value={k.id}>{k.keyword}</option>
                                         ))}
@@ -4066,7 +4335,7 @@ const WorkflowEditor: React.FC<{
                                     title="Trigger PCO list"
                                     className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
                                 >
-                                    <option value="">— Select a list —</option>
+                                    <option value="">â€” Select a list â€”</option>
                                     {pcoLists.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
                                 </select>
                                 <p className="text-[10px] text-slate-400 mt-1">Contacts are enrolled whenever the scheduler detects them added to this list.</p>
@@ -4106,7 +4375,7 @@ const WorkflowEditor: React.FC<{
                                 </div>
                                 {/* Info banner */}
                                 <div className="flex items-start gap-2.5 p-3.5 bg-pink-50 dark:bg-pink-900/20 border border-pink-200 dark:border-pink-800 rounded-xl">
-                                    <span className="text-lg shrink-0 mt-0.5">{wf.trigger === 'birthday' ? '🎂' : '💍'}</span>
+                                    <span className="text-lg shrink-0 mt-0.5">{wf.trigger === 'birthday' ? 'ðŸŽ‚' : 'ðŸ’'}</span>
                                     <div className="text-xs text-pink-700 dark:text-pink-300 leading-relaxed">
                                         <p className="font-bold mb-0.5">
                                             Automatically fires every year
@@ -4127,56 +4396,98 @@ const WorkflowEditor: React.FC<{
                         )}
                     </div>
 
-                    {/* Steps */}
+                    {/* Workflow Nodes */}
                     <div className="space-y-3">
                         <div className="flex items-center justify-between">
-                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Steps ({wf.steps.length})</p>
-                            <button
-                                onClick={addStep}
-                                className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold rounded-xl transition"
-                            >
-                                <Plus size={12} /> Add Step
-                            </button>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                Sequence ({nodes.length} node{nodes.length !== 1 ? 's' : ''})
+                            </p>
+                            {/* 3-button add toolbar (top) */}
+                            <div className="flex items-center gap-1.5">
+                                <button onClick={addActionNode}
+                                    className="flex items-center gap-1 px-2.5 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-[10px] font-bold rounded-xl transition">
+                                    <Plus size={11} /> Action
+                                </button>
+                                <button onClick={addDelayNode}
+                                    className="flex items-center gap-1 px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-bold rounded-xl transition">
+                                    <Clock size={11} /> Delay
+                                </button>
+                                <button onClick={addBranchNode}
+                                    className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold rounded-xl transition">
+                                    <GitBranch size={11} /> Branch
+                                </button>
+                            </div>
                         </div>
 
-                        {/* Timeline connector */}
-                        <div className="relative">
-                            {wf.steps.map((step, idx) => (
-                                <div key={step.id} className="relative">
-                                    {/* Connector line between steps */}
-                                    {idx > 0 && (
-                                        <div className="flex items-center gap-3 mb-2 ml-3">
-                                            <div className="w-0.5 h-6 bg-violet-200 dark:bg-violet-800 ml-2.5" />
-                                            <span className="text-[10px] text-slate-400 font-semibold">
-                                                {stepTimingLabel(step)}
-                                            </span>
-                                        </div>
+                        {/* Node timeline */}
+                        <div className="space-y-2">
+                            {nodes.map((node, idx) => (
+                                <div key={node.id}>
+                                    {/* Connector line between nodes */}
+                                    {idx > 0 && node.nodeType !== 'delay' && nodes[idx - 1]?.nodeType !== 'delay' && (
+                                        <div className="w-0.5 h-4 bg-slate-200 dark:bg-slate-700 mx-auto mb-2" />
                                     )}
-                                    <StepRow
-                                        step={step}
-                                        index={idx}
-                                        total={wf.steps.length}
-                                        onChange={p => updateStep(idx, p)}
-                                        onDelete={() => deleteStep(idx)}
-                                        onMoveUp={() => moveStep(idx, 'up')}
-                                        onMoveDown={() => moveStep(idx, 'down')}
-                                        pcoLists={pcoLists}
-                                        pcoGroups={pcoGroups}
-                                    />
+                                    {node.nodeType === 'delay' && (
+                                        <>
+                                            <div className="w-0.5 h-3 bg-amber-300 dark:bg-amber-700 mx-auto" />
+                                            <DelayNodeCard
+                                                node={node}
+                                                onChange={p => updateNode(idx, p)}
+                                                onDelete={() => deleteNode(idx)}
+                                            />
+                                            <div className="w-0.5 h-3 bg-amber-300 dark:bg-amber-700 mx-auto" />
+                                        </>
+                                    )}
+                                    {node.nodeType === 'action' && (
+                                        <ActionNodeCard
+                                            step={node}
+                                            index={idx}
+                                            total={nodes.length}
+                                            onChange={p => updateNode(idx, p)}
+                                            onDelete={() => deleteNode(idx)}
+                                            onMoveUp={() => moveNode(idx, 'up')}
+                                            onMoveDown={() => moveNode(idx, 'down')}
+                                            pcoLists={pcoLists}
+                                            pcoGroups={pcoGroups}
+                                        />
+                                    )}
+                                    {node.nodeType === 'branch' && (
+                                        <BranchNodeCard
+                                            node={node}
+                                            onChange={p => updateNode(idx, p)}
+                                            onDelete={() => deleteNode(idx)}
+                                            pcoLists={pcoLists}
+                                            pcoGroups={pcoGroups}
+                                            smsTags={smsTags}
+                                        />
+                                    )}
                                 </div>
                             ))}
                         </div>
 
-                        {wf.steps.length === 0 && (
+                        {/* Empty state */}
+                        {nodes.length === 0 && (
                             <div className="text-center py-10 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl text-slate-400">
                                 <Zap size={28} className="mx-auto mb-2 opacity-30" />
-                                <p className="text-sm">No steps yet. Add your first message step.</p>
+                                <p className="text-sm font-semibold mb-3">No nodes yet. Add your first step below.</p>
                             </div>
                         )}
 
-                        <button onClick={addStep} className="w-full py-2.5 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl text-sm font-bold text-slate-400 hover:border-violet-400 hover:text-violet-500 transition flex items-center justify-center gap-2">
-                            <Plus size={14} /> Add Another Step
-                        </button>
+                        {/* 3-button add toolbar (bottom) */}
+                        <div className="flex items-center gap-2 pt-1">
+                            <button onClick={addActionNode}
+                                className="flex-1 py-2.5 border-2 border-dashed border-violet-300 dark:border-violet-700 rounded-2xl text-xs font-bold text-violet-500 hover:border-violet-500 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition flex items-center justify-center gap-1.5">
+                                <Plus size={13} /> Action
+                            </button>
+                            <button onClick={addDelayNode}
+                                className="flex-1 py-2.5 border-2 border-dashed border-amber-300 dark:border-amber-700 rounded-2xl text-xs font-bold text-amber-500 hover:border-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition flex items-center justify-center gap-1.5">
+                                <Clock size={13} /> Delay
+                            </button>
+                            <button onClick={addBranchNode}
+                                className="flex-1 py-2.5 border-2 border-dashed border-blue-300 dark:border-blue-700 rounded-2xl text-xs font-bold text-blue-500 hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition flex items-center justify-center gap-1.5">
+                                <GitBranch size={13} /> Branch
+                            </button>
+                        </div>
                     </div>
 
                     {error && (
@@ -4190,7 +4501,7 @@ const WorkflowEditor: React.FC<{
     );
 };
 
-// ─── Enrollment Pane ─────────────────────────────────────────────────────────
+// â”€â”€â”€ Enrollment Pane â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const EnrollmentPane: React.FC<{
     workflow: SmsWorkflow;
@@ -4291,7 +4602,7 @@ const EnrollmentPane: React.FC<{
                         disabled={!phone.trim() || enrolling}
                         className="w-full py-2.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-sm font-bold rounded-xl transition flex items-center justify-center gap-2"
                     >
-                        {enrolling ? <><Loader2 size={13} className="animate-spin" />Enrolling…</> : <><Plus size={13} />Enroll in Workflow</>}
+                        {enrolling ? <><Loader2 size={13} className="animate-spin" />Enrollingâ€¦</> : <><Plus size={13} />Enroll in Workflow</>}
                     </button>
                 </div>
 
@@ -4309,7 +4620,7 @@ const EnrollmentPane: React.FC<{
                                         <p className="text-sm font-bold text-slate-900 dark:text-white">{en.personName || formatPhone(en.phoneNumber)}</p>
                                         {en.personName && <p className="text-[10px] text-slate-400">{formatPhone(en.phoneNumber)}</p>}
                                         <p className="text-[10px] text-slate-500 mt-0.5">
-                                            Step {en.currentStep + 1} of {workflow.steps.length} · enrolled {timeAgo(en.enrolledAt)}
+                                            Step {en.currentStep + 1} of {workflow.steps.length} Â· enrolled {timeAgo(en.enrolledAt)}
                                         </p>
                                     </div>
                                     <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${
@@ -4325,13 +4636,14 @@ const EnrollmentPane: React.FC<{
     );
 };
 
-// ─── Workflows List + Manager ─────────────────────────────────────────────────
+// â”€â”€â”€ Workflows List + Manager â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
     const [workflows, setWorkflows] = useState<SmsWorkflow[]>([]);
     const [keywords, setKeywords]   = useState<SmsKeyword[]>([]);
     const [pcoLists, setPcoLists]   = useState<{ id: string; name: string }[]>([]);
     const [pcoGroups, setPcoGroups] = useState<{ id: string; name: string }[]>([]);
+    const [smsTags, setSmsTags]     = useState<SmsTag[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [editing, setEditing]     = useState<SmsWorkflow | null | 'new'>('new' as any);
     const [viewMode, setViewMode]   = useState<'list' | 'editor'>('list');
@@ -4356,6 +4668,8 @@ const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
     useEffect(() => {
         getDocs(query(collection(firebaseDb, 'smsKeywords'), where('churchId', '==', churchId)))
             .then(snap => setKeywords(snap.docs.map(d => ({ id: d.id, ...d.data() } as SmsKeyword))));
+        getDocs(query(collection(firebaseDb, 'smsTags'), where('churchId', '==', churchId)))
+            .then(snap => setSmsTags(snap.docs.map(d => ({ id: d.id, ...d.data() } as SmsTag))));
         pcoService.getPeopleLists(churchId)
             .then((raw: any[]) => setPcoLists(raw.map(r => ({ id: r.id, name: r.attributes?.name || 'Unnamed' }))))
             .catch(() => {});
@@ -4394,11 +4708,11 @@ const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
     const openEdit = (wf: SmsWorkflow) => { setEditing(wf); setViewMode('editor'); };
 
     const TRIGGER_BADGE: Record<string, { label: string; color: string; icon: string }> = {
-        manual:      { label: 'Manual',      color: 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300',    icon: '✍️' },
-        keyword:     { label: 'Keyword',     color: 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300', icon: '💬' },
-        list_add:    { label: 'List Add',    color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300',      icon: '📝' },
-        birthday:    { label: 'Birthday',    color: 'bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300',      icon: '🎂' },
-        anniversary: { label: 'Anniversary', color: 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300',      icon: '💍' },
+        manual:      { label: 'Manual',      color: 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300',    icon: 'âœï¸' },
+        keyword:     { label: 'Keyword',     color: 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300', icon: 'ðŸ’¬' },
+        list_add:    { label: 'List Add',    color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300',      icon: 'ðŸ“' },
+        birthday:    { label: 'Birthday',    color: 'bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300',      icon: 'ðŸŽ‚' },
+        anniversary: { label: 'Anniversary', color: 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300',      icon: 'ðŸ’' },
     };
 
     // Show editor view
@@ -4411,6 +4725,7 @@ const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
                     keywords={keywords}
                     pcoLists={pcoLists}
                     pcoGroups={pcoGroups}
+                    smsTags={smsTags}
                     onSave={handleSave}
                     onBack={() => setViewMode('list')}
                     isBusy={isBusy}
@@ -4429,7 +4744,7 @@ const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
                         <Zap size={26} className="text-violet-500" /> Workflows
                     </h1>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                        Automated drip sequences — the right message at the right time.
+                        Automated drip sequences â€” the right message at the right time.
                     </p>
                 </div>
                 <button onClick={openNew} className="flex items-center gap-2 px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold rounded-xl transition shadow-md shadow-violet-200 dark:shadow-violet-900/40">
@@ -4439,18 +4754,18 @@ const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
 
             {/* Explainer */}
             <div className="flex items-start gap-4 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-2xl p-4 mb-6">
-                <div className="text-3xl">⚡</div>
+                <div className="text-3xl">âš¡</div>
                 <div>
                     <p className="text-sm font-bold text-violet-800 dark:text-violet-200 mb-1">How Workflows Work</p>
                     <p className="text-xs text-violet-700 dark:text-violet-300 leading-relaxed">
-                        Build a multi-step message sequence with custom delays between each step. Triggered automatically by a keyword text, a PCO List add, a <strong>🎂 birthday</strong>, or a <strong>💍 anniversary</strong> — or manually by staff. Once enrolled, contacts move through each step on schedule. Birthday and anniversary workflows auto-enroll the right people every year.
+                        Build a multi-step message sequence with custom delays between each step. Triggered automatically by a keyword text, a PCO List add, a <strong>ðŸŽ‚ birthday</strong>, or a <strong>ðŸ’ anniversary</strong> â€” or manually by staff. Once enrolled, contacts move through each step on schedule. Birthday and anniversary workflows auto-enroll the right people every year.
                     </p>
                 </div>
             </div>
 
             {/* Workflow cards */}
             {isLoading ? (
-                <div className="flex items-center justify-center h-40 text-slate-400"><Loader2 size={20} className="animate-spin mr-2" />Loading workflows…</div>
+                <div className="flex items-center justify-center h-40 text-slate-400"><Loader2 size={20} className="animate-spin mr-2" />Loading workflowsâ€¦</div>
             ) : workflows.length === 0 ? (
                 <div className="text-center py-20 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
                     <Zap size={40} className="mx-auto text-slate-300 dark:text-slate-600 mb-3" />
@@ -4585,7 +4900,7 @@ const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
     );
 };
 
-// ─── SMS Setup Banner ────────────────────────────────────────────────────────
+// â”€â”€â”€ SMS Setup Banner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const SmsSetupBanner: React.FC<{ onSetup: () => void }> = ({ onSetup }) => (
     <div className="p-6 max-w-2xl mx-auto mt-12">
@@ -4599,9 +4914,9 @@ const SmsSetupBanner: React.FC<{ onSetup: () => void }> = ({ onSetup }) => (
             </p>
             <div className="grid grid-cols-3 gap-4 mb-8 text-center">
                 {[
-                    { icon: '📱', title: 'Local Number', desc: 'Pick an area code' },
-                    { icon: '📣', title: 'Bulk Texts', desc: 'Reach entire lists' },
-                    { icon: '💬', title: '2-Way Inbox', desc: 'Real conversations' },
+                    { icon: 'ðŸ“±', title: 'Local Number', desc: 'Pick an area code' },
+                    { icon: 'ðŸ“£', title: 'Bulk Texts', desc: 'Reach entire lists' },
+                    { icon: 'ðŸ’¬', title: '2-Way Inbox', desc: 'Real conversations' },
                 ].map(f => (
                     <div key={f.title} className="bg-white/10 rounded-2xl p-3">
                         <div className="text-2xl mb-1">{f.icon}</div>
@@ -4614,13 +4929,13 @@ const SmsSetupBanner: React.FC<{ onSetup: () => void }> = ({ onSetup }) => (
                 onClick={onSetup}
                 className="px-8 py-3 bg-white text-violet-700 font-black rounded-2xl hover:bg-violet-50 transition text-sm shadow-lg"
             >
-                Get Started →
+                Get Started â†’
             </button>
         </div>
     </div>
 );
 
-// ─── Setup Wizard (Inline) ────────────────────────────────────────────────────
+// â”€â”€â”€ Setup Wizard (Inline) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const SmsSetupWizard: React.FC<{
     churchId: string;
@@ -4735,7 +5050,7 @@ const SmsSetupWizard: React.FC<{
                                             : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'
                                     }`}
                                 >
-                                    {mode === 'city-state' ? '🏙 City & State' : '# Area Code'}
+                                    {mode === 'city-state' ? 'ðŸ™ City & State' : '# Area Code'}
                                 </button>
                             ))}
                         </div>
@@ -4762,7 +5077,7 @@ const SmsSetupWizard: React.FC<{
                                         title="State"
                                         className="w-full text-base border-2 border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500 appearance-none"
                                     >
-                                        <option value="">Select a state…</option>
+                                        <option value="">Select a stateâ€¦</option>
                                         {US_STATES.map(([abbr, name]) => (
                                             <option key={abbr} value={abbr}>{name} ({abbr})</option>
                                         ))}
@@ -4793,7 +5108,7 @@ const SmsSetupWizard: React.FC<{
                             disabled={loadingNums || !canSearch}
                             className="w-full py-3 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white font-black rounded-2xl transition mt-5 flex items-center justify-center gap-2"
                         >
-                            {loadingNums ? <><Loader2 size={16} className="animate-spin" /> Searching…</> : 'Find Available Numbers →'}
+                            {loadingNums ? <><Loader2 size={16} className="animate-spin" /> Searchingâ€¦</> : 'Find Available Numbers â†’'}
                         </button>
                     </>
                 )}
@@ -4825,7 +5140,7 @@ const SmsSetupWizard: React.FC<{
                         {/* Cross-state fallback notice (city found in a different state) */}
                         {numbers.length > 0 && city && resolvedSearch.includes('(any state)') && (
                             <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl px-3 py-2 mb-3">
-                                ℹ️ No numbers found in <strong>{city}, {stateAbbr}</strong> — showing numbers for <strong>{city}</strong> in another state instead.
+                                â„¹ï¸ No numbers found in <strong>{city}, {stateAbbr}</strong> â€” showing numbers for <strong>{city}</strong> in another state instead.
                             </p>
                         )}
 
@@ -4839,7 +5154,7 @@ const SmsSetupWizard: React.FC<{
                                     disabled={loadingNums}
                                     className="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-black rounded-xl transition flex items-center gap-2 mx-auto"
                                 >
-                                    {loadingNums ? <><Loader2 size={12} className="animate-spin" /> Searching…</> : `Search all of ${stateAbbr} →`}
+                                    {loadingNums ? <><Loader2 size={12} className="animate-spin" /> Searchingâ€¦</> : `Search all of ${stateAbbr} â†’`}
                                 </button>
                             </div>
                         )}
@@ -4858,7 +5173,7 @@ const SmsSetupWizard: React.FC<{
                                             <div className="flex-1 min-w-0">
                                                 <p className="font-black text-lg text-slate-900 dark:text-white tracking-wide">{n.friendlyName}</p>
                                                 <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold">
-                                                    📍 {cityState || `Area code ${areaCode}`}
+                                                    ðŸ“ {cityState || `Area code ${areaCode}`}
                                                 </span>
                                             </div>
                                             {selectedNumber === n.phoneNumber && (
@@ -4878,7 +5193,7 @@ const SmsSetupWizard: React.FC<{
                                     disabled={page === 0}
                                     className="flex items-center gap-1 text-xs font-bold text-slate-600 dark:text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 disabled:opacity-30 transition"
                                 >
-                                    ← Prev
+                                    â† Prev
                                 </button>
                                 <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
                                     Page {page + 1} of {totalPages}
@@ -4889,7 +5204,7 @@ const SmsSetupWizard: React.FC<{
                                     disabled={page >= totalPages - 1}
                                     className="flex items-center gap-1 text-xs font-bold text-slate-600 dark:text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 disabled:opacity-30 transition"
                                 >
-                                    Next →
+                                    Next â†’
                                 </button>
                             </div>
                         )}
@@ -4911,14 +5226,14 @@ const SmsSetupWizard: React.FC<{
                         {error && <p className="text-sm text-red-500 mb-3">{error}</p>}
 
                         <div className="flex gap-2">
-                            <button onClick={() => setStep('search')} className="flex-1 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 transition">← Search Again</button>
+                            <button onClick={() => setStep('search')} className="flex-1 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 transition">â† Search Again</button>
                             {numbers.length > 0 && (
                                 <button
                                     onClick={provision}
                                     disabled={provisioning || !selectedNumber}
                                     className="flex-1 py-2.5 text-sm font-black bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-xl transition flex items-center justify-center gap-2"
                                 >
-                                    {provisioning ? <><Loader2 size={14} className="animate-spin" />Provisioning…</> : 'Claim Number →'}
+                                    {provisioning ? <><Loader2 size={14} className="animate-spin" />Provisioningâ€¦</> : 'Claim Number â†’'}
                                 </button>
                             )}
                         </div>
@@ -4931,7 +5246,7 @@ const SmsSetupWizard: React.FC<{
                         <div className="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mx-auto mb-4">
                             <CheckCircle size={32} className="text-emerald-600" />
                         </div>
-                        <h2 className="text-xl font-black text-slate-900 dark:text-white mb-2">You're All Set! 🎉</h2>
+                        <h2 className="text-xl font-black text-slate-900 dark:text-white mb-2">You're All Set! ðŸŽ‰</h2>
                         <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
                             Your church phone number has been provisioned. You can now send text campaigns and receive replies in your inbox.
                         </p>
@@ -4939,7 +5254,7 @@ const SmsSetupWizard: React.FC<{
                             <strong>Next step:</strong> For high-volume sending (more than 200 msgs/day), complete A2P 10DLC brand registration in your Twilio Console to avoid carrier filtering.
                         </div>
                         <button onClick={onComplete} className="px-8 py-3 bg-violet-600 hover:bg-violet-700 text-white font-black rounded-2xl transition">
-                            Start Messaging →
+                            Start Messaging â†’
                         </button>
                     </div>
                 )}
@@ -4948,7 +5263,7 @@ const SmsSetupWizard: React.FC<{
     );
 };
 
-// ─── Main MessagingModule ─────────────────────────────────────────────────────
+// â”€â”€â”€ Main MessagingModule â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface MessagingModuleProps {
     churchId:    string;
@@ -5063,11 +5378,11 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
             recurringFrequency: recurringFrequency ?? null,
             updatedAt: Date.now(),
         });
-        showToast('Campaign scheduled ✓');
+        showToast('Campaign scheduled âœ“');
         setActiveCampaign(null);
     };
 
-    // ── Not yet set up ──
+    // â”€â”€ Not yet set up â”€â”€
     if (!smsEnabled && !showSetup) {
         return <SmsSetupBanner onSetup={() => setShowSetup(true)} />;
     }
@@ -5115,7 +5430,7 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                         <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-full px-3 py-1.5">
                             <Phone size={12} />
                             {formatPhone(church.smsSettings.twilioPhoneNumber)}
-                            <span className="text-[10px] opacity-70">· SMS Active</span>
+                            <span className="text-[10px] opacity-70">Â· SMS Active</span>
                         </div>
                     )}
                 </div>
