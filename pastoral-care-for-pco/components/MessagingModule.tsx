@@ -8,7 +8,7 @@ import {
     Timestamp, collectionGroup, arrayUnion, arrayRemove
 } from 'firebase/firestore';
 import { pcoService } from '../services/pcoService';
-import { SmsCampaign, SmsConversation, SmsMessage, SmsKeyword, SmsOptOut, SmsWorkflow, SmsWorkflowStep, SmsWorkflowEnrollment, SmsTag, Church, User, WorkflowChannelType, WorkflowNode, WorkflowActionNode, WorkflowDelayNode, WorkflowBranchNode, WorkflowBranchConditionType } from '../types';
+import { SmsCampaign, SmsConversation, SmsMessage, SmsKeyword, SmsOptOut, SmsWorkflow, SmsWorkflowStep, SmsWorkflowEnrollment, SmsTag, Church, User, WorkflowChannelType, WorkflowNode, WorkflowActionNode, WorkflowDelayNode, WorkflowBranchNode, WorkflowBranchConditionType, TwilioPhoneNumber } from '../types';
 import {
     MessageSquare, Send, Clock, Users, Plus, ArrowLeft, Trash2,
     Eye, Pencil, ChevronDown, CheckCircle, Circle, Loader2, X,
@@ -16,7 +16,7 @@ import {
     Inbox, BarChart3, Copy, Zap, MessageCircle, TrendingUp, TrendingDown,
     Activity, DollarSign, UserX, Edit3, UserCheck, List, Layers,
     Smile, Image as ImageIcon, Link, Sparkles, ChevronRight, RotateCcw,
-    Mail, Tag, Filter, Hash, Upload, ExternalLink, GitBranch, Info
+    Mail, Tag, Filter, Hash, Upload, ExternalLink, GitBranch, Info, ShieldCheck, Globe2, PlusCircle, Lock, Unlock
 } from 'lucide-react';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -1581,7 +1581,9 @@ const SmsInbox: React.FC<{
     churchId: string;
     currentUser: User;
     church: Church;
-}> = ({ churchId, currentUser, church }) => {
+    /** If provided, only shows conversations for this TwilioPhoneNumber doc */
+    twilioNumberId?: string | null;
+}> = ({ churchId, currentUser, church, twilioNumberId }) => {
     const [conversations, setConversations] = useState<SmsConversation[]>([]);
     const [activeConv, setActiveConv]       = useState<SmsConversation | null>(null);
     const [messages, setMessages]           = useState<SmsMessage[]>([]);
@@ -1615,19 +1617,25 @@ const SmsInbox: React.FC<{
         });
     }, [churchId]);
 
-    // Load conversations
+    // Load conversations — filtered by twilioNumberId when provided.
+    // Conversations without twilioNumberId (legacy) show up in every inbox.
     useEffect(() => {
-        const q = query(
+        const baseQ = query(
             collection(firebaseDb, 'smsConversations'),
             where('churchId', '==', churchId),
             orderBy('lastMessageAt', 'desc'),
             limit(100)
         );
-        const unsub = onSnapshot(q, snap => {
-            setConversations(snap.docs.map(d => ({ id: d.id, ...d.data() } as SmsConversation)));
+        const unsub = onSnapshot(baseQ, snap => {
+            const all = snap.docs.map(d => ({ id: d.id, ...d.data() } as SmsConversation));
+            // Client-side filter: include legacy (no twilioNumberId) + matching ones
+            const filtered = twilioNumberId
+                ? all.filter(c => !c.twilioNumberId || c.twilioNumberId === twilioNumberId)
+                : all;
+            setConversations(filtered);
         });
         return unsub;
-    }, [churchId]);
+    }, [churchId, twilioNumberId]);
 
     // Load messages for active conversation
     useEffect(() => {
@@ -5120,7 +5128,9 @@ const SmsSetupWizard: React.FC<{
     church: Church;
     onComplete: () => void;
     onBack: () => void;
-}> = ({ churchId, church, onComplete, onBack }) => {
+    /** 'setup' = full first-time flow (default); 'add-number' = skip sub-account/A2P, just pick and claim a number */
+    mode?: 'setup' | 'add-number';
+}> = ({ churchId, church, onComplete, onBack, mode = 'setup' }) => {
     const [step, setStep]               = useState<'search' | 'pick-number' | 'done'>('search');
     const [searchMode, setSearchMode]   = useState<'area-code' | 'city-state'>('city-state');
     const [areaCode, setAreaCode]       = useState(church.zip?.slice(0, 3) || '');
@@ -5128,12 +5138,13 @@ const SmsSetupWizard: React.FC<{
     const [stateAbbr, setStateAbbr]     = useState(church.state || '');
     const [numbers, setNumbers]         = useState<{ phoneNumber: string; friendlyName: string; locality: string; region: string }[]>([]);
     const [resolvedSearch, setResolvedSearch] = useState('');
-    const [canExpand, setCanExpand]     = useState(false); // backend says 0 city results, offer state search
+    const [canExpand, setCanExpand]     = useState(false);
     const [page, setPage]               = useState(0);
     const PAGE_SIZE                     = 10;
     const [loadingNums, setLoadingNums] = useState(false);
     const [selectedNumber, setSelectedNumber] = useState('');
     const [senderName, setSenderName]   = useState(church.name || '');
+    const [friendlyLabel, setFriendlyLabel] = useState('');
     const [provisioning, setProvisioning] = useState(false);
     const [error, setError]             = useState('');
 
@@ -5185,10 +5196,18 @@ const SmsSetupWizard: React.FC<{
         setError('');
         setProvisioning(true);
         try {
-            const res = await fetch(`${API_BASE}/api/messaging/provision`, {
+            // In add-number mode, use the add-number endpoint (reuses existing sub-account)
+            const endpoint = mode === 'add-number'
+                ? `${API_BASE}/api/messaging/add-number`
+                : `${API_BASE}/api/messaging/provision`;
+
+            const body: any = { churchId, phoneNumber: selectedNumber, senderName };
+            if (mode === 'add-number' && friendlyLabel) body.friendlyLabel = friendlyLabel;
+
+            const res = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ churchId, phoneNumber: selectedNumber, senderName }),
+                body: JSON.stringify(body),
             });
             const data = await res.json();
             if (!data.success) throw new Error(data.error || 'Provisioning failed');
@@ -5387,9 +5406,21 @@ const SmsSetupWizard: React.FC<{
                             </div>
                         )}
 
-                        {/* Sender Name */}
+                        {/* Sender Name + (in add-number mode) Inbox Label */}
                         {numbers.length > 0 && (
                             <>
+                                {mode === 'add-number' && (
+                                    <>
+                                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Inbox Label (e.g. "Youth Line")</label>
+                                        <input
+                                            type="text"
+                                            value={friendlyLabel}
+                                            onChange={e => setFriendlyLabel(e.target.value)}
+                                            className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 mb-4"
+                                            placeholder="Youth Ministry"
+                                        />
+                                    </>
+                                )}
                                 <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Sender Name (shown in message headers)</label>
                                 <input
                                     type="text"
@@ -5441,6 +5472,267 @@ const SmsSetupWizard: React.FC<{
     );
 };
 
+// ─── useTwilioNumbers ─────────────────────────────────────────────────────────
+// Real-time listener for all phone numbers owned by this church.
+
+function useTwilioNumbers(churchId: string) {
+    const [numbers, setNumbers] = useState<TwilioPhoneNumber[]>([]);
+    const [loading, setLoading] = useState(true);
+    useEffect(() => {
+        const q = query(
+            collection(firebaseDb, 'twilioNumbers'),
+            where('churchId', '==', churchId),
+            orderBy('isDefault', 'desc'),
+            orderBy('createdAt', 'asc')
+        );
+        const unsub = onSnapshot(q, snap => {
+            setNumbers(snap.docs.map(d => ({ id: d.id, ...d.data() } as TwilioPhoneNumber)));
+            setLoading(false);
+        });
+        return unsub;
+    }, [churchId]);
+    return { numbers, loading };
+}
+
+/** Returns true if the current user is allowed to see/use a given number. */
+function canUserSeeNumber(num: TwilioPhoneNumber, user: User): boolean {
+    if (user.roles.includes('Church Admin') || user.roles.includes('System Administration')) return true;
+    return num.allowedUserIds.length === 0 || num.allowedUserIds.includes(user.id);
+}
+
+// ─── NumberManager ───────────────────────────────────────────────────────────
+// Admin-only panel for managing provisioned numbers.
+
+const NumberManager: React.FC<{
+    churchId:     string;
+    church:       Church;
+    currentUser:  User;
+    numbers:      TwilioPhoneNumber[];
+    onClose:      () => void;
+    onAddNumber:  () => void;
+    allUsers:     User[];
+}> = ({ churchId, numbers, currentUser, onClose, onAddNumber, allUsers }) => {
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [labelDraft, setLabelDraft] = useState('');
+    const [usersDraft, setUsersDraft] = useState<string[]>([]);
+    const [senderDraft, setSenderDraft] = useState('');
+    const [saving, setSaving] = useState(false);
+    const [toast, setToast] = useState<{ msg: string; type: 'success'|'error' } | null>(null);
+
+    const showToast = (msg: string, type: 'success'|'error' = 'success') => {
+        setToast({ msg, type });
+        setTimeout(() => setToast(null), 3500);
+    };
+
+    const startEdit = (num: TwilioPhoneNumber) => {
+        setEditingId(num.id);
+        setLabelDraft(num.friendlyLabel);
+        setUsersDraft(num.allowedUserIds);
+        setSenderDraft(num.senderName || '');
+    };
+
+    const saveEdit = async (numId: string) => {
+        setSaving(true);
+        try {
+            await fetch(`${API_BASE}/api/messaging/number-settings`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    churchId,
+                    twilioNumberId: numId,
+                    friendlyLabel:  labelDraft,
+                    allowedUserIds: usersDraft,
+                    senderName:     senderDraft,
+                }),
+            });
+            setEditingId(null);
+            showToast('Saved ✓');
+        } catch {
+            showToast('Save failed', 'error');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const setDefault = async (numId: string) => {
+        await fetch(`${API_BASE}/api/messaging/set-default-number`, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ churchId, twilioNumberId: numId }),
+        });
+        showToast('Default number updated ✓');
+    };
+
+    const releaseNumber = async (num: TwilioPhoneNumber) => {
+        if (!window.confirm(`Release ${num.phoneNumber} (${num.friendlyLabel})? This cannot be undone.`)) return;
+        await fetch(`${API_BASE}/api/messaging/release-number`, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ churchId, twilioNumberId: num.id }),
+        });
+        showToast(`${num.phoneNumber} released`);
+    };
+
+    const isAdmin = currentUser.roles.includes('Church Admin') || currentUser.roles.includes('System Administration');
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh]">
+                {/* Header */}
+                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+                    <div className="flex items-center gap-2">
+                        <Phone size={18} className="text-violet-500" />
+                        <h2 className="text-lg font-black text-slate-900 dark:text-white">Phone Numbers</h2>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 font-semibold">{numbers.length}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        {isAdmin && (
+                            <button
+                                onClick={onAddNumber}
+                                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold transition"
+                            >
+                                <PlusCircle size={14} /> Add Number
+                            </button>
+                        )}
+                        <button onClick={onClose} className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 transition">
+                            <X size={16} />
+                        </button>
+                    </div>
+                </div>
+
+                {/* List */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                    {toast && (
+                        <div className={`text-sm font-semibold px-4 py-2 rounded-xl ${toast.type === 'error' ? 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400' : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400'}`}>
+                            {toast.msg}
+                        </div>
+                    )}
+
+                    {numbers.map(num => (
+                        <div key={num.id} className={`border rounded-2xl overflow-hidden ${num.isDefault ? 'border-violet-300 dark:border-violet-700' : 'border-slate-200 dark:border-slate-700'}`}>
+                            {/* Number header row */}
+                            <div className="flex items-center gap-3 px-4 py-3 bg-slate-50 dark:bg-slate-800/60">
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="font-black text-sm text-slate-900 dark:text-white">{num.friendlyLabel}</span>
+                                        {num.isDefault && (
+                                            <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300">Default</span>
+                                        )}
+                                        {!num.smsEnabled && (
+                                            <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400">Disabled</span>
+                                        )}
+                                    </div>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">{num.phoneNumber}</p>
+                                </div>
+                                {isAdmin && (
+                                    <div className="flex items-center gap-1 shrink-0">
+                                        {!num.isDefault && (
+                                            <button
+                                                onClick={() => setDefault(num.id)}
+                                                title="Set as default"
+                                                className="text-[10px] font-bold px-2 py-1 rounded-lg bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-500 hover:text-violet-600 hover:border-violet-400 transition"
+                                            >
+                                                Set Default
+                                            </button>
+                                        )}
+                                        <button
+                                            onClick={() => editingId === num.id ? setEditingId(null) : startEdit(num)}
+                                            className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-violet-500 transition"
+                                            title="Edit"
+                                        >
+                                            <Edit3 size={13} />
+                                        </button>
+                                        <button
+                                            onClick={() => releaseNumber(num)}
+                                            className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-slate-400 hover:text-red-500 transition"
+                                            title="Release number"
+                                        >
+                                            <Trash2 size={13} />
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Access badge */}
+                            <div className="px-4 py-2 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-700/50">
+                                {num.allowedUserIds.length === 0 ? (
+                                    <><Unlock size={11} className="text-emerald-500" /> Visible to all users</>
+                                ) : (
+                                    <><Lock size={11} className="text-amber-500" /> Restricted to {num.allowedUserIds.length} user{num.allowedUserIds.length !== 1 ? 's' : ''}</>
+                                )}
+                            </div>
+
+                            {/* Inline editor */}
+                            {isAdmin && editingId === num.id && (
+                                <div className="px-4 py-3 border-t border-slate-200 dark:border-slate-700 space-y-3 bg-white dark:bg-slate-900">
+                                    <div>
+                                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Label</label>
+                                        <input
+                                            type="text"
+                                            value={labelDraft}
+                                            onChange={e => setLabelDraft(e.target.value)}
+                                            className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Sender Name</label>
+                                        <input
+                                            type="text"
+                                            value={senderDraft}
+                                            onChange={e => setSenderDraft(e.target.value)}
+                                            placeholder="Grace Community Church"
+                                            className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">
+                                            <Lock size={10} className="inline mr-1" />
+                                            Restrict to users (leave empty for all)
+                                        </label>
+                                        <div className="flex flex-wrap gap-1.5 p-2 border border-slate-200 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-800 min-h-[36px]">
+                                            {allUsers.map(u => {
+                                                const selected = usersDraft.includes(u.id);
+                                                return (
+                                                    <button
+                                                        key={u.id}
+                                                        type="button"
+                                                        onClick={() => setUsersDraft(prev =>
+                                                            selected ? prev.filter(id => id !== u.id) : [...prev, u.id]
+                                                        )}
+                                                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition ${selected ? 'bg-violet-600 text-white' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 hover:border-violet-400'}`}
+                                                    >
+                                                        {selected && <CheckCircle size={10} />}
+                                                        {u.name}
+                                                    </button>
+                                                );
+                                            })}
+                                            {allUsers.length === 0 && <span className="text-xs text-slate-400">No users found</span>}
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-2 pt-1">
+                                        <button onClick={() => saveEdit(num.id)} disabled={saving} className="flex-1 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold transition disabled:opacity-50">
+                                            {saving ? 'Saving…' : 'Save Changes'}
+                                        </button>
+                                        <button onClick={() => setEditingId(null)} className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-sm font-semibold hover:bg-slate-200 dark:hover:bg-slate-700 transition">
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    ))}
+
+                    {numbers.length === 0 && (
+                        <div className="text-center py-12 text-slate-400 text-sm">
+                            No phone numbers provisioned yet.
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // ─── Main MessagingModule ─────────────────────────────────────────────────────
 
 interface MessagingModuleProps {
@@ -5464,6 +5756,52 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
     const [toast, setToast]           = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
     const [isSending, setIsSending]   = useState(false);
     const [showSetup, setShowSetup]   = useState(false);
+
+    // ── Multi-number support ───────────────────────────────────────────────────
+    const { numbers: twilioNumbers, loading: numbersLoading } = useTwilioNumbers(churchId);
+    const visibleNumbers = twilioNumbers.filter(n => canUserSeeNumber(n, currentUser));
+    const [activeNumberId, setActiveNumberId] = useState<string | null>(null);
+    const [showNumberManager, setShowNumberManager] = useState(false);
+    const [showAddNumber, setShowAddNumber] = useState(false);
+    // All users in the church — needed for the user restriction picker
+    const [allUsers, setAllUsers] = useState<User[]>([]);
+    useEffect(() => {
+        const q = query(collection(firebaseDb, 'users'), where('churchId', '==', churchId));
+        getDocs(q).then(snap => setAllUsers(snap.docs.map(d => ({ id: d.id, ...d.data() } as User))));
+    }, [churchId]);
+
+    // Auto-select first visible number when list loads
+    useEffect(() => {
+        if (!activeNumberId && visibleNumbers.length > 0) {
+            // Prefer the default number, otherwise first visible
+            const defaultNum = visibleNumbers.find(n => n.isDefault) ?? visibleNumbers[0];
+            setActiveNumberId(defaultNum.id);
+        }
+    }, [visibleNumbers.length]);
+
+    // Auto-migrate: if church has smsSettings.twilioPhoneNumber but no twilioNumbers docs yet
+    useEffect(() => {
+        const legacyPhone = church.smsSettings?.twilioPhoneNumber;
+        const legacyPhoneSid = church.smsSettings?.twilioPhoneSid;
+        if (legacyPhone && !numbersLoading && twilioNumbers.length === 0) {
+            const migratedId = `${churchId}_migrated`;
+            setDoc(doc(firebaseDb, 'twilioNumbers', migratedId), {
+                id:             migratedId,
+                churchId,
+                phoneNumber:    legacyPhone,
+                phoneSid:       legacyPhoneSid || '',
+                friendlyLabel:  'Main Line',
+                isDefault:      true,
+                smsEnabled:     true,
+                allowedUserIds: [],
+                createdAt:      Date.now(),
+                updatedAt:      Date.now(),
+            }).catch(() => {/* silent – may race with another tab */});
+        }
+    }, [numbersLoading, twilioNumbers.length, church.smsSettings?.twilioPhoneNumber]);
+
+    const activeNumber = visibleNumbers.find(n => n.id === activeNumberId) ?? visibleNumbers[0] ?? null;
+
 
     const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
         setToast({ msg, type });
@@ -5616,8 +5954,43 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                     )}
                 </div>
             )}
-            {/* Phone badge only — shown when tab is externally controlled */}
-            {!activeCampaign && controlledTab && church.smsSettings?.twilioPhoneNumber && (
+
+            {/* ── Number / Inbox switcher strip ───────────────────────────────────
+                Shown when SMS is enabled and at least one number exists.        */}
+            {!activeCampaign && smsEnabled && visibleNumbers.length > 0 && (
+                <div className="flex items-center gap-2 px-6 pt-2 pb-1 shrink-0 overflow-x-auto">
+                    {/* Per-number pills */}
+                    {visibleNumbers.map(num => (
+                        <button
+                            key={num.id}
+                            onClick={() => setActiveNumberId(num.id)}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition border ${
+                                activeNumberId === num.id
+                                    ? 'bg-violet-600 text-white border-violet-600 shadow-sm'
+                                    : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-violet-400'
+                            }`}
+                        >
+                            <Phone size={10} />
+                            <span>{num.friendlyLabel}</span>
+                            <span className={`font-mono ${ activeNumberId === num.id ? 'opacity-80' : 'opacity-50' }`}>{formatPhone(num.phoneNumber)}</span>
+                            {num.isDefault && (<span className="text-[8px] uppercase tracking-wider opacity-70">·default</span>)}
+                        </button>
+                    ))}
+
+                    {/* Manage button (admin only) */}
+                    {(currentUser.roles.includes('Church Admin') || currentUser.roles.includes('System Administration')) && (
+                        <button
+                            onClick={() => setShowNumberManager(true)}
+                            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:border-violet-400 hover:text-violet-600 transition whitespace-nowrap bg-white dark:bg-slate-800"
+                        >
+                            <Settings size={10} /> Manage Numbers
+                        </button>
+                    )}
+                </div>
+            )}
+
+            {/* Phone badge only — shown when tab is externally controlled AND no numbers yet (fallback) */}
+            {!activeCampaign && controlledTab && visibleNumbers.length === 0 && church.smsSettings?.twilioPhoneNumber && (
                 <div className="flex justify-end px-6 pt-2 shrink-0">
                     <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-full px-3 py-1.5">
                         <Phone size={12} />
@@ -5660,7 +6033,12 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                 {/* Inbox tab */}
                 {effectiveTab === 'inbox' && (
                     <div className="h-full">
-                        <SmsInbox churchId={churchId} currentUser={currentUser} church={church} />
+                        <SmsInbox
+                            churchId={churchId}
+                            currentUser={currentUser}
+                            church={church}
+                            twilioNumberId={activeNumberId}
+                        />
                     </div>
                 )}
 
@@ -5685,8 +6063,52 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                     </div>
                 )}
             </div>
+
+            {/* ── Modals ──────────────────────────────────────────────────────── */}
+
+            {/* Number Manager modal */}
+            {showNumberManager && (
+                <NumberManager
+                    churchId={churchId}
+                    church={church}
+                    currentUser={currentUser}
+                    numbers={twilioNumbers}
+                    allUsers={allUsers}
+                    onClose={() => setShowNumberManager(false)}
+                    onAddNumber={() => { setShowNumberManager(false); setShowAddNumber(true); }}
+                />
+            )}
+
+            {/* Add-a-Number flow: re-uses the SmsSetupWizard but skip sub-account steps */}
+            {showAddNumber && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+                            <div className="flex items-center gap-2">
+                                <PlusCircle size={16} className="text-violet-500" />
+                                <h2 className="text-base font-black text-slate-900 dark:text-white">Add Phone Number</h2>
+                            </div>
+                            <button onClick={() => setShowAddNumber(false)} className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 transition">
+                                <X size={16} />
+                            </button>
+                        </div>
+                        <SmsSetupWizard
+                            churchId={churchId}
+                            church={church}
+                            onBack={() => setShowAddNumber(false)}
+                            onComplete={() => {
+                                setShowAddNumber(false);
+                                setShowNumberManager(true);
+                                showToast('New number added ✓');
+                            }}
+                            mode="add-number"
+                        />
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
 
 export default MessagingModule;
+

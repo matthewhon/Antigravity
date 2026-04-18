@@ -921,7 +921,11 @@ export interface SmsConversation {
     /** Staff user ID assigned to handle this thread */
     assignedTo?: string | null;
     tags?: string[];
-    /** Named inbox this conversation belongs to (multi-inbox) */
+    /** ID of the TwilioPhoneNumber doc this conversation belongs to */
+    twilioNumberId?: string | null;
+    /** The Twilio E.164 number that received / will send messages in this thread */
+    toPhoneNumber?: string | null;
+    /** Named inbox this conversation belongs to (legacy — same value as twilioNumberId) */
     inboxId?: string | null;
 }
 
@@ -934,7 +938,7 @@ export interface SmsCampaign {
     status: SmsCampaignStatus;
     body: string;
     mediaUrls?: string[];
-    // Recipients � one of listId, groupId, or toPhones
+    // Recipients  one of listId, groupId, or toPhones
     toListId?: string | null;
     toListName?: string | null;
     toGroupId?: string | null;
@@ -943,11 +947,14 @@ export interface SmsCampaign {
     toPhones?: string[];
     // Scheduling
     sendAt?: string | null;       // ISO string for UI display
-    scheduledAt?: number | null;  // epoch ms � authoritative trigger for the scheduler
+    scheduledAt?: number | null;  // epoch ms  authoritative trigger for the scheduler
     sentAt?: number | null;
     recurringFrequency?: 'daily' | 'weekly' | 'monthly' | null;
     lastSentAt?: number | null;
     sentHistory?: { sentAt: number; recipientCount: number }[];
+    // Sending number override
+    /** TwilioPhoneNumber doc ID to use for this campaign. Falls back to the church default number. */
+    twilioNumberId?: string | null;
     // Analytics
     recipientCount?: number;
     deliveredCount?: number;
@@ -987,6 +994,11 @@ export interface SmsKeyword {
     addToListName?: string | null;
     /** Tag IDs (SmsTag.id) to automatically apply to the conversation when this keyword matches */
     autoTagIds?: string[];
+    /**
+     * Optional restriction to specific TwilioPhoneNumber doc IDs.
+     * Empty / absent = applies to all numbers for the church.
+     */
+    numberIds?: string[];
     isActive: boolean;
     matchCount: number;
     createdAt: number;
@@ -1008,6 +1020,39 @@ export interface SmsInbox {
     name: string;
     assignedUserIds: string[];
     isDefault: boolean;
+}
+
+/**
+ * A Twilio phone number owned by a church tenant.
+ * Stored in the top-level `twilioNumbers` collection (one doc per number).
+ * Replaces the single-number pattern in Church.smsSettings.
+ */
+export interface TwilioPhoneNumber {
+    id: string;                   // Firestore doc ID (auto)
+    churchId: string;
+    /** E.164 phone number, e.g. "+15551234567" */
+    phoneNumber: string;
+    /** Twilio IncomingPhoneNumber SID */
+    phoneSid: string;
+    /** Admin-assigned label, e.g. "Main Office", "Youth Line" */
+    friendlyLabel: string;
+    /** True for the number used by campaigns/workflows when no override is set */
+    isDefault: boolean;
+    smsEnabled: boolean;
+    /**
+     * IDs of users who can see this inbox.
+     * Empty array = visible to all users in the church.
+     * Church Admins always bypass this restriction.
+     */
+    allowedUserIds: string[];
+    /** Webhook URL configured on this number in Twilio */
+    webhookUrl?: string;
+    /** Twilio Messaging Service SID linked to this number */
+    messagingServiceSid?: string;
+    /** Sender name prefix shown to recipients */
+    senderName?: string;
+    createdAt: number;
+    updatedAt: number;
 }
 
 export interface SmsUsageRecord {
@@ -1050,9 +1095,9 @@ export interface SmsWorkflowStep {
      * - 'day_of_month' ? fire on the next calendar date matching scheduleDayOfMonth.
      */
     scheduleType?: 'relative' | 'day_of_week' | 'day_of_month';
-    /** 0 = Sunday � 6 = Saturday. Used when scheduleType = 'day_of_week'. Default: 1 (Monday). */
+    /** 0 = Sunday  6 = Saturday. Used when scheduleType = 'day_of_week'. Default: 1 (Monday). */
     scheduleDayOfWeek?: number;
-    /** 1�31. Used when scheduleType = 'day_of_month'. */
+    /** 131. Used when scheduleType = 'day_of_month'. */
     scheduleDayOfMonth?: number;
     /** Send time in 'HH:MM' 24-hour format. Used for day_of_week and day_of_month modes. Default '09:00'. */
     scheduleTime?: string;
@@ -1097,7 +1142,7 @@ export interface SmsWorkflow {
      * 0 = send on the event day (default), 7 = send 1 week early, etc.
      */
     triggerDayOffset?: number;
-    /** Legacy flat step array � kept in sync by the editor for the scheduler */
+    /** Legacy flat step array  kept in sync by the editor for the scheduler */
     steps: SmsWorkflowStep[];
     /**
      * New node-based workflow structure used by the editor.
@@ -1136,7 +1181,7 @@ export interface SmsWorkflowEnrollment {
 export type WorkflowBranchConditionType = 'replied' | 'email_opened' | 'tag_applied' | 'custom';
 
 /**
- * An *action* node � sends a message to the contact (or staff).
+ * An *action* node  sends a message to the contact (or staff).
  * Equivalent to the legacy SmsWorkflowStep but without timing fields
  * (timing lives in a separate DelayNode that precedes this node).
  */
@@ -1177,12 +1222,8 @@ export interface WorkflowDelayNode {
     scheduleDayOfMonth?: number;
     /** 'HH:MM' 24-hour send time for day_of_week / day_of_month modes. */
     scheduleTime?: string;
-    /**
-     * Recurrence mode for the *following* action node.
-     * 'none'    = fire once (default).
-     * 'weekly'  = repeat every week on the chosen day(s).
-     * 'monthly' = repeat every month on the chosen date(s).
-     */
+    // ── Recurrence ─────────────────────────────────────────────────────────
+    /** 'none' = fire once; 'weekly' = repeat on selected days of week; 'monthly' = repeat on selected dates */
     repeatType?: 'none' | 'weekly' | 'monthly';
     /**
      * Days on which the action repeats.

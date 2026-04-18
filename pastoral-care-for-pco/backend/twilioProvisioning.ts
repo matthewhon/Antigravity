@@ -130,7 +130,7 @@ export const getAvailableNumbers = async (req: any, res: any) => {
 export const provisionTwilioNumber = async (req: any, res: any) => {
     res.set('Access-Control-Allow-Origin', '*');
 
-    const { churchId, phoneNumber, senderName } = req.body || {};
+    const { churchId, phoneNumber, senderName, friendlyLabel } = req.body || {};
     if (!churchId || !phoneNumber) {
         return res.status(400).json({ error: 'Missing churchId or phoneNumber' });
     }
@@ -213,10 +213,12 @@ export const provisionTwilioNumber = async (req: any, res: any) => {
         log.info(`Purchased number ${phoneNumber} (SID: ${purchased.sid}) for church ${churchId}`, 'system', { churchId, phoneNumber, sid: purchased.sid }, churchId);
 
         // 5. Save SMS settings to Firestore
+        const now = Date.now();
         const smsSettings = {
             smsEnabled:               true,
             twilioSubAccountSid:      subAccountSid,
             twilioSubAccountAuthToken: subAccountAuthToken,
+            // Keep these on smsSettings for backward-compat (A2P, send, etc.)
             twilioPhoneNumber:        phoneNumber,
             twilioPhoneSid:           purchased.sid,
             twilioA2pStatus:          'not_started' as const,
@@ -225,10 +227,37 @@ export const provisionTwilioNumber = async (req: any, res: any) => {
 
         await db.collection('churches').doc(churchId).update({ smsSettings });
 
+        // 5b. Write to the new twilioNumbers collection
+        // Check if this is the first number for the church
+        const existingNums = await db.collection('twilioNumbers')
+            .where('churchId', '==', churchId)
+            .limit(1)
+            .get();
+        const isFirstNumber = existingNums.empty;
+
+        const numDocId = `${churchId}_${purchased.sid}`;
+        await db.collection('twilioNumbers').doc(numDocId).set({
+            id:             numDocId,
+            churchId,
+            phoneNumber,
+            phoneSid:       purchased.sid,
+            friendlyLabel:  friendlyLabel || 'Main Line',
+            isDefault:      isFirstNumber,
+            smsEnabled:     true,
+            allowedUserIds: [],          // open to all users
+            webhookUrl:     inboundUrl,
+            senderName:     senderName || church.name || 'Church',
+            createdAt:      now,
+            updatedAt:      now,
+        });
+
+        log.info(`[twilioProvisioning] Wrote twilioNumbers doc ${numDocId} for church ${churchId}`, 'system', { churchId, numDocId, isFirstNumber }, churchId);
+
         return res.json({
             success:      true,
             phoneNumber,
             subAccountSid,
+            twilioNumberId: numDocId,
             message:      `Phone number ${phoneNumber} provisioned successfully.`,
         });
     } catch (e: any) {
@@ -238,7 +267,8 @@ export const provisionTwilioNumber = async (req: any, res: any) => {
 };
 
 // ─── POST /api/messaging/release ────────────────────────────────────────────
-// Releases the phone number from Twilio (and sets smsEnabled = false).
+// Releases the FIRST / only phone number (legacy single-number flow).
+// For multi-number tenants, use /api/messaging/release-number instead.
 
 export const releaseTwilioNumber = async (req: any, res: any) => {
     res.set('Access-Control-Allow-Origin', '*');
@@ -275,6 +305,244 @@ export const releaseTwilioNumber = async (req: any, res: any) => {
         return res.status(500).json({ error: e.message || 'Release failed' });
     }
 };
+
+// ─── POST /api/messaging/add-number ─────────────────────────────────────────
+// Adds a SECOND (or Nth) phone number to an already-enabled church.
+// Reuses the existing Twilio sub-account — no new sub-account is created.
+// Body: { churchId, phoneNumber, friendlyLabel? }
+
+export const addTwilioNumber = async (req: any, res: any) => {
+    res.set('Access-Control-Allow-Origin', '*');
+
+    const { churchId, phoneNumber, friendlyLabel } = req.body || {};
+    if (!churchId || !phoneNumber) {
+        return res.status(400).json({ error: 'Missing churchId or phoneNumber' });
+    }
+
+    const db  = getDb();
+    const log = createServerLogger(db);
+
+    try {
+        const churchSnap = await db.collection('churches').doc(churchId).get();
+        if (!churchSnap.exists) return res.status(404).json({ error: 'Church not found' });
+        const church     = churchSnap.data() || {};
+        const smsSettings = church.smsSettings || {};
+
+        if (!smsSettings.twilioSubAccountSid || !smsSettings.twilioSubAccountAuthToken) {
+            return res.status(400).json({
+                error: 'No Twilio sub-account found. Complete the initial SMS setup first.',
+            });
+        }
+
+        // Build inbound webhook URL
+        const sysSnap = await db.doc('system/settings').get();
+        const sysData = sysSnap.data() || {};
+        const baseUrl = (
+            sysData.twilioWebhookBaseUrl ||
+            sysData.apiBaseUrl ||
+            process.env.SERVER_BASE_URL || ''
+        ).replace(/\/$/, '');
+        if (!baseUrl) throw new Error('Webhook Base URL is not configured.');
+
+        const inboundUrl     = `${baseUrl}/api/messaging/inbound`;
+        const statusCallback = `${baseUrl}/api/messaging/status`;
+
+        const subClient = twilio(smsSettings.twilioSubAccountSid, smsSettings.twilioSubAccountAuthToken);
+
+        // Purchase the additional number
+        const purchased = await subClient.incomingPhoneNumbers.create({
+            phoneNumber,
+            smsUrl:              inboundUrl,
+            smsMethod:           'POST',
+            statusCallback,
+            statusCallbackMethod: 'POST',
+        });
+
+        const now      = Date.now();
+        const numDocId = `${churchId}_${purchased.sid}`;
+
+        await db.collection('twilioNumbers').doc(numDocId).set({
+            id:             numDocId,
+            churchId,
+            phoneNumber,
+            phoneSid:       purchased.sid,
+            friendlyLabel:  friendlyLabel || phoneNumber,
+            isDefault:      false,   // never default — use set-default-number to change
+            smsEnabled:     true,
+            allowedUserIds: [],
+            webhookUrl:     inboundUrl,
+            senderName:     smsSettings.senderName || church.name || 'Church',
+            createdAt:      now,
+            updatedAt:      now,
+        });
+
+        log.info(`[addTwilioNumber] Added number ${phoneNumber} (SID: ${purchased.sid}) for church ${churchId}`, 'system', { churchId, numDocId }, churchId);
+
+        return res.json({
+            success:      true,
+            phoneNumber,
+            twilioNumberId: numDocId,
+            message:      `Phone number ${phoneNumber} added successfully.`,
+        });
+
+    } catch (e: any) {
+        log.error(`[addTwilioNumber] Failed for ${churchId}: ${e.message}`, 'system', { churchId, phoneNumber }, churchId);
+        return res.status(500).json({ error: e.message || 'Failed to add number' });
+    }
+};
+
+// ─── POST /api/messaging/release-number ─────────────────────────────────────
+// Releases a specific phone number by twilioNumberId.
+// Body: { churchId, twilioNumberId }
+
+export const releaseSpecificNumber = async (req: any, res: any) => {
+    res.set('Access-Control-Allow-Origin', '*');
+
+    const { churchId, twilioNumberId } = req.body || {};
+    if (!churchId || !twilioNumberId) {
+        return res.status(400).json({ error: 'Missing churchId or twilioNumberId' });
+    }
+
+    const db  = getDb();
+    const log = createServerLogger(db);
+
+    try {
+        const numSnap = await db.collection('twilioNumbers').doc(twilioNumberId).get();
+        if (!numSnap.exists) return res.status(404).json({ error: 'Phone number record not found' });
+        const numData = numSnap.data() || {};
+        if (numData.churchId !== churchId) return res.status(403).json({ error: 'Forbidden' });
+
+        // Fetch sub-account credentials
+        const churchSnap = await db.collection('churches').doc(churchId).get();
+        const sms = churchSnap.data()?.smsSettings || {};
+
+        if (sms.twilioSubAccountSid && sms.twilioSubAccountAuthToken && numData.phoneSid) {
+            const subClient = twilio(sms.twilioSubAccountSid, sms.twilioSubAccountAuthToken);
+            try {
+                await subClient.incomingPhoneNumbers(numData.phoneSid).remove();
+            } catch (twilioErr: any) {
+                // If the number was already released in Twilio, continue with DB cleanup
+                log.warn(`[releaseSpecificNumber] Twilio release failed (may already be released): ${twilioErr.message}`, 'system', { churchId, twilioNumberId }, churchId);
+            }
+        }
+
+        // Delete the twilioNumbers doc
+        await db.collection('twilioNumbers').doc(twilioNumberId).delete();
+
+        // If this was the default number, promote the next one
+        if (numData.isDefault) {
+            const remaining = await db.collection('twilioNumbers')
+                .where('churchId', '==', churchId)
+                .limit(1)
+                .get();
+            if (!remaining.empty) {
+                await remaining.docs[0].ref.update({ isDefault: true, updatedAt: Date.now() });
+            } else {
+                // No numbers left — disable SMS
+                await db.collection('churches').doc(churchId).update({
+                    'smsSettings.smsEnabled':        false,
+                    'smsSettings.twilioPhoneNumber': null,
+                    'smsSettings.twilioPhoneSid':    null,
+                });
+            }
+        }
+
+        log.info(`[releaseSpecificNumber] Released ${numData.phoneNumber} for church ${churchId}`, 'system', { churchId, twilioNumberId }, churchId);
+        return res.json({ success: true, message: `${numData.phoneNumber} released.` });
+
+    } catch (e: any) {
+        log.error(`[releaseSpecificNumber] Failed: ${e.message}`, 'system', { churchId, twilioNumberId }, churchId);
+        return res.status(500).json({ error: e.message || 'Release failed' });
+    }
+};
+
+// ─── PATCH /api/messaging/number-settings ────────────────────────────────────
+// Updates label, user restrictions, or senderName for a specific number.
+// Body: { churchId, twilioNumberId, friendlyLabel?, allowedUserIds?, senderName? }
+
+export const updateNumberSettings = async (req: any, res: any) => {
+    res.set('Access-Control-Allow-Origin', '*');
+
+    const { churchId, twilioNumberId, friendlyLabel, allowedUserIds, senderName } = req.body || {};
+    if (!churchId || !twilioNumberId) {
+        return res.status(400).json({ error: 'Missing churchId or twilioNumberId' });
+    }
+
+    const db  = getDb();
+    const log = createServerLogger(db);
+
+    try {
+        const numSnap = await db.collection('twilioNumbers').doc(twilioNumberId).get();
+        if (!numSnap.exists) return res.status(404).json({ error: 'Number not found' });
+        if (numSnap.data()?.churchId !== churchId) return res.status(403).json({ error: 'Forbidden' });
+
+        const patch: Record<string, any> = { updatedAt: Date.now() };
+        if (friendlyLabel  !== undefined) patch.friendlyLabel  = friendlyLabel;
+        if (allowedUserIds !== undefined) patch.allowedUserIds = allowedUserIds;
+        if (senderName     !== undefined) patch.senderName     = senderName;
+
+        await db.collection('twilioNumbers').doc(twilioNumberId).update(patch);
+        log.info(`[updateNumberSettings] Updated ${twilioNumberId} for church ${churchId}`, 'system', { churchId, twilioNumberId, patch }, churchId);
+
+        return res.json({ success: true });
+    } catch (e: any) {
+        log.error(`[updateNumberSettings] Failed: ${e.message}`, 'system', { churchId, twilioNumberId }, churchId);
+        return res.status(500).json({ error: e.message || 'Update failed' });
+    }
+};
+
+// ─── POST /api/messaging/set-default-number ──────────────────────────────────
+// Atomically marks one number as isDefault=true and all others false.
+// Body: { churchId, twilioNumberId }
+
+export const setDefaultNumber = async (req: any, res: any) => {
+    res.set('Access-Control-Allow-Origin', '*');
+
+    const { churchId, twilioNumberId } = req.body || {};
+    if (!churchId || !twilioNumberId) {
+        return res.status(400).json({ error: 'Missing churchId or twilioNumberId' });
+    }
+
+    const db  = getDb();
+    const log = createServerLogger(db);
+
+    try {
+        const allNums = await db.collection('twilioNumbers')
+            .where('churchId', '==', churchId)
+            .get();
+
+        const batch = db.batch();
+        const now   = Date.now();
+        let targetPhone = '';
+
+        allNums.docs.forEach(doc => {
+            const isTarget = doc.id === twilioNumberId;
+            batch.update(doc.ref, { isDefault: isTarget, updatedAt: now });
+            if (isTarget) targetPhone = doc.data().phoneNumber || '';
+        });
+
+        await batch.commit();
+
+        // Also update smsSettings.twilioPhoneNumber to keep backward-compat
+        if (targetPhone) {
+            const targetDoc = allNums.docs.find(d => d.id === twilioNumberId);
+            if (targetDoc) {
+                await db.collection('churches').doc(churchId).update({
+                    'smsSettings.twilioPhoneNumber': targetPhone,
+                    'smsSettings.twilioPhoneSid':    targetDoc.data().phoneSid || null,
+                });
+            }
+        }
+
+        log.info(`[setDefaultNumber] Set ${twilioNumberId} as default for church ${churchId}`, 'system', { churchId, twilioNumberId }, churchId);
+        return res.json({ success: true });
+
+    } catch (e: any) {
+        log.error(`[setDefaultNumber] Failed: ${e.message}`, 'system', { churchId, twilioNumberId }, churchId);
+        return res.status(500).json({ error: e.message || 'Failed to set default' });
+    }
+};
+
 
 // ─── POST /api/messaging/a2p-register ───────────────────────────────────────
 // Submits A2P 10DLC brand registration for the church's sub-account.

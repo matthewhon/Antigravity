@@ -67,17 +67,46 @@ async function getStatusCallbackUrl(db: any): Promise<string | null> {
     }
 }
 
-/** Get sub-account Twilio client for a church. */
-async function getSubClient(db: any, churchId: string): Promise<{ client: any; fromNumber: string }> {
+/**
+ * Get sub-account Twilio client and the correct from-number for a church.
+ * If twilioNumberId is provided, uses that specific number.
+ * Otherwise falls back to the church's smsSettings.twilioPhoneNumber (default/legacy).
+ */
+async function getSubClient(
+    db: any,
+    churchId: string,
+    twilioNumberId?: string | null
+): Promise<{ client: any; fromNumber: string }> {
     const snap = await db.collection('churches').doc(churchId).get();
     if (!snap.exists) throw new Error(`Church ${churchId} not found`);
     const sms = snap.data()?.smsSettings || {};
     if (!sms.smsEnabled)          throw new Error('SMS is not enabled for this church.');
     if (!sms.twilioSubAccountSid) throw new Error('No Twilio sub-account configured.');
-    if (!sms.twilioPhoneNumber)   throw new Error('No Twilio phone number configured.');
 
-    const client     = twilio(sms.twilioSubAccountSid, sms.twilioSubAccountAuthToken);
-    const fromNumber = sms.twilioPhoneNumber;
+    const client = twilio(sms.twilioSubAccountSid, sms.twilioSubAccountAuthToken);
+
+    // Resolve the from-number
+    let fromNumber = sms.twilioPhoneNumber as string | undefined;
+
+    if (twilioNumberId) {
+        // Specific number override
+        const numSnap = await db.collection('twilioNumbers').doc(twilioNumberId).get();
+        if (numSnap.exists && numSnap.data()?.churchId === churchId) {
+            fromNumber = numSnap.data()!.phoneNumber;
+        }
+    } else if (!fromNumber) {
+        // Look up the default number in the collection
+        const defaultSnap = await db.collection('twilioNumbers')
+            .where('churchId', '==', churchId)
+            .where('isDefault', '==', true)
+            .limit(1)
+            .get();
+        if (!defaultSnap.empty) {
+            fromNumber = defaultSnap.docs[0].data().phoneNumber;
+        }
+    }
+
+    if (!fromNumber) throw new Error('No Twilio phone number configured for this church.');
     return { client, fromNumber };
 }
 
@@ -123,7 +152,12 @@ async function recordUsage(db: any, params: {
 export const sendIndividual = async (req: any, res: any) => {
     res.set('Access-Control-Allow-Origin', '*');
 
-    const { churchId, toPhone, body, mediaUrls = [], sentBy, sentByName } = req.body || {};
+    const {
+        churchId, toPhone, body, mediaUrls = [],
+        sentBy, sentByName,
+        twilioNumberId,     // optional: override which number to send from
+        conversationId: existingConvId,
+    } = req.body || {};
     if (!churchId || !toPhone || !body) {
         return res.status(400).json({ error: 'Missing churchId, toPhone, or body' });
     }
@@ -139,7 +173,14 @@ export const sendIndividual = async (req: any, res: any) => {
             return res.status(403).json({ error: `${to} has opted out of messages from this church.` });
         }
 
-        const { client, fromNumber } = await getSubClient(db, churchId);
+        // If caller provides a conversationId, read the twilioNumberId from there
+        let resolvedNumberId = twilioNumberId || null;
+        if (!resolvedNumberId && existingConvId) {
+            const convSnap = await db.collection('smsConversations').doc(existingConvId).get();
+            if (convSnap.exists) resolvedNumberId = convSnap.data()?.twilioNumberId || null;
+        }
+
+        const { client, fromNumber } = await getSubClient(db, churchId, resolvedNumberId);
 
         const isMms    = (mediaUrls as string[]).length > 0;
         const segments = isMms ? 1 : countSegments(body);
@@ -159,11 +200,11 @@ export const sendIndividual = async (req: any, res: any) => {
         await recordUsage(db, { churchId, toPhone: to, segments, isMms, twilioSid: msg.sid });
 
         // Write to conversation
-        const convId  = `${churchId}_${to.replace(/\+/g, '')}`;
+        const convId  = existingConvId || `${churchId}_${to.replace(/\+/g, '')}`;
         const convRef = db.collection('smsConversations').doc(convId);
         const now     = Date.now();
 
-        await convRef.set({
+        const convPatch: any = {
             id:                  convId,
             churchId,
             phoneNumber:         to,
@@ -172,7 +213,13 @@ export const sendIndividual = async (req: any, res: any) => {
             lastMessageDirection:'outbound',
             isOptedOut:          false,
             unreadCount:         0,
-        }, { merge: true });
+        };
+        if (resolvedNumberId) {
+            convPatch.twilioNumberId = resolvedNumberId;
+            convPatch.inboxId        = resolvedNumberId;
+            convPatch.toPhoneNumber  = fromNumber;
+        }
+        await convRef.set(convPatch, { merge: true });
 
         // Save the outbound message
         const messageId = `msg_${now}_${Math.random().toString(36).slice(2, 8)}`;
@@ -183,7 +230,7 @@ export const sendIndividual = async (req: any, res: any) => {
             direction:      'outbound',
             body,
             mediaUrls:      mediaUrls || [],
-            status:         msg.status || 'queued',   // real status from Twilio; updated via webhook
+            status:         msg.status || 'queued',
             twilioSid:      msg.sid,
             sentBy:         sentBy     || null,
             sentByName:     sentByName || null,
@@ -203,20 +250,22 @@ export const sendIndividual = async (req: any, res: any) => {
 // Core bulk-send logic — callable directly from the scheduler without HTTP.
 
 export async function sendBulkInternal(params: {
-    db:          any;
-    churchId:    string;
-    campaignId?: string;
-    phones:      string[];
-    body:        string;
-    mediaUrls?:  string[];
-    sentBy?:     string;
-    sentByName?: string;
-    personMap?:  Record<string, PersonInfo>;
+    db:              any;
+    churchId:        string;
+    campaignId?:     string;
+    phones:          string[];
+    body:            string;
+    mediaUrls?:      string[];
+    sentBy?:         string;
+    sentByName?:     string;
+    personMap?:      Record<string, PersonInfo>;
+    /** Optional: send from a specific number instead of the church default */
+    twilioNumberId?: string | null;
 }): Promise<{ sent: number; failed: number; optedOut: number; skipped: number; errors: { phone: string; error: string }[] }> {
-    const { db, churchId, campaignId, phones, body, mediaUrls = [], sentBy, sentByName, personMap = {} } = params as any;
+    const { db, churchId, campaignId, phones, body, mediaUrls = [], sentBy, sentByName, personMap = {}, twilioNumberId } = params as any;
     const log   = createServerLogger(db);
     const isMms = (mediaUrls as string[]).length > 0;
-    const { client, fromNumber } = await getSubClient(db, churchId);
+    const { client, fromNumber } = await getSubClient(db, churchId, twilioNumberId || null);
 
     let sent = 0, failed = 0, optedOut = 0, skipped = 0;
     const errors: { phone: string; error: string }[] = [];

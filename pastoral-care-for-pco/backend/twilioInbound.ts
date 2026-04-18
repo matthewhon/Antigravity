@@ -73,21 +73,47 @@ export const handleInboundSms = async (req: any, res: any) => {
         const from = normaliseE164(fromRaw || '');
         const to   = normaliseE164(toRaw   || '');
 
-        // 1. Find the church by the Twilio "To" number
-        const churchSnap = await db.collection('churches')
-            .where('smsSettings.twilioPhoneNumber', '==', to)
+        // 1. Find the church via the twilioNumbers collection (new multi-number routing)
+        const numSnap = await db.collection('twilioNumbers')
+            .where('phoneNumber', '==', to)
+            .where('smsEnabled', '==', true)
             .limit(1)
             .get();
 
-        if (churchSnap.empty) {
-            log.warn(`[Inbound SMS] No church found for number ${to}`, 'system', { to, from }, '');
+        // Fallback: legacy single-number lookup on the church doc itself
+        let churchId    = '';
+        let twilioNumberId: string | null = null;
+        let smsSettings: any = {};
+
+        if (!numSnap.empty) {
+            const numDoc    = numSnap.docs[0];
+            churchId        = numDoc.data().churchId;
+            twilioNumberId  = numDoc.id;
+
+            const churchSnap2 = await db.collection('churches').doc(churchId).get();
+            smsSettings       = churchSnap2.data()?.smsSettings || {};
+        } else {
+            // Fallback to legacy church field (for churches not yet migrated)
+            const legacySnap = await db.collection('churches')
+                .where('smsSettings.twilioPhoneNumber', '==', to)
+                .limit(1)
+                .get();
+
+            if (legacySnap.empty) {
+                log.warn(`[Inbound SMS] No church found for number ${to}`, 'system', { to, from }, '');
+                res.set('Content-Type', 'text/xml');
+                return res.status(200).send('<Response></Response>');
+            }
+            const churchDoc2  = legacySnap.docs[0];
+            churchId          = churchDoc2.id;
+            smsSettings       = churchDoc2.data()?.smsSettings || {};
+        }
+
+        if (!churchId) {
+            log.warn(`[Inbound SMS] Could not resolve churchId for number ${to}`, 'system', { to, from }, '');
             res.set('Content-Type', 'text/xml');
             return res.status(200).send('<Response></Response>');
         }
-
-        const churchDoc = churchSnap.docs[0];
-        const churchId  = churchDoc.id;
-        const smsSettings = churchDoc.data()?.smsSettings || {};
 
         // 2. Handle STOP / HELP / START (carrier compliance)
         const upperBody = body.trim().toUpperCase();
@@ -132,6 +158,9 @@ export const handleInboundSms = async (req: any, res: any) => {
                 lastMessageDirection:'inbound',
                 unreadCount:         1,
                 isOptedOut:          false,
+                twilioNumberId:      twilioNumberId,
+                inboxId:             twilioNumberId,   // keep legacy field in sync
+                toPhoneNumber:       to,
             };
             if (personMatch) {
                 convData.personId     = personMatch.personId;
@@ -146,6 +175,12 @@ export const handleInboundSms = async (req: any, res: any) => {
                 lastMessageDirection:'inbound',
                 unreadCount:         (convSnap.data()?.unreadCount || 0) + 1,
             };
+            // Backfill twilioNumberId if not set (migration)
+            if (!convSnap.data()?.twilioNumberId && twilioNumberId) {
+                updateData.twilioNumberId = twilioNumberId;
+                updateData.inboxId        = twilioNumberId;
+                updateData.toPhoneNumber  = to;
+            }
             if (personMatch) {
                 updateData.personId     = personMatch.personId;
                 updateData.personName   = personMatch.personName;
@@ -153,6 +188,7 @@ export const handleInboundSms = async (req: any, res: any) => {
             }
             await convRef.update(updateData);
         }
+
 
         // 4. Save the inbound message
         const messageId = `msg_${now}_${Math.random().toString(36).slice(2, 8)}`;
