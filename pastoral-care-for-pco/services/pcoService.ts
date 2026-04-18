@@ -104,6 +104,26 @@ export const pcoService = {
         }
     },
 
+    /**
+     * Returns the PCO person IDs for all members of a given PCO List.
+     * Handles pagination automatically.
+     */
+    async getListPeopleIds(churchId: string, listId: string): Promise<string[]> {
+        try {
+            const ids: string[] = [];
+            let url: string | null = `https://api.planningcenteronline.com/people/v2/lists/${listId}/people?per_page=100&fields[Person]=id`;
+            while (url) {
+                const data = await pcoFetch(churchId, url);
+                const page = safeData(data);
+                page.forEach((p: any) => { if (p.id) ids.push(p.id); });
+                url = data?.links?.next || null;
+            }
+            return ids;
+        } catch {
+            return [];
+        }
+    },
+
     async getGroupMembers(churchId: string, groupId: string): Promise<string[]> {
         // PCO Groups API: get memberships with person included, extract primary emails
         try {

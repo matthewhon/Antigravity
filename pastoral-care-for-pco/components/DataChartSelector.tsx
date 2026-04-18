@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { firestore } from '../services/firestoreService';
+import { pcoService } from '../services/pcoService';
 import { calculateGivingAnalytics, calculateServicesAnalytics, DEFAULT_LIFECYCLE_SETTINGS } from '../services/analyticsService';
-import { Loader2, BarChart2, Users, DollarSign, ChevronRight, ChevronLeft, SlidersHorizontal, Calendar } from 'lucide-react';
+import { Loader2, BarChart2, Users, DollarSign, ChevronRight, ChevronLeft, SlidersHorizontal, Calendar, List } from 'lucide-react';
 
 // ─── Widget Catalogue ─────────────────────────────────────────────────────────
 
@@ -30,6 +31,7 @@ export interface WidgetConfigDef {
   fundPicker?: boolean;       // Show a fund selector
   dayRangePicker?: boolean;   // Show a days-ahead range picker
   timePeriodPicker?: boolean; // Show a historical time-period selector
+  pcoListPicker?: boolean;    // Show a PCO People List selector
 }
 
 interface WidgetDef {
@@ -43,9 +45,12 @@ interface WidgetDef {
 
 // User-chosen settings before fetching data
 interface WidgetConfig {
-  fundName?: string;    // '' = all funds
-  dayRange?: number;    // e.g. 7, 14, 30
-  timePeriod?: string;  // e.g. 'This Week', 'Last Month'
+  fundName?: string;       // '' = all funds
+  dayRange?: number;       // e.g. 7, 14, 30
+  timePeriod?: string;     // e.g. 'This Week', 'Last Month'
+  pcoListId?: string;      // PCO List ID to filter people
+  pcoListName?: string;    // PCO List display name
+  pcoListPeopleIds?: string[]; // Resolved people IDs from the selected list
 }
 
 const WIDGET_DEFS: WidgetDef[] = [
@@ -134,6 +139,7 @@ const WIDGET_DEFS: WidgetDef[] = [
     description: 'Church members with birthdays in the next 30 days',
     module: 'People',
     icon: <Users size={14} />,
+    configDef: { pcoListPicker: true },
   },
   {
     id: 'people_anniversaries',
@@ -141,6 +147,7 @@ const WIDGET_DEFS: WidgetDef[] = [
     description: 'Couples with anniversaries in the next 30 days',
     module: 'People',
     icon: <Users size={14} />,
+    configDef: { pcoListPicker: true },
   },
   // Services
   {
@@ -623,7 +630,7 @@ async function fetchWidgetSnapshot(
     case 'people_membership':
     case 'people_birthdays':
     case 'people_anniversaries': {
-      const people = await firestore.getPeople(churchId);
+      let people = await firestore.getPeople(churchId);
       const now = new Date();
       const thirtyDaysAgo = new Date(now);
       thirtyDaysAgo.setDate(now.getDate() - 30);
@@ -680,8 +687,12 @@ async function fetchWidgetSnapshot(
       }
       if (widgetId === 'people_birthdays') {
         const EXCLUDED = ['Inactive', 'Archived'];
+        // If a PCO list is selected, filter to only those people IDs
+        const listPeopleIds = config.pcoListPeopleIds && config.pcoListPeopleIds.length > 0
+          ? new Set(config.pcoListPeopleIds)
+          : null;
         const upcoming = people
-          .filter(p => !!p.birthdate && !EXCLUDED.includes(p.status || ''))
+          .filter(p => !!p.birthdate && !EXCLUDED.includes(p.status || '') && (!listPeopleIds || listPeopleIds.has(p.id)))
           .map(p => {
             const bd = new Date(p.birthdate!);
             const thisYear = new Date(now.getFullYear(), bd.getMonth(), bd.getDate());
@@ -692,12 +703,16 @@ async function fetchWidgetSnapshot(
           .filter(p => p.daysUntil <= 30)
           .sort((a, b) => a.daysUntil - b.daysUntil)
           .slice(0, 15);
-        return { upcoming };
+        return { upcoming, listFilter: config.pcoListName || null };
       }
       if (widgetId === 'people_anniversaries') {
         const EXCLUDED = ['Inactive', 'Archived'];
+        // If a PCO list is selected, filter to only those people IDs
+        const listPeopleIds = config.pcoListPeopleIds && config.pcoListPeopleIds.length > 0
+          ? new Set(config.pcoListPeopleIds)
+          : null;
         const upcoming = people
-          .filter(p => !!p.anniversary && !EXCLUDED.includes(p.status || ''))
+          .filter(p => !!p.anniversary && !EXCLUDED.includes(p.status || '') && (!listPeopleIds || listPeopleIds.has(p.id)))
           .map(p => {
             const ann = new Date(p.anniversary!);
             const thisYear = new Date(now.getFullYear(), ann.getMonth(), ann.getDate());
@@ -709,7 +724,7 @@ async function fetchWidgetSnapshot(
           .filter(p => p.daysUntil <= 30)
           .sort((a, b) => a.daysUntil - b.daysUntil)
           .slice(0, 15);
-        return { upcoming };
+        return { upcoming, listFilter: config.pcoListName || null };
       }
       break;
     }
@@ -1046,14 +1061,23 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
 
     case 'people_birthdays': {
       const upcoming: { name: string; daysUntil: number; dateStr: string }[] = data.upcoming || [];
+      const listFilter: string | null = data.listFilter || null;
       return (
         <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
-          <div className="bg-gradient-to-r from-pink-500 to-rose-500 px-4 py-2.5 flex items-center justify-between">
-            <p className="text-[11px] font-bold text-pink-100 uppercase tracking-widest">Upcoming Birthdays</p>
-            <span className="text-xs font-bold text-pink-100">Next 30 days</span>
+          <div className="bg-gradient-to-r from-pink-500 to-rose-500 px-4 py-2.5">
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] font-bold text-pink-100 uppercase tracking-widest">Upcoming Birthdays</p>
+              <span className="text-xs font-bold text-pink-100">Next 30 days</span>
+            </div>
+            {listFilter && (
+              <div className="flex items-center gap-1 mt-1">
+                <List size={9} className="text-pink-200" />
+                <span className="text-[9px] text-pink-200 font-medium truncate">{listFilter}</span>
+              </div>
+            )}
           </div>
           <div className="bg-white dark:bg-slate-800 px-4 py-2">
-            {upcoming.length === 0 && <p className="text-xs text-slate-400 py-2 text-center">No birthdays in next 30 days</p>}
+            {upcoming.length === 0 && <p className="text-xs text-slate-400 py-2 text-center">No birthdays in next 30 days{listFilter ? ` in "${listFilter}"` : ''}</p>}
             {upcoming.map((p, i) => (
               <div key={i} className="flex items-center justify-between py-1.5 border-b border-slate-50 dark:border-slate-700/50 last:border-0">
                 <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">{p.name}</span>
@@ -1072,14 +1096,23 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
 
     case 'people_anniversaries': {
       const upcoming: { name: string; daysUntil: number; dateStr: string; years: number }[] = data.upcoming || [];
+      const listFilter: string | null = data.listFilter || null;
       return (
         <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
-          <div className="bg-gradient-to-r from-violet-500 to-purple-600 px-4 py-2.5 flex items-center justify-between">
-            <p className="text-[11px] font-bold text-violet-100 uppercase tracking-widest">Upcoming Anniversaries</p>
-            <span className="text-xs font-bold text-violet-100">Next 30 days</span>
+          <div className="bg-gradient-to-r from-violet-500 to-purple-600 px-4 py-2.5">
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] font-bold text-violet-100 uppercase tracking-widest">Upcoming Anniversaries</p>
+              <span className="text-xs font-bold text-violet-100">Next 30 days</span>
+            </div>
+            {listFilter && (
+              <div className="flex items-center gap-1 mt-1">
+                <List size={9} className="text-violet-200" />
+                <span className="text-[9px] text-violet-200 font-medium truncate">{listFilter}</span>
+              </div>
+            )}
           </div>
           <div className="bg-white dark:bg-slate-800 px-4 py-2">
-            {upcoming.length === 0 && <p className="text-xs text-slate-400 py-2 text-center">No anniversaries in next 30 days</p>}
+            {upcoming.length === 0 && <p className="text-xs text-slate-400 py-2 text-center">No anniversaries in next 30 days{listFilter ? ` in "${listFilter}"` : ''}</p>}
             {upcoming.map((p, i) => (
               <div key={i} className="flex items-center justify-between py-1.5 border-b border-slate-50 dark:border-slate-700/50 last:border-0">
                 <div>
@@ -1381,6 +1414,13 @@ const WidgetConfigPanel: React.FC<{
   const [dayRange, setDayRange] = useState('14');
   const [timePeriod, setTimePeriod] = useState('This Month');
 
+  // PCO List state
+  const [pcoLists, setPcoLists] = useState<{ id: string; name: string; totalPeople: number }[]>([]);
+  const [loadingLists, setLoadingLists] = useState(false);
+  const [pcoListId, setPcoListId] = useState('');
+  const [pcoListName, setPcoListName] = useState('');
+  const [resolvingListMembers, setResolvingListMembers] = useState(false);
+
   useEffect(() => {
     if (!widget.configDef?.fundPicker) return;
     setLoadingFunds(true);
@@ -1388,6 +1428,50 @@ const WidgetConfigPanel: React.FC<{
       .then(f => setFunds(f.map(x => ({ id: x.id, name: (x as any).name || x.id })).sort((a, b) => a.name.localeCompare(b.name))))
       .finally(() => setLoadingFunds(false));
   }, [widget.id, churchId]);
+
+  useEffect(() => {
+    if (!widget.configDef?.pcoListPicker) return;
+    setLoadingLists(true);
+    pcoService.getPeopleLists(churchId)
+      .then(raw => {
+        setPcoLists(
+          (raw || []).map((item: any) => ({
+            id: item.id,
+            name: item.attributes?.name || 'Unnamed List',
+            totalPeople: item.attributes?.total_people || 0,
+          })).sort((a: any, b: any) => a.name.localeCompare(b.name))
+        );
+      })
+      .catch(() => {})
+      .finally(() => setLoadingLists(false));
+  }, [widget.id, churchId]);
+
+  const handleConfirm = async () => {
+    let pcoListPeopleIds: string[] | undefined;
+
+    // If a list is selected for birthday/anniversary widgets, resolve the member PCO IDs
+    if (widget.configDef?.pcoListPicker && pcoListId) {
+      setResolvingListMembers(true);
+      try {
+        pcoListPeopleIds = await pcoService.getListPeopleIds(churchId, pcoListId);
+      } catch {
+        // Non-fatal: proceed without list filter
+      } finally {
+        setResolvingListMembers(false);
+      }
+    }
+
+    onConfirm({
+      fundName,
+      dayRange: parseInt(dayRange, 10),
+      timePeriod,
+      pcoListId: pcoListId || undefined,
+      pcoListName: pcoListName || undefined,
+      pcoListPeopleIds,
+    });
+  };
+
+  const isBusy = isLoading || resolvingListMembers;
 
   return (
     <div className="space-y-4">
@@ -1404,6 +1488,47 @@ const WidgetConfigPanel: React.FC<{
           <p className="text-[10px] text-slate-400">{widget.description}</p>
         </div>
       </div>
+
+      {/* PCO List Picker */}
+      {widget.configDef?.pcoListPicker && (
+        <div>
+          <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+            Filter by Planning Center List <span className="font-normal normal-case text-slate-400">(optional)</span>
+          </label>
+          <p className="text-[10px] text-slate-400 mb-2 leading-snug">
+            Only show people who are members of the selected PCO list. Leave blank to show everyone.
+          </p>
+          {loadingLists ? (
+            <div className="flex items-center gap-2 text-xs text-slate-400 py-2">
+              <Loader2 size={12} className="animate-spin" /> Loading PCO Lists…
+            </div>
+          ) : (
+            <select
+              value={pcoListId}
+              onChange={e => {
+                const selected = pcoLists.find(l => l.id === e.target.value);
+                setPcoListId(e.target.value);
+                setPcoListName(selected?.name || '');
+              }}
+              className="w-full text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="">All People (no list filter)</option>
+              {pcoLists.map(l => (
+                <option key={l.id} value={l.id}>{l.name}{l.totalPeople > 0 ? ` (${l.totalPeople})` : ''}</option>
+              ))}
+            </select>
+          )}
+          {pcoLists.length === 0 && !loadingLists && (
+            <p className="text-[10px] text-slate-400 mt-1">No lists found — connect PCO and sync first.</p>
+          )}
+          {pcoListId && (
+            <div className="mt-2 flex items-center gap-1.5 text-[10px] text-indigo-600 dark:text-indigo-400">
+              <List size={11} />
+              <span>Widget will show only members of <strong>{pcoListName}</strong></span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Fund Picker */}
       {widget.configDef?.fundPicker && (
@@ -1474,11 +1599,12 @@ const WidgetConfigPanel: React.FC<{
       )}
 
       <button
-        onClick={() => onConfirm({ fundName, dayRange: parseInt(dayRange, 10), timePeriod })}
-        disabled={isLoading}
+        onClick={handleConfirm}
+        disabled={isBusy}
         className="w-full flex items-center justify-center gap-2 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white text-xs font-bold rounded-xl transition"
       >
-        {isLoading ? <><Loader2 size={13} className="animate-spin" /> Fetching data…</> : 'Insert Widget'}
+        {resolvingListMembers ? <><Loader2 size={13} className="animate-spin" /> Resolving list members…</> :
+         isLoading ? <><Loader2 size={13} className="animate-spin" /> Fetching data…</> : 'Insert Widget'}
       </button>
     </div>
   );
@@ -1510,9 +1636,12 @@ export const DataChartSelector: React.FC<Props> = ({ churchId, onInsert }) => {
     setError(null);
     try {
       const data = await fetchWidgetSnapshot(churchId, widget.id, config);
-      // Build a label that includes the fund filter if one was selected
-      const label = config.fundName ? `${widget.label} — ${config.fundName}` : widget.label;
-      onInsert(widget.id, label, data);
+      // Build a label that includes the fund or list filter if one was selected
+      let label = widget.label;
+      if (config.fundName) label = `${label} — ${config.fundName}`;
+      if (config.pcoListName) label = `${label} — ${config.pcoListName}`;
+      // Also attach the config to the block so it can be refreshed server-side
+      onInsert(widget.id, label, { ...data, _config: { pcoListId: config.pcoListId, pcoListName: config.pcoListName } });
       setConfiguringWidget(null);
     } catch (e: any) {
       setError(e?.message || 'Failed to load data');
