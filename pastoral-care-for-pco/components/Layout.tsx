@@ -422,6 +422,7 @@ const Layout: React.FC<LayoutProps> = ({
                       {[
                         { view: 'tools-emails',        icon: '📧', label: 'Emails'        },
                         { view: 'tools-sms-inbox',     icon: '💬', label: 'SMS'           },
+                        { view: 'tools-workflows',     icon: '⚡', label: 'Workflows'    },
                         { view: 'tools-polls',         icon: '📊', label: 'Polls'         },
                         { view: 'tools-website',       icon: '🌐', label: 'Website'       },
                         { view: 'tools-unsubscribers', icon: '🛋️',  label: 'Unsubscribers' },
@@ -430,7 +431,9 @@ const Layout: React.FC<LayoutProps> = ({
                           key={item.view}
                           onClick={() => { onNavigate(item.view); setToolsOpen(false); }}
                           className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest w-full text-left transition-all ${
-                            currentView === item.view || (item.view === 'tools-sms-inbox' && currentView.startsWith('tools-sms'))
+                            currentView === item.view
+                              || (item.view === 'tools-sms-inbox' && currentView.startsWith('tools-sms'))
+                              || (item.view === 'tools-workflows' && currentView === 'tools-workflows')
                               ? 'bg-indigo-600 text-white'
                               : 'text-slate-300 hover:bg-slate-700 hover:text-white'
                           }`}

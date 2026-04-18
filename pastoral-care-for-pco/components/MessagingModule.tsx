@@ -5105,7 +5105,7 @@ const EnrollmentPane: React.FC<{
 
 // ─── Workflows List + Manager ─────────────────────────────────────────────────
 
-const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
+export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
     const [workflows, setWorkflows] = useState<SmsWorkflow[]>([]);
     const [keywords, setKeywords]   = useState<SmsKeyword[]>([]);
     const [pcoLists, setPcoLists]   = useState<{ id: string; name: string }[]>([]);
@@ -6597,7 +6597,7 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                 <div className="flex items-center justify-between px-6 pt-2 shrink-0">
                     <div className="flex gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
                         {([
-                            { key: 'campaigns', label: 'Campaigns', icon: <MessageSquare size={13} /> },
+                            { key: 'campaigns', label: 'Broadcast', icon: <MessageSquare size={13} /> },
                             { key: 'workflows', label: 'Workflows', icon: <Zap size={13} /> },
                             { key: 'inbox',     label: 'Inbox',     icon: <Inbox size={13} /> },
                             { key: 'keywords',  label: 'Keywords',  icon: <Key size={13} /> },
