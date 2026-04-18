@@ -3233,16 +3233,32 @@ const ORDINAL_SUFFIX   = (n: number) => n === 1 ? 'st' : n === 2 ? 'nd' : n === 
 
 /** Human-readable timing label used in the delay connector between nodes. */
 function stepTimingLabel(node: WorkflowDelayNode): string {
-    const sType = node.scheduleType ?? 'relative';
+    const sType  = node.scheduleType ?? 'relative';
+    const repeat = node.repeatType && node.repeatType !== 'none';
+
     if (sType === 'day_of_week') {
         const day  = DOW_LABELS_LONG[node.scheduleDayOfWeek ?? 1];
         const time = node.scheduleTime ? ` at ${fmt12(node.scheduleTime)}` : '';
+        if (repeat && node.repeatType === 'weekly' && (node.repeatDays?.length ?? 0) > 0) {
+            const days = node.repeatDays!.map(d => DOW_LABELS_SHORT[d]).join(', ');
+            return `every ${days}${time}`;
+        }
         return `next ${day}${time}`;
     }
     if (sType === 'day_of_month') {
         const d    = node.scheduleDayOfMonth ?? 1;
         const time = node.scheduleTime ? ` at ${fmt12(node.scheduleTime)}` : '';
+        if (repeat && node.repeatType === 'monthly' && (node.repeatDays?.length ?? 0) > 0) {
+            const dates = node.repeatDays!.map(v => `${v}${ORDINAL_SUFFIX(v)}`).join(', ');
+            return `every month on the ${dates}${time}`;
+        }
         return `on the ${d}${ORDINAL_SUFFIX(d)}${time}`;
+    }
+    // relative
+    if (repeat && node.repeatType === 'weekly' && (node.repeatDays?.length ?? 0) > 0) {
+        const days = node.repeatDays!.map(d => DOW_LABELS_SHORT[d]).join(', ');
+        const time = node.scheduleTime ? ` at ${fmt12(node.scheduleTime)}` : '';
+        return `every ${days}${time}`;
     }
     return node.delayDays === 0
         ? 'immediately'
@@ -3256,36 +3272,57 @@ const DelayNodeCard: React.FC<{
     onChange: (patch: Partial<WorkflowDelayNode>) => void;
     onDelete: () => void;
 }> = ({ node, onChange, onDelete }) => {
-    const schedType = node.scheduleType ?? 'relative';
-    const summary = stepTimingLabel(node);
+    const schedType  = node.scheduleType  ?? 'relative';
+    const repeatType = node.repeatType    ?? 'none';
+    const repeatDays = node.repeatDays    ?? [];
+    const summary    = stepTimingLabel(node);
+    const isRepeating = repeatType !== 'none';
+
+    // Toggle a day in the repeatDays array
+    const toggleRepeatDay = (day: number) => {
+        const next = repeatDays.includes(day)
+            ? repeatDays.filter(d => d !== day)
+            : [...repeatDays, day].sort((a, b) => a - b);
+        onChange({ repeatDays: next });
+    };
+
     return (
         <div className="bg-amber-50 dark:bg-amber-950/20 border-2 border-dashed border-amber-300 dark:border-amber-700 rounded-2xl p-4 space-y-3">
             {/* Header */}
             <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <Clock size={14} className="text-amber-500" />
-                    <span className="text-xs font-black uppercase tracking-widest text-amber-600 dark:text-amber-400">Wait</span>
-                    <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold">{summary}</span>
+                <div className="flex items-center gap-2 min-w-0">
+                    <Clock size={14} className="text-amber-500 shrink-0" />
+                    <span className="text-xs font-black uppercase tracking-widest text-amber-600 dark:text-amber-400 shrink-0">
+                        {isRepeating ? 'Repeat' : 'Wait'}
+                    </span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold truncate">{summary}</span>
+                    {isRepeating && (
+                        <span className="shrink-0 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300">
+                            Recurring
+                        </span>
+                    )}
                 </div>
                 <button onClick={onDelete} title="Delete delay" className="p-1 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition">
                     <Trash2 size={13} />
                 </button>
             </div>
+
             {/* Schedule type toggle */}
             <div className="flex rounded-xl overflow-hidden border border-amber-200 dark:border-amber-700">
                 {([
-                    { id: 'relative',     label: '? Relative'  },
-                    { id: 'day_of_week',  label: '?? Weekday'   },
-                    { id: 'day_of_month', label: '?? Month Day' },
+                    { id: 'relative',     label: '⏱ Relative'  },
+                    { id: 'day_of_week',  label: '📅 Weekday'   },
+                    { id: 'day_of_month', label: '🗓 Month Day' },
                 ] as const).map(({ id, label }) => (
-                    <button key={id} type="button" onClick={() => onChange({ scheduleType: id })}
+                    <button key={id} type="button" onClick={() => onChange({ scheduleType: id, repeatType: 'none', repeatDays: [] })}
                         className={`flex-1 py-1.5 text-[10px] font-bold transition border-r last:border-r-0 border-amber-200 dark:border-amber-700 ${
                             schedType === id ? 'bg-amber-500 text-white' : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-amber-50 dark:hover:bg-slate-600'
                         }`}
                     >{label}</button>
                 ))}
             </div>
-            {/* Relative: day picker */}
+
+            {/* Relative: day counter */}
             {schedType === 'relative' && (
                 <div className="flex items-center gap-2">
                     <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Wait</span>
@@ -3301,8 +3338,9 @@ const DelayNodeCard: React.FC<{
                     </span>
                 </div>
             )}
-            {/* Day-of-week: day button grid */}
-            {schedType === 'day_of_week' && (
+
+            {/* Day-of-week: single day picker (used when not recurring) */}
+            {schedType === 'day_of_week' && !isRepeating && (
                 <div className="space-y-1.5">
                     <p className="text-[10px] text-slate-400">Fire on the next occurrence of:</p>
                     <div className="flex gap-1">
@@ -3318,8 +3356,9 @@ const DelayNodeCard: React.FC<{
                     </div>
                 </div>
             )}
-            {/* Day-of-month: select */}
-            {schedType === 'day_of_month' && (
+
+            {/* Day-of-month: single select (used when not recurring) */}
+            {schedType === 'day_of_month' && !isRepeating && (
                 <div className="space-y-1.5">
                     <p className="text-[10px] text-slate-400">Fire on the next occurrence of:</p>
                     <select value={node.scheduleDayOfMonth ?? 1}
@@ -3333,6 +3372,7 @@ const DelayNodeCard: React.FC<{
                     </select>
                 </div>
             )}
+
             {/* Time picker for weekday/month-day modes */}
             {schedType !== 'relative' && (
                 <div className="flex items-center gap-2">
@@ -3346,6 +3386,144 @@ const DelayNodeCard: React.FC<{
                     <span className="text-[10px] text-slate-400">server time</span>
                 </div>
             )}
+
+            {/* ── Recurrence toggle ─────────────────────────────────────── */}
+            <div className="pt-1 border-t border-amber-200 dark:border-amber-700">
+                <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-amber-600 dark:text-amber-400">
+                        🔁 Recurrence
+                    </span>
+                    <div className="flex rounded-lg overflow-hidden border border-amber-200 dark:border-amber-700 text-[10px] font-bold">
+                        {(['none', 'weekly', 'monthly'] as const).map(rt => (
+                            <button key={rt} type="button"
+                                onClick={() => onChange({ repeatType: rt, repeatDays: [] })}
+                                className={`px-3 py-1 transition border-r last:border-r-0 border-amber-200 dark:border-amber-700 capitalize ${
+                                    repeatType === rt
+                                        ? 'bg-violet-600 text-white'
+                                        : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-violet-50 dark:hover:bg-slate-600'
+                                }`}
+                            >{rt}</button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Weekly: multi-day-of-week checkboxes */}
+                {repeatType === 'weekly' && (
+                    <div className="space-y-2">
+                        <p className="text-[10px] text-slate-400">Fire every week on these day(s):</p>
+                        <div className="flex gap-1">
+                            {DOW_LABELS_SHORT.map((d, i) => {
+                                const active = repeatDays.includes(i);
+                                return (
+                                    <button key={i} type="button"
+                                        onClick={() => toggleRepeatDay(i)}
+                                        title={DOW_LABELS_LONG[i]}
+                                        className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition ${
+                                            active
+                                                ? 'bg-violet-600 text-white shadow-sm'
+                                                : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-violet-100 dark:hover:bg-violet-900/30'
+                                        }`}
+                                    >{d}</button>
+                                );
+                            })}
+                        </div>
+                        {repeatDays.length > 0 && (
+                            <div className="flex items-center gap-2">
+                                <Clock size={11} className="text-violet-400 shrink-0" />
+                                <span className="text-[10px] text-slate-400">Send at</span>
+                                <input type="time" value={node.scheduleTime ?? '09:00'}
+                                    onChange={e => onChange({ scheduleTime: e.target.value })}
+                                    title="Recurring send time"
+                                    className="text-sm border border-violet-200 dark:border-violet-700 rounded-xl px-3 py-1 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-400"
+                                />
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Monthly: multi-day-of-month chip grid */}
+                {repeatType === 'monthly' && (
+                    <div className="space-y-2">
+                        <p className="text-[10px] text-slate-400">Fire every month on these date(s):</p>
+                        <div className="flex flex-wrap gap-1">
+                            {Array.from({ length: 31 }, (_, i) => i + 1).map(d => {
+                                const active = repeatDays.includes(d);
+                                return (
+                                    <button key={d} type="button"
+                                        onClick={() => toggleRepeatDay(d)}
+                                        title={`${d}${ORDINAL_SUFFIX(d)} of the month`}
+                                        className={`w-8 h-8 text-[10px] font-bold rounded-lg transition ${
+                                            active
+                                                ? 'bg-violet-600 text-white shadow-sm'
+                                                : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-violet-100 dark:hover:bg-violet-900/30'
+                                        }`}
+                                    >{d}</button>
+                                );
+                            })}
+                        </div>
+                        {repeatDays.length > 0 && (
+                            <div className="flex items-center gap-2">
+                                <Clock size={11} className="text-violet-400 shrink-0" />
+                                <span className="text-[10px] text-slate-400">Send at</span>
+                                <input type="time" value={node.scheduleTime ?? '09:00'}
+                                    onChange={e => onChange({ scheduleTime: e.target.value })}
+                                    title="Recurring send time"
+                                    className="text-sm border border-violet-200 dark:border-violet-700 rounded-xl px-3 py-1 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-400"
+                                />
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* End condition row — only shown when recurrence is active */}
+                {isRepeating && repeatDays.length > 0 && (
+                    <div className="mt-3 pt-2 border-t border-violet-100 dark:border-violet-800 space-y-2">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-violet-500">Stop after</p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                            {/* Count */}
+                            <label className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                                <input type="checkbox"
+                                    checked={!!node.repeatCount}
+                                    onChange={e => onChange({ repeatCount: e.target.checked ? 4 : null })}
+                                    className="accent-violet-600"
+                                />
+                                Max
+                            </label>
+                            {node.repeatCount != null && (
+                                <>
+                                    <input type="number" min={1} max={520}
+                                        value={node.repeatCount}
+                                        onChange={e => onChange({ repeatCount: Math.max(1, parseInt(e.target.value) || 1) })}
+                                        title="Max repeat count"
+                                        className="w-14 text-center text-sm font-black border border-violet-200 dark:border-violet-700 rounded-lg px-2 py-1 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-400"
+                                    />
+                                    <span className="text-xs text-slate-400">sends</span>
+                                </>
+                            )}
+                            {/* End date */}
+                            <label className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 ml-2">
+                                <input type="checkbox"
+                                    checked={!!node.repeatUntil}
+                                    onChange={e => onChange({ repeatUntil: e.target.checked ? Date.now() + 30 * 86_400_000 : null })}
+                                    className="accent-violet-600"
+                                />
+                                Until
+                            </label>
+                            {node.repeatUntil != null && (
+                                <input type="date"
+                                    value={new Date(node.repeatUntil).toISOString().slice(0, 10)}
+                                    onChange={e => onChange({ repeatUntil: new Date(e.target.value).getTime() })}
+                                    title="Repeat until this date"
+                                    className="text-sm border border-violet-200 dark:border-violet-700 rounded-lg px-2 py-1 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-400"
+                                />
+                            )}
+                            {!node.repeatCount && !node.repeatUntil && (
+                                <span className="text-[10px] text-slate-400 italic">indefinitely (no limit set)</span>
+                            )}
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 };

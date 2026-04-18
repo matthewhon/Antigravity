@@ -1,4 +1,4 @@
-﻿
+
 export type UserRole = 'Church Admin' | 'Pastor' | 'Pastor AI' | 'People' | 'Services' | 'Groups' | 'Giving' | 'Finance' | 'Pastoral Care' | 'Metrics' | 'System Administration' | 'Messaging';
 
 export interface User {
@@ -1161,7 +1161,7 @@ export interface WorkflowActionNode {
 }
 
 /**
- * A *delay* node � a pure wait period; no message is sent.
+ * A *delay* node — a pure wait period; no message is sent.
  * Sits in the timeline between action nodes to control timing.
  */
 export interface WorkflowDelayNode {
@@ -1171,16 +1171,37 @@ export interface WorkflowDelayNode {
     /** Days to wait in 'relative' mode. */
     delayDays: number;
     scheduleType?: 'relative' | 'day_of_week' | 'day_of_month';
-    /** 0 = Sunday � 6 = Saturday. Used when scheduleType = 'day_of_week'. */
+    /** 0 = Sunday — 6 = Saturday. Used when scheduleType = 'day_of_week'. */
     scheduleDayOfWeek?: number;
-    /** 1�31. Used when scheduleType = 'day_of_month'. */
+    /** 1–31. Used when scheduleType = 'day_of_month'. */
     scheduleDayOfMonth?: number;
     /** 'HH:MM' 24-hour send time for day_of_week / day_of_month modes. */
     scheduleTime?: string;
+    /**
+     * Recurrence mode for the *following* action node.
+     * 'none'    = fire once (default).
+     * 'weekly'  = repeat every week on the chosen day(s).
+     * 'monthly' = repeat every month on the chosen date(s).
+     */
+    repeatType?: 'none' | 'weekly' | 'monthly';
+    /**
+     * Days on which the action repeats.
+     * For repeatType 'weekly'  : day-of-week values (0–6, Sunday = 0).
+     * For repeatType 'monthly' : day-of-month values (1–31).
+     * Leave empty for a single-occurrence send.
+     */
+    repeatDays?: number[];
+    /**
+     * Optional end date (epoch ms) after which recurrence stops.
+     * Undefined / null means repeat indefinitely.
+     */
+    repeatUntil?: number | null;
+    /** Maximum number of times this recurrence fires (overrides repeatUntil if both set). */
+    repeatCount?: number | null;
 }
 
 /**
- * A *branch* node � evaluates a condition and routes the enrollment
+ * A *branch* node  evaluates a condition and routes the enrollment
  * to either the `thenNodes` (condition true) or `elseNodes` (condition false) path.
  * Single-level only; no nested branches.
  */
