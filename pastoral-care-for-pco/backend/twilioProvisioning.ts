@@ -819,7 +819,26 @@ export const createCustomerProfile = async (req: any, res: any) => {
             });
         }
 
-        // ── Step 1a: Business info EndUser (business fields + physical address) ──────
+        // ── Step 1a: Create a Twilio Address resource for the business ───────────
+        // Twilio requires a proper Address object (AD... SID) — raw address fields
+        // are NOT accepted as attributes on customer_profile_business_information.
+        // The AD... SID is referenced via address_sids_attest in the EndUser below.
+        // NOTE: The Address SID must NOT be added as a bundle entity assignment —
+        // only EndUser (IT...) and SupportingDocument (SD...) SIDs are valid there.
+        const bizAddress = await (master as any).addresses.create({
+            customerName: sms.a2pBusinessName,
+            street:       sms.a2pAddress,
+            city:         sms.a2pCity,
+            region:       sms.a2pState,
+            postalCode:   sms.a2pZip,
+            isoCountry:   'US',
+            friendlyName: `${sms.a2pBusinessName} – Business Address`,
+        });
+        log.info(`[createCustomerProfile] Created Address ${bizAddress.sid}`, 'system', { churchId }, churchId);
+
+        // ── Step 1b: Business info EndUser (business fields only + address SID ref) ──
+        // Only valid attributes for customer_profile_business_information are listed here.
+        // Raw address fields (street, city, etc.) are NOT accepted — pass the AD... SID instead.
         const bizEndUser = await (master as any).trusthub.v1.endUsers.create({
             friendlyName: `Business Info – ${sms.a2pBusinessName}`,
             type: 'customer_profile_business_information',
@@ -831,18 +850,12 @@ export const createCustomerProfile = async (req: any, res: any) => {
                 business_industry:                sms.a2pVertical     || 'RELIGIOUS',
                 business_regions_of_operation:    'USA',
                 website_url:                      sms.a2pWebsite,
-                // Physical address fields belong in the EndUser, not as a separate Address object
-                address_sids_attest:              'AC',
-                street:                           sms.a2pAddress,
-                city:                             sms.a2pCity,
-                region:                           sms.a2pState,
-                postal_code:                      sms.a2pZip,
-                iso_country:                      'US',
+                address_sids_attest:              bizAddress.sid,  // AD... SID from addresses.create() above
             },
         });
         log.info(`[createCustomerProfile] Created biz EndUser ${bizEndUser.sid}`, 'system', { churchId }, churchId);
 
-        // ── Step 1b: Authorised rep EndUser (personal contact fields) ───────────
+        // ── Step 1c: Authorised rep EndUser (personal contact fields) ───────────
         const repEndUser = await (master as any).trusthub.v1.endUsers.create({
             friendlyName: `${sms.a2pContactFirstName} ${sms.a2pContactLastName} – ${sms.a2pBusinessName}`,
             type: 'authorized_representative_1',
