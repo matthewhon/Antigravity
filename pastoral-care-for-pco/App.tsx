@@ -21,6 +21,7 @@ import { MetricsView } from './components/MetricsView';
 import LibraryView from './components/LibraryView';
 import WelcomeLayoutModal from './components/WelcomeLayoutModal';
 import { PublicPollView } from './components/PublicPollView';
+import { PublicNoteView } from './components/PublicNoteView';
 import { ToolsView } from './components/ToolsView';
 import { SmsWorkflowsManager } from './components/MessagingModule';
 import { 
@@ -842,6 +843,12 @@ const App: React.FC = () => {
     return <PublicPollView pollId={pollMatch[1]} />;
   }
 
+  // ── Public Note Route (no auth required) ──────────────────────────────────
+  const noteMatch = window.location.pathname.match(/^\/note\/([^/]+)/);
+  if (noteMatch) {
+    return <PublicNoteView noteId={noteMatch[1]} />;
+  }
+
   if (loading) {
     return <div className="flex h-screen items-center justify-center text-slate-400 font-bold text-sm bg-slate-50 dark:bg-slate-950">Loading Pastoral Care...</div>;
   }
@@ -1181,6 +1188,7 @@ const App: React.FC = () => {
         {view === 'tools-website' && <ToolsView churchId={church.id} church={church} currentUserId={user.id} currentUser={user} onUpdateChurch={(updates) => { firestore.updateChurch(church.id, updates); setChurch({ ...church, ...updates }); }} activePage="website" />}
         {view === 'tools-unsubscribers' && <ToolsView churchId={church.id} church={church} currentUserId={user.id} currentUser={user} onUpdateChurch={(updates) => { firestore.updateChurch(church.id, updates); setChurch({ ...church, ...updates }); }} activePage="unsubscribers" />}
         {view === 'tools-qrcodes' && <ToolsView churchId={church.id} church={church} currentUserId={user.id} currentUser={user} onUpdateChurch={(updates) => { firestore.updateChurch(church.id, updates); setChurch({ ...church, ...updates }); }} activePage="qrcodes" />}
+        {view === 'tools-notes'   && <ToolsView churchId={church.id} church={church} currentUserId={user.id} currentUser={user} onUpdateChurch={(updates) => { firestore.updateChurch(church.id, updates); setChurch({ ...church, ...updates }); }} activePage="notes" />}
         {/* Workflows — standalone, no SMS sub-nav */}
         {view === 'tools-workflows' && church && <SmsWorkflowsManager churchId={church.id} />}
         {/* SMS sub-routes — controlledTab drives panel selection; pill-nav hidden automatically */}

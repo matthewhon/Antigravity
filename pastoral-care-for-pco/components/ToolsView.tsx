@@ -11,6 +11,7 @@ import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebas
 import { DataChartSelector } from './DataChartSelector';
 import { PollsManager } from './PollsManager';
 import { WebsiteWidgetsManager } from './WebsiteWidgetsManager';
+import { NotesManager } from './NotesManager';
 
 import { PcoImportModal } from './PcoImportModal';
 import MessagingModule from './MessagingModule';
@@ -1199,12 +1200,12 @@ const SendTestModal: React.FC<SendTestModalProps> = ({ onConfirm, onCancel, isSe
 export const ToolsView: React.FC<{ churchId: string; church?: Church;
 currentUserId?: string; currentUser?: User; onUpdateChurch?: (updates: Partial<Church>) => void;
 /** When provided by a parent route, controls which tab is shown and hides the internal tab bar */
-activePage?: 'website' | 'emails' | 'polls' | 'messaging' | 'unsubscribers' | 'qrcodes';
+activePage?: 'website' | 'emails' | 'polls' | 'messaging' | 'unsubscribers' | 'qrcodes' | 'notes';
 /** When activePage='messaging', this controls the active SMS sub-tab */
 smsTab?: 'campaigns' | 'inbox' | 'keywords' | 'analytics' | 'workflows' | 'agent';
 }> = ({ churchId, church, currentUserId,
 currentUser, onUpdateChurch, activePage, smsTab }) => {
-  const [activeTab, setActiveTab] = useState<'website' | 'emails' | 'polls' | 'unsubscribers' | 'messaging' | 'qrcodes'>('emails');
+  const [activeTab, setActiveTab] = useState<'website' | 'emails' | 'polls' | 'unsubscribers' | 'messaging' | 'qrcodes' | 'notes'>('emails');
   const effectiveTab = activePage ?? activeTab;
   const [campaigns, setCampaigns] = useState<EmailCampaign[]>([]);
   const [activeCampaign, setActiveCampaign] = useState<EmailCampaign | null>(null);
@@ -1627,6 +1628,13 @@ currentUser, onUpdateChurch, activePage, smsTab }) => {
       {effectiveTab === 'qrcodes' && (
         <div className="flex-1 min-h-0 overflow-hidden">
           <QrCodeGenerator churchId={churchId} />
+        </div>
+      )}
+
+      {/* ─── Notes Tab ────────────────────────────────────────────────── */}
+      {effectiveTab === 'notes' && (
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <NotesManager churchId={churchId} currentUser={currentUser} church={church} />
         </div>
       )}
 

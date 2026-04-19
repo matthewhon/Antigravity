@@ -779,6 +779,23 @@ export interface RiskChangeRecord {
     timestamp: number;
 }
 
+// --- Notes Module ---------------------------------------------------------------
+
+export type NoteStatus = 'draft' | 'published';
+
+export interface ChurchNote {
+    id: string;
+    churchId: string;
+    title: string;
+    /** HTML or plain-text content */
+    content: string;
+    authorId: string;
+    authorName: string;
+    status: NoteStatus;
+    createdAt: number;
+    updatedAt: number;
+}
+
 // --- SMS / Messaging Module ---------------------------------------------------
 
 export interface SmsSettings {

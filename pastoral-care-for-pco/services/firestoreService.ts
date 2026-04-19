@@ -22,7 +22,7 @@ import {
     Ministry, MetricDefinition, MetricEntry, AggregatedChurchStats, LogEntry,
     PastoralNote, PrayerRequest, CheckInRecord, EmailCampaign, PcoRegistrationEvent,
     PcoRegistrationAttendee, PcoRegistrationCampus,
-    Poll, PollResponse, RiskChangeRecord
+    Poll, PollResponse, RiskChangeRecord, ChurchNote
 } from '../types';
 import { calculateServicesAnalytics, calculateAggregatedStats } from './analyticsService';
 
@@ -1021,6 +1021,58 @@ class FirestoreService {
       await batch.commit();
     } catch (e) {
       throw e;
+    }
+  }
+
+  // --- Church Notes ---
+
+  async getNotes(churchId: string): Promise<ChurchNote[]> {
+    try {
+      const q = query(collection(db, 'church_notes'), where('churchId', '==', churchId));
+      const snapshot = await getDocs(q);
+      return snapshot.docs
+        .map(d => d.data() as ChurchNote)
+        .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    } catch (e) {
+      console.error('[FirestoreService] getNotes failed:', e);
+      return [];
+    }
+  }
+
+  async getNote(noteId: string): Promise<ChurchNote | null> {
+    try {
+      const docSnap = await getDoc(doc(db, 'church_notes', noteId));
+      return docSnap.exists() ? (docSnap.data() as ChurchNote) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  async saveNote(note: ChurchNote): Promise<void> {
+    try {
+      const safe = JSON.parse(JSON.stringify(note));
+      await setDoc(doc(db, 'church_notes', note.id), safe);
+    } catch (e) {
+      this.handleFirestoreError(e);
+      throw e;
+    }
+  }
+
+  async updateNote(noteId: string, updates: Partial<ChurchNote>): Promise<void> {
+    try {
+      const safe = JSON.parse(JSON.stringify({ ...updates, updatedAt: Date.now() }));
+      await updateDoc(doc(db, 'church_notes', noteId), safe);
+    } catch (e) {
+      this.handleFirestoreError(e);
+      throw e;
+    }
+  }
+
+  async deleteNote(noteId: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, 'church_notes', noteId));
+    } catch (e) {
+      this.handleFirestoreError(e);
     }
   }
 }
