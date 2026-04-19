@@ -1,9 +1,14 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ChurchNote, NoteStatus, Church, User } from '../types';
 import { firestore } from '../services/firestoreService';
+import { storage } from '../services/firebase';
+import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { pcoService } from '../services/pcoService';
 import {
-  Plus, ArrowLeft, Copy, Trash2, Pencil, FileText,
+  Plus, ArrowLeft, Trash2, Pencil, FileText,
   CheckCircle, Globe, Lock, Clock, Loader2, Link, Eye,
+  Image, CalendarDays, Users, ClipboardList, Search, X,
+  CheckSquare, Square,
 } from 'lucide-react';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -36,6 +41,266 @@ function stripHtml(html: string): string {
 
 interface ToastMsg { msg: string; type: 'success' | 'error' }
 
+// ─── PCO Item Types ────────────────────────────────────────────────────────────
+
+type PcoTab = 'registrations' | 'groups' | 'calendar';
+
+interface PcoItem {
+  id: string;
+  name: string;
+  description?: string;
+  date?: string;
+  imageUrl?: string;
+  meta?: string;
+  raw: any;
+}
+
+const formatPcoDate = (iso?: string): string => {
+  if (!iso) return '';
+  try { return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
+  catch { return ''; }
+};
+
+const mapPcoRegistration = (item: any): PcoItem => ({
+  id: item.id,
+  name: item.attributes?.name || 'Unnamed Event',
+  description: item.attributes?.description || '',
+  date: formatPcoDate(item.attributes?.open_at || item.attributes?.close_at),
+  imageUrl: item.attributes?.logo_url || item.attributes?.image_url,
+  meta: item.attributes?.archived ? 'Archived' : 'Active registration',
+  raw: item,
+});
+
+const mapPcoGroup = (item: any): PcoItem => ({
+  id: item.id,
+  name: item.attributes?.name || 'Unnamed Group',
+  description: item.attributes?.description || '',
+  imageUrl: item.attributes?.header_image?.medium || item.attributes?.header_image?.thumbnail,
+  meta: `${item.attributes?.memberships_count ?? '?'} members`,
+  raw: item,
+});
+
+const mapPcoCalendar = (item: any): PcoItem => ({
+  id: item.id,
+  name: item.attributes?.name || 'Unnamed Event',
+  description: item.attributes?.description || '',
+  date: formatPcoDate(item.attributes?.starts_at || item.attributes?.start_time),
+  imageUrl: item.attributes?.image_url,
+  meta: item.attributes?.location || '',
+  raw: item,
+});
+
+/** Convert a selected PCO item into an HTML snippet to inject into the note content */
+function buildPcoHtml(tab: PcoTab, item: PcoItem): string {
+  const typeLabel = tab === 'registrations' ? 'Registration' : tab === 'groups' ? 'Group' : 'Event';
+  return `
+<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin:16px 0;font-family:inherit;">
+  ${item.imageUrl ? `<img src="${item.imageUrl}" alt="${item.name}" style="width:100%;max-height:200px;object-fit:cover;display:block;" />` : ''}
+  <div style="padding:16px 20px;">
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#6366f1;margin-bottom:6px;">${typeLabel}</div>
+    <div style="font-size:18px;font-weight:800;color:#0f172a;margin-bottom:6px;">${item.name}</div>
+    ${item.date ? `<div style="font-size:12px;color:#6366f1;font-weight:600;margin-bottom:6px;">📅 ${item.date}</div>` : ''}
+    ${item.meta ? `<div style="font-size:12px;color:#64748b;margin-bottom:8px;">${item.meta}</div>` : ''}
+    ${item.description ? `<div style="font-size:14px;color:#334155;line-height:1.6;">${stripHtml(item.description).slice(0, 200)}${item.description.length > 200 ? '…' : ''}</div>` : ''}
+  </div>
+</div>`;
+}
+
+// ─── PCO Import Modal ─────────────────────────────────────────────────────────
+
+const PcoNoteModal: React.FC<{
+  churchId: string;
+  onInsert: (html: string) => void;
+  onClose: () => void;
+}> = ({ churchId, onInsert, onClose }) => {
+  const [tab, setTab] = useState<PcoTab>('registrations');
+  const [items, setItems] = useState<Record<PcoTab, PcoItem[]>>({ registrations: [], groups: [], calendar: [] });
+  const [loading, setLoading] = useState<Record<PcoTab, boolean>>({ registrations: false, groups: false, calendar: false });
+  const [errors, setErrors] = useState<Record<PcoTab, string>>({ registrations: '', groups: '', calendar: '' });
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    if (items[tab].length > 0 || loading[tab]) return;
+    setLoading(p => ({ ...p, [tab]: true }));
+    setErrors(p => ({ ...p, [tab]: '' }));
+
+    const load = async () => {
+      try {
+        let raw: any[] = [];
+        if (tab === 'registrations') {
+          raw = await pcoService.getRegistrations(churchId);
+          const active = (raw || []).filter((i: any) => !i.attributes?.archived);
+          setItems(p => ({ ...p, registrations: active.map(mapPcoRegistration) }));
+        } else if (tab === 'groups') {
+          raw = await pcoService.getGroups(churchId);
+          setItems(p => ({ ...p, groups: (raw || []).map(mapPcoGroup) }));
+        } else {
+          raw = await pcoService.getEvents(churchId);
+          setItems(p => ({ ...p, calendar: (raw || []).map(mapPcoCalendar) }));
+        }
+      } catch (e: any) {
+        setErrors(p => ({ ...p, [tab]: e?.message || 'Failed to load PCO data.' }));
+      } finally {
+        setLoading(p => ({ ...p, [tab]: false }));
+      }
+    };
+    load();
+  }, [tab, churchId]);
+
+  const toggleSelected = (id: string) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const handleInsert = () => {
+    const html = (['registrations', 'groups', 'calendar'] as PcoTab[])
+      .flatMap(t => items[t].filter(i => selected.has(i.id)).map(i => buildPcoHtml(t, i)))
+      .join('\n');
+    onInsert(html);
+  };
+
+  const filtered = (items[tab] || []).filter(i =>
+    !search.trim() || i.name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const TAB_INFO: Record<PcoTab, { label: string; icon: React.ReactNode }> = {
+    registrations: { label: 'Registrations', icon: <ClipboardList size={14} /> },
+    groups: { label: 'Groups', icon: <Users size={14} /> },
+    calendar: { label: 'Calendar', icon: <CalendarDays size={14} /> },
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[85vh]">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-700 shrink-0">
+          <div className="flex items-center gap-2">
+            <img src="https://planningcenter.com/favicon.ico" alt="PCO" className="w-4 h-4" />
+            <h2 className="text-base font-bold text-slate-900 dark:text-white">Insert from Planning Center</h2>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition">
+            <X size={18} />
+          </button>
+        </div>
+
+        <p className="text-xs text-slate-500 dark:text-slate-400 px-5 pt-3 pb-0 shrink-0">
+          Select items to insert as cards into your note.
+        </p>
+
+        {/* Tabs */}
+        <div className="flex gap-1 px-5 pt-3 shrink-0">
+          {(Object.keys(TAB_INFO) as PcoTab[]).map(t => (
+            <button
+              key={t}
+              onClick={() => { setTab(t); setSearch(''); }}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-t-lg text-sm font-semibold border-b-2 transition ${
+                tab === t
+                  ? 'border-indigo-600 text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20'
+                  : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
+              }`}
+            >
+              {TAB_INFO[t].icon} {TAB_INFO[t].label}
+            </button>
+          ))}
+        </div>
+
+        {/* Search */}
+        <div className="px-5 py-3 border-t border-b border-slate-100 dark:border-slate-700 shrink-0">
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder={`Search ${TAB_INFO[tab].label.toLowerCase()}…`}
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full pl-8 pr-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+        </div>
+
+        {/* List */}
+        <div className="flex-1 overflow-y-auto px-5 py-4 min-h-0">
+          {loading[tab] ? (
+            <div className="flex items-center justify-center h-40 text-slate-400 gap-2">
+              <Loader2 size={20} className="animate-spin" /> Loading from Planning Center…
+            </div>
+          ) : errors[tab] ? (
+            <div className="flex flex-col items-center justify-center h-40 text-center">
+              <p className="text-red-500 text-sm font-medium">{errors[tab]}</p>
+              <button
+                onClick={() => { setErrors(p => ({ ...p, [tab]: '' })); setItems(p => ({ ...p, [tab]: [] })); }}
+                className="mt-3 px-4 py-1.5 text-xs font-semibold text-indigo-600 dark:text-indigo-400 border border-indigo-300 dark:border-indigo-700 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition"
+              >
+                Retry
+              </button>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-40 text-slate-400">
+              <CalendarDays size={36} className="mb-2 text-slate-300" />
+              <p className="text-sm">No {TAB_INFO[tab].label.toLowerCase()} found</p>
+            </div>
+          ) : (
+            filtered.map(item => (
+              <button
+                key={item.id}
+                onClick={() => toggleSelected(item.id)}
+                className={`w-full flex items-start gap-3 p-3 rounded-xl border transition text-left mb-2 ${
+                  selected.has(item.id)
+                    ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 dark:border-indigo-500'
+                    : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-indigo-300 dark:hover:border-indigo-600'
+                }`}
+              >
+                {item.imageUrl ? (
+                  <img src={item.imageUrl} alt={item.name} className="w-14 h-14 rounded-lg object-cover shrink-0 bg-slate-100" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                ) : (
+                  <div className="w-14 h-14 rounded-lg bg-gradient-to-br from-indigo-100 to-indigo-200 dark:from-indigo-900/40 dark:to-indigo-800/40 flex items-center justify-center shrink-0">
+                    <CalendarDays size={22} className="text-indigo-400" />
+                  </div>
+                )}
+                <div className="flex-grow min-w-0">
+                  <div className="font-semibold text-sm text-slate-900 dark:text-white truncate">{item.name}</div>
+                  {item.date && <div className="text-xs text-indigo-600 dark:text-indigo-400 font-medium mt-0.5">{item.date}</div>}
+                  {item.description && <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">{stripHtml(item.description)}</div>}
+                  {item.meta && <div className="text-xs text-slate-400 dark:text-slate-500 mt-1">{item.meta}</div>}
+                </div>
+                <div className="shrink-0 mt-0.5">
+                  {selected.has(item.id)
+                    ? <CheckSquare size={18} className="text-indigo-600 dark:text-indigo-400" />
+                    : <Square size={18} className="text-slate-300 dark:text-slate-600" />
+                  }
+                </div>
+              </button>
+            ))
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between px-5 py-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 rounded-b-2xl shrink-0">
+          <span className="text-sm text-slate-500 dark:text-slate-400">
+            {selected.size > 0 ? `${selected.size} item${selected.size !== 1 ? 's' : ''} selected` : 'Select items to insert'}
+          </span>
+          <div className="flex gap-2">
+            <button onClick={onClose} className="px-4 py-2 text-sm text-slate-600 dark:text-slate-400 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-xl transition font-medium">
+              Cancel
+            </button>
+            <button
+              onClick={handleInsert}
+              disabled={selected.size === 0}
+              className="px-4 py-2 text-sm text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 dark:disabled:bg-slate-700 disabled:text-slate-400 dark:disabled:text-slate-500 rounded-xl transition font-semibold"
+            >
+              Insert {selected.size > 0 ? `(${selected.size})` : ''}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── Note Card (list view) ────────────────────────────────────────────────────
 
 const NoteCard: React.FC<{
@@ -62,7 +327,6 @@ const NoteCard: React.FC<{
       }}
       className="note-card-hover"
     >
-      {/* Left accent bar */}
       <div style={{
         position: 'absolute', left: 0, top: 0, bottom: 0, width: 4,
         background: isPublished
@@ -72,9 +336,7 @@ const NoteCard: React.FC<{
       }} />
 
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-        {/* Content */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          {/* Status badge */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
             <span style={{
               display: 'inline-flex', alignItems: 'center', gap: 4,
@@ -92,7 +354,6 @@ const NoteCard: React.FC<{
             </span>
           </div>
 
-          {/* Title */}
           <h3 style={{
             fontSize: 16, fontWeight: 700, color: '#0f172a',
             marginBottom: 6, lineHeight: 1.3,
@@ -101,19 +362,16 @@ const NoteCard: React.FC<{
             {note.title || 'Untitled Note'}
           </h3>
 
-          {/* Preview */}
           {preview && (
             <p style={{
               fontSize: 13, color: '#64748b', lineHeight: 1.55,
               display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-              overflow: 'hidden',
-              margin: '0 0 10px',
+              overflow: 'hidden', margin: '0 0 10px',
             }}>
               {preview}
             </p>
           )}
 
-          {/* Author */}
           <div style={{ fontSize: 12, color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 5 }}>
             <div style={{
               width: 18, height: 18, borderRadius: '50%',
@@ -127,7 +385,6 @@ const NoteCard: React.FC<{
           </div>
         </div>
 
-        {/* Actions */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}
           onClick={e => e.stopPropagation()}>
           <ActionBtn title="Edit" onClick={onEdit} icon={<Pencil size={13} />} />
@@ -153,17 +410,128 @@ const ActionBtn: React.FC<{
     style={{
       width: 30, height: 30, borderRadius: 8,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      border: '1px solid #e2e8f0',
-      background: 'white',
+      border: '1px solid #e2e8f0', background: 'white',
       color: danger ? '#ef4444' : '#64748b',
-      cursor: 'pointer',
-      transition: 'all 0.15s',
+      cursor: 'pointer', transition: 'all 0.15s',
     }}
     className={danger ? 'action-btn-danger' : 'action-btn'}
   >
     {icon}
   </button>
 );
+
+// ─── Editor Toolbar ───────────────────────────────────────────────────────────
+
+interface ToolbarProps {
+  churchId: string;
+  onImageInsert: (url: string) => void;
+  onPcoInsert: (html: string) => void;
+}
+
+const EditorToolbar: React.FC<ToolbarProps> = ({ churchId, onImageInsert, onPcoInsert }) => {
+  const imgInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [showPco, setShowPco] = useState(false);
+
+  const handleImageFile = useCallback(async (file: File) => {
+    if (!file.type.startsWith('image/')) return;
+    setIsUploading(true);
+    try {
+      const ext = file.name.split('.').pop() || 'jpg';
+      const path = `note_images/${churchId}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+      const sRef = storageRef(storage, path);
+      await new Promise<void>((resolve, reject) => {
+        const task = uploadBytesResumable(sRef, file);
+        task.on('state_changed', () => {}, reject, () => resolve());
+      });
+      const url = await getDownloadURL(sRef);
+      onImageInsert(url);
+    } catch (e) {
+      console.error('[NotesManager] Image upload failed:', e);
+      alert('Image upload failed. Please try again.');
+    } finally {
+      setIsUploading(false);
+    }
+  }, [churchId, onImageInsert]);
+
+  return (
+    <>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 6,
+        padding: '8px 16px',
+        background: '#f8fafc',
+        borderBottom: '1px solid #e2e8f0',
+        flexShrink: 0,
+      }}>
+        <span style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginRight: 4 }}>
+          Insert
+        </span>
+
+        {/* Image upload */}
+        <button
+          onClick={() => imgInputRef.current?.click()}
+          disabled={isUploading}
+          title="Upload and insert image"
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '5px 12px', borderRadius: 8,
+            border: '1px solid #e2e8f0', background: 'white',
+            fontSize: 12, fontWeight: 600, color: '#475569',
+            cursor: isUploading ? 'wait' : 'pointer',
+            transition: 'all 0.15s',
+          }}
+          className="toolbar-btn"
+        >
+          {isUploading
+            ? <Loader2 size={13} style={{ animation: 'spin 0.8s linear infinite' }} />
+            : <Image size={13} />
+          }
+          {isUploading ? 'Uploading…' : 'Image'}
+        </button>
+        <input
+          ref={imgInputRef}
+          type="file"
+          accept="image/*"
+          style={{ display: 'none' }}
+          onChange={e => {
+            const file = e.target.files?.[0];
+            if (file) handleImageFile(file);
+            e.target.value = '';
+          }}
+        />
+
+        {/* PCO insert */}
+        <button
+          onClick={() => setShowPco(true)}
+          title="Insert Planning Center event, group, or registration"
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '5px 12px', borderRadius: 8,
+            border: '1px solid #e2e8f0', background: 'white',
+            fontSize: 12, fontWeight: 600, color: '#475569',
+            cursor: 'pointer', transition: 'all 0.15s',
+          }}
+          className="toolbar-btn"
+        >
+          <img src="https://planningcenter.com/favicon.ico" alt="PCO" style={{ width: 13, height: 13 }} />
+          Planning Center
+        </button>
+
+        <div style={{ marginLeft: 'auto', fontSize: 11, color: '#94a3b8' }}>
+          Plain text or HTML · images supported
+        </div>
+      </div>
+
+      {showPco && (
+        <PcoNoteModal
+          churchId={churchId}
+          onInsert={html => { onPcoInsert(html); setShowPco(false); }}
+          onClose={() => setShowPco(false)}
+        />
+      )}
+    </>
+  );
+};
 
 // ─── Editor ───────────────────────────────────────────────────────────────────
 
@@ -178,10 +546,40 @@ const NoteEditor: React.FC<{
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const update = (patch: Partial<ChurchNote>) => {
     setNote(prev => ({ ...prev, ...patch, updatedAt: Date.now() }));
   };
+
+  /** Insert text/HTML at the current cursor position in the textarea */
+  const insertAtCursor = useCallback((insertion: string) => {
+    const ta = textareaRef.current;
+    if (!ta) {
+      update({ content: note.content + '\n' + insertion });
+      return;
+    }
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const newContent = note.content.slice(0, start) + insertion + note.content.slice(end);
+    update({ content: newContent });
+    // Restore cursor after the inserted text
+    requestAnimationFrame(() => {
+      ta.focus();
+      const pos = start + insertion.length;
+      ta.setSelectionRange(pos, pos);
+    });
+  }, [note.content]);
+
+  const handleImageInsert = useCallback((url: string) => {
+    insertAtCursor(`\n<img src="${url}" alt="Image" style="max-width:100%;border-radius:8px;margin:8px 0;" />\n`);
+    showToast('Image inserted ✓');
+  }, [insertAtCursor, showToast]);
+
+  const handlePcoInsert = useCallback((html: string) => {
+    insertAtCursor('\n' + html + '\n');
+    showToast('Planning Center content inserted ✓');
+  }, [insertAtCursor, showToast]);
 
   const save = useCallback(async (overrideStatus?: NoteStatus) => {
     setIsSaving(true);
@@ -233,13 +631,9 @@ const NoteEditor: React.FC<{
       {/* ── Editor Header ── */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '14px 24px',
-        background: 'white',
-        borderBottom: '1px solid #e2e8f0',
-        flexShrink: 0,
-        flexWrap: 'wrap', gap: 12,
+        padding: '14px 24px', background: 'white', borderBottom: '1px solid #e2e8f0',
+        flexShrink: 0, flexWrap: 'wrap', gap: 12,
       }}>
-        {/* Left: back + breadcrumb */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <button
             onClick={onBack}
@@ -252,32 +646,22 @@ const NoteEditor: React.FC<{
             <ArrowLeft size={16} />
           </button>
           <div style={{ fontSize: 13, color: '#64748b' }}>
-            <span
-              style={{ cursor: 'pointer', fontWeight: 500 }}
-              onClick={onBack}
-            >Notes</span>
+            <span style={{ cursor: 'pointer', fontWeight: 500 }} onClick={onBack}>Notes</span>
             <span style={{ margin: '0 6px' }}>›</span>
-            <span style={{ fontWeight: 700, color: '#1e293b' }}>
-              {note.title || 'New Note'}
-            </span>
+            <span style={{ fontWeight: 700, color: '#1e293b' }}>{note.title || 'New Note'}</span>
           </div>
           {lastSaved && (
-            <span style={{
-              fontSize: 10, color: '#10b981', fontWeight: 700,
-              display: 'flex', alignItems: 'center', gap: 4,
-            }}>
+            <span style={{ fontSize: 10, color: '#10b981', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
               <CheckCircle size={10} /> Saved
             </span>
           )}
         </div>
 
-        {/* Right: actions */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {/* Status pill */}
           <div style={{
             display: 'flex', alignItems: 'center', gap: 5,
-            fontSize: 11, fontWeight: 700,
-            padding: '4px 12px', borderRadius: 20,
+            fontSize: 11, fontWeight: 700, padding: '4px 12px', borderRadius: 20,
             background: isPublished ? '#d1fae5' : '#f1f5f9',
             color: isPublished ? '#065f46' : '#475569',
             border: `1px solid ${isPublished ? '#a7f3d0' : '#e2e8f0'}`,
@@ -286,7 +670,6 @@ const NoteEditor: React.FC<{
             {isPublished ? 'Published' : 'Draft'}
           </div>
 
-          {/* Copy link (if published) */}
           {isPublished && (
             <button
               onClick={handleCopyLink}
@@ -294,8 +677,7 @@ const NoteEditor: React.FC<{
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
                 padding: '7px 14px', borderRadius: 10,
-                border: '1px solid #c7d2fe',
-                background: '#eef2ff', color: '#4338ca',
+                border: '1px solid #c7d2fe', background: '#eef2ff', color: '#4338ca',
                 fontSize: 12, fontWeight: 600, cursor: 'pointer',
               }}
             >
@@ -304,62 +686,56 @@ const NoteEditor: React.FC<{
             </button>
           )}
 
-          {/* Save draft */}
           <button
             onClick={() => save('draft')}
             disabled={isSaving}
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
               padding: '8px 16px', borderRadius: 10,
-              border: '1px solid #e2e8f0',
-              background: 'white', color: '#475569',
-              fontSize: 12, fontWeight: 600, cursor: 'pointer',
-              opacity: isSaving ? 0.7 : 1,
+              border: '1px solid #e2e8f0', background: 'white', color: '#475569',
+              fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: isSaving ? 0.7 : 1,
             }}
           >
             {isSaving ? <Loader2 size={13} style={{ animation: 'spin 0.8s linear infinite' }} /> : <Clock size={13} />}
             Save Draft
           </button>
 
-          {/* Publish + copy link */}
           <button
             onClick={handlePublishAndCopy}
             disabled={isSaving}
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
-              padding: '8px 18px', borderRadius: 10,
-              border: 'none',
+              padding: '8px 18px', borderRadius: 10, border: 'none',
               background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
-              color: 'white',
-              fontSize: 12, fontWeight: 700, cursor: 'pointer',
-              boxShadow: '0 2px 8px rgba(79,70,229,0.3)',
-              opacity: isSaving ? 0.7 : 1,
+              color: 'white', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+              boxShadow: '0 2px 8px rgba(79,70,229,0.3)', opacity: isSaving ? 0.7 : 1,
             }}
           >
-            {isSaving
-              ? <Loader2 size={13} style={{ animation: 'spin 0.8s linear infinite' }} />
-              : <Globe size={13} />
-            }
+            {isSaving ? <Loader2 size={13} style={{ animation: 'spin 0.8s linear infinite' }} /> : <Globe size={13} />}
             Publish & Copy Link
           </button>
         </div>
       </div>
 
+      {/* ── Toolbar ── */}
+      <EditorToolbar
+        churchId={initialNote.churchId}
+        onImageInsert={handleImageInsert}
+        onPcoInsert={handlePcoInsert}
+      />
+
       {/* ── Editor Body ── */}
       <div style={{
-        flex: 1, overflowY: 'auto',
-        background: '#f8fafc',
-        display: 'flex', justifyContent: 'center',
-        padding: '32px 16px',
+        flex: 1, overflowY: 'auto', background: '#f8fafc',
+        display: 'flex', justifyContent: 'center', padding: '32px 16px',
       }}>
         <div style={{ width: '100%', maxWidth: 720 }}>
 
-          {/* Church/author preview strip */}
+          {/* Church/author strip */}
           <div style={{
             display: 'flex', alignItems: 'center', gap: 12,
             marginBottom: 20, padding: '10px 16px',
-            background: 'white', borderRadius: 12,
-            border: '1px solid #e2e8f0',
+            background: 'white', borderRadius: 12, border: '1px solid #e2e8f0',
             fontSize: 13, color: '#64748b',
           }}>
             <div style={{
@@ -378,16 +754,13 @@ const NoteEditor: React.FC<{
                 placeholder="Author name…"
                 style={{
                   border: 'none', outline: 'none', fontSize: 13,
-                  fontWeight: 700, color: '#1e293b', background: 'transparent',
-                  width: '100%',
+                  fontWeight: 700, color: '#1e293b', background: 'transparent', width: '100%',
                 }}
               />
               <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>
                 {church?.name || 'Your Church'}
               </div>
             </div>
-
-            {/* Preview link */}
             <a
               href={publicUrl(note.id)}
               target="_blank"
@@ -403,7 +776,7 @@ const NoteEditor: React.FC<{
             </a>
           </div>
 
-          {/* Title input */}
+          {/* Title */}
           <textarea
             value={note.title}
             onChange={e => update({ title: e.target.value })}
@@ -415,8 +788,7 @@ const NoteEditor: React.FC<{
               fontWeight: 800, color: '#0f172a',
               border: 'none', outline: 'none',
               background: 'transparent', resize: 'none',
-              lineHeight: 1.3, letterSpacing: '-0.02em',
-              marginBottom: 20,
+              lineHeight: 1.3, letterSpacing: '-0.02em', marginBottom: 20,
               fontFamily: 'inherit',
             }}
           />
@@ -427,14 +799,14 @@ const NoteEditor: React.FC<{
             marginBottom: 28, opacity: 0.25,
           }} />
 
-          {/* Content textarea */}
+          {/* Content */}
           <textarea
+            ref={textareaRef}
             value={note.content}
             onChange={e => update({ content: e.target.value })}
-            placeholder="Write your note here…&#10;&#10;You can use plain text or paste HTML for rich formatting."
+            placeholder={`Write your note here…\n\nUse the toolbar above to insert images or Planning Center events.`}
             style={{
-              width: '100%', boxSizing: 'border-box',
-              minHeight: 360,
+              width: '100%', boxSizing: 'border-box', minHeight: 360,
               fontSize: 16, lineHeight: 1.8, color: '#334155',
               border: 'none', outline: 'none',
               background: 'transparent', resize: 'vertical',
@@ -452,7 +824,7 @@ const NoteEditor: React.FC<{
             <span style={{ flexShrink: 0 }}>💡</span>
             <span>
               Click <strong>Publish &amp; Copy Link</strong> to make this note public and copy the URL for SMS.
-              The link works for anyone — no login required.
+              Use the toolbar above to insert images or Planning Center content cards.
             </span>
           </div>
         </div>
@@ -481,7 +853,6 @@ export const NotesManager: React.FC<NotesManagerProps> = ({ churchId, currentUse
     setTimeout(() => setToast(null), 4000);
   };
 
-  // Load notes
   useEffect(() => {
     setIsLoading(true);
     firestore.getNotes(churchId)
@@ -489,7 +860,6 @@ export const NotesManager: React.FC<NotesManagerProps> = ({ churchId, currentUse
       .catch(() => setIsLoading(false));
   }, [churchId]);
 
-  // Create new note
   const handleCreate = () => {
     const note: ChurchNote = {
       id: newNoteId(),
@@ -506,14 +876,11 @@ export const NotesManager: React.FC<NotesManagerProps> = ({ churchId, currentUse
     setActiveNote(note);
   };
 
-  // Saved callback from editor
   const handleSaved = (updated: ChurchNote) => {
     setNotes(prev => prev.map(n => n.id === updated.id ? updated : n));
   };
 
-  // Delete
-  const handleDelete = async (note: ChurchNote, e?: React.MouseEvent) => {
-    e?.stopPropagation();
+  const handleDelete = async (note: ChurchNote) => {
     if (!confirm(`Delete "${note.title || 'this note'}"? This cannot be undone.`)) return;
     await firestore.deleteNote(note.id);
     setNotes(prev => prev.filter(n => n.id !== note.id));
@@ -521,7 +888,6 @@ export const NotesManager: React.FC<NotesManagerProps> = ({ churchId, currentUse
     showToast('Note deleted');
   };
 
-  // Copy link
   const handleCopyLink = async (note: ChurchNote, e?: React.MouseEvent) => {
     e?.stopPropagation();
     try {
@@ -532,7 +898,6 @@ export const NotesManager: React.FC<NotesManagerProps> = ({ churchId, currentUse
     }
   };
 
-  // Filtered list
   const filtered = notes.filter(n => {
     if (tab === 'draft') return n.status === 'draft';
     if (tab === 'published') return n.status === 'published';
@@ -545,7 +910,6 @@ export const NotesManager: React.FC<NotesManagerProps> = ({ churchId, currentUse
     published: notes.filter(n => n.status === 'published').length,
   };
 
-  // ── Render editor ──
   if (activeNote) {
     return (
       <>
@@ -562,16 +926,12 @@ export const NotesManager: React.FC<NotesManagerProps> = ({ churchId, currentUse
     );
   }
 
-  // ── Render list ──
   return (
     <>
       <div style={{ padding: '28px 32px', maxWidth: 900, margin: '0 auto' }}>
 
         {/* Header */}
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          marginBottom: 24
-        }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
           <div>
             <h1 style={{
               fontSize: 26, fontWeight: 800, color: '#0f172a',
@@ -591,18 +951,14 @@ export const NotesManager: React.FC<NotesManagerProps> = ({ churchId, currentUse
               Create shareable notes — send public links via SMS
             </p>
           </div>
-
           <button
             onClick={handleCreate}
             style={{
               display: 'flex', alignItems: 'center', gap: 7,
-              padding: '10px 20px', borderRadius: 12,
-              border: 'none',
+              padding: '10px 20px', borderRadius: 12, border: 'none',
               background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
-              color: 'white', fontSize: 13, fontWeight: 700,
-              cursor: 'pointer',
-              boxShadow: '0 2px 12px rgba(79,70,229,0.35)',
-              transition: 'all 0.2s',
+              color: 'white', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              boxShadow: '0 2px 12px rgba(79,70,229,0.35)', transition: 'all 0.2s',
             }}
           >
             <Plus size={15} /> Create Note
@@ -611,8 +967,7 @@ export const NotesManager: React.FC<NotesManagerProps> = ({ churchId, currentUse
 
         {/* Tabs */}
         <div style={{
-          display: 'flex', gap: 4,
-          padding: 4, background: '#f1f5f9', borderRadius: 12,
+          display: 'flex', gap: 4, padding: 4, background: '#f1f5f9', borderRadius: 12,
           marginBottom: 20, width: 'fit-content',
         }}>
           {(['all', 'draft', 'published'] as const).map(t => (
@@ -621,8 +976,7 @@ export const NotesManager: React.FC<NotesManagerProps> = ({ churchId, currentUse
               onClick={() => setTab(t)}
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
-                padding: '7px 16px', borderRadius: 10,
-                border: 'none', cursor: 'pointer',
+                padding: '7px 16px', borderRadius: 10, border: 'none', cursor: 'pointer',
                 fontSize: 12, fontWeight: 600,
                 background: tab === t ? 'white' : 'transparent',
                 color: tab === t ? '#1e293b' : '#64748b',
@@ -637,8 +991,7 @@ export const NotesManager: React.FC<NotesManagerProps> = ({ churchId, currentUse
               <span style={{
                 fontSize: 10, padding: '1px 6px', borderRadius: 20,
                 background: tab === t ? '#eef2ff' : '#e2e8f0',
-                color: tab === t ? '#4f46e5' : '#94a3b8',
-                fontWeight: 700,
+                color: tab === t ? '#4f46e5' : '#94a3b8', fontWeight: 700,
               }}>
                 {counts[t]}
               </span>
@@ -655,8 +1008,7 @@ export const NotesManager: React.FC<NotesManagerProps> = ({ churchId, currentUse
         ) : filtered.length === 0 ? (
           <div style={{
             textAlign: 'center', padding: '64px 40px',
-            border: '2px dashed #e2e8f0', borderRadius: 20,
-            background: '#f8fafc',
+            border: '2px dashed #e2e8f0', borderRadius: 20, background: '#f8fafc',
           }}>
             <div style={{ fontSize: 48, marginBottom: 16 }}>📝</div>
             <p style={{ fontSize: 16, fontWeight: 700, color: '#1e293b', marginBottom: 6 }}>
@@ -687,7 +1039,7 @@ export const NotesManager: React.FC<NotesManagerProps> = ({ churchId, currentUse
                 note={note}
                 onEdit={() => setActiveNote(note)}
                 onDelete={() => handleDelete(note)}
-                onCopyLink={() => handleCopyLink(note)}
+                onCopyLink={e => handleCopyLink(note, e)}
               />
             ))}
           </div>
@@ -705,14 +1057,12 @@ export const NotesManager: React.FC<NotesManagerProps> = ({ churchId, currentUse
 const ToastBar: React.FC<{ toast: ToastMsg }> = ({ toast }) => (
   <div style={{
     position: 'fixed', top: 20, left: '50%', transform: 'translateX(-50%)',
-    zIndex: 9999,
-    padding: '12px 22px', borderRadius: 14,
+    zIndex: 9999, padding: '12px 22px', borderRadius: 14,
     background: toast.type === 'error'
       ? 'linear-gradient(135deg, #ef4444, #dc2626)'
       : 'linear-gradient(135deg, #10b981, #059669)',
     color: 'white', fontSize: 13, fontWeight: 700,
-    boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
-    whiteSpace: 'nowrap',
+    boxShadow: '0 8px 24px rgba(0,0,0,0.2)', whiteSpace: 'nowrap',
   }}>
     {toast.msg}
   </div>
@@ -736,6 +1086,11 @@ const GlobalStyles: React.FC = () => (
     .action-btn-danger:hover {
       background: #fef2f2 !important;
       border-color: #fecaca !important;
+    }
+    .toolbar-btn:hover {
+      background: #f1f5f9 !important;
+      border-color: #c7d2fe !important;
+      color: #4338ca !important;
     }
   `}</style>
 );
