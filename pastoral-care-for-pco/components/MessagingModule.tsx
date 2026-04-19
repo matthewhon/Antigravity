@@ -1724,6 +1724,28 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
         }
     };
 
+    // Shorten the current draft to under 160 chars via AI
+    const handleAiShorten = async () => {
+        if (!replyBody.trim() || aiGenerating) return;
+        setAiGenerating(true);
+        try {
+            const res = await fetch('/ai/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    prompt: `Shorten this SMS reply to under 160 characters while keeping the same meaning, warmth, and tone. Return ONLY the shortened text — no explanation:\n\n${replyBody}`,
+                    model: 'gemini-2.5-flash',
+                }),
+            });
+            const data = await res.json();
+            if (data.text) setReplyBody(data.text.trim());
+        } catch {
+            // Silent fail
+        } finally {
+            setAiGenerating(false);
+        }
+    };
+
     // Toggle a tag on the active conversation
     const handleToggleConvTag = async (conv: SmsConversation, tagId: string) => {
         const isOn = (conv.tags || []).includes(tagId);
@@ -2120,35 +2142,60 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                 <AlertTriangle size={13} /> This contact has opted out. You cannot send them messages.
                             </div>
                         ) : (
-                            <div className="flex items-end gap-2">
-                                {/* AI suggest button — only shown when agent is enabled */}
-                                {smsAgentEnabled && (
+                            <div className="space-y-1.5">
+                                <div className="flex items-end gap-2">
+                                    {/* AI suggest button — only shown when agent is enabled */}
+                                    {smsAgentEnabled && (
+                                        <button
+                                            onClick={handleAiSuggest}
+                                            disabled={aiGenerating}
+                                            title="Ask AI to suggest a reply"
+                                            className="flex items-center justify-center w-10 h-10 shrink-0 rounded-xl bg-violet-50 hover:bg-violet-100 dark:bg-violet-900/30 dark:hover:bg-violet-900/50 text-violet-600 dark:text-violet-400 border border-violet-200 dark:border-violet-700 transition disabled:opacity-50"
+                                        >
+                                            {aiGenerating
+                                                ? <Loader2 size={16} className="animate-spin" />
+                                                : <Sparkles size={16} />}
+                                        </button>
+                                    )}
+                                    <textarea
+                                        rows={2}
+                                        value={replyBody}
+                                        onChange={e => setReplyBody(e.target.value)}
+                                        placeholder="Type a reply…"
+                                        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendReply(); }}}
+                                        className="flex-1 text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
+                                    />
                                     <button
-                                        onClick={handleAiSuggest}
-                                        disabled={aiGenerating}
-                                        title="Ask AI to suggest a reply"
-                                        className="flex items-center justify-center w-10 h-10 shrink-0 rounded-xl bg-violet-50 hover:bg-violet-100 dark:bg-violet-900/30 dark:hover:bg-violet-900/50 text-violet-600 dark:text-violet-400 border border-violet-200 dark:border-violet-700 transition disabled:opacity-50"
+                                        onClick={handleSendReply}
+                                        disabled={!replyBody.trim() || isSending}
+                                        className="px-4 py-2.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-xl transition font-bold shrink-0"
                                     >
-                                        {aiGenerating
-                                            ? <Loader2 size={16} className="animate-spin" />
-                                            : <Sparkles size={16} />}
+                                        {isSending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
                                     </button>
+                                </div>
+                                {/* AI shorten + char counter — only shown when there's draft text */}
+                                {replyBody.trim() && (
+                                    <div className="flex items-center justify-between px-1">
+                                        {smsAgentEnabled ? (
+                                            <button
+                                                onClick={handleAiShorten}
+                                                disabled={aiGenerating || replyBody.length <= 160}
+                                                title="Shorten to under 160 characters"
+                                                className="flex items-center gap-1 text-[10px] font-bold text-violet-500 dark:text-violet-400 hover:text-violet-700 dark:hover:text-violet-200 disabled:opacity-40 transition"
+                                            >
+                                                <Sparkles size={11} />
+                                                {aiGenerating ? 'Shortening…' : 'Shorten to 160'}
+                                            </button>
+                                        ) : <span />}
+                                        <span className={`text-[10px] font-mono tabular-nums font-bold transition-colors ${
+                                            replyBody.length > 160 ? 'text-red-500' :
+                                            replyBody.length > 120 ? 'text-amber-500' :
+                                            'text-slate-400 dark:text-slate-500'
+                                        }`}>
+                                            {replyBody.length}/160
+                                        </span>
+                                    </div>
                                 )}
-                                <textarea
-                                    rows={2}
-                                    value={replyBody}
-                                    onChange={e => setReplyBody(e.target.value)}
-                                    placeholder="Type a reply…"
-                                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendReply(); }}}
-                                    className="flex-1 text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
-                                />
-                                <button
-                                    onClick={handleSendReply}
-                                    disabled={!replyBody.trim() || isSending}
-                                    className="px-4 py-2.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-xl transition font-bold shrink-0"
-                                >
-                                    {isSending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-                                </button>
                             </div>
                         )}
                     </div>
