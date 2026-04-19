@@ -23,53 +23,36 @@ function getInitials(name: string): string {
 // ─── Shell (shared chrome) ────────────────────────────────────────────────────
 
 const Shell: React.FC<{ children: React.ReactNode; churchName?: string }> = ({ children, churchName }) => (
-  <div className="min-h-screen font-sans" style={{
-    background: 'linear-gradient(135deg, #fdf4ff 0%, #fef9ec 35%, #eff6ff 70%, #f0fdf4 100%)',
-  }}>
+  <div className="pnv-bg min-h-screen font-sans">
     {/* Header */}
-    <header style={{
-      background: 'rgba(255,255,255,0.85)',
-      backdropFilter: 'blur(12px)',
-      borderBottom: '1px solid rgba(0,0,0,0.07)',
-      padding: '14px 24px',
-    }}>
-      <div style={{ maxWidth: 680, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 12 }}>
+    <header className="pnv-header px-6 py-3.5">
+      <div className="max-w-[680px] mx-auto flex items-center gap-3">
         {/* Brand icon */}
-        <div style={{
-          width: 32, height: 32, borderRadius: 10,
-          background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 2px 8px rgba(79,70,229,0.35)',
-          flexShrink: 0,
-        }}>
+        <div className="pnv-brand-icon w-8 h-8 rounded-[10px] flex items-center justify-center shrink-0">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z" />
           </svg>
         </div>
         <div>
           {churchName && (
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', lineHeight: 1.2 }}>
-              {churchName}
-            </div>
+            <div className="text-[13px] font-bold text-slate-800 leading-tight">{churchName}</div>
           )}
-          <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-            Church Note
-          </div>
+          <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-[0.1em]">Church Note</div>
         </div>
       </div>
     </header>
 
     {/* Content */}
-    <div style={{ padding: '40px 16px 80px', display: 'flex', justifyContent: 'center' }}>
-      <div style={{ width: '100%', maxWidth: 680 }}>
+    <div className="px-4 pt-10 pb-20 flex justify-center">
+      <div className="w-full max-w-[680px]">
         {children}
       </div>
     </div>
 
     {/* Footer */}
-    <div style={{ textAlign: 'center', fontSize: 11, color: '#94a3b8', paddingBottom: 24 }}>
+    <div className="text-center text-[11px] text-slate-400 pb-6">
       Powered by{' '}
-      <span style={{ fontWeight: 700, color: '#64748b' }}>Barnabas</span>
+      <span className="font-bold text-slate-500">Barnabas</span>
     </div>
   </div>
 );
@@ -78,14 +61,9 @@ const Shell: React.FC<{ children: React.ReactNode; churchName?: string }> = ({ c
 
 const LoadingCard: React.FC = () => (
   <Shell>
-    <div style={{ textAlign: 'center', padding: '80px 0', color: '#94a3b8' }}>
-      <div style={{
-        width: 40, height: 40, margin: '0 auto 16px',
-        border: '3px solid #e2e8f0', borderTopColor: '#4f46e5',
-        borderRadius: '50%', animation: 'spin 0.8s linear infinite',
-      }} />
-      <p style={{ fontSize: 14 }}>Loading note…</p>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    <div className="text-center py-20 text-slate-400">
+      <div className="pnv-spinner" />
+      <p className="text-[14px]">Loading note…</p>
     </div>
   </Shell>
 );
@@ -94,13 +72,10 @@ const LoadingCard: React.FC = () => (
 
 const NotFoundCard: React.FC = () => (
   <Shell>
-    <div style={{
-      background: 'white', borderRadius: 20, boxShadow: '0 4px 24px rgba(0,0,0,0.08)',
-      border: '1px solid rgba(0,0,0,0.06)', padding: '56px 40px', textAlign: 'center',
-    }}>
-      <div style={{ fontSize: 48, marginBottom: 16 }}>🔍</div>
-      <h2 style={{ fontSize: 22, fontWeight: 800, color: '#1e293b', marginBottom: 8 }}>Note Not Found</h2>
-      <p style={{ fontSize: 14, color: '#64748b' }}>
+    <div className="bg-white rounded-[20px] shadow-[0_4px_24px_rgba(0,0,0,0.08)] border border-black/[0.06] px-10 py-14 text-center">
+      <div className="text-5xl mb-4">🔍</div>
+      <h2 className="text-[22px] font-extrabold text-slate-900 mb-2">Note Not Found</h2>
+      <p className="text-[14px] text-slate-500">
         This link may be invalid or the note has been removed.
       </p>
     </div>
@@ -111,13 +86,10 @@ const NotFoundCard: React.FC = () => (
 
 const ErrorCard: React.FC = () => (
   <Shell>
-    <div style={{
-      background: 'white', borderRadius: 20, boxShadow: '0 4px 24px rgba(0,0,0,0.08)',
-      border: '1px solid rgba(239,68,68,0.15)', padding: '56px 40px', textAlign: 'center',
-    }}>
-      <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
-      <h2 style={{ fontSize: 22, fontWeight: 800, color: '#1e293b', marginBottom: 8 }}>Something went wrong</h2>
-      <p style={{ fontSize: 14, color: '#64748b' }}>Unable to load this note. Please try again later.</p>
+    <div className="bg-white rounded-[20px] shadow-[0_4px_24px_rgba(0,0,0,0.08)] border border-red-500/15 px-10 py-14 text-center">
+      <div className="text-5xl mb-4">⚠️</div>
+      <h2 className="text-[22px] font-extrabold text-slate-900 mb-2">Something went wrong</h2>
+      <p className="text-[14px] text-slate-500">Unable to load this note. Please try again later.</p>
     </div>
   </Shell>
 );
@@ -140,7 +112,6 @@ export const PublicNoteView: React.FC<{ noteId: string }> = ({ noteId }) => {
           return;
         }
         setNote(data);
-        // Fetch church name for branding
         try {
           const church = await firestore.getChurch(data.churchId);
           if (church?.name) setChurchName(church.name);
@@ -174,150 +145,70 @@ export const PublicNoteView: React.FC<{ noteId: string }> = ({ noteId }) => {
     <Shell churchName={churchName}>
       {/* Draft banner */}
       {isDraft && (
-        <div style={{
-          background: 'linear-gradient(90deg, #fef3c7, #fde68a)',
-          border: '1px solid #fbbf24',
-          borderRadius: 12,
-          padding: '10px 18px',
-          marginBottom: 20,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-          fontSize: 13,
-          fontWeight: 600,
-          color: '#92400e',
-        }}>
+        <div className="pnv-draft-banner border border-amber-400 rounded-xl px-[18px] py-2.5 mb-5 flex items-center gap-2.5 text-[13px] font-semibold text-amber-900">
           <span>✏️</span>
           <span>Preview — this note hasn't been published yet</span>
         </div>
       )}
 
       {/* Main note card */}
-      <div style={{
-        background: 'white',
-        borderRadius: 24,
-        boxShadow: '0 8px 40px rgba(0,0,0,0.10), 0 1px 3px rgba(0,0,0,0.06)',
-        border: '1px solid rgba(0,0,0,0.05)',
-        overflow: 'hidden',
-      }}>
+      <div className="pnv-card bg-white rounded-3xl border border-black/[0.05] overflow-hidden">
 
-        {/* Decorative top bar */}
-        <div style={{
-          height: 5,
-          background: 'linear-gradient(90deg, #4f46e5, #7c3aed, #a855f7, #ec4899)',
-        }} />
+        {/* Rainbow top bar */}
+        <div className="pnv-card-top-bar" />
 
         {/* Card body */}
-        <div style={{ padding: '40px 44px 44px' }}>
+        <div className="px-11 pt-10 pb-11">
 
           {/* Church + date meta */}
-          <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            marginBottom: 28,
-            flexWrap: 'wrap', gap: 8,
-          }}>
+          <div className="flex items-center justify-between mb-7 flex-wrap gap-2">
             {churchName && (
-              <div style={{
-                display: 'inline-flex', alignItems: 'center', gap: 6,
-                background: 'linear-gradient(135deg, #eef2ff, #f5f3ff)',
-                border: '1px solid #c7d2fe',
-                borderRadius: 20, padding: '4px 12px',
-                fontSize: 11, fontWeight: 700, color: '#4338ca',
-                textTransform: 'uppercase', letterSpacing: '0.08em',
-              }}>
+              <div className="pnv-church-pill inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold text-indigo-700 uppercase tracking-widest">
                 <span>⛪</span> {churchName}
               </div>
             )}
-            <div style={{ fontSize: 12, color: '#94a3b8', fontWeight: 500 }}>
+            <div className="text-xs text-slate-400 font-medium">
               {formatDate(note.updatedAt || note.createdAt)}
             </div>
           </div>
 
           {/* Title */}
-          <h1 style={{
-            fontSize: 'clamp(26px, 5vw, 36px)',
-            fontWeight: 800,
-            color: '#0f172a',
-            lineHeight: 1.2,
-            marginBottom: 28,
-            letterSpacing: '-0.02em',
-          }}>
+          <h1 className="text-[clamp(26px,5vw,36px)] font-extrabold text-slate-900 leading-tight mb-7 tracking-tight">
             {note.title || 'Untitled Note'}
           </h1>
 
           {/* Author byline */}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 12,
-            marginBottom: 36,
-            paddingBottom: 28,
-            borderBottom: '1px solid #f1f5f9',
-          }}>
+          <div className="flex items-center gap-3 mb-9 pb-7 border-b border-slate-100">
             {/* Avatar */}
-            <div style={{
-              width: 44, height: 44, borderRadius: '50%',
-              background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: 'white', fontWeight: 800, fontSize: 14,
-              boxShadow: '0 2px 8px rgba(79,70,229,0.3)',
-              flexShrink: 0,
-            }}>
+            <div className="pnv-avatar w-11 h-11 rounded-full flex items-center justify-center text-white font-extrabold text-sm shrink-0">
               {getInitials(note.authorName || 'A')}
             </div>
             <div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#1e293b' }}>
-                {note.authorName || 'Church Staff'}
-              </div>
-              <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>
-                {churchName || 'Church Leader'}
-              </div>
+              <div className="text-[14px] font-bold text-slate-800">{note.authorName || 'Church Staff'}</div>
+              <div className="text-xs text-slate-400 mt-0.5">{churchName || 'Church Leader'}</div>
             </div>
           </div>
 
           {/* Content */}
           <div
             className="note-content"
-            style={{
-              fontSize: 16,
-              lineHeight: 1.8,
-              color: '#334155',
-            }}
             // Safe: content is authored by admin, not user-submitted
             dangerouslySetInnerHTML={{ __html: note.content.replace(/\n/g, '<br/>') }}
           />
         </div>
 
         {/* Card footer */}
-        <div style={{
-          padding: '20px 44px',
-          background: '#f8fafc',
-          borderTop: '1px solid #f1f5f9',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          flexWrap: 'wrap', gap: 12,
-        }}>
-          <div style={{ fontSize: 12, color: '#94a3b8' }}>
+        <div className="px-11 py-5 bg-slate-50 border-t border-slate-100 flex items-center justify-between flex-wrap gap-3">
+          <div className="text-xs text-slate-400">
             Shared by {note.authorName || 'Church Staff'}
             {churchName ? ` · ${churchName}` : ''}
           </div>
 
           <button
             onClick={handleCopyLink}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 7,
-              padding: '8px 18px',
-              background: copied
-                ? 'linear-gradient(135deg, #10b981, #059669)'
-                : 'linear-gradient(135deg, #4f46e5, #7c3aed)',
-              color: 'white',
-              border: 'none',
-              borderRadius: 20,
-              fontSize: 12,
-              fontWeight: 700,
-              cursor: 'pointer',
-              boxShadow: copied
-                ? '0 2px 8px rgba(16,185,129,0.35)'
-                : '0 2px 8px rgba(79,70,229,0.35)',
-              transition: 'all 0.2s',
-            }}
+            className={`flex items-center gap-1.5 px-[18px] py-2 rounded-full text-xs font-bold text-white cursor-pointer border-none ${
+              copied ? 'pnv-btn-copied' : 'pnv-btn-copy'
+            }`}
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               {copied
@@ -329,27 +220,6 @@ export const PublicNoteView: React.FC<{ noteId: string }> = ({ noteId }) => {
           </button>
         </div>
       </div>
-
-      {/* Style overrides for note content */}
-      <style>{`
-        .note-content h1, .note-content h2, .note-content h3 {
-          font-weight: 700; color: #0f172a; margin: 1.5em 0 0.5em;
-        }
-        .note-content h1 { font-size: 1.6em; }
-        .note-content h2 { font-size: 1.3em; }
-        .note-content h3 { font-size: 1.1em; }
-        .note-content p { margin: 0 0 1em; }
-        .note-content ul, .note-content ol { padding-left: 1.5em; margin: 0.5em 0 1em; }
-        .note-content li { margin-bottom: 0.3em; }
-        .note-content strong { font-weight: 700; color: #1e293b; }
-        .note-content em { font-style: italic; }
-        .note-content blockquote {
-          border-left: 4px solid #c7d2fe; margin: 1em 0; padding: 8px 16px;
-          background: #eef2ff; border-radius: 0 8px 8px 0; color: #4338ca;
-          font-style: italic;
-        }
-        .note-content a { color: #4f46e5; text-decoration: underline; }
-      `}</style>
     </Shell>
   );
 };

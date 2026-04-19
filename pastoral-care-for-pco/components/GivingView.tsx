@@ -969,8 +969,8 @@ export const GivingView: React.FC<GivingViewProps> = ({
                               <LineChart data={cumulativeChartData}>
                                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
                                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: axisColor}} />
-                                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: axisColor}} />
-                                  <Tooltip contentStyle={TOOLTIP_STYLE} itemStyle={{ color: '#fff' }} cursor={{fill: currentTheme === 'dark' ? '#334155' : '#f8fafc'}} />
+                                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: axisColor}} tickFormatter={(v: number) => v >= 1000 ? `$${(v / 1000).toLocaleString(undefined, { maximumFractionDigits: 1 })}k` : `$${v.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} width={56} />
+                                  <Tooltip contentStyle={TOOLTIP_STYLE} itemStyle={{ color: '#fff' }} cursor={{fill: currentTheme === 'dark' ? '#334155' : '#f8fafc'}} formatter={(value: number) => [`$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, '']} />
                                   <Legend verticalAlign="top" iconType="circle" wrapperStyle={{fontSize: '10px'}} />
                                   <Line type="monotone" dataKey="Budget" stroke="#94a3b8" strokeWidth={2} dot={false} strokeDasharray="5 5" />
                                   <Line type="monotone" dataKey="Actual" stroke="#10b981" strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}} />

@@ -182,7 +182,11 @@ const PcoNoteModal: React.FC<{
             <img src="https://planningcenter.com/favicon.ico" alt="PCO" className="w-4 h-4" />
             <h2 className="text-base font-bold text-slate-900 dark:text-white">Insert from Planning Center</h2>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition">
+          <button
+            onClick={onClose}
+            title="Close"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+          >
             <X size={18} />
           </button>
         </div>
@@ -214,6 +218,7 @@ const PcoNoteModal: React.FC<{
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
+              title={`Search ${TAB_INFO[tab].label.toLowerCase()}`}
               placeholder={`Search ${TAB_INFO[tab].label.toLowerCase()}…`}
               value={search}
               onChange={e => setSearch(e.target.value)}
@@ -315,83 +320,56 @@ const NoteCard: React.FC<{
   return (
     <div
       onClick={onEdit}
-      style={{
-        background: 'white',
-        border: '1px solid #e2e8f0',
-        borderRadius: 16,
-        padding: '20px 22px',
-        cursor: 'pointer',
-        transition: 'all 0.18s',
-        position: 'relative',
-        overflow: 'hidden',
-      }}
-      className="note-card-hover"
+      className="nm-card-hover bg-white border border-slate-200 rounded-2xl px-[22px] py-5 cursor-pointer relative overflow-hidden"
     >
-      <div style={{
-        position: 'absolute', left: 0, top: 0, bottom: 0, width: 4,
-        background: isPublished
-          ? 'linear-gradient(180deg, #10b981, #059669)'
-          : 'linear-gradient(180deg, #94a3b8, #64748b)',
-        borderRadius: '16px 0 0 16px',
-      }} />
+      {/* Coloured left accent */}
+      <div className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-2xl ${isPublished ? 'nm-card-accent-published' : 'nm-card-accent-draft'}`} />
 
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-            <span style={{
-              display: 'inline-flex', alignItems: 'center', gap: 4,
-              fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em',
-              padding: '2px 8px', borderRadius: 20,
-              background: isPublished ? '#d1fae5' : '#f1f5f9',
-              color: isPublished ? '#065f46' : '#475569',
-              border: `1px solid ${isPublished ? '#a7f3d0' : '#e2e8f0'}`,
-            }}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          {/* Status + timestamp */}
+          <div className="flex items-center gap-2 mb-2">
+            <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border ${
+              isPublished
+                ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                : 'bg-slate-100 text-slate-500 border-slate-200'
+            }`}>
               {isPublished ? <Globe size={9} /> : <Lock size={9} />}
               {isPublished ? 'Published' : 'Draft'}
             </span>
-            <span style={{ fontSize: 11, color: '#94a3b8' }}>
+            <span className="text-[11px] text-slate-400">
               {formatRelative(note.updatedAt || note.createdAt)}
             </span>
           </div>
 
-          <h3 style={{
-            fontSize: 16, fontWeight: 700, color: '#0f172a',
-            marginBottom: 6, lineHeight: 1.3,
-            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-          }}>
+          {/* Title */}
+          <h3 className="text-base font-bold text-slate-900 mb-1.5 leading-snug truncate">
             {note.title || 'Untitled Note'}
           </h3>
 
+          {/* Preview */}
           {preview && (
-            <p style={{
-              fontSize: 13, color: '#64748b', lineHeight: 1.55,
-              display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-              overflow: 'hidden', margin: '0 0 10px',
-            }}>
+            <p className="text-[13px] text-slate-500 leading-relaxed line-clamp-2 mb-2.5">
               {preview}
             </p>
           )}
 
-          <div style={{ fontSize: 12, color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 5 }}>
-            <div style={{
-              width: 18, height: 18, borderRadius: '50%',
-              background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: 'white', fontSize: 8, fontWeight: 800, flexShrink: 0,
-            }}>
+          {/* Author */}
+          <div className="flex items-center gap-1.5 text-xs text-slate-400">
+            <div className="nm-avatar w-[18px] h-[18px] rounded-full flex items-center justify-center text-white text-[8px] font-extrabold shrink-0">
               {(note.authorName || 'A').charAt(0).toUpperCase()}
             </div>
             {note.authorName || 'Unknown'}
           </div>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}
-          onClick={e => e.stopPropagation()}>
-          <ActionBtn title="Edit" onClick={onEdit} icon={<Pencil size={13} />} />
+        {/* Action buttons */}
+        <div className="flex flex-col gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+          <ActionBtn title="Edit"      onClick={onEdit}      icon={<Pencil size={13} />} />
           {isPublished && (
-            <ActionBtn title="Copy link" onClick={onCopyLink} icon={<Link size={13} />} />
+            <ActionBtn title="Copy link" onClick={onCopyLink}  icon={<Link size={13} />} />
           )}
-          <ActionBtn title="Delete" onClick={onDelete} icon={<Trash2 size={13} />} danger />
+          <ActionBtn title="Delete"    onClick={onDelete}    icon={<Trash2 size={13} />} danger />
         </div>
       </div>
     </div>
@@ -407,14 +385,9 @@ const ActionBtn: React.FC<{
   <button
     onClick={onClick}
     title={title}
-    style={{
-      width: 30, height: 30, borderRadius: 8,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      border: '1px solid #e2e8f0', background: 'white',
-      color: danger ? '#ef4444' : '#64748b',
-      cursor: 'pointer', transition: 'all 0.15s',
-    }}
-    className={danger ? 'action-btn-danger' : 'action-btn'}
+    className={`nm-action-btn w-[30px] h-[30px] rounded-lg flex items-center justify-center border border-slate-200 bg-white cursor-pointer ${
+      danger ? 'text-red-500 nm-action-btn-danger' : 'text-slate-500'
+    }`}
   >
     {icon}
   </button>
@@ -456,34 +429,18 @@ const EditorToolbar: React.FC<ToolbarProps> = ({ churchId, onImageInsert, onPcoI
 
   return (
     <>
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 6,
-        padding: '8px 16px',
-        background: '#f8fafc',
-        borderBottom: '1px solid #e2e8f0',
-        flexShrink: 0,
-      }}>
-        <span style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginRight: 4 }}>
-          Insert
-        </span>
+      <div className="flex items-center gap-1.5 px-4 py-2 bg-slate-50 border-b border-slate-200 shrink-0">
+        <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mr-1">Insert</span>
 
         {/* Image upload */}
         <button
           onClick={() => imgInputRef.current?.click()}
           disabled={isUploading}
           title="Upload and insert image"
-          style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            padding: '5px 12px', borderRadius: 8,
-            border: '1px solid #e2e8f0', background: 'white',
-            fontSize: 12, fontWeight: 600, color: '#475569',
-            cursor: isUploading ? 'wait' : 'pointer',
-            transition: 'all 0.15s',
-          }}
-          className="toolbar-btn"
+          className="nm-toolbar-btn flex items-center gap-1.5 px-3 py-[5px] rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 disabled:opacity-60 disabled:cursor-wait cursor-pointer"
         >
           {isUploading
-            ? <Loader2 size={13} style={{ animation: 'spin 0.8s linear infinite' }} />
+            ? <Loader2 size={13} className="nm-spin" />
             : <Image size={13} />
           }
           {isUploading ? 'Uploading…' : 'Image'}
@@ -492,7 +449,7 @@ const EditorToolbar: React.FC<ToolbarProps> = ({ churchId, onImageInsert, onPcoI
           ref={imgInputRef}
           type="file"
           accept="image/*"
-          style={{ display: 'none' }}
+          className="hidden"
           onChange={e => {
             const file = e.target.files?.[0];
             if (file) handleImageFile(file);
@@ -504,20 +461,13 @@ const EditorToolbar: React.FC<ToolbarProps> = ({ churchId, onImageInsert, onPcoI
         <button
           onClick={() => setShowPco(true)}
           title="Insert Planning Center event, group, or registration"
-          style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            padding: '5px 12px', borderRadius: 8,
-            border: '1px solid #e2e8f0', background: 'white',
-            fontSize: 12, fontWeight: 600, color: '#475569',
-            cursor: 'pointer', transition: 'all 0.15s',
-          }}
-          className="toolbar-btn"
+          className="nm-toolbar-btn flex items-center gap-1.5 px-3 py-[5px] rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 cursor-pointer"
         >
-          <img src="https://planningcenter.com/favicon.ico" alt="PCO" style={{ width: 13, height: 13 }} />
+          <img src="https://planningcenter.com/favicon.ico" alt="PCO" className="w-[13px] h-[13px]" />
           Planning Center
         </button>
 
-        <div style={{ marginLeft: 'auto', fontSize: 11, color: '#94a3b8' }}>
+        <div className="ml-auto text-[11px] text-slate-400">
           Plain text or HTML · images supported
         </div>
       </div>
@@ -563,7 +513,6 @@ const NoteEditor: React.FC<{
     const end = ta.selectionEnd;
     const newContent = note.content.slice(0, start) + insertion + note.content.slice(end);
     update({ content: newContent });
-    // Restore cursor after the inserted text
     requestAnimationFrame(() => {
       ta.focus();
       const pos = start + insertion.length;
@@ -626,46 +575,37 @@ const NoteEditor: React.FC<{
   const isPublished = note.status === 'published';
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div className="flex flex-col h-full">
 
       {/* ── Editor Header ── */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '14px 24px', background: 'white', borderBottom: '1px solid #e2e8f0',
-        flexShrink: 0, flexWrap: 'wrap', gap: 12,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div className="flex items-center justify-between px-6 py-3.5 bg-white border-b border-slate-200 shrink-0 flex-wrap gap-3">
+        <div className="flex items-center gap-2.5">
           <button
             onClick={onBack}
-            style={{
-              width: 32, height: 32, borderRadius: 8, border: '1px solid #e2e8f0',
-              background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', color: '#64748b',
-            }}
+            title="Back to notes"
+            className="w-8 h-8 rounded-lg border border-slate-200 bg-white flex items-center justify-center cursor-pointer text-slate-500 hover:bg-slate-50 transition"
           >
             <ArrowLeft size={16} />
           </button>
-          <div style={{ fontSize: 13, color: '#64748b' }}>
-            <span style={{ cursor: 'pointer', fontWeight: 500 }} onClick={onBack}>Notes</span>
-            <span style={{ margin: '0 6px' }}>›</span>
-            <span style={{ fontWeight: 700, color: '#1e293b' }}>{note.title || 'New Note'}</span>
+          <div className="text-[13px] text-slate-500">
+            <span className="cursor-pointer font-medium hover:text-slate-700 transition" onClick={onBack}>Notes</span>
+            <span className="mx-1.5">›</span>
+            <span className="font-bold text-slate-800">{note.title || 'New Note'}</span>
           </div>
           {lastSaved && (
-            <span style={{ fontSize: 10, color: '#10b981', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
               <CheckCircle size={10} /> Saved
             </span>
           )}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div className="flex items-center gap-2">
           {/* Status pill */}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 5,
-            fontSize: 11, fontWeight: 700, padding: '4px 12px', borderRadius: 20,
-            background: isPublished ? '#d1fae5' : '#f1f5f9',
-            color: isPublished ? '#065f46' : '#475569',
-            border: `1px solid ${isPublished ? '#a7f3d0' : '#e2e8f0'}`,
-          }}>
+          <div className={`flex items-center gap-1 text-[11px] font-bold px-3 py-1 rounded-full border ${
+            isPublished
+              ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+              : 'bg-slate-100 text-slate-500 border-slate-200'
+          }`}>
             {isPublished ? <Globe size={11} /> : <Lock size={11} />}
             {isPublished ? 'Published' : 'Draft'}
           </div>
@@ -674,12 +614,7 @@ const NoteEditor: React.FC<{
             <button
               onClick={handleCopyLink}
               title="Copy public link"
-              style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                padding: '7px 14px', borderRadius: 10,
-                border: '1px solid #c7d2fe', background: '#eef2ff', color: '#4338ca',
-                fontSize: 12, fontWeight: 600, cursor: 'pointer',
-              }}
+              className="nm-btn-copy-link flex items-center gap-1.5 px-3.5 py-[7px] rounded-[10px] text-xs font-semibold cursor-pointer"
             >
               {copied ? <CheckCircle size={13} /> : <Link size={13} />}
               {copied ? 'Copied!' : 'Copy Link'}
@@ -689,30 +624,19 @@ const NoteEditor: React.FC<{
           <button
             onClick={() => save('draft')}
             disabled={isSaving}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '8px 16px', borderRadius: 10,
-              border: '1px solid #e2e8f0', background: 'white', color: '#475569',
-              fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: isSaving ? 0.7 : 1,
-            }}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-[10px] border border-slate-200 bg-white text-slate-600 text-xs font-semibold cursor-pointer disabled:opacity-70 hover:bg-slate-50 transition"
           >
-            {isSaving ? <Loader2 size={13} style={{ animation: 'spin 0.8s linear infinite' }} /> : <Clock size={13} />}
+            {isSaving ? <Loader2 size={13} className="nm-spin" /> : <Clock size={13} />}
             Save Draft
           </button>
 
           <button
             onClick={handlePublishAndCopy}
             disabled={isSaving}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '8px 18px', borderRadius: 10, border: 'none',
-              background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
-              color: 'white', fontSize: 12, fontWeight: 700, cursor: 'pointer',
-              boxShadow: '0 2px 8px rgba(79,70,229,0.3)', opacity: isSaving ? 0.7 : 1,
-            }}
+            className="nm-btn-publish flex items-center gap-1.5 px-4 py-2 rounded-[10px] border-none text-white text-xs font-bold cursor-pointer disabled:opacity-70"
           >
-            {isSaving ? <Loader2 size={13} style={{ animation: 'spin 0.8s linear infinite' }} /> : <Globe size={13} />}
-            Publish & Copy Link
+            {isSaving ? <Loader2 size={13} className="nm-spin" /> : <Globe size={13} />}
+            Publish &amp; Copy Link
           </button>
         </div>
       </div>
@@ -725,39 +649,24 @@ const NoteEditor: React.FC<{
       />
 
       {/* ── Editor Body ── */}
-      <div style={{
-        flex: 1, overflowY: 'auto', background: '#f8fafc',
-        display: 'flex', justifyContent: 'center', padding: '32px 16px',
-      }}>
-        <div style={{ width: '100%', maxWidth: 720 }}>
+      <div className="flex-1 overflow-y-auto bg-slate-50 flex justify-center px-4 py-8">
+        <div className="w-full max-w-[720px]">
 
           {/* Church/author strip */}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 12,
-            marginBottom: 20, padding: '10px 16px',
-            background: 'white', borderRadius: 12, border: '1px solid #e2e8f0',
-            fontSize: 13, color: '#64748b',
-          }}>
-            <div style={{
-              width: 32, height: 32, borderRadius: '50%',
-              background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: 'white', fontSize: 11, fontWeight: 800, flexShrink: 0,
-            }}>
+          <div className="flex items-center gap-3 mb-5 px-4 py-2.5 bg-white rounded-xl border border-slate-200 text-[13px] text-slate-500">
+            <div className="nm-avatar w-8 h-8 rounded-full flex items-center justify-center text-white text-[11px] font-extrabold shrink-0">
               {(note.authorName || 'A').charAt(0).toUpperCase()}
             </div>
-            <div style={{ flex: 1 }}>
+            <div className="flex-1">
               <input
                 type="text"
                 value={note.authorName}
                 onChange={e => update({ authorName: e.target.value })}
                 placeholder="Author name…"
-                style={{
-                  border: 'none', outline: 'none', fontSize: 13,
-                  fontWeight: 700, color: '#1e293b', background: 'transparent', width: '100%',
-                }}
+                title="Author name"
+                className="border-none outline-none text-[13px] font-bold text-slate-800 bg-transparent w-full"
               />
-              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>
+              <div className="text-[11px] text-slate-400 mt-px">
                 {church?.name || 'Your Church'}
               </div>
             </div>
@@ -766,11 +675,7 @@ const NoteEditor: React.FC<{
               target="_blank"
               rel="noopener noreferrer"
               title="Preview public view"
-              style={{
-                display: 'flex', alignItems: 'center', gap: 5,
-                fontSize: 11, color: '#4f46e5', fontWeight: 600,
-                textDecoration: 'none', flexShrink: 0,
-              }}
+              className="flex items-center gap-1 text-[11px] text-indigo-600 font-semibold no-underline shrink-0 hover:underline"
             >
               <Eye size={12} /> Preview
             </a>
@@ -781,23 +686,13 @@ const NoteEditor: React.FC<{
             value={note.title}
             onChange={e => update({ title: e.target.value })}
             placeholder="Note title…"
+            title="Note title"
             rows={2}
-            style={{
-              width: '100%', boxSizing: 'border-box',
-              fontSize: 'clamp(24px, 4vw, 34px)',
-              fontWeight: 800, color: '#0f172a',
-              border: 'none', outline: 'none',
-              background: 'transparent', resize: 'none',
-              lineHeight: 1.3, letterSpacing: '-0.02em', marginBottom: 20,
-              fontFamily: 'inherit',
-            }}
+            className="w-full box-border text-[clamp(24px,4vw,34px)] font-extrabold text-slate-900 border-none outline-none bg-transparent resize-none leading-snug tracking-tight mb-5 font-[inherit]"
           />
 
           {/* Divider */}
-          <div style={{
-            height: 1, background: 'linear-gradient(90deg, #4f46e5, #7c3aed, transparent)',
-            marginBottom: 28, opacity: 0.25,
-          }} />
+          <div className="nm-title-divider mb-7" />
 
           {/* Content */}
           <textarea
@@ -805,23 +700,13 @@ const NoteEditor: React.FC<{
             value={note.content}
             onChange={e => update({ content: e.target.value })}
             placeholder={`Write your note here…\n\nUse the toolbar above to insert images or Planning Center events.`}
-            style={{
-              width: '100%', boxSizing: 'border-box', minHeight: 360,
-              fontSize: 16, lineHeight: 1.8, color: '#334155',
-              border: 'none', outline: 'none',
-              background: 'transparent', resize: 'vertical',
-              fontFamily: 'inherit',
-            }}
+            title="Note content"
+            className="w-full box-border min-h-[360px] text-base leading-[1.8] text-slate-600 border-none outline-none bg-transparent resize-y font-[inherit]"
           />
 
           {/* Tip */}
-          <div style={{
-            marginTop: 20, padding: '10px 14px',
-            background: '#eff6ff', borderRadius: 10, border: '1px solid #bfdbfe',
-            fontSize: 12, color: '#3b82f6',
-            display: 'flex', alignItems: 'flex-start', gap: 8,
-          }}>
-            <span style={{ flexShrink: 0 }}>💡</span>
+          <div className="mt-5 px-3.5 py-2.5 bg-blue-50 rounded-[10px] border border-blue-200 text-xs text-blue-500 flex items-start gap-2">
+            <span className="shrink-0">💡</span>
             <span>
               Click <strong>Publish &amp; Copy Link</strong> to make this note public and copy the URL for SMS.
               Use the toolbar above to insert images or Planning Center content cards.
@@ -921,78 +806,54 @@ export const NotesManager: React.FC<NotesManagerProps> = ({ churchId, currentUse
           showToast={showToast}
         />
         {toast && <ToastBar toast={toast} />}
-        <GlobalStyles />
       </>
     );
   }
 
   return (
     <>
-      <div style={{ padding: '28px 32px', maxWidth: 900, margin: '0 auto' }}>
+      <div className="px-8 py-7 max-w-[900px] mx-auto">
 
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+        <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 style={{
-              fontSize: 26, fontWeight: 800, color: '#0f172a',
-              display: 'flex', alignItems: 'center', gap: 10, margin: 0,
-            }}>
-              <span style={{
-                width: 38, height: 38, borderRadius: 10,
-                background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: '0 2px 8px rgba(79,70,229,0.3)',
-              }}>
+            <h1 className="text-[26px] font-extrabold text-slate-900 flex items-center gap-2.5 m-0">
+              <span className="nm-icon-gradient w-[38px] h-[38px] rounded-[10px] inline-flex items-center justify-center">
                 <FileText size={18} color="white" />
               </span>
               Notes
             </h1>
-            <p style={{ fontSize: 13, color: '#64748b', margin: '4px 0 0 48px' }}>
+            <p className="text-[13px] text-slate-500 mt-1 ml-12">
               Create shareable notes — send public links via SMS
             </p>
           </div>
           <button
             onClick={handleCreate}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 7,
-              padding: '10px 20px', borderRadius: 12, border: 'none',
-              background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
-              color: 'white', fontSize: 13, fontWeight: 700, cursor: 'pointer',
-              boxShadow: '0 2px 12px rgba(79,70,229,0.35)', transition: 'all 0.2s',
-            }}
+            className="nm-btn-create flex items-center gap-1.5 px-5 py-2.5 rounded-xl border-none text-white text-[13px] font-bold cursor-pointer transition-opacity hover:opacity-90"
           >
             <Plus size={15} /> Create Note
           </button>
         </div>
 
         {/* Tabs */}
-        <div style={{
-          display: 'flex', gap: 4, padding: 4, background: '#f1f5f9', borderRadius: 12,
-          marginBottom: 20, width: 'fit-content',
-        }}>
+        <div className="flex gap-1 p-1 bg-slate-100 rounded-xl mb-5 w-fit">
           {(['all', 'draft', 'published'] as const).map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                padding: '7px 16px', borderRadius: 10, border: 'none', cursor: 'pointer',
-                fontSize: 12, fontWeight: 600,
-                background: tab === t ? 'white' : 'transparent',
-                color: tab === t ? '#1e293b' : '#64748b',
-                boxShadow: tab === t ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
-                transition: 'all 0.15s',
-              }}
+              className={`flex items-center gap-1.5 px-4 py-[7px] rounded-[10px] border-none cursor-pointer text-xs font-semibold transition-all ${
+                tab === t
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'bg-transparent text-slate-500 hover:text-slate-700'
+              }`}
             >
               {t === 'all' && <FileText size={12} />}
               {t === 'draft' && <Lock size={12} />}
               {t === 'published' && <Globe size={12} />}
               {t === 'all' ? 'All' : t === 'draft' ? 'Drafts' : 'Published'}
-              <span style={{
-                fontSize: 10, padding: '1px 6px', borderRadius: 20,
-                background: tab === t ? '#eef2ff' : '#e2e8f0',
-                color: tab === t ? '#4f46e5' : '#94a3b8', fontWeight: 700,
-              }}>
+              <span className={`text-[10px] px-1.5 py-px rounded-full font-bold ${
+                tab === t ? 'bg-indigo-50 text-indigo-600' : 'bg-slate-200 text-slate-400'
+              }`}>
                 {counts[t]}
               </span>
             </button>
@@ -1001,38 +862,30 @@ export const NotesManager: React.FC<NotesManagerProps> = ({ churchId, currentUse
 
         {/* Content */}
         {isLoading ? (
-          <div style={{ textAlign: 'center', padding: '60px 0', color: '#94a3b8' }}>
-            <Loader2 size={28} style={{ animation: 'spin 0.8s linear infinite', margin: '0 auto 12px', display: 'block' }} />
-            <p style={{ fontSize: 13 }}>Loading notes…</p>
+          <div className="text-center py-16 text-slate-400">
+            <Loader2 size={28} className="nm-spin mx-auto mb-3 block" />
+            <p className="text-[13px]">Loading notes…</p>
           </div>
         ) : filtered.length === 0 ? (
-          <div style={{
-            textAlign: 'center', padding: '64px 40px',
-            border: '2px dashed #e2e8f0', borderRadius: 20, background: '#f8fafc',
-          }}>
-            <div style={{ fontSize: 48, marginBottom: 16 }}>📝</div>
-            <p style={{ fontSize: 16, fontWeight: 700, color: '#1e293b', marginBottom: 6 }}>
+          <div className="text-center py-16 px-10 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50">
+            <div className="text-5xl mb-4">📝</div>
+            <p className="text-base font-bold text-slate-900 mb-1.5">
               {tab === 'published' ? 'No published notes yet' : tab === 'draft' ? 'No drafts' : 'No notes yet'}
             </p>
-            <p style={{ fontSize: 13, color: '#94a3b8', marginBottom: 20 }}>
+            <p className="text-[13px] text-slate-400 mb-5">
               Create your first note to start sharing with your congregation
             </p>
             {tab !== 'published' && (
               <button
                 onClick={handleCreate}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 6,
-                  padding: '10px 20px', borderRadius: 12, border: 'none',
-                  background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
-                  color: 'white', fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                }}
+                className="nm-btn-create inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl border-none text-white text-[13px] font-bold cursor-pointer"
               >
                 <Plus size={14} /> Create Note
               </button>
             )}
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div className="flex flex-col gap-3">
             {filtered.map(note => (
               <NoteCard
                 key={note.id}
@@ -1047,7 +900,6 @@ export const NotesManager: React.FC<NotesManagerProps> = ({ churchId, currentUse
       </div>
 
       {toast && <ToastBar toast={toast} />}
-      <GlobalStyles />
     </>
   );
 };
@@ -1055,42 +907,9 @@ export const NotesManager: React.FC<NotesManagerProps> = ({ churchId, currentUse
 // ─── Toast ────────────────────────────────────────────────────────────────────
 
 const ToastBar: React.FC<{ toast: ToastMsg }> = ({ toast }) => (
-  <div style={{
-    position: 'fixed', top: 20, left: '50%', transform: 'translateX(-50%)',
-    zIndex: 9999, padding: '12px 22px', borderRadius: 14,
-    background: toast.type === 'error'
-      ? 'linear-gradient(135deg, #ef4444, #dc2626)'
-      : 'linear-gradient(135deg, #10b981, #059669)',
-    color: 'white', fontSize: 13, fontWeight: 700,
-    boxShadow: '0 8px 24px rgba(0,0,0,0.2)', whiteSpace: 'nowrap',
-  }}>
+  <div className={`fixed top-5 left-1/2 -translate-x-1/2 z-[9999] px-[22px] py-3 rounded-2xl text-white text-[13px] font-bold shadow-2xl whitespace-nowrap ${
+    toast.type === 'error' ? 'nm-toast-error' : 'nm-toast-success'
+  }`}>
     {toast.msg}
   </div>
-);
-
-// ─── Global Styles ────────────────────────────────────────────────────────────
-
-const GlobalStyles: React.FC = () => (
-  <style>{`
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .note-card-hover:hover {
-      border-color: #c7d2fe !important;
-      box-shadow: 0 4px 20px rgba(79,70,229,0.10) !important;
-      transform: translateY(-1px);
-    }
-    .action-btn:hover {
-      background: #f1f5f9 !important;
-      color: #1e293b !important;
-      border-color: #c7d2fe !important;
-    }
-    .action-btn-danger:hover {
-      background: #fef2f2 !important;
-      border-color: #fecaca !important;
-    }
-    .toolbar-btn:hover {
-      background: #f1f5f9 !important;
-      border-color: #c7d2fe !important;
-      color: #4338ca !important;
-    }
-  `}</style>
 );

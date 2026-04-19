@@ -1,0 +1,207 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   components.css
+   External styles for anything that can't be expressed as a Tailwind utility:
+   gradients, @keyframes, complex box-shadows, content-scoped typography.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Shared animation ────────────────────────────────────────────────────── */
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Notes Module (NotesManager.tsx) ─────────────────────────────────────── */
+
+/* Gradient icon badge used on buttons / avatars */
+.nm-icon-gradient {
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+}
+
+/* Gradient publish button */
+.nm-btn-publish {
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
+}
+.nm-btn-publish:hover:not(:disabled) { opacity: 0.92; }
+
+/* Create Note CTA button */
+.nm-btn-create {
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  box-shadow: 0 2px 12px rgba(79, 70, 229, 0.35);
+}
+
+/* Note card hover effect */
+.nm-card-hover {
+  transition: border-color 0.18s, box-shadow 0.18s, transform 0.18s;
+}
+.nm-card-hover:hover {
+  border-color: #c7d2fe;
+  box-shadow: 0 4px 20px rgba(79, 70, 229, 0.10);
+  transform: translateY(-1px);
+}
+
+/* Coloured left accent bar on note cards */
+.nm-card-accent-published {
+  background: linear-gradient(180deg, #10b981, #059669);
+}
+.nm-card-accent-draft {
+  background: linear-gradient(180deg, #94a3b8, #64748b);
+}
+
+/* Author avatar gradient */
+.nm-avatar {
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+}
+
+/* Editor title divider */
+.nm-title-divider {
+  height: 1px;
+  background: linear-gradient(90deg, #4f46e5, #7c3aed, transparent);
+  opacity: 0.25;
+}
+
+/* Action icon buttons */
+.nm-action-btn {
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.nm-action-btn:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+  border-color: #c7d2fe;
+}
+.nm-action-btn-danger:hover {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+/* Toolbar buttons (Image / Planning Center) */
+.nm-toolbar-btn {
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.nm-toolbar-btn:hover {
+  background: #f1f5f9;
+  border-color: #c7d2fe;
+  color: #4338ca;
+}
+
+/* Toast bar */
+.nm-toast-success {
+  background: linear-gradient(135deg, #10b981, #059669);
+}
+.nm-toast-error {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+}
+
+/* Copy-link button (editor header) */
+.nm-btn-copy-link {
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  color: #4338ca;
+  transition: opacity 0.15s;
+}
+
+/* Spinning loader (inline Loader2 icons with animation) */
+.nm-spin { animation: spin 0.8s linear infinite; }
+
+/* ── Public Note View (PublicNoteView.tsx) ───────────────────────────────── */
+
+/* Page background gradient */
+.pnv-bg {
+  background: linear-gradient(135deg, #fdf4ff 0%, #fef9ec 35%, #eff6ff 70%, #f0fdf4 100%);
+}
+
+/* Brand icon in header */
+.pnv-brand-icon {
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.35);
+}
+
+/* Glassmorphic page header */
+.pnv-header {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.07);
+}
+
+/* Draft banner */
+.pnv-draft-banner {
+  background: linear-gradient(90deg, #fef3c7, #fde68a);
+}
+
+/* Main note card */
+.pnv-card {
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.10), 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+/* Rainbow top bar on note card */
+.pnv-card-top-bar {
+  height: 5px;
+  background: linear-gradient(90deg, #4f46e5, #7c3aed, #a855f7, #ec4899);
+}
+
+/* Author avatar gradient */
+.pnv-avatar {
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
+}
+
+/* Church pill badge */
+.pnv-church-pill {
+  background: linear-gradient(135deg, #eef2ff, #f5f3ff);
+  border: 1px solid #c7d2fe;
+}
+
+/* Copy-link button (published / copied states) */
+.pnv-btn-copy {
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.35);
+  transition: all 0.2s;
+}
+.pnv-btn-copied {
+  background: linear-gradient(135deg, #10b981, #059669);
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.35);
+  transition: all 0.2s;
+}
+
+/* Spinner circle used in LoadingCard */
+.pnv-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #e2e8f0;
+  border-top-color: #4f46e5;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto 16px;
+}
+
+/* ── Note content rich-text typography ───────────────────────────────────── */
+/* Applied to the dangerouslySetInnerHTML div in PublicNoteView */
+
+.note-content {
+  font-size: 16px;
+  line-height: 1.8;
+  color: #334155;
+}
+.note-content h1,
+.note-content h2,
+.note-content h3 {
+  font-weight: 700;
+  color: #0f172a;
+  margin: 1.5em 0 0.5em;
+}
+.note-content h1 { font-size: 1.6em; }
+.note-content h2 { font-size: 1.3em; }
+.note-content h3 { font-size: 1.1em; }
+.note-content p  { margin: 0 0 1em; }
+.note-content ul,
+.note-content ol { padding-left: 1.5em; margin: 0.5em 0 1em; }
+.note-content li { margin-bottom: 0.3em; }
+.note-content strong { font-weight: 700; color: #1e293b; }
+.note-content em    { font-style: italic; }
+.note-content blockquote {
+  border-left: 4px solid #c7d2fe;
+  margin: 1em 0;
+  padding: 8px 16px;
+  background: #eef2ff;
+  border-radius: 0 8px 8px 0;
+  color: #4338ca;
+  font-style: italic;
+}
+.note-content a { color: #4f46e5; text-decoration: underline; }
