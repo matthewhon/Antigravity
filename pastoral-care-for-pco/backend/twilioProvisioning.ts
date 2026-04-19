@@ -836,9 +836,9 @@ export const createCustomerProfile = async (req: any, res: any) => {
         });
         log.info(`[createCustomerProfile] Created Address ${bizAddress.sid}`, 'system', { churchId }, churchId);
 
-        // ── Step 1b: Business info EndUser (business fields only + address SID ref) ──
-        // Only valid attributes for customer_profile_business_information are listed here.
-        // Raw address fields (street, city, etc.) are NOT accepted — pass the AD... SID instead.
+        // ── Step 1b: Business info EndUser (business fields only — NO address fields) ──
+        // customer_profile_business_information does NOT accept address attributes.
+        // The address will be added as a separate SupportingDocument (Step 1c).
         const bizEndUser = await (master as any).trusthub.v1.endUsers.create({
             friendlyName: `Business Info – ${sms.a2pBusinessName}`,
             type: 'customer_profile_business_information',
@@ -850,12 +850,24 @@ export const createCustomerProfile = async (req: any, res: any) => {
                 business_industry:                sms.a2pVertical     || 'RELIGIOUS',
                 business_regions_of_operation:    'USA',
                 website_url:                      sms.a2pWebsite,
-                address_sids_attest:              bizAddress.sid,  // AD... SID from addresses.create() above
+                // address_sids_attest is NOT a valid attribute here — address goes in a SupportingDocument
             },
         });
         log.info(`[createCustomerProfile] Created biz EndUser ${bizEndUser.sid}`, 'system', { churchId }, churchId);
 
-        // ── Step 1c: Authorised rep EndUser (personal contact fields) ───────────
+        // ── Step 1c: Wrap the Address as a SupportingDocument (customer_profile_address) ──
+        // This produces an RD... SID that CAN be assigned to the CustomerProfile bundle.
+        // The address_sids attribute on this SupportingDocument type is valid and required.
+        const addrDoc = await (master as any).trusthub.v1.supportingDocuments.create({
+            friendlyName: `Business Address – ${sms.a2pBusinessName}`,
+            type: 'customer_profile_address',
+            attributes: {
+                address_sids: [bizAddress.sid],  // AD... SID wrapped in an array
+            },
+        });
+        log.info(`[createCustomerProfile] Created address SupportingDocument ${addrDoc.sid}`, 'system', { churchId }, churchId);
+
+        // ── Step 1d: Authorised rep EndUser (personal contact fields) ───────────
         const repEndUser = await (master as any).trusthub.v1.endUsers.create({
             friendlyName: `${sms.a2pContactFirstName} ${sms.a2pContactLastName} – ${sms.a2pBusinessName}`,
             type: 'authorized_representative_1',
@@ -878,9 +890,10 @@ export const createCustomerProfile = async (req: any, res: any) => {
         });
         log.info(`[createCustomerProfile] Created CustomerProfile ${profile.sid}`, 'system', { churchId }, churchId);
 
-        // ── Step 3: Assign biz info and authorised rep to the profile ───────────
-        // IMPORTANT: Only EndUser (IT...) and SupportingDocument (SD...) SIDs are valid
-        // bundle entity types. Twilio Address objects (AD...) throw "invalid Object Type".
+        // ── Step 3: Assign biz EndUser, rep EndUser, and address SupportingDocument ──
+        // Valid object types for customerProfilesEntityAssignments:
+        //   IT... (EndUser)  |  RD... (SupportingDocument)
+        // AD... (Address) objects are NOT valid — the address must be wrapped as RD... first.
         await (master as any).trusthub.v1
             .customerProfiles(profile.sid)
             .customerProfilesEntityAssignments
@@ -891,7 +904,12 @@ export const createCustomerProfile = async (req: any, res: any) => {
             .customerProfilesEntityAssignments
             .create({ objectSid: repEndUser.sid });
 
-        log.info(`[createCustomerProfile] Assigned EndUsers to ${profile.sid}`, 'system', { churchId }, churchId);
+        await (master as any).trusthub.v1
+            .customerProfiles(profile.sid)
+            .customerProfilesEntityAssignments
+            .create({ objectSid: addrDoc.sid });  // RD... SupportingDocument for the address
+
+        log.info(`[createCustomerProfile] Assigned EndUsers + address doc to ${profile.sid}`, 'system', { churchId }, churchId);
 
 
         // ── Step 4: Submit the profile for Twilio review ───────────────────────
