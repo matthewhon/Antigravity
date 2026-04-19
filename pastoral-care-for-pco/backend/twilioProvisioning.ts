@@ -819,7 +819,7 @@ export const createCustomerProfile = async (req: any, res: any) => {
             });
         }
 
-        // ── Step 1a: Business info EndUser (only business fields go here) ──────
+        // ── Step 1a: Business info EndUser (business fields + physical address) ──────
         const bizEndUser = await (master as any).trusthub.v1.endUsers.create({
             friendlyName: `Business Info – ${sms.a2pBusinessName}`,
             type: 'customer_profile_business_information',
@@ -831,6 +831,13 @@ export const createCustomerProfile = async (req: any, res: any) => {
                 business_industry:                sms.a2pVertical     || 'RELIGIOUS',
                 business_regions_of_operation:    'USA',
                 website_url:                      sms.a2pWebsite,
+                // Physical address fields belong in the EndUser, not as a separate Address object
+                address_sids_attest:              'AC',
+                street:                           sms.a2pAddress,
+                city:                             sms.a2pCity,
+                region:                           sms.a2pState,
+                postal_code:                      sms.a2pZip,
+                iso_country:                      'US',
             },
         });
         log.info(`[createCustomerProfile] Created biz EndUser ${bizEndUser.sid}`, 'system', { churchId }, churchId);
@@ -849,18 +856,6 @@ export const createCustomerProfile = async (req: any, res: any) => {
         });
         log.info(`[createCustomerProfile] Created rep EndUser ${repEndUser.sid}`, 'system', { churchId }, churchId);
 
-        // ── Step 1c: Create a Twilio Address resource for physical address ───────
-        // Addresses are their own object in Trust Hub and must be assigned separately.
-        const address = await (master as any).addresses.create({
-            friendlyName:  sms.a2pBusinessName,
-            customerName:  `${sms.a2pContactFirstName} ${sms.a2pContactLastName}`,
-            street:        sms.a2pAddress,
-            city:          sms.a2pCity,
-            region:        sms.a2pState,
-            postalCode:    sms.a2pZip,
-            isoCountry:    'US',
-        });
-        log.info(`[createCustomerProfile] Created Address ${address.sid}`, 'system', { churchId }, churchId);
 
         // ── Step 2: Create the CustomerProfile bundle ─────────────────────────
         const profile = await (master as any).trusthub.v1.customerProfiles.create({
@@ -870,7 +865,9 @@ export const createCustomerProfile = async (req: any, res: any) => {
         });
         log.info(`[createCustomerProfile] Created CustomerProfile ${profile.sid}`, 'system', { churchId }, churchId);
 
-        // ── Step 3: Assign biz info, authorised rep, and address to the profile ─
+        // ── Step 3: Assign biz info and authorised rep to the profile ───────────
+        // IMPORTANT: Only EndUser (IT...) and SupportingDocument (SD...) SIDs are valid
+        // bundle entity types. Twilio Address objects (AD...) throw "invalid Object Type".
         await (master as any).trusthub.v1
             .customerProfiles(profile.sid)
             .customerProfilesEntityAssignments
@@ -881,12 +878,8 @@ export const createCustomerProfile = async (req: any, res: any) => {
             .customerProfilesEntityAssignments
             .create({ objectSid: repEndUser.sid });
 
-        await (master as any).trusthub.v1
-            .customerProfiles(profile.sid)
-            .customerProfilesEntityAssignments
-            .create({ objectSid: address.sid });
+        log.info(`[createCustomerProfile] Assigned EndUsers to ${profile.sid}`, 'system', { churchId }, churchId);
 
-        log.info(`[createCustomerProfile] Assigned all entities to ${profile.sid}`, 'system', { churchId }, churchId);
 
         // ── Step 4: Submit the profile for Twilio review ───────────────────────
         await (master as any).trusthub.v1
@@ -899,7 +892,6 @@ export const createCustomerProfile = async (req: any, res: any) => {
             'smsSettings.twilioCustomerProfileSid':       profile.sid,
             'smsSettings.twilioEndUserSid':               bizEndUser.sid,
             'smsSettings.twilioRepEndUserSid':            repEndUser.sid,
-            'smsSettings.twilioAddressSid':               address.sid,
             'smsSettings.twilioCustomerProfileStatus':    'pending-review',
             'smsSettings.twilioCustomerProfileCreatedAt': Date.now(),
         });

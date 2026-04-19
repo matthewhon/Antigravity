@@ -2144,19 +2144,18 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                         ) : (
                             <div className="space-y-1.5">
                                 <div className="flex items-end gap-2">
-                                    {/* AI suggest button — only shown when agent is enabled */}
-                                    {smsAgentEnabled && (
-                                        <button
-                                            onClick={handleAiSuggest}
-                                            disabled={aiGenerating}
-                                            title="Ask AI to suggest a reply"
-                                            className="flex items-center justify-center w-10 h-10 shrink-0 rounded-xl bg-violet-50 hover:bg-violet-100 dark:bg-violet-900/30 dark:hover:bg-violet-900/50 text-violet-600 dark:text-violet-400 border border-violet-200 dark:border-violet-700 transition disabled:opacity-50"
-                                        >
-                                            {aiGenerating
-                                                ? <Loader2 size={16} className="animate-spin" />
-                                                : <Sparkles size={16} />}
-                                        </button>
-                                    )}
+                                    {/* AI suggest button — always visible in inbox */}
+                                    <button
+                                        onClick={handleAiSuggest}
+                                        disabled={aiGenerating}
+                                        title="AI: Suggest a reply based on this conversation"
+                                        className="flex items-center gap-1.5 px-3 h-10 shrink-0 rounded-xl bg-violet-50 hover:bg-violet-100 dark:bg-violet-900/30 dark:hover:bg-violet-900/50 text-violet-600 dark:text-violet-400 border border-violet-200 dark:border-violet-700 transition disabled:opacity-50 text-[11px] font-bold whitespace-nowrap"
+                                    >
+                                        {aiGenerating
+                                            ? <Loader2 size={14} className="animate-spin" />
+                                            : <Sparkles size={14} />}
+                                        <span>{aiGenerating ? 'Thinking…' : 'Suggest'}</span>
+                                    </button>
                                     <textarea
                                         rows={2}
                                         value={replyBody}
@@ -2173,20 +2172,18 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                         {isSending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
                                     </button>
                                 </div>
-                                {/* AI shorten + char counter — only shown when there's draft text */}
+                                {/* AI shorten + char counter — always visible when there's draft text */}
                                 {replyBody.trim() && (
                                     <div className="flex items-center justify-between px-1">
-                                        {smsAgentEnabled ? (
-                                            <button
-                                                onClick={handleAiShorten}
-                                                disabled={aiGenerating || replyBody.length <= 160}
-                                                title="Shorten to under 160 characters"
-                                                className="flex items-center gap-1 text-[10px] font-bold text-violet-500 dark:text-violet-400 hover:text-violet-700 dark:hover:text-violet-200 disabled:opacity-40 transition"
-                                            >
-                                                <Sparkles size={11} />
-                                                {aiGenerating ? 'Shortening…' : 'Shorten to 160'}
-                                            </button>
-                                        ) : <span />}
+                                        <button
+                                            onClick={handleAiShorten}
+                                            disabled={aiGenerating || replyBody.length <= 160}
+                                            title={replyBody.length <= 160 ? 'Already under 160 characters' : 'AI: Shorten to under 160 characters'}
+                                            className="flex items-center gap-1 text-[10px] font-bold text-violet-500 dark:text-violet-400 hover:text-violet-700 dark:hover:text-violet-200 disabled:opacity-40 transition"
+                                        >
+                                            <Sparkles size={11} />
+                                            {aiGenerating ? 'Shortening…' : 'Shorten to 160'}
+                                        </button>
                                         <span className={`text-[10px] font-mono tabular-nums font-bold transition-colors ${
                                             replyBody.length > 160 ? 'text-red-500' :
                                             replyBody.length > 120 ? 'text-amber-500' :
