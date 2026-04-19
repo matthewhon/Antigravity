@@ -14,6 +14,7 @@ import { WebsiteWidgetsManager } from './WebsiteWidgetsManager';
 
 import { PcoImportModal } from './PcoImportModal';
 import MessagingModule from './MessagingModule';
+import QrCodeGenerator from './QrCodeGenerator';
 import { EmailCampaign, TemplateSettings, PcoList, Church, User, EmailUnsubscribe } from '../types';
 import {
   Mail, Plus, ChevronDown, ChevronUp, CheckCircle, Circle, Send,
@@ -1198,12 +1199,12 @@ const SendTestModal: React.FC<SendTestModalProps> = ({ onConfirm, onCancel, isSe
 export const ToolsView: React.FC<{ churchId: string; church?: Church;
 currentUserId?: string; currentUser?: User; onUpdateChurch?: (updates: Partial<Church>) => void;
 /** When provided by a parent route, controls which tab is shown and hides the internal tab bar */
-activePage?: 'website' | 'emails' | 'polls' | 'messaging' | 'unsubscribers';
+activePage?: 'website' | 'emails' | 'polls' | 'messaging' | 'unsubscribers' | 'qrcodes';
 /** When activePage='messaging', this controls the active SMS sub-tab */
 smsTab?: 'campaigns' | 'inbox' | 'keywords' | 'analytics' | 'workflows' | 'agent';
 }> = ({ churchId, church, currentUserId,
 currentUser, onUpdateChurch, activePage, smsTab }) => {
-  const [activeTab, setActiveTab] = useState<'website' | 'emails' | 'polls' | 'unsubscribers' | 'messaging'>('emails');
+  const [activeTab, setActiveTab] = useState<'website' | 'emails' | 'polls' | 'unsubscribers' | 'messaging' | 'qrcodes'>('emails');
   const effectiveTab = activePage ?? activeTab;
   const [campaigns, setCampaigns] = useState<EmailCampaign[]>([]);
   const [activeCampaign, setActiveCampaign] = useState<EmailCampaign | null>(null);
@@ -1486,6 +1487,16 @@ currentUser, onUpdateChurch, activePage, smsTab }) => {
             </span>
           )}
         </button>
+        <button
+          onClick={() => setActiveTab('qrcodes')}
+          className={`flex items-center gap-2 px-4 py-2 -mb-px text-sm font-semibold border-b-2 transition shrink-0 ${
+            effectiveTab === 'qrcodes'
+              ? 'border-violet-600 text-violet-600 dark:text-violet-400 dark:border-violet-400'
+              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
+          }`}
+        >
+          🔲 QR Codes
+        </button>
       </div>
       )}
 
@@ -1609,6 +1620,13 @@ currentUser, onUpdateChurch, activePage, smsTab }) => {
       {effectiveTab === 'polls' && (
         <div className="flex-1 overflow-y-auto">
           <PollsManager churchId={churchId} currentUserId={currentUserId || ''} />
+        </div>
+      )}
+
+      {/* ─── QR Codes Tab ─────────────────────────────────────────────── */}
+      {effectiveTab === 'qrcodes' && (
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <QrCodeGenerator churchId={churchId} />
         </div>
       )}
 

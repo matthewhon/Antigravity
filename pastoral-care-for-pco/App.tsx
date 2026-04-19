@@ -1180,6 +1180,7 @@ const App: React.FC = () => {
         {view === 'tools-polls' && <ToolsView churchId={church.id} church={church} currentUserId={user.id} currentUser={user} onUpdateChurch={(updates) => { firestore.updateChurch(church.id, updates); setChurch({ ...church, ...updates }); }} activePage="polls" />}
         {view === 'tools-website' && <ToolsView churchId={church.id} church={church} currentUserId={user.id} currentUser={user} onUpdateChurch={(updates) => { firestore.updateChurch(church.id, updates); setChurch({ ...church, ...updates }); }} activePage="website" />}
         {view === 'tools-unsubscribers' && <ToolsView churchId={church.id} church={church} currentUserId={user.id} currentUser={user} onUpdateChurch={(updates) => { firestore.updateChurch(church.id, updates); setChurch({ ...church, ...updates }); }} activePage="unsubscribers" />}
+        {view === 'tools-qrcodes' && <ToolsView churchId={church.id} church={church} currentUserId={user.id} currentUser={user} onUpdateChurch={(updates) => { firestore.updateChurch(church.id, updates); setChurch({ ...church, ...updates }); }} activePage="qrcodes" />}
         {/* Workflows — standalone, no SMS sub-nav */}
         {view === 'tools-workflows' && church && <SmsWorkflowsManager churchId={church.id} />}
         {/* SMS sub-routes — controlledTab drives panel selection; pill-nav hidden automatically */}

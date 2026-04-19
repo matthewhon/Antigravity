@@ -425,6 +425,7 @@ const Layout: React.FC<LayoutProps> = ({
                         { view: 'tools-workflows',     icon: '⚡', label: 'Workflows'    },
                         { view: 'tools-polls',         icon: '📊', label: 'Polls'         },
                         { view: 'tools-website',       icon: '🌐', label: 'Website'       },
+                        { view: 'tools-qrcodes',       icon: '🔲', label: 'QR Codes'      },
                         { view: 'tools-unsubscribers', icon: '🛋️',  label: 'Unsubscribers' },
                       ].map(item => (
                         <button
