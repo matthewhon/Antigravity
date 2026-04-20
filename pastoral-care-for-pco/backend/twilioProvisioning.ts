@@ -153,12 +153,48 @@ export const provisionTwilioNumber = async (req: any, res: any) => {
         let subAccountAuthToken: string;
 
         if (existingSms.twilioSubAccountSid) {
-            // Reuse existing sub-account
-            subAccountSid       = existingSms.twilioSubAccountSid;
-            subAccountAuthToken = existingSms.twilioSubAccountAuthToken;
-            log.info(`Reusing existing sub-account ${subAccountSid} for church ${churchId}`, 'system', { churchId }, churchId);
+            // Verify the existing sub-account is still active before reusing it.
+            // Sub-accounts can become suspended/inactive after creation.
+            try {
+                const existing = await master.api.v2010
+                    .accounts(existingSms.twilioSubAccountSid)
+                    .fetch();
+
+                if (existing.status === 'active') {
+                    subAccountSid       = existingSms.twilioSubAccountSid;
+                    subAccountAuthToken = existingSms.twilioSubAccountAuthToken || '';
+                    log.info(`Reusing active sub-account ${subAccountSid} for church ${churchId}`, 'system', { churchId }, churchId);
+                } else {
+                    // Sub-account exists but is suspended or closed — create a fresh one
+                    log.warn(`Sub-account ${existingSms.twilioSubAccountSid} is ${existing.status} — creating a new one for church ${churchId}`, 'system', { churchId }, churchId);
+                    const subAccount    = await master.api.v2010.accounts.create({
+                        friendlyName: `PastoralCare - ${church.name || churchId}`,
+                    });
+                    subAccountSid       = subAccount.sid;
+                    subAccountAuthToken = subAccount.authToken;
+                    // Update Firestore with the new sub-account right away
+                    await db.collection('churches').doc(churchId).update({
+                        'smsSettings.twilioSubAccountSid':       subAccountSid,
+                        'smsSettings.twilioSubAccountAuthToken': subAccountAuthToken,
+                    });
+                    log.info(`Created replacement sub-account ${subAccountSid} for church ${churchId}`, 'system', { churchId, subAccountSid }, churchId);
+                }
+            } catch (fetchErr: any) {
+                // Could not fetch sub-account (e.g. it was fully deleted) — create a new one
+                log.warn(`Could not fetch sub-account ${existingSms.twilioSubAccountSid}: ${fetchErr.message} — creating new`, 'system', { churchId }, churchId);
+                const subAccount    = await master.api.v2010.accounts.create({
+                    friendlyName: `PastoralCare - ${church.name || churchId}`,
+                });
+                subAccountSid       = subAccount.sid;
+                subAccountAuthToken = subAccount.authToken;
+                await db.collection('churches').doc(churchId).update({
+                    'smsSettings.twilioSubAccountSid':       subAccountSid,
+                    'smsSettings.twilioSubAccountAuthToken': subAccountAuthToken,
+                });
+                log.info(`Created fallback sub-account ${subAccountSid} for church ${churchId}`, 'system', { churchId, subAccountSid }, churchId);
+            }
         } else {
-            // Create a new sub-account
+            // No sub-account on file — create a brand new one
             const subAccount = await master.api.v2010.accounts.create({
                 friendlyName: `PastoralCare - ${church.name || churchId}`,
             });
@@ -201,14 +237,19 @@ export const provisionTwilioNumber = async (req: any, res: any) => {
 
 
         // 4. Purchase the phone number under the sub-account
-        const subClient = twilio(subAccountSid, subAccountAuthToken);
-        const purchased = await subClient.incomingPhoneNumbers.create({
-            phoneNumber,
-            smsUrl:             inboundUrl,
-            smsMethod:          'POST',
-            statusCallback:     statusCallback,
-            statusCallbackMethod: 'POST',
-        });
+        // Use the master client acting on behalf of the sub-account.
+        // This avoids relying on the stored sub-account auth token, which can
+        // become stale or was never persisted correctly.
+        const purchased = await master.api.v2010
+            .accounts(subAccountSid)
+            .incomingPhoneNumbers
+            .create({
+                phoneNumber,
+                smsUrl:               inboundUrl,
+                smsMethod:            'POST',
+                statusCallback:       statusCallback,
+                statusCallbackMethod: 'POST',
+            });
 
         log.info(`Purchased number ${phoneNumber} (SID: ${purchased.sid}) for church ${churchId}`, 'system', { churchId, phoneNumber, sid: purchased.sid }, churchId);
 
@@ -328,7 +369,7 @@ export const addTwilioNumber = async (req: any, res: any) => {
         const church     = churchSnap.data() || {};
         const smsSettings = church.smsSettings || {};
 
-        if (!smsSettings.twilioSubAccountSid || !smsSettings.twilioSubAccountAuthToken) {
+        if (!smsSettings.twilioSubAccountSid) {
             return res.status(400).json({
                 error: 'No Twilio sub-account found. Complete the initial SMS setup first.',
             });
@@ -347,16 +388,23 @@ export const addTwilioNumber = async (req: any, res: any) => {
         const inboundUrl     = `${baseUrl}/api/messaging/inbound`;
         const statusCallback = `${baseUrl}/api/messaging/status`;
 
-        const subClient = twilio(smsSettings.twilioSubAccountSid, smsSettings.twilioSubAccountAuthToken);
+        // Use master credentials acting on behalf of the sub-account.
+        // The master Twilio account can always manage its own sub-accounts
+        // without needing the sub-account's own auth token.
+        const { accountSid, authToken } = await getMasterCredentials(db);
+        const master = getMasterClient(accountSid, authToken);
 
-        // Purchase the additional number
-        const purchased = await subClient.incomingPhoneNumbers.create({
-            phoneNumber,
-            smsUrl:              inboundUrl,
-            smsMethod:           'POST',
-            statusCallback,
-            statusCallbackMethod: 'POST',
-        });
+        // Purchase the additional number under the sub-account
+        const purchased = await master.api.v2010
+            .accounts(smsSettings.twilioSubAccountSid)
+            .incomingPhoneNumbers
+            .create({
+                phoneNumber,
+                smsUrl:               inboundUrl,
+                smsMethod:            'POST',
+                statusCallback,
+                statusCallbackMethod: 'POST',
+            });
 
         const now      = Date.now();
         const numDocId = `${churchId}_${purchased.sid}`;
@@ -416,10 +464,15 @@ export const releaseSpecificNumber = async (req: any, res: any) => {
         const churchSnap = await db.collection('churches').doc(churchId).get();
         const sms = churchSnap.data()?.smsSettings || {};
 
-        if (sms.twilioSubAccountSid && sms.twilioSubAccountAuthToken && numData.phoneSid) {
-            const subClient = twilio(sms.twilioSubAccountSid, sms.twilioSubAccountAuthToken);
+        if (sms.twilioSubAccountSid && numData.phoneSid) {
+            // Use master credentials acting on behalf of the sub-account
+            const { accountSid: masterSid, authToken: masterToken } = await getMasterCredentials(db);
+            const masterClient = getMasterClient(masterSid, masterToken);
             try {
-                await subClient.incomingPhoneNumbers(numData.phoneSid).remove();
+                await masterClient.api.v2010
+                    .accounts(sms.twilioSubAccountSid)
+                    .incomingPhoneNumbers(numData.phoneSid)
+                    .remove();
             } catch (twilioErr: any) {
                 // If the number was already released in Twilio, continue with DB cleanup
                 log.warn(`[releaseSpecificNumber] Twilio release failed (may already be released): ${twilioErr.message}`, 'system', { churchId, twilioNumberId }, churchId);
