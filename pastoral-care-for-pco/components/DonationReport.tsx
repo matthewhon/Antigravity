@@ -291,65 +291,43 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
         });
     }, [buckets, filteredDonations, filters.interval, filters.startDate, donorAllHistory]);
 
-    // 5. Avg Giving by Period — avg weekly giving per fund, driven by the page filter
+    // 5. Avg Giving by Fund — total given per fund ÷ weeks in period
     const avgGivingByQuarter = useMemo(() => {
         const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#06b6d4', '#f43f5e', '#8b5cf6', '#ec4899', '#14b8a6'];
 
-        // How many weeks are in a given bucket?
-        const weeksForBucket = (bk: string): number => {
-            switch (filters.interval) {
-                case 'Weekly':    return 1;
-                case 'Quarterly': return 13;
-                case 'YTD':       return 52;
-                case 'Monthly': {
-                    // bk is "Jan 2026" — parse and find days in that month
-                    try {
-                        const [mon, yr] = bk.split(' ');
-                        const mIdx = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].indexOf(mon);
-                        if (mIdx === -1) return 4;
-                        const days = new Date(parseInt(yr, 10), mIdx + 1, 0).getDate();
-                        return days / 7;
-                    } catch { return 4; }
-                }
-                default: return 1;
-            }
-        };
+        // Number of weeks in the selected date range
+        const start = parseISO(filters.startDate);
+        const end   = parseISO(filters.endDate);
+        const daysDiff = Math.max((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24), 1);
+        const totalWeeks = Math.max(daysDiff / 7, 1);
 
-        const bkLabels = buckets.map(b => getBucketLabel(b, filters.interval));
+        // Split into two halves to compute trend (first half vs second half)
+        const midPoint = new Date((start.getTime() + end.getTime()) / 2);
+
         const allFundNames = Array.from(new Set(filteredDonations.map(d => d.fundName))).sort();
 
         const fundData = allFundNames.map((fundName, idx) => {
             const color = COLORS[idx % COLORS.length];
-            const bkAvgs = buckets.map(bk => {
-                const total = filteredDonations
-                    .filter(d => d.fundName === fundName && getBucketKey(parseISO(d.date), filters.interval) === bk)
-                    .reduce((s, d) => s + d.amount, 0);
-                return total / weeksForBucket(bk);
-            });
-            const latestAvg = bkAvgs[bkAvgs.length - 1] ?? 0;
-            const prevAvg   = bkAvgs.length >= 2 ? bkAvgs[bkAvgs.length - 2] : 0;
-            const trendPct  = prevAvg > 0 ? ((latestAvg - prevAvg) / prevAvg) * 100 : null;
+
+            const fundDonations = filteredDonations.filter(d => d.fundName === fundName);
+            const totalGiven = fundDonations.reduce((s, d) => s + d.amount, 0);
+            const avgPerWeek = totalGiven / totalWeeks;
+
+            // Trend: second half vs first half of the period
+            const firstHalf  = fundDonations.filter(d => parseISO(d.date) <= midPoint).reduce((s, d) => s + d.amount, 0) / (totalWeeks / 2);
+            const secondHalf = fundDonations.filter(d => parseISO(d.date) >  midPoint).reduce((s, d) => s + d.amount, 0) / (totalWeeks / 2);
+            const trendPct   = firstHalf > 0 ? ((secondHalf - firstHalf) / firstHalf) * 100 : null;
             const trend: 'up' | 'down' | 'flat' =
                 trendPct === null ? 'flat' : trendPct > 3 ? 'up' : trendPct < -3 ? 'down' : 'flat';
-            return { fundName, color, bkAvgs, latestAvg, trendPct, trend };
+
+            return { fundName, color, totalGiven, avgPerWeek, trendPct, trend };
         });
 
-        const chartData = bkLabels.map((label, bi) => {
-            const entry: Record<string, number | string> = { label };
-            fundData.forEach(f => { entry[f.fundName] = Math.round(f.bkAvgs[bi]); });
-            return entry;
-        });
+        const overallAvgPerWeek = fundData.reduce((s, f) => s + f.avgPerWeek, 0);
+        const overallTotal      = fundData.reduce((s, f) => s + f.totalGiven, 0);
 
-        const latestLabel = bkLabels[bkLabels.length - 1] || '';
-        const prevLabel   = bkLabels.length >= 2 ? bkLabels[bkLabels.length - 2] : '';
-        const overallLatestAvg = fundData.reduce((s, f) => s + f.latestAvg, 0);
-        const overallPrevAvg   = fundData.reduce((s, f) => s + (f.bkAvgs[f.bkAvgs.length - 2] ?? 0), 0);
-        const overallTrendPct  = overallPrevAvg > 0 ? ((overallLatestAvg - overallPrevAvg) / overallPrevAvg) * 100 : null;
-        const overallTrend: 'up' | 'down' | 'flat' =
-            overallTrendPct === null ? 'flat' : overallTrendPct > 3 ? 'up' : overallTrendPct < -3 ? 'down' : 'flat';
-
-        return { bkLabels, fundData, chartData, overallLatestAvg, overallTrendPct, overallTrend, latestLabel, prevLabel };
-    }, [filteredDonations, buckets, filters.interval]);
+        return { fundData, overallAvgPerWeek, overallTotal, totalWeeks };
+    }, [filteredDonations, filters.startDate, filters.endDate]);
 
     // ── CSV Export ──────────────────────────────────────────────────────────────
     const handleExport = () => {
@@ -454,7 +432,7 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                     { id: 'donors',        label: '👤 Donor Report' },
                     { id: 'age_trends',    label: '🎂 Age Demographics' },
                     { id: 'status_trends', label: '🏷️ Giving By Status' },
-                    { id: 'avg_giving',    label: '📊 Avg Giving by Quarter' },
+                    { id: 'avg_giving',    label: '📊 Avg Giving by Fund' },
                 ] as { id: ReportTab; label: string }[]).map(tab => (
                     <button
                         key={tab.id}
@@ -732,13 +710,13 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                     </div>
                 </div>
             )}
-            {/* ── Average Giving by Period ───────────────────────────── */}
+            {/* ── Average Giving by Fund ─────────────────────────────── */}
             {activeTab === 'avg_giving' && (() => {
-                const { bkLabels, fundData, chartData, overallLatestAvg, overallTrendPct, overallTrend, latestLabel, prevLabel } = avgGivingByQuarter;
+                const { fundData, overallAvgPerWeek, overallTotal, totalWeeks } = avgGivingByQuarter;
                 const hasFunds = fundData.length > 0;
 
-                const trendIcon  = (t: 'up' | 'down' | 'flat') => t === 'up' ? '↑' : t === 'down' ? '↓' : '→';
-                const trendCls   = (t: 'up' | 'down' | 'flat') =>
+                const trendIcon = (t: 'up' | 'down' | 'flat') => t === 'up' ? '↑' : t === 'down' ? '↓' : '→';
+                const trendCls  = (t: 'up' | 'down' | 'flat') =>
                     t === 'up'   ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400'
                     : t === 'down' ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-400'
                     : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400';
@@ -749,23 +727,21 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                             {/* Header */}
                             <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-8">
                                 <div>
-                                    <h3 className="text-lg font-black text-slate-900 dark:text-white">Average Giving by {filters.interval === 'Weekly' ? 'Week' : filters.interval === 'Monthly' ? 'Month' : filters.interval === 'Quarterly' ? 'Quarter' : 'Year'}</h3>
+                                    <h3 className="text-lg font-black text-slate-900 dark:text-white">Average Giving by Fund</h3>
                                     <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1">
-                                        Avg weekly giving per fund · {filters.interval} buckets
+                                        Avg weekly giving per fund · {Math.round(totalWeeks)} weeks
                                     </p>
                                     <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">{filters.startDate} – {filters.endDate}</p>
                                 </div>
                                 {hasFunds && (
                                     <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{latestLabel} Avg / Week (All)</p>
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Avg / Week (All Funds)</p>
                                         <p className="text-3xl font-black text-indigo-600 dark:text-indigo-400">
-                                            ${overallLatestAvg.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                            ${overallAvgPerWeek.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                                         </p>
-                                        <span className={`inline-flex items-center gap-1 text-sm font-black px-3 py-1 rounded-full ${trendCls(overallTrend)}`}>
-                                            {trendIcon(overallTrend)}
-                                            {overallTrendPct !== null ? ` ${Math.abs(Math.round(overallTrendPct))}%` : ''}
-                                        </span>
-                                        <span className="text-[9px] text-slate-400 dark:text-slate-500">vs {prevLabel}</span>
+                                        <p className="text-[10px] text-slate-400 dark:text-slate-500">
+                                            ${overallTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })} total
+                                        </p>
                                     </div>
                                 )}
                             </div>
@@ -774,102 +750,54 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                                 <div className="flex flex-col items-center justify-center h-48 text-center gap-3">
                                     <span className="text-4xl opacity-20">📊</span>
                                     <p className="text-xs font-bold text-slate-400">No giving data in selected range</p>
-                                    <p className="text-[10px] text-slate-400">Adjust the date range or interval filter above.</p>
+                                    <p className="text-[10px] text-slate-400">Adjust the date range filter above.</p>
                                 </div>
                             ) : (
-                                <>
-                                    {/* Stacked bar chart */}
-                                    <div className="h-72">
-                                        <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={1}>
-                                            <BarChart data={chartData} margin={{ left: 8, right: 8, top: 4, bottom: 4 }}>
-                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                                <XAxis
-                                                    dataKey="label"
-                                                    axisLine={false} tickLine={false}
-                                                    tick={{ fontSize: 11, fontWeight: 700, fill: axisColor }}
-                                                />
-                                                <YAxis
-                                                    axisLine={false} tickLine={false}
-                                                    tick={{ fontSize: 9, fill: axisColor }}
-                                                    tickFormatter={(v: number) => `$${v >= 1000 ? `${Math.round(v / 1000)}k` : v}`}
-                                                />
-                                                <Tooltip
-                                                    contentStyle={TOOLTIP_STYLE}
-                                                    itemStyle={{ color: '#fff' }}
-                                                    cursor={{ fill: '#f8fafc' }}
-                                                    formatter={(value: number, name: string) => [`$${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}/wk`, name]}
-                                                />
-                                                <Legend verticalAlign="top" iconType="circle" wrapperStyle={{ fontSize: '11px', fontWeight: 700, paddingBottom: '16px' }} />
-                                                {fundData.map((f, fi) => (
-                                                    <Bar
-                                                        key={f.fundName}
-                                                        dataKey={f.fundName}
-                                                        stackId="avg"
-                                                        fill={f.color}
-                                                        radius={fi === fundData.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
-                                                    />
-                                                ))}
-                                            </BarChart>
-                                        </ResponsiveContainer>
-                                    </div>
-
-                                    {/* Per-fund rows with trend badge */}
-                                    <div className="mt-8 space-y-4">
-                                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
-                                            Weekly Avg by Fund — {latestLabel} vs {prevLabel}
-                                        </p>
-                                        {fundData
-                                            .slice()
-                                            .sort((a, b) => b.latestAvg - a.latestAvg)
-                                            .map(f => {
-                                                const maxAvg = Math.max(...fundData.map(d => d.latestAvg), 1);
-                                                const barPct = (f.latestAvg / maxAvg) * 100;
-                                                return (
-                                                    <div key={f.fundName} className="space-y-1.5">
-                                                        <div className="flex items-center justify-between gap-3">
-                                                            <div className="flex items-center gap-2 min-w-0">
-                                                                <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: f.color }} />
-                                                                <span className="text-sm font-bold text-slate-700 dark:text-slate-300 truncate">{f.fundName}</span>
-                                                            </div>
-                                                            <div className="flex items-center gap-3 flex-shrink-0">
+                                <div className="space-y-4">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                                        Avg / Week by Fund — {filters.startDate} to {filters.endDate}
+                                    </p>
+                                    {fundData
+                                        .slice()
+                                        .sort((a, b) => b.avgPerWeek - a.avgPerWeek)
+                                        .map(f => {
+                                            const maxAvg = Math.max(...fundData.map(d => d.avgPerWeek), 1);
+                                            const barPct = (f.avgPerWeek / maxAvg) * 100;
+                                            return (
+                                                <div key={f.fundName} className="space-y-2">
+                                                    <div className="flex items-center justify-between gap-3">
+                                                        <div className="flex items-center gap-2 min-w-0">
+                                                            <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: f.color }} />
+                                                            <span className="text-sm font-bold text-slate-700 dark:text-slate-300 truncate">{f.fundName}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-3 flex-shrink-0">
+                                                            <div className="text-right">
                                                                 <span className="text-sm font-black text-slate-900 dark:text-white font-mono">
-                                                                    ${f.latestAvg.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                                                    ${f.avgPerWeek.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                                                                     <span className="text-xs font-semibold text-slate-400">/wk</span>
                                                                 </span>
-                                                                <span className={`inline-flex items-center gap-0.5 text-xs font-black px-2.5 py-1 rounded-full ${trendCls(f.trend)}`}>
-                                                                    {trendIcon(f.trend)}
-                                                                    {f.trendPct !== null && Math.abs(f.trendPct) >= 1
-                                                                        ? ` ${Math.abs(Math.round(f.trendPct))}%`
-                                                                        : ''}
-                                                                </span>
+                                                                <p className="text-[9px] text-slate-400 dark:text-slate-500 text-right">
+                                                                    ${f.totalGiven.toLocaleString(undefined, { maximumFractionDigits: 0 })} total
+                                                                </p>
                                                             </div>
+                                                            <span className={`inline-flex items-center gap-0.5 text-xs font-black px-2.5 py-1 rounded-full ${trendCls(f.trend)}`}>
+                                                                {trendIcon(f.trend)}
+                                                                {f.trendPct !== null && Math.abs(f.trendPct) >= 1
+                                                                    ? ` ${Math.abs(Math.round(f.trendPct))}%`
+                                                                    : ''}
+                                                            </span>
                                                         </div>
-                                                        <div className="relative h-2.5 bg-slate-100 dark:bg-slate-700/60 rounded-full overflow-hidden">
-                                                            <div
-                                                                className="h-full rounded-full transition-all duration-700"
-                                                                style={{ width: `${barPct}%`, backgroundColor: f.color, opacity: 0.85 }}
-                                                            />
-                                                        </div>
-                                                        {/* Per-bucket mini breakdown */}
-                                                        {bkLabels.length <= 12 && (
-                                                            <div className="flex gap-1 pt-0.5 overflow-x-auto">
-                                                                {bkLabels.map((lbl, bi) => (
-                                                                    <div key={lbl} className="flex-1 min-w-[32px] text-center">
-                                                                        <p className="text-[8px] font-bold text-slate-400 uppercase truncate">{lbl}</p>
-                                                                        <p className={`text-[10px] font-black ${
-                                                                            bi === bkLabels.length - 1 ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-500 dark:text-slate-400'
-                                                                        }`}>
-                                                                            ${Math.round(f.bkAvgs[bi] ?? 0).toLocaleString()}
-                                                                        </p>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        )}
                                                     </div>
-                                                );
-                                            })}
-                                    </div>
-                                </>
+                                                    <div className="relative h-2.5 bg-slate-100 dark:bg-slate-700/60 rounded-full overflow-hidden">
+                                                        <div
+                                                            className="h-full rounded-full transition-all duration-700"
+                                                            style={{ width: `${barPct}%`, backgroundColor: f.color, opacity: 0.85 }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                </div>
                             )}
                         </div>
                     </div>
