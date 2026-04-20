@@ -14,6 +14,7 @@ export type AnalyticsWidgetId =
   | 'giving_cumulative_ytd'
   | 'giving_budget_progress'
   | 'giving_last_week_by_fund'
+  | 'giving_average_giving'
   | 'people_stats'
   | 'people_age'
   | 'people_gender'
@@ -102,6 +103,13 @@ const WIDGET_DEFS: WidgetDef[] = [
     id: 'giving_last_week_by_fund',
     label: 'Last Week by Fund',
     description: 'Giving totals for each fund during last calendar week (Mon–Sun)',
+    module: 'Giving',
+    icon: <DollarSign size={14} />,
+  },
+  {
+    id: 'giving_average_giving',
+    label: 'Average Giving',
+    description: 'Average weekly giving per fund over the last 12 weeks — stacked bar chart',
     module: 'Giving',
     icon: <DollarSign size={14} />,
   },
@@ -623,6 +631,51 @@ async function fetchWidgetSnapshot(
           };
         });
       return { upcoming };
+    }
+    case 'giving_average_giving': {
+      const now = new Date();
+      const donations = await firestore.getDetailedDonations(churchId);
+      // Build 12 weekly buckets (most recent first, then reverse for display)
+      const weeks: { label: string; weekStart: Date; weekEnd: Date }[] = [];
+      for (let i = 11; i >= 0; i--) {
+        const weekEnd = new Date(now);
+        weekEnd.setDate(now.getDate() - i * 7);
+        weekEnd.setHours(23, 59, 59, 999);
+        const weekStart = new Date(weekEnd);
+        weekStart.setDate(weekEnd.getDate() - 6);
+        weekStart.setHours(0, 0, 0, 0);
+        const label = weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        weeks.push({ label, weekStart, weekEnd });
+      }
+
+      // Collect all fund names
+      const fundSet = new Set<string>();
+      donations.forEach(d => fundSet.add(d.fundName));
+      const fundNames = Array.from(fundSet).sort();
+
+      // For each week, total by fund
+      const weekData = weeks.map(w => {
+        const byFund: Record<string, number> = {};
+        fundNames.forEach(f => (byFund[f] = 0));
+        donations.forEach(d => {
+          const dDate = new Date(d.date);
+          if (dDate >= w.weekStart && dDate <= w.weekEnd) {
+            byFund[d.fundName] = (byFund[d.fundName] || 0) + d.amount;
+          }
+        });
+        const total = Object.values(byFund).reduce((s, v) => s + v, 0);
+        return { label: w.label, byFund, total };
+      });
+
+      // Compute per-fund averages across the 12 weeks
+      const fundAverages = fundNames.map(f => ({
+        name: f,
+        average: weekData.reduce((s, w) => s + (w.byFund[f] || 0), 0) / 12,
+      })).sort((a, b) => b.average - a.average);
+
+      const overallWeeklyAverage = weekData.reduce((s, w) => s + w.total, 0) / 12;
+
+      return { weeks: weekData, fundNames, fundAverages, overallWeeklyAverage };
     }
     case 'people_stats':
     case 'people_age':
@@ -1379,6 +1432,95 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
                       </p>
                     </div>
                   </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    case 'giving_average_giving': {
+      const weeks: { label: string; byFund: Record<string, number>; total: number }[] = data.weeks || [];
+      const fundNames: string[] = data.fundNames || [];
+      const fundAverages: { name: string; average: number }[] = data.fundAverages || [];
+      const overallWeeklyAverage: number = data.overallWeeklyAverage || 0;
+
+      const FUND_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#06b6d4', '#f43f5e', '#8b5cf6', '#ec4899', '#14b8a6'];
+      const maxWeekTotal = Math.max(...weeks.map(w => w.total), 1);
+
+      return (
+        <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-emerald-600 to-cyan-600 px-4 py-2.5 flex items-center justify-between">
+            <div>
+              <p className="text-[11px] font-bold text-emerald-100 uppercase tracking-widest">Average Giving</p>
+              <p className="text-[10px] text-emerald-200 mt-0.5">Last 12 Weeks</p>
+            </div>
+            <div className="text-right">
+              <p className="text-sm font-black text-emerald-100">{fmt(overallWeeklyAverage, true)}</p>
+              <p className="text-[10px] text-emerald-200">weekly avg</p>
+            </div>
+          </div>
+
+          {/* Stacked bar chart */}
+          <div className="bg-white dark:bg-slate-800 px-4 pt-3 pb-1">
+            {weeks.length === 0 && <p className="text-xs text-slate-400 text-center py-2">No giving data available</p>}
+            <div className="flex items-end gap-0.5" style={{ height: 64 }}>
+              {weeks.map((w, wi) => {
+                const totalH = Math.max(2, Math.round((w.total / maxWeekTotal) * 56));
+                return (
+                  <div
+                    key={wi}
+                    className="flex-1 flex flex-col justify-end"
+                    title={`${w.label}: ${fmt(w.total, true)}`}
+                  >
+                    {fundNames.map((f, fi) => {
+                      const val = w.byFund[f] || 0;
+                      if (val <= 0) return null;
+                      const segH = Math.max(1, Math.round((val / maxWeekTotal) * 56));
+                      return (
+                        <div
+                          key={f}
+                          className="w-full"
+                          style={{
+                            height: segH,
+                            backgroundColor: FUND_COLORS[fi % FUND_COLORS.length],
+                            opacity: 0.85,
+                          }}
+                          title={`${f}: ${fmt(val, true)}`}
+                        />
+                      );
+                    })}
+                    {w.total === 0 && <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-sm" style={{ height: 2 }} />}
+                  </div>
+                );
+              })}
+            </div>
+            {/* X-axis labels: show first and last */}
+            {weeks.length > 0 && (
+              <div className="flex justify-between mt-0.5">
+                <span className="text-[7px] text-slate-400">{weeks[0]?.label}</span>
+                <span className="text-[7px] text-slate-400">{weeks[weeks.length - 1]?.label}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Fund legend & averages */}
+          <div className="bg-slate-50 dark:bg-slate-900 px-4 py-3 border-t border-slate-100 dark:border-slate-700 space-y-1.5">
+            {fundAverages.length === 0 && <p className="text-xs text-slate-400 text-center py-1">No fund data</p>}
+            {fundAverages.slice(0, 6).map((f, fi) => {
+              const colorIdx = fundNames.indexOf(f.name);
+              return (
+                <div key={f.name} className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <div
+                      className="w-2 h-2 rounded-full shrink-0"
+                      style={{ backgroundColor: FUND_COLORS[colorIdx % FUND_COLORS.length] }}
+                    />
+                    <span className="text-[10px] font-semibold text-slate-700 dark:text-slate-300 truncate max-w-[120px]">{f.name}</span>
+                  </div>
+                  <span className="text-[10px] font-black text-slate-900 dark:text-white shrink-0 ml-2">{fmt(f.average, true)}<span className="text-slate-400 font-normal">/wk</span></span>
                 </div>
               );
             })}
