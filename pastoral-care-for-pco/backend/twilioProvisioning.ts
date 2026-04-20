@@ -330,6 +330,7 @@ export const releaseTwilioNumber = async (req: any, res: any) => {
 
         if (twilioSubAccountSid && twilioPhoneSid) {
             try {
+                const { accountSid, authToken } = await getMasterCredentials(db);
                 const masterForRelease = getMasterClient(accountSid, authToken);
                 await masterForRelease.api.v2010
                     .accounts(twilioSubAccountSid)
