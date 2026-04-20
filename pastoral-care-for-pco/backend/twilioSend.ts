@@ -2,6 +2,22 @@ import twilio from 'twilio';
 import { getDb } from './firebase';
 import { createServerLogger } from '../services/logService';
 
+// ─── Master credentials helper ────────────────────────────────────────────────
+// All Twilio operations use the master account acting on behalf of the
+// church's sub-account.  This avoids any dependency on the stored
+// twilioSubAccountAuthToken, which can become stale after creation.
+
+async function getMasterClient(db: any): Promise<any> {
+    const snap = await db.doc('system/settings').get();
+    const data = snap.data() || {};
+    const accountSid = data.twilioMasterAccountSid || '';
+    const authToken  = data.twilioMasterAuthToken  || '';
+    if (!accountSid || !authToken) {
+        throw new Error('Twilio master credentials are not configured in System Settings.');
+    }
+    return twilio(accountSid, authToken);
+}
+
 // ─── Segment cost constants (US pricing, adjust as needed) ───────────────────
 const SMS_COST_PER_SEGMENT = 0.0079;  // USD per outbound SMS segment
 const MMS_COST_PER_MESSAGE = 0.02;    // USD per outbound MMS
@@ -68,7 +84,9 @@ async function getStatusCallbackUrl(db: any): Promise<string | null> {
 }
 
 /**
- * Get sub-account Twilio client and the correct from-number for a church.
+ * Get a scoped Twilio client and the correct from-number for a church.
+ * Uses the master account acting on behalf of the church's sub-account so
+ * that the stored twilioSubAccountAuthToken is never needed for sending.
  * If twilioNumberId is provided, uses that specific number.
  * Otherwise falls back to the church's smsSettings.twilioPhoneNumber (default/legacy).
  */
@@ -83,7 +101,9 @@ async function getSubClient(
     if (!sms.smsEnabled)          throw new Error('SMS is not enabled for this church.');
     if (!sms.twilioSubAccountSid) throw new Error('No Twilio sub-account configured.');
 
-    const client = twilio(sms.twilioSubAccountSid, sms.twilioSubAccountAuthToken);
+    // Use master client scoped to the sub-account — no stale auth token needed
+    const master = await getMasterClient(db);
+    const client = master.api.v2010.accounts(sms.twilioSubAccountSid);
 
     // Resolve the from-number
     let fromNumber = sms.twilioPhoneNumber as string | undefined;

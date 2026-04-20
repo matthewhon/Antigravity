@@ -328,10 +328,17 @@ export const releaseTwilioNumber = async (req: any, res: any) => {
 
         const { twilioSubAccountSid, twilioSubAccountAuthToken, twilioPhoneSid } = smsSettings;
 
-        if (twilioSubAccountSid && twilioSubAccountAuthToken && twilioPhoneSid) {
-            const subClient = twilio(twilioSubAccountSid, twilioSubAccountAuthToken);
-            await subClient.incomingPhoneNumbers(twilioPhoneSid).remove();
-            log.info(`Released phone number (SID: ${twilioPhoneSid}) for church ${churchId}`, 'system', { churchId }, churchId);
+        if (twilioSubAccountSid && twilioPhoneSid) {
+            try {
+                const masterForRelease = getMasterClient(accountSid, authToken);
+                await masterForRelease.api.v2010
+                    .accounts(twilioSubAccountSid)
+                    .incomingPhoneNumbers(twilioPhoneSid)
+                    .remove();
+                log.info(`Released phone number (SID: ${twilioPhoneSid}) for church ${churchId}`, 'system', { churchId }, churchId);
+            } catch (releaseErr: any) {
+                log.warn(`[releaseTwilioNumber] Twilio release error (continuing): ${releaseErr.message}`, 'system', { churchId }, churchId);
+            }
         }
 
         await db.collection('churches').doc(churchId).update({
