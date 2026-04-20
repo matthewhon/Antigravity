@@ -548,80 +548,88 @@ export const GivingView: React.FC<GivingViewProps> = ({
     return rows.filter(r => r.amount > 0).sort((a, b) => b.amount - a.amount);
   }, [analytics, donations, filter, dateRange]);
 
-  // --- Average Giving — Quarterly Weekly Average per Fund (last 4 rolling quarters) ---
+  // --- Average Giving — Weekly avg by month for the last 12 weeks per fund ---
   const averageGivingData = useMemo(() => {
     const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#06b6d4', '#f43f5e', '#8b5cf6', '#ec4899', '#14b8a6'];
     const now = new Date();
     now.setHours(23, 59, 59, 999);
 
-    // Build 4 rolling 13-week quarters ending today
-    // Q4 = most recent 13 weeks, Q1 = oldest 13-week block
-    const quarters: { label: string; start: Date; end: Date; weeks: number }[] = [];
-    for (let q = 3; q >= 0; q--) {
-      const qEnd = new Date(now);
-      qEnd.setDate(now.getDate() - q * 13 * 7);
-      qEnd.setHours(23, 59, 59, 999);
-      const qStart = new Date(qEnd);
-      qStart.setDate(qEnd.getDate() - 13 * 7 + 1);
-      qStart.setHours(0, 0, 0, 0);
-      const qIndex = 4 - q; // 1..4
-      quarters.push({
-        label: `Q${qIndex}`,
-        start: qStart,
-        end: qEnd,
-        weeks: 13,
-      });
+    // --- Build the 12 individual weeks ---
+    // Monday-align the current week
+    const todayMonday = new Date(now);
+    todayMonday.setDate(now.getDate() - (now.getDay() === 0 ? 6 : now.getDay() - 1));
+    todayMonday.setHours(0, 0, 0, 0);
+
+    const weeks: { start: Date; end: Date; monthKey: string }[] = [];
+    for (let i = 11; i >= 0; i--) {
+      const wStart = new Date(todayMonday);
+      wStart.setDate(todayMonday.getDate() - i * 7);
+      const wEnd = new Date(wStart);
+      wEnd.setDate(wStart.getDate() + 6);
+      wEnd.setHours(23, 59, 59, 999);
+      // Assign each week to the month its start falls in
+      const monthKey = wStart.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+      weeks.push({ start: wStart, end: wEnd, monthKey });
     }
 
-    // All fund names across the full 52-week window
-    const windowStart = quarters[0].start;
+    // --- Derive ordered month buckets ---
+    const monthOrder: string[] = [];
+    weeks.forEach(w => { if (!monthOrder.includes(w.monthKey)) monthOrder.push(w.monthKey); });
+
+    // Count how many weeks land in each month
+    const weeksPerMonth: Record<string, number> = {};
+    weeks.forEach(w => { weeksPerMonth[w.monthKey] = (weeksPerMonth[w.monthKey] || 0) + 1; });
+
+    const windowStart = weeks[0].start;
+
+    // --- All fund names in this 12-week window ---
     const allFundNames = Array.from(
-      new Set(donations.filter(d => new Date(d.date) >= windowStart && new Date(d.date) <= now).map(d => d.fundName))
+      new Set(donations.filter(d => { const dd = new Date(d.date); return dd >= windowStart && dd <= now; }).map(d => d.fundName))
     ).sort();
 
-    // Per-fund quarterly averages
+    // --- Per-fund data ---
     const fundData = allFundNames.map((fundName, idx) => {
       const color = COLORS[idx % COLORS.length];
-      const qAvgs = quarters.map(q => {
-        const total = donations
-          .filter(d => {
-            const dDate = new Date(d.date);
-            return d.fundName === fundName && dDate >= q.start && dDate <= q.end;
-          })
-          .reduce((s, d) => s + d.amount, 0);
-        return total / q.weeks; // avg weekly giving for this quarter
+
+      // Weekly avg per month = total given in that month’s weeks / number of those weeks
+      const monthAvgs = monthOrder.map(mk => {
+        const monthWeeks = weeks.filter(w => w.monthKey === mk);
+        const total = monthWeeks.reduce((s, w) => {
+          return s + donations
+            .filter(d => { const dd = new Date(d.date); return d.fundName === fundName && dd >= w.start && dd <= w.end; })
+            .reduce((ss, d) => ss + d.amount, 0);
+        }, 0);
+        return total / (weeksPerMonth[mk] || 1);
       });
 
-      // Trend: compare most recent quarter (Q4) vs previous (Q3)
-      const latestAvg = qAvgs[3];
-      const prevAvg = qAvgs[2];
-      const trendPct = prevAvg > 0 ? ((latestAvg - prevAvg) / prevAvg) * 100 : null;
+      const latestAvg = monthAvgs[monthAvgs.length - 1];
+      const prevAvg   = monthAvgs.length >= 2 ? monthAvgs[monthAvgs.length - 2] : 0;
+      const trendPct  = prevAvg > 0 ? ((latestAvg - prevAvg) / prevAvg) * 100 : null;
       const trend: 'up' | 'down' | 'flat' =
         trendPct === null ? 'flat' : trendPct > 3 ? 'up' : trendPct < -3 ? 'down' : 'flat';
 
-      const totalGiven = donations
-        .filter(d => new Date(d.date) >= windowStart && new Date(d.date) <= now && d.fundName === fundName)
-        .reduce((s, d) => s + d.amount, 0);
-
-      return { fundName, color, qAvgs, latestAvg, trendPct, trend, totalGiven };
+      return { fundName, color, monthAvgs, monthOrder, latestAvg, trendPct, trend };
     });
 
-    // Chart rows — one entry per quarter, keyed by fund name
-    const chartData = quarters.map((q, qi) => {
-      const entry: Record<string, number | string> = { label: q.label };
-      fundData.forEach(f => {
-        entry[f.fundName] = Math.round(f.qAvgs[qi]);
-      });
+    // --- Chart rows: one per month ---
+    const chartData = monthOrder.map((mk, mi) => {
+      const entry: Record<string, number | string> = { label: mk };
+      fundData.forEach(f => { entry[f.fundName] = Math.round(f.monthAvgs[mi]); });
       return entry;
     });
 
+    const latestMonth = monthOrder[monthOrder.length - 1] || '';
+    const prevMonth   = monthOrder.length >= 2 ? monthOrder[monthOrder.length - 2] : '';
     const overallLatestAvg = fundData.reduce((s, f) => s + f.latestAvg, 0);
-    const overallPrevAvg = fundData.reduce((s, f) => s + f.qAvgs[2], 0);
-    const overallTrendPct = overallPrevAvg > 0 ? ((overallLatestAvg - overallPrevAvg) / overallPrevAvg) * 100 : null;
+    const overallPrevAvg   = fundData.reduce((s, f) => s + (f.monthAvgs[f.monthAvgs.length - 2] ?? 0), 0);
+    const overallTrendPct  = overallPrevAvg > 0 ? ((overallLatestAvg - overallPrevAvg) / overallPrevAvg) * 100 : null;
     const overallTrend: 'up' | 'down' | 'flat' =
       overallTrendPct === null ? 'flat' : overallTrendPct > 3 ? 'up' : overallTrendPct < -3 ? 'down' : 'flat';
 
-    return { quarters, fundData, chartData, overallLatestAvg, overallTrendPct, overallTrend };
+    const rangeStart = weeks[0].start.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const rangeEnd   = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+    return { monthOrder, fundData, chartData, overallLatestAvg, overallTrendPct, overallTrend, latestMonth, prevMonth, rangeStart, rangeEnd };
   }, [donations]);
 
   const acquisitionData = useMemo(() => {
@@ -1366,7 +1374,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
               );
           }
           case 'averageGiving': {
-            const { quarters, fundData, chartData, overallLatestAvg, overallTrendPct, overallTrend } = averageGivingData;
+            const { monthOrder, fundData, chartData, overallLatestAvg, overallTrendPct, overallTrend, latestMonth, prevMonth, rangeStart, rangeEnd } = averageGivingData;
             const hasFunds = fundData.length > 0;
 
             const trendIcon = (t: 'up' | 'down' | 'flat') =>
@@ -1378,35 +1386,31 @@ export const GivingView: React.FC<GivingViewProps> = ({
                 ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-400'
                 : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400';
 
-            // Hero subtitle: date range of Q1 → Q4
-            const q1Start = quarters[0]?.start.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-            const q4End = quarters[3]?.end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-
             return (
               <WidgetWrapper
-                title="Average Giving (by Quarter)"
+                title="Average Giving"
                 onRemove={() => handleRemoveWidget(id)}
-                source="Last 52 Weeks · 13-wk quarters"
+                source="Last 12 Weeks · by month"
               >
                 {!hasFunds ? (
                   <div className="flex flex-col items-center justify-center h-40 text-center space-y-2">
                     <div className="text-4xl opacity-30">📊</div>
                     <p className="text-xs font-bold text-slate-400 dark:text-slate-500">No giving data found</p>
-                    <p className="text-[10px] text-slate-400 dark:text-slate-500">Sync giving data to see quarterly averages by fund.</p>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500">Sync giving data to see monthly averages by fund.</p>
                   </div>
                 ) : (
                   <div className="space-y-6">
-                    {/* Hero: overall latest quarter avg + trend */}
+                    {/* Hero: latest month avg + trend */}
                     <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-50 to-violet-50 dark:from-indigo-900/20 dark:to-violet-900/20 flex items-center justify-between">
                       <div>
                         <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-1">
-                          {quarters[3]?.label} Avg / Week (All Funds)
+                          {latestMonth} Avg / Week (All Funds)
                         </p>
                         <p className="text-3xl font-black text-indigo-600 dark:text-indigo-400">
                           ${overallLatestAvg.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                         </p>
                         <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">
-                          {q1Start} – {q4End}
+                          {rangeStart} – {rangeEnd}
                         </p>
                       </div>
                       <div className="flex flex-col items-end gap-1">
@@ -1414,11 +1418,11 @@ export const GivingView: React.FC<GivingViewProps> = ({
                           {trendIcon(overallTrend)}
                           {overallTrendPct !== null ? ` ${Math.abs(Math.round(overallTrendPct))}%` : ''}
                         </span>
-                        <span className="text-[9px] text-slate-400 dark:text-slate-500">vs {quarters[2]?.label}</span>
+                        <span className="text-[9px] text-slate-400 dark:text-slate-500">vs {prevMonth}</span>
                       </div>
                     </div>
 
-                    {/* Stacked bar chart — Q1..Q4, avg weekly giving */}
+                    {/* Stacked bar chart — one bar per month, Y = avg weekly $ */}
                     <div className="h-52">
                       <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={1}>
                         <BarChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
@@ -1427,7 +1431,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
                             dataKey="label"
                             axisLine={false}
                             tickLine={false}
-                            tick={{ fontSize: 11, fontWeight: 700, fill: axisColor }}
+                            tick={{ fontSize: 10, fontWeight: 700, fill: axisColor }}
                           />
                           <YAxis
                             axisLine={false}
@@ -1440,8 +1444,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
                             contentStyle={TOOLTIP_STYLE}
                             itemStyle={{ color: '#fff' }}
                             cursor={{ fill: currentTheme === 'dark' ? '#334155' : '#f8fafc' }}
-                            formatter={(value: number, name: string) => [`$${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}/wk`, name]}
-                            label="Quarter"
+                            formatter={(value: number, name: string) => [`$${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}/wk avg`, name]}
                           />
                           <Legend verticalAlign="top" iconType="circle" wrapperStyle={{ fontSize: '10px' }} />
                           {fundData.map((f, fi) => (
@@ -1460,7 +1463,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
                     {/* Per-fund rows with trend indicator */}
                     <div className="space-y-3">
                       <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
-                        Weekly Avg by Fund — {quarters[3]?.label} vs {quarters[2]?.label}
+                        Weekly Avg by Fund — {latestMonth} vs {prevMonth}
                       </p>
                       {fundData
                         .slice()
