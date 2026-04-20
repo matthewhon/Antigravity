@@ -1113,17 +1113,6 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                         <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 transition-colors">
                             <h4 className="font-bold text-indigo-600 dark:text-indigo-400 mb-4 text-sm">Integrations</h4>
                             
-                            <div className="mb-6">
-                                <label className="block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-2">Google Maps API Key</label>
-                                <input 
-                                    type="text" 
-                                    value={formData.googleMapsApiKey || ''}
-                                    onChange={e => handleChange('googleMapsApiKey', e.target.value)}
-                                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 text-xs font-mono text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 placeholder-slate-400 transition-colors"
-                                    placeholder="Enter your key for maps"
-                                />
-                            </div>
-
                             {/* Geocode Addresses */}
                             <div className="mb-6 p-4 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700">
                                 <p className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-widest mb-1">Member Heatmap</p>
@@ -1366,16 +1355,17 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                             <h4 className="font-bold text-slate-900 dark:text-white mb-6 text-sm">Automated Sync Schedule</h4>
                             <div className="flex items-center gap-4">
                                 <div className="flex-1">
-                                    <label className="block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-2">Daily Time</label>
+                                    <label className="block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-2">Daily Time <span className="text-amber-500">(UTC)</span></label>
                                     <input 
                                         type="time"
-                                        title="Daily sync time"
+                                        title="Daily sync time (UTC)"
                                         value={formData.scheduledSyncTime || ''}
                                         onChange={e => handleChange('scheduledSyncTime', e.target.value)}
                                         className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 font-mono text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
                                     />
                                     <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-2 leading-relaxed">
-                                        The system will automatically sync all data from Planning Center at this time each day. Leave blank to disable.
+                                        The system syncs daily at this time. <strong className="text-amber-600 dark:text-amber-400">Enter UTC time</strong> — the server runs in UTC.
+                                        For example, for 2 AM Central (UTC−5), enter <span className="font-mono">07:00</span>.
                                     </p>
                                 </div>
                             </div>
@@ -1383,7 +1373,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 {formData.scheduledSyncTime ? (
                                     <span className="inline-flex items-center gap-1.5 text-[9px] font-black uppercase text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded-full border border-emerald-100 dark:border-emerald-900/30">
                                         <span className="relative flex h-1.5 w-1.5"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span></span>
-                                        Auto-sync enabled
+                                        Auto-sync enabled · {formData.scheduledSyncTime} UTC
                                     </span>
                                 ) : (
                                     <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Auto-sync disabled</span>

@@ -560,11 +560,31 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
 
       ensureLeafletCss();
 
-      Promise.all([
-          import('leaflet'),
-          import('leaflet.markercluster').then(() => {}) // side-effect: attaches to L global
-      ]).then(([L]) => {
+      // Inject MarkerCluster CSS (needed for cluster spiderfy animations)
+      const clusterId = 'leaflet-cluster-css';
+      if (!document.getElementById(clusterId)) {
+          const link = document.createElement('link');
+          link.id = clusterId;
+          link.rel = 'stylesheet';
+          link.href = 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css';
+          document.head.appendChild(link);
+          const link2 = document.createElement('link');
+          link2.id = clusterId + '-default';
+          link2.rel = 'stylesheet';
+          link2.href = 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css';
+          document.head.appendChild(link2);
+      }
+
+      // leaflet.markercluster is a UMD plugin — it must find window.L at load time.
+      // Import Leaflet first, expose as window.L, then import the plugin sequentially.
+      import('leaflet').then(async (L) => {
           if (!mapRef.current) return;
+
+          // Expose to window so the UMD plugin can attach markerClusterGroup to L
+          (window as any).L = L;
+
+          // Now load the plugin — it will attach L.markerClusterGroup to window.L
+          await import('leaflet.markercluster');
 
           // Build geocoded point list from people with lat/lng on their first address
           const points: { lat: number; lng: number; name: string; city?: string; membership?: string }[] = [];
@@ -617,8 +637,8 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
           }).addTo(map);
 
           if (points.length > 0) {
-              // Build the cluster group with custom indigo cluster icon
-              const clusterGroup = (L as any).markerClusterGroup({
+              // markerClusterGroup is attached to window.L by the UMD plugin (not the ESM export)
+              const clusterGroup = (window as any).L.markerClusterGroup({
                   maxClusterRadius: 60,
                   showCoverageOnHover: false,
                   iconCreateFunction: (cluster: any) => {

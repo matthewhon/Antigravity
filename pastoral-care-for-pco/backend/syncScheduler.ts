@@ -4,7 +4,12 @@
  * Runs every minute, reads each church's `scheduledSyncTime` from Firestore,
  * and triggers a full sync when the current time matches that schedule.
  *
- * Mirrors the pattern used by emailScheduler.ts.
+ * ⚠️  TIME ZONE NOTE:
+ *   Cloud Run servers run in UTC.  `scheduledSyncTime` stored in Firestore
+ *   must therefore be in UTC (e.g. "08:00" for 3 AM US/Eastern).
+ *   The admin UI label has been updated to remind admins of this.
+ *   We use getUTC* methods explicitly so the behaviour is identical whether
+ *   the server's TZ env-var is set or not.
  */
 
 import type { Firestore } from 'firebase-admin/firestore';
@@ -12,17 +17,20 @@ import type { Firestore } from 'firebase-admin/firestore';
 let schedulerInterval: ReturnType<typeof setInterval> | null = null;
 
 // Track which churchIds have already been synced today so we don't double-fire
-const syncedToday = new Map<string, string>(); // churchId → "HH:MM" last fired
+// key = `${churchId}_${UTC-date-string}`
+const syncedToday = new Map<string, string>();
 
-function getTodayKey(): string {
+/** Returns a UTC date string like "2025-3-15" — resets at UTC midnight */
+function getTodayUTCKey(): string {
     const d = new Date();
-    return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    return `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}`;
 }
 
-function getCurrentHHMM(): string {
+/** Returns current UTC time as "HH:MM" */
+function getCurrentUTCHHMM(): string {
     const now = new Date();
-    const hh = String(now.getHours()).padStart(2, '0');
-    const mm = String(now.getMinutes()).padStart(2, '0');
+    const hh = String(now.getUTCHours()).padStart(2, '0');
+    const mm = String(now.getUTCMinutes()).padStart(2, '0');
     return `${hh}:${mm}`;
 }
 
@@ -36,7 +44,7 @@ async function triggerSyncForChurch(churchId: string, db: Firestore): Promise<vo
 
         console.log(`[SyncScheduler] Scheduled sync complete for church ${churchId}`);
 
-        // Log into system logs
+        // Log into Firestore
         await db.collection('logs').add({
             level: 'info',
             source: 'sync',
@@ -65,19 +73,22 @@ export function startSyncScheduler(db: Firestore): void {
         clearInterval(schedulerInterval);
     }
 
-    console.log('[SyncScheduler] Sync scheduler started — checking every minute.');
+    console.log('[SyncScheduler] Sync scheduler started — checking every minute (UTC comparison).');
 
-    // Reset the "already synced" map at midnight
-    const todayKey = getTodayKey();
+    // Bug fix: do NOT capture todayKey at startup — recalculate each tick so the
+    // midnight-reset logic works correctly after the server has been running for days.
+    let lastDayKey = getTodayUTCKey();
 
     schedulerInterval = setInterval(async () => {
-        const currentKey = getTodayKey();
-        // Reset tracker if a new day has started
-        if (currentKey !== todayKey) {
+        const currentDayKey = getTodayUTCKey();
+
+        // Reset the "already synced" tracker when UTC date rolls over
+        if (currentDayKey !== lastDayKey) {
             syncedToday.clear();
+            lastDayKey = currentDayKey;
         }
 
-        const currentTime = getCurrentHHMM();
+        const currentTime = getCurrentUTCHHMM();
 
         try {
             const snapshot = await db.collection('churches')
@@ -87,20 +98,25 @@ export function startSyncScheduler(db: Firestore): void {
             for (const doc of snapshot.docs) {
                 const church = doc.data();
                 const churchId = doc.id;
-                const scheduledTime: string | undefined = church.scheduledSyncTime;
+
+                // Support both field names for backwards-compat
+                const scheduledTime: string | undefined =
+                    church.scheduledSyncTimeUTC ?? church.scheduledSyncTime;
 
                 if (!scheduledTime) continue;
 
-                // Normalize to HH:MM (trim seconds if someone stored HH:MM:SS)
+                // Normalize to HH:MM (trim seconds if stored as HH:MM:SS)
                 const normalizedSchedule = scheduledTime.substring(0, 5);
 
                 if (normalizedSchedule !== currentTime) continue;
 
-                // Only fire once per day per church
-                const alreadySyncedKey = `${churchId}_${currentKey}`;
+                // Only fire once per UTC day per church
+                const alreadySyncedKey = `${churchId}_${currentDayKey}`;
                 if (syncedToday.has(alreadySyncedKey)) continue;
 
                 syncedToday.set(alreadySyncedKey, currentTime);
+
+                console.log(`[SyncScheduler] Match! Firing sync for ${churchId} at UTC ${currentTime}`);
 
                 // Fire without awaiting — do not block the scheduler loop
                 triggerSyncForChurch(churchId, db).catch((e) => {

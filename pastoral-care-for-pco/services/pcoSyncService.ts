@@ -1549,9 +1549,9 @@ export const syncRegistrationsData = async (churchId: string) => {
 export const geocodePeopleAddresses = async (churchId: string): Promise<void> => {
     logger.info('Geocoding people addresses...', 'sync', { churchId }, churchId);
 
-    // Fetch church to get the Google Maps API key
-    const church = await firestore.getChurch(churchId);
-    const googleApiKey: string | undefined = (church as any)?.googleMapsApiKey;
+    // Fetch Google Maps API key from App Config → SystemSettings (the canonical location)
+    const sysSettings = await firestore.getSystemSettings();
+    const googleApiKey: string | undefined = sysSettings?.googleMapsApiKey || undefined;
 
     // Fetch all people for this church
     const people = await firestore.getPeople(churchId);
