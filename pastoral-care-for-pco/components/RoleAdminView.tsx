@@ -2095,8 +2095,14 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                 setIsSmsSaving(true);
                 setSmsMessage(null);
                 try {
+                    // Use dot-notation merge so we don't wipe unrelated smsSettings fields
+                    // (termsAcceptedAt, twilioCustomerProfileSid, etc.)
+                    const dotFields: Record<string, any> = {};
+                    (Object.keys(smsForm) as Array<keyof typeof smsForm>).forEach(k => {
+                        dotFields[`smsSettings.${k}`] = (smsForm as any)[k];
+                    });
                     await onUpdateChurch({ smsSettings: smsForm });
-                    setSmsMessage({ type: 'success', text: 'SMS settings saved successfully.' });
+                    setSmsMessage({ type: 'success', text: 'SMS settings saved.' });
                     setTimeout(() => setSmsMessage(null), 4000);
                 } catch (e: any) {
                     setSmsMessage({ type: 'error', text: 'Failed to save: ' + e.message });
@@ -2427,21 +2433,50 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 <p className="text-[10px] text-slate-400 mb-6 leading-relaxed">
                                     Each church gets an isolated Twilio Sub-Account. These are filled automatically by the platform when your account is provisioned. Do not edit unless instructed by support.
                                 </p>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <label className={labelCn}>Sub-Account SID</label>
-                                        <input type="text" value={smsForm.twilioSubAccountSid || ''} readOnly
-                                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 font-mono text-xs text-slate-500 dark:text-slate-400 cursor-default"
-                                            placeholder="AC... (auto-filled)"
-                                        />
+                                <div className="md:col-span-2 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/30 rounded-xl p-4">
+                                    <p className="text-[9px] font-black uppercase tracking-widest text-amber-600 dark:text-amber-400 mb-3">⚠ Admin-Only Fields — Edit with Caution</p>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className={labelCn}>Sub-Account SID</label>
+                                            <input type="text" value={smsForm.twilioSubAccountSid || ''}
+                                                onChange={e => handleSmsChange('twilioSubAccountSid', e.target.value)}
+                                                className={`${inputCn} font-mono text-xs`}
+                                                placeholder="AC... (auto-filled on provision)"
+                                            />
+                                            <p className="text-[9px] text-amber-600 dark:text-amber-400 mt-1">
+                                                If inactive, find the active sub-account <a href="https://console.twilio.com/us1/account/sub-accounts/" target="_blank" rel="noopener noreferrer" className="underline">in Twilio Console → Sub-Accounts</a> and paste the SID here.
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <label className={labelCn}>Assigned Phone Number</label>
+                                            <input type="text" value={smsForm.twilioPhoneNumber || ''}
+                                                onChange={e => handleSmsChange('twilioPhoneNumber', e.target.value)}
+                                                className={`${inputCn} font-mono text-xs`}
+                                                placeholder="+1... (auto-filled on provision)"
+                                            />
+                                            <p className="text-[9px] text-amber-600 dark:text-amber-400 mt-1">
+                                                E.164 format number. Must belong to the sub-account above.
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <label className={labelCn}>Assigned Phone Number</label>
-                                        <input type="text" value={smsForm.twilioPhoneNumber || ''} readOnly
-                                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 font-mono text-xs text-slate-500 dark:text-slate-400 cursor-default"
-                                            placeholder="+1... (auto-filled)"
-                                        />
+                                    <div className="flex items-center gap-3 mt-3 pt-3 border-t border-amber-200 dark:border-amber-800/30">
+                                        <button
+                                            onClick={() => {
+                                                if (!window.confirm('This will clear the stored sub-account SID and phone number so the next provision attempt creates a fresh sub-account. Are you sure?')) return;
+                                                handleSmsChange('twilioSubAccountSid', '');
+                                                handleSmsChange('twilioSubAccountAuthToken', '');
+                                                handleSmsChange('twilioPhoneNumber', '');
+                                                handleSmsChange('twilioPhoneSid', '');
+                                                handleSmsChange('smsEnabled', false);
+                                            }}
+                                            className="text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800 hover:bg-rose-100 transition"
+                                        >
+                                            🗑 Clear Sub-Account (Force Re-Provision)
+                                        </button>
+                                        <p className="text-[9px] text-slate-400">Save after clearing — tenant will need to claim a new number.</p>
                                     </div>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                                     <div>
                                         <label className={labelCn}>Messaging Service SID</label>
                                         <input type="text" value={smsForm.twilioMessagingServiceSid || ''}
