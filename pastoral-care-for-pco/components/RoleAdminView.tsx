@@ -311,6 +311,12 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   const [pendingTermsAction, setPendingTermsAction] = useState<'create-profile' | 'submit-a2p' | null>(null);
   // Ref that the SMS tab IIFE populates with its handler functions
   const smsActionRef = useRef<{ handleCreateProfile: () => void; handleSubmitToTwilio: () => void } | null>(null);
+  // A2P pipeline step loading states
+  const [isRegisteringBrand, setIsRegisteringBrand]         = useState(false);
+  const [isCreatingMsgSvc, setIsCreatingMsgSvc]             = useState(false);
+  const [isRegisteringCampaign, setIsRegisteringCampaign]   = useState(false);
+  const [isAssigningNumbers, setIsAssigningNumbers]         = useState(false);
+  const [isCheckingCampaign, setIsCheckingCampaign]         = useState(false);
 
   // Phone Numbers panel state (SMS → Numbers tab)
   const [twilioNumbers, setTwilioNumbers] = useState<any[]>([]);
@@ -2279,6 +2285,92 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                 }
             };
 
+            // ── Step 4: Submit Brand Registration ────────────────────────────────
+            const handleRegisterBrand = async () => {
+                setIsRegisteringBrand(true);
+                setA2pResult(null);
+                try {
+                    const res  = await fetch('/api/messaging/register-brand', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ churchId }),
+                    });
+                    const data = await res.json();
+                    if (!res.ok) { setA2pResult({ success: false, message: data.error || 'Brand registration failed' }); return; }
+                    if (data.brandSid) setSmsForm(prev => ({ ...prev, twilioBrandSid: data.brandSid, twilioA2pStatus: data.status }));
+                    setA2pResult({ success: true, message: data.message || 'Brand submitted!' });
+                } catch (e: any) {
+                    setA2pResult({ success: false, message: e.message || 'Brand registration failed' });
+                } finally { setIsRegisteringBrand(false); }
+            };
+
+            // ── Step 5: Create Messaging Service ─────────────────────────────────
+            const handleCreateMessagingService = async () => {
+                setIsCreatingMsgSvc(true);
+                setA2pResult(null);
+                try {
+                    const res  = await fetch('/api/messaging/create-messaging-service', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ churchId }),
+                    });
+                    const data = await res.json();
+                    if (!res.ok) { setA2pResult({ success: false, message: data.error || 'Failed to create Messaging Service' }); return; }
+                    if (data.messagingServiceSid) setSmsForm(prev => ({ ...prev, twilioMessagingServiceSid: data.messagingServiceSid }));
+                    setA2pResult({ success: true, message: data.message || 'Messaging Service created!' });
+                } catch (e: any) {
+                    setA2pResult({ success: false, message: e.message || 'Failed to create Messaging Service' });
+                } finally { setIsCreatingMsgSvc(false); }
+            };
+
+            // ── Step 6: Register A2P Campaign ────────────────────────────────────
+            const handleRegisterCampaign = async () => {
+                setIsRegisteringCampaign(true);
+                setA2pResult(null);
+                try {
+                    const res  = await fetch('/api/messaging/register-campaign', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ churchId }),
+                    });
+                    const data = await res.json();
+                    if (!res.ok) { setA2pResult({ success: false, message: data.error || 'Campaign registration failed' }); return; }
+                    if (data.usAppToPersonSid) setSmsForm(prev => ({ ...prev, twilioUsAppToPersonSid: data.usAppToPersonSid, twilioA2pCampaignStatus: 'pending' } as any));
+                    setA2pResult({ success: true, message: data.message || 'Campaign registered!' });
+                } catch (e: any) {
+                    setA2pResult({ success: false, message: e.message || 'Campaign registration failed' });
+                } finally { setIsRegisteringCampaign(false); }
+            };
+
+            // ── Step 7: Assign Numbers to Messaging Service ───────────────────────
+            const handleAssignNumbers = async () => {
+                setIsAssigningNumbers(true);
+                setA2pResult(null);
+                try {
+                    const res  = await fetch('/api/messaging/assign-numbers-to-service', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ churchId }),
+                    });
+                    const data = await res.json();
+                    if (!res.ok) { setA2pResult({ success: false, message: data.error || 'Failed to link numbers' }); return; }
+                    if (data.success) setSmsForm(prev => ({ ...prev, twilioNumbersLinked: true } as any));
+                    setA2pResult({ success: data.success, message: data.message || 'Numbers linked!' });
+                } catch (e: any) {
+                    setA2pResult({ success: false, message: e.message || 'Failed to link numbers' });
+                } finally { setIsAssigningNumbers(false); }
+            };
+
+            // ── Poll live campaign status ─────────────────────────────────────────
+            const handleCheckCampaignStatus = async () => {
+                setIsCheckingCampaign(true);
+                setA2pResult(null);
+                try {
+                    const res  = await fetch(`/api/messaging/campaign-status?churchId=${encodeURIComponent(churchId)}`);
+                    const data = await res.json();
+                    if (data.status) setSmsForm(prev => ({ ...prev, twilioA2pCampaignStatus: data.status } as any));
+                    setA2pResult({ success: true, message: `Campaign status: ${data.twilioStatus || data.status || 'unknown'}` });
+                } catch (e: any) {
+                    setA2pResult({ success: false, message: e.message || 'Status check failed' });
+                } finally { setIsCheckingCampaign(false); }
+            };
+
             const inputCn = 'w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-colors';
             const labelCn = 'block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-2';
 
@@ -3147,6 +3239,200 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                     )
                                 )}
                             </div>
+
+                            {/* ── Step 4: Brand Registration ─────────────────────────────── */}
+                            {(() => {
+                                const brandStatus  = smsForm.twilioA2pStatus || 'not_started';
+                                const brandDone    = brandStatus === 'approved';
+                                const brandFailed  = brandStatus === 'failed';
+                                const hasBrand     = !!smsForm.twilioBrandSid;
+                                const hasProfile   = !!smsForm.twilioCustomerProfileSid;
+                                const s4Colors = brandDone   ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                                               : brandFailed ? 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800'
+                                               : hasBrand    ? 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
+                                               :               'bg-slate-100 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700';
+                                const s4Label = brandDone   ? '✅ Approved'
+                                              : brandFailed ? '❌ Failed'
+                                              : hasBrand    ? '⏳ Pending Review'
+                                              :               '🔲 Not Started';
+                                return (
+                                    <div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800">
+                                        <div className="flex items-center justify-between gap-4 mb-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-sm ${brandDone ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' : 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'}`}>4</div>
+                                                <div>
+                                                    <h4 className="text-sm font-black text-slate-900 dark:text-white">Brand Registration</h4>
+                                                    <p className="text-[10px] text-slate-400 mt-0.5">Submit your organization to The Campaign Registry (TCR) via Twilio.</p>
+                                                </div>
+                                            </div>
+                                            <span className={`shrink-0 text-[10px] font-black px-3 py-1.5 rounded-full border ${s4Colors}`}>{s4Label}</span>
+                                        </div>
+                                        {smsForm.twilioBrandSid && (
+                                            <p className="text-[10px] font-mono text-slate-400 mb-4">Brand SID: <strong className="text-slate-600 dark:text-slate-300">{smsForm.twilioBrandSid}</strong></p>
+                                        )}
+                                        {!hasProfile && (
+                                            <p className="text-[10px] text-amber-600 dark:text-amber-400 mb-4">⚠ Complete the Customer Profile Bundle (above) before submitting a brand.</p>
+                                        )}
+                                        <button
+                                            id="btn-register-brand"
+                                            onClick={handleRegisterBrand}
+                                            disabled={isRegisteringBrand || !hasProfile || brandDone}
+                                            className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30 whitespace-nowrap"
+                                        >
+                                            {isRegisteringBrand ? '📡 Submitting...' : hasBrand ? '🔄 Re-check Brand Status' : '🚀 Submit Brand to Twilio'}
+                                        </button>
+                                    </div>
+                                );
+                            })()}
+
+                            {/* ── Step 5: Messaging Service ───────────────────────────────── */}
+                            {(() => {
+                                const hasMgSvc      = !!smsForm.twilioMessagingServiceSid;
+                                const brandApproved = smsForm.twilioA2pStatus === 'approved';
+                                return (
+                                    <div className={`bg-white dark:bg-slate-900 p-8 rounded-[2rem] border transition-all ${!brandApproved ? 'opacity-60' : ''} border-slate-100 dark:border-slate-800`}>
+                                        <div className="flex items-center justify-between gap-4 mb-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-sm ${hasMgSvc ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' : 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'}`}>5</div>
+                                                <div>
+                                                    <h4 className="text-sm font-black text-slate-900 dark:text-white">Create Messaging Service</h4>
+                                                    <p className="text-[10px] text-slate-400 mt-0.5">Creates the MG... SID that links your phone number to the A2P campaign.</p>
+                                                </div>
+                                            </div>
+                                            <span className={`shrink-0 text-[10px] font-black px-3 py-1.5 rounded-full border ${hasMgSvc ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700'}`}>
+                                                {hasMgSvc ? '✅ Created' : brandApproved ? '🔲 Not Created' : '🔒 Waiting for Brand Approval'}
+                                            </span>
+                                        </div>
+                                        {smsForm.twilioMessagingServiceSid && (
+                                            <p className="text-[10px] font-mono text-slate-400 mb-4">Messaging Service SID: <strong className="text-slate-600 dark:text-slate-300">{smsForm.twilioMessagingServiceSid}</strong></p>
+                                        )}
+                                        <button
+                                            id="btn-create-messaging-service"
+                                            onClick={handleCreateMessagingService}
+                                            disabled={isCreatingMsgSvc || !brandApproved || hasMgSvc}
+                                            className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30 whitespace-nowrap"
+                                        >
+                                            {isCreatingMsgSvc ? '📡 Creating...' : hasMgSvc ? '✅ Already Created' : '⚡ Create Messaging Service'}
+                                        </button>
+                                    </div>
+                                );
+                            })()}
+
+                            {/* ── Step 6: Register A2P Campaign ──────────────────────────── */}
+                            {(() => {
+                                const hasCampaign      = !!(smsForm as any).twilioUsAppToPersonSid;
+                                const hasMgSvc         = !!smsForm.twilioMessagingServiceSid;
+                                const brandApproved    = smsForm.twilioA2pStatus === 'approved';
+                                const campaignStatus   = (smsForm as any).twilioA2pCampaignStatus || '';
+                                const campaignApproved = campaignStatus === 'approved';
+                                const campaignFailed   = campaignStatus === 'failed';
+                                const canRegister      = hasMgSvc && brandApproved;
+                                const s6Label = campaignApproved ? '✅ Verified'
+                                              : campaignFailed   ? '❌ Failed'
+                                              : hasCampaign      ? '⏳ Pending'
+                                              : canRegister      ? '🔲 Not Registered'
+                                              :                    '🔒 Prerequisites Missing';
+                                const s6Colors = campaignApproved ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                                               : campaignFailed   ? 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800'
+                                               : hasCampaign      ? 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
+                                               :                    'bg-slate-100 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700';
+                                return (
+                                    <div className={`bg-white dark:bg-slate-900 p-8 rounded-[2rem] border transition-all ${!canRegister ? 'opacity-60' : ''} border-slate-100 dark:border-slate-800`}>
+                                        <div className="flex items-center justify-between gap-4 mb-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-sm ${campaignApproved ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' : 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'}`}>6</div>
+                                                <div>
+                                                    <h4 className="text-sm font-black text-slate-900 dark:text-white">Register A2P Campaign</h4>
+                                                    <p className="text-[10px] text-slate-400 mt-0.5">Registers your use case with US carriers. Requires Brand APPROVED + sample messages in Step 3.</p>
+                                                </div>
+                                            </div>
+                                            <span className={`shrink-0 text-[10px] font-black px-3 py-1.5 rounded-full border ${s6Colors}`}>{s6Label}</span>
+                                        </div>
+                                        {(smsForm as any).twilioUsAppToPersonSid && (
+                                            <p className="text-[10px] font-mono text-slate-400 mb-4">Campaign SID: <strong className="text-slate-600 dark:text-slate-300">{(smsForm as any).twilioUsAppToPersonSid}</strong></p>
+                                        )}
+                                        {!canRegister && (
+                                            <p className="text-[10px] text-amber-600 dark:text-amber-400 mb-4">
+                                                {!brandApproved ? 'Brand must be APPROVED by Twilio before you can register a campaign (1-5 business days).' : 'Create the Messaging Service (Step 5) first.'}
+                                            </p>
+                                        )}
+                                        <div className="flex flex-wrap gap-3">
+                                            <button
+                                                id="btn-register-campaign"
+                                                onClick={handleRegisterCampaign}
+                                                disabled={isRegisteringCampaign || !canRegister || (hasCampaign && campaignApproved)}
+                                                className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30 whitespace-nowrap"
+                                            >
+                                                {isRegisteringCampaign ? '📡 Registering...' : campaignApproved ? '✅ Verified' : hasCampaign ? '🔄 Already Registered' : '📋 Register Campaign'}
+                                            </button>
+                                            {hasCampaign && !campaignApproved && (
+                                                <button
+                                                    onClick={handleCheckCampaignStatus}
+                                                    disabled={isCheckingCampaign}
+                                                    className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-50 text-slate-700 dark:text-slate-300 px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all whitespace-nowrap"
+                                                >
+                                                    {isCheckingCampaign ? '...' : '🔄 Check Campaign Status'}
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+
+                            {/* ── Step 7: Link Phone Numbers to Service ───────────────────── */}
+                            {(() => {
+                                const hasMgSvc  = !!smsForm.twilioMessagingServiceSid;
+                                const hasPhone  = !!(smsForm.twilioPhoneNumber || smsForm.twilioPhoneSid);
+                                const numLinked = !!(smsForm as any).twilioNumbersLinked;
+                                const canLink   = hasMgSvc && hasPhone;
+                                return (
+                                    <div className={`bg-white dark:bg-slate-900 p-8 rounded-[2rem] border transition-all ${numLinked ? 'border-emerald-200 dark:border-emerald-800/50' : 'border-slate-100 dark:border-slate-800'} ${!canLink ? 'opacity-60' : ''}`}>
+                                        <div className="flex items-center justify-between gap-4 mb-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-sm ${numLinked ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' : 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'}`}>7</div>
+                                                <div>
+                                                    <h4 className="text-sm font-black text-slate-900 dark:text-white">Link Phone Numbers to Service</h4>
+                                                    <p className="text-[10px] text-slate-400 mt-0.5">Assigns your provisioned number(s) to the Messaging Service for A2P compliance routing.</p>
+                                                </div>
+                                            </div>
+                                            <span className={`shrink-0 text-[10px] font-black px-3 py-1.5 rounded-full border ${numLinked ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700'}`}>
+                                                {numLinked ? '✅ Linked' : canLink ? '🔲 Not Linked' : '🔒 Waiting for Messaging Service'}
+                                            </span>
+                                        </div>
+                                        {smsForm.twilioPhoneNumber && (
+                                            <p className="text-[10px] font-mono text-slate-400 mb-4">Number: <strong className="text-slate-600 dark:text-slate-300">{smsForm.twilioPhoneNumber}</strong></p>
+                                        )}
+                                        <button
+                                            id="btn-assign-numbers"
+                                            onClick={handleAssignNumbers}
+                                            disabled={isAssigningNumbers || !canLink}
+                                            className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30 whitespace-nowrap"
+                                        >
+                                            {isAssigningNumbers ? '📡 Linking...' : numLinked ? '🔄 Re-Link Numbers' : '🔗 Link Numbers to Service'}
+                                        </button>
+                                        {numLinked && (
+                                            <div className="mt-4 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800">
+                                                <p className="text-xs font-bold text-emerald-700 dark:text-emerald-300">🎉 A2P 10DLC Setup Complete!</p>
+                                                <p className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-1">Your phone number is linked to the Messaging Service and routing through your registered A2P campaign. Messages will be delivered with full carrier compliance.</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })()}
+
+                            {/* ── Pipeline Result Panel ──────────────────────────────────── */}
+                            {a2pResult && (
+                                <div className={`p-4 rounded-xl border text-xs ${a2pResult.success ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300' : 'bg-rose-50 dark:bg-rose-900/20 border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300'}`}>
+                                    <div className="flex items-start gap-2">
+                                        <span className="shrink-0 text-base mt-0.5">{a2pResult.success ? '✅' : '❌'}</span>
+                                        <div className="min-w-0">
+                                            <p className="font-bold">{a2pResult.message}</p>
+                                            {a2pResult.brandSid && <p className="font-mono text-[10px] mt-0.5">Brand SID: <strong>{a2pResult.brandSid}</strong></p>}
+                                            {(a2pResult as any).twilioCode && <p className="text-[10px] mt-0.5 opacity-70">Twilio error code: {(a2pResult as any).twilioCode}</p>}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
 
                         </div>
                     )}
