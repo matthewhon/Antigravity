@@ -6826,8 +6826,80 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
     };
 
     // ── Not yet set up ──
+    // Determine whether the church has already set up their Customer Profile Bundle.
+    // A number should NOT be provisioned before the profile exists — otherwise A2P
+    // registration will fail because there is no business identity in Twilio TrustHub.
+    const hasCustomerProfile = !!(church.smsSettings?.twilioCustomerProfileSid);
+
     if (!smsEnabled && !showSetup) {
-        return <SmsSetupBanner onSetup={() => setShowSetup(true)} />;
+        return (
+            <SmsSetupBanner
+                onSetup={() => {
+                    if (hasCustomerProfile) {
+                        // Profile already exists — safe to go straight to the number wizard
+                        setShowSetup(true);
+                    } else {
+                        // No profile yet — show the profile-first interstitial
+                        setShowSetup('need-profile' as any);
+                    }
+                }}
+            />
+        );
+    }
+
+    // Profile-first interstitial: shown when tenant clicks "Get Started" but has no Customer Profile
+    if (showSetup === ('need-profile' as any)) {
+        return (
+            <div className="p-6 max-w-2xl mx-auto mt-12">
+                <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 p-8 shadow-sm">
+                    <div className="w-14 h-14 rounded-2xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center mx-auto mb-4">
+                        <span className="text-2xl">📋</span>
+                    </div>
+                    <h2 className="text-xl font-black text-slate-900 dark:text-white text-center mb-2">
+                        Complete Your Business Profile First
+                    </h2>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 text-center mb-6 leading-relaxed">
+                        Before you can claim a phone number, Twilio requires your church's business identity
+                        to be registered via a <strong>Customer Profile Bundle</strong>. This is a one-time
+                        step that verifies your organization for A2P 10DLC compliance.
+                    </p>
+
+                    <div className="space-y-3 mb-6">
+                        {[
+                            { num: '1', title: 'Go to Settings → SMS', desc: 'Open the A2P 10DLC Registration tab and fill in your church\'s legal name, EIN, address, and authorized representative details.' },
+                            { num: '2', title: 'Click "Create & Submit Profile"', desc: 'Our system will automatically create and submit your Customer Profile Bundle to Twilio TrustHub for review (same-day approval).' },
+                            { num: '3', title: 'Return here for your phone number', desc: 'Once your profile is created (any status), come back to this screen and click "Get Started" to pick your local number.' },
+                        ].map(step => (
+                            <div key={step.num} className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-800">
+                                <div className="w-6 h-6 rounded-full bg-indigo-600 text-white text-[10px] font-black flex items-center justify-center shrink-0 mt-0.5">{step.num}</div>
+                                <div>
+                                    <p className="text-xs font-black text-slate-900 dark:text-white">{step.title}</p>
+                                    <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">{step.desc}</p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-3">
+                        <button
+                            onClick={() => setShowSetup(false)}
+                            className="flex-1 py-2.5 text-sm font-bold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition"
+                        >
+                            ← Back
+                        </button>
+                        <button
+                            onClick={() => setShowSetup(false)}
+                            className="flex-1 py-2.5 text-sm font-black text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition shadow-md shadow-indigo-200 dark:shadow-indigo-900/30"
+                        >
+                            Open Settings → SMS →
+                        </button>
+                    </div>
+                    <p className="text-[10px] text-slate-400 text-center mt-3">
+                        Navigate to Admin → Settings → SMS → A2P 10DLC Registration tab
+                    </p>
+                </div>
+            </div>
+        );
     }
 
     if (showSetup) {
@@ -6843,6 +6915,7 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
             />
         );
     }
+
 
     return (
         <div className="flex flex-col h-full">
