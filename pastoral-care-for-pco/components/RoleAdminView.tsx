@@ -2339,15 +2339,28 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             className={inputCn}
                                         >
                                             <option value="">— Select —</option>
-                                            <option value="Religion">Religion / Non-Profit ✝ (most churches)</option>
-                                            <option value="Not For Profit">Not For Profit</option>
-                                            <option value="Education">Education</option>
-                                            <option value="Healthcare">Healthcare</option>
-                                            <option value="Government">Government</option>
-                                            <option value="Professional Services">Professional Services</option>
-                                            <option value="Online">Online / Media</option>
-                                            <option value="Consumer">Consumer</option>
+                                            <option value="RELIGION">Religion ✝ (most churches)</option>
+                                            <option value="NOT_FOR_PROFIT">Not For Profit / NGO</option>
+                                            <option value="EDUCATION">Education</option>
+                                            <option value="HEALTHCARE">Healthcare</option>
+                                            <option value="GOVERNMENT">Government</option>
+                                            <option value="CONSUMER">Consumer</option>
+                                            <option value="ONLINE">Online / Digital</option>
+                                            <option value="MEDIA">Media / Entertainment</option>
+                                            <option value="TECHNOLOGY">Technology</option>
+                                            <option value="FINANCIAL">Financial Services</option>
+                                            <option value="RETAIL">Retail</option>
+                                            <option value="MANUFACTURING">Manufacturing</option>
+                                            <option value="HOSPITALITY">Hospitality</option>
+                                            <option value="REAL_ESTATE">Real Estate</option>
+                                            <option value="TRANSPORTATION">Transportation</option>
+                                            <option value="AGRICULTURE">Agriculture</option>
+                                            <option value="AUTOMOTIVE">Automotive</option>
+                                            <option value="BANKING">Banking</option>
+                                            <option value="INSURANCE">Insurance</option>
+                                            <option value="LEGAL">Legal</option>
                                         </select>
+                                        <p className="text-[9px] text-slate-400 mt-1.5">Exact Twilio category. Churches use <strong>Religion</strong>.</p>
                                     </div>
                                     <div>
                                         <label className={labelCn}>Church Website <span className="text-rose-500">*</span></label>

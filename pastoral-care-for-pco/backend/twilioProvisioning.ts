@@ -798,52 +798,76 @@ function toE164(phone: string): string {
 
 /**
  * Map human-readable industry/vertical names to Twilio's accepted
- * business_industry enum values (all-caps).
+ * business_industry enum values (ALL-CAPS exactly as Twilio requires).
+ * Full valid list from Twilio Trust Hub docs:
+ * AGRICULTURE, AUTOMOTIVE, BANKING, CONSUMER, EDUCATION, ELECTRONICS,
+ * ENERGY, ENGINEERING, FAST_MOVING_CONSUMER_GOODS, FINANCIAL, FINTECH,
+ * FOOD_AND_BEVERAGE, GOVERNMENT, HEALTHCARE, HOSPITALITY, INSURANCE,
+ * JEWELRY, LEGAL, MANUFACTURING, MEDIA, NOT_FOR_PROFIT, OIL_AND_GAS,
+ * ONLINE, RAW_MATERIALS, REAL_ESTATE, RELIGION, RETAIL, TECHNOLOGY,
+ * TELECOMMUNICATIONS, TRANSPORTATION, TRAVEL
  */
 function toTwilioIndustry(vertical: string): string {
     const map: Record<string, string> = {
-        'religion':              'NGO',
-        'not for profit':       'NGO',
-        'nonprofit':            'NGO',
-        'non-profit':           'NGO',
-        'ngo':                  'NGO',
-        'education':            'EDUCATION',
-        'healthcare':           'HEALTHCARE',
-        'government':           'GOVERNMENT',
-        'professional services':'PROFESSIONAL_SERVICES',
-        'online':               'COMMUNICATION',
-        'consumer':             'CONSUMER',
-        'agriculture':          'AGRICULTURE',
-        'automotive':           'AUTOMOTIVE',
-        'banking':              'BANKING',
-        'construction':         'CONSTRUCTION',
-        'energy':               'ENERGY',
-        'entertainment':        'ENTERTAINMENT',
-        'financial':            'FINANCIAL',
-        'hospitality':          'HOSPITALITY',
-        'insurance':            'INSURANCE',
-        'legal':                'LEGAL',
-        'manufacturing':        'MANUFACTURING',
-        'real estate':          'REAL_ESTATE',
-        'retail':               'RETAIL',
-        'technology':           'TECHNOLOGY',
-        'transportation':       'TRANSPORTATION',
+        // Already correct Twilio values – pass through
+        'religion':              'RELIGION',
+        'not_for_profit':        'NOT_FOR_PROFIT',
+        'not for profit':        'NOT_FOR_PROFIT',
+        'nonprofit':             'NOT_FOR_PROFIT',
+        'non-profit':            'NOT_FOR_PROFIT',
+        'ngo':                   'NOT_FOR_PROFIT',
+        'education':             'EDUCATION',
+        'healthcare':            'HEALTHCARE',
+        'government':            'GOVERNMENT',
+        'online':                'ONLINE',
+        'media':                 'MEDIA',
+        'consumer':              'CONSUMER',
+        'agriculture':           'AGRICULTURE',
+        'automotive':            'AUTOMOTIVE',
+        'banking':               'BANKING',
+        'construction':          'ENGINEERING',
+        'energy':                'ENERGY',
+        'entertainment':         'MEDIA',
+        'financial':             'FINANCIAL',
+        'fintech':               'FINTECH',
+        'food':                  'FOOD_AND_BEVERAGE',
+        'food and beverage':     'FOOD_AND_BEVERAGE',
+        'hospitality':           'HOSPITALITY',
+        'insurance':             'INSURANCE',
+        'jewelry':               'JEWELRY',
+        'legal':                 'LEGAL',
+        'manufacturing':         'MANUFACTURING',
+        'oil':                   'OIL_AND_GAS',
+        'oil and gas':           'OIL_AND_GAS',
+        'real estate':           'REAL_ESTATE',
+        'retail':                'RETAIL',
+        'technology':            'TECHNOLOGY',
+        'telecommunications':    'TELECOMMUNICATIONS',
+        'telecom':               'TELECOMMUNICATIONS',
+        'transportation':        'TRANSPORTATION',
+        'travel':                'TRAVEL',
+        'professional services': 'TECHNOLOGY', // closest match
     };
     const key = (vertical || '').toLowerCase().trim();
-    return map[key] || vertical.toUpperCase().replace(/[^A-Z_]/g, '_');
+    // If it's already an all-caps Twilio enum value, pass through
+    if (/^[A-Z_]+$/.test(vertical.trim())) return vertical.trim();
+    return map[key] || 'RELIGION'; // default for churches
 }
 
 /**
  * Map job level dropdown labels to Twilio's accepted job_position enum values.
- * Twilio accepts: Director, VP, GM, Technician, Other
+ * Twilio accepts: Director, GM, VP, CEO, CFO, General Counsel, Other
  */
 function toTwilioJobPosition(pos: string): string {
     const map: Record<string, string> = {
-        'director':  'Director',
-        'vp':        'VP',
-        'gm':        'GM',
-        'technician':'Technician',
-        'other':     'Other',
+        'director':        'Director',
+        'vp':              'VP',
+        'gm':              'GM',
+        'ceo':             'CEO',
+        'cfo':             'CFO',
+        'general counsel': 'General Counsel',
+        'technician':      'Director', // map to closest valid value
+        'other':           'Other',
     };
     return map[(pos || '').toLowerCase().trim()] || 'Director';
 }
@@ -913,7 +937,8 @@ export const createCustomerProfile = async (req: any, res: any) => {
                 business_registration_identifier: 'EIN',
                 business_registration_number:     sms.a2pEin,
                 business_type:                    sms.a2pBusinessType || 'Non-profit Corporation',
-                business_industry:                toTwilioIndustry(sms.a2pVertical || 'NGO'),
+                business_industry:                toTwilioIndustry(sms.a2pVertical || 'RELIGION'),
+                business_identity:                'direct_customer',
                 business_regions_of_operation:    'USA_AND_CANADA',
                 website_url:                      sms.a2pWebsite,
             }),
