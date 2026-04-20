@@ -492,12 +492,12 @@ export const GivingView: React.FC<GivingViewProps> = ({
     let unknownTotal = 0;
 
     periodTotals.forEach((amount, donorId) => {
-      const person = peopleMap.get(donorId);
+      const person = peopleMap.get(donorId) as any;
       if (!person?.birthdate) {
         unknownTotal += amount;
         return;
       }
-      const birthYear = parseInt(person.birthdate.split('-')[0], 10);
+      const birthYear = parseInt((person.birthdate as string).split('-')[0], 10);
       if (isNaN(birthYear)) { unknownTotal += amount; return; }
       const age = currentYear - birthYear;
       const bucket = AGE_RANGES.find(r => age >= r.min && age <= r.max);
@@ -614,7 +614,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
     // --- Chart rows: one per month ---
     const chartData = monthOrder.map((mk, mi) => {
       const entry: Record<string, number | string> = { label: mk };
-      fundData.forEach(f => { entry[f.fundName] = Math.round(f.monthAvgs[mi]); });
+      fundData.forEach((f: { fundName: string; monthAvgs: number[] }) => { entry[f.fundName] = Math.round(f.monthAvgs[mi]); });
       return entry;
     });
 
@@ -996,6 +996,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
                       headerControl={
                           <div className="flex gap-2">
                               <select 
+                                  aria-label="Budget fund"
                                   value={gvbFund} 
                                   onChange={(e) => setGvbFund(e.target.value)} 
                                   className="bg-slate-100 dark:bg-slate-800 border-none text-[10px] font-bold uppercase rounded-lg py-1 px-2 outline-none text-slate-600 dark:text-slate-300"
@@ -1003,6 +1004,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
                                   {availableBudgetFunds.map(f => <option key={f.id} value={f.name}>{f.name}</option>)}
                               </select>
                               <select 
+                                  aria-label="Time filter"
                                   value={gvbFilter} 
                                   onChange={(e) => setGvbFilter(e.target.value as GivingFilter)}
                                   className="bg-slate-100 dark:bg-slate-800 border-none text-[10px] font-bold uppercase rounded-lg py-1 px-2 outline-none text-slate-600 dark:text-slate-300"
@@ -1040,6 +1042,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
                       source="PCO & Budgets"
                       headerControl={
                           <select 
+                              aria-label="Cumulative giving fund"
                               value={cumulativeFundFilter} 
                               onChange={(e) => setCumulativeFundFilter(e.target.value)}
                               className="bg-slate-100 dark:bg-slate-800 border-none text-[10px] font-bold uppercase rounded-lg py-1 px-2 outline-none text-slate-600 dark:text-slate-300"
@@ -1515,6 +1518,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
           <div className="flex items-center gap-2 bg-white dark:bg-slate-800 p-2 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm">
               <span className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest pl-3">Time Range</span>
               <select 
+                  aria-label="Time range filter"
                   value={filter} 
                   onChange={(e) => onFilterChange(e.target.value as GivingFilter)}
                   className="bg-slate-100 dark:bg-slate-900 border-none text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 rounded-xl py-2 px-4 cursor-pointer outline-none focus:ring-2 focus:ring-indigo-500"
@@ -1535,6 +1539,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
                   <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-900 p-1 rounded-xl border border-slate-100 dark:border-slate-800">
                       <input 
                           type="date"
+                          aria-label="Start date"
                           value={dateRange?.start || ''}
                           onChange={(e) => onDateRangeChange({ start: e.target.value, end: dateRange?.end || '' })}
                           className="px-3 py-2 rounded-lg text-[10px] font-bold bg-white dark:bg-slate-800 border-none outline-none text-slate-700 dark:text-slate-300 w-28"
@@ -1542,6 +1547,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
                       <span className="text-[10px] text-slate-400 font-bold">-</span>
                       <input 
                           type="date"
+                          aria-label="End date"
                           value={dateRange?.end || ''}
                           onChange={(e) => onDateRangeChange({ start: dateRange?.start || '', end: e.target.value })}
                           className="px-3 py-2 rounded-lg text-[10px] font-bold bg-white dark:bg-slate-800 border-none outline-none text-slate-700 dark:text-slate-300 w-28"
@@ -1733,6 +1739,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
                         <div className="flex items-center gap-2 bg-white dark:bg-slate-800 p-2 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm">
                         <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest pl-2">Fiscal Year</span>
                         <select 
+                            aria-label="Fiscal year"
                             value={budgetYear} 
                             onChange={(e) => setBudgetYear(parseInt(e.target.value))}
                             className="bg-slate-50 dark:bg-slate-700 border-none text-xs font-bold text-slate-700 dark:text-slate-300 rounded-lg py-1 px-3 outline-none cursor-pointer"
@@ -1770,7 +1777,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
                     <div className="flex justify-between items-center mb-6"><div><h3 className="text-xl font-black text-slate-900 dark:text-white">{editingBudget.fundName} Budget</h3></div><button onClick={() => setIsEditingBudget(false)} className="text-slate-300 hover:text-slate-500 text-2xl">×</button></div>
                     
                     <div className="space-y-4">
-                        {editingBudget.monthlyAmounts.map((amt, idx) => (<div key={idx} className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700"><span className="text-xs font-bold text-slate-700 dark:text-slate-300 w-24">{new Date(0, idx).toLocaleString('default', { month: 'long' })}</span><div className="flex items-center gap-2 flex-1 justify-end"><input type="number" value={amt} onChange={(e) => { const newAmts = [...editingBudget.monthlyAmounts]; newAmts[idx] = parseFloat(e.target.value) || 0; const newTotal = newAmts.reduce((a, b) => a + b, 0); setEditingBudget({ ...editingBudget, monthlyAmounts: newAmts, totalAmount: newTotal }); }} className="w-32 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-right text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 dark:text-white" /></div></div>))}
+                        {editingBudget.monthlyAmounts.map((amt, idx) => (<div key={idx} className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700"><span className="text-xs font-bold text-slate-700 dark:text-slate-300 w-24">{new Date(0, idx).toLocaleString('default', { month: 'long' })}</span><div className="flex items-center gap-2 flex-1 justify-end"><input type="number" aria-label={`${new Date(0, idx).toLocaleString('default', { month: 'long' })} budget amount`} placeholder="0" value={amt} onChange={(e) => { const newAmts = [...editingBudget.monthlyAmounts]; newAmts[idx] = parseFloat(e.target.value) || 0; const newTotal = newAmts.reduce((a, b) => a + b, 0); setEditingBudget({ ...editingBudget, monthlyAmounts: newAmts, totalAmount: newTotal }); }} className="w-32 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-right text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 dark:text-white" /></div></div>))}
                     </div>
                     
                     <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-4">
@@ -1781,6 +1788,8 @@ export const GivingView: React.FC<GivingViewProps> = ({
                                     <span className="absolute left-3 top-2.5 text-slate-400 font-bold">$</span>
                                     <input 
                                         type="number" 
+                                        aria-label="Total annual budget"
+                                        placeholder="0"
                                         value={editingBudget.totalAmount}
                                         onChange={(e) => setEditingBudget({ ...editingBudget, totalAmount: parseFloat(e.target.value) || 0 })}
                                         className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-7 pr-4 py-2 font-black text-xl text-emerald-600 dark:text-emerald-400 outline-none focus:ring-2 focus:ring-emerald-500"
