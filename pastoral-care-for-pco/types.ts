@@ -1216,7 +1216,7 @@ export interface SmsWorkflowStep {
     staffGroupName?: string | null;
 }
 
-export type SmsWorkflowTrigger = 'keyword' | 'manual' | 'list_add' | 'birthday' | 'anniversary';
+export type SmsWorkflowTrigger = 'keyword' | 'manual' | 'list_add' | 'birthday' | 'anniversary' | 'event_registration';
 
 export interface SmsWorkflow {
     id: string;
@@ -1230,6 +1230,9 @@ export interface SmsWorkflow {
     /** When trigger = 'list_add', the PCO list id */
     triggerListId?: string | null;
     triggerListName?: string | null;
+    /** When trigger = 'event_registration', the PCO Signup/Event ID (PcoRegistrationEvent.pcoId) */
+    triggerEventId?: string | null;
+    triggerEventName?: string | null;
     /**
      * For 'birthday' and 'anniversary' triggers:
      * Number of days BEFORE the event to send Step 1.

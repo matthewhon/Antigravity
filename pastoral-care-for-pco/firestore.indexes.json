@@ -96,6 +96,15 @@
         { "fieldPath": "churchId",  "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "pco_registration_attendees",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "churchId",   "order": "ASCENDING" },
+        { "fieldPath": "pcoEventId", "order": "ASCENDING" },
+        { "fieldPath": "status",     "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

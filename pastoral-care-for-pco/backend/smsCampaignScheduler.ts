@@ -481,6 +481,164 @@ async function runWorkflowStepExecutor(db: any): Promise<void> {
     }
 }
 
+// ─── Event Registration Scanner ──────────────────────────────────────────────
+
+/**
+ * Once per day: scan all active 'event_registration' workflows and enroll any
+ * confirmed PCO attendees who are not yet enrolled.
+ *
+ * Phone numbers are resolved from the `people` collection via the attendee's
+ * personId. Attendees with no matching person doc (or no phone) are skipped;
+ * they will be picked up on the next daily run after the full PCO sync runs.
+ *
+ * Enrollment ID: `{workflowId}_{personId}` — one enrolment per person per
+ * workflow, regardless of how many times the scanner runs.
+ */
+async function runEventRegistrationScanner(db: any): Promise<void> {
+    const log = createServerLogger(db as any);
+
+    try {
+        // 1. Find all active event_registration workflows across all churches
+        let wfDocs: any[] = [];
+
+        const wfSnap = await db.collection('smsWorkflows')
+            .where('isActive', '==', true)
+            .where('trigger', '==', 'event_registration')
+            .get()
+            .catch(() => null);
+
+        if (wfSnap) {
+            wfDocs = wfSnap.docs || [];
+        }
+
+        // Fallback: per-church query if collectionGroup or simple query returned nothing
+        if (wfDocs.length === 0) {
+            const churchesSnap = await db.collection('churches').get();
+            for (const churchDoc of churchesSnap.docs) {
+                const churchId = churchDoc.id;
+                const snap = await db.collection('smsWorkflows')
+                    .where('churchId', '==', churchId)
+                    .where('isActive', '==', true)
+                    .where('trigger', '==', 'event_registration')
+                    .get()
+                    .catch(() => null);
+                if (snap) wfDocs.push(...snap.docs);
+            }
+        }
+
+        if (wfDocs.length === 0) return;
+
+        log.info(
+            `[EventRegistrationScanner] Scanning ${wfDocs.length} event_registration workflow(s)`,
+            'system', {}, ''
+        );
+
+        for (const wfDoc of wfDocs) {
+            const wf       = wfDoc.data() as any;
+            const wfId     = wfDoc.id;
+            const churchId = wf.churchId;
+            const eventId  = wf.triggerEventId as string | null;
+
+            if (!eventId) {
+                log.warn(
+                    `[EventRegistrationScanner] Workflow ${wfId} has no triggerEventId — skipping`,
+                    'system', { wfId, churchId }, churchId
+                );
+                continue;
+            }
+
+            if (!wf.steps?.length) continue;
+
+            try {
+                // 2. Load confirmed attendees for this event from the Firestore cache
+                const attendeesSnap = await db.collection('pco_registration_attendees')
+                    .where('churchId', '==', churchId)
+                    .where('pcoEventId', '==', eventId)
+                    .where('status', '==', 'confirmed')
+                    .get();
+
+                if (attendeesSnap.empty) continue;
+
+                let enrolled = 0;
+
+                for (const attDoc of attendeesSnap.docs) {
+                    const attendee = attDoc.data() as any;
+                    const personId: string | null = attendee.personId || null;
+
+                    if (!personId) continue; // can't resolve a phone without a person
+
+                    // 3. Check for an existing enrollment — skip if already enrolled
+                    const enrollId = `${wfId}_${personId}`;
+                    const existing = await db.collection('smsWorkflowEnrollments').doc(enrollId).get();
+                    if (existing.exists) continue;
+
+                    // 4. Look up the person for their phone number and merge-tag data
+                    const personDoc = await db.collection('people').doc(personId).get().catch(() => null);
+                    if (!personDoc?.exists) continue;
+
+                    const person = personDoc.data() as any;
+                    const rawPhone: string = (person.phone || '').replace(/\D/g, '');
+                    const e164 =
+                        rawPhone.length === 10 ? `+1${rawPhone}` :
+                        rawPhone.length === 11 ? `+${rawPhone}` : '';
+
+                    if (!e164) continue; // no usable phone number
+
+                    // 5. Create the enrollment — fires at 9 am on the next scheduler tick
+                    const today = new Date();
+                    today.setHours(9, 0, 0, 0);
+
+                    const enrollment = {
+                        id:            enrollId,
+                        churchId,
+                        workflowId:    wfId,
+                        phoneNumber:   e164,
+                        personName:    person.name   || attendee.name || null,
+                        personId,
+                        currentStep:   0,
+                        nextSendAt:    today.getTime(),
+                        completed:     false,
+                        enrolledAt:    Date.now(),
+                        lastStepSentAt: null,
+                        // Merge-tag data
+                        personBirthdate:   person.birthdate   || null,
+                        personAnniversary: person.anniversary || null,
+                        personEmail:       person.email       || null,
+                        personCity:        person.city        || null,
+                        personState:       person.state       || null,
+                    };
+
+                    await db.collection('smsWorkflowEnrollments').doc(enrollId).set(enrollment);
+
+                    // Increment enrolledCount on the workflow
+                    await db.collection('smsWorkflows').doc(wfId).update({
+                        enrolledCount: (wf.enrolledCount || 0) + enrolled + 1,
+                        updatedAt: Date.now(),
+                    }).catch(() => {});
+
+                    enrolled++;
+                }
+
+                if (enrolled > 0) {
+                    log.info(
+                        `[EventRegistrationScanner] Enrolled ${enrolled} person(s) into workflow "${wf.name}" for event ${eventId}`,
+                        'system', { wfId, churchId, eventId, enrolled }, churchId
+                    );
+                }
+
+            } catch (e: any) {
+                log.warn(
+                    `[EventRegistrationScanner] Error scanning workflow ${wfId}: ${e.message}`,
+                    'system', { wfId, churchId, eventId }, churchId
+                );
+            }
+        }
+
+    } catch (e: any) {
+        console.error('[EventRegistrationScanner] Unexpected error:', e?.message);
+    }
+}
+
 // ─── Main Scheduler (SMS Campaigns + Workflow Executor + Birthday Scanner) ────
 
 export function startSmsCampaignScheduler(db: any): void {
@@ -615,14 +773,29 @@ export function startSmsCampaignScheduler(db: any): void {
         }
     };
 
+    // ── Event Registration scanner — once per day (shares the birthday interval) ──
+    let lastEventRegScan = 0;
+    const EVENT_REG_SCAN_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours
+
+    const eventRegTick = async () => {
+        const now = Date.now();
+        if (now - lastEventRegScan >= EVENT_REG_SCAN_INTERVAL) {
+            lastEventRegScan = now;
+            await runEventRegistrationScanner(db);
+        }
+    };
+
     // Start everything
     tick();
     workflowTick();
     birthdayTick();
+    eventRegTick();
 
     setInterval(tick, 60_000);
     setInterval(workflowTick, 60_000);
     setInterval(birthdayTick, 60_000); // checks every minute, but only scans once per 24h
+    setInterval(eventRegTick, 60_000); // checks every minute, but only scans once per 24h
 
-    console.log('[SmsScheduler] Started — polling every 60 seconds (campaigns + workflow executor + birthday scanner)');
+    console.log('[SmsScheduler] Started — polling every 60 seconds (campaigns + workflow executor + birthday scanner + event registration scanner)');
 }
+

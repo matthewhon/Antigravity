@@ -4602,10 +4602,11 @@ const WorkflowEditor: React.FC<{
     pcoLists: { id: string; name: string }[];
     pcoGroups: { id: string; name: string }[];
     smsTags: SmsTag[];
+    pcoRegistrationEvents: { id: string; pcoId: string; name: string; startsAt?: string | null }[];
     onSave: (wf: SmsWorkflow) => Promise<void>;
     onBack: () => void;
     isBusy: boolean;
-}> = ({ initial, churchId, keywords, pcoLists, pcoGroups, smsTags, onSave, onBack, isBusy }) => {
+}> = ({ initial, churchId, keywords, pcoLists, pcoGroups, smsTags, pcoRegistrationEvents, onSave, onBack, isBusy }) => {
 
     /** Convert legacy flat SmsWorkflowStep[] ? WorkflowNode[]. */
     const stepsToNodes = (steps: SmsWorkflowStep[]): WorkflowNode[] => {
@@ -4704,6 +4705,8 @@ const WorkflowEditor: React.FC<{
         triggerKeywordWord: null,
         triggerListId: null,
         triggerListName: null,
+        triggerEventId: null,
+        triggerEventName: null,
         steps: [],
         nodes: [{ nodeType: 'action', id: uid(), order: 0, channelType: 'sms', message: '' }],
         isActive: true,
@@ -4809,8 +4812,9 @@ const WorkflowEditor: React.FC<{
             const err = validateActionNode(an);
             if (err) { setError(err); return; }
         }
-        if (wf.trigger === 'keyword'  && !wf.triggerKeywordId) { setError('Select a keyword trigger.'); return; }
-        if (wf.trigger === 'list_add' && !wf.triggerListId)     { setError('Select a PCO list trigger.'); return; }
+        if (wf.trigger === 'keyword'            && !wf.triggerKeywordId) { setError('Select a keyword trigger.'); return; }
+        if (wf.trigger === 'list_add'            && !wf.triggerListId)   { setError('Select a PCO list trigger.'); return; }
+        if (wf.trigger === 'event_registration'  && !wf.triggerEventId)  { setError('Select a PCO event trigger.'); return; }
         setError('');
         // Build backward-compat flat steps for the scheduler
         const flatSteps = nodesToSteps(nodes);
@@ -4818,11 +4822,12 @@ const WorkflowEditor: React.FC<{
     };
 
     const triggerLabel: Record<string, string> = {
-        manual:      'Staff manually enrolls a contact',
-        keyword:     'Contact texts a keyword',
-        list_add:    'Contact added to a PCO List',
-        birthday:    'Fires each year on birthdays',
-        anniversary: 'Fires each year on anniversaries',
+        manual:             'Staff manually enrolls a contact',
+        keyword:            'Contact texts a keyword',
+        list_add:           'Contact added to a PCO List',
+        birthday:           'Fires each year on birthdays',
+        anniversary:        'Fires each year on anniversaries',
+        event_registration: 'Contact registers for a PCO event',
     };
 
     return (
@@ -4949,6 +4954,19 @@ const WorkflowEditor: React.FC<{
                             ))}
                         </div>
 
+                        {/* Row 3 — PCO Event Registration trigger */}
+                        <button
+                            onClick={() => patch({ trigger: 'event_registration' })}
+                            className={`w-full p-3 rounded-xl border-2 text-left transition ${
+                                wf.trigger === 'event_registration'
+                                    ? 'border-teal-500 bg-teal-50 dark:bg-teal-900/20'
+                                    : 'border-slate-200 dark:border-slate-700 hover:border-teal-300'
+                            }`}
+                        >
+                            <p className="text-xs font-black text-slate-900 dark:text-white mb-0.5">🗓️ Event Registration</p>
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">{triggerLabel.event_registration}</p>
+                        </button>
+
                         {/* Keyword picker */}
                         {wf.trigger === 'keyword' && (
                             <div>
@@ -4992,6 +5010,42 @@ const WorkflowEditor: React.FC<{
                                     {pcoLists.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
                                 </select>
                                 <p className="text-[10px] text-slate-400 mt-1">Contacts are enrolled whenever the scheduler detects them added to this list.</p>
+                            </div>
+                        )}
+
+                        {/* Event Registration picker */}
+                        {wf.trigger === 'event_registration' && (
+                            <div className="space-y-3">
+                                <div>
+                                    <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">PCO Event</label>
+                                    {pcoRegistrationEvents.length === 0 ? (
+                                        <p className="text-xs text-amber-600 dark:text-amber-400">No registration events found. Run a PCO sync first, or ensure your account has the Registrations module.</p>
+                                    ) : (
+                                        <select
+                                            value={wf.triggerEventId || ''}
+                                            onChange={e => {
+                                                const ev = pcoRegistrationEvents.find(x => x.pcoId === e.target.value);
+                                                patch({ triggerEventId: e.target.value || null, triggerEventName: ev?.name || null });
+                                            }}
+                                            title="Trigger PCO registration event"
+                                            className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                        >
+                                            <option value="">— Select an event —</option>
+                                            {pcoRegistrationEvents.map(ev => (
+                                                <option key={ev.pcoId} value={ev.pcoId}>
+                                                    {ev.name}{ev.startsAt ? ` (${new Date(ev.startsAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })})` : ''}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    )}
+                                </div>
+                                <div className="flex items-start gap-2.5 p-3.5 bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-xl">
+                                    <span className="text-lg shrink-0 mt-0.5">🗓️</span>
+                                    <div className="text-xs text-teal-700 dark:text-teal-300 leading-relaxed">
+                                        <p className="font-bold mb-0.5">Enrolls once per person</p>
+                                        <p>The daily scanner checks confirmed registrants for this event and enrolls anyone not yet in the workflow. Each person is only enrolled once, regardless of how many times the scanner runs. Use <span className="font-mono bg-teal-100 dark:bg-teal-900/40 px-1 rounded">{'{firstName}'}</span> in your messages to personalize them.</p>
+                                    </div>
+                                </div>
                             </div>
                         )}
 
@@ -5297,6 +5351,7 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
     const [pcoLists, setPcoLists]   = useState<{ id: string; name: string }[]>([]);
     const [pcoGroups, setPcoGroups] = useState<{ id: string; name: string }[]>([]);
     const [smsTags, setSmsTags]     = useState<SmsTag[]>([]);
+    const [pcoRegistrationEvents, setPcoRegistrationEvents] = useState<{ id: string; pcoId: string; name: string; startsAt?: string | null }[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [editing, setEditing]     = useState<SmsWorkflow | null | 'new'>('new' as any);
     const [viewMode, setViewMode]   = useState<'list' | 'editor'>('list');
@@ -5317,7 +5372,7 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
         return unsub;
     }, [churchId]);
 
-    // Load keywords, PCO lists and PCO groups for the editor
+    // Load keywords, PCO lists, PCO groups, and PCO registration events for the editor
     useEffect(() => {
         getDocs(query(collection(firebaseDb, 'smsKeywords'), where('churchId', '==', churchId)))
             .then(snap => setKeywords(snap.docs.map(d => ({ id: d.id, ...d.data() } as SmsKeyword))));
@@ -5328,6 +5383,15 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
             .catch(() => {});
         pcoService.getGroups(churchId)
             .then((raw: any[]) => setPcoGroups(raw.map(r => ({ id: r.id, name: r.attributes?.name || 'Unnamed' }))))
+            .catch(() => {});
+        // Load synced registration events from Firestore cache
+        getDocs(query(collection(firebaseDb, 'pco_registrations'), where('churchId', '==', churchId)))
+            .then(snap => setPcoRegistrationEvents(
+                snap.docs.map(d => {
+                    const data = d.data() as any;
+                    return { id: d.id, pcoId: data.pcoId, name: data.name || 'Unnamed Event', startsAt: data.startsAt || null };
+                }).sort((a, b) => (a.startsAt || '').localeCompare(b.startsAt || ''))
+            ))
             .catch(() => {});
     }, [churchId]);
 
@@ -5361,11 +5425,12 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
     const openEdit = (wf: SmsWorkflow) => { setEditing(wf); setViewMode('editor'); };
 
     const TRIGGER_BADGE: Record<string, { label: string; color: string; icon: string }> = {
-        manual:      { label: 'Manual',      color: 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300',    icon: '✍️' },
-        keyword:     { label: 'Keyword',     color: 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300', icon: '💬' },
-        list_add:    { label: 'List Add',    color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300',      icon: '📝' },
-        birthday:    { label: 'Birthday',    color: 'bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300',      icon: '🎂' },
-        anniversary: { label: 'Anniversary', color: 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300',      icon: '💍' },
+        manual:             { label: 'Manual',             color: 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300',    icon: '✍️' },
+        keyword:            { label: 'Keyword',            color: 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300', icon: '💬' },
+        list_add:           { label: 'List Add',           color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300',      icon: '📝' },
+        birthday:           { label: 'Birthday',           color: 'bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300',      icon: '🎂' },
+        anniversary:        { label: 'Anniversary',        color: 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300',      icon: '💍' },
+        event_registration: { label: 'Event Registration', color: 'bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300',      icon: '🗓️' },
     };
 
     // Show editor view
@@ -5379,6 +5444,7 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
                     pcoLists={pcoLists}
                     pcoGroups={pcoGroups}
                     smsTags={smsTags}
+                    pcoRegistrationEvents={pcoRegistrationEvents}
                     onSave={handleSave}
                     onBack={() => setViewMode('list')}
                     isBusy={isBusy}
@@ -5411,7 +5477,7 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
                 <div>
                     <p className="text-sm font-bold text-violet-800 dark:text-violet-200 mb-1">How Workflows Work</p>
                     <p className="text-xs text-violet-700 dark:text-violet-300 leading-relaxed">
-                        Build a multi-step message sequence with custom delays between each step. Triggered automatically by a keyword text, a PCO List add, a <strong>🎂 birthday</strong>, or a <strong>💍 anniversary</strong> — or manually by staff. Once enrolled, contacts move through each step on schedule. Birthday and anniversary workflows auto-enroll the right people every year.
+                        Build a multi-step message sequence with custom delays between each step. Triggered automatically by a keyword text, a PCO List add, a <strong>🎂 birthday</strong>, a <strong>💍 anniversary</strong>, a <strong>🗓️ PCO event registration</strong> — or manually by staff. Once enrolled, contacts move through each step on schedule.
                     </p>
                 </div>
             </div>
@@ -5468,6 +5534,9 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
                                                 )}
                                                 {wf.trigger === 'list_add' && wf.triggerListName && (
                                                     <span className="text-[10px] text-blue-600 dark:text-blue-400">{wf.triggerListName}</span>
+                                                )}
+                                                {wf.trigger === 'event_registration' && wf.triggerEventName && (
+                                                    <span className="text-[10px] text-teal-600 dark:text-teal-400">{wf.triggerEventName}</span>
                                                 )}
                                             </div>
                                         </div>
