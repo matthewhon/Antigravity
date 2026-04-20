@@ -857,21 +857,15 @@ export const createCustomerProfile = async (req: any, res: any) => {
                 business_industry:                sms.a2pVertical     || 'RELIGION',
                 business_regions_of_operation:    'USA_AND_CANADA',
                 website_url:                      sms.a2pWebsite,
+                // Address fields inline — avoids the need for a separate SupportingDocument
+                address_street:       sms.a2pAddress,
+                address_city:         sms.a2pCity,
+                address_region:       sms.a2pState,
+                address_postal_code:  sms.a2pZip,
+                address_country_code: 'US',
             }),
         });
         log.info(`[createCustomerProfile] Created biz EndUser ${bizEndUser.sid}`, 'system', { churchId }, churchId);
-
-        // ── Step 1c: Wrap the Address as a SupportingDocument (customer_profile_address) ──
-        // This produces an RD... SID that CAN be assigned to the CustomerProfile bundle.
-        // The address_sids attribute on this SupportingDocument type is valid and required.
-        const addrDoc = await (master as any).trusthub.v1.supportingDocuments.create({
-            friendlyName: `Business Address – ${sms.a2pBusinessName}`,
-            type: 'customer_profile_address',
-            attributes: JSON.stringify({
-                address_sids: [bizAddress.sid],
-            }),
-        });
-        log.info(`[createCustomerProfile] Created address SupportingDocument ${addrDoc.sid}`, 'system', { churchId }, churchId);
 
         // ── Step 1d: Authorised rep 1 EndUser (personal contact fields) ─────────
         const repEndUser = await (master as any).trusthub.v1.endUsers.create({
@@ -926,10 +920,9 @@ export const createCustomerProfile = async (req: any, res: any) => {
         });
         log.info(`[createCustomerProfile] Created CustomerProfile ${profile.sid}`, 'system', { churchId }, churchId);
 
-        // ── Step 3: Assign biz EndUser, rep1 EndUser, rep2 EndUser, and address SupportingDocument ──
-        // Valid object types for customerProfilesEntityAssignments:
-        //   IT... (EndUser)  |  RD... (SupportingDocument)
-        // AD... (Address) objects are NOT valid — the address must be wrapped as RD... first.
+        // ── Step 3: Assign biz EndUser, rep1 EndUser, rep2 EndUser (address is inline in biz EndUser) ──
+        // Valid entity types: IT... (EndUser).
+        // AD... Address and RD... SupportingDocument assignment is skipped — address is inline.
         await (master as any).trusthub.v1
             .customerProfiles(profile.sid)
             .customerProfilesEntityAssignments
@@ -947,12 +940,7 @@ export const createCustomerProfile = async (req: any, res: any) => {
                 .create({ objectSid: rep2EndUser.sid });
         }
 
-        await (master as any).trusthub.v1
-            .customerProfiles(profile.sid)
-            .customerProfilesEntityAssignments
-            .create({ objectSid: addrDoc.sid });  // RD... SupportingDocument for the address
-
-        const assignedCount = rep2EndUser ? 4 : 3;
+        const assignedCount = rep2EndUser ? 3 : 2;
         log.info(`[createCustomerProfile] Assigned ${assignedCount} components to ${profile.sid}${rep2EndUser ? '' : ' (no Rep 2)'}`, 'system', { churchId }, churchId);
 
         // ── Step 3b: Evaluate bundle compliance before submitting ──────────────
@@ -988,7 +976,6 @@ export const createCustomerProfile = async (req: any, res: any) => {
             'smsSettings.twilioEndUserSid':                bizEndUser.sid,
             'smsSettings.twilioRepEndUserSid':             repEndUser.sid,
             'smsSettings.twilioAddressSid':                bizAddress.sid,
-            'smsSettings.twilioSupportingDocSid':          addrDoc.sid,
             'smsSettings.twilioCustomerProfileStatus':     'pending-review',
             'smsSettings.twilioCustomerProfileEvaluation': evaluationStatus,
             'smsSettings.twilioCustomerProfileCreatedAt':  Date.now(),
