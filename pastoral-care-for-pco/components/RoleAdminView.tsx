@@ -2326,8 +2326,8 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         {isA2pChecking ? '⏳ Checking…' : '🔄 Check Status'}
                                     </button>
                                 )}
-                                {smsForm.twilioPhoneNumber && twilioNumbers.length === 0 && (
-                                    // Legacy field shown only if no new-style numbers are provisioned
+                                {smsForm.twilioPhoneNumber && smsForm.twilioSubAccountSid && twilioNumbers.length === 0 && (
+                                    // Legacy field shown only if number AND sub-account are both provisioned
                                     <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-1.5 rounded-full border border-emerald-100 dark:border-emerald-900/30">
                                         📱 {smsForm.twilioPhoneNumber}
                                     </span>
