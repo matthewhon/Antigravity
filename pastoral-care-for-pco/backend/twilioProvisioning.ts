@@ -867,9 +867,9 @@ export const createCustomerProfile = async (req: any, res: any) => {
                 'Content-Type':  'application/x-www-form-urlencoded',
             },
             body: new URLSearchParams({
-                FriendlyName: `Business Address – ${sms.a2pBusinessName}`,
+                FriendlyName: `Business Address - ${sms.a2pBusinessName}`,
                 Type:         'customer_profile_address',
-                Attributes:   JSON.stringify({ address_sids: [bizAddress.sid] }),
+                Attributes:   JSON.stringify({ address_sids: bizAddress.sid }),
             }).toString(),
         });
         const addrDocData = await addrDocResp.json() as any;
