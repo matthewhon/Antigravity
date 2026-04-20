@@ -823,8 +823,8 @@ export interface SmsSettings {
     a2pBusinessName?: string;
     /** Federal Employer Identification Number (EIN) e.g. 12-3456789 */
     a2pEin?: string;
-    /** Business type for 10DLC registration */
-    a2pBusinessType?: 'Sole Proprietorship' | 'Partnership' | 'LLC' | 'Co-operative' | 'Non-profit Corporation' | 'Corporation';
+    /** Business type for 10DLC registration — must match Twilio's exact enum value */
+    a2pBusinessType?: 'Sole Proprietorship' | 'Partnership' | 'Limited Liability Corporation' | 'Co-operative' | 'Non-profit Corporation' | 'Corporation';
     /** Industry vertical for TCR brand registration */
     a2pVertical?: string;
     /** Website URL submitted during brand registration */
@@ -841,6 +841,17 @@ export interface SmsSettings {
     a2pContactEmail?: string;
     /** Contact phone (E.164) */
     a2pContactPhone?: string;
+    /**
+     * Contact's specific job title, e.g. "Senior Pastor", "Executive Director".
+     * Maps to Twilio Trust Hub authorized_representative_1 `business_title`.
+     */
+    a2pContactJobTitle?: string;
+    /**
+     * Contact's job level — must be one of Twilio's accepted enum values:
+     * Director | VP | GM | CEO | CFO | General Counsel
+     * Maps to Twilio Trust Hub authorized_representative_1 `job_position`.
+     */
+    a2pContactJobPosition?: 'Director' | 'VP' | 'GM' | 'CEO' | 'CFO' | 'General Counsel';
     /** Street address for brand registration */
     a2pAddress?: string;
     /** City */

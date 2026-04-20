@@ -577,19 +577,21 @@ export const registerA2p = async (req: any, res: any) => {
 
         // Validate required brand fields are saved in Firestore
         const required: { key: string; label: string }[] = [
-            { key: 'a2pBusinessName',     label: 'Legal Business Name' },
-            { key: 'a2pEin',              label: 'Federal EIN' },
-            { key: 'a2pBusinessType',     label: 'Business Type' },
-            { key: 'a2pVertical',         label: 'Industry Vertical' },
-            { key: 'a2pWebsite',          label: 'Website' },
-            { key: 'a2pContactFirstName', label: 'Contact First Name' },
-            { key: 'a2pContactLastName',  label: 'Contact Last Name' },
-            { key: 'a2pContactEmail',     label: 'Contact Email' },
-            { key: 'a2pContactPhone',     label: 'Contact Phone' },
-            { key: 'a2pAddress',          label: 'Street Address' },
-            { key: 'a2pCity',             label: 'City' },
-            { key: 'a2pState',            label: 'State' },
-            { key: 'a2pZip',              label: 'ZIP Code' },
+            { key: 'a2pBusinessName',        label: 'Legal Business Name' },
+            { key: 'a2pEin',                 label: 'Federal EIN' },
+            { key: 'a2pBusinessType',        label: 'Business Type' },
+            { key: 'a2pVertical',            label: 'Industry Vertical' },
+            { key: 'a2pWebsite',             label: 'Website' },
+            { key: 'a2pContactFirstName',    label: 'Contact First Name' },
+            { key: 'a2pContactLastName',     label: 'Contact Last Name' },
+            { key: 'a2pContactEmail',        label: 'Contact Email' },
+            { key: 'a2pContactPhone',        label: 'Contact Phone' },
+            { key: 'a2pContactJobTitle',     label: 'Contact Job Title' },
+            { key: 'a2pContactJobPosition',  label: 'Contact Job Level' },
+            { key: 'a2pAddress',             label: 'Street Address' },
+            { key: 'a2pCity',                label: 'City' },
+            { key: 'a2pState',               label: 'State' },
+            { key: 'a2pZip',                 label: 'ZIP Code' },
         ];
         const missing = required.filter(r => !smsSettings[r.key]).map(r => r.label);
         if (missing.length > 0) {
@@ -800,17 +802,21 @@ export const createCustomerProfile = async (req: any, res: any) => {
 
         // Validate required fields
         const required: { key: string; label: string }[] = [
-            { key: 'a2pBusinessName',     label: 'Legal Business Name' },
-            { key: 'a2pEin',              label: 'Federal EIN' },
-            { key: 'a2pWebsite',          label: 'Website' },
-            { key: 'a2pContactFirstName', label: 'Contact First Name' },
-            { key: 'a2pContactLastName',  label: 'Contact Last Name' },
-            { key: 'a2pContactEmail',     label: 'Contact Email' },
-            { key: 'a2pContactPhone',     label: 'Contact Phone' },
-            { key: 'a2pAddress',          label: 'Street Address' },
-            { key: 'a2pCity',             label: 'City' },
-            { key: 'a2pState',            label: 'State' },
-            { key: 'a2pZip',              label: 'ZIP Code' },
+            { key: 'a2pBusinessName',        label: 'Legal Business Name' },
+            { key: 'a2pEin',                 label: 'Federal EIN' },
+            { key: 'a2pBusinessType',        label: 'Business Type' },
+            { key: 'a2pVertical',            label: 'Industry Vertical' },
+            { key: 'a2pWebsite',             label: 'Website' },
+            { key: 'a2pContactFirstName',    label: 'Contact First Name' },
+            { key: 'a2pContactLastName',     label: 'Contact Last Name' },
+            { key: 'a2pContactEmail',        label: 'Contact Email' },
+            { key: 'a2pContactPhone',        label: 'Contact Phone' },
+            { key: 'a2pContactJobTitle',     label: 'Contact Job Title' },
+            { key: 'a2pContactJobPosition',  label: 'Contact Job Level' },
+            { key: 'a2pAddress',             label: 'Street Address' },
+            { key: 'a2pCity',               label: 'City' },
+            { key: 'a2pState',              label: 'State' },
+            { key: 'a2pZip',                label: 'ZIP Code' },
         ];
         const missing = required.filter(r => !sms[r.key]).map(r => r.label);
         if (missing.length) {
@@ -847,10 +853,9 @@ export const createCustomerProfile = async (req: any, res: any) => {
                 business_registration_identifier: 'EIN',
                 business_registration_number:     sms.a2pEin,
                 business_type:                    sms.a2pBusinessType || 'Non-profit Corporation',
-                business_industry:                sms.a2pVertical     || 'RELIGIOUS',
-                business_regions_of_operation:    'USA',
+                business_industry:                sms.a2pVertical     || 'Religion',
+                business_regions_of_operation:    'USA_AND_CANADA',
                 website_url:                      sms.a2pWebsite,
-                // address_sids_attest is NOT a valid attribute here — address goes in a SupportingDocument
             },
         });
         log.info(`[createCustomerProfile] Created biz EndUser ${bizEndUser.sid}`, 'system', { churchId }, churchId);
@@ -872,21 +877,31 @@ export const createCustomerProfile = async (req: any, res: any) => {
             friendlyName: `${sms.a2pContactFirstName} ${sms.a2pContactLastName} – ${sms.a2pBusinessName}`,
             type: 'authorized_representative_1',
             attributes: {
-                first_name:   sms.a2pContactFirstName,
-                last_name:    sms.a2pContactLastName,
-                email:        sms.a2pContactEmail,
-                phone_number: sms.a2pContactPhone,
-                job_position: 'Director',
+                first_name:     sms.a2pContactFirstName,
+                last_name:      sms.a2pContactLastName,
+                email:          sms.a2pContactEmail,
+                phone_number:   sms.a2pContactPhone,
+                job_position:   sms.a2pContactJobPosition || 'Director',
+                business_title: sms.a2pContactJobTitle    || sms.a2pContactJobPosition || 'Director',
             },
         });
         log.info(`[createCustomerProfile] Created rep EndUser ${repEndUser.sid}`, 'system', { churchId }, churchId);
 
 
         // ── Step 2: Create the CustomerProfile bundle ─────────────────────────
+        const sysSnap = await db.doc('system/settings').get();
+        const sysData = sysSnap.data() || {};
+        const baseUrl = (
+            sysData.twilioWebhookBaseUrl ||
+            sysData.apiBaseUrl ||
+            process.env.SERVER_BASE_URL || ''
+        ).replace(/\/$/, '');
+
         const profile = await (master as any).trusthub.v1.customerProfiles.create({
-            friendlyName: sms.a2pBusinessName,
-            email:        sms.a2pContactEmail,
-            policySid:    A2P_POLICY_SID,
+            friendlyName:   sms.a2pBusinessName,
+            email:          sms.a2pContactEmail,
+            policySid:      A2P_POLICY_SID,
+            statusCallback: baseUrl ? `${baseUrl}/api/messaging/trust-hub-status` : undefined,
         });
         log.info(`[createCustomerProfile] Created CustomerProfile ${profile.sid}`, 'system', { churchId }, churchId);
 

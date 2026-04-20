@@ -2183,7 +2183,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             <option value="">— Select —</option>
                                             <option value="Non-profit Corporation">Non-profit Corporation ✝ (most churches)</option>
                                             <option value="Corporation">Corporation</option>
-                                            <option value="LLC">LLC</option>
+                                            <option value="Limited Liability Corporation">Limited Liability Corporation (LLC)</option>
                                             <option value="Partnership">Partnership</option>
                                             <option value="Sole Proprietorship">Sole Proprietorship</option>
                                             <option value="Co-operative">Co-operative</option>
@@ -2196,12 +2196,14 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             className={inputCn}
                                         >
                                             <option value="">— Select —</option>
-                                            <option value="RELIGIOUS">Religious / Non-Profit</option>
-                                            <option value="EDUCATION">Education</option>
-                                            <option value="NONPROFIT">Non-Profit</option>
-                                            <option value="COMMUNITY">Community / Local Government</option>
-                                            <option value="HEALTHCARE">Healthcare</option>
-                                            <option value="OTHER">Other</option>
+                                            <option value="Religion">Religion / Non-Profit ✝ (most churches)</option>
+                                            <option value="Not For Profit">Not For Profit</option>
+                                            <option value="Education">Education</option>
+                                            <option value="Healthcare">Healthcare</option>
+                                            <option value="Government">Government</option>
+                                            <option value="Professional Services">Professional Services</option>
+                                            <option value="Online">Online / Media</option>
+                                            <option value="Consumer">Consumer</option>
                                         </select>
                                     </div>
                                     <div>
@@ -2280,6 +2282,30 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                 onChange={e => handleSmsChange('a2pContactPhone', e.target.value)}
                                                 className={inputCn} placeholder="+16155551234"
                                             />
+                                        </div>
+                                        <div>
+                                            <label className={labelCn}>Job Title <span className="text-rose-500">*</span></label>
+                                            <input type="text" value={smsForm.a2pContactJobTitle || ''}
+                                                onChange={e => handleSmsChange('a2pContactJobTitle', e.target.value)}
+                                                className={inputCn} placeholder="Senior Pastor, Executive Director…"
+                                            />
+                                            <p className="text-[9px] text-slate-400 mt-1.5">Your specific title within the organization (e.g. "Senior Pastor").</p>
+                                        </div>
+                                        <div>
+                                            <label className={labelCn}>Job Level <span className="text-rose-500">*</span></label>
+                                            <select value={smsForm.a2pContactJobPosition || ''}
+                                                onChange={e => handleSmsChange('a2pContactJobPosition', e.target.value)}
+                                                className={inputCn}
+                                            >
+                                                <option value="">— Select —</option>
+                                                <option value="Director">Director (most pastors / ministry leads)</option>
+                                                <option value="VP">VP / Vice President</option>
+                                                <option value="GM">GM / General Manager</option>
+                                                <option value="CEO">CEO / President</option>
+                                                <option value="CFO">CFO</option>
+                                                <option value="General Counsel">General Counsel</option>
+                                            </select>
+                                            <p className="text-[9px] text-slate-400 mt-1.5">Closest executive-level equivalent. Twilio requires one of these values.</p>
                                         </div>
                                     </div>
                                 </div>
