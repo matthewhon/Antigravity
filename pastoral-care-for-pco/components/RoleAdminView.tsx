@@ -2299,6 +2299,17 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         Eval: {evalStatus}
                                     </span>
                                 )}
+                                {/* Refresh Profile Status — quick pull from Twilio */}
+                                {profileSid && (
+                                    <button
+                                        onClick={handleRefreshProfileStatus}
+                                        disabled={isRefreshingProfile}
+                                        title="Pull latest Customer Profile & A2P status from Twilio"
+                                        className="text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border transition-all disabled:opacity-50 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/40"
+                                    >
+                                        {isRefreshingProfile ? '⏳ Refreshing…' : '🔄 Refresh Status'}
+                                    </button>
+                                )}
                                 {/* Delete Profile button — only shown when profile exists */}
                                 {profileSid && (() => {
                                     const canDelete = profileStatus === 'draft' || profileStatus === 'twilio-rejected' || !profileStatus;

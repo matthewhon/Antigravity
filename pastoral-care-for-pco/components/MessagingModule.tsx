@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { db as firebaseDb } from '../services/firebase';
 import { storage } from '../services/firebase';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
@@ -6831,11 +6831,12 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
         }
     }, [visibleNumbers.length]);
 
-    // Auto-migrate: if church has smsSettings.twilioPhoneNumber but no twilioNumbers docs yet
+    // Auto-migrate: if church has smsSettings.twilioPhoneNumber (and a real sub-account) but no twilioNumbers docs yet
     useEffect(() => {
         const legacyPhone = church.smsSettings?.twilioPhoneNumber;
         const legacyPhoneSid = church.smsSettings?.twilioPhoneSid;
-        if (legacyPhone && !numbersLoading && twilioNumbers.length === 0) {
+        const hasRealSubAccount = !!church.smsSettings?.twilioSubAccountSid;
+        if (legacyPhone && hasRealSubAccount && !numbersLoading && twilioNumbers.length === 0) {
             const migratedId = `${churchId}_migrated`;
             setDoc(doc(firebaseDb, 'twilioNumbers', migratedId), {
                 id:             migratedId,
@@ -7074,12 +7075,13 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                         ))}
                     </div>
                     {/* Phone badge — prefer the canonical default twilioNumbers doc; fall back to
-                        smsSettings.twilioPhoneNumber only when no twilioNumbers docs exist yet. */}
+                        smsSettings.twilioPhoneNumber only when a real sub-account exists. */}
                     {(() => {
+                        const hasRealSubAccount = !!church.smsSettings?.twilioSubAccountSid;
                         const badgePhone =
                             visibleNumbers.find(n => n.isDefault)?.phoneNumber ??
                             visibleNumbers[0]?.phoneNumber ??
-                            church.smsSettings?.twilioPhoneNumber;
+                            (hasRealSubAccount ? church.smsSettings?.twilioPhoneNumber : undefined);
                         return badgePhone ? (
                             <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-full px-3 py-1.5">
                                 <Phone size={12} />
@@ -7126,7 +7128,7 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
             )}
 
             {/* Phone badge only — shown when tab is externally controlled AND no numbers yet (fallback) */}
-            {!activeCampaign && controlledTab && visibleNumbers.length === 0 && church.smsSettings?.twilioPhoneNumber && (
+            {!activeCampaign && controlledTab && visibleNumbers.length === 0 && church.smsSettings?.twilioSubAccountSid && church.smsSettings?.twilioPhoneNumber && (
                 <div className="flex justify-end px-6 pt-2 shrink-0">
                     <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-full px-3 py-1.5">
                         <Phone size={12} />
