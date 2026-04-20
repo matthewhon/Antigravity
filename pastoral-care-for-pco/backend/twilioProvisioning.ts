@@ -1924,3 +1924,51 @@ export const checkCampaignStatus = async (req: any, res: any) => {
         return res.status(500).json({ error: e.message || 'Campaign status check failed' });
     }
 };
+
+// ─── GET /api/messaging/primary-profile-sid ──────────────────────────────────
+// Fetches the list of Customer Profiles from the master Twilio account and
+// returns the BU... SID of the first approved / pending-review one. The admin
+// can then save it into System Settings without opening the Twilio Console.
+export const fetchPrimaryProfileSid = async (req: any, res: any) => {
+    const db = getDb();
+    const log = createServerLogger(db);
+    try {
+        const { accountSid, authToken } = await getMasterCredentials(db);
+        const master = getMasterClient(accountSid, authToken);
+
+        // List all customer profiles on the master account
+        const profiles = await (master as any).trusthub.v1.customerProfiles.list({ pageSize: 50 });
+
+        if (!profiles || profiles.length === 0) {
+            return res.status(404).json({
+                error: 'No Customer Profiles found on this Twilio master account. Create a Primary Customer Profile at: https://console.twilio.com/us1/develop/trust-hub/customer-profiles',
+            });
+        }
+
+        // Prefer approved, then twilio-approved, then pending-review
+        const priorityOrder = ['approved', 'twilio-approved', 'pending-review', 'draft'];
+        let best: any = null;
+        for (const status of priorityOrder) {
+            best = profiles.find((p: any) => p.status === status);
+            if (best) break;
+        }
+        if (!best) best = profiles[0]; // fallback to whatever is first
+
+        const allProfiles = profiles.map((p: any) => ({
+            sid:          p.sid,
+            friendlyName: p.friendlyName,
+            status:       p.status,
+        }));
+
+        return res.json({
+            success:        true,
+            primarySid:     best.sid,
+            friendlyName:   best.friendlyName,
+            status:         best.status,
+            allProfiles,
+        });
+    } catch (e: any) {
+        log.error(`[fetchPrimaryProfileSid] ${e.message}`, 'system', {}, 'system');
+        return res.status(500).json({ error: e.message || 'Failed to fetch Customer Profiles' });
+    }
+};

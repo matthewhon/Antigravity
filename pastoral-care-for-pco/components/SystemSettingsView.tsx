@@ -514,13 +514,37 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                         </a>.
                                         This is assigned as an entity in every secondary church profile to satisfy Twilio's ISV compliance requirement.
                                     </p>
-                                    <input
-                                        type="text"
-                                        value={settings.primaryCustomerProfileSid || ''}
-                                        onChange={e => handleChange('primaryCustomerProfileSid', e.target.value.trim())}
-                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                                        placeholder="BUxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                                    />
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            value={settings.primaryCustomerProfileSid || ''}
+                                            onChange={e => handleChange('primaryCustomerProfileSid', e.target.value.trim())}
+                                            className="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                            placeholder="BUxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                                        />
+                                        <button
+                                            onClick={async () => {
+                                                setIsVerifying(true);
+                                                setMessage(null);
+                                                try {
+                                                    const base = (settings.apiBaseUrl || DEFAULT_API_URL).replace(/\/$/, '');
+                                                    const res = await fetch(`${base}/api/messaging/primary-profile-sid`);
+                                                    const data = await res.json();
+                                                    if (!res.ok) { setMessage({ type: 'error', text: data.error || 'Failed to fetch profiles' }); return; }
+                                                    handleChange('primaryCustomerProfileSid', data.primarySid);
+                                                    setMessage({ type: 'success', text: `Auto-filled: ${data.friendlyName} (${data.status}) — ${data.primarySid}` });
+                                                } catch (e: any) {
+                                                    setMessage({ type: 'error', text: e.message || 'Failed to fetch from Twilio' });
+                                                } finally {
+                                                    setIsVerifying(false);
+                                                }
+                                            }}
+                                            disabled={isVerifying}
+                                            className="shrink-0 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 px-3 py-2 rounded-xl font-bold text-xs hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors disabled:opacity-50 whitespace-nowrap"
+                                        >
+                                            {isVerifying ? '...' : '🔍 Fetch from Twilio'}
+                                        </button>
+                                    </div>
                                 </div>
 
                                 {/* API Key pair (optional, tighter scope than Auth Token) */}
