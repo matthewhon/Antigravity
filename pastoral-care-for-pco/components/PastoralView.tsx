@@ -924,8 +924,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                                               </div>
                                               <div className="w-full bg-slate-200 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
                                                   <div 
-                                                      className="h-full bg-indigo-500 rounded-full" 
-                                                      style={{ width: `${relativeWidth}%` }}
+                                                      className="pastoral-bar-fill" style={{ '--bar-w': `${relativeWidth}%` } as React.CSSProperties}
                                                   ></div>
                                               </div>
                                           </div>
@@ -1088,7 +1087,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                           <span className="text-3xl font-black text-slate-700 dark:text-white">{displayCensus.commute.longCommuteRate.toFixed(1)}%</span>
                           <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Commute &gt; 30m</span>
                           <div className="w-full bg-slate-100 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden mt-3">
-                              <div className="h-full bg-indigo-500" style={{width: `${Math.min(100, displayCensus.commute.longCommuteRate)}%`}}></div>
+                              <div className="h-full bg-indigo-500" className="pastoral-bar-fill" style={{ '--bar-w': `${Math.min(100, displayCensus.commute.longCommuteRate)}%` } as React.CSSProperties}></div>
                           </div>
                       </div>
                   </CensusCard>

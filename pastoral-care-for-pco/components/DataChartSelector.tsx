@@ -854,7 +854,7 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
                   <span className="font-black text-slate-900 dark:text-white">{fmt(f.value, true)}</span>
                 </div>
                 <div className="h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full">
-                  <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${(f.value / max) * 100}%` }} />
+                  <div className="bar-fill bg-indigo-500" style={{ '--bar-w': `${(f.value / max) * 100}%` } as React.CSSProperties} />
                 </div>
               </div>
             ))}
@@ -885,7 +885,7 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
                   <span className="font-black text-slate-900 dark:text-white">{fmt(r.value)}</span>
                 </div>
                 <div className="h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full">
-                  <div className={`h-full ${r.color} rounded-full`} style={{ width: `${(r.value / max) * 100}%` }} />
+                  <div className={`bar-fill ${r.color}`} style={{ '--bar-w': `${(r.value / max) * 100}%` } as React.CSSProperties} />
                 </div>
               </div>
             ))}
@@ -934,7 +934,7 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
                   <span className="font-black text-slate-900 dark:text-white">{fmt(r.count)}</span>
                 </div>
                 <div className="h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full">
-                  <div className="h-full bg-pink-400 rounded-full" style={{ width: `${(r.count / max) * 100}%` }} />
+                  <div className="bar-fill bg-pink-400" style={{ '--bar-w': `${(r.count / max) * 100}%` } as React.CSSProperties} />
                 </div>
               </div>
             ))}
@@ -960,7 +960,7 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
                   <span className="font-black text-slate-900 dark:text-white">{fmt(r.value)} <span className="text-slate-400 font-normal">({Math.round((r.value / total) * 100)}%)</span></span>
                 </div>
                 <div className="h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full">
-                  <div className={`h-full ${gColors[r.name] || 'bg-slate-400'} rounded-full`} style={{ width: `${(r.value / total) * 100}%` }} />
+                  <div className={`bar-fill ${gColors[r.name] || 'bg-slate-400'}`} style={{ '--bar-w': `${(r.value / total) * 100}%` } as React.CSSProperties} />
                 </div>
               </div>
             ))}
@@ -986,7 +986,7 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
                   <span className="font-black text-slate-900 dark:text-white">{fmt(r.value)} <span className="text-slate-400 font-normal">({Math.round((r.value / total) * 100)}%)</span></span>
                 </div>
                 <div className="h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full">
-                  <div className={`h-full ${mColors[i % mColors.length]} rounded-full`} style={{ width: `${(r.value / total) * 100}%` }} />
+                  <div className={`bar-fill ${mColors[i % mColors.length]}`} style={{ '--bar-w': `${(r.value / total) * 100}%` } as React.CSSProperties} />
                 </div>
               </div>
             ))}
@@ -1016,7 +1016,7 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
                   <span className="font-black text-slate-900 dark:text-white">{fmt(r.value)}</span>
                 </div>
                 <div className="h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full">
-                  <div className={`h-full ${r.color} rounded-full`} style={{ width: `${(r.value / max) * 100}%` }} />
+                  <div className={`bar-fill ${r.color}`} style={{ '--bar-w': `${(r.value / max) * 100}%` } as React.CSSProperties} />
                 </div>
               </div>
             ))}
@@ -1080,7 +1080,7 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
           {/* Chart */}
           <div className="bg-white dark:bg-slate-800 px-4 py-3">
             {months.length === 0 && <p className="text-xs text-slate-400 text-center py-2">No YTD data yet</p>}
-            <div className="flex items-end gap-0.5" style={{ height: 64 }}>
+            <div className="dcs-mini-bar-chart flex items-end gap-0.5">
               {months.map((m, i) => {
                 const actualH = m.actual !== null ? Math.max(2, Math.round((m.actual / maxVal) * 56)) : 0;
                 const budgetH = Math.max(2, Math.round((m.budget / maxVal) * 56));
@@ -1089,8 +1089,8 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
                     {/* Budget bar (behind) */}
                     {hasBudget && (
                       <div
-                        className="absolute bottom-4 w-full border-t-2 border-dashed border-slate-300 dark:border-slate-500"
-                        style={{ bottom: `${budgetH + 12}px` }}
+                        className="budget-tick border-slate-300 dark:border-slate-500"
+                        style={{ '--tick-bottom': `${budgetH + 12}px` } as React.CSSProperties}
                         title={`Budget: ${fmt(m.budget, true)}`}
                       />
                     )}
@@ -1099,7 +1099,7 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
                       className={`w-full rounded-sm transition-all ${
                         m.isPast ? 'bg-emerald-400' : 'bg-slate-200 dark:bg-slate-600'
                       }`}
-                      style={{ height: actualH > 0 ? `${actualH}px` : '2px', minHeight: 2, opacity: m.isPast ? 1 : 0.4 }}
+                      style={{ '--seg-h': actualH > 0 ? `${actualH}px` : '2px', '--seg-opacity': m.isPast ? '1' : '0.4' } as React.CSSProperties} className={...
                       title={`${m.label}: ${m.actual !== null ? fmt(m.actual, true) : 'Future'}`}
                     />
                     <span className="text-[7px] text-slate-400 leading-none">{m.label.charAt(0)}</span>
@@ -1211,7 +1211,7 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
                   <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${badgeCls(totalPct)}`}>{totalPct}%</span>
                 </div>
                 <div className="h-4 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                  <div className="h-full rounded-full transition-all" style={{ width: `${totalPct}%`, backgroundColor: barColor(totalPct) }} />
+                  <div className="bar-fill-color" style={{ '--bar-w': `${totalPct}%`, '--bar-color': barColor(totalPct) } as React.CSSProperties} />
                 </div>
                 <div className="flex justify-between text-[9px] text-slate-400">
                   <span>{fmt(totalActual, true)} raised</span>
@@ -1230,7 +1230,7 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
                   </div>
                 </div>
                 <div className="h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                  <div className="h-full rounded-full" style={{ width: `${f.pct}%`, backgroundColor: barColor(f.pct), opacity: 0.85 }} />
+                  <div className="bar-fill-color" style={{ '--bar-w': `${f.pct}%`, '--bar-color': barColor(f.pct), '--bar-opacity': '0.85' } as React.CSSProperties} />
                 </div>
               </div>
             ))}
@@ -1265,7 +1265,7 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
               <div key={i} className="space-y-1">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
-                    <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: FUND_COLORS[i % FUND_COLORS.length] }} />
+                    <div className="color-dot" style={{ '--dot-color': FUND_COLORS[i % FUND_COLORS.length] } as React.CSSProperties} />
                     <span className="text-[10px] font-semibold text-slate-700 dark:text-slate-300 truncate max-w-[55%]">{f.name}</span>
                   </div>
                   <div className="flex items-center gap-1.5">
@@ -1274,7 +1274,7 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
                   </div>
                 </div>
                 <div className="h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full">
-                  <div className="h-full rounded-full" style={{ width: `${f.pct}%`, backgroundColor: FUND_COLORS[i % FUND_COLORS.length], opacity: 0.85 }} />
+                  <div className="bar-fill-color" style={{ '--bar-w': `${f.pct}%`, '--bar-color': FUND_COLORS[i % FUND_COLORS.length], '--bar-opacity': '0.85' } as React.CSSProperties} />
                 </div>
               </div>
             ))}
@@ -1346,9 +1346,7 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
                 </div>
                 {e.fillPct !== null && (
                   <div className="mt-1 h-1 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                    <div className={`h-full rounded-full ${
-                      e.isFull ? 'bg-rose-400' : e.fillPct >= 80 ? 'bg-amber-400' : 'bg-emerald-400'
-                    }`} style={{ width: `${e.fillPct}%` }} />
+                    <div className={`bar-fill ${e.isFull ? 'bg-rose-400' : e.fillPct >= 80 ? 'bg-amber-400' : 'bg-emerald-400'}`} style={{ '--bar-w': `${e.fillPct}%` } as React.CSSProperties} />
                   </div>
                 )}
               </div>
@@ -1389,8 +1387,8 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
                 const vH = Math.max(r.visitors > 0 ? 2 : 0, Math.round((r.visitors / maxVal) * 48));
                 return (
                   <div key={i} className="flex-1 flex flex-col justify-end" title={`${r.name}: ${r.total} total`}>
-                    {vH > 0 && <div className="w-full bg-amber-400 rounded-t-sm" style={{ height: vH }} />}
-                    <div className="w-full bg-indigo-500 rounded-t-sm" style={{ height: mH }} />
+                    {vH > 0 && <div className="bar-seg bg-amber-400 rounded-t-sm" style={{ '--seg-h': `${vH}px` } as React.CSSProperties} />}
+                    <div className="bar-seg bg-indigo-500 rounded-t-sm" style={{ '--seg-h': `${mH}px` } as React.CSSProperties} />
                   </div>
                 );
               })}
@@ -1466,7 +1464,7 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
           {/* Stacked bar chart */}
           <div className="bg-white dark:bg-slate-800 px-4 pt-3 pb-1">
             {weeks.length === 0 && <p className="text-xs text-slate-400 text-center py-2">No giving data available</p>}
-            <div className="flex items-end gap-0.5" style={{ height: 64 }}>
+            <div className="dcs-mini-bar-chart flex items-end gap-0.5">
               {weeks.map((w, wi) => {
                 const totalH = Math.max(2, Math.round((w.total / maxWeekTotal) * 56));
                 return (
@@ -1482,17 +1480,13 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
                       return (
                         <div
                           key={f}
-                          className="w-full"
-                          style={{
-                            height: segH,
-                            backgroundColor: FUND_COLORS[fi % FUND_COLORS.length],
-                            opacity: 0.85,
-                          }}
+                          className="bar-seg"
+                          style={{ '--seg-h': `${segH}px`, '--seg-color': FUND_COLORS[fi % FUND_COLORS.length], '--seg-opacity': '0.85' } as React.CSSProperties}
                           title={`${f}: ${fmt(val, true)}`}
                         />
                       );
                     })}
-                    {w.total === 0 && <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-sm" style={{ height: 2 }} />}
+                    {w.total === 0 && <div className="bar-seg bg-slate-100 dark:bg-slate-700 rounded-sm" style={{ '--seg-h': '2px' } as React.CSSProperties} />}
                   </div>
                 );
               })}
@@ -1515,8 +1509,7 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
                 <div key={f.name} className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5 min-w-0">
                     <div
-                      className="w-2 h-2 rounded-full shrink-0"
-                      style={{ backgroundColor: FUND_COLORS[colorIdx % FUND_COLORS.length] }}
+                      className="color-dot" style={{ '--dot-color': FUND_COLORS[colorIdx % FUND_COLORS.length] } as React.CSSProperties}
                     />
                     <span className="text-[10px] font-semibold text-slate-700 dark:text-slate-300 truncate max-w-[120px]">{f.name}</span>
                   </div>

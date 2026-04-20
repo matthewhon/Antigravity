@@ -793,11 +793,11 @@ export const GivingView: React.FC<GivingViewProps> = ({
                               <div className="relative h-5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
                                   <div
                                       className="h-full rounded-full transition-all duration-700"
-                                      style={{ width: `${totalPct}%`, background: `linear-gradient(90deg, ${totalColor}, ${totalColor}cc)` }}
+                                      className="gv-gradient-bar" style={{ '--bar-w': `${totalPct}%`, '--bar-gradient': `linear-gradient(90deg, ${totalColor}, ${totalColor}cc)` } as React.CSSProperties}
                                   />
                                   {/* Expected pace marker */}
                                   {expectedPct > 0 && expectedPct < 99 && (
-                                      <div className="absolute top-0 h-full" style={{ left: `${expectedPct}%`, transform: 'translateX(-50%)', width: '2px', backgroundColor: 'rgba(100,116,139,0.6)' }} />
+                                      <div className="gv-pace-marker bg-slate-400/60" style={{ '--marker-left': `${expectedPct}%` } as React.CSSProperties} />
                                   )}
                               </div>
                               <div className="flex justify-between text-[10px] font-semibold text-slate-500 dark:text-slate-400">
@@ -838,11 +838,11 @@ export const GivingView: React.FC<GivingViewProps> = ({
                                               <div className="relative h-3 bg-slate-100 dark:bg-slate-700/60 rounded-full overflow-hidden">
                                                   <div
                                                       className="h-full rounded-full transition-all duration-700"
-                                                      style={{ width: `${pct}%`, backgroundColor: color, opacity: 0.85 }}
+                                                      style={{ '--bar-w': `${pct}%`, '--bar-color': color, '--bar-opacity': '0.85' } as React.CSSProperties} className="gv-bar-fill"
                                                   />
                                                   {/* Expected pace marker */}
                                                   {fundExpectedPct > 0 && fundExpectedPct < 99 && (
-                                                      <div className="absolute top-0 h-full" style={{ left: `${fundExpectedPct}%`, transform: 'translateX(-50%)', width: '2px', backgroundColor: 'rgba(100,116,139,0.5)' }} />
+                                                      <div className="gv-pace-marker bg-slate-400/50" style={{ '--marker-left': `${fundExpectedPct}%` } as React.CSSProperties} />
                                                   )}
                                               </div>
                                               <div className="flex justify-between text-[9px] text-slate-400 dark:text-slate-500">
@@ -1194,7 +1194,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
                                           <div key={fundName} className="space-y-1">
                                               <div className="flex items-center justify-between">
                                                   <div className="flex items-center gap-2">
-                                                      <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                                                      <div className="color-dot" style={{ '--dot-color': color } as React.CSSProperties} />
                                                       <span className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate max-w-[140px]">{fundName}</span>
                                                   </div>
                                                   <div className="flex items-center gap-2">
@@ -1205,7 +1205,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
                                               <div className="relative h-2 bg-slate-100 dark:bg-slate-700/60 rounded-full overflow-hidden">
                                                   <div
                                                       className="h-full rounded-full transition-all duration-700"
-                                                      style={{ width: `${pct}%`, backgroundColor: color, opacity: 0.85 }}
+                                                      style={{ '--bar-w': `${pct}%`, '--bar-color': color, '--bar-opacity': '0.85' } as React.CSSProperties} className="gv-bar-fill"
                                                   />
                                               </div>
                                           </div>
@@ -1284,9 +1284,9 @@ export const GivingView: React.FC<GivingViewProps> = ({
                                           <span
                                               key={row.label}
                                               className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full"
-                                              style={{ backgroundColor: `${row.color}22`, color: row.color }}
+                                              style={{ '--bubble-bg': `${row.color}22`, color: row.color } as React.CSSProperties} className="msg-bubble-bg"
                                           >
-                                              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: row.color }} />
+                                              <span className="color-dot" style={{ '--dot-color': row.color } as React.CSSProperties} />
                                               {row.label} · {pct}%
                                           </span>
                                       );
@@ -1332,7 +1332,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
                                           <div key={row.name} className="space-y-1.5">
                                               <div className="flex items-center justify-between">
                                                   <div className="flex items-center gap-2">
-                                                      <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: row.color }} />
+                                                      <div className="color-dot" style={{ '--dot-color': row.color } as React.CSSProperties} />
                                                       <div>
                                                           <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{row.name}</span>
                                                           <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-tight">{STATUS_LABELS[row.name]}</p>
@@ -1342,7 +1342,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
                                                       <span className="text-xs font-black text-slate-800 dark:text-white">${row.amount.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
                                                       <span
                                                           className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                                                          style={{ backgroundColor: `${row.color}22`, color: row.color }}
+                                                          style={{ '--bubble-bg': `${row.color}22`, color: row.color } as React.CSSProperties} className="msg-bubble-bg"
                                                       >
                                                           {Math.round(pct)}%
                                                       </span>
@@ -1351,7 +1351,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
                                               <div className="relative h-2.5 bg-slate-100 dark:bg-slate-700/60 rounded-full overflow-hidden">
                                                   <div
                                                       className="h-full rounded-full transition-all duration-700"
-                                                      style={{ width: `${pct}%`, backgroundColor: row.color, opacity: 0.85 }}
+                                                      style={{ '--bar-w': `${pct}%`, '--bar-color': row.color, '--bar-opacity': '0.85' } as React.CSSProperties} className="gv-bar-fill"
                                                   />
                                               </div>
                                           </div>
@@ -1421,7 +1421,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
                             <div key={f.fundName} className="space-y-1.5">
                               <div className="flex items-center justify-between gap-2">
                                 <div className="flex items-center gap-2 min-w-0">
-                                  <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: f.color }} />
+                                  <div className="color-dot" style={{ '--dot-color': f.color } as React.CSSProperties} />
                                   <span className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate max-w-[150px]">{f.fundName}</span>
                                 </div>
                                 <div className="flex items-center gap-2 flex-shrink-0">
@@ -1440,7 +1440,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
                               <div className="relative h-2 bg-slate-100 dark:bg-slate-700/60 rounded-full overflow-hidden">
                                 <div
                                   className="h-full rounded-full transition-all duration-700"
-                                  style={{ width: `${barPct}%`, backgroundColor: f.color, opacity: 0.85 }}
+                                  style={{ '--bar-w': `${barPct}%`, '--bar-color': f.color, '--bar-opacity': '0.85' } as React.CSSProperties} className="gv-bar-fill"
                                 />
                               </div>
                             </div>

@@ -236,3 +236,143 @@
 .dcs-legend-budget-dash {
   border-top: 2px dashed;
 }
+
+/* ── CSS custom-property bar/dot utility classes ─────────────────────────── */
+/*
+ * These classes read runtime-computed values from CSS custom properties that
+ * are set via style="--bar-w:X%; --bar-color:#abc; --bar-h:Npx" on the element.
+ * This pattern is linter-compliant: the style attribute only declares variables,
+ * while the actual presentational rules live here in CSS.
+ */
+
+/* Full-width progress bar fill — width driven by --bar-w */
+.bar-fill {
+  width: var(--bar-w, 0%);
+  height: 100%;
+  border-radius: inherit;
+  transition: width 0.3s ease;
+}
+
+/* Progress bar fill with a dynamic background color — uses --bar-color */
+.bar-fill-color {
+  width: var(--bar-w, 0%);
+  height: 100%;
+  border-radius: inherit;
+  background-color: var(--bar-color, #6366f1);
+  opacity: var(--bar-opacity, 1);
+  transition: width 0.3s ease;
+}
+
+/* Tiny color-dot swatch (w-2 h-2 rounded-full) */
+.color-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  flex-shrink: 0;
+  background-color: var(--dot-color, #6366f1);
+}
+
+/* Vertical bar segment in a pixel-height mini chart */
+.bar-seg {
+  width: 100%;
+  height: var(--seg-h, 4px);
+  background-color: var(--seg-color, #6366f1);
+  opacity: var(--seg-opacity, 0.85);
+}
+
+/* Fixed-height chart container — height driven by --chart-h */
+.chart-h-box {
+  height: var(--chart-h, 64px);
+}
+
+/* Absolute budget-line tick — bottom driven by --tick-bottom */
+.budget-tick {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: var(--tick-bottom, 0px);
+  border-top: 2px dashed;
+}
+
+/* ── Layout.tsx dropdown style ───────────────────────────────────────────── */
+/* Dropdown panel positioned via CSS vars set at runtime */
+.nav-dropdown-panel {
+  position: fixed;
+  top: var(--dd-top);
+  left: var(--dd-left);
+  width: var(--dd-width);
+  z-index: 9999;
+}
+
+/* ── MessagingModule (MessagingModule.tsx) ───────────────────────────────── */
+/* Bubble/thread card with dynamic background set by --bubble-bg */
+.msg-bubble-bg {
+  background-color: var(--bubble-bg, transparent);
+}
+
+/* ── PastoralView (PastoralView.tsx) ─────────────────────────────────────── */
+/* City penetration bar fill */
+.pastoral-bar-fill {
+  width: var(--bar-w, 0%);
+  height: 100%;
+  background: #6366f1;
+  border-radius: 9999px;
+}
+
+/* ── DonationReport (DonationReport.tsx) ─────────────────────────────────── */
+/* Age/status legend color dot */
+.report-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  flex-shrink: 0;
+  background-color: var(--dot-color, #6366f1);
+}
+
+/* ── GivingView (GivingView.tsx) ─────────────────────────────────────────── */
+/* Fund bar fill with dynamic width and color */
+.gv-bar-fill {
+  width: var(--bar-w, 0%);
+  height: 100%;
+  border-radius: 9999px;
+  background-color: var(--bar-color, #6366f1);
+  opacity: var(--bar-opacity, 0.85);
+}
+
+
+/* -- MessagingModule vertical column chart (SmsAnalytics) ------------------- */
+/* Height + top-margin driven by CSS vars set at runtime */
+.msg-col-sent {
+  width: 100%;
+  height: var(--col-h);
+  margin-top: var(--col-mt);
+  position: relative;
+  border-radius: 0.75rem;
+  transition: height 0.5s ease, margin-top 0.5s ease;
+}
+.msg-col-deliv {
+  width: 100%;
+  height: var(--col-deliv-h);
+  border-radius: 0 0 0.75rem 0.75rem;
+  transition: height 0.5s ease;
+}
+
+/* -- GivingView gradient bar (total giving bar) ---------------------------- */
+/* Width + background gradient driven by CSS vars */
+.gv-gradient-bar {
+  width: var(--bar-w, 0%);
+  height: 100%;
+  border-radius: inherit;
+  background: var(--bar-gradient, #6366f1);
+  transition: width 0.7s ease;
+}
+
+/* GivingView pace marker � left offset driven by --marker-left */
+.gv-pace-marker {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  width: 2px;
+  left: var(--marker-left, 0%);
+  transform: translateX(-50%);
+}

@@ -567,7 +567,7 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                                                 return (
                                                     <tr key={label} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
                                                         <td className="py-2.5 text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                                                            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                                                            <span className="report-dot" style={{ '--dot-color': color } as React.CSSProperties} />
                                                             {label}
                                                         </td>
                                                         {buckets.map(b => {
@@ -688,7 +688,7 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                                                 return (
                                                     <tr key={s.key} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
                                                         <td className="py-2.5 text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                                                            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: s.color }} />
+                                                            <span className="report-dot" style={{ '--dot-color': s.color } as React.CSSProperties} />
                                                             {s.label}
                                                         </td>
                                                         {buckets.map(b => {
@@ -770,7 +770,7 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                                                 <div key={f.fundName} className="space-y-2">
                                                     <div className="flex items-center justify-between gap-3">
                                                         <div className="flex items-center gap-2 min-w-0">
-                                                            <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: f.color }} />
+                                                            <div className="report-dot" style={{ '--dot-color': f.color } as React.CSSProperties} />
                                                             <span className="text-sm font-bold text-slate-700 dark:text-slate-300 truncate">{f.fundName}</span>
                                                         </div>
                                                         <div className="flex items-center gap-3 flex-shrink-0">
@@ -794,7 +794,7 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                                                     <div className="relative h-2.5 bg-slate-100 dark:bg-slate-700/60 rounded-full overflow-hidden">
                                                         <div
                                                             className="h-full rounded-full transition-all duration-700"
-                                                            style={{ width: `${barPct}%`, backgroundColor: f.color, opacity: 0.85 }}
+                                                            style={{ '--bar-w': `${barPct}%`, '--bar-color': f.color, '--bar-opacity': '0.85' } as React.CSSProperties} className="gv-bar-fill"
                                                         />
                                                     </div>
                                                 </div>
