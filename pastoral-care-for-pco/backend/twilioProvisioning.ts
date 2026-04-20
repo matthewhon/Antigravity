@@ -257,19 +257,18 @@ export const provisionTwilioNumber = async (req: any, res: any) => {
         log.info(`Purchased number ${phoneNumber} (SID: ${purchased.sid}) for church ${churchId}`, 'system', { churchId, phoneNumber, sid: purchased.sid }, churchId);
 
         // 5. Save SMS settings to Firestore
+        // Use dot-notation so we MERGE fields rather than replacing the entire smsSettings map.
+        // This preserves termsAcceptedAt, twilioCustomerProfileSid, twilioA2pStatus, etc.
         const now = Date.now();
-        const smsSettings = {
-            smsEnabled:               true,
-            twilioSubAccountSid:      subAccountSid,
-            twilioSubAccountAuthToken: subAccountAuthToken,
-            // Keep these on smsSettings for backward-compat (A2P, send, etc.)
-            twilioPhoneNumber:        phoneNumber,
-            twilioPhoneSid:           purchased.sid,
-            twilioA2pStatus:          'not_started' as const,
-            senderName:               senderName || church.name || 'Church',
-        };
-
-        await db.collection('churches').doc(churchId).update({ smsSettings });
+        await db.collection('churches').doc(churchId).update({
+            'smsSettings.smsEnabled':               true,
+            'smsSettings.twilioSubAccountSid':       subAccountSid,
+            'smsSettings.twilioSubAccountAuthToken': subAccountAuthToken,
+            'smsSettings.twilioPhoneNumber':         phoneNumber,
+            'smsSettings.twilioPhoneSid':            purchased.sid,
+            'smsSettings.twilioA2pStatus':           existingSms.twilioA2pStatus || 'not_started',
+            'smsSettings.senderName':                senderName || church.name || 'Church',
+        });
 
         // 5b. Write to the new twilioNumbers collection
         // Check if this is the first number for the church
@@ -420,19 +419,37 @@ export const addTwilioNumber = async (req: any, res: any) => {
         const now      = Date.now();
         const numDocId = `${churchId}_${purchased.sid}`;
 
+        // Check if this is the first number for this church
+        const existingNums = await db.collection('twilioNumbers')
+            .where('churchId', '==', churchId)
+            .limit(1)
+            .get();
+        const isFirstNumber = existingNums.empty;
+
         await db.collection('twilioNumbers').doc(numDocId).set({
             id:             numDocId,
             churchId,
             phoneNumber,
             phoneSid:       purchased.sid,
             friendlyLabel:  friendlyLabel || phoneNumber,
-            isDefault:      false,   // never default — use set-default-number to change
+            isDefault:      isFirstNumber,   // first number becomes the default
             smsEnabled:     true,
             allowedUserIds: [],
             webhookUrl:     inboundUrl,
             senderName:     smsSettings.senderName || church.name || 'Church',
             createdAt:      now,
             updatedAt:      now,
+        });
+
+        // Also keep smsSettings in sync so getSubClient can find the from-number
+        // Use dot-notation to avoid overwriting other smsSettings fields
+        await db.collection('churches').doc(churchId).update({
+            'smsSettings.smsEnabled':         true,
+            'smsSettings.twilioSubAccountSid': smsSettings.twilioSubAccountSid,
+            ...(isFirstNumber ? {
+                'smsSettings.twilioPhoneNumber': phoneNumber,
+                'smsSettings.twilioPhoneSid':    purchased.sid,
+            } : {}),
         });
 
         log.info(`[addTwilioNumber] Added number ${phoneNumber} (SID: ${purchased.sid}) for church ${churchId}`, 'system', { churchId, numDocId }, churchId);

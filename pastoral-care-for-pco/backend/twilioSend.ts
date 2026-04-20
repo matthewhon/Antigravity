@@ -122,9 +122,28 @@ async function getSubClient(
         if (numSnap.exists && numSnap.data()?.churchId === churchId) {
             fromNumber = numSnap.data()!.phoneNumber;
         }
+    } else if (!fromNumber) {
+        // Fall back to the default twilioNumber from the collection.
+        // This handles churches where smsSettings.twilioPhoneNumber was not
+        // set (e.g. claimed via addTwilioNumber or after data migration).
+        const defaultSnap = await db.collection('twilioNumbers')
+            .where('churchId', '==', churchId)
+            .where('isDefault', '==', true)
+            .limit(1)
+            .get();
+        if (!defaultSnap.empty) {
+            fromNumber = defaultSnap.docs[0].data().phoneNumber;
+        } else {
+            // Last resort: any number for this church
+            const anySnap = await db.collection('twilioNumbers')
+                .where('churchId', '==', churchId)
+                .limit(1)
+                .get();
+            if (!anySnap.empty) {
+                fromNumber = anySnap.docs[0].data().phoneNumber;
+            }
+        }
     }
-    // smsSettings.twilioPhoneNumber is always kept in sync as the default
-    // so we don't need the compound twilioNumbers query (avoids index requirement)
 
     if (!fromNumber) throw new Error('No Twilio phone number configured for this church.');
     return { client, fromNumber };
