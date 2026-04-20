@@ -320,6 +320,8 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                             <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Census.gov API Key</label>
                             <input 
                                 type="text" 
+                                aria-label="Census.gov API Key"
+                                placeholder="Enter Census.gov API key"
                                 value={settings.censusApiKey || ''}
                                 onChange={e => handleChange('censusApiKey', e.target.value)}
                                 className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
@@ -369,6 +371,8 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                     <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Client ID</label>
                                     <input 
                                         type="text" 
+                                        aria-label="Planning Center Client ID"
+                                        placeholder="Enter PCO Client ID"
                                         value={settings.pcoClientId || ''}
                                         onChange={e => handleChange('pcoClientId', e.target.value)}
                                         className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
@@ -378,6 +382,8 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                     <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Client Secret</label>
                                     <input 
                                         type="password" 
+                                        aria-label="Planning Center Client Secret"
+                                        placeholder="Enter PCO Client Secret"
                                         value={settings.pcoClientSecret || ''}
                                         onChange={e => handleChange('pcoClientSecret', e.target.value)}
                                         className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
@@ -668,6 +674,8 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">$</span>
                                                 <input
                                                     type="number"
+                                                    aria-label="SMS cost per segment in USD"
+                                                    placeholder="0.0079"
                                                     step="0.0001"
                                                     min="0"
                                                     value={settings.twilioSegmentCostUsd ?? 0.0079}
@@ -682,6 +690,8 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">$</span>
                                                 <input
                                                     type="number"
+                                                    aria-label="MMS cost per segment in USD"
+                                                    placeholder="0.0200"
                                                     step="0.001"
                                                     min="0"
                                                     value={settings.twilioMmsSegmentCostUsd ?? 0.02}
@@ -703,6 +713,9 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                             <p className="text-[10px] text-slate-400 leading-snug mt-0.5">Block number provisioning until the tenant has a registered Brand + Campaign. Required for US carrier compliance at scale.</p>
                                         </div>
                                         <button
+                                            role="switch"
+                                            aria-checked={!!settings.twilioRequireA2PRegistration}
+                                            aria-label="Require A2P 10DLC Registration"
                                             onClick={() => handleChange('twilioRequireA2PRegistration', !settings.twilioRequireA2PRegistration)}
                                             className={`ml-4 shrink-0 w-12 h-6 rounded-full p-1 transition-colors ${settings.twilioRequireA2PRegistration ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'}`}
                                         >
@@ -716,6 +729,9 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                             <p className="text-[10px] text-slate-400 leading-snug mt-0.5">Enrich every inbound sender with carrier + line-type data via Twilio Lookup. Adds ~$0.005 per unique number.</p>
                                         </div>
                                         <button
+                                            role="switch"
+                                            aria-checked={!!settings.twilioEnableCarrierLookup}
+                                            aria-label="Enable Carrier Lookup on Inbound Numbers"
                                             onClick={() => handleChange('twilioEnableCarrierLookup', !settings.twilioEnableCarrierLookup)}
                                             className={`ml-4 shrink-0 w-12 h-6 rounded-full p-1 transition-colors ${settings.twilioEnableCarrierLookup ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'}`}
                                         >
@@ -921,6 +937,9 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                         <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
                             <span className="text-xs font-bold text-slate-900 dark:text-white">Allow Public Signups</span>
                             <button 
+                                role="switch"
+                                aria-checked={!!settings.allowSignups}
+                                aria-label="Allow Public Signups"
                                 onClick={() => handleChange('allowSignups', !settings.allowSignups)}
                                 className={`w-12 h-6 rounded-full p-1 transition-colors ${settings.allowSignups ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'}`}
                             >
@@ -1248,6 +1267,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                     {/* Filter Bar */}
                     <div className="flex flex-wrap gap-3">
                         <select
+                            aria-label="Filter by tenant"
                             value={logFilter}
                             onChange={(e) => setLogFilter(e.target.value)}
                             className="bg-slate-100 dark:bg-slate-800 border-none text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 rounded-lg py-2 px-3 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
@@ -1257,6 +1277,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                         </select>
 
                         <select
+                            aria-label="Filter by log level"
                             value={logLevelFilter}
                             onChange={(e) => setLogLevelFilter(e.target.value as any)}
                             className="bg-slate-100 dark:bg-slate-800 border-none text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 rounded-lg py-2 px-3 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
@@ -1268,6 +1289,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                         </select>
 
                         <select
+                            aria-label="Filter by log source"
                             value={logSourceFilter}
                             onChange={(e) => setLogSourceFilter(e.target.value)}
                             className="bg-slate-100 dark:bg-slate-800 border-none text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 rounded-lg py-2 px-3 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
