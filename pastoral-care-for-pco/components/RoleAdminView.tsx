@@ -1358,6 +1358,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             ) : (
                                                 <select
                                                     id="regular-attenders-list-select"
+                                                    title="Select a Planning Center list"
                                                     value={selectedListId}
                                                     onChange={e => {
                                                         const chosen = pcoLists.find(l => l.id === e.target.value);
@@ -2492,6 +2493,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         <label className={labelCn}>Business Type <span className="text-rose-500">*</span></label>
                                         <select value={smsForm.a2pBusinessType || ''}
                                             onChange={e => handleSmsChange('a2pBusinessType', e.target.value as any)}
+                                            title="Business Type"
                                             className={inputCn}
                                         >
                                             <option value="">— Select —</option>
@@ -2507,6 +2509,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         <label className={labelCn}>Industry Vertical <span className="text-rose-500">*</span></label>
                                         <select value={smsForm.a2pVertical || ''}
                                             onChange={e => handleSmsChange('a2pVertical', e.target.value)}
+                                            title="Industry Vertical"
                                             className={inputCn}
                                         >
                                             <option value="">— Select —</option>
@@ -2557,7 +2560,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             <label className={labelCn}>City</label>
                                             <input type="text" value={smsForm.a2pCity || ''}
                                                 onChange={e => handleSmsChange('a2pCity', e.target.value)}
-                                                className={inputCn}
+                                                className={inputCn} placeholder="Nashville"
                                             />
                                         </div>
                                         <div>
@@ -2586,14 +2589,14 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             <label className={labelCn}>First Name</label>
                                             <input type="text" value={smsForm.a2pContactFirstName || ''}
                                                 onChange={e => handleSmsChange('a2pContactFirstName', e.target.value)}
-                                                className={inputCn}
+                                                className={inputCn} placeholder="John"
                                             />
                                         </div>
                                         <div>
                                             <label className={labelCn}>Last Name</label>
                                             <input type="text" value={smsForm.a2pContactLastName || ''}
                                                 onChange={e => handleSmsChange('a2pContactLastName', e.target.value)}
-                                                className={inputCn}
+                                                className={inputCn} placeholder="Smith"
                                             />
                                         </div>
                                         <div>
@@ -2622,6 +2625,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             <label className={labelCn}>Job Level <span className="text-rose-500">*</span></label>
                                             <select value={smsForm.a2pContactJobPosition || ''}
                                                 onChange={e => handleSmsChange('a2pContactJobPosition', e.target.value)}
+                                                title="Job Level (Rep 1)"
                                                 className={inputCn}
                                             >
                                                 <option value="">— Select —</option>
@@ -2650,14 +2654,14 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             <label className={labelCn}>First Name <span className="text-rose-500">*</span></label>
                                             <input type="text" value={smsForm.a2pRep2FirstName || ''}
                                                 onChange={e => handleSmsChange('a2pRep2FirstName' as any, e.target.value)}
-                                                className={inputCn}
+                                                className={inputCn} placeholder="Jane"
                                             />
                                         </div>
                                         <div>
                                             <label className={labelCn}>Last Name <span className="text-rose-500">*</span></label>
                                             <input type="text" value={smsForm.a2pRep2LastName || ''}
                                                 onChange={e => handleSmsChange('a2pRep2LastName' as any, e.target.value)}
-                                                className={inputCn}
+                                                className={inputCn} placeholder="Doe"
                                             />
                                         </div>
                                         <div>
@@ -2685,6 +2689,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             <label className={labelCn}>Job Level</label>
                                             <select value={smsForm.a2pRep2JobPosition || ''}
                                                 onChange={e => handleSmsChange('a2pRep2JobPosition' as any, e.target.value)}
+                                                title="Job Level (Rep 2)"
                                                 className={inputCn}
                                             >
                                                 <option value="">— Select —</option>
@@ -2715,6 +2720,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         <label className={labelCn}>Use Case Category <span className="text-rose-500">*</span></label>
                                         <select value={smsForm.a2pUseCaseCategory || ''}
                                             onChange={e => handleSmsChange('a2pUseCaseCategory', e.target.value)}
+                                            title="Use Case Category"
                                             className={inputCn}
                                         >
                                             <option value="">— Select —</option>
@@ -2926,6 +2932,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                         <button
                                                             onClick={handleCreateProfile}
                                                             disabled={isCreatingProfile}
+                                                            title="Retry profile creation after Twilio approval"
                                                             className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition whitespace-nowrap"
                                                         >
                                                             {isCreatingProfile ? '📡 Retrying…' : '🔄 Retry After Approval'}
@@ -3485,7 +3492,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                         </div>
                                                         <div>
                                                             <label className={labelCn}>State <span className="text-rose-500">*</span></label>
-                                                            <select value={addNumState} onChange={e => setAddNumState(e.target.value)} className={inputCn}>
+                                                            <select value={addNumState} onChange={e => setAddNumState(e.target.value)} title="State" className={inputCn}>
                                                                 <option value="">— Select state —</option>
                                                                 {US_STATES.map(([abbr, name]) => (
                                                                     <option key={abbr} value={abbr}>{name}</option>
