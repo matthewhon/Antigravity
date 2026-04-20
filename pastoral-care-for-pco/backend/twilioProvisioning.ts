@@ -849,15 +849,15 @@ export const createCustomerProfile = async (req: any, res: any) => {
         const bizEndUser = await (master as any).trusthub.v1.endUsers.create({
             friendlyName: `Business Info – ${sms.a2pBusinessName}`,
             type: 'customer_profile_business_information',
-            attributes: {
+            attributes: JSON.stringify({
                 business_name:                    sms.a2pBusinessName,
                 business_registration_identifier: 'EIN',
                 business_registration_number:     sms.a2pEin,
                 business_type:                    sms.a2pBusinessType || 'Non-profit Corporation',
-                business_industry:                sms.a2pVertical     || 'Religion',
+                business_industry:                sms.a2pVertical     || 'RELIGION',
                 business_regions_of_operation:    'USA_AND_CANADA',
                 website_url:                      sms.a2pWebsite,
-            },
+            }),
         });
         log.info(`[createCustomerProfile] Created biz EndUser ${bizEndUser.sid}`, 'system', { churchId }, churchId);
 
@@ -867,9 +867,9 @@ export const createCustomerProfile = async (req: any, res: any) => {
         const addrDoc = await (master as any).trusthub.v1.supportingDocuments.create({
             friendlyName: `Business Address – ${sms.a2pBusinessName}`,
             type: 'customer_profile_address',
-            attributes: {
-                address_sids: [bizAddress.sid],  // AD... SID wrapped in an array
-            },
+            attributes: JSON.stringify({
+                address_sids: [bizAddress.sid],
+            }),
         });
         log.info(`[createCustomerProfile] Created address SupportingDocument ${addrDoc.sid}`, 'system', { churchId }, churchId);
 
@@ -877,14 +877,14 @@ export const createCustomerProfile = async (req: any, res: any) => {
         const repEndUser = await (master as any).trusthub.v1.endUsers.create({
             friendlyName: `${sms.a2pContactFirstName} ${sms.a2pContactLastName} – ${sms.a2pBusinessName}`,
             type: 'authorized_representative_1',
-            attributes: {
+            attributes: JSON.stringify({
                 first_name:     sms.a2pContactFirstName,
                 last_name:      sms.a2pContactLastName,
                 email:          sms.a2pContactEmail,
                 phone_number:   sms.a2pContactPhone,
                 job_position:   sms.a2pContactJobPosition || 'Director',
                 business_title: sms.a2pContactJobTitle    || sms.a2pContactJobPosition || 'Director',
-            },
+            }),
         });
         log.info(`[createCustomerProfile] Created rep1 EndUser ${repEndUser.sid}`, 'system', { churchId }, churchId);
 
@@ -895,14 +895,14 @@ export const createCustomerProfile = async (req: any, res: any) => {
             rep2EndUser = await (master as any).trusthub.v1.endUsers.create({
                 friendlyName: `${sms.a2pRep2FirstName} ${sms.a2pRep2LastName} – ${sms.a2pBusinessName} (Rep 2)`,
                 type: 'authorized_representative_2',
-                attributes: {
+                attributes: JSON.stringify({
                     first_name:     sms.a2pRep2FirstName,
                     last_name:      sms.a2pRep2LastName,
                     email:          sms.a2pRep2Email,
                     phone_number:   sms.a2pRep2Phone,
                     job_position:   sms.a2pRep2JobPosition || 'Director',
                     business_title: sms.a2pRep2JobTitle    || sms.a2pRep2JobPosition || 'Director',
-                },
+                }),
             });
             log.info(`[createCustomerProfile] Created rep2 EndUser ${rep2EndUser.sid}`, 'system', { churchId }, churchId);
         } else {
