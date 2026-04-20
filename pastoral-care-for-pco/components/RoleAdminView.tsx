@@ -1,4 +1,4 @@
-
+﻿
 import React, { useState, useEffect, useRef } from 'react';
 import { User, Church, RiskSettings, ChurchRiskSettings, DonorLifecycleSettings, GroupRiskSettings, CommunityLocation, UserRole } from '../types';
 import { CreateUserModal } from './CreateUserModal';
@@ -14,7 +14,7 @@ import { ALL_WIDGETS } from '../constants/widgetRegistry';
 import { PLANS } from '../services/stripeService';
 import { pcoService } from '../services/pcoService';
 
-// ─── SMS Terms of Service Modal (Admin settings gate) ────────────────────────
+// â”€â”€â”€ SMS Terms of Service Modal (Admin settings gate) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const SmsAdminTermsModal: React.FC<{
     churchId: string;
@@ -53,7 +53,7 @@ const SmsAdminTermsModal: React.FC<{
                 {/* Header */}
                 <div className="px-7 pt-7 pb-4 border-b border-slate-100 dark:border-slate-800 flex items-start gap-4 shrink-0">
                     <div className="w-12 h-12 rounded-2xl bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center shrink-0">
-                        <span className="text-2xl">📜</span>
+                        <span className="text-2xl">ðŸ“œ</span>
                     </div>
                     <div>
                         <h2 className="text-lg font-black text-slate-900 dark:text-white">SMS Service Terms of Use</h2>
@@ -85,7 +85,7 @@ const SmsAdminTermsModal: React.FC<{
                     <section>
                         <h3 className="text-sm font-black text-slate-900 dark:text-white mb-2 flex items-center gap-2">
                             <span className="w-5 h-5 bg-indigo-600 text-white rounded-full flex items-center justify-center text-[10px] font-black">2</span>
-                            Privacy Policy — SMS Data
+                            Privacy Policy â€” SMS Data
                         </h3>
                         <div className="space-y-2">
                             <p><strong>Data We Collect.</strong> To provide SMS services, we collect and process: phone numbers of message recipients, message content, delivery status events, opt-out records, and Twilio account credentials associated with your church's sub-account.</p>
@@ -106,7 +106,7 @@ const SmsAdminTermsModal: React.FC<{
                             <li>You are an authorized representative of the church with authority to register for commercial texting services.</li>
                             <li>Your church will only send messages to recipients who have <strong>explicitly opted in</strong> and will honor all STOP requests immediately.</li>
                             <li>You will submit accurate legal entity information (name, EIN, physical address) during brand registration.</li>
-                            <li>You understand that carrier approval is not guaranteed and may take 1–10 business days.</li>
+                            <li>You understand that carrier approval is not guaranteed and may take 1â€“10 business days.</li>
                         </ul>
                     </section>
                 </div>
@@ -151,7 +151,7 @@ const SmsAdminTermsModal: React.FC<{
                             disabled={!allChecked || saving}
                             className="flex-1 py-2.5 text-sm font-black text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition shadow-md shadow-indigo-200 dark:shadow-indigo-900/30"
                         >
-                            {saving ? 'Saving…' : 'I Accept — Continue →'}
+                            {saving ? 'Savingâ€¦' : 'I Accept â€” Continue â†’'}
                         </button>
                     </div>
                     {!allChecked && (
@@ -163,7 +163,7 @@ const SmsAdminTermsModal: React.FC<{
     );
 };
 
-// ─── Per-area Sync Component ──────────────────────────────────────────────────
+// â”€â”€â”€ Per-area Sync Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 type SyncArea = {
     key: string;
@@ -173,12 +173,12 @@ type SyncArea = {
 };
 
 const SYNC_AREAS: SyncArea[] = [
-    { key: 'people',        label: 'People',        icon: '👥', description: 'Contacts, households, addresses, field data' },
-    { key: 'groups',        label: 'Groups',        icon: '🏘️', description: 'Groups, memberships, attendance history' },
-    { key: 'services',      label: 'Services',      icon: '🎙️', description: 'Service plans, teams, songs, positions' },
-    { key: 'giving',        label: 'Giving',        icon: '💰', description: 'Donations, funds, donor stats (last 365 days)' },
-    { key: 'checkins',      label: 'Check-Ins',     icon: '✅', description: 'Headcounts, digital check-ins (last 90 days)' },
-    { key: 'registrations', label: 'Registrations', icon: '📋', description: 'Full replace — clears & re-fetches all registration events from Planning Center' },
+    { key: 'people',        label: 'People',        icon: 'ðŸ‘¥', description: 'Contacts, households, addresses, field data' },
+    { key: 'groups',        label: 'Groups',        icon: 'ðŸ˜ï¸', description: 'Groups, memberships, attendance history' },
+    { key: 'services',      label: 'Services',      icon: 'ðŸŽ™ï¸', description: 'Service plans, teams, songs, positions' },
+    { key: 'giving',        label: 'Giving',        icon: 'ðŸ’°', description: 'Donations, funds, donor stats (last 365 days)' },
+    { key: 'checkins',      label: 'Check-Ins',     icon: 'âœ…', description: 'Headcounts, digital check-ins (last 90 days)' },
+    { key: 'registrations', label: 'Registrations', icon: 'ðŸ“‹', description: 'Full replace â€” clears & re-fetches all registration events from Planning Center' },
 ];
 
 type AreaStatus = { state: 'idle' | 'running' | 'success' | 'error'; message?: string };
@@ -229,10 +229,10 @@ const SyncAreaButtons: React.FC<{ churchId: string; onSyncComplete: () => void }
                                 <span className="animate-spin inline-block w-3.5 h-3.5 border-2 border-indigo-400 border-t-transparent rounded-full shrink-0 mt-0.5"></span>
                             )}
                             {status.state === 'success' && (
-                                <span className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 shrink-0">✓ Done</span>
+                                <span className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 shrink-0">âœ“ Done</span>
                             )}
                             {status.state === 'error' && (
-                                <span className="text-[9px] font-black text-rose-500 shrink-0">✕ Failed</span>
+                                <span className="text-[9px] font-black text-rose-500 shrink-0">âœ• Failed</span>
                             )}
                         </div>
                         <p className="text-[9px] text-slate-400 dark:text-slate-500 leading-snug mb-3">{area.description}</p>
@@ -244,7 +244,7 @@ const SyncAreaButtons: React.FC<{ churchId: string; onSyncComplete: () => void }
                             disabled={status.state === 'running'}
                             className="w-full bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 disabled:opacity-50 text-indigo-600 dark:text-indigo-400 text-[9px] font-black uppercase tracking-widest py-2 rounded-xl transition-all"
                         >
-                            {status.state === 'running' ? 'Syncing…' : 'Force Sync'}
+                            {status.state === 'running' ? 'Syncingâ€¦' : 'Force Sync'}
                         </button>
                     </div>
                 );
@@ -307,7 +307,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   const [a2pResult, setA2pResult] = useState<{ success: boolean; message: string; brandSid?: string; failureReason?: string | null; twilioStatus?: string; needsBundle?: boolean; needsPrimaryProfile?: boolean; evaluationStatus?: string } | null>(null);
   const [isRefreshingProfile, setIsRefreshingProfile] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
-  // 'create-profile' | 'submit-a2p' — which action to run after terms are accepted
+  // 'create-profile' | 'submit-a2p' â€” which action to run after terms are accepted
   const [pendingTermsAction, setPendingTermsAction] = useState<'create-profile' | 'submit-a2p' | null>(null);
   // Ref that the SMS tab IIFE populates with its handler functions
   const smsActionRef = useRef<{ handleCreateProfile: () => void; handleSubmitToTwilio: () => void } | null>(null);
@@ -318,7 +318,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   const [isAssigningNumbers, setIsAssigningNumbers]     = useState(false);
   const [isCheckingCampaign, setIsCheckingCampaign]     = useState(false);
 
-  // Phone Numbers panel state (SMS → Numbers tab)
+  // Phone Numbers panel state (SMS â†’ Numbers tab)
   const [twilioNumbers, setTwilioNumbers] = useState<any[]>([]);
   const [numLoading, setNumLoading] = useState(false);
   const [numError, setNumError] = useState('');
@@ -841,7 +841,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                     <h3 className="text-xl font-black text-slate-900 dark:text-white">Team Members</h3>
                     <div className="flex items-center gap-4">
                         <span className={`text-xs font-bold ${users.length >= maxUsers ? 'text-rose-500' : 'text-slate-400'}`}>
-                            {users.length} / {maxUsers > 1000 ? '∞' : maxUsers} Users
+                            {users.length} / {maxUsers > 1000 ? 'âˆž' : maxUsers} Users
                         </span>
                         <button 
                             onClick={handleAddMemberClick}
@@ -859,7 +859,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                 <div className="space-y-4">
                     {users.map(u => (
                         <div key={u.id} className="bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 overflow-hidden">
-                            {/* ── User summary row ── */}
+                            {/* â”€â”€ User summary row â”€â”€ */}
                             <div className="flex flex-col md:flex-row items-center justify-between p-4 gap-4">
                                 <div className="flex items-center gap-4 w-full md:w-auto">
                                     <div className="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-black text-sm shrink-0">
@@ -883,7 +883,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                     ))}
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0">
-                                    {/* Edit Roles — only Church Admins can edit other users, not themselves */}
+                                    {/* Edit Roles â€” only Church Admins can edit other users, not themselves */}
                                     {isChurchAdmin && currentUser.id !== u.id && (
                                         editingUserId === u.id ? (
                                             <button
@@ -912,10 +912,10 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 </div>
                             </div>
 
-                            {/* ── Inline role editor (Church Admin only) ── */}
+                            {/* â”€â”€ Inline role editor (Church Admin only) â”€â”€ */}
                             {editingUserId === u.id && (
                                 <div className="border-t border-slate-200 dark:border-slate-700 px-6 py-5 bg-white dark:bg-slate-900">
-                                    <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-4">Assign Roles — {u.name}</p>
+                                    <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-4">Assign Roles â€” {u.name}</p>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-5">
                                         {ALL_ROLES.map(role => {
                                             const checked = pendingRoles.includes(role);
@@ -948,7 +948,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             disabled={isSavingRoles}
                                             className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition shadow-lg"
                                         >
-                                            {isSavingRoles ? 'Saving…' : 'Save Roles'}
+                                            {isSavingRoles ? 'Savingâ€¦' : 'Save Roles'}
                                         </button>
                                         <button
                                             onClick={() => setEditingUserId(null)}
@@ -957,7 +957,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             Cancel
                                         </button>
                                         {pendingRoles.length === 0 && (
-                                            <p className="text-[10px] text-rose-500 font-bold">⚠ At least one role required</p>
+                                            <p className="text-[10px] text-rose-500 font-bold">âš  At least one role required</p>
                                         )}
                                     </div>
                                 </div>
@@ -1276,7 +1276,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                             onClick={handleConnectPco}
                             className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-4 rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-lg flex items-center gap-3"
                         >
-                            <span>🔗</span> Connect Planning Center
+                            <span>ðŸ”—</span> Connect Planning Center
                         </button>
                     )}
                 </div>
@@ -1314,7 +1314,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                     disabled={isSaving}
                                     className="text-indigo-600 dark:text-indigo-400 text-xs font-bold hover:underline disabled:opacity-50"
                                 >
-                                    {isSaving ? 'Saving…' : 'Save Schedule'}
+                                    {isSaving ? 'Savingâ€¦' : 'Save Schedule'}
                                 </button>
                             </div>
                         </div>
@@ -1366,7 +1366,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                             {!church.pcoConnected ? (
                                 <div className="p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 rounded-xl">
                                     <p className="text-[10px] font-bold text-amber-700 dark:text-amber-400">
-                                        ⚠ Connect Planning Center first to load available lists.
+                                        âš  Connect Planning Center first to load available lists.
                                     </p>
                                 </div>
                             ) : (
@@ -1384,13 +1384,13 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             ) : pcoListsError ? (
                                                 <div className="space-y-2">
                                                     <div className="w-full bg-rose-50 dark:bg-rose-900/10 border border-rose-200 dark:border-rose-800 rounded-xl px-4 py-3 text-xs text-rose-600 dark:text-rose-400">
-                                                        ⚠ {pcoListsError}
+                                                        âš  {pcoListsError}
                                                     </div>
                                                     <button
                                                         onClick={loadPcoLists}
                                                         className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
                                                     >
-                                                        ↻ Retry
+                                                        â†» Retry
                                                     </button>
                                                 </div>
                                             ) : (
@@ -1405,7 +1405,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                     }}
                                                     className="w-full bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-800 rounded-xl px-4 py-3 text-sm font-medium text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer"
                                                 >
-                                                    <option value="">— Select a list —</option>
+                                                    <option value="">â€” Select a list â€”</option>
                                                     {pcoLists.map(list => (
                                                         <option key={list.id} value={list.id}>
                                                             {list.attributes?.name}
@@ -1423,14 +1423,14 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                 title="Refresh lists"
                                                 className="mt-6 p-3 rounded-xl bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-800 text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors text-sm"
                                             >
-                                                ↻
+                                                â†»
                                             </button>
                                         )}
                                     </div>
 
                                     {selectedListName && (
                                         <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
-                                            ✓ Selected: <span className="font-mono">{selectedListName}</span>
+                                            âœ“ Selected: <span className="font-mono">{selectedListName}</span>
                                         </p>
                                     )}
 
@@ -1574,9 +1574,9 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
             const emailStatusBadge = () => {
                 const es = church.emailSettings;
                 if (!es) return <span className="text-[9px] font-black bg-slate-100 dark:bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full">Not Configured</span>;
-                if (es.mode === 'custom' && es.domainVerified) return <span className="text-[9px] font-black bg-emerald-100 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">✓ Custom Domain Verified</span>;
-                if (es.mode === 'custom') return <span className="text-[9px] font-black bg-amber-100 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800">Custom Domain — DNS Pending</span>;
-                if (es.mode === 'shared' && es.sharedPrefix) return <span className="text-[9px] font-black bg-indigo-100 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded-full border border-indigo-200 dark:border-indigo-800">✓ Shared Domain Active</span>;
+                if (es.mode === 'custom' && es.domainVerified) return <span className="text-[9px] font-black bg-emerald-100 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">âœ“ Custom Domain Verified</span>;
+                if (es.mode === 'custom') return <span className="text-[9px] font-black bg-amber-100 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800">Custom Domain â€” DNS Pending</span>;
+                if (es.mode === 'shared' && es.sharedPrefix) return <span className="text-[9px] font-black bg-indigo-100 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded-full border border-indigo-200 dark:border-indigo-800">âœ“ Shared Domain Active</span>;
                 return <span className="text-[9px] font-black bg-slate-100 dark:bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full">Not Configured</span>;
             };
 
@@ -1594,7 +1594,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                     });
                     const data = await res.json();
                     if (!res.ok) throw new Error(data.error || 'Provisioning failed');
-                    setMailMessage({ type: 'success', text: `✓ ${data.message}` });
+                    setMailMessage({ type: 'success', text: `âœ“ ${data.message}` });
                     if (onUpdateChurch) {
                         const fresh = await firestore.getChurch(churchId);
                         if (fresh) onUpdateChurch(fresh);
@@ -1689,8 +1689,8 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                     setMailMessage({
                         type: allPass ? 'success' : 'error',
                         text: allPass
-                            ? '✓ All checks passed! Test email sent. Check your inbox.'
-                            : '⚠ Some checks failed. See results below for details.',
+                            ? 'âœ“ All checks passed! Test email sent. Check your inbox.'
+                            : 'âš  Some checks failed. See results below for details.',
                     });
                     if (onUpdateChurch) {
                         const fresh = await firestore.getChurch(churchId);
@@ -1724,7 +1724,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
 
                         {mailMessage && (
                             <div className={`mb-6 p-4 rounded-xl text-xs font-bold flex items-start gap-2 ${mailMessage.type === 'success' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800' : 'bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-800'}`}>
-                                <span className="shrink-0 mt-0.5">{mailMessage.type === 'success' ? '✓' : '⚠'}</span>
+                                <span className="shrink-0 mt-0.5">{mailMessage.type === 'success' ? 'âœ“' : 'âš '}</span>
                                 <span>{mailMessage.text}</span>
                             </div>
                         )}
@@ -1749,7 +1749,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                     <span className="text-[9px] font-black bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded-full">Fastest Setup</span>
                                 </div>
                                 <p className="text-xs text-slate-500 dark:text-slate-400 ml-8 leading-relaxed">
-                                    Send as <code className="font-mono bg-slate-100 dark:bg-slate-800 px-1 rounded">you@{SHARED_DOMAIN}</code>. No DNS changes required — ready in seconds.
+                                    Send as <code className="font-mono bg-slate-100 dark:bg-slate-800 px-1 rounded">you@{SHARED_DOMAIN}</code>. No DNS changes required â€” ready in seconds.
                                 </p>
                             </button>
 
@@ -1776,7 +1776,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                             </button>
                         </div>
 
-                        {/* ── Shared Mode Form ── */}
+                        {/* â”€â”€ Shared Mode Form â”€â”€ */}
                         {mailMode === 'shared' && (
                             <div className="space-y-6">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1825,13 +1825,13 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         disabled={isMailSaving}
                                         className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg disabled:opacity-50"
                                     >
-                                        {isMailSaving ? 'Configuring…' : church.emailSettings?.sendGridSubuserId ? 'Update Email Settings' : 'Activate Shared Email'}
+                                        {isMailSaving ? 'Configuringâ€¦' : church.emailSettings?.sendGridSubuserId ? 'Update Email Settings' : 'Activate Shared Email'}
                                     </button>
                                 </div>
                             </div>
                         )}
 
-                        {/* ── Custom Domain Form ── */}
+                        {/* â”€â”€ Custom Domain Form â”€â”€ */}
                         {mailMode === 'custom' && (
                             <div className="space-y-8">
 
@@ -1843,7 +1843,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         {church.emailSettings?.customDomain && (
                                             <span className="ml-auto text-[10px] font-bold text-slate-500 dark:text-slate-400 font-mono bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded-lg">
                                                 Currently: {church.emailSettings.customDomain}
-                                                {church.emailSettings.domainAuthId ? ` · Auth #${church.emailSettings.domainAuthId}` : ''}
+                                                {church.emailSettings.domainAuthId ? ` Â· Auth #${church.emailSettings.domainAuthId}` : ''}
                                             </span>
                                         )}
                                     </div>
@@ -1886,7 +1886,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             disabled={isMailSaving || !mailCustomDomain.trim()}
                                             className="bg-violet-600 hover:bg-violet-700 text-white px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg disabled:opacity-40"
                                         >
-                                            {isMailSaving ? 'Requesting…' : (mailCnameRecords.length > 0 || mailDomainAuthId) ? 'Re-fetch DNS Records' : 'Get DNS Records'}
+                                            {isMailSaving ? 'Requestingâ€¦' : (mailCnameRecords.length > 0 || mailDomainAuthId) ? 'Re-fetch DNS Records' : 'Get DNS Records'}
                                         </button>
                                     </div>
                                 </div>
@@ -1931,7 +1931,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                                         className="text-slate-400 hover:text-indigo-500 transition-colors text-sm"
                                                                         title="Copy row"
                                                                     >
-                                                                        📋
+                                                                        ðŸ“‹
                                                                     </button>
                                                                 </td>
                                                             </tr>
@@ -1941,7 +1941,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             </div>
                                         ) : (
                                             <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-xs text-amber-600 dark:text-amber-400">
-                                                <p className="font-bold mb-1">⚠ DNS records not cached locally</p>
+                                                <p className="font-bold mb-1">âš  DNS records not cached locally</p>
                                                 <p>Your domain <strong>{church.emailSettings?.customDomain}</strong> is registered in SendGrid (Auth ID: {mailDomainAuthId}), but the CNAME records are not cached here. Click <strong>"Re-fetch DNS Records"</strong> in Step 1 to reload them.</p>
                                             </div>
                                         )}
@@ -1962,11 +1962,11 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             <div className="flex items-center gap-3">
                                                 {mailDomainVerified ? (
                                                     <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 px-3 py-1.5 rounded-full">
-                                                        ✓ Domain Verified
+                                                        âœ“ Domain Verified
                                                     </span>
                                                 ) : (
                                                     <span className="text-xs font-black text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-3 py-1.5 rounded-full">
-                                                        ⏳ DNS Pending
+                                                        â³ DNS Pending
                                                     </span>
                                                 )}
                                                 <button
@@ -1974,7 +1974,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                     disabled={isMailSaving}
                                                     className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg disabled:opacity-50"
                                                 >
-                                                    {isMailSaving ? 'Checking…' : 'Verify DNS'}
+                                                    {isMailSaving ? 'Checkingâ€¦' : 'Verify DNS'}
                                                 </button>
                                             </div>
                                         </div>
@@ -2008,7 +2008,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                 disabled={isMailSaving || !mailDiagEmail.trim()}
                                                 className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg disabled:opacity-40 whitespace-nowrap"
                                             >
-                                                {isMailSaving ? 'Running…' : '🔍 Run Diagnostics'}
+                                                {isMailSaving ? 'Runningâ€¦' : 'ðŸ” Run Diagnostics'}
                                             </button>
                                         </div>
 
@@ -2028,7 +2028,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                         <span className={`shrink-0 text-base mt-0.5 ${
                                                             check.status === 'pass' ? 'text-emerald-500' : check.status === 'warn' ? 'text-amber-500' : 'text-rose-500'
                                                         }`}>
-                                                            {check.status === 'pass' ? '✓' : check.status === 'warn' ? '⚠' : '✗'}
+                                                            {check.status === 'pass' ? 'âœ“' : check.status === 'warn' ? 'âš ' : 'âœ—'}
                                                         </span>
                                                         <div className="min-w-0">
                                                             <p className={`font-bold ${
@@ -2048,10 +2048,10 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
 
                     {/* Info card */}
                     <div className="bg-indigo-900/10 dark:bg-indigo-900/20 p-6 rounded-2xl border border-indigo-500/20">
-                        <h4 className="font-bold text-indigo-400 mb-2 text-sm">📬 How Email Delivery Works</h4>
+                        <h4 className="font-bold text-indigo-400 mb-2 text-sm">ðŸ“¬ How Email Delivery Works</h4>
                         <ul className="text-xs text-slate-400 space-y-1.5 list-disc list-inside leading-relaxed">
                             <li>Each church gets an isolated SendGrid account (Subuser), so your reputation is separate from other tenants.</li>
-                            <li>The <strong>Shared Subdomain</strong> option lets you start sending immediately — no DNS changes required.</li>
+                            <li>The <strong>Shared Subdomain</strong> option lets you start sending immediately â€” no DNS changes required.</li>
                             <li>The <strong>Custom Domain</strong> option improves deliverability by authenticating your brand with DKIM/SPF through SendGrid's domain authentication.</li>
                             <li>Individual email campaigns can still override the From name and address on a per-campaign basis.</li>
                         </ul>
@@ -2075,16 +2075,16 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                 'draft':            'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400',
             };
             const PROFILE_STATUS_LABEL: Record<string, string> = {
-                'twilio-approved': '✓ Profile Approved',
-                'pending-review':  '⏳ Profile Pending',
-                'in-review':       '🔍 In Review',
-                'twilio-rejected': '✗ Profile Rejected',
+                'twilio-approved': 'âœ“ Profile Approved',
+                'pending-review':  'â³ Profile Pending',
+                'in-review':       'ðŸ” In Review',
+                'twilio-rejected': 'âœ— Profile Rejected',
                 'draft':           'Profile Draft',
             };
             const statusLabel: Record<string, string> = {
-                approved: '✓ Approved',
-                pending: '⏳ Pending Review',
-                failed: '✗ Failed',
+                approved: 'âœ“ Approved',
+                pending: 'â³ Pending Review',
+                failed: 'âœ— Failed',
                 not_started: 'Not Started',
             };
             const a2pStatus      = smsForm.twilioA2pStatus           || 'not_started';
@@ -2117,7 +2117,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                 }
             };
 
-            // ── Submit A2P registration to Twilio (saves first, then submits) ──
+            // â”€â”€ Submit A2P registration to Twilio (saves first, then submits) â”€â”€
             const handleSubmitToTwilio = async () => {
                 if (!onUpdateChurch) return;
                 setIsA2pSubmitting(true);
@@ -2156,7 +2156,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                 }
             };
 
-            // ── Check live A2P status from Twilio ──────────────────────────────
+            // â”€â”€ Check live A2P status from Twilio â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             const handleCheckA2pStatus = async () => {
                 setIsA2pChecking(true);
                 setA2pResult(null);
@@ -2182,7 +2182,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                 }
             };
 
-            // ── Programmatically create Twilio Customer Profile Bundle ──────────
+            // â”€â”€ Programmatically create Twilio Customer Profile Bundle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             const handleCreateProfile = async () => {
                 if (!onUpdateChurch) return;
                 setIsCreatingProfile(true);
@@ -2225,7 +2225,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                 }
             };
 
-            // ── Programmatically DELETE Twilio Customer Profile Bundle ─────────
+            // â”€â”€ Programmatically DELETE Twilio Customer Profile Bundle â”€â”€â”€â”€â”€â”€â”€â”€â”€
             const handleDeleteProfile = async () => {
                 const canDelete = profileStatus === 'draft' || profileStatus === 'twilio-rejected' || !profileStatus;
                 if (!canDelete) {
@@ -2291,7 +2291,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                 }
             };
 
-            // ── Step 4: Register Brand ────────────────────────────────────────────
+            // â”€â”€ Step 4: Register Brand â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             const handleRegisterBrand = async () => {
                 setIsRegisteringBrand(true);
                 setA2pResult(null);
@@ -2314,7 +2314,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                 }
             };
 
-            // ── Step 5: Create Messaging Service ─────────────────────────────────
+            // â”€â”€ Step 5: Create Messaging Service â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             const handleCreateMessagingService = async () => {
                 setIsCreatingMsgSvc(true);
                 setA2pResult(null);
@@ -2337,7 +2337,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                 }
             };
 
-            // ── Step 6: Register A2P Campaign ────────────────────────────────────
+            // â”€â”€ Step 6: Register A2P Campaign â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             const handleRegisterCampaign = async () => {
                 setIsRegisteringCampaign(true);
                 setA2pResult(null);
@@ -2360,7 +2360,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                 }
             };
 
-            // ── Step 7: Assign Numbers to Service ────────────────────────────────
+            // â”€â”€ Step 7: Assign Numbers to Service â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             const handleAssignNumbers = async () => {
                 setIsAssigningNumbers(true);
                 setA2pResult(null);
@@ -2383,7 +2383,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                 }
             };
 
-            // ── Poll campaign status ──────────────────────────────────────────────
+            // â”€â”€ Poll campaign status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             const handleCheckCampaignStatus = async () => {
                 setIsCheckingCampaign(true);
                 setA2pResult(null);
@@ -2427,14 +2427,14 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 {/* Terms badge */}
                                 {smsForm.termsAcceptedAt ? (
                                     <span className="text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/25" title={`Terms accepted on ${new Date(smsForm.termsAcceptedAt).toLocaleString()}`}>
-                                        ✓ ToS Accepted
+                                        âœ“ ToS Accepted
                                     </span>
                                 ) : (
                                     <button
                                         onClick={() => { setPendingTermsAction(null); setShowTermsModal(true); }}
                                         className="text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/25 hover:bg-amber-500/20 transition"
                                     >
-                                        ⚠ ToS Not Accepted — Click to Review
+                                        âš  ToS Not Accepted â€” Click to Review
                                     </button>
                                 )}
                                 {profileSid && (
@@ -2453,7 +2453,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         Eval: {evalStatus}
                                     </span>
                                 )}
-                                {/* Refresh Profile Status — quick pull from Twilio */}
+                                {/* Refresh Profile Status â€” quick pull from Twilio */}
                                 {profileSid && (
                                     <button
                                         onClick={handleRefreshProfileStatus}
@@ -2461,24 +2461,24 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         title="Pull latest Customer Profile & A2P status from Twilio"
                                         className="text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border transition-all disabled:opacity-50 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/40"
                                     >
-                                        {isRefreshingProfile ? '⏳ Refreshing…' : '🔄 Refresh Status'}
+                                        {isRefreshingProfile ? 'â³ Refreshingâ€¦' : 'ðŸ”„ Refresh Status'}
                                     </button>
                                 )}
-                                {/* Delete Profile button — only shown when profile exists */}
+                                {/* Delete Profile button â€” only shown when profile exists */}
                                 {profileSid && (() => {
                                     const canDelete = profileStatus === 'draft' || profileStatus === 'twilio-rejected' || !profileStatus;
                                     return (
                                         <button
                                             onClick={handleDeleteProfile}
                                             disabled={isDeletingProfile || !canDelete}
-                                            title={canDelete ? 'Delete Customer Profile Bundle from Twilio' : `Profile in "${profileStatus}" status — contact Twilio Support to remove`}
+                                            title={canDelete ? 'Delete Customer Profile Bundle from Twilio' : `Profile in "${profileStatus}" status â€” contact Twilio Support to remove`}
                                             className={`text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border transition-all disabled:cursor-not-allowed ${
                                                 canDelete
                                                     ? 'bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-800 hover:bg-rose-100 dark:hover:bg-rose-900/40'
                                                     : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-700'
                                             }`}
                                         >
-                                            {isDeletingProfile ? '🗑 Deleting…' : canDelete ? '🗑 Delete Profile' : '🔒 Cannot Delete'}
+                                            {isDeletingProfile ? 'ðŸ—‘ Deletingâ€¦' : canDelete ? 'ðŸ—‘ Delete Profile' : 'ðŸ”’ Cannot Delete'}
                                         </button>
                                     );
                                 })()}
@@ -2488,19 +2488,19 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         disabled={isA2pChecking}
                                         className="text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-600 dark:hover:text-indigo-400 border border-slate-200 dark:border-slate-700 transition-all disabled:opacity-50"
                                     >
-                                        {isA2pChecking ? '⏳ Checking…' : '🔄 Check Status'}
+                                        {isA2pChecking ? 'â³ Checkingâ€¦' : 'ðŸ”„ Check Status'}
                                     </button>
                                 )}
                                 {smsForm.twilioPhoneNumber && smsForm.twilioSubAccountSid && twilioNumbers.length === 0 && (
                                     // Legacy field shown only if number AND sub-account are both provisioned
                                     <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-1.5 rounded-full border border-emerald-100 dark:border-emerald-900/30">
-                                        📱 {smsForm.twilioPhoneNumber}
+                                        ðŸ“± {smsForm.twilioPhoneNumber}
                                     </span>
                                 )}
                                 {twilioNumbers.length > 0 && (
                                     // Prefer showing the default number from the new twilioNumbers collection
                                     <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-1.5 rounded-full border border-emerald-100 dark:border-emerald-900/30">
-                                        📱 {(twilioNumbers.find(n => n.isDefault) || twilioNumbers[0])?.phoneNumber}
+                                        ðŸ“± {(twilioNumbers.find(n => n.isDefault) || twilioNumbers[0])?.phoneNumber}
                                         {twilioNumbers.length > 1 && <span className="ml-1 text-[9px]">+{twilioNumbers.length - 1} more</span>}
                                     </span>
                                 )}
@@ -2519,25 +2519,25 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             : 'text-slate-500 dark:text-slate-400 hover:bg-white/50 dark:hover:bg-slate-700/50'
                                     }`}
                                 >
-                                    {st === 'a2p' ? '📋 A2P 10DLC Registration' : st === 'optout' ? '🔕 Opt-Out & Sender ID' : '📱 Phone Numbers'}
+                                    {st === 'a2p' ? 'ðŸ“‹ A2P 10DLC Registration' : st === 'optout' ? 'ðŸ”• Opt-Out & Sender ID' : 'ðŸ“± Phone Numbers'}
                                 </button>
                             ))}
                         </div>
                     </div>
 
-                    {/* ── A2P 10DLC Sub-tab ─────────────────────────────────────────── */}
+                    {/* â”€â”€ A2P 10DLC Sub-tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
                     {smsSubTab === 'a2p' && (
                         <div className="space-y-6">
 
                             {/* Step 0: What is A2P 10DLC */}
                             <div className="bg-indigo-900/10 dark:bg-indigo-900/20 p-6 rounded-2xl border border-indigo-500/20">
-                                <h4 className="font-bold text-indigo-400 mb-3 text-sm">📡 What is A2P 10DLC?</h4>
+                                <h4 className="font-bold text-indigo-400 mb-3 text-sm">ðŸ“¡ What is A2P 10DLC?</h4>
                                 <ul className="text-xs text-slate-400 space-y-1.5 list-disc list-inside leading-relaxed">
                                     <li><strong>A2P</strong> = Application-to-Person messaging. This is how your church texts members from software.</li>
                                     <li><strong>10DLC</strong> = 10-Digit Long Code. These are standard US phone numbers (not shortcodes) registered for A2P use.</li>
                                     <li>The FCC and US carriers require that every A2P sender register a <strong>Brand</strong> (your organization) and a <strong>Campaign</strong> (your use case) through The Campaign Registry (TCR).</li>
                                     <li>Without registration, carriers will <strong>filter or block</strong> your messages at scale.</li>
-                                    <li>Approval typically takes <strong>1–5 business days</strong> after all information is submitted.</li>
+                                    <li>Approval typically takes <strong>1â€“5 business days</strong> after all information is submitted.</li>
                                 </ul>
                             </div>
 
@@ -2551,7 +2551,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                     Each church gets an isolated Twilio Sub-Account. These are filled automatically by the platform when your account is provisioned. Do not edit unless instructed by support.
                                 </p>
                                 <div className="md:col-span-2 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/30 rounded-xl p-4">
-                                    <p className="text-[9px] font-black uppercase tracking-widest text-amber-600 dark:text-amber-400 mb-3">⚠ Admin-Only Fields — Edit with Caution</p>
+                                    <p className="text-[9px] font-black uppercase tracking-widest text-amber-600 dark:text-amber-400 mb-3">âš  Admin-Only Fields â€” Edit with Caution</p>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
                                             <label className={labelCn}>Sub-Account SID</label>
@@ -2561,7 +2561,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                 placeholder="AC... (auto-filled on provision)"
                                             />
                                             <p className="text-[9px] text-amber-600 dark:text-amber-400 mt-1">
-                                                If inactive, find the active sub-account <a href="https://console.twilio.com/us1/account/sub-accounts/" target="_blank" rel="noopener noreferrer" className="underline">in Twilio Console → Sub-Accounts</a> and paste the SID here.
+                                                If inactive, find the active sub-account <a href="https://console.twilio.com/us1/account/sub-accounts/" target="_blank" rel="noopener noreferrer" className="underline">in Twilio Console â†’ Sub-Accounts</a> and paste the SID here.
                                             </p>
                                         </div>
                                         <div>
@@ -2588,9 +2588,9 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             }}
                                             className="text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800 hover:bg-rose-100 transition"
                                         >
-                                            🗑 Clear Sub-Account (Force Re-Provision)
+                                            ðŸ—‘ Clear Sub-Account (Force Re-Provision)
                                         </button>
-                                        <p className="text-[9px] text-slate-400">Save after clearing — tenant will need to claim a new number.</p>
+                                        <p className="text-[9px] text-slate-400">Save after clearing â€” tenant will need to claim a new number.</p>
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
@@ -2601,7 +2601,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             className={inputCn}
                                             placeholder="MG... (enter after creating in Twilio Console)"
                                         />
-                                        <p className="text-[9px] text-slate-400 mt-1.5">Create in <a href="https://console.twilio.com/us1/develop/sms/services" target="_blank" rel="noopener noreferrer" className="underline text-indigo-400 hover:text-indigo-300">Twilio Console → Messaging → Services</a>. Attach your phone number to this service.</p>
+                                        <p className="text-[9px] text-slate-400 mt-1.5">Create in <a href="https://console.twilio.com/us1/develop/sms/services" target="_blank" rel="noopener noreferrer" className="underline text-indigo-400 hover:text-indigo-300">Twilio Console â†’ Messaging â†’ Services</a>. Attach your phone number to this service.</p>
                                     </div>
                                     <div>
                                         <label className={labelCn}>A2P Brand SID</label>
@@ -2638,29 +2638,29 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                             title="Pull current status from Twilio"
                                                             className="shrink-0 px-3 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest border transition disabled:cursor-not-allowed bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100"
                                                         >
-                                                            {isRefreshingProfile ? '⏳…' : '🔄 Refresh'}
+                                                            {isRefreshingProfile ? 'â³â€¦' : 'ðŸ”„ Refresh'}
                                                         </button>
                                                         <button
                                                             onClick={handleDeleteProfile}
                                                             disabled={isDeletingProfile || !canDel}
-                                                            title={canDel ? 'Delete this Customer Profile from Twilio' : `Cannot delete — profile is "${st}". Contact Twilio Support.`}
+                                                            title={canDel ? 'Delete this Customer Profile from Twilio' : `Cannot delete â€” profile is "${st}". Contact Twilio Support.`}
                                                             className={`shrink-0 px-3 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest border transition disabled:cursor-not-allowed ${
                                                                 canDel
                                                                     ? 'bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-800 hover:bg-rose-100'
                                                                     : 'bg-slate-100 dark:bg-slate-700 text-slate-400 border-slate-200 dark:border-slate-600'
                                                             }`}
                                                         >
-                                                            {isDeletingProfile ? 'Deleting…' : canDel ? '🗑 Delete' : '🔒 Locked'}
+                                                            {isDeletingProfile ? 'Deletingâ€¦' : canDel ? 'ðŸ—‘ Delete' : 'ðŸ”’ Locked'}
                                                         </button>
                                                     </div>
                                                 );
                                             })()}
                                         </div>
                                         <p className="text-[9px] text-slate-400 mt-1.5">
-                                            TrustHub bundle SID (BU…). Auto-filled when you click &quot;Create &amp; Submit Profile&quot;. Only deletable when status is <em>draft</em> or <em>rejected</em>.
+                                            TrustHub bundle SID (BUâ€¦). Auto-filled when you click &quot;Create &amp; Submit Profile&quot;. Only deletable when status is <em>draft</em> or <em>rejected</em>.
                                         </p>
                                     </div>
-                                    {/* Live A2P Status — read from Firestore / Twilio, not a manual dropdown */}
+                                    {/* Live A2P Status â€” read from Firestore / Twilio, not a manual dropdown */}
                                     <div>
                                         <label className={labelCn}>A2P Registration Status</label>
                                         <div className={`flex items-center gap-3 px-4 py-2.5 rounded-xl border ${
@@ -2670,11 +2670,11 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700'
                                         }`}>
                                             <span className={`text-sm ${
-                                                a2pStatus === 'approved' ? '✅' :
-                                                a2pStatus === 'pending'  ? '⏳' :
-                                                a2pStatus === 'failed'   ? '❌' : ''
+                                                a2pStatus === 'approved' ? 'âœ…' :
+                                                a2pStatus === 'pending'  ? 'â³' :
+                                                a2pStatus === 'failed'   ? 'âŒ' : ''
                                             }`}>
-                                                {a2pStatus === 'approved' ? '✅' : a2pStatus === 'pending' ? '⏳' : a2pStatus === 'failed' ? '❌' : '⬜'}
+                                                {a2pStatus === 'approved' ? 'âœ…' : a2pStatus === 'pending' ? 'â³' : a2pStatus === 'failed' ? 'âŒ' : 'â¬œ'}
                                             </span>
                                             <span className={`text-xs font-black ${
                                                 a2pStatus === 'approved'   ? 'text-emerald-700 dark:text-emerald-300' :
@@ -2686,8 +2686,8 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             </span>
                                             <span className="text-[9px] text-slate-400 dark:text-slate-500 ml-auto">
                                                 {a2pStatus === 'not_started' ? 'Submit to Twilio to begin' :
-                                                 a2pStatus === 'pending'     ? 'Awaiting Twilio review (1–5 days)' :
-                                                 a2pStatus === 'approved'    ? 'Registration complete ✓' :
+                                                 a2pStatus === 'pending'     ? 'Awaiting Twilio review (1â€“5 days)' :
+                                                 a2pStatus === 'approved'    ? 'Registration complete âœ“' :
                                                  'Check failure reason below'}
                                             </span>
                                         </div>
@@ -2730,8 +2730,8 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             title="Business Type"
                                             className={inputCn}
                                         >
-                                            <option value="">— Select —</option>
-                                            <option value="Non-profit Corporation">Non-profit Corporation ✝ (most churches)</option>
+                                            <option value="">â€” Select â€”</option>
+                                            <option value="Non-profit Corporation">Non-profit Corporation âœ (most churches)</option>
                                             <option value="Corporation">Corporation</option>
                                             <option value="Limited Liability Corporation">Limited Liability Corporation (LLC)</option>
                                             <option value="Partnership">Partnership</option>
@@ -2746,8 +2746,8 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             title="Industry Vertical"
                                             className={inputCn}
                                         >
-                                            <option value="">— Select —</option>
-                                            <option value="RELIGION">Religion ✝ (most churches)</option>
+                                            <option value="">â€” Select â€”</option>
+                                            <option value="RELIGION">Religion âœ (most churches)</option>
                                             <option value="NOT_FOR_PROFIT">Not For Profit / NGO</option>
                                             <option value="EDUCATION">Education</option>
                                             <option value="HEALTHCARE">Healthcare</option>
@@ -2851,7 +2851,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             <label className={labelCn}>Job Title <span className="text-rose-500">*</span></label>
                                             <input type="text" value={smsForm.a2pContactJobTitle || ''}
                                                 onChange={e => handleSmsChange('a2pContactJobTitle', e.target.value)}
-                                                className={inputCn} placeholder="Senior Pastor, Executive Director…"
+                                                className={inputCn} placeholder="Senior Pastor, Executive Directorâ€¦"
                                             />
                                             <p className="text-[9px] text-slate-400 mt-1.5">Your specific title within the organization (e.g. "Senior Pastor").</p>
                                         </div>
@@ -2862,7 +2862,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                 title="Job Level (Rep 1)"
                                                 className={inputCn}
                                             >
-                                                <option value="">— Select —</option>
+                                                <option value="">â€” Select â€”</option>
                                                 <option value="Director">Director (most pastors / ministry leads)</option>
                                                 <option value="VP">VP / Vice President</option>
                                                 <option value="GM">GM / General Manager</option>
@@ -2875,7 +2875,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                     </div>
                                 </div>
 
-                                {/* Authorized Rep 2 — required by Twilio TrustHub */}
+                                {/* Authorized Rep 2 â€” required by Twilio TrustHub */}
                                 <div className="mt-5 pt-5 border-t border-slate-100 dark:border-slate-800">
                                     <label className="block text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest mb-3">
                                         Authorized Representative 2 <span className="text-rose-500">*</span>
@@ -2916,7 +2916,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             <label className={labelCn}>Job Title</label>
                                             <input type="text" value={smsForm.a2pRep2JobTitle || ''}
                                                 onChange={e => handleSmsChange('a2pRep2JobTitle' as any, e.target.value)}
-                                                className={inputCn} placeholder="Church Administrator, Operations Director…"
+                                                className={inputCn} placeholder="Church Administrator, Operations Directorâ€¦"
                                             />
                                         </div>
                                         <div>
@@ -2926,7 +2926,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                 title="Job Level (Rep 2)"
                                                 className={inputCn}
                                             >
-                                                <option value="">— Select —</option>
+                                                <option value="">â€” Select â€”</option>
                                                 <option value="Director">Director</option>
                                                 <option value="VP">VP / Vice President</option>
                                                 <option value="GM">GM / General Manager</option>
@@ -2957,15 +2957,15 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             title="Use Case Category"
                                             className={inputCn}
                                         >
-                                            <option value="">— Select —</option>
-                                            <option value="MIXED">Mixed — General church communications (recommended for most churches)</option>
-                                            <option value="MARKETING">Marketing — Event announcements, seasonal campaigns</option>
-                                            <option value="PUBLIC_SERVICE_ANNOUNCEMENT">Public Service Announcement — Community alerts</option>
-                                            <option value="CUSTOMER_CARE">Customer Care — Pastoral follow-up &amp; support</option>
-                                            <option value="POLLING_VOTING">Polling / Voting — Member polls</option>
-                                            <option value="2FA">2FA — Authentication codes only</option>
+                                            <option value="">â€” Select â€”</option>
+                                            <option value="MIXED">Mixed â€” General church communications (recommended for most churches)</option>
+                                            <option value="MARKETING">Marketing â€” Event announcements, seasonal campaigns</option>
+                                            <option value="PUBLIC_SERVICE_ANNOUNCEMENT">Public Service Announcement â€” Community alerts</option>
+                                            <option value="CUSTOMER_CARE">Customer Care â€” Pastoral follow-up &amp; support</option>
+                                            <option value="POLLING_VOTING">Polling / Voting â€” Member polls</option>
+                                            <option value="2FA">2FA â€” Authentication codes only</option>
                                         </select>
-                                        <p className="text-[9px] text-slate-400 mt-1.5"><strong>MIXED</strong> is the most common choice for churches — it covers service reminders, event invites, prayer requests, and pastoral care in one campaign.</p>
+                                        <p className="text-[9px] text-slate-400 mt-1.5"><strong>MIXED</strong> is the most common choice for churches â€” it covers service reminders, event invites, prayer requests, and pastoral care in one campaign.</p>
                                     </div>
 
                                     <div>
@@ -3046,7 +3046,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
 
                             {/* Compliance checklist */}
                             <div className="bg-amber-50 dark:bg-amber-900/10 p-6 rounded-2xl border border-amber-200 dark:border-amber-800">
-                                <h4 className="font-bold text-amber-800 dark:text-amber-400 mb-3 text-sm">⚠ Compliance Checklist Before Submitting</h4>
+                                <h4 className="font-bold text-amber-800 dark:text-amber-400 mb-3 text-sm">âš  Compliance Checklist Before Submitting</h4>
                                 <ul className="text-xs text-amber-900 dark:text-amber-300 space-y-1.5 list-disc list-inside leading-relaxed">
                                     <li>Business name matches your IRS EIN records exactly.</li>
                                     <li>EIN is valid and active (Form 990 / IRS determination letter on file).</li>
@@ -3058,7 +3058,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 </ul>
                             </div>
 
-                            {/* ── Submit to Twilio Action ────────────────────────────────── */}
+                            {/* â”€â”€ Submit to Twilio Action â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
                             <div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800">
                                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
                                     <div>
@@ -3066,10 +3066,10 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         <p className="text-[10px] text-slate-400 leading-relaxed max-w-lg">
                                             Clicking <strong>Submit to Twilio</strong> will save your settings and submit your brand
                                             registration directly to Twilio / The Campaign Registry (TCR). You will receive a Brand SID
-                                            and status will change to <em>Pending Review</em>. Approval takes 1–5 business days.
+                                            and status will change to <em>Pending Review</em>. Approval takes 1â€“5 business days.
                                         </p>
                                         {a2pStatus === 'approved' && (
-                                            <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold mt-2">✅ Your registration is already approved — no action needed.</p>
+                                            <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold mt-2">âœ… Your registration is already approved â€” no action needed.</p>
                                         )}
                                     </div>
                                     <div className="flex flex-col items-end gap-3 shrink-0">
@@ -3085,7 +3085,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             disabled={isA2pSubmitting || isSmsSaving || a2pStatus === 'approved'}
                                             className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-8 py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30 whitespace-nowrap"
                                         >
-                                            {isA2pSubmitting ? '📡 Submitting to Twilio…' : a2pStatus === 'pending' ? '🔄 Re-Submit to Twilio' : '📡 Submit to Twilio'}
+                                            {isA2pSubmitting ? 'ðŸ“¡ Submitting to Twilioâ€¦' : a2pStatus === 'pending' ? 'ðŸ”„ Re-Submit to Twilio' : 'ðŸ“¡ Submit to Twilio'}
                                         </button>
                                         <p className="text-[9px] text-slate-400">Settings are saved first, then submitted.</p>
                                     </div>
@@ -3094,13 +3094,13 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 {/* Result feedback */}
                                 {a2pResult && (
                                     a2pResult.needsBundle ? (
-                                        // ── Customer Profile Bundle Required ─────────────────────────────
+                                        // â”€â”€ Customer Profile Bundle Required â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                                         a2pResult.needsPrimaryProfile ? (
-                                            // ── Platform-level one-time setup required ────────────────────
+                                            // â”€â”€ Platform-level one-time setup required â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                                             <div className="mt-5 space-y-4">
                                                 <div className="p-5 rounded-xl border bg-rose-50 dark:bg-rose-900/20 border-rose-200 dark:border-rose-800">
                                                     <div className="flex items-start gap-3">
-                                                        <span className="shrink-0 text-xl mt-0.5">🏗️</span>
+                                                        <span className="shrink-0 text-xl mt-0.5">ðŸ—ï¸</span>
                                                         <div>
                                                             <p className="text-xs font-black text-rose-800 dark:text-rose-300 mb-1">
                                                                 Platform setup required (one-time, done by you)
@@ -3108,42 +3108,42 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                             <p className="text-[10px] text-rose-700 dark:text-rose-400 leading-relaxed">
                                                                 Twilio requires the <strong>master Twilio account</strong> (Barnabas Software) to have an approved{' '}
                                                                 <strong>Primary Customer Profile</strong> before any church Secondary Profiles can be created. This is a
-                                                                one-time platform setup — not something each church does.
+                                                                one-time platform setup â€” not something each church does.
                                                             </p>
                                                         </div>
                                                     </div>
                                                 </div>
                                                 <div className="p-5 rounded-xl border bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 space-y-4">
                                                     <p className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400">
-                                                        ↓ Complete this one-time platform setup in the Twilio Console
+                                                        â†“ Complete this one-time platform setup in the Twilio Console
                                                     </p>
 
                                                     {([
                                                         {
                                                             step: '1',
                                                             title: 'Log into the MASTER Twilio account',
-                                                            desc: 'Go to console.twilio.com and sign in as the platform owner. Make sure you are on the root/master account — NOT a sub-account.',
+                                                            desc: 'Go to console.twilio.com and sign in as the platform owner. Make sure you are on the root/master account â€” NOT a sub-account.',
                                                             link: 'https://console.twilio.com',
-                                                            linkLabel: 'Open Twilio Console →',
+                                                            linkLabel: 'Open Twilio Console â†’',
                                                         },
                                                         {
                                                             step: '2',
-                                                            title: 'Open Trust Hub → Customer Profiles',
-                                                            desc: 'In the left sidebar: Messaging → Regulatory Compliance → Customer Profiles. This section manages business identity for the platform.',
+                                                            title: 'Open Trust Hub â†’ Customer Profiles',
+                                                            desc: 'In the left sidebar: Messaging â†’ Regulatory Compliance â†’ Customer Profiles. This section manages business identity for the platform.',
                                                             link: 'https://console.twilio.com/us1/develop/sms/regulatory-compliance/customer-profiles',
-                                                            linkLabel: 'Open Customer Profiles →',
+                                                            linkLabel: 'Open Customer Profiles â†’',
                                                         },
                                                         {
                                                             step: '3',
                                                             title: 'Create a Primary Business Profile for Barnabas Software',
-                                                            desc: 'Click "Create new" → Business → fill in your platform company details (Barnabas Software legal name, EIN, website, address, authorized rep). Submit for Twilio review.',
+                                                            desc: 'Click "Create new" â†’ Business â†’ fill in your platform company details (Barnabas Software legal name, EIN, website, address, authorized rep). Submit for Twilio review.',
                                                             link: null,
                                                             linkLabel: null,
                                                         },
                                                         {
                                                             step: '4',
                                                             title: 'Wait for Twilio approval (same-day)',
-                                                            desc: 'Once the Primary Profile status shows TWILIO_APPROVED, come back here and click "🪄 Create & Submit Profile" again. Church Secondary Profiles will then work.',
+                                                            desc: 'Once the Primary Profile status shows TWILIO_APPROVED, come back here and click "ðŸª„ Create & Submit Profile" again. Church Secondary Profiles will then work.',
                                                             link: null,
                                                             linkLabel: null,
                                                         },
@@ -3169,7 +3169,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                             title="Retry profile creation after Twilio approval"
                                                             className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition whitespace-nowrap"
                                                         >
-                                                            {isCreatingProfile ? '📡 Retrying…' : '🔄 Retry After Approval'}
+                                                            {isCreatingProfile ? 'ðŸ“¡ Retryingâ€¦' : 'ðŸ”„ Retry After Approval'}
                                                         </button>
                                                         <p className="text-[9px] text-slate-400 mt-1.5">Click after your Primary Profile is approved in Twilio Console.</p>
                                                     </div>
@@ -3180,7 +3180,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             {/* Explanation banner */}
                                             <div className="p-4 rounded-xl border bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800">
                                                 <div className="flex items-start gap-2">
-                                                    <span className="shrink-0 text-lg mt-0.5">📋</span>
+                                                    <span className="shrink-0 text-lg mt-0.5">ðŸ“‹</span>
                                                     <div>
                                                         <p className="text-xs font-black text-amber-800 dark:text-amber-300 mb-1">
                                                             One more step: Customer Profile Bundle required
@@ -3188,7 +3188,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                         <p className="text-[10px] text-amber-700 dark:text-amber-400 leading-relaxed">
                                                             Twilio requires a verified <strong>Customer Profile Bundle</strong> (business identity) before it can submit
                                                             your brand to The Campaign Registry. We can create this automatically using the information
-                                                            you already entered above — no Twilio Console needed.
+                                                            you already entered above â€” no Twilio Console needed.
                                                         </p>
                                                     </div>
                                                 </div>
@@ -3199,7 +3199,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                                                     <div>
                                                         <p className="text-xs font-black text-slate-900 dark:text-white mb-1">
-                                                            🪄 Create Profile Automatically
+                                                            ðŸª„ Create Profile Automatically
                                                         </p>
                                                         <p className="text-[10px] text-slate-500 dark:text-slate-400 max-w-md leading-relaxed">
                                                             Clicking <strong>Create &amp; Submit Profile</strong> will use your business info from Steps 2 &amp; 3 above to
@@ -3219,11 +3219,11 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                         disabled={isCreatingProfile}
                                                         className="shrink-0 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30 whitespace-nowrap"
                                                     >
-                                                        {isCreatingProfile ? '📡 Creating Profile…' : '🪤 Create & Submit Profile'}
+                                                        {isCreatingProfile ? 'ðŸ“¡ Creating Profileâ€¦' : 'ðŸª¤ Create & Submit Profile'}
                                                     </button>
                                                 </div>
 
-                                                {/* Manual fallback — paste BU SID if they get it from Console */}
+                                                {/* Manual fallback â€” paste BU SID if they get it from Console */}
                                                 <div className="mt-5 pt-5 border-t border-slate-100 dark:border-slate-800">
                                                     <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2">
                                                         Or paste an existing Bundle SID
@@ -3233,7 +3233,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                             type="text"
                                                             value={smsForm.twilioCustomerProfileSid || ''}
                                                             onChange={e => handleSmsChange('twilioCustomerProfileSid', e.target.value)}
-                                                            placeholder="BU…"
+                                                            placeholder="BUâ€¦"
                                                             className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm font-mono text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
                                                         />
                                                         <button
@@ -3241,11 +3241,11 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                             disabled={!smsForm.twilioCustomerProfileSid || isA2pSubmitting}
                                                             className="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition whitespace-nowrap"
                                                         >
-                                                            {isA2pSubmitting ? '📡 Submitting…' : '🔄 Re-Submit'}
+                                                            {isA2pSubmitting ? 'ðŸ“¡ Submittingâ€¦' : 'ðŸ”„ Re-Submit'}
                                                         </button>
                                                     </div>
                                                     <p className="text-[9px] text-slate-400 mt-1.5">
-                                                        If you already created a profile in Twilio Console, paste the <strong>BU…</strong> SID here and click Re-Submit.
+                                                        If you already created a profile in Twilio Console, paste the <strong>BUâ€¦</strong> SID here and click Re-Submit.
                                                     </p>
                                                 </div>
                                             </div>
@@ -3259,14 +3259,14 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         </div>
                                         )
                                     ) : (
-                                        // ── Standard success / error feedback ─────────────────────────────
+                                        // â”€â”€ Standard success / error feedback â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                                         <div className={`mt-5 p-4 rounded-xl border text-xs ${
                                             a2pResult.success
                                                 ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300'
                                                 : 'bg-rose-50 dark:bg-rose-900/20 border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300'
                                         }`}>
                                             <div className="flex items-start gap-2">
-                                                <span className="shrink-0 text-base mt-0.5">{a2pResult.success ? '✅' : '❌'}</span>
+                                                <span className="shrink-0 text-base mt-0.5">{a2pResult.success ? 'âœ…' : 'âŒ'}</span>
                                                 <div className="min-w-0">
                                                     <p className="font-bold mb-1">{a2pResult.message}</p>
                                                     {a2pResult.brandSid && (
@@ -3300,11 +3300,50 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 )}
                             </div>
 
+            {/* Step 4: Brand Registration */}
+            {(() => {
+                const brandStatus = smsForm.twilioA2pStatus || 'not_started';
+                const brandDone = brandStatus === 'approved';
+                const brandFailed = brandStatus === 'failed';
+                const hasBrand = !!smsForm.twilioBrandSid;
+                const hasProfile = !!smsForm.twilioCustomerProfileSid;
+                const s4Colors = brandDone ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' : brandFailed ? 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800' : hasBrand ? 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700';
+                const s4Label = brandDone ? 'Approved' : brandFailed ? 'Failed' : hasBrand ? 'Pending Review' : 'Not Started';
+                return (<div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800"><div className="flex items-center justify-between gap-4 mb-4"><div className="flex items-center gap-3"><div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-sm ${brandDone ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' : 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'}`}>4</div><div><h4 className="text-sm font-black text-slate-900 dark:text-white">Brand Registration</h4><p className="text-[10px] text-slate-400 mt-0.5">Submit your organization to The Campaign Registry (TCR) via Twilio.</p></div></div><span className={`shrink-0 text-[10px] font-black px-3 py-1.5 rounded-full border ${s4Colors}`}>{s4Label}</span></div>{smsForm.twilioBrandSid && (<p className="text-[10px] font-mono text-slate-400 mb-4">Brand SID: <strong className="text-slate-600 dark:text-slate-300">{smsForm.twilioBrandSid}</strong></p>)}{!hasProfile && (<p className="text-[10px] text-amber-600 dark:text-amber-400 mb-4">Complete Customer Profile Bundle above before submitting a brand.</p>)}<button id="btn-register-brand" onClick={handleRegisterBrand} disabled={isRegisteringBrand || !hasProfile || brandDone} className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all whitespace-nowrap">{isRegisteringBrand ? 'Submitting...' : hasBrand ? 'Re-check Brand Status' : 'Submit Brand to Twilio'}</button></div>);
+            })()}
+            {/* Step 5: Messaging Service */}
+            {(() => {
+                const hasMgSvc = !!smsForm.twilioMessagingServiceSid;
+                const brandApproved = smsForm.twilioA2pStatus === 'approved';
+                return (<div className={`bg-white dark:bg-slate-900 p-8 rounded-[2rem] border transition-all ${!brandApproved ? 'opacity-60' : ''} border-slate-100 dark:border-slate-800`}><div className="flex items-center justify-between gap-4 mb-4"><div className="flex items-center gap-3"><div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-sm ${hasMgSvc ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' : 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'}`}>5</div><div><h4 className="text-sm font-black text-slate-900 dark:text-white">Create Messaging Service</h4><p className="text-[10px] text-slate-400 mt-0.5">Creates the MG... SID that links your phone number to the A2P campaign.</p></div></div><span className={`shrink-0 text-[10px] font-black px-3 py-1.5 rounded-full border ${hasMgSvc ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700'}`}>{hasMgSvc ? 'Created' : brandApproved ? 'Not Created' : 'Waiting for Brand Approval'}</span></div>{smsForm.twilioMessagingServiceSid && (<p className="text-[10px] font-mono text-slate-400 mb-4">Messaging Service SID: <strong className="text-slate-600 dark:text-slate-300">{smsForm.twilioMessagingServiceSid}</strong></p>)}<button id="btn-create-messaging-service" onClick={handleCreateMessagingService} disabled={isCreatingMsgSvc || !brandApproved || hasMgSvc} className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all whitespace-nowrap">{isCreatingMsgSvc ? 'Creating...' : hasMgSvc ? 'Already Created' : 'Create Messaging Service'}</button></div>);
+            })()}
+            {/* Step 6: Register A2P Campaign */}
+            {(() => {
+                const hasCampaign = !!(smsForm as any).twilioUsAppToPersonSid;
+                const hasMgSvc = !!smsForm.twilioMessagingServiceSid;
+                const brandApproved = smsForm.twilioA2pStatus === 'approved';
+                const campaignStatus = (smsForm as any).twilioA2pCampaignStatus || '';
+                const campaignApproved = campaignStatus === 'approved';
+                const campaignFailed = campaignStatus === 'failed';
+                const canRegister = hasMgSvc && brandApproved;
+                const s6Label = campaignApproved ? 'Verified' : campaignFailed ? 'Failed' : hasCampaign ? 'Pending' : canRegister ? 'Not Registered' : 'Prerequisites Missing';
+                const s6Colors = campaignApproved ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' : campaignFailed ? 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800' : hasCampaign ? 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700';
+                return (<div className={`bg-white dark:bg-slate-900 p-8 rounded-[2rem] border transition-all ${!canRegister ? 'opacity-60' : ''} border-slate-100 dark:border-slate-800`}><div className="flex items-center justify-between gap-4 mb-4"><div className="flex items-center gap-3"><div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-sm ${campaignApproved ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' : 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'}`}>6</div><div><h4 className="text-sm font-black text-slate-900 dark:text-white">Register A2P Campaign</h4><p className="text-[10px] text-slate-400 mt-0.5">Registers your use case with US carriers. Requires brand APPROVED and sample messages saved in Step 3.</p></div></div><span className={`shrink-0 text-[10px] font-black px-3 py-1.5 rounded-full border ${s6Colors}`}>{s6Label}</span></div>{(smsForm as any).twilioUsAppToPersonSid && (<p className="text-[10px] font-mono text-slate-400 mb-4">Campaign SID: <strong className="text-slate-600 dark:text-slate-300">{(smsForm as any).twilioUsAppToPersonSid}</strong></p>)}{!canRegister && (<p className="text-[10px] text-amber-600 dark:text-amber-400 mb-4">{!brandApproved ? 'Brand must be APPROVED by Twilio before you can register a campaign (1-5 business days).' : 'Create the Messaging Service (Step 5) first.'}</p>)}<div className="flex flex-wrap gap-3"><button id="btn-register-campaign" onClick={handleRegisterCampaign} disabled={isRegisteringCampaign || !canRegister || (hasCampaign && campaignApproved)} className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all whitespace-nowrap">{isRegisteringCampaign ? 'Registering...' : campaignApproved ? 'Campaign Verified' : hasCampaign ? 'Already Registered' : 'Register Campaign'}</button>{hasCampaign && !campaignApproved && (<button onClick={handleCheckCampaignStatus} disabled={isCheckingCampaign} className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-50 text-slate-700 dark:text-slate-300 px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all whitespace-nowrap">{isCheckingCampaign ? '...' : 'Check Campaign Status'}</button>)}</div></div>);
+            })()}
+            {/* Step 7: Link Phone Numbers */}
+            {(() => {
+                const hasMgSvc = !!smsForm.twilioMessagingServiceSid;
+                const hasPhone = !!(smsForm.twilioPhoneNumber || smsForm.twilioPhoneSid);
+                const numLinked = !!(smsForm as any).twilioNumbersLinked;
+                const canLink = hasMgSvc && hasPhone;
+                return (<div className={`bg-white dark:bg-slate-900 p-8 rounded-[2rem] border transition-all ${numLinked ? 'border-emerald-200 dark:border-emerald-800/50' : !canLink ? 'opacity-60 border-slate-100 dark:border-slate-800' : 'border-slate-100 dark:border-slate-800'}`}><div className="flex items-center justify-between gap-4 mb-4"><div className="flex items-center gap-3"><div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-sm ${numLinked ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' : 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'}`}>7</div><div><h4 className="text-sm font-black text-slate-900 dark:text-white">Link Phone Numbers to Service</h4><p className="text-[10px] text-slate-400 mt-0.5">Assigns your provisioned number(s) to the Messaging Service for A2P compliance routing.</p></div></div><span className={`shrink-0 text-[10px] font-black px-3 py-1.5 rounded-full border ${numLinked ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700'}`}>{numLinked ? 'Linked' : canLink ? 'Not Linked' : 'Waiting for Messaging Service'}</span></div>{smsForm.twilioPhoneNumber && (<p className="text-[10px] font-mono text-slate-400 mb-4">Number: <strong className="text-slate-600 dark:text-slate-300">{smsForm.twilioPhoneNumber}</strong></p>)}<button id="btn-assign-numbers" onClick={handleAssignNumbers} disabled={isAssigningNumbers || !canLink} className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all whitespace-nowrap">{isAssigningNumbers ? 'Linking...' : numLinked ? 'Re-Link Numbers' : 'Link Numbers to Service'}</button>{numLinked && (<div className="mt-4 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800"><p className="text-xs font-bold text-emerald-700 dark:text-emerald-300">A2P 10DLC Setup Complete!</p><p className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-1">Your phone number is linked to the Messaging Service and routing through your registered A2P campaign. Messages will now be delivered with full carrier compliance.</p></div>)}</div>);
+            })()}
+            {a2pResult && (<div className={`p-4 rounded-xl border text-xs ${a2pResult.success ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300' : 'bg-rose-50 dark:bg-rose-900/20 border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300'}`}><div className="flex items-start gap-2"><div><p className="font-bold">{a2pResult.message}</p>{a2pResult.brandSid && <p className="font-mono text-[10px] mt-0.5">Brand SID: <strong>{a2pResult.brandSid}</strong></p>}</div></div></div>)}
                         </div>
                     )}
 
 
-                    {/* ── Opt-Out & Sender ID Sub-tab ───────────────────────────────────── */}
+                    {/* â”€â”€ Opt-Out & Sender ID Sub-tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
                     {smsSubTab === 'optout' && (
                         <div className="space-y-6">
 
@@ -3320,7 +3359,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             onChange={e => handleSmsChange('senderName', e.target.value)}
                                             className={inputCn} placeholder="Grace Church"
                                         />
-                                        <p className="text-[9px] text-slate-400 mt-1.5">Used in the app to identify who sent the message. On carrier-delivered SMS, recipients see your phone number — carriers do not pass a display name.</p>
+                                        <p className="text-[9px] text-slate-400 mt-1.5">Used in the app to identify who sent the message. On carrier-delivered SMS, recipients see your phone number â€” carriers do not pass a display name.</p>
                                     </div>
 
                                     <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
@@ -3412,14 +3451,14 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
 
                             {/* TCPA / CTIA guidance */}
                             <div className="bg-indigo-900/10 dark:bg-indigo-900/20 p-6 rounded-2xl border border-indigo-500/20">
-                                <h4 className="font-bold text-indigo-400 mb-3 text-sm">⚖️ TCPA & CTIA Compliance Notes</h4>
+                                <h4 className="font-bold text-indigo-400 mb-3 text-sm">âš–ï¸ TCPA & CTIA Compliance Notes</h4>
                                 <ul className="text-xs text-slate-400 space-y-1.5 list-disc list-inside leading-relaxed">
                                     <li>Always honor STOP requests immediately and do not send further messages.</li>
                                     <li>Maintain a record of all opt-outs. Our system automatically tracks these.</li>
                                     <li>You must obtain prior express written consent before sending marketing messages.</li>
                                     <li>Include your church name and opt-out instructions in every marketing message.</li>
                                     <li>HELP and STOP must always work, even after opting out.</li>
-                                    <li>Under TCPA, violations can carry fines of $500–$1,500 per message — compliance is critical.</li>
+                                    <li>Under TCPA, violations can carry fines of $500â€“$1,500 per message â€” compliance is critical.</li>
                                     <li>Consult legal counsel for advice specific to your ministry context.</li>
                                 </ul>
                             </div>
@@ -3427,7 +3466,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                         </div>
                     )}
 
-                    {/* ── Phone Numbers Sub-tab ────────────────────────────────────────── */}
+                    {/* â”€â”€ Phone Numbers Sub-tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
                     {smsSubTab === 'numbers' && (() => {
                         const US_STATES = [
                             ['AL','Alabama'],['AK','Alaska'],['AZ','Arizona'],['AR','Arkansas'],['CA','California'],
@@ -3492,7 +3531,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                     throw new Error(`Server returned unexpected response (HTTP ${res.status}): ${raw.slice(0, 300)}`);
                                 }
                                 if (!data.success) throw new Error(data.error || 'Failed to claim number');
-                                setNumToast('✓ Number added successfully!');
+                                setNumToast('âœ“ Number added successfully!');
                                 setShowAddNumber(false);
                                 setAddNumStep('search');
                                 setAddNumResults([]);
@@ -3528,7 +3567,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 });
                                 const data = await res.json();
                                 if (!data.success) throw new Error(data.error || 'Failed');
-                                setNumToast('✓ Default number updated.');
+                                setNumToast('âœ“ Default number updated.');
                                 setTwilioNumbers(prev => prev.map(n => ({ ...n, isDefault: n.id === numId })));
                                 setTimeout(() => setNumToast(''), 3000);
                             } catch (e: any) {
@@ -3555,7 +3594,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 let data: any;
                                 try { data = JSON.parse(raw); } catch { data = { error: raw.slice(0, 200) }; }
                                 if (!data.success) throw new Error(data.error || 'Release failed');
-                                setNumToast(`✓ ${num.phoneNumber} released.`);
+                                setNumToast(`âœ“ ${num.phoneNumber} released.`);
                                 setTwilioNumbers(prev => prev.filter(n => n.id !== num.id));
                                 setTimeout(() => setNumToast(''), 4000);
                             } catch (e: any) {
@@ -3586,14 +3625,14 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                     : 'bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed'
                                             }`}
                                         >
-                                            <span className="text-sm leading-none">{profileApproved ? '+' : '🔒'}</span>
+                                            <span className="text-sm leading-none">{profileApproved ? '+' : 'ðŸ”’'}</span>
                                             {profileApproved ? 'Request a Number' : 'Profile Required'}
                                         </button>
                                     </div>
 
                                     {!profileApproved && (
                                         <div className="mb-4 flex items-start gap-3 px-4 py-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl">
-                                            <span className="text-lg shrink-0">⚠️</span>
+                                            <span className="text-lg shrink-0">âš ï¸</span>
                                             <div>
                                                 <p className="text-xs font-bold text-amber-800 dark:text-amber-300">Customer Profile approval required</p>
                                                 <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-0.5">
@@ -3621,10 +3660,10 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
 
                                     {/* Numbers list */}
                                     {numLoading ? (
-                                        <p className="text-xs text-slate-400 py-4 text-center">Loading numbers…</p>
+                                        <p className="text-xs text-slate-400 py-4 text-center">Loading numbersâ€¦</p>
                                     ) : twilioNumbers.length === 0 ? (
                                         <div className="py-10 text-center">
-                                            <p className="text-3xl mb-3">📱</p>
+                                            <p className="text-3xl mb-3">ðŸ“±</p>
                                             <p className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">No Numbers Provisioned</p>
                                             <p className="text-xs text-slate-400">
                                                 {profileApproved
@@ -3680,7 +3719,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                                 : `Release ${num.phoneNumber}`}
                                                             className="text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border transition-all disabled:cursor-not-allowed disabled:opacity-40 border-rose-200 dark:border-rose-800 text-rose-500 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 hover:border-rose-400"
                                                         >
-                                                            {num.isDefault && twilioNumbers.length > 1 ? '🔒 Release' : '🗑 Release'}
+                                                            {num.isDefault && twilioNumbers.length > 1 ? 'ðŸ”’ Release' : 'ðŸ—‘ Release'}
                                                         </button>
                                                     </div>
                                                 </div>
@@ -3689,7 +3728,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                     )}
                                 </div>
 
-                                {/* ── Add Number Inline Wizard ─────────────────────────── */}
+                                {/* â”€â”€ Add Number Inline Wizard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
                                 {showAddNumber && (
                                     <div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border-2 border-violet-300 dark:border-violet-700 shadow-xl shadow-violet-100 dark:shadow-violet-900/20">
                                         <div className="flex items-center justify-between mb-6">
@@ -3702,7 +3741,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                 className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-lg font-bold leading-none"
                                                 title="Close"
                                             >
-                                                ✕
+                                                âœ•
                                             </button>
                                         </div>
 
@@ -3735,7 +3774,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                         <div>
                                                             <label className={labelCn}>State <span className="text-rose-500">*</span></label>
                                                             <select value={addNumState} onChange={e => setAddNumState(e.target.value)} title="State" className={inputCn}>
-                                                                <option value="">— Select state —</option>
+                                                                <option value="">â€” Select state â€”</option>
                                                                 {US_STATES.map(([abbr, name]) => (
                                                                     <option key={abbr} value={abbr}>{name}</option>
                                                                 ))}
@@ -3756,7 +3795,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                     disabled={addNumBusy}
                                                     className="bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all"
                                                 >
-                                                    {addNumBusy ? 'Searching…' : 'Search Available Numbers'}
+                                                    {addNumBusy ? 'Searchingâ€¦' : 'Search Available Numbers'}
                                                 </button>
                                             </div>
                                         )}
@@ -3765,7 +3804,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             <div className="space-y-5">
                                                 <div>
                                                     <p className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-3">
-                                                        {addNumResults.length} number{addNumResults.length !== 1 ? 's' : ''} found — pick one:
+                                                        {addNumResults.length} number{addNumResults.length !== 1 ? 's' : ''} found â€” pick one:
                                                     </p>
                                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1">
                                                         {addNumResults.map(n => (
@@ -3808,14 +3847,14 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                         onClick={() => { setAddNumStep('search'); setAddNumResults([]); setAddNumSelected(''); }}
                                                         className="px-5 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 transition"
                                                     >
-                                                        ← Search Again
+                                                        â† Search Again
                                                     </button>
                                                     <button
                                                         onClick={handleClaimNumber}
                                                         disabled={addNumBusy || !addNumSelected}
                                                         className="flex-1 py-2.5 text-sm font-black bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-xl transition flex items-center justify-center gap-2"
                                                     >
-                                                        {addNumBusy ? 'Claiming…' : 'Claim Number →'}
+                                                        {addNumBusy ? 'Claimingâ€¦' : 'Claim Number â†’'}
                                                     </button>
                                                 </div>
                                             </div>
@@ -3825,11 +3864,11 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
 
                                 {/* Info callout */}
                                 <div className="bg-violet-900/10 dark:bg-violet-900/20 p-6 rounded-2xl border border-violet-500/20">
-                                    <h4 className="font-bold text-violet-400 mb-3 text-sm">📱 Multi-Number Inboxes</h4>
+                                    <h4 className="font-bold text-violet-400 mb-3 text-sm">ðŸ“± Multi-Number Inboxes</h4>
                                     <ul className="text-xs text-slate-400 space-y-1.5 list-disc list-inside leading-relaxed">
                                         <li>Each number gets its own inbox in the SMS tool. You can restrict which users see each inbox.</li>
                                         <li>The <strong>default</strong> number handles inbound replies when the conversation has no assigned inbox.</li>
-                                        <li>New numbers use the same Twilio sub-account as your primary — no extra A2P registration needed.</li>
+                                        <li>New numbers use the same Twilio sub-account as your primary â€” no extra A2P registration needed.</li>
                                         <li>To restrict inbox access per user, use the <strong>Manage Numbers</strong> panel inside the SMS tool.</li>
                                     </ul>
                                 </div>
@@ -3842,7 +3881,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                         <div className={`p-4 rounded-xl text-xs font-bold flex items-center gap-2 ${
                             smsMessage.type === 'success' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' : 'bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400'
                         }`}>
-                            <span>{smsMessage.type === 'success' ? '✓' : '⚠️'}</span>
+                            <span>{smsMessage.type === 'success' ? 'âœ“' : 'âš ï¸'}</span>
                             {smsMessage.text}
                         </div>
                     )}
@@ -3853,7 +3892,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                             disabled={isSmsSaving}
                             className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-8 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30"
                         >
-                            {isSmsSaving ? 'Saving…' : 'Save SMS Settings'}
+                            {isSmsSaving ? 'Savingâ€¦' : 'Save SMS Settings'}
                         </button>
                     </div>
                 </div>
@@ -3895,7 +3934,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
             />
         )}
 
-        {/* ─── SMS Terms of Service Modal ──────────────────────────────────── */}
+        {/* â”€â”€â”€ SMS Terms of Service Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         {showTermsModal && (
             <SmsAdminTermsModal
                 churchId={churchId}
