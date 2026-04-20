@@ -547,6 +547,56 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                     </div>
                                 </div>
 
+                                {/* ── A2P Profile Bundle SID ── */}
+                                <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
+                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">
+                                        A2P Profile Bundle SID
+                                        {settings.twilioA2pProfileBundleSid?.startsWith('BN') ? (
+                                            <span className="ml-2 normal-case font-black text-[9px] bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded-full">SET</span>
+                                        ) : (
+                                            <span className="ml-2 normal-case font-black text-[9px] bg-rose-500/10 text-rose-500 px-1.5 py-0.5 rounded-full">REQUIRED</span>
+                                        )}
+                                    </label>
+                                    <p className="text-[9px] text-slate-400 mb-2">
+                                        The <strong>BN...</strong> SID for <strong>Hon Ventures LLC</strong> — the ISV master A2P Profile Bundle. Required when registering church brands.
+                                        Find it at:{' '}
+                                        <a href="https://console.twilio.com/us1/develop/sms/regulatory/a2p-registration" target="_blank" rel="noopener noreferrer" className="underline text-indigo-400 hover:text-indigo-300">
+                                            Twilio Console → Messaging → Regulatory → A2P Registration
+                                        </a>.
+                                    </p>
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            value={settings.twilioA2pProfileBundleSid || ''}
+                                            onChange={e => handleChange('twilioA2pProfileBundleSid', e.target.value.trim())}
+                                            className="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                            placeholder="BNxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                                        />
+                                        <button
+                                            onClick={async () => {
+                                                setIsVerifying(true);
+                                                setMessage(null);
+                                                try {
+                                                    const base = (settings.apiBaseUrl || DEFAULT_API_URL).replace(/\/$/, '');
+                                                    const res = await fetch(`${base}/api/messaging/a2p-profile-sid`);
+                                                    const data = await res.json();
+                                                    if (!res.ok) { setMessage({ type: 'error', text: data.error || 'Failed to fetch A2P profiles' }); return; }
+                                                    handleChange('twilioA2pProfileBundleSid', data.primarySid);
+                                                    setMessage({ type: 'success', text: `Auto-filled A2P Bundle: ${data.friendlyName} (${data.status}) — ${data.primarySid}` });
+                                                } catch (e: any) {
+                                                    setMessage({ type: 'error', text: e.message || 'Failed to fetch from Twilio' });
+                                                } finally {
+                                                    setIsVerifying(false);
+                                                }
+                                            }}
+                                            disabled={isVerifying}
+                                            className="shrink-0 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 px-3 py-2 rounded-xl font-bold text-xs hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors disabled:opacity-50 whitespace-nowrap"
+                                        >
+                                            {isVerifying ? '...' : '🔍 Fetch from Twilio'}
+                                        </button>
+                                    </div>
+                                </div>
+
                                 {/* API Key pair (optional, tighter scope than Auth Token) */}
                                 <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
                                     <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">API Key SID <span className="normal-case font-normal text-slate-400">(optional, preferred)</span></label>

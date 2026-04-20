@@ -1535,10 +1535,23 @@ export const registerBrand = async (req: any, res: any) => {
             });
         }
 
+        // ── Read A2P Profile Bundle SID from system settings ──────────────────────
+        // Twilio requires a2PProfileBundleSid (BN...) — the ISV master A2P profile bundle.
+        // Set this in System Settings → Twilio SMS → A2P Profile Bundle SID.
+        const sysSnap = await db.doc('system/settings').get();
+        const sysData = sysSnap.data() || {};
+        const a2pProfileSid: string = sysData.twilioA2pProfileBundleSid || sms.twilioA2pProfileSid || '';
+        if (!a2pProfileSid || !a2pProfileSid.startsWith('BN')) {
+            return res.status(400).json({
+                error: 'A2P Profile Bundle SID (BN...) is not configured. ' +
+                    'Go to System Settings → Twilio SMS → A2P Profile Bundle SID and click "Fetch from Twilio" or paste it manually.',
+            });
+        }
+
         // ── Submit brand registration ─────────────────────────────────────────────
         const brand = await (master as any).messaging.v1.brandRegistrations.create({
             customerProfileBundleSid: profileSid,
-            ...(sms.twilioA2pProfileSid ? { a2PProfileBundleSid: sms.twilioA2pProfileSid } : {}),
+            a2PProfileBundleSid:      a2pProfileSid,
             friendlyName: sms.a2pBusinessName,
             email:        sms.a2pContactEmail,
             phone:        toE164(sms.a2pContactPhone || ''),
@@ -1970,5 +1983,66 @@ export const fetchPrimaryProfileSid = async (req: any, res: any) => {
     } catch (e: any) {
         log.error(`[fetchPrimaryProfileSid] ${e.message}`, 'system', {}, 'system');
         return res.status(500).json({ error: e.message || 'Failed to fetch Customer Profiles' });
+    }
+};
+
+// ─── GET /api/messaging/a2p-profile-sid ──────────────────────────────────────
+// Fetches the A2P Profile Bundles (BN...) from the master Twilio account.
+// The admin pastes this into System Settings so brand registrations can link
+// to the ISV A2P profile, which Twilio requires via a2PProfileBundleSid.
+export const fetchA2pProfileSid = async (req: any, res: any) => {
+    const db = getDb();
+    const log = createServerLogger(db);
+    try {
+        const { accountSid, authToken } = await getMasterCredentials(db);
+        const master = getMasterClient(accountSid, authToken);
+
+        // List all A2P Profile Bundles on the master account
+        const bundles = await (master as any).messaging.v1.a2PProfileBundles?.list({ pageSize: 50 })
+            ?? [];
+
+        if (!bundles || bundles.length === 0) {
+            // Twilio older SDK may not expose a2PProfileBundles directly — try the trusthub route
+            try {
+                const tBundles = await (master as any).trusthub.v1.a2PProfileBundles?.list({ pageSize: 20 }) ?? [];
+                if (tBundles.length > 0) {
+                    const priorityOrder = ['approved', 'twilio-approved', 'pending-review', 'draft'];
+                    let best: any = null;
+                    for (const status of priorityOrder) {
+                        best = tBundles.find((p: any) => p.status === status);
+                        if (best) break;
+                    }
+                    if (!best) best = tBundles[0];
+                    return res.json({
+                        success: true, primarySid: best.sid,
+                        friendlyName: best.friendlyName, status: best.status,
+                        allProfiles: tBundles.map((b: any) => ({ sid: b.sid, friendlyName: b.friendlyName, status: b.status })),
+                    });
+                }
+            } catch (_) { /* ignore */ }
+
+            return res.status(404).json({
+                error: 'No A2P Profile Bundles (BN...) found. Create one at: https://console.twilio.com/us1/develop/sms/regulatory/a2p-registration',
+            });
+        }
+
+        const priorityOrder = ['approved', 'twilio-approved', 'pending-review', 'draft'];
+        let best: any = null;
+        for (const status of priorityOrder) {
+            best = bundles.find((p: any) => p.status === status);
+            if (best) break;
+        }
+        if (!best) best = bundles[0];
+
+        return res.json({
+            success:      true,
+            primarySid:   best.sid,
+            friendlyName: best.friendlyName,
+            status:       best.status,
+            allProfiles:  bundles.map((b: any) => ({ sid: b.sid, friendlyName: b.friendlyName, status: b.status })),
+        });
+    } catch (e: any) {
+        log.error(`[fetchA2pProfileSid] ${e.message}`, 'system', {}, 'system');
+        return res.status(500).json({ error: e.message || 'Failed to fetch A2P Profile Bundles' });
     }
 };

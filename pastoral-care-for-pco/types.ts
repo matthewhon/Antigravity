@@ -471,6 +471,12 @@ export interface SystemSettings {
      * so Twilio can validate the ISV chain before approving. Set in System Settings → Twilio SMS.
      */
     primaryCustomerProfileSid?: string;
+    /**
+     * A2P Profile Bundle SID (BN...) — the ISV master A2P profile bundle for Hon Ventures LLC.
+     * Required when submitting brand registrations via the Twilio messaging.v1.brandRegistrations API.
+     * Find it at: Twilio Console → Messaging → Regulatory → A2P Registration.
+     */
+    twilioA2pProfileBundleSid?: string;
 }
 
 export interface TemplateSettings {

@@ -19,7 +19,7 @@ import { getDb } from './backend/firebase';
 import { handleGeminiProxy } from './backend/geminiProxy';
 import { provisionSubuser, authenticateDomain, verifyDomain, diagnoseDomain } from './backend/emailProvisioning';
 import { getPublicGroups, getPublicRegistrations, getPublicEvents, serveWidgetScript } from './backend/publicApi.js';
-import { getAvailableNumbers, provisionTwilioNumber, releaseTwilioNumber, registerA2p, checkA2pStatus, createCustomerProfile, deleteCustomerProfile, refreshCustomerProfileStatus, addTwilioNumber, releaseSpecificNumber, updateNumberSettings, setDefaultNumber, trustHubStatusCallback, registerBrand, createMessagingService, registerCampaign, assignNumbersToService, checkCampaignStatus, fetchPrimaryProfileSid } from './backend/twilioProvisioning';
+import { getAvailableNumbers, provisionTwilioNumber, releaseTwilioNumber, registerA2p, checkA2pStatus, createCustomerProfile, deleteCustomerProfile, refreshCustomerProfileStatus, addTwilioNumber, releaseSpecificNumber, updateNumberSettings, setDefaultNumber, trustHubStatusCallback, registerBrand, createMessagingService, registerCampaign, assignNumbersToService, checkCampaignStatus, fetchPrimaryProfileSid, fetchA2pProfileSid } from './backend/twilioProvisioning';
 import { handleInboundSms } from './backend/twilioInbound';
 import { sendIndividual, sendBulk } from './backend/twilioSend';
 import { handleStatusCallback } from './backend/twilioWebhookStatus';
@@ -189,6 +189,8 @@ async function startServer() {
     app.post('/api/messaging/campaign-status', express.json(), checkCampaignStatus);
     // Fetch primary customer profile BU... SID from master Twilio account
     app.get('/api/messaging/primary-profile-sid', fetchPrimaryProfileSid);
+    // Fetch A2P Profile Bundle BN... SID from master Twilio account
+    app.get('/api/messaging/a2p-profile-sid', fetchA2pProfileSid);
 
     // ─── SMS Agent: Website Scanner ─────────────────────────────────────────────
     // Fetches a church website URL server-side, extracts visible text, and uses
