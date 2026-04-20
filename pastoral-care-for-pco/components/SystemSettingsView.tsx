@@ -714,7 +714,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                         </div>
                                         <button
                                             role="switch"
-                                            aria-checked={!!settings.twilioRequireA2PRegistration}
+                                            aria-checked={settings.twilioRequireA2PRegistration ? 'true' : 'false'}
                                             aria-label="Require A2P 10DLC Registration"
                                             onClick={() => handleChange('twilioRequireA2PRegistration', !settings.twilioRequireA2PRegistration)}
                                             className={`ml-4 shrink-0 w-12 h-6 rounded-full p-1 transition-colors ${settings.twilioRequireA2PRegistration ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'}`}
@@ -730,7 +730,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                         </div>
                                         <button
                                             role="switch"
-                                            aria-checked={!!settings.twilioEnableCarrierLookup}
+                                            aria-checked={settings.twilioEnableCarrierLookup ? 'true' : 'false'}
                                             aria-label="Enable Carrier Lookup on Inbound Numbers"
                                             onClick={() => handleChange('twilioEnableCarrierLookup', !settings.twilioEnableCarrierLookup)}
                                             className={`ml-4 shrink-0 w-12 h-6 rounded-full p-1 transition-colors ${settings.twilioEnableCarrierLookup ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'}`}
@@ -938,7 +938,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                             <span className="text-xs font-bold text-slate-900 dark:text-white">Allow Public Signups</span>
                             <button 
                                 role="switch"
-                                aria-checked={!!settings.allowSignups}
+                                aria-checked={settings.allowSignups ? 'true' : 'false'}
                                 aria-label="Allow Public Signups"
                                 onClick={() => handleChange('allowSignups', !settings.allowSignups)}
                                 className={`w-12 h-6 rounded-full p-1 transition-colors ${settings.allowSignups ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'}`}

@@ -1621,6 +1621,7 @@ const WidgetConfigPanel: React.FC<{
       <div className="flex items-center gap-2">
         <button
           onClick={onBack}
+          aria-label="Back to widget list"
           className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
         >
           <ChevronLeft size={15} />
@@ -1646,6 +1647,7 @@ const WidgetConfigPanel: React.FC<{
             </div>
           ) : (
             <select
+              aria-label="Filter by Planning Center List"
               value={pcoListId}
               onChange={e => {
                 const selected = pcoLists.find(l => l.id === e.target.value);
@@ -1684,6 +1686,7 @@ const WidgetConfigPanel: React.FC<{
             </div>
           ) : (
             <select
+              aria-label="Filter by fund"
               value={fundName}
               onChange={e => setFundName(e.target.value)}
               className="w-full text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -1707,6 +1710,7 @@ const WidgetConfigPanel: React.FC<{
             Days to look ahead
           </label>
           <select
+            aria-label="Days to look ahead"
             value={dayRange}
             onChange={e => setDayRange(e.target.value)}
             className="w-full text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -1727,6 +1731,7 @@ const WidgetConfigPanel: React.FC<{
             Time Period
           </label>
           <select
+            aria-label="Time period"
             value={timePeriod}
             onChange={e => setTimePeriod(e.target.value)}
             className="w-full text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"

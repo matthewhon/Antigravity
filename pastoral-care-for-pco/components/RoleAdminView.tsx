@@ -3570,7 +3570,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         </div>
                                         <button
                                             role="switch"
-                                            aria-checked={!!smsForm.prefixMessagesWithName}
+                                            aria-checked={smsForm.prefixMessagesWithName ? 'true' : 'false'}
                                             aria-label="Prefix Messages with Church Name"
                                             onClick={() => handleSmsChange('prefixMessagesWithName', !smsForm.prefixMessagesWithName)}
                                             className={`ml-4 shrink-0 w-12 h-6 rounded-full p-1 transition-colors ${smsForm.prefixMessagesWithName ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'}`}

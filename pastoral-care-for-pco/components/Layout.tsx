@@ -57,6 +57,19 @@ const Layout: React.FC<LayoutProps> = ({
   const [toolsOpen, setToolsOpen] = useState(false);
   const toolsRef = useRef<HTMLDivElement>(null);
 
+  // ── Close-delay timers ──────────────────────────────────────────────────────
+  // The dropdown panels are fixed-position with an 8px gap below the trigger.
+  // Without a delay, moving the mouse from the button across that gap fires
+  // onMouseLeave and closes the menu before the cursor reaches the panel.
+  // A 150ms debounce gives the mouse enough time to cross the gap.
+  const closeTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const scheduleClose = (key: string, setter: (v: boolean) => void) => {
+    closeTimers.current[key] = setTimeout(() => setter(false), 150);
+  };
+  const cancelClose = (key: string) => {
+    clearTimeout(closeTimers.current[key]);
+  };
+
   const getDropdownStyle = (ref: React.RefObject<HTMLDivElement>) => {
     if (!ref.current) return {};
     const rect = ref.current.getBoundingClientRect();
@@ -112,8 +125,8 @@ const Layout: React.FC<LayoutProps> = ({
                   <div
                     ref={peopleRef}
                     className="relative shrink-0"
-                    onMouseEnter={() => setPeopleOpen(true)}
-                    onMouseLeave={() => setPeopleOpen(false)}
+                    onMouseEnter={() => { cancelClose('people'); setPeopleOpen(true); }}
+                    onMouseLeave={() => scheduleClose('people', setPeopleOpen)}
                   >
                     <button
                       onClick={() => onNavigate('people')}
@@ -145,8 +158,8 @@ const Layout: React.FC<LayoutProps> = ({
                   <div
                     ref={servicesRef}
                     className="relative shrink-0"
-                    onMouseEnter={() => setServicesOpen(true)}
-                    onMouseLeave={() => setServicesOpen(false)}
+                    onMouseEnter={() => { cancelClose('services'); setServicesOpen(true); }}
+                    onMouseLeave={() => scheduleClose('services', setServicesOpen)}
                   >
                     <button
                       onClick={() => onNavigate('services')}
@@ -167,8 +180,8 @@ const Layout: React.FC<LayoutProps> = ({
                   <div
                     ref={givingRef}
                     className="relative shrink-0"
-                    onMouseEnter={() => setGivingOpen(true)}
-                    onMouseLeave={() => setGivingOpen(false)}
+                    onMouseEnter={() => { cancelClose('giving'); setGivingOpen(true); }}
+                    onMouseLeave={() => scheduleClose('giving', setGivingOpen)}
                   >
                     <button
                       onClick={() => onNavigate('giving')}
@@ -189,8 +202,8 @@ const Layout: React.FC<LayoutProps> = ({
                   <div
                     ref={careRef}
                     className="relative shrink-0"
-                    onMouseEnter={() => setCareOpen(true)}
-                    onMouseLeave={() => setCareOpen(false)}
+                    onMouseEnter={() => { cancelClose('care'); setCareOpen(true); }}
+                    onMouseLeave={() => scheduleClose('care', setCareOpen)}
                   >
                     <button
                       onClick={() => onNavigate('pastoral')}
@@ -211,8 +224,8 @@ const Layout: React.FC<LayoutProps> = ({
                   <div
                     ref={metricsRef}
                     className="relative shrink-0"
-                    onMouseEnter={() => setMetricsOpen(true)}
-                    onMouseLeave={() => setMetricsOpen(false)}
+                    onMouseEnter={() => { cancelClose('metrics'); setMetricsOpen(true); }}
+                    onMouseLeave={() => scheduleClose('metrics', setMetricsOpen)}
                   >
                     <button
                       onClick={() => onNavigate('metrics')}
@@ -234,8 +247,8 @@ const Layout: React.FC<LayoutProps> = ({
                   <div
                     className="fixed z-[9999]"
                     style={getDropdownStyle(metricsRef)}
-                    onMouseEnter={() => setMetricsOpen(true)}
-                    onMouseLeave={() => setMetricsOpen(false)}
+                    onMouseEnter={() => { cancelClose('metrics'); setMetricsOpen(true); }}
+                    onMouseLeave={() => scheduleClose('metrics', setMetricsOpen)}
                   >
                     <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl shadow-black/40 p-2 flex flex-col gap-1 min-w-[180px]">
                       {[
@@ -265,8 +278,8 @@ const Layout: React.FC<LayoutProps> = ({
                   <div
                     className="fixed z-[9999]"
                     style={getDropdownStyle(careRef)}
-                    onMouseEnter={() => setCareOpen(true)}
-                    onMouseLeave={() => setCareOpen(false)}
+                    onMouseEnter={() => { cancelClose('care'); setCareOpen(true); }}
+                    onMouseLeave={() => scheduleClose('care', setCareOpen)}
                   >
                     <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl shadow-black/40 p-2 flex flex-col gap-1 min-w-[180px]">
                       {[
@@ -298,8 +311,8 @@ const Layout: React.FC<LayoutProps> = ({
                   <div
                     className="fixed z-[9999]"
                     style={getDropdownStyle(peopleRef)}
-                    onMouseEnter={() => setPeopleOpen(true)}
-                    onMouseLeave={() => setPeopleOpen(false)}
+                    onMouseEnter={() => { cancelClose('people'); setPeopleOpen(true); }}
+                    onMouseLeave={() => scheduleClose('people', setPeopleOpen)}
                   >
                     <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl shadow-black/40 p-2 flex flex-col gap-1 min-w-[180px]">
                       {[
@@ -329,8 +342,8 @@ const Layout: React.FC<LayoutProps> = ({
                   <div
                     className="fixed z-[9999]"
                     style={getDropdownStyle(servicesRef)}
-                    onMouseEnter={() => setServicesOpen(true)}
-                    onMouseLeave={() => setServicesOpen(false)}
+                    onMouseEnter={() => { cancelClose('services'); setServicesOpen(true); }}
+                    onMouseLeave={() => scheduleClose('services', setServicesOpen)}
                   >
                     <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl shadow-black/40 p-2 flex flex-col gap-1 min-w-[180px]">
                       {[
@@ -360,8 +373,8 @@ const Layout: React.FC<LayoutProps> = ({
                   <div
                     className="fixed z-[9999]"
                     style={getDropdownStyle(givingRef)}
-                    onMouseEnter={() => setGivingOpen(true)}
-                    onMouseLeave={() => setGivingOpen(false)}
+                    onMouseEnter={() => { cancelClose('giving'); setGivingOpen(true); }}
+                    onMouseLeave={() => scheduleClose('giving', setGivingOpen)}
                   >
                     <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl shadow-black/40 p-2 flex flex-col gap-1 min-w-[180px]">
                       {[
@@ -392,8 +405,8 @@ const Layout: React.FC<LayoutProps> = ({
                   <div
                     ref={toolsRef}
                     className="relative shrink-0"
-                    onMouseEnter={() => setToolsOpen(true)}
-                    onMouseLeave={() => setToolsOpen(false)}
+                    onMouseEnter={() => { cancelClose('tools'); setToolsOpen(true); }}
+                    onMouseLeave={() => scheduleClose('tools', setToolsOpen)}
                   >
                     <button
                       onClick={() => onNavigate('tools-emails')}
@@ -415,8 +428,8 @@ const Layout: React.FC<LayoutProps> = ({
                   <div
                     className="fixed z-[9999]"
                     style={getDropdownStyle(toolsRef)}
-                    onMouseEnter={() => setToolsOpen(true)}
-                    onMouseLeave={() => setToolsOpen(false)}
+                    onMouseEnter={() => { cancelClose('tools'); setToolsOpen(true); }}
+                    onMouseLeave={() => scheduleClose('tools', setToolsOpen)}
                   >
                     <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl shadow-black/40 p-2 flex flex-col gap-1 min-w-[180px]">
                       {[

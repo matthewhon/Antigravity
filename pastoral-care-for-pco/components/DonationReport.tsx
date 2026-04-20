@@ -360,6 +360,7 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                 <div>
                     <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Interval</label>
                     <select
+                        aria-label="Reporting interval"
                         value={filters.interval}
                         onChange={(e) => setFilters(prev => ({ ...prev, interval: e.target.value as IntervalType }))}
                         className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-4 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500"
@@ -376,6 +377,7 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                     <div className="flex items-center gap-2">
                         <input
                             type="date"
+                            aria-label="Start date"
                             value={filters.startDate}
                             onChange={(e) => setFilters(prev => ({ ...prev, startDate: e.target.value }))}
                             className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-xs font-bold outline-none"
@@ -383,6 +385,7 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                         <span className="text-slate-300">-</span>
                         <input
                             type="date"
+                            aria-label="End date"
                             value={filters.endDate}
                             onChange={(e) => setFilters(prev => ({ ...prev, endDate: e.target.value }))}
                             className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-xs font-bold outline-none"

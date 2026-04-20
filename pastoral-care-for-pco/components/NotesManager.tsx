@@ -448,6 +448,7 @@ const EditorToolbar: React.FC<ToolbarProps> = ({ churchId, onImageInsert, onPcoI
         <input
           ref={imgInputRef}
           type="file"
+          aria-label="Upload image"
           accept="image/*"
           className="hidden"
           onChange={e => {
