@@ -1,4 +1,4 @@
-
+﻿
 export type UserRole = 'Church Admin' | 'Pastor' | 'Pastor AI' | 'People' | 'Services' | 'Groups' | 'Giving' | 'Finance' | 'Pastoral Care' | 'Metrics' | 'System Administration' | 'Messaging';
 
 export interface User {
@@ -886,6 +886,21 @@ export interface SmsSettings {
     twilioCustomerProfileSid?: string;
     /** Twilio A2P Profile Bundle SID � required for full brand registration */
     twilioA2pProfileSid?: string;
+    twilioEndUserSid?: string;
+    twilioRepEndUserSid?: string;
+    twilioRep2EndUserSid?: string;
+    twilioAddressSid?: string;
+    twilioSupportingDocSid?: string;
+    twilioCustomerProfileStatus?: string;
+    twilioCustomerProfileEvaluation?: string;
+    twilioCustomerProfileCreatedAt?: number;
+    twilioCustomerProfileUpdatedAt?: number;
+    a2pRep2FirstName?: string;
+    a2pRep2LastName?: string;
+    a2pRep2Email?: string;
+    a2pRep2Phone?: string;
+    a2pRep2JobTitle?: string;
+    a2pRep2JobPosition?: string;
 
     // -- Opt-Out / Sender ID Settings ------------------------------------------
     /** Display name used as sender context in message headers */

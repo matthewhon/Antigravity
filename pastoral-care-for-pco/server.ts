@@ -19,7 +19,7 @@ import { getDb } from './backend/firebase';
 import { handleGeminiProxy } from './backend/geminiProxy';
 import { provisionSubuser, authenticateDomain, verifyDomain, diagnoseDomain } from './backend/emailProvisioning';
 import { getPublicGroups, getPublicRegistrations, getPublicEvents, serveWidgetScript } from './backend/publicApi.js';
-import { getAvailableNumbers, provisionTwilioNumber, releaseTwilioNumber, registerA2p, checkA2pStatus, createCustomerProfile, addTwilioNumber, releaseSpecificNumber, updateNumberSettings, setDefaultNumber } from './backend/twilioProvisioning';
+import { getAvailableNumbers, provisionTwilioNumber, releaseTwilioNumber, registerA2p, checkA2pStatus, createCustomerProfile, addTwilioNumber, releaseSpecificNumber, updateNumberSettings, setDefaultNumber, trustHubStatusCallback } from './backend/twilioProvisioning';
 import { handleInboundSms } from './backend/twilioInbound';
 import { sendIndividual, sendBulk } from './backend/twilioSend';
 import { handleStatusCallback } from './backend/twilioWebhookStatus';
@@ -168,6 +168,8 @@ async function startServer() {
     app.get('/api/messaging/a2p-status', checkA2pStatus);
     app.post('/api/messaging/a2p-status', express.json(), checkA2pStatus); // also accept POST
     app.post('/api/messaging/create-customer-profile', express.json(), createCustomerProfile);
+    // TrustHub status webhook — Twilio posts form-urlencoded when a bundle status changes
+    app.post('/api/messaging/trust-hub-status', express.urlencoded({ extended: false }), trustHubStatusCallback);
     // Multi-number endpoints
     app.post('/api/messaging/add-number', express.json(), addTwilioNumber);
     app.post('/api/messaging/release-number', express.json(), releaseSpecificNumber);

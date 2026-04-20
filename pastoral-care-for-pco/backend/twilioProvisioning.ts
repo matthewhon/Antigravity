@@ -592,6 +592,10 @@ export const registerA2p = async (req: any, res: any) => {
             { key: 'a2pCity',                label: 'City' },
             { key: 'a2pState',               label: 'State' },
             { key: 'a2pZip',                 label: 'ZIP Code' },
+            { key: 'a2pRep2FirstName',        label: 'Rep 2 First Name' },
+            { key: 'a2pRep2LastName',         label: 'Rep 2 Last Name' },
+            { key: 'a2pRep2Email',            label: 'Rep 2 Email' },
+            { key: 'a2pRep2Phone',            label: 'Rep 2 Phone' },
         ];
         const missing = required.filter(r => !smsSettings[r.key]).map(r => r.label);
         if (missing.length > 0) {
@@ -814,9 +818,13 @@ export const createCustomerProfile = async (req: any, res: any) => {
             { key: 'a2pContactJobTitle',     label: 'Contact Job Title' },
             { key: 'a2pContactJobPosition',  label: 'Contact Job Level' },
             { key: 'a2pAddress',             label: 'Street Address' },
-            { key: 'a2pCity',               label: 'City' },
-            { key: 'a2pState',              label: 'State' },
-            { key: 'a2pZip',                label: 'ZIP Code' },
+            { key: 'a2pCity',                label: 'City' },
+            { key: 'a2pState',               label: 'State' },
+            { key: 'a2pZip',                 label: 'ZIP Code' },
+            { key: 'a2pRep2FirstName',        label: 'Rep 2 First Name' },
+            { key: 'a2pRep2LastName',         label: 'Rep 2 Last Name' },
+            { key: 'a2pRep2Email',            label: 'Rep 2 Email' },
+            { key: 'a2pRep2Phone',            label: 'Rep 2 Phone' },
         ];
         const missing = required.filter(r => !sms[r.key]).map(r => r.label);
         if (missing.length) {
@@ -872,7 +880,7 @@ export const createCustomerProfile = async (req: any, res: any) => {
         });
         log.info(`[createCustomerProfile] Created address SupportingDocument ${addrDoc.sid}`, 'system', { churchId }, churchId);
 
-        // ── Step 1d: Authorised rep EndUser (personal contact fields) ───────────
+        // ── Step 1d: Authorised rep 1 EndUser (personal contact fields) ─────────
         const repEndUser = await (master as any).trusthub.v1.endUsers.create({
             friendlyName: `${sms.a2pContactFirstName} ${sms.a2pContactLastName} – ${sms.a2pBusinessName}`,
             type: 'authorized_representative_1',
@@ -885,7 +893,22 @@ export const createCustomerProfile = async (req: any, res: any) => {
                 business_title: sms.a2pContactJobTitle    || sms.a2pContactJobPosition || 'Director',
             },
         });
-        log.info(`[createCustomerProfile] Created rep EndUser ${repEndUser.sid}`, 'system', { churchId }, churchId);
+        log.info(`[createCustomerProfile] Created rep1 EndUser ${repEndUser.sid}`, 'system', { churchId }, churchId);
+
+        // ── Step 1e: Authorised rep 2 EndUser (required by Twilio TrustHub) ──────
+        const rep2EndUser = await (master as any).trusthub.v1.endUsers.create({
+            friendlyName: `${sms.a2pRep2FirstName} ${sms.a2pRep2LastName} – ${sms.a2pBusinessName} (Rep 2)`,
+            type: 'authorized_representative_2',
+            attributes: {
+                first_name:     sms.a2pRep2FirstName,
+                last_name:      sms.a2pRep2LastName,
+                email:          sms.a2pRep2Email,
+                phone_number:   sms.a2pRep2Phone,
+                job_position:   sms.a2pRep2JobPosition || 'Director',
+                business_title: sms.a2pRep2JobTitle    || sms.a2pRep2JobPosition || 'Director',
+            },
+        });
+        log.info(`[createCustomerProfile] Created rep2 EndUser ${rep2EndUser.sid}`, 'system', { churchId }, churchId);
 
 
         // ── Step 2: Create the CustomerProfile bundle ─────────────────────────
@@ -905,7 +928,7 @@ export const createCustomerProfile = async (req: any, res: any) => {
         });
         log.info(`[createCustomerProfile] Created CustomerProfile ${profile.sid}`, 'system', { churchId }, churchId);
 
-        // ── Step 3: Assign biz EndUser, rep EndUser, and address SupportingDocument ──
+        // ── Step 3: Assign biz EndUser, rep1 EndUser, rep2 EndUser, and address SupportingDocument ──
         // Valid object types for customerProfilesEntityAssignments:
         //   IT... (EndUser)  |  RD... (SupportingDocument)
         // AD... (Address) objects are NOT valid — the address must be wrapped as RD... first.
@@ -922,10 +945,35 @@ export const createCustomerProfile = async (req: any, res: any) => {
         await (master as any).trusthub.v1
             .customerProfiles(profile.sid)
             .customerProfilesEntityAssignments
+            .create({ objectSid: rep2EndUser.sid });  // required second rep
+
+        await (master as any).trusthub.v1
+            .customerProfiles(profile.sid)
+            .customerProfilesEntityAssignments
             .create({ objectSid: addrDoc.sid });  // RD... SupportingDocument for the address
 
-        log.info(`[createCustomerProfile] Assigned EndUsers + address doc to ${profile.sid}`, 'system', { churchId }, churchId);
+        log.info(`[createCustomerProfile] Assigned 4 components to ${profile.sid}`, 'system', { churchId }, churchId);
 
+        // ── Step 3b: Evaluate bundle compliance before submitting ──────────────
+        let evaluationStatus = 'unknown';
+        let evaluationResults: any[] = [];
+        try {
+            const evaluation = await (master as any).trusthub.v1
+                .customerProfiles(profile.sid)
+                .customerProfilesEvaluations
+                .create({ policySid: A2P_POLICY_SID });
+            evaluationStatus = evaluation.status || 'unknown';
+            evaluationResults = evaluation.results || [];
+            log.info(
+                `[createCustomerProfile] Evaluation ${evaluationStatus} for ${profile.sid}`,
+                'system', { churchId, evaluationStatus }, churchId
+            );
+        } catch (evalErr: any) {
+            log.warn(
+                `[createCustomerProfile] Evaluation failed (non-fatal): ${evalErr.message}`,
+                'system', { churchId }, churchId
+            );
+        }
 
         // ── Step 4: Submit the profile for Twilio review ───────────────────────
         await (master as any).trusthub.v1
@@ -935,21 +983,31 @@ export const createCustomerProfile = async (req: any, res: any) => {
 
         // ── Step 5: Save to Firestore ──────────────────────────────────────────
         await db.collection('churches').doc(churchId).update({
-            'smsSettings.twilioCustomerProfileSid':       profile.sid,
-            'smsSettings.twilioEndUserSid':               bizEndUser.sid,
-            'smsSettings.twilioRepEndUserSid':            repEndUser.sid,
-            'smsSettings.twilioCustomerProfileStatus':    'pending-review',
-            'smsSettings.twilioCustomerProfileCreatedAt': Date.now(),
+            'smsSettings.twilioCustomerProfileSid':            profile.sid,
+            'smsSettings.twilioEndUserSid':                    bizEndUser.sid,
+            'smsSettings.twilioRepEndUserSid':                 repEndUser.sid,
+            'smsSettings.twilioRep2EndUserSid':                rep2EndUser.sid,
+            'smsSettings.twilioAddressSid':                    bizAddress.sid,
+            'smsSettings.twilioSupportingDocSid':              addrDoc.sid,
+            'smsSettings.twilioCustomerProfileStatus':         'pending-review',
+            'smsSettings.twilioCustomerProfileEvaluation':     evaluationStatus,
+            'smsSettings.twilioCustomerProfileCreatedAt':      Date.now(),
         });
 
+        const isCompliant = evaluationStatus === 'compliant';
         return res.json({
-            success:    true,
-            profileSid: profile.sid,
-            endUserSid: bizEndUser.sid,
-            status:     'pending-review',
-            message:    'Customer Profile Bundle created and submitted for Twilio review. ' +
-                        'Approval is typically same-day. Once approved, click "Submit to Twilio" ' +
-                        'to complete A2P brand registration.',
+            success:           true,
+            profileSid:        profile.sid,
+            endUserSid:        bizEndUser.sid,
+            rep2EndUserSid:    rep2EndUser.sid,
+            evaluationStatus,
+            evaluationResults: isCompliant ? [] : evaluationResults,
+            status:            'pending-review',
+            message:           isCompliant
+                ? 'Customer Profile Bundle created, passed compliance evaluation, and submitted for Twilio review. ' +
+                  'Approval is typically same-day. Once approved, click "Submit to Twilio" to complete A2P brand registration.'
+                : `Customer Profile Bundle created and submitted, but the compliance evaluation returned "${evaluationStatus}". ` +
+                  'Twilio may still approve it. Check the evaluation results for details.',
         });
 
     } catch (e: any) {
@@ -969,3 +1027,47 @@ export const createCustomerProfile = async (req: any, res: any) => {
     }
 };
 
+
+// ─── POST /api/messaging/trust-hub-status ──────────────────────────────────────
+// Twilio webhook called when a CustomerProfile bundle status changes.
+// Body (application/x-www-form-urlencoded): AccountSid, BundleSid, Status
+// We find the church by BundleSid and sync the status to Firestore.
+
+export const trustHubStatusCallback = async (req: any, res: any) => {
+    const { BundleSid, Status } = req.body || {};
+    if (!BundleSid || !Status) return res.sendStatus(400);
+
+    const db  = getDb();
+    const log = createServerLogger(db);
+
+    try {
+        const snap = await db
+            .collection('churches')
+            .where('smsSettings.twilioCustomerProfileSid', '==', BundleSid)
+            .limit(1)
+            .get();
+
+        if (snap.empty) {
+            log.warn(`[trustHubStatusCallback] No church found for BundleSid ${BundleSid}`, 'system', {}, '');
+            return res.sendStatus(200); // ACK so Twilio does not retry
+        }
+
+        const churchId  = snap.docs[0].id;
+        const newStatus = (Status as string).toLowerCase();
+
+        await db.collection('churches').doc(churchId).update({
+            'smsSettings.twilioCustomerProfileStatus':    newStatus,
+            'smsSettings.twilioCustomerProfileUpdatedAt': Date.now(),
+        });
+
+        log.info(
+            `[trustHubStatusCallback] Profile ${BundleSid} → ${newStatus} for church ${churchId}`,
+            'system', { churchId, BundleSid, newStatus }, churchId
+        );
+
+        return res.sendStatus(200);
+    } catch (e: any) {
+        log.error(`[trustHubStatusCallback] Error: ${e.message}`, 'system', { BundleSid }, '');
+        return res.sendStatus(500);
+    }
+};

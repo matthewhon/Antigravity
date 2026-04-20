@@ -153,7 +153,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   const [isA2pSubmitting, setIsA2pSubmitting] = useState(false);
   const [isA2pChecking, setIsA2pChecking] = useState(false);
   const [isCreatingProfile, setIsCreatingProfile] = useState(false);
-  const [a2pResult, setA2pResult] = useState<{ success: boolean; message: string; brandSid?: string; failureReason?: string | null; twilioStatus?: string; needsBundle?: boolean; needsPrimaryProfile?: boolean } | null>(null);
+  const [a2pResult, setA2pResult] = useState<{ success: boolean; message: string; brandSid?: string; failureReason?: string | null; twilioStatus?: string; needsBundle?: boolean; needsPrimaryProfile?: boolean; evaluationStatus?: string } | null>(null);
 
   // Phone Numbers panel state (SMS → Numbers tab)
   const [twilioNumbers, setTwilioNumbers] = useState<any[]>([]);
@@ -1872,13 +1872,30 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                 failed:   'bg-rose-500/20   text-rose-600   dark:text-rose-400   border border-rose-500/30',
                 not_started: 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400',
             };
+            const PROFILE_STATUS_COLORS: Record<string, string> = {
+                'twilio-approved':  'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30',
+                'pending-review':   'bg-amber-500/10  text-amber-600  dark:text-amber-400  border border-amber-500/30',
+                'in-review':        'bg-blue-500/10   text-blue-600   dark:text-blue-400   border border-blue-500/30',
+                'twilio-rejected':  'bg-rose-500/20   text-rose-600   dark:text-rose-400   border border-rose-500/30',
+                'draft':            'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400',
+            };
+            const PROFILE_STATUS_LABEL: Record<string, string> = {
+                'twilio-approved': '✓ Profile Approved',
+                'pending-review':  '⏳ Profile Pending',
+                'in-review':       '🔍 In Review',
+                'twilio-rejected': '✗ Profile Rejected',
+                'draft':           'Profile Draft',
+            };
             const statusLabel: Record<string, string> = {
                 approved: '✓ Approved',
                 pending: '⏳ Pending Review',
                 failed: '✗ Failed',
                 not_started: 'Not Started',
             };
-            const a2pStatus = smsForm.twilioA2pStatus || 'not_started';
+            const a2pStatus      = smsForm.twilioA2pStatus           || 'not_started';
+            const profileStatus  = smsForm.twilioCustomerProfileStatus || '';
+            const profileSid     = smsForm.twilioCustomerProfileSid   || '';
+            const evalStatus     = smsForm.twilioCustomerProfileEvaluation || '';
 
             const handleSmsChange = (key: keyof NonNullable<Church['smsSettings']>, value: any) => {
                 setSmsForm(prev => ({ ...prev, [key]: value }));
@@ -1974,7 +1991,12 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                     });
                     const data = await res.json();
                     if (data.profileSid) {
-                        setSmsForm(prev => ({ ...prev, twilioCustomerProfileSid: data.profileSid }));
+                        setSmsForm(prev => ({
+                            ...prev,
+                            twilioCustomerProfileSid:        data.profileSid,
+                            twilioCustomerProfileStatus:     'pending-review',
+                            twilioCustomerProfileEvaluation: data.evaluationStatus || '',
+                        }));
                     }
                     setA2pResult({
                         success: !!data.success,
@@ -1983,6 +2005,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                             : (data.error || 'Profile creation failed'),
                         needsBundle: !data.success,
                         needsPrimaryProfile: !!data.needsPrimaryProfile,
+                        evaluationStatus: data.evaluationStatus || '',
                     });
                 } catch (e: any) {
                     setA2pResult({ success: false, message: e.message || 'Profile creation failed', needsBundle: true });
@@ -2006,10 +2029,26 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                     A2P 10DLC Registration &amp; Messaging Compliance
                                 </p>
                             </div>
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-3 flex-wrap">
                                 <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full ${A2P_STATUS_COLORS[a2pStatus]}`}>
                                     A2P: {statusLabel[a2pStatus]}
                                 </span>
+                                {profileSid && (
+                                    <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full ${
+                                        PROFILE_STATUS_COLORS[profileStatus] || 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                                    }`}>
+                                        {PROFILE_STATUS_LABEL[profileStatus] || `Profile: ${profileStatus || 'unknown'}`}
+                                    </span>
+                                )}
+                                {profileSid && evalStatus && (
+                                    <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full ${
+                                        evalStatus === 'compliant'
+                                            ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
+                                            : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30'
+                                    }`}>
+                                        Eval: {evalStatus}
+                                    </span>
+                                )}
                                 {smsForm.twilioBrandSid && (
                                     <button
                                         onClick={handleCheckA2pStatus}
@@ -2250,10 +2289,10 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                     </div>
                                 </div>
 
-                                {/* Contact */}
+                                {/* Contact / Authorized Rep 1 */}
                                 <div className="mt-5 pt-5 border-t border-slate-100 dark:border-slate-800">
-                                    <label className="block text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest mb-3">Authorized Contact</label>
-                                    <p className="text-[10px] text-slate-400 mb-4">This person will be the TCR point-of-contact. An executive at the organization (e.g., Senior Pastor, Executive Director) is preferred.</p>
+                                    <label className="block text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest mb-3">Authorized Representative 1</label>
+                                    <p className="text-[10px] text-slate-400 mb-4">Primary point-of-contact. An executive at the organization (e.g., Senior Pastor, Executive Director) is preferred.</p>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
                                             <label className={labelCn}>First Name</label>
@@ -2306,6 +2345,68 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                 <option value="General Counsel">General Counsel</option>
                                             </select>
                                             <p className="text-[9px] text-slate-400 mt-1.5">Closest executive-level equivalent. Twilio requires one of these values.</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Authorized Rep 2 — required by Twilio TrustHub */}
+                                <div className="mt-5 pt-5 border-t border-slate-100 dark:border-slate-800">
+                                    <label className="block text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest mb-3">
+                                        Authorized Representative 2 <span className="text-rose-500">*</span>
+                                    </label>
+                                    <p className="text-[10px] text-slate-400 mb-4">
+                                        Twilio TrustHub requires <strong>two</strong> authorized representatives for Secondary Customer Profiles. This person should be a different senior staff member.
+                                    </p>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className={labelCn}>First Name <span className="text-rose-500">*</span></label>
+                                            <input type="text" value={smsForm.a2pRep2FirstName || ''}
+                                                onChange={e => handleSmsChange('a2pRep2FirstName' as any, e.target.value)}
+                                                className={inputCn}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className={labelCn}>Last Name <span className="text-rose-500">*</span></label>
+                                            <input type="text" value={smsForm.a2pRep2LastName || ''}
+                                                onChange={e => handleSmsChange('a2pRep2LastName' as any, e.target.value)}
+                                                className={inputCn}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className={labelCn}>Email <span className="text-rose-500">*</span></label>
+                                            <input type="email" value={smsForm.a2pRep2Email || ''}
+                                                onChange={e => handleSmsChange('a2pRep2Email' as any, e.target.value)}
+                                                className={inputCn} placeholder="admin@mychurch.org"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className={labelCn}>Phone <span className="text-rose-500">*</span></label>
+                                            <input type="tel" value={smsForm.a2pRep2Phone || ''}
+                                                onChange={e => handleSmsChange('a2pRep2Phone' as any, e.target.value)}
+                                                className={inputCn} placeholder="+16155559876"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className={labelCn}>Job Title</label>
+                                            <input type="text" value={smsForm.a2pRep2JobTitle || ''}
+                                                onChange={e => handleSmsChange('a2pRep2JobTitle' as any, e.target.value)}
+                                                className={inputCn} placeholder="Church Administrator, Operations Director…"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className={labelCn}>Job Level</label>
+                                            <select value={smsForm.a2pRep2JobPosition || ''}
+                                                onChange={e => handleSmsChange('a2pRep2JobPosition' as any, e.target.value)}
+                                                className={inputCn}
+                                            >
+                                                <option value="">— Select —</option>
+                                                <option value="Director">Director</option>
+                                                <option value="VP">VP / Vice President</option>
+                                                <option value="GM">GM / General Manager</option>
+                                                <option value="CEO">CEO / President</option>
+                                                <option value="CFO">CFO</option>
+                                                <option value="General Counsel">General Counsel</option>
+                                            </select>
                                         </div>
                                     </div>
                                 </div>
@@ -2481,6 +2582,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                     <p className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400">
                                                         ↓ Complete this one-time platform setup in the Twilio Console
                                                     </p>
+
                                                     {([
                                                         {
                                                             step: '1',
@@ -2574,7 +2676,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                         disabled={isCreatingProfile}
                                                         className="shrink-0 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30 whitespace-nowrap"
                                                     >
-                                                        {isCreatingProfile ? '📡 Creating Profile…' : '🪄 Create & Submit Profile'}
+                                                        {isCreatingProfile ? '📡 Creating Profile…' : '🪄 Create &amp; Submit Profile'}
                                                     </button>
                                                 </div>
 
@@ -2614,7 +2716,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         </div>
                                         )
                                     ) : (
-                                        // ── Standard success / error feedback ────────────────────────────
+                                        // ── Standard success / error feedback ─────────────────────────────
                                         <div className={`mt-5 p-4 rounded-xl border text-xs ${
                                             a2pResult.success
                                                 ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300'
@@ -2627,6 +2729,15 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                     {a2pResult.brandSid && (
                                                         <p className="font-mono text-[10px] text-slate-500 dark:text-slate-400">
                                                             Brand SID: <strong>{a2pResult.brandSid}</strong>
+                                                        </p>
+                                                    )}
+                                                    {a2pResult.evaluationStatus && (
+                                                        <p className={`text-[10px] mt-0.5 font-bold ${
+                                                            a2pResult.evaluationStatus === 'compliant'
+                                                                ? 'text-emerald-600 dark:text-emerald-400'
+                                                                : 'text-amber-600 dark:text-amber-400'
+                                                        }`}>
+                                                            Evaluation: {a2pResult.evaluationStatus}
                                                         </p>
                                                     )}
                                                     {a2pResult.twilioStatus && (
@@ -2648,6 +2759,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
 
                         </div>
                     )}
+
 
                     {/* ── Opt-Out & Sender ID Sub-tab ───────────────────────────────────── */}
                     {smsSubTab === 'optout' && (
