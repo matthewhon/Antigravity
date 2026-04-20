@@ -105,6 +105,32 @@
         { "fieldPath": "pcoEventId", "order": "ASCENDING" },
         { "fieldPath": "status",     "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "twilioNumbers",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "churchId",   "order": "ASCENDING" },
+        { "fieldPath": "isDefault",  "order": "DESCENDING" },
+        { "fieldPath": "createdAt",  "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "twilioNumbers",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "churchId",  "order": "ASCENDING" },
+        { "fieldPath": "isDefault", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "smsConversations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "churchId",      "order": "ASCENDING" },
+        { "fieldPath": "twilioNumberId","order": "ASCENDING" },
+        { "fieldPath": "lastMessageAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

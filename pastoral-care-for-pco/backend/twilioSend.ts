@@ -4,10 +4,15 @@ import { createServerLogger } from '../services/logService';
 
 // ─── Master credentials helper ────────────────────────────────────────────────
 // All Twilio operations use the master account acting on behalf of the
-// church's sub-account.  This avoids any dependency on the stored
-// twilioSubAccountAuthToken, which can become stale after creation.
+// church's sub-account via the accountSid option.  This avoids any
+// dependency on the stored twilioSubAccountAuthToken, which can go stale.
+//
+// The correct pattern per Twilio Node.js SDK docs:
+//   twilio(masterSid, masterToken, { accountSid: subAccountSid })
+// This creates a full client that sends requests authenticated as the master
+// but scoped to the sub-account's resources.
 
-async function getMasterClient(db: any): Promise<any> {
+async function getMasterClient(db: any, subAccountSid?: string): Promise<any> {
     const snap = await db.doc('system/settings').get();
     const data = snap.data() || {};
     const accountSid = data.twilioMasterAccountSid || '';
@@ -15,7 +20,10 @@ async function getMasterClient(db: any): Promise<any> {
     if (!accountSid || !authToken) {
         throw new Error('Twilio master credentials are not configured in System Settings.');
     }
-    return twilio(accountSid, authToken);
+    // When subAccountSid is provided, the client will act on behalf of that sub-account
+    return subAccountSid
+        ? twilio(accountSid, authToken, { accountSid: subAccountSid })
+        : twilio(accountSid, authToken);
 }
 
 // ─── Segment cost constants (US pricing, adjust as needed) ───────────────────
@@ -85,10 +93,11 @@ async function getStatusCallbackUrl(db: any): Promise<string | null> {
 
 /**
  * Get a scoped Twilio client and the correct from-number for a church.
- * Uses the master account acting on behalf of the church's sub-account so
- * that the stored twilioSubAccountAuthToken is never needed for sending.
+ * Uses twilio(masterSid, masterToken, { accountSid: subSid }) so all API
+ * calls are authenticated with master credentials but scoped to the
+ * sub-account — no stored twilioSubAccountAuthToken needed.
  * If twilioNumberId is provided, uses that specific number.
- * Otherwise falls back to the church's smsSettings.twilioPhoneNumber (default/legacy).
+ * Otherwise falls back to the church's smsSettings.twilioPhoneNumber.
  */
 async function getSubClient(
     db: any,
@@ -101,30 +110,21 @@ async function getSubClient(
     if (!sms.smsEnabled)          throw new Error('SMS is not enabled for this church.');
     if (!sms.twilioSubAccountSid) throw new Error('No Twilio sub-account configured.');
 
-    // Use master client scoped to the sub-account — no stale auth token needed
-    const master = await getMasterClient(db);
-    const client = master.api.v2010.accounts(sms.twilioSubAccountSid);
+    // Full Twilio client scoped to the sub-account via master credentials
+    const client = await getMasterClient(db, sms.twilioSubAccountSid);
 
     // Resolve the from-number
     let fromNumber = sms.twilioPhoneNumber as string | undefined;
 
     if (twilioNumberId) {
-        // Specific number override
+        // Specific number override — simple single-doc lookup, no index needed
         const numSnap = await db.collection('twilioNumbers').doc(twilioNumberId).get();
         if (numSnap.exists && numSnap.data()?.churchId === churchId) {
             fromNumber = numSnap.data()!.phoneNumber;
         }
-    } else if (!fromNumber) {
-        // Look up the default number in the collection
-        const defaultSnap = await db.collection('twilioNumbers')
-            .where('churchId', '==', churchId)
-            .where('isDefault', '==', true)
-            .limit(1)
-            .get();
-        if (!defaultSnap.empty) {
-            fromNumber = defaultSnap.docs[0].data().phoneNumber;
-        }
     }
+    // smsSettings.twilioPhoneNumber is always kept in sync as the default
+    // so we don't need the compound twilioNumbers query (avoids index requirement)
 
     if (!fromNumber) throw new Error('No Twilio phone number configured for this church.');
     return { client, fromNumber };

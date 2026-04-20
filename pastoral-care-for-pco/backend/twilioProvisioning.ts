@@ -15,8 +15,11 @@ async function getMasterCredentials(db: any): Promise<{ accountSid: string; auth
     return { accountSid, authToken };
 }
 
-function getMasterClient(accountSid: string, authToken: string) {
-    return twilio(accountSid, authToken);
+/** Master client. Pass subAccountSid to scope all operations to that sub-account. */
+function getMasterClient(accountSid: string, authToken: string, subAccountSid?: string) {
+    return subAccountSid
+        ? twilio(accountSid, authToken, { accountSid: subAccountSid })
+        : twilio(accountSid, authToken);
 }
 
 // ─── GET /api/messaging/available-numbers ────────────────────────────────────
