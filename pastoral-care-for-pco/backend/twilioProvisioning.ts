@@ -592,10 +592,7 @@ export const registerA2p = async (req: any, res: any) => {
             { key: 'a2pCity',                label: 'City' },
             { key: 'a2pState',               label: 'State' },
             { key: 'a2pZip',                 label: 'ZIP Code' },
-            { key: 'a2pRep2FirstName',        label: 'Rep 2 First Name' },
-            { key: 'a2pRep2LastName',         label: 'Rep 2 Last Name' },
-            { key: 'a2pRep2Email',            label: 'Rep 2 Email' },
-            { key: 'a2pRep2Phone',            label: 'Rep 2 Phone' },
+            // Note: Rep 2 fields are required for createCustomerProfile, NOT for registerA2p
         ];
         const missing = required.filter(r => !smsSettings[r.key]).map(r => r.label);
         if (missing.length > 0) {
@@ -804,7 +801,7 @@ export const createCustomerProfile = async (req: any, res: any) => {
         if (!churchSnap.exists) return res.status(404).json({ error: 'Church not found' });
         const sms = churchSnap.data()?.smsSettings || {};
 
-        // Validate required fields
+        // Validate required fields (Rep 2 is optional — added in Step 1e if present)
         const required: { key: string; label: string }[] = [
             { key: 'a2pBusinessName',        label: 'Legal Business Name' },
             { key: 'a2pEin',                 label: 'Federal EIN' },
@@ -821,10 +818,6 @@ export const createCustomerProfile = async (req: any, res: any) => {
             { key: 'a2pCity',                label: 'City' },
             { key: 'a2pState',               label: 'State' },
             { key: 'a2pZip',                 label: 'ZIP Code' },
-            { key: 'a2pRep2FirstName',        label: 'Rep 2 First Name' },
-            { key: 'a2pRep2LastName',         label: 'Rep 2 Last Name' },
-            { key: 'a2pRep2Email',            label: 'Rep 2 Email' },
-            { key: 'a2pRep2Phone',            label: 'Rep 2 Phone' },
         ];
         const missing = required.filter(r => !sms[r.key]).map(r => r.label);
         if (missing.length) {
@@ -895,21 +888,26 @@ export const createCustomerProfile = async (req: any, res: any) => {
         });
         log.info(`[createCustomerProfile] Created rep1 EndUser ${repEndUser.sid}`, 'system', { churchId }, churchId);
 
-        // ── Step 1e: Authorised rep 2 EndUser (required by Twilio TrustHub) ──────
-        const rep2EndUser = await (master as any).trusthub.v1.endUsers.create({
-            friendlyName: `${sms.a2pRep2FirstName} ${sms.a2pRep2LastName} – ${sms.a2pBusinessName} (Rep 2)`,
-            type: 'authorized_representative_2',
-            attributes: {
-                first_name:     sms.a2pRep2FirstName,
-                last_name:      sms.a2pRep2LastName,
-                email:          sms.a2pRep2Email,
-                phone_number:   sms.a2pRep2Phone,
-                job_position:   sms.a2pRep2JobPosition || 'Director',
-                business_title: sms.a2pRep2JobTitle    || sms.a2pRep2JobPosition || 'Director',
-            },
-        });
-        log.info(`[createCustomerProfile] Created rep2 EndUser ${rep2EndUser.sid}`, 'system', { churchId }, churchId);
-
+        // ── Step 1e: Authorised rep 2 EndUser (optional — required for full TrustHub compliance) ──
+        let rep2EndUser: any = null;
+        const hasRep2 = sms.a2pRep2FirstName && sms.a2pRep2LastName && sms.a2pRep2Email && sms.a2pRep2Phone;
+        if (hasRep2) {
+            rep2EndUser = await (master as any).trusthub.v1.endUsers.create({
+                friendlyName: `${sms.a2pRep2FirstName} ${sms.a2pRep2LastName} – ${sms.a2pBusinessName} (Rep 2)`,
+                type: 'authorized_representative_2',
+                attributes: {
+                    first_name:     sms.a2pRep2FirstName,
+                    last_name:      sms.a2pRep2LastName,
+                    email:          sms.a2pRep2Email,
+                    phone_number:   sms.a2pRep2Phone,
+                    job_position:   sms.a2pRep2JobPosition || 'Director',
+                    business_title: sms.a2pRep2JobTitle    || sms.a2pRep2JobPosition || 'Director',
+                },
+            });
+            log.info(`[createCustomerProfile] Created rep2 EndUser ${rep2EndUser.sid}`, 'system', { churchId }, churchId);
+        } else {
+            log.info(`[createCustomerProfile] Rep 2 fields not provided — skipping rep2 EndUser (profile may still be approved as a sole-authorized profile)`, 'system', { churchId }, churchId);
+        }
 
         // ── Step 2: Create the CustomerProfile bundle ─────────────────────────
         const sysSnap = await db.doc('system/settings').get();
@@ -942,17 +940,20 @@ export const createCustomerProfile = async (req: any, res: any) => {
             .customerProfilesEntityAssignments
             .create({ objectSid: repEndUser.sid });
 
-        await (master as any).trusthub.v1
-            .customerProfiles(profile.sid)
-            .customerProfilesEntityAssignments
-            .create({ objectSid: rep2EndUser.sid });  // required second rep
+        if (rep2EndUser) {
+            await (master as any).trusthub.v1
+                .customerProfiles(profile.sid)
+                .customerProfilesEntityAssignments
+                .create({ objectSid: rep2EndUser.sid });
+        }
 
         await (master as any).trusthub.v1
             .customerProfiles(profile.sid)
             .customerProfilesEntityAssignments
             .create({ objectSid: addrDoc.sid });  // RD... SupportingDocument for the address
 
-        log.info(`[createCustomerProfile] Assigned 4 components to ${profile.sid}`, 'system', { churchId }, churchId);
+        const assignedCount = rep2EndUser ? 4 : 3;
+        log.info(`[createCustomerProfile] Assigned ${assignedCount} components to ${profile.sid}${rep2EndUser ? '' : ' (no Rep 2)'}`, 'system', { churchId }, churchId);
 
         // ── Step 3b: Evaluate bundle compliance before submitting ──────────────
         let evaluationStatus = 'unknown';
@@ -982,17 +983,20 @@ export const createCustomerProfile = async (req: any, res: any) => {
         log.info(`[createCustomerProfile] Profile ${profile.sid} submitted for review`, 'system', { churchId }, churchId);
 
         // ── Step 5: Save to Firestore ──────────────────────────────────────────
-        await db.collection('churches').doc(churchId).update({
-            'smsSettings.twilioCustomerProfileSid':            profile.sid,
-            'smsSettings.twilioEndUserSid':                    bizEndUser.sid,
-            'smsSettings.twilioRepEndUserSid':                 repEndUser.sid,
-            'smsSettings.twilioRep2EndUserSid':                rep2EndUser.sid,
-            'smsSettings.twilioAddressSid':                    bizAddress.sid,
-            'smsSettings.twilioSupportingDocSid':              addrDoc.sid,
-            'smsSettings.twilioCustomerProfileStatus':         'pending-review',
-            'smsSettings.twilioCustomerProfileEvaluation':     evaluationStatus,
-            'smsSettings.twilioCustomerProfileCreatedAt':      Date.now(),
-        });
+        const firestoreUpdate: Record<string, any> = {
+            'smsSettings.twilioCustomerProfileSid':        profile.sid,
+            'smsSettings.twilioEndUserSid':                bizEndUser.sid,
+            'smsSettings.twilioRepEndUserSid':             repEndUser.sid,
+            'smsSettings.twilioAddressSid':                bizAddress.sid,
+            'smsSettings.twilioSupportingDocSid':          addrDoc.sid,
+            'smsSettings.twilioCustomerProfileStatus':     'pending-review',
+            'smsSettings.twilioCustomerProfileEvaluation': evaluationStatus,
+            'smsSettings.twilioCustomerProfileCreatedAt':  Date.now(),
+        };
+        if (rep2EndUser) {
+            firestoreUpdate['smsSettings.twilioRep2EndUserSid'] = rep2EndUser.sid;
+        }
+        await db.collection('churches').doc(churchId).update(firestoreUpdate);
 
         const isCompliant = evaluationStatus === 'compliant';
         return res.json({

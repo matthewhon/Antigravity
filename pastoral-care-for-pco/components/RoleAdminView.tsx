@@ -1930,7 +1930,12 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ churchId }),
                     });
-                    const data = await res.json();
+                    const raw = await res.text();
+                    let data: any;
+                    try { data = JSON.parse(raw); } catch {
+                        setA2pResult({ success: false, message: `Server error (HTTP ${res.status}): ${raw.slice(0, 200)}` });
+                        return;
+                    }
                     if (data.brandSid) {
                         setSmsForm(prev => ({ ...prev, twilioBrandSid: data.brandSid, twilioA2pStatus: 'pending' }));
                     }
@@ -1989,7 +1994,12 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ churchId }),
                     });
-                    const data = await res.json();
+                    const cpRaw = await res.text();
+                    let data: any;
+                    try { data = JSON.parse(cpRaw); } catch {
+                        setA2pResult({ success: false, message: `Server error (HTTP ${res.status}): ${cpRaw.slice(0, 200)}`, needsBundle: true });
+                        return;
+                    }
                     if (data.profileSid) {
                         setSmsForm(prev => ({
                             ...prev,
@@ -2676,7 +2686,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                         disabled={isCreatingProfile}
                                                         className="shrink-0 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30 whitespace-nowrap"
                                                     >
-                                                        {isCreatingProfile ? '📡 Creating Profile…' : '🪄 Create &amp; Submit Profile'}
+                                                        {isCreatingProfile ? '📡 Creating Profile…' : '🪄 Create & Submit Profile'}
                                                     </button>
                                                 </div>
 
