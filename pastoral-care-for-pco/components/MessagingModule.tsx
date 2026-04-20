@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { db as firebaseDb } from '../services/firebase';
 import { storage } from '../services/firebase';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
@@ -5622,6 +5622,99 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
     );
 };
 
+// ─── SMS Terms & Privacy Modal ───────────────────────────────────────────────
+// First step of SmsSetupWizard — tenant must accept before claiming a number.
+
+const SmsTermsModal: React.FC<{
+    churchId: string;
+    userId: string;
+    onAccepted: (ts: number) => void;
+    onCancel: () => void;
+}> = ({ churchId, userId, onAccepted, onCancel }) => {
+    const [checkedTos, setCheckedTos]         = useState(false);
+    const [checkedPrivacy, setCheckedPrivacy] = useState(false);
+    const [checkedCompliance, setCheckedCompliance] = useState(false);
+    const [saving, setSaving]                 = useState(false);
+    const allChecked = checkedTos && checkedPrivacy && checkedCompliance;
+
+    const handleAccept = async () => {
+        if (!allChecked) return;
+        setSaving(true);
+        const ts = Date.now();
+        try {
+            await setDoc(doc(firebaseDb, 'churches', churchId), {
+                smsSettings: { termsAcceptedAt: ts, termsAcceptedByUserId: userId }
+            }, { merge: true });
+        } catch (e: any) {
+            console.error('[SmsTermsModal] Firestore write failed (continuing):', e.message);
+        } finally {
+            setSaving(false);
+            onAccepted(ts);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onCancel}>
+            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+                <div className="px-7 pt-7 pb-4 border-b border-slate-100 dark:border-slate-800 flex items-start gap-4 shrink-0">
+                    <div className="w-12 h-12 rounded-2xl bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center shrink-0"><span className="text-2xl">📜</span></div>
+                    <div>
+                        <h2 className="text-lg font-black text-slate-900 dark:text-white">SMS Service Terms of Use</h2>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Please read and accept before activating your church's SMS line.</p>
+                    </div>
+                </div>
+                <div className="overflow-y-auto flex-1 px-7 py-5 space-y-5 text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                    <section>
+                        <h3 className="text-sm font-black text-slate-900 dark:text-white mb-2">1. Terms of Service</h3>
+                        <p><strong>Permitted Use.</strong> The SMS service may only be used for legitimate pastoral and ministry communications with individuals who have explicitly opted in. Spam or unsolicited messages are prohibited and may result in immediate account suspension.</p>
+                        <p className="mt-1"><strong>A2P 10DLC Compliance.</strong> Your church must complete Twilio's brand and campaign registration with accurate information. Submitting false information violates these terms and federal law.</p>
+                        <p className="mt-1"><strong>Opt-Out Management.</strong> You must honor all STOP requests immediately and permanently.</p>
+                        <p className="mt-1"><strong>Limitation of Liability.</strong> Barnabas Software is not liable for carrier delivery failures or damages beyond amounts paid in the prior 30 days.</p>
+                    </section>
+                    <div className="border-t border-slate-100 dark:border-slate-800" />
+                    <section>
+                        <h3 className="text-sm font-black text-slate-900 dark:text-white mb-2">2. Privacy Policy — SMS Data</h3>
+                        <p><strong>Data We Collect.</strong> We collect phone numbers, message content, delivery events, opt-out records, and Twilio credentials for your sub-account, solely to deliver messages on your behalf.</p>
+                        <p className="mt-1"><strong>Twilio.</strong> Messages route through Twilio, Inc., subject to their Privacy Policy (twilio.com/en-us/legal/privacy).</p>
+                        <p className="mt-1"><strong>Your Responsibilities.</strong> You are the data controller for your congregation's contact information and are responsible for consent and applicable privacy law compliance.</p>
+                    </section>
+                    <div className="border-t border-slate-100 dark:border-slate-800" />
+                    <section>
+                        <h3 className="text-sm font-black text-slate-900 dark:text-white mb-2">3. A2P Compliance Acknowledgment</h3>
+                        <ul className="list-disc list-inside space-y-1 ml-2">
+                            <li>I am authorized to register commercial texting on behalf of this church.</li>
+                            <li>We only message recipients who have <strong>explicitly opted in</strong> and will honor all STOP requests.</li>
+                            <li>We will submit accurate legal info (name, EIN, address) for brand registration.</li>
+                            <li>We understand carrier approval may take 1–10 business days.</li>
+                        </ul>
+                    </section>
+                </div>
+                <div className="px-7 py-5 bg-slate-50 dark:bg-slate-800/60 border-t border-slate-200 dark:border-slate-700 shrink-0 space-y-3">
+                    {([
+                        { id: 'tos',        checked: checkedTos,        setter: setCheckedTos,        label: 'I have read and agree to the Terms of Service.' },
+                        { id: 'privacy',    checked: checkedPrivacy,    setter: setCheckedPrivacy,    label: 'I have read and agree to the Privacy Policy for SMS data.' },
+                        { id: 'compliance', checked: checkedCompliance, setter: setCheckedCompliance, label: 'I confirm I am an authorized representative and acknowledge the A2P 10DLC requirements.' },
+                    ] as const).map(item => (
+                        <label key={item.id} className="flex items-start gap-3 cursor-pointer select-none group" onClick={() => item.setter(!item.checked)}>
+                            <div className={`mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all ${ item.checked ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300 dark:border-slate-600 group-hover:border-indigo-400' }`}>
+                                {item.checked && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
+                            </div>
+                            <span className={`text-xs leading-relaxed ${ item.checked ? 'text-slate-800 dark:text-slate-200 font-semibold' : 'text-slate-600 dark:text-slate-400' }`}>{item.label}</span>
+                        </label>
+                    ))}
+                    <div className="flex gap-3 pt-1">
+                        <button onClick={onCancel} className="flex-1 py-2.5 text-sm font-bold text-slate-600 dark:text-slate-400 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition">Cancel</button>
+                        <button onClick={handleAccept} disabled={!allChecked || saving} className="flex-1 py-2.5 text-sm font-black text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition shadow-md shadow-indigo-200 dark:shadow-indigo-900/30">
+                            {saving ? 'Saving…' : 'I Accept — Continue →'}
+                        </button>
+                    </div>
+                    {!allChecked && <p className="text-[10px] text-slate-400 text-center">Please check all three boxes above to continue.</p>}
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // ─── SMS Setup Banner ────────────────────────────────────────────────────────
 
 const SmsSetupBanner: React.FC<{ onSetup: () => void }> = ({ onSetup }) => (
@@ -5666,8 +5759,14 @@ const SmsSetupWizard: React.FC<{
     onBack: () => void;
     /** 'setup' = full first-time flow (default); 'add-number' = skip sub-account/A2P, just pick and claim a number */
     mode?: 'setup' | 'add-number';
-}> = ({ churchId, church, onComplete, onBack, mode = 'setup' }) => {
-    const [step, setStep]               = useState<'search' | 'pick-number' | 'done'>('search');
+    /** Pre-accepted timestamp, if the tenant already accepted terms previously */
+    termsAcceptedAt?: number;
+    currentUserId?: string;
+}> = ({ churchId, church, onComplete, onBack, mode = 'setup', termsAcceptedAt, currentUserId }) => {
+    // Show terms step first if not yet accepted (setup mode only)
+    const needsTerms = mode === 'setup' && !termsAcceptedAt;
+    const [step, setStep]               = useState<'terms' | 'search' | 'pick-number' | 'done'>(needsTerms ? 'terms' : 'search');
+    const [termsTs, setTermsTs]         = useState<number | null>(termsAcceptedAt || null);
     const [searchMode, setSearchMode]   = useState<'area-code' | 'city-state'>('city-state');
     const [areaCode, setAreaCode]       = useState(church.zip?.slice(0, 3) || '');
     const [city, setCity]               = useState(church.city || '');
@@ -5765,7 +5864,35 @@ const SmsSetupWizard: React.FC<{
                 <ArrowLeft size={14} /> Back
             </button>
 
+            {/* Terms step */}
+            {step === 'terms' && (
+                <SmsTermsModal
+                    churchId={churchId}
+                    userId={currentUserId || ''}
+                    onAccepted={(ts) => { setTermsTs(ts); setStep('search'); }}
+                    onCancel={onBack}
+                />
+            )}
+
+            {step !== 'terms' && (
             <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 p-8 shadow-sm">
+                {/* Step progress indicator */}
+                {mode === 'setup' && (
+                    <div className="flex items-center gap-2 mb-6">
+                        {(['search', 'pick-number', 'done'] as const).map((s, i) => (
+                            <React.Fragment key={s}>
+                                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black transition-all ${
+                                    step === s ? 'bg-violet-600 text-white' :
+                                    ['pick-number', 'done'].indexOf(step) > ['pick-number', 'done'].indexOf(s) || (s === 'search' && step !== 'search')
+                                        ? 'bg-emerald-500 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-400'
+                                }`}>
+                                    {i + 1}
+                                </div>
+                                {i < 2 && <div className="flex-1 h-0.5 bg-slate-200 dark:bg-slate-700 rounded-full" />}
+                            </React.Fragment>
+                        ))}
+                    </div>
+                )}
                 {step === 'search' && (
                     <>
                         <h2 className="text-xl font-black text-slate-900 dark:text-white mb-1">Find a Local Number</h2>
@@ -6004,6 +6131,7 @@ const SmsSetupWizard: React.FC<{
                     </div>
                 )}
             </div>
+            )}
         </div>
     );
 };
@@ -6912,6 +7040,8 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                     setShowSetup(false);
                     if (onUpdateChurch) onUpdateChurch({ smsSettings: { ...church.smsSettings, smsEnabled: true } });
                 }}
+                termsAcceptedAt={church.smsSettings?.termsAcceptedAt}
+                currentUserId={currentUser.id}
             />
         );
     }
@@ -7125,6 +7255,7 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                                 showToast('New number added ✓');
                             }}
                             mode="add-number"
+                            currentUserId={currentUser.id}
                         />
                     </div>
                 </div>
