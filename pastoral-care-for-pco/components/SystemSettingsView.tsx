@@ -497,6 +497,32 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                     </p>
                                 </div>
 
+                                {/* ── Primary Customer Profile SID ── */}
+                                <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
+                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">
+                                        Primary Customer Profile SID
+                                        {settings.primaryCustomerProfileSid?.startsWith('BU') ? (
+                                            <span className="ml-2 normal-case font-black text-[9px] bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded-full">SET</span>
+                                        ) : (
+                                            <span className="ml-2 normal-case font-black text-[9px] bg-rose-500/10 text-rose-500 px-1.5 py-0.5 rounded-full">REQUIRED</span>
+                                        )}
+                                    </label>
+                                    <p className="text-[9px] text-slate-400 mb-2">
+                                        The <strong>BU...</strong> SID for <strong>Hon Ventures LLC</strong> — the master ISV Primary Customer Profile in the{' '}
+                                        <a href="https://console.twilio.com/us1/develop/trust-hub/customer-profiles" target="_blank" rel="noopener noreferrer" className="underline text-indigo-400 hover:text-indigo-300">
+                                            Twilio Console → Trust Hub → Customer Profiles
+                                        </a>.
+                                        This is assigned as an entity in every secondary church profile to satisfy Twilio's ISV compliance requirement.
+                                    </p>
+                                    <input
+                                        type="text"
+                                        value={settings.primaryCustomerProfileSid || ''}
+                                        onChange={e => handleChange('primaryCustomerProfileSid', e.target.value.trim())}
+                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                        placeholder="BUxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                                    />
+                                </div>
+
                                 {/* API Key pair (optional, tighter scope than Auth Token) */}
                                 <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
                                     <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">API Key SID <span className="normal-case font-normal text-slate-400">(optional, preferred)</span></label>

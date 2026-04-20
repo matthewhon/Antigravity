@@ -464,6 +464,13 @@ export interface SystemSettings {
     twilioApiKeySid?: string;
     /** Twilio API Key Secret */
     twilioApiKeySecret?: string;
+    /**
+     * Primary Customer Profile SID (BU...) for Hon Ventures LLC.
+     * This is Barnabas Software's master ISV profile in Twilio Trust Hub.
+     * It must be assigned as an entity in every secondary (per-church) customer profile
+     * so Twilio can validate the ISV chain before approving. Set in System Settings → Twilio SMS.
+     */
+    primaryCustomerProfileSid?: string;
 }
 
 export interface TemplateSettings {
