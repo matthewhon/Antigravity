@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { User, Church, RiskSettings, ChurchRiskSettings, DonorLifecycleSettings, GroupRiskSettings, CommunityLocation, UserRole } from '../types';
 import { CreateUserModal } from './CreateUserModal';
 import { firestore } from '../services/firestoreService';
@@ -308,6 +308,8 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   const [showTermsModal, setShowTermsModal] = useState(false);
   // 'create-profile' | 'submit-a2p' — which action to run after terms are accepted
   const [pendingTermsAction, setPendingTermsAction] = useState<'create-profile' | 'submit-a2p' | null>(null);
+  // Ref that the SMS tab IIFE populates with its handler functions
+  const smsActionRef = useRef<{ handleCreateProfile: () => void; handleSubmitToTwilio: () => void } | null>(null);
 
   // Phone Numbers panel state (SMS → Numbers tab)
   const [twilioNumbers, setTwilioNumbers] = useState<any[]>([]);
@@ -2226,6 +2228,9 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
             const inputCn = 'w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-colors';
             const labelCn = 'block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-2';
 
+            // Expose handlers to the top-level terms modal via ref
+            smsActionRef.current = { handleCreateProfile, handleSubmitToTwilio };
+
 
             return (
                 <div className="space-y-6">
@@ -3282,23 +3287,76 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                             }
                         };
 
+                        const profileApproved =
+                            (smsForm.twilioCustomerProfileStatus || '').toLowerCase() === 'twilio-approved';
+
+                        const handleReleaseNumber = async (num: any) => {
+                            const confirmed = window.confirm(
+                                `Release ${num.phoneNumber} ("${num.friendlyLabel || num.senderName || 'this number'}")? \n\nThis will permanently release the number back to Twilio and cannot be undone.`
+                            );
+                            if (!confirmed) return;
+                            setNumError('');
+                            try {
+                                const res = await fetch('/api/messaging/release-number', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ churchId, twilioNumberId: num.id }),
+                                });
+                                const raw = await res.text();
+                                let data: any;
+                                try { data = JSON.parse(raw); } catch { data = { error: raw.slice(0, 200) }; }
+                                if (!data.success) throw new Error(data.error || 'Release failed');
+                                setNumToast(`✓ ${num.phoneNumber} released.`);
+                                setTwilioNumbers(prev => prev.filter(n => n.id !== num.id));
+                                setTimeout(() => setNumToast(''), 4000);
+                            } catch (e: any) {
+                                setNumError(e.message || 'Failed to release number');
+                            }
+                        };
+
                         return (
                             <div className="space-y-6">
 
                                 {/* Header row */}
                                 <div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800">
-                                    <div className="flex items-center justify-between mb-6">
+                                    <div className="flex items-center justify-between mb-4">
                                         <div>
                                             <h4 className="text-sm font-black text-slate-900 dark:text-white">Provisioned Phone Numbers</h4>
                                             <p className="text-[10px] text-slate-400 mt-0.5">All Twilio numbers associated with this church. The default number is used for outbound replies when no inbox is specified.</p>
                                         </div>
                                         <button
-                                            onClick={() => { setShowAddNumber(true); setAddNumStep('search'); setAddNumResults([]); setNumError(''); }}
-                                            className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-violet-200 dark:shadow-violet-900/30"
+                                            onClick={() => {
+                                                if (!profileApproved) return;
+                                                setShowAddNumber(true); setAddNumStep('search'); setAddNumResults([]); setNumError('');
+                                            }}
+                                            disabled={!profileApproved}
+                                            title={!profileApproved ? 'A Twilio-approved Customer Profile is required before requesting a phone number.' : 'Request a new phone number'}
+                                            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${
+                                                profileApproved
+                                                    ? 'bg-violet-600 hover:bg-violet-700 text-white shadow-lg shadow-violet-200 dark:shadow-violet-900/30'
+                                                    : 'bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed'
+                                            }`}
                                         >
-                                            <span className="text-sm leading-none">+</span> Request a Number
+                                            <span className="text-sm leading-none">{profileApproved ? '+' : '🔒'}</span>
+                                            {profileApproved ? 'Request a Number' : 'Profile Required'}
                                         </button>
                                     </div>
+
+                                    {!profileApproved && (
+                                        <div className="mb-4 flex items-start gap-3 px-4 py-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl">
+                                            <span className="text-lg shrink-0">⚠️</span>
+                                            <div>
+                                                <p className="text-xs font-bold text-amber-800 dark:text-amber-300">Customer Profile approval required</p>
+                                                <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-0.5">
+                                                    You cannot provision phone numbers until your Twilio Customer Profile (A2P 10DLC) has been approved.
+                                                    Complete the A2P Registration tab first, then return here once Twilio approves it.
+                                                    {smsForm.twilioCustomerProfileSid && (
+                                                        <> Current status: <strong>{smsForm.twilioCustomerProfileStatus || 'pending-review'}</strong>.</>
+                                                    )}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
 
                                     {/* Toast */}
                                     {numToast && (
@@ -3319,7 +3377,11 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         <div className="py-10 text-center">
                                             <p className="text-3xl mb-3">📱</p>
                                             <p className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">No Numbers Provisioned</p>
-                                            <p className="text-xs text-slate-400">Use "Request a Number" to add your first Twilio number.</p>
+                                            <p className="text-xs text-slate-400">
+                                                {profileApproved
+                                                    ? 'Use "Request a Number" to add your first Twilio number.'
+                                                    : 'Complete A2P Registration and get your Customer Profile approved first.'}
+                                            </p>
                                         </div>
                                     ) : (
                                         <div className="space-y-3">
@@ -3352,14 +3414,26 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                         )}
                                                     </div>
                                                     {/* Actions */}
-                                                    {!num.isDefault && (
+                                                    <div className="flex items-center gap-2 shrink-0">
+                                                        {!num.isDefault && (
+                                                            <button
+                                                                onClick={() => handleSetDefault(num.id)}
+                                                                className="text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:border-violet-400 hover:text-violet-600 dark:hover:text-violet-400 transition-all"
+                                                            >
+                                                                Set Default
+                                                            </button>
+                                                        )}
                                                         <button
-                                                            onClick={() => handleSetDefault(num.id)}
-                                                            className="shrink-0 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:border-violet-400 hover:text-violet-600 dark:hover:text-violet-400 transition-all"
+                                                            onClick={() => handleReleaseNumber(num)}
+                                                            disabled={num.isDefault && twilioNumbers.length > 1}
+                                                            title={num.isDefault && twilioNumbers.length > 1
+                                                                ? 'Set another number as default before releasing this one'
+                                                                : `Release ${num.phoneNumber}`}
+                                                            className="text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border transition-all disabled:cursor-not-allowed disabled:opacity-40 border-rose-200 dark:border-rose-800 text-rose-500 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 hover:border-rose-400"
                                                         >
-                                                            Set Default
+                                                            {num.isDefault && twilioNumbers.length > 1 ? '🔒 Release' : '🗑 Release'}
                                                         </button>
-                                                    )}
+                                                    </div>
                                                 </div>
                                             ))}
                                         </div>
@@ -3573,25 +3647,22 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
         )}
 
         {/* ─── SMS Terms of Service Modal ──────────────────────────────────── */}
-        {showTermsModal && (() => {
-            const [tos, setTos]         = [false, () => {}] as any;
-            return (
-                <SmsAdminTermsModal
-                    churchId={churchId}
-                    userId={currentUser.id}
-                    onAccepted={async (ts: number) => {
-                        // Persist acceptance
-                        setSmsForm((prev: any) => ({ ...prev, termsAcceptedAt: ts, termsAcceptedByUserId: currentUser.id }));
-                        if (onUpdateChurch) await onUpdateChurch({ smsSettings: { ...smsForm, termsAcceptedAt: ts, termsAcceptedByUserId: currentUser.id } });
-                        setShowTermsModal(false);
-                        if (pendingTermsAction === 'create-profile') handleCreateProfile();
-                        if (pendingTermsAction === 'submit-a2p') handleSubmitToTwilio();
-                        setPendingTermsAction(null);
-                    }}
-                    onCancel={() => { setShowTermsModal(false); setPendingTermsAction(null); }}
-                />
-            );
-        })()}
+        {showTermsModal && (
+            <SmsAdminTermsModal
+                churchId={churchId}
+                userId={currentUser.id}
+                onAccepted={async (ts: number) => {
+                    setSmsForm((prev: any) => ({ ...prev, termsAcceptedAt: ts, termsAcceptedByUserId: currentUser.id }));
+                    if (onUpdateChurch) await onUpdateChurch({ smsSettings: { ...smsForm, termsAcceptedAt: ts, termsAcceptedByUserId: currentUser.id } });
+                    setShowTermsModal(false);
+                    // Use the ref to call handlers that live inside the SMS IIFE
+                    if (pendingTermsAction === 'create-profile') smsActionRef.current?.handleCreateProfile();
+                    if (pendingTermsAction === 'submit-a2p') smsActionRef.current?.handleSubmitToTwilio();
+                    setPendingTermsAction(null);
+                }}
+                onCancel={() => { setShowTermsModal(false); setPendingTermsAction(null); }}
+            />
+        )}
     </div>
   );
 };
