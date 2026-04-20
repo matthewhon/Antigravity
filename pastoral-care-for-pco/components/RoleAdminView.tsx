@@ -1016,6 +1016,8 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                             <label className="block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-3">Church Name</label>
                             <input 
                                 type="text" 
+                                aria-label="Church Name"
+                                placeholder="First Baptist Church"
                                 value={formData.name || ''}
                                 onChange={e => handleChange('name', e.target.value)}
                                 className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
@@ -1038,6 +1040,8 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 <label className="block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-3">City</label>
                                 <input 
                                     type="text" 
+                                    aria-label="City"
+                                    placeholder="Nashville"
                                     value={formData.city || ''}
                                     onChange={e => handleChange('city', e.target.value)}
                                     className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
@@ -1047,6 +1051,8 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 <label className="block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-3">State</label>
                                 <input 
                                     type="text" 
+                                    aria-label="State"
+                                    placeholder="TN"
                                     value={formData.state || ''}
                                     onChange={e => handleChange('state', e.target.value)}
                                     className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
@@ -1056,6 +1062,8 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 <label className="block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-3">Zip</label>
                                 <input 
                                     type="text" 
+                                    aria-label="Zip Code"
+                                    placeholder="37201"
                                     value={formData.zip || ''}
                                     onChange={e => handleChange('zip', e.target.value)}
                                     className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
@@ -1090,6 +1098,8 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                             <label className="block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-3">Website</label>
                             <input 
                                 type="text" 
+                                aria-label="Website"
+                                placeholder="https://www.mychurch.org"
                                 value={formData.website || ''}
                                 onChange={e => handleChange('website', e.target.value)}
                                 className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
@@ -3559,6 +3569,9 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             <p className="text-[10px] text-slate-400 mt-0.5">Automatically prepend &quot;&#123;Church Name&#125;:&quot; to the start of every outbound SMS. Helps recipients immediately recognize who is texting them.</p>
                                         </div>
                                         <button
+                                            role="switch"
+                                            aria-checked={!!smsForm.prefixMessagesWithName}
+                                            aria-label="Prefix Messages with Church Name"
                                             onClick={() => handleSmsChange('prefixMessagesWithName', !smsForm.prefixMessagesWithName)}
                                             className={`ml-4 shrink-0 w-12 h-6 rounded-full p-1 transition-colors ${smsForm.prefixMessagesWithName ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'}`}
                                         >
