@@ -2512,27 +2512,38 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
 
                             {/* Step 1: Twilio Sub-Account & Phone */}
                             <div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800">
-                                <div className="flex items-center gap-3 mb-6">
+                                <div className="flex items-center gap-3 mb-4">
                                     <div className="w-8 h-8 rounded-xl bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-black text-sm">1</div>
-                                    <h4 className="text-sm font-black text-slate-900 dark:text-white">Twilio Sub-Account (Auto-Provisioned)</h4>
+                                    <h4 className="text-sm font-black text-slate-900 dark:text-white">Twilio Sub-Account &amp; Phone</h4>
                                 </div>
-                                <p className="text-[10px] text-slate-400 mb-6 leading-relaxed">
-                                    Each church gets an isolated Twilio Sub-Account. These are filled automatically by the platform when your account is provisioned. Do not edit unless instructed by support.
-                                </p>
+                                {/* Admin-editable warning */}
+                                <div className="flex items-start gap-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 rounded-xl p-3 mb-5">
+                                    <span className="text-amber-500 text-base shrink-0 mt-0.5">⚠️</span>
+                                    <p className="text-[10px] text-amber-700 dark:text-amber-400 leading-relaxed">
+                                        <strong>Global Admin only.</strong> These fields are auto-provisioned. Editing them manually overrides what the platform set.
+                                        Use <strong>Force Re-Provision</strong> below to clear stale credentials and let the system create a fresh sub-account.
+                                    </p>
+                                </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
-                                        <label className={labelCn}>Sub-Account SID</label>
-                                        <input type="text" value={smsForm.twilioSubAccountSid || ''} readOnly
-                                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 font-mono text-xs text-slate-500 dark:text-slate-400 cursor-default"
-                                            placeholder="AC... (auto-filled)"
+                                        <label className={labelCn}>Sub-Account SID <span className="normal-case font-normal text-slate-400">(editable)</span></label>
+                                        <input type="text"
+                                            value={smsForm.twilioSubAccountSid || ''}
+                                            onChange={e => handleSmsChange('twilioSubAccountSid', e.target.value.trim())}
+                                            className={inputCn}
+                                            placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
                                         />
+                                        <p className="text-[9px] text-slate-400 mt-1">Twilio Sub-Account SID. Starts with <code>AC</code>. Found in Twilio Console → Sub-accounts.</p>
                                     </div>
                                     <div>
-                                        <label className={labelCn}>Assigned Phone Number</label>
-                                        <input type="text" value={smsForm.twilioPhoneNumber || ''} readOnly
-                                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 font-mono text-xs text-slate-500 dark:text-slate-400 cursor-default"
-                                            placeholder="+1... (auto-filled)"
+                                        <label className={labelCn}>Assigned Phone Number <span className="normal-case font-normal text-slate-400">(editable)</span></label>
+                                        <input type="text"
+                                            value={smsForm.twilioPhoneNumber || ''}
+                                            onChange={e => handleSmsChange('twilioPhoneNumber', e.target.value.trim())}
+                                            className={inputCn}
+                                            placeholder="+1xxxxxxxxxx"
                                         />
+                                        <p className="text-[9px] text-slate-400 mt-1">E.164 format, e.g. <code>+14695551234</code>. Must be a number provisioned in the sub-account above.</p>
                                     </div>
                                     <div>
                                         <label className={labelCn}>Messaging Service SID</label>
