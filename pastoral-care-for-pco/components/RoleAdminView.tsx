@@ -366,19 +366,50 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
       setSmsForm(church.smsSettings || {});
   }, [church.smsSettings]);
 
-  // Load phone numbers directly from Firestore when 'numbers' sub-tab is opened
+  // Load phone numbers directly from Firestore when 'numbers' sub-tab is opened.
+  // Also auto-migrates the legacy smsSettings.twilioPhoneNumber into the twilioNumbers
+  // collection if no docs exist yet but a real sub-account is present.
   useEffect(() => {
       if (smsSubTab !== 'numbers') return;
       setNumLoading(true);
       setNumError('');
-      import('firebase/firestore').then(({ collection, query, where, orderBy, getDocs }) => {
+      import('firebase/firestore').then(({ collection, query, where, orderBy, getDocs, setDoc, doc: fsDoc }) => {
           const q = query(
               collection(firebaseDb, 'twilioNumbers'),
               where('churchId', '==', churchId),
               orderBy('createdAt', 'asc')
           );
           getDocs(q)
-              .then(snap => setTwilioNumbers(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
+              .then(async snap => {
+                  const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                  if (docs.length === 0) {
+                      // Auto-migrate legacy number if church has a real provisioned sub-account
+                      const legacyPhone = church.smsSettings?.twilioPhoneNumber;
+                      const hasSubAccount = !!church.smsSettings?.twilioSubAccountSid;
+                      if (legacyPhone && hasSubAccount) {
+                          const migratedId = `${churchId}_migrated`;
+                          const migratedDoc = {
+                              id: migratedId,
+                              churchId,
+                              phoneNumber: legacyPhone,
+                              phoneSid: church.smsSettings?.twilioPhoneSid || '',
+                              friendlyLabel: 'Main Line',
+                              isDefault: true,
+                              smsEnabled: true,
+                              allowedUserIds: [],
+                              createdAt: Date.now(),
+                              updatedAt: Date.now(),
+                          };
+                          await setDoc(fsDoc(firebaseDb, 'twilioNumbers', migratedId), migratedDoc)
+                              .catch(() => {/* silent race */});
+                          setTwilioNumbers([migratedDoc]);
+                      } else {
+                          setTwilioNumbers([]);
+                      }
+                  } else {
+                      setTwilioNumbers(docs);
+                  }
+              })
               .catch(e => setNumError(e.message || 'Failed to load numbers'))
               .finally(() => setNumLoading(false));
       });
