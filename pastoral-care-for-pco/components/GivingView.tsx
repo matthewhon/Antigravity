@@ -63,7 +63,7 @@ const TOOLTIP_STYLE = {
 };
 
 const getWidgetSpan = (id: string) => {
-    if (['keyMetrics', 'trends', 'fundPerformance', 'cumulativeYTD', 'donorLifecycle', 'trendsComparison', 'benchmark_giving_avg', 'budgetProgress', 'givingVsBudget', 'givingByStatus', 'givingAgeDemographics'].includes(id)) return 'col-span-1 md:col-span-2 lg:col-span-2';
+    if (['keyMetrics', 'trends', 'fundPerformance', 'cumulativeYTD', 'donorLifecycle', 'trendsComparison', 'benchmark_giving_avg', 'budgetProgress', 'givingVsBudget', 'givingByStatus', 'givingAgeDemographics', 'averageGiving'].includes(id)) return 'col-span-1 md:col-span-2 lg:col-span-2';
     return 'col-span-1';
 };
 
@@ -547,6 +547,67 @@ export const GivingView: React.FC<GivingViewProps> = ({
 
     return rows.filter(r => r.amount > 0).sort((a, b) => b.amount - a.amount);
   }, [analytics, donations, filter, dateRange]);
+
+  // --- Average Giving — Last 12 Weeks per Fund ---
+  const averageGivingData = useMemo(() => {
+    // Build the 12 week buckets (most recent first, then reverse to chronological)
+    const now = new Date();
+    now.setHours(23, 59, 59, 999);
+
+    // Start of the week that is 12 weeks ago (Monday-based)
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - (now.getDay() === 0 ? 6 : now.getDay() - 1)); // Monday of current week
+    weekStart.setHours(0, 0, 0, 0);
+    weekStart.setDate(weekStart.getDate() - 11 * 7); // go back 11 more weeks = 12 total
+
+    // Collect all fund names from donations in this window
+    const windowDonations = donations.filter(d => {
+      const dDate = new Date(d.date);
+      return dDate >= weekStart && dDate <= now;
+    });
+
+    const allFundNames = Array.from(new Set(windowDonations.map(d => d.fundName))).sort();
+
+    // Build per-fund per-week totals
+    const weeks: { label: string; start: Date; end: Date }[] = [];
+    for (let i = 0; i < 12; i++) {
+      const wStart = new Date(weekStart);
+      wStart.setDate(weekStart.getDate() + i * 7);
+      const wEnd = new Date(wStart);
+      wEnd.setDate(wStart.getDate() + 6);
+      wEnd.setHours(23, 59, 59, 999);
+      weeks.push({
+        label: wStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        start: wStart,
+        end: wEnd,
+      });
+    }
+
+    // For each fund, calculate the 12-week average (only weeks where something was given)
+    const fundAverages = allFundNames.map((fundName, idx) => {
+      const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#06b6d4', '#f43f5e', '#8b5cf6', '#ec4899', '#14b8a6'];
+      const color = COLORS[idx % COLORS.length];
+
+      let totalGiven = 0;
+      let activeWeeks = 0;
+      const weeklyTotals = weeks.map(w => {
+        const amt = donations
+          .filter(d => {
+            const dDate = new Date(d.date);
+            return d.fundName === fundName && dDate >= w.start && dDate <= w.end;
+          })
+          .reduce((sum, d) => sum + d.amount, 0);
+        if (amt > 0) activeWeeks++;
+        totalGiven += amt;
+        return amt;
+      });
+
+      const avg = activeWeeks > 0 ? totalGiven / 12 : 0; // avg over all 12 weeks (not just active)
+      return { fundName, color, avg, totalGiven, activeWeeks, weeklyTotals };
+    });
+
+    return { weeks, fundAverages };
+  }, [donations]);
 
   const acquisitionData = useMemo(() => {
       const donorFirstGift = new Map<string, number>();
@@ -1288,6 +1349,105 @@ export const GivingView: React.FC<GivingViewProps> = ({
                       )}
                   </WidgetWrapper>
               );
+          }
+          case 'averageGiving': {
+            const { weeks, fundAverages } = averageGivingData;
+            const hasFunds = fundAverages.length > 0;
+            const grandTotal = fundAverages.reduce((s, f) => s + f.totalGiven, 0);
+            const overallAvg = grandTotal > 0 ? grandTotal / 12 : 0;
+
+            // Build bar chart data: each entry is one week, keys are fund names
+            const barData = weeks.map((w, wi) => {
+              const entry: Record<string, number | string> = { label: w.label };
+              fundAverages.forEach(f => {
+                entry[f.fundName] = f.weeklyTotals[wi];
+              });
+              return entry;
+            });
+
+            return (
+              <WidgetWrapper
+                title="Average Giving"
+                onRemove={() => handleRemoveWidget(id)}
+                source="Last 12 Weeks"
+              >
+                {!hasFunds ? (
+                  <div className="flex flex-col items-center justify-center h-40 text-center space-y-2">
+                    <div className="text-4xl opacity-30">📊</div>
+                    <p className="text-xs font-bold text-slate-400 dark:text-slate-500">No giving data found</p>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500">Sync giving data to see 12-week averages by fund.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {/* Hero Row */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-50 to-violet-50 dark:from-indigo-900/20 dark:to-violet-900/20">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-1">Avg / Week (All Funds)</p>
+                        <p className="text-3xl font-black text-indigo-600 dark:text-indigo-400">${overallAvg.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">over last 12 weeks</p>
+                      </div>
+                      <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-1">Total Given (12 wks)</p>
+                        <p className="text-3xl font-black text-emerald-600 dark:text-emerald-400">${grandTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">{fundAverages.length} fund{fundAverages.length !== 1 ? 's' : ''} active</p>
+                      </div>
+                    </div>
+
+                    {/* Stacked bar chart */}
+                    <div className="h-52">
+                      <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={1}>
+                        <BarChart data={barData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
+                          <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: axisColor }} interval={1} />
+                          <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: axisColor }} tickFormatter={(v: number) => v >= 1000 ? `$${Math.round(v / 1000)}k` : `$${v}`} width={44} />
+                          <Tooltip
+                            contentStyle={TOOLTIP_STYLE}
+                            itemStyle={{ color: '#fff' }}
+                            cursor={{ fill: currentTheme === 'dark' ? '#334155' : '#f8fafc' }}
+                            formatter={(value: number, name: string) => [`$${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, name]}
+                          />
+                          <Legend verticalAlign="top" iconType="circle" wrapperStyle={{ fontSize: '10px' }} />
+                          {fundAverages.map(f => (
+                            <Bar key={f.fundName} dataKey={f.fundName} stackId="a" fill={f.color} radius={fundAverages.indexOf(f) === fundAverages.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
+                          ))}
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    {/* Per-fund average rows */}
+                    <div className="space-y-3">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Weekly Average by Fund</p>
+                      {fundAverages
+                        .slice()
+                        .sort((a, b) => b.avg - a.avg)
+                        .map(f => {
+                          const pct = overallAvg > 0 ? Math.min((f.avg / overallAvg) * 100, 100) : 0;
+                          return (
+                            <div key={f.fundName} className="space-y-1">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: f.color }} />
+                                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate max-w-[160px]">{f.fundName}</span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <span className="text-xs font-black text-slate-800 dark:text-white">${f.avg.toLocaleString(undefined, { maximumFractionDigits: 0 })}<span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500">/wk</span></span>
+                                  <span className="text-[10px] text-slate-400 dark:text-slate-500 w-16 text-right">{f.activeWeeks} of 12 wks</span>
+                                </div>
+                              </div>
+                              <div className="relative h-2 bg-slate-100 dark:bg-slate-700/60 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full rounded-full transition-all duration-700"
+                                  style={{ width: `${pct}%`, backgroundColor: f.color, opacity: 0.85 }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+                )}
+              </WidgetWrapper>
+            );
           }
           default: return null;
       }
