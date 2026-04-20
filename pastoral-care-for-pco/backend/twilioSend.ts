@@ -146,7 +146,7 @@ async function getSubClient(
     }
 
     if (!fromNumber) throw new Error('No Twilio phone number configured for this church.');
-    return { client, fromNumber };
+    return { client, fromNumber, messagingServiceSid: (sms.twilioMessagingServiceSid as string | undefined) || null };
 }
 
 /** Check if a phone number is opted out. */
@@ -219,14 +219,16 @@ export const sendIndividual = async (req: any, res: any) => {
             if (convSnap.exists) resolvedNumberId = convSnap.data()?.twilioNumberId || null;
         }
 
-        const { client, fromNumber } = await getSubClient(db, churchId, resolvedNumberId);
+        const { client, fromNumber, messagingServiceSid } = await getSubClient(db, churchId, resolvedNumberId);
 
         const isMms    = (mediaUrls as string[]).length > 0;
         const segments = isMms ? 1 : countSegments(body);
 
-        // Send via Twilio — include statusCallback so Twilio posts delivery updates
+        // Send via Twilio — prefer messagingServiceSid (A2P compliance) over bare from:
         const statusCallbackUrl = await getStatusCallbackUrl(db);
-        const msgParams: any = { from: fromNumber, to, body };
+        const msgParams: any = messagingServiceSid
+            ? { messagingServiceSid, to, body }
+            : { from: fromNumber, to, body };
         if (isMms) msgParams.mediaUrl = mediaUrls;
         if (statusCallbackUrl) {
             msgParams.statusCallback       = statusCallbackUrl;
@@ -304,7 +306,7 @@ export async function sendBulkInternal(params: {
     const { db, churchId, campaignId, phones, body, mediaUrls = [], sentBy, sentByName, personMap = {}, twilioNumberId } = params as any;
     const log   = createServerLogger(db);
     const isMms = (mediaUrls as string[]).length > 0;
-    const { client, fromNumber } = await getSubClient(db, churchId, twilioNumberId || null);
+    const { client, fromNumber, messagingServiceSid } = await getSubClient(db, churchId, twilioNumberId || null);
 
     let sent = 0, failed = 0, optedOut = 0, skipped = 0;
     const errors: { phone: string; error: string }[] = [];
@@ -336,7 +338,9 @@ export async function sendBulkInternal(params: {
                 }
                 const cbUrl = (sendBulkInternal as any)._cbUrl as string | null;
 
-                const msgParams: any = { from: fromNumber, to, body: resolved };
+                const msgParams: any = messagingServiceSid
+                    ? { messagingServiceSid, to, body: resolved }
+                    : { from: fromNumber, to, body: resolved };
                 if (isMms) msgParams.mediaUrl = mediaUrls;
                 if (cbUrl) {
                     msgParams.statusCallback       = cbUrl;

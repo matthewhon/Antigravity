@@ -1469,3 +1469,458 @@ export const trustHubStatusCallback = async (req: any, res: any) => {
         return res.sendStatus(500);
     }
 };
+
+// ─── POST /api/messaging/register-brand ─────────────────────────────────────
+// Idempotent brand registration. If twilioBrandSid already exists, refreshes
+// its status from Twilio instead of creating a duplicate. The Customer Profile
+// Bundle must be approved before Twilio will accept the brand.
+// Body: { churchId }
+
+export const registerBrand = async (req: any, res: any) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    const { churchId } = req.body || {};
+    if (!churchId) return res.status(400).json({ error: 'Missing churchId' });
+
+    const db  = getDb();
+    const log = createServerLogger(db);
+
+    try {
+        const { accountSid, authToken } = await getMasterCredentials(db);
+        const master = getMasterClient(accountSid, authToken);
+
+        const churchSnap = await db.collection('churches').doc(churchId).get();
+        if (!churchSnap.exists) return res.status(404).json({ error: 'Church not found' });
+        const sms = churchSnap.data()?.smsSettings || {};
+
+        // ── Idempotency: brand already registered → refresh status ────────────────
+        if (sms.twilioBrandSid) {
+            let twilioStatus = 'pending';
+            let failureReason: string | null = null;
+            try {
+                const brandReg = await (master as any).messaging.v1
+                    .brandRegistrations(sms.twilioBrandSid).fetch();
+                twilioStatus  = (brandReg.status || 'pending').toLowerCase();
+                failureReason = brandReg.failureReason || null;
+            } catch (fetchErr: any) {
+                log.warn(`[registerBrand] Could not fetch existing brand: ${fetchErr.message}`, 'system', { churchId }, churchId);
+            }
+            const mapped = twilioStatus === 'approved' ? 'approved'
+                         : twilioStatus === 'failed'   ? 'failed'
+                         : 'pending';
+            await db.collection('churches').doc(churchId).update({
+                'smsSettings.twilioA2pStatus':    mapped,
+                'smsSettings.a2pLastStatusCheck': Date.now(),
+                ...(failureReason ? { 'smsSettings.a2pFailureReason': failureReason } : {}),
+            });
+            return res.json({
+                success: true, brandSid: sms.twilioBrandSid,
+                status: mapped, twilioStatus, failureReason,
+                alreadyRegistered: true,
+                message: mapped === 'approved'
+                    ? 'Brand already approved. Proceed to create a Messaging Service.'
+                    : `Brand registration is ${mapped}. Approval typically takes 1–5 business days.`,
+            });
+        }
+
+        // ── Validate prerequisites ────────────────────────────────────────────────
+        const profileSid = sms.twilioCustomerProfileSid as string | undefined;
+        if (!profileSid) {
+            return res.status(400).json({
+                error: 'Customer Profile Bundle (BU...) not found. Complete Step 3 (Create Customer Profile) first.',
+            });
+        }
+        if (!sms.a2pBusinessName || !sms.a2pContactEmail) {
+            return res.status(400).json({
+                error: 'Business name and contact email are required. Save the Registration Info form first.',
+            });
+        }
+
+        // ── Submit brand registration ─────────────────────────────────────────────
+        const brand = await (master as any).messaging.v1.brandRegistrations.create({
+            customerProfileBundleSid: profileSid,
+            ...(sms.twilioA2pProfileSid ? { a2PProfileBundleSid: sms.twilioA2pProfileSid } : {}),
+            friendlyName: sms.a2pBusinessName,
+            email:        sms.a2pContactEmail,
+            phone:        toE164(sms.a2pContactPhone || ''),
+            website:      sms.a2pWebsite || '',
+        });
+
+        await db.collection('churches').doc(churchId).update({
+            'smsSettings.twilioBrandSid':  brand.sid,
+            'smsSettings.twilioA2pStatus': 'pending',
+            'smsSettings.a2pSubmittedAt':  Date.now(),
+        });
+
+        log.info(`[registerBrand] Brand ${brand.sid} submitted for ${churchId}`, 'system', { churchId, brandSid: brand.sid }, churchId);
+
+        return res.json({
+            success:  true,
+            brandSid: brand.sid,
+            status:   'pending',
+            message:  'Brand registration submitted to Twilio. Approval typically takes 1–5 business days.',
+        });
+
+    } catch (e: any) {
+        log.error(`[registerBrand] Failed for ${churchId}: ${e.message}`, 'system', { churchId }, churchId);
+        return res.status(500).json({ error: e.message || 'Brand registration failed', twilioCode: (e as any).code });
+    }
+};
+
+
+// ─── POST /api/messaging/create-messaging-service ────────────────────────────
+// Creates a Twilio Messaging Service (MG...) which is the container that links
+// phone numbers to an A2P campaign for compliance routing.
+// Body: { churchId }
+
+export const createMessagingService = async (req: any, res: any) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    const { churchId } = req.body || {};
+    if (!churchId) return res.status(400).json({ error: 'Missing churchId' });
+
+    const db  = getDb();
+    const log = createServerLogger(db);
+
+    try {
+        const { accountSid, authToken } = await getMasterCredentials(db);
+        const master = getMasterClient(accountSid, authToken);
+
+        const churchSnap = await db.collection('churches').doc(churchId).get();
+        if (!churchSnap.exists) return res.status(404).json({ error: 'Church not found' });
+        const sms    = churchSnap.data()?.smsSettings || {};
+        const church = churchSnap.data() || {};
+
+        // ── Idempotency ───────────────────────────────────────────────────────────
+        if (sms.twilioMessagingServiceSid) {
+            return res.json({
+                success: true,
+                messagingServiceSid: sms.twilioMessagingServiceSid,
+                alreadyCreated: true,
+                message: 'Messaging Service already created. Proceed to register the A2P campaign.',
+            });
+        }
+
+        // ── Build webhook URLs ────────────────────────────────────────────────────
+        const sysSnap = await db.doc('system/settings').get();
+        const sysData = sysSnap.data() || {};
+        const baseUrl = (
+            sysData.twilioWebhookBaseUrl || sysData.apiBaseUrl ||
+            process.env.SERVER_BASE_URL || ''
+        ).replace(/\/$/, '');
+        if (!baseUrl) throw new Error('Webhook Base URL is not configured in System Settings.');
+
+        const inboundUrl     = `${baseUrl}/api/messaging/inbound`;
+        const statusCallback = `${baseUrl}/api/messaging/status`;
+
+        // ── Create Messaging Service ──────────────────────────────────────────────
+        const svc = await (master as any).messaging.v1.services.create({
+            friendlyName:      `${church.name || sms.a2pBusinessName || 'Church'} – PastoralCare`,
+            inboundRequestUrl: inboundUrl,
+            inboundMethod:     'POST',
+            statusCallback,
+            usecase:           'mixed',
+            smartEncoding:     true,
+            mmsConverter:      true,
+        });
+
+        await db.collection('churches').doc(churchId).update({
+            'smsSettings.twilioMessagingServiceSid': svc.sid,
+        });
+
+        log.info(`[createMessagingService] Created MG ${svc.sid} for ${churchId}`, 'system', { churchId, sid: svc.sid }, churchId);
+
+        return res.json({
+            success:             true,
+            messagingServiceSid: svc.sid,
+            message:             'Messaging Service created. Now register the A2P campaign.',
+        });
+
+    } catch (e: any) {
+        log.error(`[createMessagingService] Failed for ${churchId}: ${e.message}`, 'system', { churchId }, churchId);
+        return res.status(500).json({ error: e.message || 'Failed to create Messaging Service', twilioCode: (e as any).code });
+    }
+};
+
+
+// ─── POST /api/messaging/register-campaign ───────────────────────────────────
+// Registers an A2P Use Case (campaign) under the Messaging Service.
+// Twilio requires the Brand Registration to be in APPROVED status first.
+// Body: { churchId }
+
+function mapUseCase(category: string): string {
+    const map: Record<string, string> = {
+        'low_volume':     'LOW_VOLUME',
+        'low volume':     'LOW_VOLUME',
+        'mixed':          'MIXED',
+        'notification':   'NOTIFICATION',
+        'notifications':  'NOTIFICATION',
+        'marketing':      'MARKETING',
+        '2fa':            '2FA',
+        'charity':        'CHARITY',
+        'emergency':      'EMERGENCY_ALERTS',
+        'religious':      'LOW_VOLUME',
+        'religion':       'LOW_VOLUME',
+        'non-profit':     'LOW_VOLUME',
+        'nonprofit':      'LOW_VOLUME',
+        'not_for_profit': 'LOW_VOLUME',
+    };
+    const key = (category || 'LOW_VOLUME').toLowerCase().replace(/\s+/g, '_');
+    return map[key] || 'LOW_VOLUME';
+}
+
+export const registerCampaign = async (req: any, res: any) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    const { churchId } = req.body || {};
+    if (!churchId) return res.status(400).json({ error: 'Missing churchId' });
+
+    const db  = getDb();
+    const log = createServerLogger(db);
+
+    try {
+        const { accountSid, authToken } = await getMasterCredentials(db);
+        const master = getMasterClient(accountSid, authToken);
+
+        const churchSnap = await db.collection('churches').doc(churchId).get();
+        if (!churchSnap.exists) return res.status(404).json({ error: 'Church not found' });
+        const sms    = churchSnap.data()?.smsSettings || {};
+        const church = churchSnap.data() || {};
+
+        // ── Idempotency ───────────────────────────────────────────────────────────
+        if (sms.twilioUsAppToPersonSid) {
+            return res.json({
+                success: true,
+                usAppToPersonSid: sms.twilioUsAppToPersonSid,
+                alreadyRegistered: true,
+                message: 'A2P campaign already registered. Proceed to link phone numbers.',
+            });
+        }
+
+        // ── Validate prerequisites ────────────────────────────────────────────────
+        if (!sms.twilioBrandSid) {
+            return res.status(400).json({ error: 'Brand Registration (BN...) is required. Complete Step 4 first.' });
+        }
+        if (!sms.twilioMessagingServiceSid) {
+            return res.status(400).json({ error: 'Messaging Service (MG...) is required. Complete Step 5 first.' });
+        }
+
+        // Verify brand is APPROVED — fetch live status
+        let brandStatus = (sms.twilioA2pStatus || 'pending').toLowerCase();
+        try {
+            const brandReg = await (master as any).messaging.v1
+                .brandRegistrations(sms.twilioBrandSid).fetch();
+            brandStatus = (brandReg.status || 'pending').toLowerCase();
+            // Sync back
+            await db.collection('churches').doc(churchId).update({
+                'smsSettings.twilioA2pStatus': brandStatus === 'approved' ? 'approved'
+                    : brandStatus === 'failed' ? 'failed' : 'pending',
+            });
+        } catch { /* use cached */ }
+
+        if (brandStatus !== 'approved') {
+            return res.status(400).json({
+                error: `Brand Registration is "${brandStatus}" — Twilio requires APPROVED status before you can register a campaign. Check back after Twilio approves your brand (1–5 business days).`,
+                brandStatus,
+            });
+        }
+
+        // Validate sample messages (required by Twilio)
+        const sample1   = (sms.a2pSampleMessage1 || sms.a2pMessageSample1 || '').trim();
+        const sample2   = (sms.a2pSampleMessage2 || sms.a2pMessageSample2 || '').trim();
+        if (!sample1 || !sample2) {
+            return res.status(400).json({
+                error: 'Two sample messages are required. Add them in Step 3 (Campaign Registration) of the A2P form and save before registering the campaign.',
+            });
+        }
+
+        const churchName = church.name || sms.a2pBusinessName || 'Our Church';
+        const optInMsg   = (sms.a2pUseCaseOptIn || sms.a2pOptInDescription || `You have opted in to receive messages from ${churchName}. Reply STOP to unsubscribe.`).trim();
+        const useCase    = mapUseCase(sms.a2pUseCaseCategory || 'LOW_VOLUME');
+
+        // ── Register the A2P campaign ─────────────────────────────────────────────
+        const campaign = await (master as any).messaging.v1
+            .services(sms.twilioMessagingServiceSid)
+            .usAppToPerson
+            .create({
+                brandRegistrationSid: sms.twilioBrandSid,
+                description:          `Pastoral care, prayer requests, event notifications, and community outreach for ${churchName}.`,
+                messageSamples:       [sample1, sample2],
+                usAppToPersonUsecase: useCase,
+                hasEmbeddedLinks:     false,
+                hasEmbeddedPhone:     false,
+                optInMessage:         optInMsg,
+                optInKeywords:        ['JOIN', 'YES', 'START', 'SUBSCRIBE'],
+                optOutMessage:        'You have been unsubscribed. Reply JOIN to re-subscribe.',
+                optOutKeywords:       ['STOP', 'UNSUBSCRIBE', 'CANCEL', 'QUIT', 'END'],
+                helpMessage:          `For help, contact ${churchName}. Reply STOP to unsubscribe.`,
+                helpKeywords:         ['HELP', 'INFO'],
+            });
+
+        await db.collection('churches').doc(churchId).update({
+            'smsSettings.twilioUsAppToPersonSid':  campaign.sid,
+            'smsSettings.twilioA2pCampaignStatus': 'pending',
+            'smsSettings.a2pCampaignSubmittedAt':  Date.now(),
+        });
+
+        log.info(`[registerCampaign] Campaign ${campaign.sid} registered for ${churchId}`, 'system', { churchId, sid: campaign.sid }, churchId);
+
+        return res.json({
+            success:          true,
+            usAppToPersonSid: campaign.sid,
+            status:           'pending',
+            message:          'A2P campaign registered. Now link your phone numbers to complete setup.',
+        });
+
+    } catch (e: any) {
+        log.error(`[registerCampaign] Failed for ${churchId}: ${e.message}`, 'system', { churchId }, churchId);
+        return res.status(500).json({ error: e.message || 'Campaign registration failed', twilioCode: (e as any).code });
+    }
+};
+
+
+// ─── POST /api/messaging/assign-numbers-to-service ───────────────────────────
+// Links all twilioNumbers docs (by phoneSid) for the church to the Messaging
+// Service. Falls back to smsSettings.twilioPhoneSid if no collection docs exist.
+// Body: { churchId }
+
+export const assignNumbersToService = async (req: any, res: any) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    const { churchId } = req.body || {};
+    if (!churchId) return res.status(400).json({ error: 'Missing churchId' });
+
+    const db  = getDb();
+    const log = createServerLogger(db);
+
+    try {
+        const { accountSid, authToken } = await getMasterCredentials(db);
+        const master = getMasterClient(accountSid, authToken);
+
+        const churchSnap = await db.collection('churches').doc(churchId).get();
+        if (!churchSnap.exists) return res.status(404).json({ error: 'Church not found' });
+        const sms = churchSnap.data()?.smsSettings || {};
+
+        if (!sms.twilioMessagingServiceSid) {
+            return res.status(400).json({ error: 'Messaging Service (MG...) not found. Complete Step 5 first.' });
+        }
+
+        const mgSid = sms.twilioMessagingServiceSid as string;
+
+        // Gather phone SIDs (prefer twilioNumbers collection, fall back to smsSettings)
+        const numsSnap = await db.collection('twilioNumbers')
+            .where('churchId', '==', churchId).get();
+
+        const targets: { docRef: any; sid: string; phone: string }[] = [];
+        if (!numsSnap.empty) {
+            numsSnap.docs.forEach(d => {
+                const phoneSid = d.data().phoneSid as string | undefined;
+                if (phoneSid) targets.push({ docRef: d.ref, sid: phoneSid, phone: d.data().phoneNumber || '' });
+            });
+        } else if (sms.twilioPhoneSid) {
+            targets.push({ docRef: null, sid: sms.twilioPhoneSid, phone: sms.twilioPhoneNumber || '' });
+        }
+
+        if (targets.length === 0) {
+            return res.status(400).json({ error: 'No phone numbers found to link. Provision a number first.' });
+        }
+
+        const results: { sid: string; phone: string; success: boolean; error?: string }[] = [];
+
+        for (const { docRef, sid, phone } of targets) {
+            try {
+                await (master as any).messaging.v1
+                    .services(mgSid)
+                    .phoneNumbers
+                    .create({ phoneNumberSid: sid });
+
+                if (docRef) await docRef.update({ messagingServiceSid: mgSid, updatedAt: Date.now() });
+                results.push({ sid, phone, success: true });
+                log.info(`[assignNumbersToService] Linked ${sid} → ${mgSid}`, 'system', { churchId }, churchId);
+
+            } catch (e: any) {
+                // Error code 21710 = number already linked to this service
+                if ((e as any).code === 21710 || (e.message || '').includes('already')) {
+                    if (docRef) await docRef.update({ messagingServiceSid: mgSid, updatedAt: Date.now() });
+                    results.push({ sid, phone, success: true });
+                } else {
+                    results.push({ sid, phone, success: false, error: e.message });
+                    log.warn(`[assignNumbersToService] Failed to link ${sid}: ${e.message}`, 'system', { churchId }, churchId);
+                }
+            }
+        }
+
+        // Mark setup complete
+        await db.collection('churches').doc(churchId).update({
+            'smsSettings.twilioNumbersLinked':   true,
+            'smsSettings.twilioNumbersLinkedAt': Date.now(),
+        });
+
+        const allSuccess = results.every(r => r.success);
+        log.info(`[assignNumbersToService] Linked ${results.filter(r => r.success).length}/${results.length} numbers for ${churchId}`, 'system', { churchId }, churchId);
+
+        return res.json({
+            success: allSuccess,
+            results,
+            message: allSuccess
+                ? `All ${results.length} number(s) linked to the Messaging Service. SMS setup is complete! ✅`
+                : `${results.filter(r => r.success).length}/${results.length} numbers linked. See errors above.`,
+        });
+
+    } catch (e: any) {
+        log.error(`[assignNumbersToService] Failed for ${churchId}: ${e.message}`, 'system', { churchId }, churchId);
+        return res.status(500).json({ error: e.message || 'Failed to assign numbers', twilioCode: (e as any).code });
+    }
+};
+
+
+// ─── GET /api/messaging/campaign-status ──────────────────────────────────────
+// Fetches the live A2P campaign (UsAppToPerson) status from Twilio and syncs
+// it back to Firestore. Query: ?churchId=xxx
+
+export const checkCampaignStatus = async (req: any, res: any) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    const churchId = (req.query.churchId || req.body?.churchId) as string;
+    if (!churchId) return res.status(400).json({ error: 'Missing churchId' });
+
+    const db  = getDb();
+    const log = createServerLogger(db);
+
+    try {
+        const { accountSid, authToken } = await getMasterCredentials(db);
+        const master = getMasterClient(accountSid, authToken);
+
+        const churchSnap = await db.collection('churches').doc(churchId).get();
+        if (!churchSnap.exists) return res.status(404).json({ error: 'Church not found' });
+        const sms = churchSnap.data()?.smsSettings || {};
+
+        if (!sms.twilioUsAppToPersonSid || !sms.twilioMessagingServiceSid) {
+            return res.json({ status: 'not_registered', message: 'Campaign not yet registered.' });
+        }
+
+        const campaign = await (master as any).messaging.v1
+            .services(sms.twilioMessagingServiceSid)
+            .usAppToPerson(sms.twilioUsAppToPersonSid)
+            .fetch();
+
+        // Twilio campaign statuses: PENDING, IN_PROGRESS, VERIFIED, FAILED, EXPIRED, ACTIVE
+        const twilioStatus = (campaign.campaignStatus || 'PENDING').toUpperCase();
+        const mapped = (twilioStatus === 'VERIFIED' || twilioStatus === 'ACTIVE') ? 'approved'
+                     : twilioStatus === 'FAILED'    ? 'failed'
+                     : 'pending';
+
+        await db.collection('churches').doc(churchId).update({
+            'smsSettings.twilioA2pCampaignStatus':      mapped,
+            'smsSettings.a2pCampaignStatusCheckedAt':   Date.now(),
+        });
+
+        log.info(`[checkCampaignStatus] Campaign ${sms.twilioUsAppToPersonSid} → ${twilioStatus} for ${churchId}`, 'system', { churchId }, churchId);
+
+        return res.json({
+            success:          true,
+            status:           mapped,
+            twilioStatus,
+            usAppToPersonSid: sms.twilioUsAppToPersonSid,
+        });
+
+    } catch (e: any) {
+        log.error(`[checkCampaignStatus] ${e.message}`, 'system', { churchId }, churchId);
+        return res.status(500).json({ error: e.message || 'Campaign status check failed' });
+    }
+};

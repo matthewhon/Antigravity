@@ -19,7 +19,7 @@ import { getDb } from './backend/firebase';
 import { handleGeminiProxy } from './backend/geminiProxy';
 import { provisionSubuser, authenticateDomain, verifyDomain, diagnoseDomain } from './backend/emailProvisioning';
 import { getPublicGroups, getPublicRegistrations, getPublicEvents, serveWidgetScript } from './backend/publicApi.js';
-import { getAvailableNumbers, provisionTwilioNumber, releaseTwilioNumber, registerA2p, checkA2pStatus, createCustomerProfile, deleteCustomerProfile, refreshCustomerProfileStatus, addTwilioNumber, releaseSpecificNumber, updateNumberSettings, setDefaultNumber, trustHubStatusCallback } from './backend/twilioProvisioning';
+import { getAvailableNumbers, provisionTwilioNumber, releaseTwilioNumber, registerA2p, checkA2pStatus, createCustomerProfile, deleteCustomerProfile, refreshCustomerProfileStatus, addTwilioNumber, releaseSpecificNumber, updateNumberSettings, setDefaultNumber, trustHubStatusCallback, registerBrand, createMessagingService, registerCampaign, assignNumbersToService, checkCampaignStatus } from './backend/twilioProvisioning';
 import { handleInboundSms } from './backend/twilioInbound';
 import { sendIndividual, sendBulk } from './backend/twilioSend';
 import { handleStatusCallback } from './backend/twilioWebhookStatus';
@@ -180,6 +180,13 @@ async function startServer() {
     // Sending
     app.post('/api/messaging/send-individual', express.json(), sendIndividual);
     app.post('/api/messaging/send-bulk', express.json(), sendBulk);
+    // A2P full pipeline (brand → service → campaign → numbers)
+    app.post('/api/messaging/register-brand', express.json(), registerBrand);
+    app.post('/api/messaging/create-messaging-service', express.json(), createMessagingService);
+    app.post('/api/messaging/register-campaign', express.json(), registerCampaign);
+    app.post('/api/messaging/assign-numbers-to-service', express.json(), assignNumbersToService);
+    app.get('/api/messaging/campaign-status', checkCampaignStatus);
+    app.post('/api/messaging/campaign-status', express.json(), checkCampaignStatus);
 
     // ─── SMS Agent: Website Scanner ─────────────────────────────────────────────
     // Fetches a church website URL server-side, extracts visible text, and uses

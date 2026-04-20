@@ -311,6 +311,12 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   const [pendingTermsAction, setPendingTermsAction] = useState<'create-profile' | 'submit-a2p' | null>(null);
   // Ref that the SMS tab IIFE populates with its handler functions
   const smsActionRef = useRef<{ handleCreateProfile: () => void; handleSubmitToTwilio: () => void } | null>(null);
+  // New A2P pipeline step states
+  const [isRegisteringBrand, setIsRegisteringBrand]     = useState(false);
+  const [isCreatingMsgSvc, setIsCreatingMsgSvc]         = useState(false);
+  const [isRegisteringCampaign, setIsRegisteringCampaign] = useState(false);
+  const [isAssigningNumbers, setIsAssigningNumbers]     = useState(false);
+  const [isCheckingCampaign, setIsCheckingCampaign]     = useState(false);
 
   // Phone Numbers panel state (SMS → Numbers tab)
   const [twilioNumbers, setTwilioNumbers] = useState<any[]>([]);
@@ -2282,6 +2288,117 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                     setA2pResult({ success: false, message: e.message || 'Refresh failed' });
                 } finally {
                     setIsRefreshingProfile(false);
+                }
+            };
+
+            // ── Step 4: Register Brand ────────────────────────────────────────────
+            const handleRegisterBrand = async () => {
+                setIsRegisteringBrand(true);
+                setA2pResult(null);
+                try {
+                    const res  = await fetch('/api/messaging/register-brand', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ churchId }),
+                    });
+                    const data = await res.json();
+                    if (!res.ok) {
+                        setA2pResult({ success: false, message: data.error || 'Brand registration failed' });
+                        return;
+                    }
+                    if (data.brandSid) setSmsForm(prev => ({ ...prev, twilioBrandSid: data.brandSid, twilioA2pStatus: data.status }));
+                    setA2pResult({ success: true, message: data.message || 'Brand submitted!' });
+                } catch (e: any) {
+                    setA2pResult({ success: false, message: e.message || 'Brand registration failed' });
+                } finally {
+                    setIsRegisteringBrand(false);
+                }
+            };
+
+            // ── Step 5: Create Messaging Service ─────────────────────────────────
+            const handleCreateMessagingService = async () => {
+                setIsCreatingMsgSvc(true);
+                setA2pResult(null);
+                try {
+                    const res  = await fetch('/api/messaging/create-messaging-service', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ churchId }),
+                    });
+                    const data = await res.json();
+                    if (!res.ok) {
+                        setA2pResult({ success: false, message: data.error || 'Failed to create Messaging Service' });
+                        return;
+                    }
+                    if (data.messagingServiceSid) setSmsForm(prev => ({ ...prev, twilioMessagingServiceSid: data.messagingServiceSid }));
+                    setA2pResult({ success: true, message: data.message || 'Messaging Service created!' });
+                } catch (e: any) {
+                    setA2pResult({ success: false, message: e.message || 'Failed to create Messaging Service' });
+                } finally {
+                    setIsCreatingMsgSvc(false);
+                }
+            };
+
+            // ── Step 6: Register A2P Campaign ────────────────────────────────────
+            const handleRegisterCampaign = async () => {
+                setIsRegisteringCampaign(true);
+                setA2pResult(null);
+                try {
+                    const res  = await fetch('/api/messaging/register-campaign', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ churchId }),
+                    });
+                    const data = await res.json();
+                    if (!res.ok) {
+                        setA2pResult({ success: false, message: data.error || 'Campaign registration failed' });
+                        return;
+                    }
+                    if (data.usAppToPersonSid) setSmsForm(prev => ({ ...prev, twilioUsAppToPersonSid: data.usAppToPersonSid, twilioA2pCampaignStatus: 'pending' }));
+                    setA2pResult({ success: true, message: data.message || 'Campaign registered!' });
+                } catch (e: any) {
+                    setA2pResult({ success: false, message: e.message || 'Campaign registration failed' });
+                } finally {
+                    setIsRegisteringCampaign(false);
+                }
+            };
+
+            // ── Step 7: Assign Numbers to Service ────────────────────────────────
+            const handleAssignNumbers = async () => {
+                setIsAssigningNumbers(true);
+                setA2pResult(null);
+                try {
+                    const res  = await fetch('/api/messaging/assign-numbers-to-service', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ churchId }),
+                    });
+                    const data = await res.json();
+                    if (!res.ok) {
+                        setA2pResult({ success: false, message: data.error || 'Failed to link numbers' });
+                        return;
+                    }
+                    if (data.success) setSmsForm(prev => ({ ...prev, twilioNumbersLinked: true as any }));
+                    setA2pResult({ success: data.success, message: data.message || 'Numbers linked!' });
+                } catch (e: any) {
+                    setA2pResult({ success: false, message: e.message || 'Failed to link numbers' });
+                } finally {
+                    setIsAssigningNumbers(false);
+                }
+            };
+
+            // ── Poll campaign status ──────────────────────────────────────────────
+            const handleCheckCampaignStatus = async () => {
+                setIsCheckingCampaign(true);
+                setA2pResult(null);
+                try {
+                    const res  = await fetch(`/api/messaging/campaign-status?churchId=${encodeURIComponent(churchId)}`);
+                    const data = await res.json();
+                    if (data.status) setSmsForm(prev => ({ ...prev, twilioA2pCampaignStatus: data.status }));
+                    setA2pResult({
+                        success: true,
+                        message: `Campaign status: ${data.twilioStatus || data.status || 'unknown'}`,
+                    });
+                } catch (e: any) {
+                    setA2pResult({ success: false, message: e.message || 'Status check failed' });
+                } finally {
+                    setIsCheckingCampaign(false);
                 }
             };
 
