@@ -1,9 +1,9 @@
 steps:
 - name: 'gcr.io/cloud-builders/docker'
-  args: ['build', '-t', 'gcr.io/${_PROJECT_ID}/${_SERVICE_NAME}', '.']
+  args: ['build', '-t', 'gcr.io/${_BUILD_PROJECT}/${_SERVICE_NAME}', '.']
 
 - name: 'gcr.io/cloud-builders/docker'
-  args: ['push', 'gcr.io/${_PROJECT_ID}/${_SERVICE_NAME}']
+  args: ['push', 'gcr.io/${_BUILD_PROJECT}/${_SERVICE_NAME}']
 
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
   entrypoint: gcloud
@@ -12,7 +12,7 @@ steps:
     - 'deploy'
     - '${_SERVICE_NAME}'
     - '--image'
-    - 'gcr.io/${_PROJECT_ID}/${_SERVICE_NAME}'
+    - 'gcr.io/${_BUILD_PROJECT}/${_SERVICE_NAME}'
     - '--region'
     - '${_REGION}'
     - '--platform'
@@ -23,15 +23,16 @@ steps:
     - '--timeout'
     - '300s'
     - '--project'
-    - '${_PROJECT_ID}'
+    - '${_DEPLOY_PROJECT}'
 
 options:
   logging: CLOUD_LOGGING_ONLY
 
 substitutions:
-  _PROJECT_ID: gen-lang-client-0779452267
+  _BUILD_PROJECT: pastoral-care-for-pco    # project where Cloud Build SA has push rights
+  _DEPLOY_PROJECT: gen-lang-client-0779452267   # project where Cloud Run service lives
   _SERVICE_NAME: pastoral-care-for-pco
   _REGION: us-central1
 
 images:
-  - 'gcr.io/${_PROJECT_ID}/${_SERVICE_NAME}'
+  - 'gcr.io/${_BUILD_PROJECT}/${_SERVICE_NAME}'
