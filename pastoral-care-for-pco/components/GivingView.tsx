@@ -1348,23 +1348,6 @@ export const GivingView: React.FC<GivingViewProps> = ({
 
   return (
     <div className="space-y-10 animate-in fade-in duration-500">
-        <style>{`
-            @media print {
-                body { background: white; }
-                .no-print { display: none !important; }
-                .print-only { display: block !important; }
-                .report-container { 
-                    box-shadow: none !important; 
-                    border: none !important; 
-                    max-width: none !important; 
-                    width: 100% !important;
-                    margin: 0 !important;
-                    padding: 0 !important;
-                }
-                @page { margin: 1cm; size: auto; }
-            }
-        `}</style>
-        
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 no-print">
             <div>
             <h3 className="text-4xl font-black tracking-tighter text-slate-900 dark:text-white">Giving Analytics</h3>

@@ -3304,7 +3304,11 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                     url += `&state=${encodeURIComponent(addNumState)}`;
                                 }
                                 const res = await fetch(url);
-                                const data = await res.json();
+                                const raw = await res.text();
+                                let data: any;
+                                try { data = JSON.parse(raw); } catch {
+                                    throw new Error(`Server returned unexpected response (HTTP ${res.status}): ${raw.slice(0, 200)}`);
+                                }
                                 if (!data.success) throw new Error(data.error || 'Search failed');
                                 setAddNumResults(data.numbers || []);
                                 setAddNumStep('pick');
@@ -3330,7 +3334,11 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         friendlyLabel: addNumLabel || 'New Line',
                                     }),
                                 });
-                                const data = await res.json();
+                                const raw = await res.text();
+                                let data: any;
+                                try { data = JSON.parse(raw); } catch {
+                                    throw new Error(`Server returned unexpected response (HTTP ${res.status}): ${raw.slice(0, 300)}`);
+                                }
                                 if (!data.success) throw new Error(data.error || 'Failed to claim number');
                                 setNumToast('✓ Number added successfully!');
                                 setShowAddNumber(false);

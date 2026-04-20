@@ -205,3 +205,33 @@
   font-style: italic;
 }
 .note-content a { color: #4f46e5; text-decoration: underline; }
+
+/* ── GivingView (GivingView.tsx) ─────────────────────────────────────────── */
+
+/* Print overrides — moved from the inline <style> tag in GivingView.tsx */
+@media print {
+  body { background: white; }
+  .no-print { display: none !important; }
+  .print-only { display: block !important; }
+  .report-container {
+    box-shadow: none !important;
+    border: none !important;
+    max-width: none !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  @page { margin: 1cm; size: auto; }
+}
+
+/* ── DataChartSelector (DataChartSelector.tsx) ───────────────────────────── */
+
+/* Static height for the mini bar chart in the Cumulative YTD widget legend row */
+.dcs-mini-bar-chart {
+  height: 56px;
+}
+
+/* Dashed budget line indicator in the Cumulative YTD legend stat row */
+.dcs-legend-budget-dash {
+  border-top: 2px dashed;
+}

@@ -1008,7 +1008,7 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
               <div className="flex items-center gap-1.5">
                 <div className="w-3 h-3 rounded-sm bg-emerald-400" />
                 <span className="text-[10px] text-slate-500 dark:text-slate-400">Actual</span>
-                <div className="w-3 h-0.5 bg-slate-400 ml-2" style={{ borderTop: '2px dashed' }} />
+                <div className="w-3 h-0.5 bg-slate-400 ml-2 dcs-legend-budget-dash" />
                 <span className="text-[10px] text-slate-500 dark:text-slate-400">Budget</span>
               </div>
               <div className="flex items-center gap-1.5">
@@ -1330,7 +1330,7 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
               </div>
             </div>
             {rows.length === 0 && <p className="text-xs text-slate-400 text-center py-2">No attendance data for this period</p>}
-            <div className="flex items-end gap-0.5" style={{ height: 56 }}>
+            <div className="flex items-end gap-0.5 dcs-mini-bar-chart">
               {rows.slice(-20).map((r, i) => {
                 const mH = Math.max(2, Math.round((r.members / maxVal) * 48));
                 const vH = Math.max(r.visitors > 0 ? 2 : 0, Math.round((r.visitors / maxVal) * 48));
