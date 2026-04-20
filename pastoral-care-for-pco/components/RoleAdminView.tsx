@@ -362,6 +362,8 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   const [selectedListName, setSelectedListName] = useState(church.regularAttendersListName || '');
   const [isSavingList, setIsSavingList] = useState(false);
   const [listSaveMessage, setListSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [isGeocoding, setIsGeocoding] = useState(false);
+  const [geocodeMessage, setGeocodeMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
     loadUsers();
@@ -1120,6 +1122,60 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                     className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 text-xs font-mono text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 placeholder-slate-400 transition-colors"
                                     placeholder="Enter your key for maps"
                                 />
+                            </div>
+
+                            {/* Geocode Addresses */}
+                            <div className="mb-6 p-4 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700">
+                                <p className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-widest mb-1">Member Heatmap</p>
+                                <p className="text-[10px] text-slate-400 dark:text-slate-500 mb-3 leading-relaxed">
+                                    Geocode member addresses to power the cluster map on the Pastoral Care Membership tab.
+                                    Only processes addresses that haven't been geocoded yet.
+                                </p>
+                                <div className="flex items-center gap-3 flex-wrap">
+                                    <button
+                                        onClick={async () => {
+                                            setIsGeocoding(true);
+                                            setGeocodeMessage(null);
+                                            try {
+                                                const res = await fetch('/geocode/run', {
+                                                    method: 'POST',
+                                                    headers: { 'Content-Type': 'application/json' },
+                                                    body: JSON.stringify({ churchId }),
+                                                });
+                                                const data = await res.json();
+                                                if (res.ok) {
+                                                    setGeocodeMessage({ type: 'success', text: 'Geocoding complete. Reload the heatmap to see results.' });
+                                                } else {
+                                                    setGeocodeMessage({ type: 'error', text: data.error || 'Geocoding failed.' });
+                                                }
+                                            } catch (e: any) {
+                                                setGeocodeMessage({ type: 'error', text: e.message || 'Network error.' });
+                                            } finally {
+                                                setIsGeocoding(false);
+                                                setTimeout(() => setGeocodeMessage(null), 6000);
+                                            }
+                                        }}
+                                        disabled={isGeocoding}
+                                        className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-md shadow-indigo-200 dark:shadow-none"
+                                    >
+                                        {isGeocoding ? (
+                                            <>
+                                                <svg className="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24">
+                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                                                </svg>
+                                                Geocoding…
+                                            </>
+                                        ) : '📍 Geocode Addresses'}
+                                    </button>
+                                    {geocodeMessage && (
+                                        <span className={`text-[10px] font-bold animate-in fade-in ${
+                                            geocodeMessage.type === 'success' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500'
+                                        }`}>
+                                            {geocodeMessage.text}
+                                        </span>
+                                    )}
+                                </div>
                             </div>
 
                             <div className="flex items-center justify-between p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 transition-colors">

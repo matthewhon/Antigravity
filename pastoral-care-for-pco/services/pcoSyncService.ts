@@ -160,6 +160,11 @@ export const syncAllData = async (churchId: string) => {
         await syncPeopleData(churchId);
     } catch (e: any) { logger.error('Sync People failed', 'sync', { error: e?.message }, churchId); }
 
+    // Geocode new/updated addresses — runs after people are stored so we can read & update them
+    try {
+        await geocodePeopleAddresses(churchId);
+    } catch (e: any) { logger.warn('Geocoding step failed (non-fatal)', 'sync', { error: e?.message }, churchId); }
+
     // Sync check-in counts AFTER people are stored so we can update their records
     try {
         await syncCheckInCounts(churchId);
@@ -284,10 +289,12 @@ export const syncPeopleData = async (churchId: string) => {
                 addresses: (included || [])
                     .filter(i => i.type === 'Address' && rels?.addresses?.data?.some((r: any) => r.id === i.id))
                     .map(a => ({
-                        city: a.attributes.city,
-                        state: a.attributes.state,
-                        zip: a.attributes.zip,
-                        location: a.attributes.location
+                        street: a.attributes.street || null,
+                        city: a.attributes.city || null,
+                        state: a.attributes.state || null,
+                        zip: a.attributes.zip || null,
+                        location: a.attributes.location || null,
+                        // lat/lng populated separately by geocodePeopleAddresses()
                     })),
                 // ── Emails ─────────────────────────────────────────────────────
                 emails: (included || [])
@@ -1529,3 +1536,116 @@ export const syncRegistrationsData = async (churchId: string) => {
     }
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Geocoding
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Geocodes member addresses and persists lat/lng back to Firestore.
+ * Uses Google Geocoding API when the church has a googleMapsApiKey,
+ * otherwise falls back to Nominatim (free, 1 req/s, no key required).
+ * Only processes people whose primary address lacks coordinates.
+ */
+export const geocodePeopleAddresses = async (churchId: string): Promise<void> => {
+    logger.info('Geocoding people addresses...', 'sync', { churchId }, churchId);
+
+    // Fetch church to get the Google Maps API key
+    const church = await firestore.getChurch(churchId);
+    const googleApiKey: string | undefined = (church as any)?.googleMapsApiKey;
+
+    // Fetch all people for this church
+    const people = await firestore.getPeople(churchId);
+
+    // Filter to those whose first address has a city/zip but no lat/lng yet
+    const toGeocode = people.filter(p => {
+        const addr = p.addresses?.[0];
+        return addr && (addr.city || addr.zip) && (addr.lat === undefined || addr.lat === null);
+    });
+
+    if (toGeocode.length === 0) {
+        logger.info('No new addresses to geocode.', 'sync', { churchId }, churchId);
+        return;
+    }
+
+    logger.info(`Geocoding ${toGeocode.length} addresses...`, 'sync', { churchId, count: toGeocode.length }, churchId);
+
+    const geocodeAddress = async (addr: { street?: string | null, city?: string | null, state?: string | null, zip?: string | null }): Promise<{ lat: number; lng: number } | null> => {
+        const parts = [
+            addr.street,
+            addr.city,
+            addr.state,
+            addr.zip,
+        ].filter(Boolean);
+        if (parts.length === 0) return null;
+        const fullAddress = parts.join(', ');
+
+        if (googleApiKey) {
+            // ── Google Geocoding API ──────────────────────────────────────────
+            try {
+                const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(fullAddress)}&key=${googleApiKey}`;
+                const res = await fetch(url);
+                const data = await res.json();
+                if (data.status === 'OK' && data.results?.[0]?.geometry?.location) {
+                    const { lat, lng } = data.results[0].geometry.location;
+                    return { lat, lng };
+                }
+                logger.warn(`Google geocode failed for "${fullAddress}": ${data.status}`, 'sync', { churchId });
+            } catch (e: any) {
+                logger.warn(`Google geocode error: ${e?.message}`, 'sync', { churchId });
+            }
+            return null;
+        } else {
+            // ── Nominatim fallback (free, no key) — rate-limited to 1 req/s ──
+            try {
+                const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(fullAddress)}`;
+                const res = await fetch(url, { headers: { 'User-Agent': 'PastoralCareApp/1.0' } });
+                const data = await res.json();
+                if (data?.[0]) {
+                    return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+                }
+            } catch (e: any) {
+                logger.warn(`Nominatim geocode error: ${e?.message}`, 'sync', { churchId });
+            }
+            // Nominatim: respect 1 req/s
+            await delay(1100);
+            return null;
+        }
+    };
+
+    const updated: import('../types').PcoPerson[] = [];
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const person of toGeocode) {
+        const addr = person.addresses![0];
+        try {
+            const coords = await geocodeAddress(addr);
+            if (coords) {
+                // Merge lat/lng into the first address, preserve all other fields
+                const updatedAddresses = [{ ...addr, lat: coords.lat, lng: coords.lng }, ...(person.addresses?.slice(1) || [])];
+                updated.push({ ...person, addresses: updatedAddresses });
+                successCount++;
+            } else {
+                failCount++;
+            }
+        } catch (e: any) {
+            failCount++;
+            logger.warn(`Geocode failed for person ${person.id}`, 'sync', { churchId, error: e?.message });
+        }
+
+        // Google: ~50ms between requests stays safely under quota; Nominatim: already delayed above
+        if (googleApiKey) await delay(60);
+    }
+
+    // Batch-persist the geocoded people back to Firestore
+    if (updated.length > 0) {
+        await firestore.upsertPeople(updated);
+    }
+
+    logger.info(
+        `Geocoding complete`,
+        'sync',
+        { churchId, geocoded: successCount, failed: failCount, total: toGeocode.length },
+        churchId
+    );
+};

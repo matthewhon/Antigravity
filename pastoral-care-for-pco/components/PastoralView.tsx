@@ -284,6 +284,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
   const effectiveCensusError = (defaultLocation && locationErrorMap[defaultLocation.id]) || censusError;
   const [mapInstance, setMapInstance] = useState<any>(null);
   const [mapAuthError, setMapAuthError] = useState(false);
+  const [geocodeProgress, setGeocodeProgress] = useState<{ plotted: number; ungeocoded: number; topCities: string[] } | null>(null);
 
   // Care State
   const [notes, setNotes] = useState<PastoralNote[]>([]);
@@ -553,52 +554,46 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
       setStrategyReport('');
   }, [selectedLocationId, activeTab]);
 
-  // --- Map Initialization Effect (Leaflet + OpenStreetMap — no API key required) ---
+  // --- Map Initialization Effect (Leaflet + MarkerCluster) ---
   useEffect(() => {
       if (activeTab !== 'Membership' || !peopleData || !mapRef.current || mapInstance || !safeVisibleWidgets.includes('member_map')) return;
 
       ensureLeafletCss();
 
-      // Dynamically import Leaflet (installed as npm package)
-      import('leaflet').then(L => {
+      Promise.all([
+          import('leaflet'),
+          import('leaflet.markercluster').then(() => {}) // side-effect: attaches to L global
+      ]).then(([L]) => {
           if (!mapRef.current) return;
 
-          // Aggregate people by zip code
-          const locationMap = new Map<string, { count: number; latSum: number; lngSum: number; coordCount: number }>();
+          // Build geocoded point list from people with lat/lng on their first address
+          const points: { lat: number; lng: number; name: string; city?: string; membership?: string }[] = [];
+          let ungeocodedCount = 0;
+          const cityCounter = new Map<string, number>();
 
           peopleData.allPeople.forEach(p => {
-              const addr = p.addresses && p.addresses.length > 0 ? p.addresses[0] : null;
-              if (addr) {
-                  const zip = addr.zip?.trim();
-                  if (zip) {
-                      const key = zip;
-                      if (!locationMap.has(key)) {
-                          locationMap.set(key, { count: 0, latSum: 0, lngSum: 0, coordCount: 0 });
-                      }
-                      const loc = locationMap.get(key)!;
-                      loc.count++;
-                      if (addr.location) {
-                          const [latStr, lngStr] = addr.location.split(',');
-                          const lat = parseFloat(latStr);
-                          const lng = parseFloat(lngStr);
-                          if (!isNaN(lat) && !isNaN(lng)) {
-                              loc.latSum += lat;
-                              loc.lngSum += lng;
-                              loc.coordCount++;
-                          }
-                      }
-                  }
+              const addr = p.addresses?.[0];
+              if (addr?.lat != null && addr?.lng != null) {
+                  points.push({
+                      lat: addr.lat,
+                      lng: addr.lng,
+                      name: p.name,
+                      city: addr.city || '',
+                      membership: p.membership || 'Non-Member',
+                  });
+                  if (addr.city) cityCounter.set(addr.city, (cityCounter.get(addr.city) || 0) + 1);
+              } else if (addr && (addr.city || addr.zip)) {
+                  ungeocodedCount++;
+                  if (addr.city) cityCounter.set(addr.city, (cityCounter.get(addr.city) || 0) + 1);
               }
           });
 
-          const points = Array.from(locationMap.entries())
-              .filter(([_, d]) => d.coordCount > 0)
-              .map(([name, d]) => ({
-                  name,
-                  lat: d.latSum / d.coordCount,
-                  lng: d.lngSum / d.coordCount,
-                  count: d.count
-              }));
+          const topCities = Array.from(cityCounter.entries())
+              .sort((a, b) => b[1] - a[1])
+              .slice(0, 3)
+              .map(([city]) => city);
+
+          setGeocodeProgress({ plotted: points.length, ungeocoded: ungeocodedCount, topCities });
 
           // Fix default icon paths broken by bundlers
           (L.Icon.Default.prototype as any)._getIconUrl = undefined;
@@ -609,55 +604,79 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
           });
 
           const map = L.map(mapRef.current!, {
-              center: [39.8283, -98.5795], // Geographic center of US
+              center: [39.8283, -98.5795],
               zoom: 4,
               zoomControl: true,
               attributionControl: true,
+              maxZoom: 16,
           });
 
-          // OpenStreetMap tiles — completely free, no API key
           L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
               attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
               maxZoom: 19,
           }).addTo(map);
 
-          const bounds: [number, number][] = [];
+          if (points.length > 0) {
+              // Build the cluster group with custom indigo cluster icon
+              const clusterGroup = (L as any).markerClusterGroup({
+                  maxClusterRadius: 60,
+                  showCoverageOnHover: false,
+                  iconCreateFunction: (cluster: any) => {
+                      const count = cluster.getChildCount();
+                      const size = count < 10 ? 36 : count < 50 ? 44 : 52;
+                      return L.divIcon({
+                          html: `<div style="
+                              width:${size}px;height:${size}px;
+                              background:linear-gradient(135deg,#6366f1,#8b5cf6);
+                              border:2px solid #fff;
+                              border-radius:50%;
+                              display:flex;align-items:center;justify-content:center;
+                              box-shadow:0 2px 8px rgba(99,102,241,0.5);
+                              font-size:${count < 100 ? 12 : 10}px;
+                              font-weight:800;
+                              color:#fff;
+                          ">${count}</div>`,
+                          className: '',
+                          iconSize: [size, size],
+                          iconAnchor: [size / 2, size / 2],
+                      });
+                  },
+              });
 
-          const maxCount = Math.max(...points.map(p => p.count), 1);
+              points.forEach(pt => {
+                  const memberColor = pt.membership === 'Member' ? '#10b981' : '#6366f1';
+                  const marker = L.circleMarker([pt.lat, pt.lng], {
+                      radius: 7,
+                      fillColor: memberColor,
+                      fillOpacity: 0.85,
+                      color: '#fff',
+                      weight: 1.5,
+                  });
 
-          points.forEach(point => {
-              // Scale circle radius: 10px min → 40px max, proportional to count
-              const radius = 10 + 30 * (point.count / maxCount);
+                  marker.bindPopup(`
+                      <div style="text-align:center;padding:6px 10px;font-family:system-ui,sans-serif">
+                          <strong style="font-size:13px;color:#1e293b;display:block;margin-bottom:2px">${pt.name}</strong>
+                          <span style="font-size:11px;color:#64748b">${pt.city || 'Unknown city'}</span><br/>
+                          <span style="font-size:10px;font-weight:700;color:${memberColor}">${pt.membership}</span>
+                      </div>
+                  `);
 
-              const circle = L.circleMarker([point.lat, point.lng], {
-                  radius,
-                  fillColor: '#6366f1',
-                  fillOpacity: 0.7,
-                  color: '#4338ca',
-                  weight: 1.5,
-              }).addTo(map);
+                  clusterGroup.addLayer(marker);
+              });
 
-              circle.bindPopup(`
-                  <div style="text-align:center; padding:4px 8px;">
-                      <strong style="font-size:13px; color:#1e293b; display:block; margin-bottom:2px;">ZIP: ${point.name}</strong>
-                      <span style="font-size:12px; color:#6366f1; font-weight:700;">${point.count.toLocaleString()} Member${point.count !== 1 ? 's' : ''}</span>
-                  </div>
-              `);
+              map.addLayer(clusterGroup);
 
-              bounds.push([point.lat, point.lng]);
-          });
-
-          if (bounds.length > 0) {
-              map.fitBounds(bounds as any, { padding: [40, 40], maxZoom: 10 });
+              try {
+                  map.fitBounds(clusterGroup.getBounds(), { padding: [40, 40], maxZoom: 12 });
+              } catch { /* bounds may fail if only 1 point */ }
           }
 
           setMapInstance(map);
       }).catch(err => {
-          console.error('Leaflet load error:', err);
+          console.error('Leaflet cluster load error:', err);
           setMapAuthError(true);
       });
 
-      // Cleanup: destroy map instance when component unmounts
       return () => {};
   }, [activeTab, peopleData, safeVisibleWidgets, mapInstance]);
 
@@ -804,6 +823,39 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                               </div>
                           )}
                       </div>
+                      {/* Stats bar */}
+                      {geocodeProgress !== null && (
+                          <div className="mt-3 flex flex-wrap items-center gap-2">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-[10px] font-black text-indigo-700 dark:text-indigo-300 uppercase tracking-wider">
+                                  <span className="w-2 h-2 rounded-full bg-indigo-500 inline-block" />
+                                  {geocodeProgress.plotted.toLocaleString()} plotted
+                              </span>
+                              {geocodeProgress.ungeocoded > 0 && (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-900/20 text-[10px] font-black text-amber-700 dark:text-amber-300 uppercase tracking-wider" title="Run a PCO sync or use 'Geocode Addresses' in App Config to resolve these.">
+                                      <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />
+                                      {geocodeProgress.ungeocoded.toLocaleString()} pending geocode
+                                  </span>
+                              )}
+                              {geocodeProgress.topCities.length > 0 && (
+                                  <span className="ml-auto text-[10px] text-slate-400 font-bold truncate">
+                                      Top: {geocodeProgress.topCities.join(' · ')}
+                                  </span>
+                              )}
+                          </div>
+                      )}
+                      {geocodeProgress?.plotted === 0 && geocodeProgress?.ungeocoded === 0 && (
+                          <div className="mt-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-dashed border-slate-200 dark:border-slate-700 text-center">
+                              <p className="text-xs font-bold text-slate-400">No address data found. Sync PCO to import member addresses.</p>
+                          </div>
+                      )}
+                      {geocodeProgress?.plotted === 0 && (geocodeProgress?.ungeocoded ?? 0) > 0 && (
+                          <div className="mt-3 p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-center">
+                              <p className="text-xs font-bold text-amber-700 dark:text-amber-300">
+                                  {geocodeProgress.ungeocoded} addresses imported but not yet geocoded.
+                              </p>
+                              <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1">Run a full PCO sync or use "Geocode Addresses" in App Config → API Integrations.</p>
+                          </div>
+                      )}
                   </WidgetWrapper>
               );
           case 'member_age_chart':

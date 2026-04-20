@@ -101,6 +101,19 @@ async function startServer() {
       }
     });
 
+    // Geocode addresses on-demand (without full sync) — useful after first deploy
+    app.post('/geocode/run', express.json(), async (req: any, res: any) => {
+      const { churchId } = req.body || {};
+      if (!churchId) return res.status(400).json({ error: 'Missing churchId' });
+      try {
+        const { geocodePeopleAddresses } = await import('./services/pcoSyncService.js');
+        await geocodePeopleAddresses(churchId);
+        res.json({ success: true, message: 'Geocoding complete.' });
+      } catch (e: any) {
+        res.status(500).json({ error: e.message || 'Geocoding failed' });
+      }
+    });
+
     // PCO Registrations Diagnostic — shows exactly what PCO returns for this church's token
     app.post('/pco/diagnose-registrations', express.json(), async (req: any, res: any) => {
       const { churchId } = req.body || {};

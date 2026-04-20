@@ -160,7 +160,7 @@ export interface PcoPerson {
     salvationDate?: string | null;
     baptismDate?: string | null;
     createdAt: string;
-    addresses?: { city?: string, state?: string, zip?: string, location?: string }[];
+    addresses?: { city?: string, state?: string, zip?: string, street?: string, location?: string, lat?: number, lng?: number }[];
     checkInCount?: number;
     householdId?: string;
     householdName?: string;
