@@ -4,6 +4,7 @@ import { User, Church, RiskSettings, ChurchRiskSettings, DonorLifecycleSettings,
 import { CreateUserModal } from './CreateUserModal';
 import { firestore } from '../services/firestoreService';
 import { auth, db as firebaseDb } from '../services/firebase';
+import { setDoc, doc } from 'firebase/firestore';
 import RiskSettingsView from './RiskSettingsView';
 import ChurchRiskSettingsView from './ChurchRiskSettingsView';
 import GroupRiskSettingsView from './GroupRiskSettingsView';
@@ -12,6 +13,155 @@ import { SubscriptionSettingsView } from './SubscriptionSettingsView';
 import { ALL_WIDGETS } from '../constants/widgetRegistry';
 import { PLANS } from '../services/stripeService';
 import { pcoService } from '../services/pcoService';
+
+// ─── SMS Terms of Service Modal (Admin settings gate) ────────────────────────
+
+const SmsAdminTermsModal: React.FC<{
+    churchId: string;
+    userId: string;
+    onAccepted: (ts: number) => void;
+    onCancel: () => void;
+}> = ({ churchId, userId, onAccepted, onCancel }) => {
+    const [checkedTos, setCheckedTos]         = React.useState(false);
+    const [checkedPrivacy, setCheckedPrivacy] = React.useState(false);
+    const [checkedCompliance, setCheckedCompliance] = React.useState(false);
+    const [saving, setSaving]                 = React.useState(false);
+    const allChecked = checkedTos && checkedPrivacy && checkedCompliance;
+
+    const handleAccept = async () => {
+        if (!allChecked) return;
+        setSaving(true);
+        const ts = Date.now();
+        try {
+            await setDoc(doc(firebaseDb, 'churches', churchId), {
+                smsSettings: { termsAcceptedAt: ts, termsAcceptedByUserId: userId }
+            }, { merge: true });
+        } catch (e: any) {
+            console.error('[SmsAdminTermsModal] Firestore write failed (continuing):', e.message);
+        } finally {
+            setSaving(false);
+            onAccepted(ts);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onCancel}>
+            <div
+                className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]"
+                onClick={(e) => e.stopPropagation()}
+            >
+                {/* Header */}
+                <div className="px-7 pt-7 pb-4 border-b border-slate-100 dark:border-slate-800 flex items-start gap-4 shrink-0">
+                    <div className="w-12 h-12 rounded-2xl bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center shrink-0">
+                        <span className="text-2xl">📜</span>
+                    </div>
+                    <div>
+                        <h2 className="text-lg font-black text-slate-900 dark:text-white">SMS Service Terms of Use</h2>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+                            Please read and accept before activating your church's SMS line.
+                        </p>
+                    </div>
+                </div>
+
+                {/* Scrollable body */}
+                <div className="overflow-y-auto flex-1 px-7 py-5 space-y-6 text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                    <section>
+                        <h3 className="text-sm font-black text-slate-900 dark:text-white mb-2 flex items-center gap-2">
+                            <span className="w-5 h-5 bg-indigo-600 text-white rounded-full flex items-center justify-center text-[10px] font-black">1</span>
+                            Terms of Service
+                        </h3>
+                        <div className="space-y-2">
+                            <p><strong>Acceptance.</strong> By activating SMS messaging through Barnabas Software ("Platform"), your organization ("Church") agrees to these Terms of Service and all applicable laws and carrier regulations governing commercial text messaging in the United States.</p>
+                            <p><strong>Permitted Use.</strong> The SMS service may only be used for legitimate pastoral, ministry, and organizational communications with individuals who have explicitly opted in to receive messages from your church. Permitted uses include service reminders, event announcements, prayer follow-ups, group updates, and pastoral care outreach.</p>
+                            <p><strong>Prohibited Content.</strong> You may not use this service to send spam, unsolicited commercial messages, illegal content, harassment, or any content that violates TCPA, CTIA guidelines, or applicable carrier acceptable-use policies. Violations may result in immediate suspension of your account without refund.</p>
+                            <p><strong>A2P 10DLC Compliance.</strong> Your church is required to complete Twilio's A2P 10DLC brand and campaign registration. You represent that all information submitted during registration is accurate and truthful. Submitting false information is a violation of these terms and federal law.</p>
+                            <p><strong>Opt-Out Management.</strong> You must honor all STOP requests immediately and permanently. Sending messages to contacts who have opted out is a violation of TCPA and these terms.</p>
+                            <p><strong>Limitation of Liability.</strong> Barnabas Software provides this service "as is" without warranty. We are not liable for carrier delivery failures, message filtering by carriers, or any damages beyond amounts paid in the 30 days prior to the claim.</p>
+                        </div>
+                    </section>
+
+                    <div className="border-t border-slate-100 dark:border-slate-800" />
+
+                    <section>
+                        <h3 className="text-sm font-black text-slate-900 dark:text-white mb-2 flex items-center gap-2">
+                            <span className="w-5 h-5 bg-indigo-600 text-white rounded-full flex items-center justify-center text-[10px] font-black">2</span>
+                            Privacy Policy — SMS Data
+                        </h3>
+                        <div className="space-y-2">
+                            <p><strong>Data We Collect.</strong> To provide SMS services, we collect and process: phone numbers of message recipients, message content, delivery status events, opt-out records, and Twilio account credentials associated with your church's sub-account.</p>
+                            <p><strong>How We Use Data.</strong> Recipient phone numbers and message content are used solely to deliver messages on your church's behalf. We do not sell, rent, or share this data with third parties except as required to operate the service.</p>
+                            <p><strong>Twilio.</strong> Messages are routed through Twilio, Inc. By using this service, your data is also subject to Twilio's Privacy Policy. Twilio acts as a data processor on your behalf.</p>
+                            <p><strong>Your Responsibilities.</strong> As the data controller for your congregation's contact information, you are responsible for maintaining a lawful basis for processing and complying with applicable privacy laws such as CCPA.</p>
+                        </div>
+                    </section>
+
+                    <div className="border-t border-slate-100 dark:border-slate-800" />
+
+                    <section>
+                        <h3 className="text-sm font-black text-slate-900 dark:text-white mb-2 flex items-center gap-2">
+                            <span className="w-5 h-5 bg-indigo-600 text-white rounded-full flex items-center justify-center text-[10px] font-black">3</span>
+                            A2P 10DLC Compliance Acknowledgment
+                        </h3>
+                        <ul className="list-disc list-inside space-y-1 ml-2">
+                            <li>You are an authorized representative of the church with authority to register for commercial texting services.</li>
+                            <li>Your church will only send messages to recipients who have <strong>explicitly opted in</strong> and will honor all STOP requests immediately.</li>
+                            <li>You will submit accurate legal entity information (name, EIN, physical address) during brand registration.</li>
+                            <li>You understand that carrier approval is not guaranteed and may take 1–10 business days.</li>
+                        </ul>
+                    </section>
+                </div>
+
+                {/* Footer */}
+                <div className="px-7 py-5 bg-slate-50 dark:bg-slate-800/60 border-t border-slate-200 dark:border-slate-700 shrink-0 space-y-3">
+                    {([
+                        { id: 'tos',        checked: checkedTos,        setter: setCheckedTos,        label: 'I have read and agree to the Terms of Service.' },
+                        { id: 'privacy',    checked: checkedPrivacy,    setter: setCheckedPrivacy,    label: 'I have read and agree to the Privacy Policy for SMS data.' },
+                        { id: 'compliance', checked: checkedCompliance, setter: setCheckedCompliance, label: 'I acknowledge the A2P 10DLC Compliance requirements and confirm I am authorized to register on behalf of this church.' },
+                    ] as const).map(item => (
+                        <label
+                            key={item.id}
+                            className="flex items-start gap-3 cursor-pointer select-none group"
+                            onClick={() => item.setter(!item.checked)}
+                        >
+                            <div className={`mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all ${
+                                item.checked ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300 dark:border-slate-600 group-hover:border-indigo-400'
+                            }`}>
+                                {item.checked && (
+                                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                )}
+                            </div>
+                            <span className={`text-xs leading-relaxed transition-colors ${
+                                item.checked ? 'text-slate-800 dark:text-slate-200 font-semibold' : 'text-slate-600 dark:text-slate-400'
+                            }`}>
+                                {item.label}
+                            </span>
+                        </label>
+                    ))}
+                    <div className="flex gap-3 pt-1">
+                        <button
+                            onClick={onCancel}
+                            className="flex-1 py-2.5 text-sm font-bold text-slate-600 dark:text-slate-400 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={handleAccept}
+                            disabled={!allChecked || saving}
+                            className="flex-1 py-2.5 text-sm font-black text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition shadow-md shadow-indigo-200 dark:shadow-indigo-900/30"
+                        >
+                            {saving ? 'Saving…' : 'I Accept — Continue →'}
+                        </button>
+                    </div>
+                    {!allChecked && (
+                        <p className="text-[10px] text-slate-400 text-center">Please check all three boxes above to continue.</p>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
 
 // ─── Per-area Sync Component ──────────────────────────────────────────────────
 
@@ -155,6 +305,9 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   const [isCreatingProfile, setIsCreatingProfile] = useState(false);
   const [isDeletingProfile, setIsDeletingProfile] = useState(false);
   const [a2pResult, setA2pResult] = useState<{ success: boolean; message: string; brandSid?: string; failureReason?: string | null; twilioStatus?: string; needsBundle?: boolean; needsPrimaryProfile?: boolean; evaluationStatus?: string } | null>(null);
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  // 'create-profile' | 'submit-a2p' — which action to run after terms are accepted
+  const [pendingTermsAction, setPendingTermsAction] = useState<'create-profile' | 'submit-a2p' | null>(null);
 
   // Phone Numbers panel state (SMS → Numbers tab)
   const [twilioNumbers, setTwilioNumbers] = useState<any[]>([]);
@@ -2089,6 +2242,19 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full ${A2P_STATUS_COLORS[a2pStatus]}`}>
                                     A2P: {statusLabel[a2pStatus]}
                                 </span>
+                                {/* Terms badge */}
+                                {smsForm.termsAcceptedAt ? (
+                                    <span className="text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/25" title={`Terms accepted on ${new Date(smsForm.termsAcceptedAt).toLocaleString()}`}>
+                                        ✓ ToS Accepted
+                                    </span>
+                                ) : (
+                                    <button
+                                        onClick={() => { setPendingTermsAction(null); setShowTermsModal(true); }}
+                                        className="text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/25 hover:bg-amber-500/20 transition"
+                                    >
+                                        ⚠ ToS Not Accepted — Click to Review
+                                    </button>
+                                )}
                                 {profileSid && (
                                     <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full ${
                                         PROFILE_STATUS_COLORS[profileStatus] || 'bg-slate-100 dark:bg-slate-800 text-slate-500'
@@ -2663,7 +2829,14 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                     </div>
                                     <div className="flex flex-col items-end gap-3 shrink-0">
                                         <button
-                                            onClick={handleSubmitToTwilio}
+                                            onClick={() => {
+                                                if (!smsForm.termsAcceptedAt) {
+                                                    setPendingTermsAction('submit-a2p');
+                                                    setShowTermsModal(true);
+                                                } else {
+                                                    handleSubmitToTwilio();
+                                                }
+                                            }}
                                             disabled={isA2pSubmitting || isSmsSaving || a2pStatus === 'approved'}
                                             className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-8 py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30 whitespace-nowrap"
                                         >
@@ -2789,11 +2962,18 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                         </p>
                                                     </div>
                                                     <button
-                                                        onClick={handleCreateProfile}
+                                                        onClick={() => {
+                                                            if (!smsForm.termsAcceptedAt) {
+                                                                setPendingTermsAction('create-profile');
+                                                                setShowTermsModal(true);
+                                                            } else {
+                                                                handleCreateProfile();
+                                                            }
+                                                        }}
                                                         disabled={isCreatingProfile}
                                                         className="shrink-0 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30 whitespace-nowrap"
                                                     >
-                                                        {isCreatingProfile ? '📡 Creating Profile…' : '🪄 Create & Submit Profile'}
+                                                        {isCreatingProfile ? '📡 Creating Profile…' : '🪤 Create & Submit Profile'}
                                                     </button>
                                                 </div>
 
@@ -3391,6 +3571,27 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                 onSuccess={() => { setIsCreateModalOpen(false); loadUsers(); }} 
             />
         )}
+
+        {/* ─── SMS Terms of Service Modal ──────────────────────────────────── */}
+        {showTermsModal && (() => {
+            const [tos, setTos]         = [false, () => {}] as any;
+            return (
+                <SmsAdminTermsModal
+                    churchId={churchId}
+                    userId={currentUser.id}
+                    onAccepted={async (ts: number) => {
+                        // Persist acceptance
+                        setSmsForm((prev: any) => ({ ...prev, termsAcceptedAt: ts, termsAcceptedByUserId: currentUser.id }));
+                        if (onUpdateChurch) await onUpdateChurch({ smsSettings: { ...smsForm, termsAcceptedAt: ts, termsAcceptedByUserId: currentUser.id } });
+                        setShowTermsModal(false);
+                        if (pendingTermsAction === 'create-profile') handleCreateProfile();
+                        if (pendingTermsAction === 'submit-a2p') handleSubmitToTwilio();
+                        setPendingTermsAction(null);
+                    }}
+                    onCancel={() => { setShowTermsModal(false); setPendingTermsAction(null); }}
+                />
+            );
+        })()}
     </div>
   );
 };

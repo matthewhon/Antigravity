@@ -1,4 +1,4 @@
-﻿
+
 export type UserRole = 'Church Admin' | 'Pastor' | 'Pastor AI' | 'People' | 'Services' | 'Groups' | 'Giving' | 'Finance' | 'Pastoral Care' | 'Metrics' | 'System Administration' | 'Messaging';
 
 export interface User {
@@ -929,6 +929,12 @@ export interface SmsSettings {
      * (e.g. "Will you pray for me?"). Defaults to "What would you like prayer for?"
      */
     prayerClarifyingReply?: string;
+
+    // -- Terms of Service acceptance -------------------------------------------
+    /** Epoch ms when an admin accepted the SMS Terms of Service and Privacy Policy */
+    termsAcceptedAt?: number;
+    /** User ID of the admin who accepted the terms */
+    termsAcceptedByUserId?: string;
 }
 
 export type SmsDirection = 'inbound' | 'outbound';

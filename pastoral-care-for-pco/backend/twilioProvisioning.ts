@@ -1014,6 +1014,17 @@ export const createCustomerProfile = async (req: any, res: any) => {
             process.env.SERVER_BASE_URL || ''
         ).replace(/\/$/, '');
 
+        // Primary Customer Profile SID (Hon Ventures LLC / the ISV master account profile)
+        // This BU... SID must be assigned as an entity in every secondary profile.
+        const primaryCpSid: string = sysData.primaryCustomerProfileSid || '';
+        if (!primaryCpSid || !primaryCpSid.startsWith('BU')) {
+            return res.status(400).json({
+                error: 'Primary Customer Profile SID is not configured. ' +
+                    'Go to Settings → SMS → A2P Registration and save the Primary Customer Profile SID ' +
+                    '(the BU... SID for Hon Ventures LLC from the Twilio Console).',
+            });
+        }
+
         const profile = await (master as any).trusthub.v1.customerProfiles.create({
             friendlyName:   sms.a2pBusinessName,
             email:          sms.a2pContactEmail,
@@ -1023,22 +1034,37 @@ export const createCustomerProfile = async (req: any, res: any) => {
         log.info(`[createCustomerProfile] Created CustomerProfile ${profile.sid}`, 'system', { churchId }, churchId);
 
         // ── Step 3: Assign entities to the bundle ─────────────────────────────────
-        // Valid types: IT... (EndUser) and RD... (SupportingDocument)
+        // Required entity types for a secondary customer profile:
+        //   BU... (Primary Customer Profile — links this secondary to Hon Ventures LLC)
+        //   IT... (EndUser: bizEndUser + repEndUser + optional rep2EndUser)
+        //   RD... (SupportingDocument: address)
+
+        // 3a: Link to the Primary Customer Profile (Hon Ventures LLC)
+        await (master as any).trusthub.v1
+            .customerProfiles(profile.sid)
+            .customerProfilesEntityAssignments
+            .create({ objectSid: primaryCpSid });
+        log.info(`[createCustomerProfile] Linked primary CP ${primaryCpSid} → ${profile.sid}`, 'system', { churchId }, churchId);
+
+        // 3b: Business info EndUser
         await (master as any).trusthub.v1
             .customerProfiles(profile.sid)
             .customerProfilesEntityAssignments
             .create({ objectSid: bizEndUser.sid });
 
+        // 3c: Address SupportingDocument
         await (master as any).trusthub.v1
             .customerProfiles(profile.sid)
             .customerProfilesEntityAssignments
-            .create({ objectSid: addrDocData.sid });   // RD... address SupportingDocument
+            .create({ objectSid: addrDocData.sid });   // RD... address
 
+        // 3d: Authorized rep 1
         await (master as any).trusthub.v1
             .customerProfiles(profile.sid)
             .customerProfilesEntityAssignments
             .create({ objectSid: repEndUser.sid });
 
+        // 3e: Authorized rep 2 (optional)
         if (rep2EndUser) {
             await (master as any).trusthub.v1
                 .customerProfiles(profile.sid)
@@ -1046,7 +1072,7 @@ export const createCustomerProfile = async (req: any, res: any) => {
                 .create({ objectSid: rep2EndUser.sid });
         }
 
-        const assignedCount = rep2EndUser ? 4 : 3;
+        const assignedCount = rep2EndUser ? 5 : 4;
         log.info(`[createCustomerProfile] Assigned ${assignedCount} entities to ${profile.sid}`, 'system', { churchId }, churchId);
 
         // ── Step 3b: Compliance evaluation (non-fatal) ────────────────────────────
@@ -1083,6 +1109,7 @@ export const createCustomerProfile = async (req: any, res: any) => {
             'smsSettings.twilioRepEndUserSid':             repEndUser.sid,
             'smsSettings.twilioAddressSid':                bizAddress.sid,
             'smsSettings.twilioSupportingDocSid':          addrDocData.sid,
+            'smsSettings.twilioPrimaryCustomerProfileSid': primaryCpSid,
             'smsSettings.twilioCustomerProfileStatus':     'pending-review',
             'smsSettings.twilioCustomerProfileEvaluation': evaluationStatus,
             'smsSettings.twilioCustomerProfileCreatedAt':  Date.now(),
