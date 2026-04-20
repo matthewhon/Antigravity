@@ -305,6 +305,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   const [isCreatingProfile, setIsCreatingProfile] = useState(false);
   const [isDeletingProfile, setIsDeletingProfile] = useState(false);
   const [a2pResult, setA2pResult] = useState<{ success: boolean; message: string; brandSid?: string; failureReason?: string | null; twilioStatus?: string; needsBundle?: boolean; needsPrimaryProfile?: boolean; evaluationStatus?: string } | null>(null);
+  const [isRefreshingProfile, setIsRefreshingProfile] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
   // 'create-profile' | 'submit-a2p' — which action to run after terms are accepted
   const [pendingTermsAction, setPendingTermsAction] = useState<'create-profile' | 'submit-a2p' | null>(null);
@@ -2226,6 +2227,27 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                 }
             };
 
+            const handleRefreshProfileStatus = async () => {
+                if (!smsForm.twilioCustomerProfileSid) return;
+                setIsRefreshingProfile(true);
+                setA2pResult(null);
+                try {
+                    const res = await fetch(`/api/messaging/customer-profile-status?churchId=${encodeURIComponent(churchId)}`);
+                    const data = await res.json();
+                    if (data.success) {
+                        const liveStatus = data.status || 'unknown';
+                        setSmsForm(prev => ({ ...prev, twilioCustomerProfileStatus: liveStatus }));
+                        setA2pResult({ success: true, message: `Profile status refreshed from Twilio: ${liveStatus.toUpperCase()}` });
+                    } else {
+                        setA2pResult({ success: false, message: data.error || 'Refresh failed' });
+                    }
+                } catch (e: any) {
+                    setA2pResult({ success: false, message: e.message || 'Refresh failed' });
+                } finally {
+                    setIsRefreshingProfile(false);
+                }
+            };
+
             const inputCn = 'w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-colors';
             const labelCn = 'block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-2';
 
@@ -2304,9 +2326,17 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         {isA2pChecking ? '⏳ Checking…' : '🔄 Check Status'}
                                     </button>
                                 )}
-                                {smsForm.twilioPhoneNumber && (
+                                {smsForm.twilioPhoneNumber && twilioNumbers.length === 0 && (
+                                    // Legacy field shown only if no new-style numbers are provisioned
                                     <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-1.5 rounded-full border border-emerald-100 dark:border-emerald-900/30">
                                         📱 {smsForm.twilioPhoneNumber}
+                                    </span>
+                                )}
+                                {twilioNumbers.length > 0 && (
+                                    // Prefer showing the default number from the new twilioNumbers collection
+                                    <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-1.5 rounded-full border border-emerald-100 dark:border-emerald-900/30">
+                                        📱 {(twilioNumbers.find(n => n.isDefault) || twilioNumbers[0])?.phoneNumber}
+                                        {twilioNumbers.length > 1 && <span className="ml-1 text-[9px]">+{twilioNumbers.length - 1} more</span>}
                                     </span>
                                 )}
                             </div>
@@ -2407,18 +2437,28 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                 const st = smsForm.twilioCustomerProfileStatus || '';
                                                 const canDel = st === 'draft' || st === 'twilio-rejected' || !st;
                                                 return (
-                                                    <button
-                                                        onClick={handleDeleteProfile}
-                                                        disabled={isDeletingProfile || !canDel}
-                                                        title={canDel ? 'Delete this Customer Profile from Twilio' : `Cannot delete — profile is "${st}". Contact Twilio Support.`}
-                                                        className={`shrink-0 px-3 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest border transition disabled:cursor-not-allowed ${
-                                                            canDel
-                                                                ? 'bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-800 hover:bg-rose-100'
-                                                                : 'bg-slate-100 dark:bg-slate-700 text-slate-400 border-slate-200 dark:border-slate-600'
-                                                        }`}
-                                                    >
-                                                        {isDeletingProfile ? 'Deleting…' : canDel ? '🗑 Delete' : '🔒 Locked'}
-                                                    </button>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <button
+                                                            onClick={handleRefreshProfileStatus}
+                                                            disabled={isRefreshingProfile}
+                                                            title="Pull current status from Twilio"
+                                                            className="shrink-0 px-3 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest border transition disabled:cursor-not-allowed bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100"
+                                                        >
+                                                            {isRefreshingProfile ? '⏳…' : '🔄 Refresh'}
+                                                        </button>
+                                                        <button
+                                                            onClick={handleDeleteProfile}
+                                                            disabled={isDeletingProfile || !canDel}
+                                                            title={canDel ? 'Delete this Customer Profile from Twilio' : `Cannot delete — profile is "${st}". Contact Twilio Support.`}
+                                                            className={`shrink-0 px-3 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest border transition disabled:cursor-not-allowed ${
+                                                                canDel
+                                                                    ? 'bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-800 hover:bg-rose-100'
+                                                                    : 'bg-slate-100 dark:bg-slate-700 text-slate-400 border-slate-200 dark:border-slate-600'
+                                                            }`}
+                                                        >
+                                                            {isDeletingProfile ? 'Deleting…' : canDel ? '🗑 Delete' : '🔒 Locked'}
+                                                        </button>
+                                                    </div>
                                                 );
                                             })()}
                                         </div>

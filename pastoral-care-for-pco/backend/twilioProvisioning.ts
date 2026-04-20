@@ -456,6 +456,60 @@ export const releaseSpecificNumber = async (req: any, res: any) => {
     }
 };
 
+// ─── GET /api/messaging/customer-profile-status ──────────────────────────────
+// Pulls the current CustomerProfile status directly from Twilio and syncs
+// it back to Firestore.  Called from the UI "Refresh Status" button.
+// Query: ?churchId=xxx
+
+export const refreshCustomerProfileStatus = async (req: any, res: any) => {
+    res.set('Access-Control-Allow-Origin', '*');
+
+    const churchId = req.query.churchId as string;
+    if (!churchId) return res.status(400).json({ error: 'Missing churchId' });
+
+    const db  = getDb();
+    const log = createServerLogger(db);
+
+    try {
+        // Load church settings
+        const churchSnap = await db.collection('churches').doc(churchId).get();
+        if (!churchSnap.exists) return res.status(404).json({ error: 'Church not found' });
+        const sms: any = (churchSnap.data() as any)?.smsSettings || {};
+
+        const profileSid = sms.twilioCustomerProfileSid || '';
+        if (!profileSid || !profileSid.startsWith('BU')) {
+            return res.status(400).json({ error: 'No Customer Profile SID on file for this church.' });
+        }
+
+        // Fetch status from Twilio
+        const { accountSid, authToken } = await getMasterCredentials(db);
+        const master = getMasterClient(accountSid, authToken);
+
+        const profile = await (master as any).trusthub.v1
+            .customerProfiles(profileSid)
+            .fetch();
+
+        const newStatus = (profile.status || 'unknown').toLowerCase();
+
+        // Sync to Firestore
+        await db.collection('churches').doc(churchId).update({
+            'smsSettings.twilioCustomerProfileStatus':    newStatus,
+            'smsSettings.twilioCustomerProfileUpdatedAt': Date.now(),
+        });
+
+        log.info(
+            `[refreshCustomerProfileStatus] ${profileSid} → ${newStatus} (manual refresh)`,
+            'system', { churchId, profileSid, newStatus }, churchId
+        );
+
+        return res.json({ success: true, status: newStatus, profileSid });
+
+    } catch (e: any) {
+        log.error(`[refreshCustomerProfileStatus] ${e.message}`, 'system', { churchId }, churchId);
+        return res.status(500).json({ error: e.message || 'Refresh failed' });
+    }
+};
+
 // ─── PATCH /api/messaging/number-settings ────────────────────────────────────
 // Updates label, user restrictions, or senderName for a specific number.
 // Body: { churchId, twilioNumberId, friendlyLabel?, allowedUserIds?, senderName? }
