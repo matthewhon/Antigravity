@@ -575,12 +575,18 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
           document.head.appendChild(link2);
       }
 
-      // leaflet.markercluster is a UMD plugin — it must find window.L at load time.
-      // Import Leaflet first, expose as window.L, then import the plugin sequentially.
-      import('leaflet').then(async (L) => {
+      // leaflet.markercluster is a UMD plugin — it must find a mutable window.L at load time.
+      // IMPORTANT: import('leaflet') returns the ES *namespace* object, which is frozen by spec.
+      // Assigning it directly to window.L and then calling plugin.attach() throws:
+      //   "TypeError: Cannot add property MarkerClusterGroup, object is not extensible"
+      // Fix: use the .default export, which is the actual mutable Leaflet object.
+      import('leaflet').then(async (leafletModule) => {
           if (!mapRef.current) return;
 
-          // Expose to window so the UMD plugin can attach markerClusterGroup to L
+          // Use the mutable .default export, NOT the frozen namespace
+          const L = leafletModule.default;
+
+          // Expose to window so the UMD plugin can attach MarkerClusterGroup to it
           (window as any).L = L;
 
           // Now load the plugin — it will attach L.markerClusterGroup to window.L
@@ -637,7 +643,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
           }).addTo(map);
 
           if (points.length > 0) {
-              // markerClusterGroup is attached to window.L by the UMD plugin (not the ESM export)
+              // markerClusterGroup is now attached to window.L by the UMD plugin
               const clusterGroup = (window as any).L.markerClusterGroup({
                   maxClusterRadius: 60,
                   showCoverageOnHover: false,
