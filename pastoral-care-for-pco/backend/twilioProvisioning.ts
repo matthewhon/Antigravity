@@ -826,12 +826,7 @@ export const createCustomerProfile = async (req: any, res: any) => {
             });
         }
 
-        // ── Step 1a: Create a Twilio Address resource for the business ───────────
-        // Twilio requires a proper Address object (AD... SID) — raw address fields
-        // are NOT accepted as attributes on customer_profile_business_information.
-        // The AD... SID is referenced via address_sids_attest in the EndUser below.
-        // NOTE: The Address SID must NOT be added as a bundle entity assignment —
-        // only EndUser (IT...) and SupportingDocument (SD...) SIDs are valid there.
+        // ── Step 1a: Create a Twilio Address resource ─────────────────────────────
         const bizAddress = await (master as any).addresses.create({
             customerName: sms.a2pBusinessName,
             street:       sms.a2pAddress,
@@ -843,9 +838,9 @@ export const createCustomerProfile = async (req: any, res: any) => {
         });
         log.info(`[createCustomerProfile] Created Address ${bizAddress.sid}`, 'system', { churchId }, churchId);
 
-        // ── Step 1b: Business info EndUser (business fields only — NO address fields) ──
-        // customer_profile_business_information does NOT accept address attributes.
-        // The address will be added as a separate SupportingDocument (Step 1c).
+        // ── Step 1b: Business info EndUser ────────────────────────────────────────
+        // customer_profile_business_information does NOT accept address fields inline.
+        // Address is referenced through a separate SupportingDocument (Step 1c).
         const bizEndUser = await (master as any).trusthub.v1.endUsers.create({
             friendlyName: `Business Info – ${sms.a2pBusinessName}`,
             type: 'customer_profile_business_information',
@@ -857,17 +852,35 @@ export const createCustomerProfile = async (req: any, res: any) => {
                 business_industry:                sms.a2pVertical     || 'RELIGION',
                 business_regions_of_operation:    'USA_AND_CANADA',
                 website_url:                      sms.a2pWebsite,
-                // Address fields inline — avoids the need for a separate SupportingDocument
-                address_street:       sms.a2pAddress,
-                address_city:         sms.a2pCity,
-                address_region:       sms.a2pState,
-                address_postal_code:  sms.a2pZip,
-                address_country_code: 'US',
             }),
         });
         log.info(`[createCustomerProfile] Created biz EndUser ${bizEndUser.sid}`, 'system', { churchId }, churchId);
 
-        // ── Step 1d: Authorised rep 1 EndUser (personal contact fields) ─────────
+        // ── Step 1c: Create SupportingDocument for the address via direct REST API ──
+        // The Twilio Node SDK double-encodes "attributes" for SupportingDocuments,
+        // so we bypass it and make a raw form-encoded POST to the TrustHub API.
+        const masterAuth = Buffer.from(`${accountSid}:${authToken}`).toString('base64');
+        const addrDocResp = await fetch('https://trusthub.twilio.com/v1/SupportingDocuments', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Basic ${masterAuth}`,
+                'Content-Type':  'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({
+                FriendlyName: `Business Address – ${sms.a2pBusinessName}`,
+                Type:         'customer_profile_address',
+                Attributes:   JSON.stringify({ address_sids: [bizAddress.sid] }),
+            }).toString(),
+        });
+        const addrDocData = await addrDocResp.json() as any;
+        if (!addrDocData.sid) {
+            throw new Error(
+                `Failed to create address SupportingDocument: ${addrDocData.message || addrDocData.code || JSON.stringify(addrDocData)}`
+            );
+        }
+        log.info(`[createCustomerProfile] Created address SupportingDocument ${addrDocData.sid}`, 'system', { churchId }, churchId);
+
+        // ── Step 1d: Authorised rep 1 EndUser ────────────────────────────────────
         const repEndUser = await (master as any).trusthub.v1.endUsers.create({
             friendlyName: `${sms.a2pContactFirstName} ${sms.a2pContactLastName} – ${sms.a2pBusinessName}`,
             type: 'authorized_representative_1',
@@ -882,7 +895,7 @@ export const createCustomerProfile = async (req: any, res: any) => {
         });
         log.info(`[createCustomerProfile] Created rep1 EndUser ${repEndUser.sid}`, 'system', { churchId }, churchId);
 
-        // ── Step 1e: Authorised rep 2 EndUser (optional — required for full TrustHub compliance) ──
+        // ── Step 1e: Authorised rep 2 EndUser (optional) ──────────────────────────
         let rep2EndUser: any = null;
         const hasRep2 = sms.a2pRep2FirstName && sms.a2pRep2LastName && sms.a2pRep2Email && sms.a2pRep2Phone;
         if (hasRep2) {
@@ -900,10 +913,10 @@ export const createCustomerProfile = async (req: any, res: any) => {
             });
             log.info(`[createCustomerProfile] Created rep2 EndUser ${rep2EndUser.sid}`, 'system', { churchId }, churchId);
         } else {
-            log.info(`[createCustomerProfile] Rep 2 fields not provided — skipping rep2 EndUser (profile may still be approved as a sole-authorized profile)`, 'system', { churchId }, churchId);
+            log.info(`[createCustomerProfile] Rep 2 not provided – skipping`, 'system', { churchId }, churchId);
         }
 
-        // ── Step 2: Create the CustomerProfile bundle ─────────────────────────
+        // ── Step 2: Create the CustomerProfile bundle ──────────────────────────────
         const sysSnap = await db.doc('system/settings').get();
         const sysData = sysSnap.data() || {};
         const baseUrl = (
@@ -920,13 +933,17 @@ export const createCustomerProfile = async (req: any, res: any) => {
         });
         log.info(`[createCustomerProfile] Created CustomerProfile ${profile.sid}`, 'system', { churchId }, churchId);
 
-        // ── Step 3: Assign biz EndUser, rep1 EndUser, rep2 EndUser (address is inline in biz EndUser) ──
-        // Valid entity types: IT... (EndUser).
-        // AD... Address and RD... SupportingDocument assignment is skipped — address is inline.
+        // ── Step 3: Assign entities to the bundle ─────────────────────────────────
+        // Valid types: IT... (EndUser) and RD... (SupportingDocument)
         await (master as any).trusthub.v1
             .customerProfiles(profile.sid)
             .customerProfilesEntityAssignments
             .create({ objectSid: bizEndUser.sid });
+
+        await (master as any).trusthub.v1
+            .customerProfiles(profile.sid)
+            .customerProfilesEntityAssignments
+            .create({ objectSid: addrDocData.sid });   // RD... address SupportingDocument
 
         await (master as any).trusthub.v1
             .customerProfiles(profile.sid)
@@ -940,10 +957,10 @@ export const createCustomerProfile = async (req: any, res: any) => {
                 .create({ objectSid: rep2EndUser.sid });
         }
 
-        const assignedCount = rep2EndUser ? 3 : 2;
-        log.info(`[createCustomerProfile] Assigned ${assignedCount} components to ${profile.sid}${rep2EndUser ? '' : ' (no Rep 2)'}`, 'system', { churchId }, churchId);
+        const assignedCount = rep2EndUser ? 4 : 3;
+        log.info(`[createCustomerProfile] Assigned ${assignedCount} entities to ${profile.sid}`, 'system', { churchId }, churchId);
 
-        // ── Step 3b: Evaluate bundle compliance before submitting ──────────────
+        // ── Step 3b: Compliance evaluation (non-fatal) ────────────────────────────
         let evaluationStatus = 'unknown';
         let evaluationResults: any[] = [];
         try {
@@ -954,7 +971,7 @@ export const createCustomerProfile = async (req: any, res: any) => {
             evaluationStatus = evaluation.status || 'unknown';
             evaluationResults = evaluation.results || [];
             log.info(
-                `[createCustomerProfile] Evaluation ${evaluationStatus} for ${profile.sid}`,
+                `[createCustomerProfile] Evaluation: ${evaluationStatus}`,
                 'system', { churchId, evaluationStatus }, churchId
             );
         } catch (evalErr: any) {
@@ -964,18 +981,19 @@ export const createCustomerProfile = async (req: any, res: any) => {
             );
         }
 
-        // ── Step 4: Submit the profile for Twilio review ───────────────────────
+        // ── Step 4: Submit for Twilio review ──────────────────────────────────────
         await (master as any).trusthub.v1
             .customerProfiles(profile.sid)
             .update({ status: 'pending-review' });
-        log.info(`[createCustomerProfile] Profile ${profile.sid} submitted for review`, 'system', { churchId }, churchId);
+        log.info(`[createCustomerProfile] Submitted profile ${profile.sid} for review`, 'system', { churchId }, churchId);
 
-        // ── Step 5: Save to Firestore ──────────────────────────────────────────
+        // ── Step 5: Persist to Firestore ──────────────────────────────────────────
         const firestoreUpdate: Record<string, any> = {
             'smsSettings.twilioCustomerProfileSid':        profile.sid,
             'smsSettings.twilioEndUserSid':                bizEndUser.sid,
             'smsSettings.twilioRepEndUserSid':             repEndUser.sid,
             'smsSettings.twilioAddressSid':                bizAddress.sid,
+            'smsSettings.twilioSupportingDocSid':          addrDocData.sid,
             'smsSettings.twilioCustomerProfileStatus':     'pending-review',
             'smsSettings.twilioCustomerProfileEvaluation': evaluationStatus,
             'smsSettings.twilioCustomerProfileCreatedAt':  Date.now(),
@@ -990,15 +1008,15 @@ export const createCustomerProfile = async (req: any, res: any) => {
             success:           true,
             profileSid:        profile.sid,
             endUserSid:        bizEndUser.sid,
-            rep2EndUserSid:    rep2EndUser.sid,
+            rep2EndUserSid:    rep2EndUser?.sid ?? null,
             evaluationStatus,
             evaluationResults: isCompliant ? [] : evaluationResults,
             status:            'pending-review',
             message:           isCompliant
                 ? 'Customer Profile Bundle created, passed compliance evaluation, and submitted for Twilio review. ' +
                   'Approval is typically same-day. Once approved, click "Submit to Twilio" to complete A2P brand registration.'
-                : `Customer Profile Bundle created and submitted, but the compliance evaluation returned "${evaluationStatus}". ` +
-                  'Twilio may still approve it. Check the evaluation results for details.',
+                : `Customer Profile Bundle created and submitted, but compliance evaluation returned "${evaluationStatus}". ` +
+                  'Twilio may still approve it manually.',
         });
 
     } catch (e: any) {
