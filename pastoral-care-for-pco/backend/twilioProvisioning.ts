@@ -784,6 +784,70 @@ export const checkA2pStatus = async (req: any, res: any) => {
 // This is the standard policy used by Twilio ISVs for customer profiles.
 const A2P_POLICY_SID = 'RNdfbf3fae0e1107f8aded0e7cead80bf5';
 
+// ── Helpers for Twilio field normalization ────────────────────────────────────
+
+/** Convert any US phone string to E.164 (+1XXXXXXXXXX). Returns original if already E.164. */
+function toE164(phone: string): string {
+    if (!phone) return phone;
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length === 10) return `+1${digits}`;
+    if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`;
+    if (phone.startsWith('+')) return phone; // already E.164
+    return `+1${digits}`; // best-effort
+}
+
+/**
+ * Map human-readable industry/vertical names to Twilio's accepted
+ * business_industry enum values (all-caps).
+ */
+function toTwilioIndustry(vertical: string): string {
+    const map: Record<string, string> = {
+        'religion':              'NGO',
+        'not for profit':       'NGO',
+        'nonprofit':            'NGO',
+        'non-profit':           'NGO',
+        'ngo':                  'NGO',
+        'education':            'EDUCATION',
+        'healthcare':           'HEALTHCARE',
+        'government':           'GOVERNMENT',
+        'professional services':'PROFESSIONAL_SERVICES',
+        'online':               'COMMUNICATION',
+        'consumer':             'CONSUMER',
+        'agriculture':          'AGRICULTURE',
+        'automotive':           'AUTOMOTIVE',
+        'banking':              'BANKING',
+        'construction':         'CONSTRUCTION',
+        'energy':               'ENERGY',
+        'entertainment':        'ENTERTAINMENT',
+        'financial':            'FINANCIAL',
+        'hospitality':          'HOSPITALITY',
+        'insurance':            'INSURANCE',
+        'legal':                'LEGAL',
+        'manufacturing':        'MANUFACTURING',
+        'real estate':          'REAL_ESTATE',
+        'retail':               'RETAIL',
+        'technology':           'TECHNOLOGY',
+        'transportation':       'TRANSPORTATION',
+    };
+    const key = (vertical || '').toLowerCase().trim();
+    return map[key] || vertical.toUpperCase().replace(/[^A-Z_]/g, '_');
+}
+
+/**
+ * Map job level dropdown labels to Twilio's accepted job_position enum values.
+ * Twilio accepts: Director, VP, GM, Technician, Other
+ */
+function toTwilioJobPosition(pos: string): string {
+    const map: Record<string, string> = {
+        'director':  'Director',
+        'vp':        'VP',
+        'gm':        'GM',
+        'technician':'Technician',
+        'other':     'Other',
+    };
+    return map[(pos || '').toLowerCase().trim()] || 'Director';
+}
+
 export const createCustomerProfile = async (req: any, res: any) => {
     res.set('Access-Control-Allow-Origin', '*');
 
@@ -849,7 +913,7 @@ export const createCustomerProfile = async (req: any, res: any) => {
                 business_registration_identifier: 'EIN',
                 business_registration_number:     sms.a2pEin,
                 business_type:                    sms.a2pBusinessType || 'Non-profit Corporation',
-                business_industry:                sms.a2pVertical     || 'RELIGION',
+                business_industry:                toTwilioIndustry(sms.a2pVertical || 'NGO'),
                 business_regions_of_operation:    'USA_AND_CANADA',
                 website_url:                      sms.a2pWebsite,
             }),
@@ -888,9 +952,9 @@ export const createCustomerProfile = async (req: any, res: any) => {
                 first_name:     sms.a2pContactFirstName,
                 last_name:      sms.a2pContactLastName,
                 email:          sms.a2pContactEmail,
-                phone_number:   sms.a2pContactPhone,
-                job_position:   sms.a2pContactJobPosition || 'Director',
-                business_title: sms.a2pContactJobTitle    || sms.a2pContactJobPosition || 'Director',
+                phone_number:   toE164(sms.a2pContactPhone),
+                job_position:   toTwilioJobPosition(sms.a2pContactJobPosition),
+                business_title: sms.a2pContactJobTitle || sms.a2pContactJobPosition || 'Director',
             }),
         });
         log.info(`[createCustomerProfile] Created rep1 EndUser ${repEndUser.sid}`, 'system', { churchId }, churchId);
@@ -906,9 +970,9 @@ export const createCustomerProfile = async (req: any, res: any) => {
                     first_name:     sms.a2pRep2FirstName,
                     last_name:      sms.a2pRep2LastName,
                     email:          sms.a2pRep2Email,
-                    phone_number:   sms.a2pRep2Phone,
-                    job_position:   sms.a2pRep2JobPosition || 'Director',
-                    business_title: sms.a2pRep2JobTitle    || sms.a2pRep2JobPosition || 'Director',
+                    phone_number:   toE164(sms.a2pRep2Phone),
+                    job_position:   toTwilioJobPosition(sms.a2pRep2JobPosition),
+                    business_title: sms.a2pRep2JobTitle || sms.a2pRep2JobPosition || 'Director',
                 }),
             });
             log.info(`[createCustomerProfile] Created rep2 EndUser ${rep2EndUser.sid}`, 'system', { churchId }, churchId);
@@ -1033,6 +1097,144 @@ export const createCustomerProfile = async (req: any, res: any) => {
             twilioCode: (e as any).code || null,
             needsPrimaryProfile,
         });
+    }
+};
+
+
+// ─── DELETE /api/messaging/customer-profile ─────────────────────────────────
+// Deletes the Twilio TrustHub Customer Profile Bundle and all associated
+// entities (EndUsers, Address, SupportingDocument) for the church.
+// IMPORTANT: Twilio only allows deletion of profiles in 'draft' or
+// 'twilio-rejected' status. Pending/approved profiles cannot be deleted
+// via API — only via Twilio Support.
+// Body: { churchId }
+
+export const deleteCustomerProfile = async (req: any, res: any) => {
+    res.set('Access-Control-Allow-Origin', '*');
+
+    const { churchId } = req.body || {};
+    if (!churchId) return res.status(400).json({ error: 'Missing churchId' });
+
+    const db  = getDb();
+    const log = createServerLogger(db);
+
+    try {
+        const { accountSid, authToken } = await getMasterCredentials(db);
+        const master = getMasterClient(accountSid, authToken);
+        const masterAuth = Buffer.from(`${accountSid}:${authToken}`).toString('base64');
+
+        const churchSnap = await db.collection('churches').doc(churchId).get();
+        if (!churchSnap.exists) return res.status(404).json({ error: 'Church not found' });
+        const sms = churchSnap.data()?.smsSettings || {};
+
+        const profileSid = sms.twilioCustomerProfileSid as string | undefined;
+        if (!profileSid) {
+            return res.status(400).json({ error: 'No Customer Profile SID on file for this church.' });
+        }
+
+        // ── Check current profile status ─────────────────────────────────────
+        // Only draft / twilio-rejected can be deleted via API.
+        let currentStatus = (sms.twilioCustomerProfileStatus || '').toLowerCase();
+
+        // Re-fetch live status from Twilio to be sure
+        try {
+            const liveProfile = await (master as any).trusthub.v1.customerProfiles(profileSid).fetch();
+            currentStatus = (liveProfile.status || '').toLowerCase();
+        } catch (fetchErr: any) {
+            log.warn(`[deleteCustomerProfile] Could not fetch live status for ${profileSid}: ${fetchErr.message}`, 'system', { churchId }, churchId);
+        }
+
+        const isDeletable = currentStatus === 'draft' || currentStatus === 'twilio-rejected';
+        if (!isDeletable) {
+            return res.status(409).json({
+                error: `Customer Profile cannot be deleted while in "${currentStatus}" status. ` +
+                    'Twilio only allows deletion of profiles in draft or twilio-rejected status. ' +
+                    'To remove an approved or pending profile, please contact Twilio Support.',
+                status: currentStatus,
+            });
+        }
+
+        const errors: string[] = [];
+
+        // ── Step 1: Delete the Customer Profile bundle ────────────────────────
+        try {
+            await (master as any).trusthub.v1.customerProfiles(profileSid).remove();
+            log.info(`[deleteCustomerProfile] Deleted profile ${profileSid}`, 'system', { churchId }, churchId);
+        } catch (e: any) {
+            errors.push(`Profile delete error: ${e.message}`);
+            log.warn(`[deleteCustomerProfile] Could not delete profile ${profileSid}: ${e.message}`, 'system', { churchId }, churchId);
+        }
+
+        // ── Step 2: Delete EndUser SIDs ───────────────────────────────────────
+        const endUserSids = [
+            sms.twilioEndUserSid,
+            sms.twilioRepEndUserSid,
+            sms.twilioRep2EndUserSid,
+        ].filter(Boolean) as string[];
+
+        for (const sid of endUserSids) {
+            try {
+                await (master as any).trusthub.v1.endUsers(sid).remove();
+                log.info(`[deleteCustomerProfile] Deleted EndUser ${sid}`, 'system', { churchId }, churchId);
+            } catch (e: any) {
+                errors.push(`EndUser ${sid} delete error: ${e.message}`);
+                log.warn(`[deleteCustomerProfile] Could not delete EndUser ${sid}: ${e.message}`, 'system', { churchId }, churchId);
+            }
+        }
+
+        // ── Step 3: Delete SupportingDocument ────────────────────────────────
+        if (sms.twilioSupportingDocSid) {
+            try {
+                const delResp = await fetch(`https://trusthub.twilio.com/v1/SupportingDocuments/${sms.twilioSupportingDocSid}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Basic ${masterAuth}` },
+                });
+                if (delResp.ok || delResp.status === 404) {
+                    log.info(`[deleteCustomerProfile] Deleted SupportingDocument ${sms.twilioSupportingDocSid}`, 'system', { churchId }, churchId);
+                } else {
+                    const body = await delResp.text();
+                    errors.push(`SupportingDoc delete error (HTTP ${delResp.status}): ${body.slice(0, 100)}`);
+                }
+            } catch (e: any) {
+                errors.push(`SupportingDoc delete error: ${e.message}`);
+            }
+        }
+
+        // ── Step 4: Delete Address ────────────────────────────────────────────
+        if (sms.twilioAddressSid) {
+            try {
+                await (master as any).addresses(sms.twilioAddressSid).remove();
+                log.info(`[deleteCustomerProfile] Deleted Address ${sms.twilioAddressSid}`, 'system', { churchId }, churchId);
+            } catch (e: any) {
+                errors.push(`Address delete error: ${e.message}`);
+                log.warn(`[deleteCustomerProfile] Could not delete Address ${sms.twilioAddressSid}: ${e.message}`, 'system', { churchId }, churchId);
+            }
+        }
+
+        // ── Step 5: Clear Firestore fields ────────────────────────────────────
+        await db.collection('churches').doc(churchId).update({
+            'smsSettings.twilioCustomerProfileSid':        null,
+            'smsSettings.twilioCustomerProfileStatus':     null,
+            'smsSettings.twilioCustomerProfileEvaluation': null,
+            'smsSettings.twilioCustomerProfileCreatedAt':  null,
+            'smsSettings.twilioEndUserSid':                null,
+            'smsSettings.twilioRepEndUserSid':             null,
+            'smsSettings.twilioRep2EndUserSid':            null,
+            'smsSettings.twilioAddressSid':                null,
+            'smsSettings.twilioSupportingDocSid':          null,
+        });
+
+        log.info(`[deleteCustomerProfile] Cleared Firestore profile fields for church ${churchId}`, 'system', { churchId, errors }, churchId);
+
+        return res.json({
+            success: true,
+            message: 'Customer Profile Bundle and associated entities have been deleted.',
+            warnings: errors.length > 0 ? errors : undefined,
+        });
+
+    } catch (e: any) {
+        log.error(`[deleteCustomerProfile] Failed for ${churchId}: ${e.message}`, 'system', { churchId }, churchId);
+        return res.status(500).json({ error: e.message || 'Failed to delete Customer Profile' });
     }
 };
 
