@@ -45,16 +45,23 @@ const buildEntry = (
     source: LogSource,
     context?: Record<string, any>,
     churchId?: string
-): LogEntry => ({
-    id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-    churchId: churchId ?? 'system',
-    timestamp: Date.now(),
-    level,
-    source,
-    message,
-    details: context ? JSON.stringify(context) : undefined,
-    context,
-});
+): LogEntry => {
+    // Strip undefined values — Firestore admin SDK rejects them as hard errors
+    const safeContext = context
+        ? Object.fromEntries(Object.entries(context).filter(([, v]) => v !== undefined))
+        : undefined;
+
+    return {
+        id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        churchId: churchId ?? 'system',
+        timestamp: Date.now(),
+        level,
+        source,
+        message,
+        details: safeContext ? JSON.stringify(safeContext) : undefined,
+        context: safeContext,
+    };
+};
 
 const write = (
     level: LogLevel,
