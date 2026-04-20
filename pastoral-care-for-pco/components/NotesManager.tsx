@@ -496,6 +496,7 @@ const NoteEditor: React.FC<{
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
+  const [editorMode, setEditorMode] = useState<'edit' | 'preview'>('edit');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const update = (patch: Partial<ChurchNote>) => {
@@ -528,6 +529,7 @@ const NoteEditor: React.FC<{
   const handlePcoInsert = useCallback((html: string) => {
     insertAtCursor('\n' + html + '\n');
     showToast('Planning Center content inserted ✓');
+    setEditorMode('preview');
   }, [insertAtCursor, showToast]);
 
   const save = useCallback(async (overrideStatus?: NoteStatus) => {
@@ -641,12 +643,39 @@ const NoteEditor: React.FC<{
         </div>
       </div>
 
-      {/* ── Toolbar ── */}
-      <EditorToolbar
-        churchId={initialNote.churchId}
-        onImageInsert={handleImageInsert}
-        onPcoInsert={handlePcoInsert}
-      />
+      {/* ── Edit / Preview Toggle + Toolbar ── */}
+      <div className="flex items-center bg-slate-50 border-b border-slate-200 shrink-0">
+        <div className="flex gap-0.5 p-1.5 bg-slate-100 rounded-lg mx-4 my-2">
+          <button
+            onClick={() => setEditorMode('edit')}
+            className={`px-3 py-1 rounded-md text-xs font-semibold transition ${
+              editorMode === 'edit'
+                ? 'bg-white text-slate-800 shadow-sm'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            Edit
+          </button>
+          <button
+            onClick={() => setEditorMode('preview')}
+            className={`px-3 py-1 rounded-md text-xs font-semibold transition ${
+              editorMode === 'preview'
+                ? 'bg-white text-slate-800 shadow-sm'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            <Eye size={11} className="inline mr-1 -mt-0.5" />
+            Preview
+          </button>
+        </div>
+        {editorMode === 'edit' && (
+          <EditorToolbar
+            churchId={initialNote.churchId}
+            onImageInsert={handleImageInsert}
+            onPcoInsert={handlePcoInsert}
+          />
+        )}
+      </div>
 
       {/* ── Editor Body ── */}
       <div className="flex-1 overflow-y-auto bg-slate-50 flex justify-center px-4 py-8">
@@ -694,24 +723,33 @@ const NoteEditor: React.FC<{
           {/* Divider */}
           <div className="nm-title-divider mb-7" />
 
-          {/* Content */}
-          <textarea
-            ref={textareaRef}
-            value={note.content}
-            onChange={e => update({ content: e.target.value })}
-            placeholder={`Write your note here…\n\nUse the toolbar above to insert images or Planning Center events.`}
-            title="Note content"
-            className="w-full box-border min-h-[360px] text-base leading-[1.8] text-slate-600 border-none outline-none bg-transparent resize-y font-[inherit]"
-          />
+          {/* Content — Edit or Preview */}
+          {editorMode === 'edit' ? (
+            <textarea
+              ref={textareaRef}
+              value={note.content}
+              onChange={e => update({ content: e.target.value })}
+              placeholder={`Write your note here…\n\nUse the toolbar above to insert images or Planning Center events.`}
+              title="Note content"
+              className="w-full box-border min-h-[360px] text-base leading-[1.8] text-slate-600 border-none outline-none bg-transparent resize-y font-[inherit]"
+            />
+          ) : (
+            <div
+              className="w-full min-h-[360px] text-base leading-[1.8] text-slate-600"
+              dangerouslySetInnerHTML={{ __html: note.content || '<p style="color:#94a3b8;">Nothing to preview yet.</p>' }}
+            />
+          )}
 
           {/* Tip */}
-          <div className="mt-5 px-3.5 py-2.5 bg-blue-50 rounded-[10px] border border-blue-200 text-xs text-blue-500 flex items-start gap-2">
-            <span className="shrink-0">💡</span>
-            <span>
-              Click <strong>Publish &amp; Copy Link</strong> to make this note public and copy the URL for SMS.
-              Use the toolbar above to insert images or Planning Center content cards.
-            </span>
-          </div>
+          {editorMode === 'edit' && (
+            <div className="mt-5 px-3.5 py-2.5 bg-blue-50 rounded-[10px] border border-blue-200 text-xs text-blue-500 flex items-start gap-2">
+              <span className="shrink-0">💡</span>
+              <span>
+                Click <strong>Publish &amp; Copy Link</strong> to make this note public and copy the URL for SMS.
+                Use the toolbar above to insert images or Planning Center content cards.
+              </span>
+            </div>
+          )}
         </div>
       </div>
     </div>

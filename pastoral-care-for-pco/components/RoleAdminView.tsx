@@ -297,6 +297,19 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
 
   // SMS Settings state
   const [smsSubTab, setSmsSubTab] = useState<'a2p' | 'optout' | 'numbers'>('a2p');
+  const [showRep2, setShowRep2] = useState(false);
+  const [expandedSteps, setExpandedSteps] = useState<Set<number>>(() => {
+    const s = church.smsSettings || {};
+    if (!s.twilioSubAccountSid) return new Set([1]); // Fresh — start at step 1
+    if (!s.a2pBusinessName)  return new Set([2]);    // Sub-account done, open brand
+    if (!s.a2pDescription)   return new Set([3]);    // Brand done, open campaign
+    return new Set<number>();                        // All complete — all collapsed
+  });
+  const toggleStep = (n: number) => setExpandedSteps(prev => {
+    const next = new Set(prev);
+    next.has(n) ? next.delete(n) : next.add(n);
+    return next;
+  });
   const [smsForm, setSmsForm] = useState<NonNullable<Church['smsSettings']>>(church.smsSettings || {});
   const [isSmsSaving, setIsSmsSaving] = useState(false);
   const [smsMessage, setSmsMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -2511,11 +2524,24 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                             </div>
 
                             {/* Step 1: Twilio Sub-Account & Phone */}
-                            <div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800">
-                                <div className="flex items-center gap-3 mb-4">
-                                    <div className="w-8 h-8 rounded-xl bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-black text-sm">1</div>
-                                    <h4 className="text-sm font-black text-slate-900 dark:text-white">Twilio Sub-Account &amp; Phone</h4>
-                                </div>
+                            {(() => {
+                                const isComplete = !!(smsForm.twilioSubAccountSid && smsForm.twilioPhoneNumber);
+                                const isOpen = expandedSteps.has(1);
+                                return (
+                                <div className="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-100 dark:border-slate-800 overflow-hidden">
+                                    <button type="button" onClick={() => toggleStep(1)}
+                                        className="w-full flex items-center gap-3 p-6 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                                    >
+                                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-sm shrink-0 ${isComplete ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' : 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'}`}>
+                                            {isComplete ? '✓' : '1'}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <h4 className="text-sm font-black text-slate-900 dark:text-white">Twilio Sub-Account &amp; Phone</h4>
+                                            {isComplete && !isOpen && <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold mt-0.5">✓ Configured</p>}
+                                        </div>
+                                        <svg className={`w-4 h-4 text-slate-400 shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                                    </button>
+                                    {isOpen && <div className="px-8 pb-8 pt-6 border-t border-slate-100 dark:border-slate-800">
                                 {/* Admin-editable warning */}
                                 <div className="flex items-start gap-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 rounded-xl p-3 mb-5">
                                     <span className="text-amber-500 text-base shrink-0 mt-0.5">⚠️</span>
@@ -2645,17 +2671,31 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         <p className="text-[9px] text-slate-400 mt-1.5">Status is synced from Twilio. Click <strong>Check Status</strong> in the header to refresh.</p>
                                     </div>
                                 </div>
-                            </div>
+                                    </div>}
+                                </div>
+                                );
+                            })()}
 
                             {/* Step 2: Brand Registration */}
-                            <div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800">
-                                <div className="flex items-center gap-3 mb-6">
-                                    <div className="w-8 h-8 rounded-xl bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-black text-sm">2</div>
-                                    <div>
-                                        <h4 className="text-sm font-black text-slate-900 dark:text-white">Brand Registration (TCR)</h4>
-                                        <p className="text-[10px] text-slate-400 mt-0.5">Register your organization with The Campaign Registry. Use the exact legal name on your EIN filing.</p>
-                                    </div>
-                                </div>
+                            {(() => {
+                                const isComplete = !!(smsForm.a2pBusinessName && smsForm.a2pEin && smsForm.a2pContactFirstName);
+                                const isOpen = expandedSteps.has(2);
+                                return (
+                                <div className="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-100 dark:border-slate-800 overflow-hidden">
+                                    <button type="button" onClick={() => toggleStep(2)}
+                                        className="w-full flex items-center gap-3 p-6 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                                    >
+                                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-sm shrink-0 ${isComplete ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' : 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'}`}>
+                                            {isComplete ? '✓' : '2'}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <h4 className="text-sm font-black text-slate-900 dark:text-white">Brand Registration (TCR)</h4>
+                                            {isComplete && !isOpen && <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold mt-0.5">✓ Filled in</p>}
+                                            {!isComplete && !isOpen && <p className="text-[10px] text-slate-400 mt-0.5">Register your organization with The Campaign Registry.</p>}
+                                        </div>
+                                        <svg className={`w-4 h-4 text-slate-400 shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                                    </button>
+                                    {isOpen && <div className="px-8 pb-8 pt-6 border-t border-slate-100 dark:border-slate-800">
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                     <div className="md:col-span-2">
@@ -2826,79 +2866,121 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                     </div>
                                 </div>
 
-                                {/* Authorized Rep 2 — required by Twilio TrustHub */}
+                                {/* Authorized Rep 2 — optional, collapsed by default */}
                                 <div className="mt-5 pt-5 border-t border-slate-100 dark:border-slate-800">
-                                    <label className="block text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest mb-3">
-                                        Authorized Representative 2 <span className="text-rose-500">*</span>
-                                    </label>
-                                    <p className="text-[10px] text-slate-400 mb-4">
-                                        Twilio TrustHub requires <strong>two</strong> authorized representatives for Secondary Customer Profiles. This person should be a different senior staff member.
-                                    </p>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div>
-                                            <label className={labelCn}>First Name <span className="text-rose-500">*</span></label>
-                                            <input type="text" value={smsForm.a2pRep2FirstName || ''}
-                                                onChange={e => handleSmsChange('a2pRep2FirstName' as any, e.target.value)}
-                                                className={inputCn} placeholder="Jane"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className={labelCn}>Last Name <span className="text-rose-500">*</span></label>
-                                            <input type="text" value={smsForm.a2pRep2LastName || ''}
-                                                onChange={e => handleSmsChange('a2pRep2LastName' as any, e.target.value)}
-                                                className={inputCn} placeholder="Doe"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className={labelCn}>Email <span className="text-rose-500">*</span></label>
-                                            <input type="email" value={smsForm.a2pRep2Email || ''}
-                                                onChange={e => handleSmsChange('a2pRep2Email' as any, e.target.value)}
-                                                className={inputCn} placeholder="admin@mychurch.org"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className={labelCn}>Phone <span className="text-rose-500">*</span></label>
-                                            <input type="tel" value={smsForm.a2pRep2Phone || ''}
-                                                onChange={e => handleSmsChange('a2pRep2Phone' as any, e.target.value)}
-                                                className={inputCn} placeholder="+16155559876"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className={labelCn}>Job Title</label>
-                                            <input type="text" value={smsForm.a2pRep2JobTitle || ''}
-                                                onChange={e => handleSmsChange('a2pRep2JobTitle' as any, e.target.value)}
-                                                className={inputCn} placeholder="Church Administrator, Operations Director…"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className={labelCn}>Job Level</label>
-                                            <select value={smsForm.a2pRep2JobPosition || ''}
-                                                onChange={e => handleSmsChange('a2pRep2JobPosition' as any, e.target.value)}
-                                                title="Job Level (Rep 2)"
-                                                className={inputCn}
+                                    {(() => {
+                                        const hasRep2Data = !!(smsForm.a2pRep2FirstName || smsForm.a2pRep2LastName || smsForm.a2pRep2Email);
+                                        const isExpanded  = showRep2 || hasRep2Data;
+                                        return isExpanded ? (
+                                            <>
+                                                <div className="flex items-center justify-between mb-3">
+                                                    <label className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest">
+                                                        Authorized Representative 2 <span className="normal-case font-normal text-slate-400 text-[9px]">(optional)</span>
+                                                    </label>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setShowRep2(false);
+                                                            // Clear Rep 2 data
+                                                            (['a2pRep2FirstName','a2pRep2LastName','a2pRep2Email','a2pRep2Phone','a2pRep2JobTitle','a2pRep2JobPosition'] as any[]).forEach(k => handleSmsChange(k, ''));
+                                                        }}
+                                                        className="text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 transition-colors px-2 py-1 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-900/20"
+                                                    >
+                                                        ✕ Remove
+                                                    </button>
+                                                </div>
+                                                <p className="text-[10px] text-slate-400 mb-4">A second senior staff member. Twilio TrustHub may require this for Secondary Customer Profiles.</p>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className={labelCn}>First Name</label>
+                                                        <input type="text" value={smsForm.a2pRep2FirstName || ''}
+                                                            onChange={e => handleSmsChange('a2pRep2FirstName' as any, e.target.value)}
+                                                            className={inputCn} placeholder="Jane"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className={labelCn}>Last Name</label>
+                                                        <input type="text" value={smsForm.a2pRep2LastName || ''}
+                                                            onChange={e => handleSmsChange('a2pRep2LastName' as any, e.target.value)}
+                                                            className={inputCn} placeholder="Doe"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className={labelCn}>Email</label>
+                                                        <input type="email" value={smsForm.a2pRep2Email || ''}
+                                                            onChange={e => handleSmsChange('a2pRep2Email' as any, e.target.value)}
+                                                            className={inputCn} placeholder="admin@mychurch.org"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className={labelCn}>Phone</label>
+                                                        <input type="tel" value={smsForm.a2pRep2Phone || ''}
+                                                            onChange={e => handleSmsChange('a2pRep2Phone' as any, e.target.value)}
+                                                            className={inputCn} placeholder="+16155559876"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className={labelCn}>Job Title</label>
+                                                        <input type="text" value={smsForm.a2pRep2JobTitle || ''}
+                                                            onChange={e => handleSmsChange('a2pRep2JobTitle' as any, e.target.value)}
+                                                            className={inputCn} placeholder="Church Administrator, Operations Director…"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className={labelCn}>Job Level</label>
+                                                        <select value={smsForm.a2pRep2JobPosition || ''}
+                                                            onChange={e => handleSmsChange('a2pRep2JobPosition' as any, e.target.value)}
+                                                            title="Job Level (Rep 2)"
+                                                            className={inputCn}
+                                                        >
+                                                            <option value="">— Select —</option>
+                                                            <option value="Director">Director</option>
+                                                            <option value="VP">VP / Vice President</option>
+                                                            <option value="GM">GM / General Manager</option>
+                                                            <option value="CEO">CEO / President</option>
+                                                            <option value="CFO">CFO</option>
+                                                            <option value="General Counsel">General Counsel</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowRep2(true)}
+                                                className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-indigo-500 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 px-4 py-2.5 rounded-xl border border-dashed border-indigo-200 dark:border-indigo-800 hover:border-indigo-400 dark:hover:border-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all w-full justify-center"
                                             >
-                                                <option value="">— Select —</option>
-                                                <option value="Director">Director</option>
-                                                <option value="VP">VP / Vice President</option>
-                                                <option value="GM">GM / General Manager</option>
-                                                <option value="CEO">CEO / President</option>
-                                                <option value="CFO">CFO</option>
-                                                <option value="General Counsel">General Counsel</option>
-                                            </select>
-                                        </div>
-                                    </div>
+                                                <span className="text-base leading-none">+</span>
+                                                Add Representative 2 <span className="normal-case font-normal text-slate-400">(optional)</span>
+                                            </button>
+                                        );
+                                    })()}
                                 </div>
-                            </div>
+                                    </div>}
+                                </div>
+                                );
+                            })()}
 
                             {/* Step 3: Campaign Registration */}
-                            <div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800">
-                                <div className="flex items-center gap-3 mb-6">
-                                    <div className="w-8 h-8 rounded-xl bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-black text-sm">3</div>
-                                    <div>
-                                        <h4 className="text-sm font-black text-slate-900 dark:text-white">Campaign Registration (Use Case)</h4>
-                                        <p className="text-[10px] text-slate-400 mt-0.5">Tell the carriers what types of messages you'll send and how recipients opt in.</p>
-                                    </div>
-                                </div>
+                            {(() => {
+                                const isComplete = !!(smsForm.a2pDescription && smsForm.a2pSampleMessage1);
+                                const isOpen = expandedSteps.has(3);
+                                return (
+                                <div className="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-100 dark:border-slate-800 overflow-hidden">
+                                    <button type="button" onClick={() => toggleStep(3)}
+                                        className="w-full flex items-center gap-3 p-6 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                                    >
+                                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-sm shrink-0 ${isComplete ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' : 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'}`}>
+                                            {isComplete ? '✓' : '3'}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <h4 className="text-sm font-black text-slate-900 dark:text-white">Campaign Registration (Use Case)</h4>
+                                            {isComplete && !isOpen && <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold mt-0.5">✓ Filled in</p>}
+                                            {!isComplete && !isOpen && <p className="text-[10px] text-slate-400 mt-0.5">Tell carriers what types of messages you'll send and how recipients opt in.</p>}
+                                        </div>
+                                        <svg className={`w-4 h-4 text-slate-400 shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                                    </button>
+                                    {isOpen && <div className="px-8 pb-8 pt-6 border-t border-slate-100 dark:border-slate-800">
 
                                 <div className="space-y-5">
                                     <div>
@@ -2993,7 +3075,10 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         </div>
                                     </div>
                                 </div>
-                            </div>
+                                    </div>}
+                                </div>
+                                );
+                            })()}
 
                             {/* Compliance checklist */}
                             <div className="bg-amber-50 dark:bg-amber-900/10 p-6 rounded-2xl border border-amber-200 dark:border-amber-800">
