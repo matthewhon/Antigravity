@@ -16,7 +16,7 @@ import {
     Inbox, BarChart3, Copy, Zap, MessageCircle, TrendingUp, TrendingDown,
     Activity, DollarSign, UserX, Edit3, UserCheck, List, Layers,
     Smile, Image as ImageIcon, Link, Sparkles, ChevronRight, RotateCcw,
-    Mail, Tag, Filter, Hash, Upload, ExternalLink, GitBranch, Info, ShieldCheck, Globe2, PlusCircle, Lock, Unlock
+    Mail, Tag, Filter, Hash, Upload, ExternalLink, GitBranch, Info, ShieldCheck, Globe2, PlusCircle, Lock, Unlock, ListPlus
 } from 'lucide-react';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -5341,6 +5341,242 @@ const EnrollmentPane: React.FC<{
     );
 };
 
+// ─── Bulk Enroll from PCO List / Group ──────────────────────────────────────
+
+/**
+ * Modal that lets an admin pick a PCO List or Group and bulk-enroll everyone
+ * in it into a given workflow. Deduplication is handled server-side.
+ */
+const BulkEnrollFromListModal: React.FC<{
+    workflow: SmsWorkflow;
+    churchId: string;
+    onClose: () => void;
+}> = ({ workflow, churchId, onClose }) => {
+    type AudienceTab = 'lists' | 'groups';
+    const [tab, setTab]                       = useState<AudienceTab>('lists');
+    const [pcoLists, setPcoLists]             = useState<{ id: string; name: string }[]>([]);
+    const [pcoGroups, setPcoGroups]           = useState<{ id: string; name: string }[]>([]);
+    const [loadingLists, setLoadingLists]     = useState(false);
+    const [loadingGroups, setLoadingGroups]   = useState(false);
+    const [selectedListId, setSelectedListId] = useState('');
+    const [selectedGroupId, setSelectedGroupId] = useState('');
+    const [memberCount, setMemberCount]       = useState<number | null>(null);
+    const [loadingCount, setLoadingCount]     = useState(false);
+    const [enrolling, setEnrolling]           = useState(false);
+    const [result, setResult]                 = useState<{ enrolled: number; skipped: number } | null>(null);
+    const [errMsg, setErrMsg]                 = useState('');
+
+    // Load PCO lists on mount
+    useEffect(() => {
+        setLoadingLists(true);
+        pcoService.getPeopleLists(churchId)
+            .then(raw => setPcoLists(raw.map((r: any) => ({ id: r.id, name: r.attributes?.name || 'Unnamed List' }))))
+            .catch(() => {})
+            .finally(() => setLoadingLists(false));
+    }, [churchId]);
+
+    // Load PCO groups when that tab is first activated
+    useEffect(() => {
+        if (tab !== 'groups' || pcoGroups.length > 0) return;
+        setLoadingGroups(true);
+        pcoService.getGroups(churchId)
+            .then(raw => setPcoGroups(raw.map((r: any) => ({ id: r.id, name: r.attributes?.name || 'Unnamed Group' }))))
+            .catch(() => {})
+            .finally(() => setLoadingGroups(false));
+    }, [tab, churchId, pcoGroups.length]);
+
+    // Fetch member count whenever the selection changes
+    useEffect(() => {
+        const id = tab === 'lists' ? selectedListId : selectedGroupId;
+        if (!id) { setMemberCount(null); return; }
+        setLoadingCount(true);
+        setMemberCount(null);
+        const body = tab === 'lists'
+            ? { churchId, listId: selectedListId }
+            : { churchId, groupId: selectedGroupId };
+        fetch('/api/messaging/workflow-enroll-preview', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        })
+            .then(r => r.json())
+            .then(d => { if (d.success) setMemberCount(d.totalCount); })
+            .catch(() => {})
+            .finally(() => setLoadingCount(false));
+    }, [selectedListId, selectedGroupId, tab, churchId]);
+
+    const handleEnroll = async () => {
+        const id = tab === 'lists' ? selectedListId : selectedGroupId;
+        if (!id) { setErrMsg('Please select a list or group first.'); return; }
+        setErrMsg('');
+        setEnrolling(true);
+        try {
+            const body = tab === 'lists'
+                ? { churchId, workflowId: workflow.id, listId: selectedListId }
+                : { churchId, workflowId: workflow.id, groupId: selectedGroupId };
+            const res  = await fetch('/api/messaging/workflow-enroll-list', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.error || 'Enrollment failed');
+            setResult({ enrolled: data.enrolled, skipped: data.skipped });
+        } catch (e: any) {
+            setErrMsg(e.message || 'Enrollment failed');
+        } finally {
+            setEnrolling(false);
+        }
+    };
+
+    const selectedId = tab === 'lists' ? selectedListId : selectedGroupId;
+
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
+            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-md mx-4 overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+
+                {/* Header */}
+                <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between shrink-0">
+                    <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center">
+                            <ListPlus size={17} className="text-violet-600 dark:text-violet-300" />
+                        </div>
+                        <div>
+                            <h3 className="text-sm font-black text-slate-900 dark:text-white">Start Workflow from List</h3>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-[240px]">{workflow.name}</p>
+                        </div>
+                    </div>
+                    <button onClick={onClose} className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition"><X size={16} /></button>
+                </div>
+
+                {/* Body */}
+                {result ? (
+                    /* Success state */
+                    <div className="p-6 text-center">
+                        <div className="w-14 h-14 rounded-2xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mx-auto mb-4">
+                            <CheckCircle size={28} className="text-emerald-500" />
+                        </div>
+                        <p className="font-black text-slate-900 dark:text-white text-base mb-1">Workflow Started!</p>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
+                            <span className="font-bold text-violet-600 dark:text-violet-300">{result.enrolled}</span> contact{result.enrolled !== 1 ? 's' : ''} enrolled.
+                            {result.skipped > 0 && <span className="text-slate-400"> {result.skipped} already enrolled (skipped).</span>}
+                        </p>
+                        <p className="text-xs text-slate-400 mt-3">The workflow scheduler will fire Step 1 within 60 seconds.</p>
+                        <button
+                            onClick={onClose}
+                            className="mt-5 px-6 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold rounded-xl transition"
+                        >
+                            Done
+                        </button>
+                    </div>
+                ) : (
+                    <div className="p-5 space-y-4">
+                        {/* How-it-works explainer */}
+                        <div className="flex items-start gap-3 bg-violet-50 dark:bg-violet-900/20 border border-violet-100 dark:border-violet-800 rounded-2xl p-3">
+                            <Zap size={14} className="text-violet-500 mt-0.5 shrink-0" />
+                            <p className="text-[11px] text-violet-700 dark:text-violet-300 leading-relaxed">
+                                Every person on the selected list with a phone number will be enrolled in <strong>{workflow.name}</strong> immediately. Step 1 fires within 60 seconds.
+                            </p>
+                        </div>
+
+                        {/* Lists / Groups tab */}
+                        <div className="flex rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700">
+                            {(['lists', 'groups'] as AudienceTab[]).map(t => (
+                                <button
+                                    key={t}
+                                    onClick={() => setTab(t)}
+                                    className={`flex-1 py-2 text-xs font-bold transition ${
+                                        tab === t
+                                            ? 'bg-violet-600 text-white'
+                                            : 'bg-white dark:bg-slate-800 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700'
+                                    }`}
+                                >
+                                    PCO {t === 'lists' ? 'Lists' : 'Groups'}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Dropdown */}
+                        {tab === 'lists' ? (
+                            loadingLists ? (
+                                <div className="flex items-center gap-2 text-slate-400 text-xs py-2"><Loader2 size={13} className="animate-spin" /> Loading PCO Lists…</div>
+                            ) : (
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">PCO List</label>
+                                    <select
+                                        value={selectedListId}
+                                        onChange={e => { setSelectedListId(e.target.value); setResult(null); setErrMsg(''); }}
+                                        className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                    >
+                                        <option value="">— Select a PCO List —</option>
+                                        {pcoLists.length === 0 && <option disabled>No lists found (connect PCO first)</option>}
+                                        {pcoLists.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                                    </select>
+                                </div>
+                            )
+                        ) : (
+                            loadingGroups ? (
+                                <div className="flex items-center gap-2 text-slate-400 text-xs py-2"><Loader2 size={13} className="animate-spin" /> Loading PCO Groups…</div>
+                            ) : (
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">PCO Group</label>
+                                    <select
+                                        value={selectedGroupId}
+                                        onChange={e => { setSelectedGroupId(e.target.value); setResult(null); setErrMsg(''); }}
+                                        className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                    >
+                                        <option value="">— Select a PCO Group —</option>
+                                        {pcoGroups.length === 0 && <option disabled>No groups found (connect PCO first)</option>}
+                                        {pcoGroups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                                    </select>
+                                </div>
+                            )
+                        )}
+
+                        {/* Member count badge */}
+                        {selectedId && (
+                            <div className="flex items-center gap-2">
+                                {loadingCount ? (
+                                    <span className="flex items-center gap-1.5 text-xs text-slate-400"><Loader2 size={11} className="animate-spin" /> Fetching count…</span>
+                                ) : memberCount !== null ? (
+                                    <span className="flex items-center gap-1.5 text-xs font-bold text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/30 px-2.5 py-1 rounded-full">
+                                        <Users size={11} /> {memberCount.toLocaleString()} member{memberCount !== 1 ? 's' : ''}
+                                    </span>
+                                ) : null}
+                            </div>
+                        )}
+
+                        {errMsg && (
+                            <div className="flex items-center gap-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-3">
+                                <AlertTriangle size={12} className="shrink-0" /> {errMsg}
+                            </div>
+                        )}
+
+                        {/* Actions */}
+                        <div className="flex gap-3 pt-1">
+                            <button
+                                onClick={onClose}
+                                className="flex-1 py-2.5 text-sm font-bold text-slate-600 dark:text-slate-400 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleEnroll}
+                                disabled={!selectedId || enrolling}
+                                className="flex-1 py-2.5 text-sm font-black text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition shadow-md shadow-violet-200 dark:shadow-violet-900/30 flex items-center justify-center gap-2"
+                            >
+                                {enrolling
+                                    ? <><Loader2 size={13} className="animate-spin" /> Enrolling…</>
+                                    : <><ListPlus size={13} /> Start Workflow</>}
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
 // ─── Workflows List + Manager ─────────────────────────────────────────────────
 
 export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
@@ -5354,7 +5590,8 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
     const [editing, setEditing]     = useState<SmsWorkflow | null | 'new'>('new' as any);
     const [viewMode, setViewMode]   = useState<'list' | 'editor'>('list');
     const [isBusy, setIsBusy]       = useState(false);
-    const [enrollTarget, setEnrollTarget] = useState<SmsWorkflow | null>(null);
+    const [enrollTarget, setEnrollTarget]         = useState<SmsWorkflow | null>(null);
+    const [listEnrollTarget, setListEnrollTarget] = useState<SmsWorkflow | null>(null);
 
     // Live listener
     useEffect(() => {
@@ -5563,6 +5800,14 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
 
                                         {/* Actions on hover */}
                                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                                            {/* Bulk-enroll from PCO list — available on all workflows */}
+                                            <button
+                                                onClick={() => setListEnrollTarget(wf)}
+                                                className="p-1.5 text-slate-400 hover:text-violet-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                                                title="Start workflow from PCO List"
+                                            >
+                                                <ListPlus size={14} />
+                                            </button>
                                             {wf.trigger === 'manual' && (
                                                 <button onClick={() => setEnrollTarget(wf)} className="p-1.5 text-slate-400 hover:text-violet-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition" title="Enroll contact">
                                                     <Users size={14} />
@@ -5608,12 +5853,21 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
                 </div>
             )}
 
-            {/* Enrollment pane modal */}
+            {/* Single-contact enrollment pane modal */}
             {enrollTarget && (
                 <EnrollmentPane
                     workflow={enrollTarget}
                     churchId={churchId}
                     onClose={() => setEnrollTarget(null)}
+                />
+            )}
+
+            {/* Bulk enroll from PCO List / Group modal */}
+            {listEnrollTarget && (
+                <BulkEnrollFromListModal
+                    workflow={listEnrollTarget}
+                    churchId={churchId}
+                    onClose={() => setListEnrollTarget(null)}
                 />
             )}
         </div>

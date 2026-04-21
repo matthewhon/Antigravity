@@ -24,6 +24,7 @@ import { handleInboundSms } from './backend/twilioInbound';
 import { sendIndividual, sendBulk } from './backend/twilioSend';
 import { handleStatusCallback } from './backend/twilioWebhookStatus';
 import { startSmsCampaignScheduler } from './backend/smsCampaignScheduler';
+import { workflowEnrollList, workflowEnrollPreview } from './backend/workflowEnrollEndpoint';
 
 // Fix for bundled CJS environment
 const __dirname = process.cwd();
@@ -193,6 +194,9 @@ async function startServer() {
     // Sending
     app.post('/api/messaging/send-individual', express.json(), sendIndividual);
     app.post('/api/messaging/send-bulk', express.json(), sendBulk);
+    // Workflow bulk-enrollment from a PCO List or Group
+    app.post('/api/messaging/workflow-enroll-list', express.json(), workflowEnrollList);
+    app.post('/api/messaging/workflow-enroll-preview', express.json(), workflowEnrollPreview);
     // A2P full pipeline (brand → service → campaign → numbers)
     app.post('/api/messaging/register-brand', express.json(), registerBrand);
     app.post('/api/messaging/create-messaging-service', express.json(), createMessagingService);
