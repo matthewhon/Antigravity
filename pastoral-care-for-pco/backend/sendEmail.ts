@@ -759,6 +759,106 @@ function renderAnalyticsBlockHtml(
               </div>
             </div>`;
         }
+        case 'giving_average_giving': {
+            const weeks: { label: string; byFund: Record<string, number>; total: number }[] = data.weeks || [];
+            const fundAverages: { name: string; average: number }[] = data.fundAverages || [];
+            const overallWeeklyAverage: number = data.overallWeeklyAverage || 0;
+            const FUND_COLORS = ['#6366f1','#10b981','#f59e0b','#06b6d4','#f43f5e','#8b5cf6'];
+            const maxWeekTotal = Math.max(...weeks.map(w => w.total), 1);
+
+            const bars = weeks.map(w => {
+                const h = Math.max(2, Math.round((w.total / maxWeekTotal) * 48));
+                return `<td valign="bottom" style="text-align:center;padding:0 1px;">
+                  <div style="width:100%;height:${h}px;background:#10b981;border-radius:2px 2px 0 0;opacity:0.85;"></div>
+                </td>`;
+            }).join('');
+
+            const fundRows = fundAverages.slice(0, 6).map((f, i) =>
+                `<tr>
+                  <td style="padding:4px 0;font-size:11px;font-weight:600;color:#334155;font-family:${fontFamily};">
+                    <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${FUND_COLORS[i % FUND_COLORS.length]};margin-right:6px;vertical-align:middle;"></span>${f.name}
+                  </td>
+                  <td style="padding:4px 0;text-align:right;font-size:11px;font-weight:800;color:#0f172a;font-family:${fontFamily};">${fmt(f.average, true)}<span style="font-weight:400;font-size:9px;color:#94a3b8;">/wk</span></td>
+                </tr>`
+            ).join('');
+
+            return `<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:16px;">
+              <div style="background:linear-gradient(135deg,#059669,#0891b2);padding:10px 16px;">
+                <table width="100%" cellpadding="0" cellspacing="0"><tr>
+                  <td align="left" valign="middle">
+                    <div style="font-size:10px;font-weight:800;color:#a7f3d0;text-transform:uppercase;letter-spacing:1px;font-family:${fontFamily};">Average Giving</div>
+                    <div style="font-size:10px;color:#6ee7b7;font-family:${fontFamily};">Last 12 Weeks</div>
+                  </td>
+                  <td align="right" valign="middle">
+                    <div style="font-size:16px;font-weight:900;color:#fff;font-family:${fontFamily};">${fmt(overallWeeklyAverage, true)}</div>
+                    <div style="font-size:10px;color:#6ee7b7;font-family:${fontFamily};">weekly avg</div>
+                  </td>
+                </tr></table>
+              </div>
+              <div style="background:#fff;padding:8px 16px;">
+                <table width="100%" cellpadding="0" cellspacing="0" style="height:56px;"><tr>${bars || '<td><div style="font-size:11px;color:#94a3b8;text-align:center;padding-top:16px;">No giving data</div></td>'}</tr></table>
+              </div>
+              <div style="background:#f8fafc;padding:8px 16px;border-top:1px solid #f1f5f9;">
+                <table width="100%" cellpadding="0" cellspacing="0">${fundRows || '<tr><td style="font-size:11px;color:#94a3b8;font-family:' + fontFamily + ';">No fund data</td></tr>'}</table>
+              </div>
+            </div>`;
+        }
+        case 'people_birthdays': {
+            const upcoming: { name: string; daysUntil: number; dateStr: string }[] = data.upcoming || [];
+            const rows = upcoming.slice(0, 8).map(p => {
+                const badgeColor = p.daysUntil === 0 ? '#dc2626' : p.daysUntil <= 7 ? '#d97706' : '#6366f1';
+                const badgeBg    = p.daysUntil === 0 ? '#fee2e2' : p.daysUntil <= 7 ? '#fef3c7' : '#eef2ff';
+                const daysLabel  = p.daysUntil === 0 ? 'Today!' : `${p.daysUntil}d`;
+                return `<tr>
+                  <td style="padding:8px 16px;border-bottom:1px solid #f8fafc;font-size:12px;font-weight:600;color:#1e293b;font-family:${fontFamily};">🎂 ${p.name}</td>
+                  <td style="padding:8px 16px;border-bottom:1px solid #f8fafc;text-align:right;">
+                    <span style="font-size:10px;color:#64748b;font-family:${fontFamily};">${p.dateStr}</span>
+                    <span style="margin-left:6px;font-size:9px;font-weight:800;background:${badgeBg};color:${badgeColor};padding:2px 6px;border-radius:6px;">${daysLabel}</span>
+                  </td>
+                </tr>`;
+            }).join('');
+            return `<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:16px;">
+              <div style="background:linear-gradient(135deg,#f59e0b,#d97706);padding:10px 16px;">
+                <table width="100%" cellpadding="0" cellspacing="0"><tr>
+                  <td align="left" valign="middle">
+                    <div style="font-size:10px;font-weight:800;color:#fef3c7;text-transform:uppercase;letter-spacing:1px;font-family:${fontFamily};">Upcoming Birthdays</div>
+                  </td>
+                  <td align="right" valign="middle">
+                    <div style="font-size:10px;color:#fde68a;font-family:${fontFamily};">Next 30 Days</div>
+                  </td>
+                </tr></table>
+              </div>
+              <table width="100%" cellpadding="0" cellspacing="0" style="background:#fff;">${rows || '<tr><td style="padding:12px 16px;font-size:11px;color:#94a3b8;text-align:center;font-family:' + fontFamily + ';">No upcoming birthdays</td></tr>'}</table>
+            </div>`;
+        }
+        case 'people_anniversaries': {
+            const upcoming: { name: string; daysUntil: number; dateStr: string; years?: number }[] = data.upcoming || [];
+            const rows = upcoming.slice(0, 8).map(p => {
+                const badgeColor = p.daysUntil === 0 ? '#dc2626' : p.daysUntil <= 7 ? '#d97706' : '#7c3aed';
+                const badgeBg    = p.daysUntil === 0 ? '#fee2e2' : p.daysUntil <= 7 ? '#fef3c7' : '#f5f3ff';
+                const daysLabel  = p.daysUntil === 0 ? 'Today!' : `${p.daysUntil}d`;
+                return `<tr>
+                  <td style="padding:8px 16px;border-bottom:1px solid #f8fafc;font-size:12px;font-weight:600;color:#1e293b;font-family:${fontFamily};">💍 ${p.name}${p.years ? ` <span style="font-size:10px;color:#7c3aed;font-weight:400;">(${p.years} yrs)</span>` : ''}</td>
+                  <td style="padding:8px 16px;border-bottom:1px solid #f8fafc;text-align:right;">
+                    <span style="font-size:10px;color:#64748b;font-family:${fontFamily};">${p.dateStr}</span>
+                    <span style="margin-left:6px;font-size:9px;font-weight:800;background:${badgeBg};color:${badgeColor};padding:2px 6px;border-radius:6px;">${daysLabel}</span>
+                  </td>
+                </tr>`;
+            }).join('');
+            return `<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:16px;">
+              <div style="background:linear-gradient(135deg,#7c3aed,#a21caf);padding:10px 16px;">
+                <table width="100%" cellpadding="0" cellspacing="0"><tr>
+                  <td align="left" valign="middle">
+                    <div style="font-size:10px;font-weight:800;color:#ede9fe;text-transform:uppercase;letter-spacing:1px;font-family:${fontFamily};">Upcoming Anniversaries</div>
+                  </td>
+                  <td align="right" valign="middle">
+                    <div style="font-size:10px;color:#c4b5fd;font-family:${fontFamily};">Next 30 Days</div>
+                  </td>
+                </tr></table>
+              </div>
+              <table width="100%" cellpadding="0" cellspacing="0" style="background:#fff;">${rows || '<tr><td style="padding:12px 16px;font-size:11px;color:#94a3b8;text-align:center;font-family:' + fontFamily + ';">No upcoming anniversaries</td></tr>'}</table>
+            </div>`;
+        }
         default:
             // Generic fallback: label only
             return `<div style="border:1px solid #e2e8f0;border-radius:8px;padding:12px;font-family:${fontFamily};font-size:12px;color:${textColor};margin-bottom:16px;">${label}</div>`;

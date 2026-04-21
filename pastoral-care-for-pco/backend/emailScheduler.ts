@@ -19,7 +19,8 @@ export async function refreshCampaignBlocks(
         blocks.map(async (block: any) => {
             if (block.type === 'analytics_block' || block.type === 'data_chart') {
                 const widgetId: string = block.content?.widgetId;
-                const config: any   = block.content?.config || {};  // fundName, dayRange, etc.
+                // Config is stored inside content.data._config by DataChartSelector at insert time
+                const config: any   = block.content?.config || block.content?.data?._config || {};  // fundName, dayRange, pcoListId, etc.
 
                 if (!widgetId) return block;
 
@@ -550,6 +551,100 @@ async function fetchWidgetData(
             eventsData.sort((a,b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
 
             return { period, events: eventsData.slice(0, 10) };
+        }
+
+        // ── Average Giving (12-week rolling) ────────────────────────────────
+        case 'giving_average_giving': {
+            const snap = await db.collection('detailed_donations').where('churchId', '==', churchId).get();
+            const donations: any[] = snap.docs.map((d: any) => d.data());
+            const now = new Date();
+            now.setHours(23, 59, 59, 999);
+
+            // Monday-align current week, then go back 12 weeks
+            const todayMonday = new Date(now);
+            todayMonday.setDate(now.getDate() - (now.getDay() === 0 ? 6 : now.getDay() - 1));
+            todayMonday.setHours(0, 0, 0, 0);
+
+            const weeks: { start: Date; end: Date; label: string }[] = [];
+            for (let i = 11; i >= 0; i--) {
+                const wStart = new Date(todayMonday);
+                wStart.setDate(todayMonday.getDate() - i * 7);
+                const wEnd = new Date(wStart);
+                wEnd.setDate(wStart.getDate() + 6);
+                wEnd.setHours(23, 59, 59, 999);
+                const label = wStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                weeks.push({ start: wStart, end: wEnd, label });
+            }
+
+            const windowStart = weeks[0].start;
+            const fundSet = new Set<string>();
+            donations.forEach((d: any) => {
+                const dd = new Date(d.date);
+                if (dd >= windowStart && dd <= now) fundSet.add(d.fundName);
+            });
+            const fundNames = Array.from(fundSet).sort();
+
+            const weekData = weeks.map(w => {
+                const byFund: Record<string, number> = {};
+                fundNames.forEach(f => (byFund[f] = 0));
+                donations.forEach((d: any) => {
+                    const dd = new Date(d.date);
+                    if (dd >= w.start && dd <= w.end) {
+                        byFund[d.fundName] = (byFund[d.fundName] || 0) + d.amount;
+                    }
+                });
+                const total = Object.values(byFund).reduce((s: number, v: number) => s + v, 0);
+                return { label: w.label, byFund, total };
+            });
+
+            const fundAverages = fundNames.map(f => ({
+                name: f,
+                average: weekData.reduce((s, w) => s + (w.byFund[f] || 0), 0) / 12,
+            })).sort((a, b) => b.average - a.average);
+
+            const overallWeeklyAverage = weekData.reduce((s, w) => s + w.total, 0) / 12;
+
+            return { weeks: weekData, fundNames, fundAverages, overallWeeklyAverage };
+        }
+
+        // ── Birthdays / Anniversaries ────────────────────────────────────────
+        case 'people_birthdays':
+        case 'people_anniversaries': {
+            const snap = await db.collection('people').where('churchId', '==', churchId).get();
+            const people: any[] = snap.docs.map((d: any) => d.data());
+            const EXCLUDED = ['Inactive', 'Archived'];
+            const now = new Date();
+
+            if (widgetId === 'people_birthdays') {
+                const upcoming = people
+                    .filter((p: any) => !!p.birthdate && !EXCLUDED.includes(p.status || ''))
+                    .map((p: any) => {
+                        const bd = new Date(p.birthdate);
+                        const thisYear = new Date(now.getFullYear(), bd.getMonth(), bd.getDate());
+                        if (thisYear < now) thisYear.setFullYear(now.getFullYear() + 1);
+                        const daysUntil = Math.ceil((thisYear.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
+                        return { name: p.name, daysUntil, dateStr: thisYear.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) };
+                    })
+                    .filter((p: any) => p.daysUntil <= 30)
+                    .sort((a: any, b: any) => a.daysUntil - b.daysUntil)
+                    .slice(0, 15);
+                return { upcoming, listFilter: null };
+            } else {
+                const upcoming = people
+                    .filter((p: any) => !!p.anniversary && !EXCLUDED.includes(p.status || ''))
+                    .map((p: any) => {
+                        const ann = new Date(p.anniversary);
+                        const thisYear = new Date(now.getFullYear(), ann.getMonth(), ann.getDate());
+                        if (thisYear < now) thisYear.setFullYear(now.getFullYear() + 1);
+                        const daysUntil = Math.ceil((thisYear.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
+                        const years = now.getFullYear() - ann.getFullYear();
+                        return { name: p.name, daysUntil, dateStr: thisYear.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), years };
+                    })
+                    .filter((p: any) => p.daysUntil <= 30)
+                    .sort((a: any, b: any) => a.daysUntil - b.daysUntil)
+                    .slice(0, 15);
+                return { upcoming, listFilter: null };
+            }
         }
 
         default:

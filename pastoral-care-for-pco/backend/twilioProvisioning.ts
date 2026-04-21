@@ -2017,7 +2017,7 @@ export const fetchPrimaryProfileSid = async (req: any, res: any) => {
         const { accountSid, authToken } = await getMasterCredentials(db);
         const master = getMasterClient(accountSid, authToken);
 
-        // List all customer profiles on the master account
+        // List all customer profiles on the master account (pageSize 50 captures everything for a small ISV)
         const profiles = await (master as any).trusthub.v1.customerProfiles.list({ pageSize: 50 });
 
         if (!profiles || profiles.length === 0) {
@@ -2026,27 +2026,62 @@ export const fetchPrimaryProfileSid = async (req: any, res: any) => {
             });
         }
 
-        // Prefer approved, then twilio-approved, then pending-review
-        const priorityOrder = ['approved', 'twilio-approved', 'pending-review', 'draft'];
-        let best: any = null;
-        for (const status of priorityOrder) {
-            best = profiles.find((p: any) => p.status === status);
-            if (best) break;
-        }
-        if (!best) best = profiles[0]; // fallback to whatever is first
+        // The ISV Primary Business Profile is the one that belongs directly to the master account.
+        // Secondary Customer Profiles (created for each church) reference the primary via
+        // `policy_sid` = RN806dd6cd175f314e1f96a9727b9a5d68 (Secondary Customer Profile policy)
+        // Primary profiles use policy_sid = RNb0d4771c2c4747d2a75621abead49828 (Primary Customer Profile)
+        //
+        // Reliable heuristic: the primary profile is either:
+        //   a) The only approved/twilio-approved profile, or
+        //   b) The one whose friendlyName is the ISV company name (Hon Ventures LLC)
+        //   c) Has no sub-account SID association (belongs directly to master)
+        //
+        // We filter: prefer profiles with status approved/twilio-approved,
+        // and exclude obvious church secondaries (those whose friendlyName looks like a church)
+        // by favouring the approved master-level one.
 
         const allProfiles = profiles.map((p: any) => ({
             sid:          p.sid,
             friendlyName: p.friendlyName,
             status:       p.status,
+            policySid:    p.policySid,
         }));
+
+        // PRIMARY policy SID (Twilio-defined, constant): RNb0d4771c2c4747d2a75621abead49828
+        const PRIMARY_POLICY_SID = 'RNb0d4771c2c4747d2a75621abead49828';
+
+        // 1. Try: profiles using the Primary Customer Profile policy
+        let candidates = profiles.filter((p: any) => p.policySid === PRIMARY_POLICY_SID);
+
+        // 2. Fallback: if policy SID isn't exposed, take approved ones
+        if (candidates.length === 0) {
+            candidates = profiles.filter((p: any) =>
+                p.status === 'twilio-approved' || p.status === 'approved'
+            );
+        }
+
+        // 3. Final fallback: first profile
+        if (candidates.length === 0) candidates = profiles;
+
+        // Among candidates, prefer twilio-approved > approved > pending-review > draft
+        const priorityOrder = ['twilio-approved', 'approved', 'pending-review', 'draft'];
+        let best: any = null;
+        for (const status of priorityOrder) {
+            best = candidates.find((p: any) => p.status === status);
+            if (best) break;
+        }
+        if (!best) best = candidates[0];
 
         return res.json({
             success:        true,
             primarySid:     best.sid,
             friendlyName:   best.friendlyName,
             status:         best.status,
+            policySid:      best.policySid,
             allProfiles,
+            note: allProfiles.length > 1
+                ? `Found ${allProfiles.length} profiles. Selected the Primary Customer Profile (${best.sid}). If this is wrong, paste the correct BU... SID manually.`
+                : undefined,
         });
     } catch (e: any) {
         log.error(`[fetchPrimaryProfileSid] ${e.message}`, 'system', {}, 'system');
@@ -2055,9 +2090,12 @@ export const fetchPrimaryProfileSid = async (req: any, res: any) => {
 };
 
 // ─── GET /api/messaging/a2p-profile-sid ──────────────────────────────────────
-// Fetches the A2P Profile Bundles (BN...) from the master Twilio account.
-// The admin pastes this into System Settings so brand registrations can link
-// to the ISV A2P profile, which Twilio requires via a2PProfileBundleSid.
+// Fetches the ISV A2P Profile Bundle (BN...) from the master Twilio account.
+// This is the ISV-level A2P Trust Product — one per platform, shared across all
+// church brand registrations via the a2PProfileBundleSid parameter.
+//
+// Twilio API: trusthub.v1.trustProducts (not messaging.v1.a2PProfileBundles)
+// Filter by policy_sid = RN670d5d2e282a6130ae063b234b6019c8 (A2P Messaging Policy)
 export const fetchA2pProfileSid = async (req: any, res: any) => {
     const db = getDb();
     const log = createServerLogger(db);
@@ -2065,49 +2103,61 @@ export const fetchA2pProfileSid = async (req: any, res: any) => {
         const { accountSid, authToken } = await getMasterCredentials(db);
         const master = getMasterClient(accountSid, authToken);
 
-        // List all A2P Profile Bundles on the master account
-        const bundles = await (master as any).messaging.v1.a2PProfileBundles?.list({ pageSize: 50 })
-            ?? [];
+        // A2P Profile Bundles are TrustProducts with the A2P Messaging Policy SID.
+        // Twilio's constant policy SID for A2P Messaging: RN670d5d2e282a6130ae063b234b6019c8
+        const A2P_POLICY_SID = 'RN670d5d2e282a6130ae063b234b6019c8';
+
+        let bundles: any[] = [];
+
+        // Strategy 1: list trustProducts filtered by A2P policy (most reliable)
+        try {
+            bundles = await (master as any).trusthub.v1.trustProducts.list({
+                policySid: A2P_POLICY_SID,
+                pageSize: 50,
+            });
+        } catch (e1: any) {
+            log.warn(`[fetchA2pProfileSid] trustProducts filtered list failed: ${e1.message}`, 'system', {}, 'system');
+        }
+
+        // Strategy 2: list all trustProducts and filter client-side
+        if (!bundles || bundles.length === 0) {
+            try {
+                const all = await (master as any).trusthub.v1.trustProducts.list({ pageSize: 50 });
+                bundles = (all || []).filter((b: any) => b.policySid === A2P_POLICY_SID);
+            } catch (e2: any) {
+                log.warn(`[fetchA2pProfileSid] trustProducts unfiltered list failed: ${e2.message}`, 'system', {}, 'system');
+            }
+        }
 
         if (!bundles || bundles.length === 0) {
-            // Twilio older SDK may not expose a2PProfileBundles directly — try the trusthub route
-            try {
-                const tBundles = await (master as any).trusthub.v1.a2PProfileBundles?.list({ pageSize: 20 }) ?? [];
-                if (tBundles.length > 0) {
-                    const priorityOrder = ['approved', 'twilio-approved', 'pending-review', 'draft'];
-                    let best: any = null;
-                    for (const status of priorityOrder) {
-                        best = tBundles.find((p: any) => p.status === status);
-                        if (best) break;
-                    }
-                    if (!best) best = tBundles[0];
-                    return res.json({
-                        success: true, primarySid: best.sid,
-                        friendlyName: best.friendlyName, status: best.status,
-                        allProfiles: tBundles.map((b: any) => ({ sid: b.sid, friendlyName: b.friendlyName, status: b.status })),
-                    });
-                }
-            } catch (_) { /* ignore */ }
-
             return res.status(404).json({
-                error: 'No A2P Profile Bundles (BN...) found. Create one at: https://console.twilio.com/us1/develop/sms/regulatory/a2p-registration',
+                error: 'No A2P Profile Bundles (BN...) found on this master Twilio account. ' +
+                    'Create one at: https://console.twilio.com/us1/develop/sms/regulatory/a2p-registration. ' +
+                    'As an ISV you need an A2P Messaging Profile Bundle on your master account before you can register church brands.',
             });
         }
 
-        const priorityOrder = ['approved', 'twilio-approved', 'pending-review', 'draft'];
+        // Among the found bundles, prefer twilio-approved > approved > pending-review > draft
+        const priorityOrder = ['twilio-approved', 'approved', 'pending-review', 'draft'];
         let best: any = null;
         for (const status of priorityOrder) {
-            best = bundles.find((p: any) => p.status === status);
+            best = bundles.find((b: any) => b.status === status);
             if (best) break;
         }
         if (!best) best = bundles[0];
+
+        log.info(`[fetchA2pProfileSid] Found ${bundles.length} A2P bundle(s), selected ${best.sid} (${best.status})`, 'system', {}, 'system');
 
         return res.json({
             success:      true,
             primarySid:   best.sid,
             friendlyName: best.friendlyName,
             status:       best.status,
+            policySid:    best.policySid,
             allProfiles:  bundles.map((b: any) => ({ sid: b.sid, friendlyName: b.friendlyName, status: b.status })),
+            note: bundles.length > 1
+                ? `Found ${bundles.length} A2P bundles. Selected the best-status one (${best.sid}). If wrong, paste the correct BN... SID manually.`
+                : undefined,
         });
     } catch (e: any) {
         log.error(`[fetchA2pProfileSid] ${e.message}`, 'system', {}, 'system');
