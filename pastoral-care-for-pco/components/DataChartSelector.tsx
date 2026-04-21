@@ -1096,10 +1096,8 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
                     )}
                     {/* Actual bar */}
                     <div
-                      className={`w-full rounded-sm transition-all ${
-                        m.isPast ? 'bg-emerald-400' : 'bg-slate-200 dark:bg-slate-600'
-                      }`}
-                      style={{ '--seg-h': actualH > 0 ? `${actualH}px` : '2px', '--seg-opacity': m.isPast ? '1' : '0.4' } as React.CSSProperties} className={...
+                      className={`bar-seg rounded-sm transition-all ${ m.isPast ? 'bg-emerald-400' : 'bg-slate-200 dark:bg-slate-600' }`}
+                      style={{ '--seg-h': actualH > 0 ? `${actualH}px` : '2px', '--seg-opacity': m.isPast ? '1' : '0.4' } as React.CSSProperties}
                       title={`${m.label}: ${m.actual !== null ? fmt(m.actual, true) : 'Future'}`}
                     />
                     <span className="text-[7px] text-slate-400 leading-none">{m.label.charAt(0)}</span>
