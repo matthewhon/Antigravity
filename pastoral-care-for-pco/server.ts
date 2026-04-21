@@ -19,7 +19,7 @@ import { getDb } from './backend/firebase';
 import { handleGeminiProxy } from './backend/geminiProxy';
 import { provisionSubuser, authenticateDomain, verifyDomain, diagnoseDomain } from './backend/emailProvisioning';
 import { getPublicGroups, getPublicRegistrations, getPublicEvents, serveWidgetScript } from './backend/publicApi.js';
-import { getAvailableNumbers, provisionTwilioNumber, releaseTwilioNumber, checkA2pStatus, createCustomerProfile, deleteCustomerProfile, refreshCustomerProfileStatus, addTwilioNumber, releaseSpecificNumber, updateNumberSettings, setDefaultNumber, trustHubStatusCallback, registerBrand, createMessagingService, registerCampaign, assignNumbersToService, checkCampaignStatus, fetchPrimaryProfileSid, fetchA2pProfileSid, lookupProfileSidsForChurch } from './backend/twilioProvisioning';
+import { getAvailableNumbers, provisionTwilioNumber, releaseTwilioNumber, checkA2pStatus, createCustomerProfile, deleteCustomerProfile, refreshCustomerProfileStatus, addTwilioNumber, releaseSpecificNumber, updateNumberSettings, setDefaultNumber, trustHubStatusCallback, registerBrand, createMessagingService, registerCampaign, assignNumbersToService, checkCampaignStatus, fetchPrimaryProfileSid, fetchA2pProfileSid, lookupProfileSidsForChurch, diagnoseAndRepairA2p } from './backend/twilioProvisioning';
 import { handleInboundSms } from './backend/twilioInbound';
 import { sendIndividual, sendBulk } from './backend/twilioSend';
 import { handleStatusCallback } from './backend/twilioWebhookStatus';
@@ -210,6 +210,8 @@ async function startServer() {
     app.get('/api/messaging/a2p-profile-sid', fetchA2pProfileSid);
     // Auto-discover Customer Profile + A2P Profile SIDs from the brand registration or TrustHub list
     app.get('/api/messaging/lookup-profile-sids', lookupProfileSidsForChurch);
+    // Diagnose + repair a church with a corrupted A2P pipeline (wrong account, missing SIDs, etc.)
+    app.post('/api/messaging/diagnose-repair', express.json(), diagnoseAndRepairA2p);
 
     // ─── SMS Agent: Website Scanner ─────────────────────────────────────────────
     // Fetches a church website URL server-side, extracts visible text, and uses

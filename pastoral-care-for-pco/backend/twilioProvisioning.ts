@@ -1512,18 +1512,29 @@ export const registerBrand = async (req: any, res: any) => {
 
     try {
         const { accountSid, authToken } = await getMasterCredentials(db);
-        const master = getMasterClient(accountSid, authToken);
 
         const churchSnap = await db.collection('churches').doc(churchId).get();
         if (!churchSnap.exists) return res.status(404).json({ error: 'Church not found' });
         const sms = churchSnap.data()?.smsSettings || {};
+
+        // Brand registration must be scoped to the church's sub-account — the account
+        // that will own the phone numbers and send messages. Twilio requires all A2P
+        // resources (brand, service, campaign) to live on the same account as the numbers.
+        const subAccountSid = sms.twilioSubAccountSid as string | undefined;
+        if (!subAccountSid) {
+            return res.status(400).json({
+                error: 'No Twilio sub-account SID found for this church. Provision a phone number first (Step 1/2) to create the sub-account.',
+            });
+        }
+        // Authenticate with master creds but scope all API calls to the sub-account
+        const client = getMasterClient(accountSid, authToken, subAccountSid);
 
         // ── Idempotency: brand already registered → refresh status ────────────────
         if (sms.twilioBrandSid) {
             let twilioStatus = 'pending';
             let failureReason: string | null = null;
             try {
-                const brandReg = await (master as any).messaging.v1
+                const brandReg = await (client as any).messaging.v1
                     .brandRegistrations(sms.twilioBrandSid).fetch();
                 twilioStatus  = (brandReg.status || 'pending').toLowerCase();
                 failureReason = brandReg.failureReason || null;
@@ -1578,8 +1589,8 @@ export const registerBrand = async (req: any, res: any) => {
             });
         }
 
-        // ── Submit brand registration ─────────────────────────────────────────────
-        const brand = await (master as any).messaging.v1.brandRegistrations.create({
+        // ── Submit brand registration (scoped to sub-account) ────────────────────
+        const brand = await (client as any).messaging.v1.brandRegistrations.create({
             customerProfileBundleSid: profileSid,
             a2PProfileBundleSid:      a2pProfileSid,
             friendlyName: sms.a2pBusinessName,
@@ -1594,7 +1605,7 @@ export const registerBrand = async (req: any, res: any) => {
             'smsSettings.a2pSubmittedAt':  Date.now(),
         });
 
-        log.info(`[registerBrand] Brand ${brand.sid} submitted for ${churchId}`, 'system', { churchId, brandSid: brand.sid }, churchId);
+        log.info(`[registerBrand] Brand ${brand.sid} submitted for ${churchId} under sub-account ${subAccountSid}`, 'system', { churchId, brandSid: brand.sid, subAccountSid }, churchId);
 
         return res.json({
             success:  true,
@@ -1625,12 +1636,20 @@ export const createMessagingService = async (req: any, res: any) => {
 
     try {
         const { accountSid, authToken } = await getMasterCredentials(db);
-        const master = getMasterClient(accountSid, authToken);
 
         const churchSnap = await db.collection('churches').doc(churchId).get();
         if (!churchSnap.exists) return res.status(404).json({ error: 'Church not found' });
         const sms    = churchSnap.data()?.smsSettings || {};
         const church = churchSnap.data() || {};
+
+        // Messaging Service must live on the church's sub-account
+        const subAccountSid = sms.twilioSubAccountSid as string | undefined;
+        if (!subAccountSid) {
+            return res.status(400).json({
+                error: 'No Twilio sub-account SID found for this church. Provision a phone number first.',
+            });
+        }
+        const client = getMasterClient(accountSid, authToken, subAccountSid);
 
         // ── Idempotency ───────────────────────────────────────────────────────────
         if (sms.twilioMessagingServiceSid) {
@@ -1654,8 +1673,8 @@ export const createMessagingService = async (req: any, res: any) => {
         const inboundUrl     = `${baseUrl}/api/messaging/inbound`;
         const statusCallback = `${baseUrl}/api/messaging/status`;
 
-        // ── Create Messaging Service ──────────────────────────────────────────────
-        const svc = await (master as any).messaging.v1.services.create({
+        // ── Create Messaging Service (scoped to sub-account) ─────────────────────
+        const svc = await (client as any).messaging.v1.services.create({
             friendlyName:      `${church.name || sms.a2pBusinessName || 'Church'} – PastoralCare`,
             inboundRequestUrl: inboundUrl,
             inboundMethod:     'POST',
@@ -1669,7 +1688,7 @@ export const createMessagingService = async (req: any, res: any) => {
             'smsSettings.twilioMessagingServiceSid': svc.sid,
         });
 
-        log.info(`[createMessagingService] Created MG ${svc.sid} for ${churchId}`, 'system', { churchId, sid: svc.sid }, churchId);
+        log.info(`[createMessagingService] Created MG ${svc.sid} for ${churchId} under sub-account ${subAccountSid}`, 'system', { churchId, sid: svc.sid, subAccountSid }, churchId);
 
         return res.json({
             success:             true,
@@ -1720,12 +1739,20 @@ export const registerCampaign = async (req: any, res: any) => {
 
     try {
         const { accountSid, authToken } = await getMasterCredentials(db);
-        const master = getMasterClient(accountSid, authToken);
 
         const churchSnap = await db.collection('churches').doc(churchId).get();
         if (!churchSnap.exists) return res.status(404).json({ error: 'Church not found' });
         const sms    = churchSnap.data()?.smsSettings || {};
         const church = churchSnap.data() || {};
+
+        // Campaign must be registered on the sub-account that owns the messaging service
+        const subAccountSid = sms.twilioSubAccountSid as string | undefined;
+        if (!subAccountSid) {
+            return res.status(400).json({
+                error: 'No Twilio sub-account SID found for this church. Provision a phone number first.',
+            });
+        }
+        const client = getMasterClient(accountSid, authToken, subAccountSid);
 
         // ── Idempotency ───────────────────────────────────────────────────────────
         if (sms.twilioUsAppToPersonSid) {
@@ -1745,10 +1772,10 @@ export const registerCampaign = async (req: any, res: any) => {
             return res.status(400).json({ error: 'Messaging Service (MG...) is required. Complete Step 5 first.' });
         }
 
-        // Verify brand is APPROVED — fetch live status
+        // Verify brand is APPROVED — fetch live status (can be fetched on sub-account)
         let brandStatus = (sms.twilioA2pStatus || 'pending').toLowerCase();
         try {
-            const brandReg = await (master as any).messaging.v1
+            const brandReg = await (client as any).messaging.v1
                 .brandRegistrations(sms.twilioBrandSid).fetch();
             brandStatus = (brandReg.status || 'pending').toLowerCase();
             // Sync back
@@ -1778,8 +1805,8 @@ export const registerCampaign = async (req: any, res: any) => {
         const optInMsg   = (sms.a2pUseCaseOptIn || sms.a2pOptInDescription || `You have opted in to receive messages from ${churchName}. Reply STOP to unsubscribe.`).trim();
         const useCase    = mapUseCase(sms.a2pUseCaseCategory || 'LOW_VOLUME');
 
-        // ── Register the A2P campaign ─────────────────────────────────────────────
-        const campaign = await (master as any).messaging.v1
+        // ── Register the A2P campaign (scoped to sub-account) ───────────────────
+        const campaign = await (client as any).messaging.v1
             .services(sms.twilioMessagingServiceSid)
             .usAppToPerson
             .create({
@@ -1803,7 +1830,7 @@ export const registerCampaign = async (req: any, res: any) => {
             'smsSettings.a2pCampaignSubmittedAt':  Date.now(),
         });
 
-        log.info(`[registerCampaign] Campaign ${campaign.sid} registered for ${churchId}`, 'system', { churchId, sid: campaign.sid }, churchId);
+        log.info(`[registerCampaign] Campaign ${campaign.sid} registered for ${churchId} under sub-account ${subAccountSid}`, 'system', { churchId, sid: campaign.sid, subAccountSid }, churchId);
 
         return res.json({
             success:          true,
@@ -1834,11 +1861,19 @@ export const assignNumbersToService = async (req: any, res: any) => {
 
     try {
         const { accountSid, authToken } = await getMasterCredentials(db);
-        const master = getMasterClient(accountSid, authToken);
 
         const churchSnap = await db.collection('churches').doc(churchId).get();
         if (!churchSnap.exists) return res.status(404).json({ error: 'Church not found' });
         const sms = churchSnap.data()?.smsSettings || {};
+
+        // Phone numbers and the messaging service live on the sub-account
+        const subAccountSid = sms.twilioSubAccountSid as string | undefined;
+        if (!subAccountSid) {
+            return res.status(400).json({
+                error: 'No Twilio sub-account SID found for this church. Provision a phone number first.',
+            });
+        }
+        const client = getMasterClient(accountSid, authToken, subAccountSid);
 
         if (!sms.twilioMessagingServiceSid) {
             return res.status(400).json({ error: 'Messaging Service (MG...) not found. Complete Step 5 first.' });
@@ -1868,14 +1903,14 @@ export const assignNumbersToService = async (req: any, res: any) => {
 
         for (const { docRef, sid, phone } of targets) {
             try {
-                await (master as any).messaging.v1
+                await (client as any).messaging.v1
                     .services(mgSid)
                     .phoneNumbers
                     .create({ phoneNumberSid: sid });
 
                 if (docRef) await docRef.update({ messagingServiceSid: mgSid, updatedAt: Date.now() });
                 results.push({ sid, phone, success: true });
-                log.info(`[assignNumbersToService] Linked ${sid} → ${mgSid}`, 'system', { churchId }, churchId);
+                log.info(`[assignNumbersToService] Linked ${sid} → ${mgSid} on sub-account ${subAccountSid}`, 'system', { churchId }, churchId);
 
             } catch (e: any) {
                 // Error code 21710 = number already linked to this service
@@ -1927,7 +1962,6 @@ export const checkCampaignStatus = async (req: any, res: any) => {
 
     try {
         const { accountSid, authToken } = await getMasterCredentials(db);
-        const master = getMasterClient(accountSid, authToken);
 
         const churchSnap = await db.collection('churches').doc(churchId).get();
         if (!churchSnap.exists) return res.status(404).json({ error: 'Church not found' });
@@ -1937,7 +1971,11 @@ export const checkCampaignStatus = async (req: any, res: any) => {
             return res.json({ status: 'not_registered', message: 'Campaign not yet registered.' });
         }
 
-        const campaign = await (master as any).messaging.v1
+        // Campaign status must be looked up on the sub-account that owns the messaging service
+        const subAccountSid = sms.twilioSubAccountSid as string | undefined;
+        const client = getMasterClient(accountSid, authToken, subAccountSid);
+
+        const campaign = await (client as any).messaging.v1
             .services(sms.twilioMessagingServiceSid)
             .usAppToPerson(sms.twilioUsAppToPersonSid)
             .fetch();
@@ -2217,5 +2255,235 @@ export const lookupProfileSidsForChurch = async (req: any, res: any) => {
     } catch (e: any) {
         log.error(`[lookupProfileSids] ${e.message}`, 'system', { churchId }, churchId);
         return res.status(500).json({ error: e.message || 'Lookup failed' });
+    }
+};
+
+
+// ─── POST /api/messaging/diagnose-repair ─────────────────────────────────────
+// Diagnostic + repair tool for churches with a corrupted A2P pipeline.
+// Checks every A2P SID stored in Firestore against both the master account and
+// the church sub-account to determine where each resource actually lives.
+//
+// If repair=true in the body, it will:
+//   - Delete the Messaging Service from whichever account it's on (if not sub-acct)
+//   - Delete the A2P Campaign from whichever account it's on (if not sub-acct)
+//   - Clear the Firestore fields for those resources so the pipeline can restart
+//
+// Brand Registrations CANNOT be deleted via Twilio API. If the brand is on the
+// wrong account it will be surfaced in the report as requiring Twilio Support.
+//
+// Body: { churchId, repair?: boolean }
+
+export const diagnoseAndRepairA2p = async (req: any, res: any) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    const { churchId, repair = false } = req.body || {};
+    if (!churchId) return res.status(400).json({ error: 'Missing churchId' });
+
+    const db  = getDb();
+    const log = createServerLogger(db);
+
+    try {
+        const { accountSid: masterSid, authToken } = await getMasterCredentials(db);
+        const masterClient = getMasterClient(masterSid, authToken);
+
+        const churchSnap = await db.collection('churches').doc(churchId).get();
+        if (!churchSnap.exists) return res.status(404).json({ error: 'Church not found' });
+        const sms = churchSnap.data()?.smsSettings || {};
+
+        const subAccountSid = sms.twilioSubAccountSid as string | undefined;
+        const subClient = subAccountSid
+            ? getMasterClient(masterSid, authToken, subAccountSid)
+            : null;
+
+        // ── Helper: try fetching a resource on both accounts ───────────────────
+        async function locateResource(
+            label: string,
+            fetchOnMaster: () => Promise<any>,
+            fetchOnSub: (() => Promise<any>) | null,
+        ): Promise<{ found: boolean; account: 'master' | 'sub' | 'not_found'; sid: string; data?: any }> {
+            const sid = label; // just used for logging
+            // Try sub-account first (correct location)
+            if (fetchOnSub) {
+                try {
+                    const data = await fetchOnSub();
+                    return { found: true, account: 'sub', sid, data };
+                } catch { /* not on sub */ }
+            }
+            // Try master account
+            try {
+                const data = await fetchOnMaster();
+                return { found: true, account: 'master', sid, data };
+            } catch { /* not on master either */ }
+            return { found: false, account: 'not_found', sid };
+        }
+
+        const report: Record<string, any> = {
+            churchId,
+            subAccountSid: subAccountSid || '⚠ MISSING — no sub-account provisioned',
+            resources: {},
+        };
+
+        // ── 1. Customer Profile (BU...) — always on master ────────────────────
+        const cpSid = sms.twilioCustomerProfileSid as string | undefined;
+        if (cpSid) {
+            try {
+                const cp = await (masterClient as any).trusthub.v1.customerProfiles(cpSid).fetch();
+                report.resources.customerProfile = {
+                    sid: cpSid, account: 'master', status: cp.status,
+                    note: cp.status === 'twilio-approved' ? '✅ Correct' : `⚠ Status: ${cp.status}`,
+                };
+            } catch (e: any) {
+                report.resources.customerProfile = { sid: cpSid, account: 'not_found', error: e.message };
+            }
+        } else {
+            report.resources.customerProfile = { sid: null, account: 'not_found', note: '⚠ No Customer Profile SID on file' };
+        }
+
+        // ── 2. Brand Registration (BN-style twilioBrandSid) ───────────────────
+        const brandSid = sms.twilioBrandSid as string | undefined;
+        if (brandSid) {
+            const brandResult = await locateResource(
+                brandSid,
+                () => (masterClient as any).messaging.v1.brandRegistrations(brandSid).fetch(),
+                subClient ? () => (subClient as any).messaging.v1.brandRegistrations(brandSid).fetch() : null,
+            );
+            report.resources.brandRegistration = {
+                sid: brandSid,
+                account: brandResult.account,
+                status: brandResult.data?.status,
+                note: brandResult.account === 'sub'
+                    ? '✅ Correct (on sub-account)'
+                    : brandResult.account === 'master'
+                    ? '❌ WRONG ACCOUNT — on master. Brand registrations cannot be deleted via API. Contact Twilio Support to transfer or delete it, then clear twilioBrandSid from Firestore and re-register.'
+                    : '⚠ Not found on either account',
+            };
+        } else {
+            report.resources.brandRegistration = { sid: null, account: 'not_found', note: '⚠ No Brand SID on file' };
+        }
+
+        // ── 3. Messaging Service (MG...) ──────────────────────────────────────
+        const mgSid = sms.twilioMessagingServiceSid as string | undefined;
+        if (mgSid) {
+            const mgResult = await locateResource(
+                mgSid,
+                () => (masterClient as any).messaging.v1.services(mgSid).fetch(),
+                subClient ? () => (subClient as any).messaging.v1.services(mgSid).fetch() : null,
+            );
+            report.resources.messagingService = {
+                sid: mgSid,
+                account: mgResult.account,
+                friendlyName: mgResult.data?.friendlyName,
+                note: mgResult.account === 'sub' ? '✅ Correct' : mgResult.account === 'master' ? '❌ On master account — needs to move to sub-account' : '⚠ Not found',
+            };
+
+            // Repair: delete messaging service from wrong account
+            if (repair && mgResult.account === 'master') {
+                try {
+                    await (masterClient as any).messaging.v1.services(mgSid).remove();
+                    report.resources.messagingService.repaired = '🔧 Deleted from master account';
+                    log.info(`[diagnoseRepair] Deleted MG ${mgSid} from master for ${churchId}`, 'system', { churchId }, churchId);
+                } catch (delErr: any) {
+                    report.resources.messagingService.repairError = `Could not delete: ${delErr.message}`;
+                }
+            }
+        } else {
+            report.resources.messagingService = { sid: null, account: 'not_found', note: '⚠ No Messaging Service SID on file' };
+        }
+
+        // ── 4. A2P Campaign (UsAppToPerson) ───────────────────────────────────
+        const campaignSid = sms.twilioUsAppToPersonSid as string | undefined;
+        if (campaignSid && mgSid) {
+            const campaignResult = await locateResource(
+                campaignSid,
+                async () => {
+                    // Campaign SID is looked up under its messaging service
+                    return await (masterClient as any).messaging.v1.services(mgSid).usAppToPerson(campaignSid).fetch();
+                },
+                subClient ? async () => {
+                    const subMgSid = report.resources.messagingService?.account === 'sub' ? mgSid : null;
+                    if (!subMgSid) throw new Error('MG not on sub-account');
+                    return await (subClient as any).messaging.v1.services(subMgSid).usAppToPerson(campaignSid).fetch();
+                } : null,
+            );
+            report.resources.campaign = {
+                sid: campaignSid,
+                account: campaignResult.account,
+                status: campaignResult.data?.campaignStatus,
+                note: campaignResult.account === 'sub' ? '✅ Correct' : campaignResult.account === 'master' ? '❌ On master account — needs to move to sub-account' : '⚠ Not found',
+            };
+
+            // Repair: delete campaign from wrong account
+            if (repair && campaignResult.account === 'master') {
+                try {
+                    await (masterClient as any).messaging.v1.services(mgSid).usAppToPerson(campaignSid).remove();
+                    report.resources.campaign.repaired = '🔧 Deleted from master account';
+                    log.info(`[diagnoseRepair] Deleted campaign ${campaignSid} from master for ${churchId}`, 'system', { churchId }, churchId);
+                } catch (delErr: any) {
+                    report.resources.campaign.repairError = `Could not delete: ${delErr.message}`;
+                }
+            }
+        } else {
+            report.resources.campaign = { sid: null, account: 'not_found', note: '⚠ No Campaign SID on file' };
+        }
+
+        // ── Repair: clear Firestore fields for resources deleted/invalid ───────
+        if (repair) {
+            const clearFields: Record<string, any> = {};
+
+            const mgOnMaster = report.resources.messagingService?.account === 'master';
+            const campaignOnMaster = report.resources.campaign?.account === 'master';
+            const brandOnMaster = report.resources.brandRegistration?.account === 'master';
+
+            if (mgOnMaster) {
+                clearFields['smsSettings.twilioMessagingServiceSid'] = null;
+                clearFields['smsSettings.twilioNumbersLinked'] = null;
+                clearFields['smsSettings.twilioNumbersLinkedAt'] = null;
+            }
+            if (campaignOnMaster) {
+                clearFields['smsSettings.twilioUsAppToPersonSid'] = null;
+                clearFields['smsSettings.twilioA2pCampaignStatus'] = null;
+                clearFields['smsSettings.a2pCampaignSubmittedAt'] = null;
+            }
+            // Brand cannot be auto-deleted — but if user explicitly wants to clear the Firestore pointer
+            // (after manually handling it with Twilio Support), they can use the brand reset endpoint.
+            // We do NOT auto-clear the brand SID here since the SID itself is useful for Support reference.
+
+            if (Object.keys(clearFields).length > 0) {
+                await db.collection('churches').doc(churchId).update(clearFields);
+                report.firestore = {
+                    cleared: Object.keys(clearFields),
+                    note: 'Firestore fields cleared. Re-run the pipeline steps that were on the wrong account.',
+                };
+            } else {
+                report.firestore = { cleared: [], note: 'Nothing needed clearing.' };
+            }
+
+            // Summarize what still needs manual action
+            if (brandOnMaster) {
+                report.manualActionRequired = {
+                    brandRegistration: brandSid,
+                    instructions: [
+                        '1. Contact Twilio Support and ask them to delete or cancel brand registration ' + brandSid,
+                        '2. Once confirmed deleted, clear "twilioBrandSid" from Firestore for church ' + churchId,
+                        '3. Re-run Step 4 (Brand Registration) from the admin panel — it will now correctly register on the sub-account ' + subAccountSid,
+                    ],
+                };
+            }
+        }
+
+        // ── Build action plan ─────────────────────────────────────────────────
+        const issues = Object.values(report.resources).filter((r: any) => r.account === 'master' || r.account === 'not_found');
+        report.status = issues.length === 0 ? '✅ All resources are on the correct sub-account' : `⚠ ${issues.length} issue(s) found`;
+        report.nextSteps = repair
+            ? 'Repair attempted. Check the report above for any manual actions still required.'
+            : 'Run again with { repair: true } to auto-delete misplaced Messaging Service and Campaign, and clear Firestore fields.';
+
+        log.info(`[diagnoseRepair] Diagnosis complete for ${churchId}: ${report.status}`, 'system', { churchId, repair }, churchId);
+
+        return res.json({ success: true, report });
+
+    } catch (e: any) {
+        log.error(`[diagnoseRepair] Failed for ${churchId}: ${e.message}`, 'system', { churchId }, churchId);
+        return res.status(500).json({ error: e.message || 'Diagnosis failed' });
     }
 };
