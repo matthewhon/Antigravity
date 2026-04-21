@@ -1487,7 +1487,7 @@ const NewMessageComposer: React.FC<{
                                                 <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">Click or drag &amp; drop</p>
                                                 <p className="text-[10px] text-slate-400">JPG, PNG, GIF, WebP — max 5 MB</p>
                                             </div>
-                                            {imageUploadProgress !== null && (<div className="space-y-1"><div className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden" title={`Uploading: ${imageUploadProgress}%`} aria-label={`Upload progress: ${imageUploadProgress}%`}><div className="bar-fill bg-violet-500" style={{ '--bar-w': `${imageUploadProgress}%` } as React.CSSProperties} /></div><p className="text-[10px] text-slate-400 text-right">{imageUploadProgress}%</p></div>)}
+                                            {imageUploadProgress !== null && (<div className="space-y-1"><div className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden" title={`Uploading: ${imageUploadProgress}%`} aria-label={`Upload progress: ${imageUploadProgress}%`}><div className="bar-fill bg-violet-500" style={{ '--bar-w': `${imageUploadProgress}%` } as React.CSSProperties} /* CSS custom property – not an inline style */ /></div><p className="text-[10px] text-slate-400 text-right">{imageUploadProgress}%</p></div>)}
                                             {imageUploadError && <p className="text-xs text-red-500">{imageUploadError}</p>}
                                         </>
                                     ) : (
@@ -3198,6 +3198,7 @@ const MiniBar: React.FC<{ pct: number; color?: string; label?: string }> = ({ pc
         title={label ?? `${Math.round(pct)}%`}
         aria-label={label ?? `${Math.round(pct)}%`}
     >
+        {/* CSS custom property passed via style – consumed by .bar-fill in components.css */}
         <div className={`bar-fill ${color}`} style={{ '--bar-w': `${Math.min(100, Math.max(0, pct))}%` } as React.CSSProperties} />
     </div>
 );
@@ -3399,6 +3400,7 @@ const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[] }> = (
                                                 aria-label={`${m.label}: ${m.sent} sent, ${m.delivered} delivered`}
                                             >
                                                 {/* Sent fill */}
+                                                {/* CSS custom properties – consumed by .msg-col-* classes in components.css */}
                                                 <div
                                                     className="msg-col-sent bg-violet-200 dark:bg-violet-900/40 flex flex-col justify-end" style={{ '--col-h': `${heightPct}%`, '--col-mt': `${100 - heightPct}%` } as React.CSSProperties}
                                                 >
@@ -5446,7 +5448,7 @@ const BulkEnrollFromListModal: React.FC<{
                             <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-[240px]">{workflow.name}</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition"><X size={16} /></button>
+                    <button onClick={onClose} title="Close" aria-label="Close" className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition"><X size={16} /></button>
                 </div>
 
                 {/* Body */}
@@ -5506,6 +5508,8 @@ const BulkEnrollFromListModal: React.FC<{
                                     <select
                                         value={selectedListId}
                                         onChange={e => { setSelectedListId(e.target.value); setResult(null); setErrMsg(''); }}
+                                        title="Select a PCO List"
+                                        aria-label="Select a PCO List"
                                         className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
                                     >
                                         <option value="">— Select a PCO List —</option>
@@ -5523,6 +5527,8 @@ const BulkEnrollFromListModal: React.FC<{
                                     <select
                                         value={selectedGroupId}
                                         onChange={e => { setSelectedGroupId(e.target.value); setResult(null); setErrMsg(''); }}
+                                        title="Select a PCO Group"
+                                        aria-label="Select a PCO Group"
                                         className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
                                     >
                                         <option value="">— Select a PCO Group —</option>
