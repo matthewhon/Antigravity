@@ -793,8 +793,8 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                                                     </div>
                                                     <div className="relative h-2.5 bg-slate-100 dark:bg-slate-700/60 rounded-full overflow-hidden">
                                                         <div
-                                                            className="h-full rounded-full transition-all duration-700"
-                                                            style={{ '--bar-w': `${barPct}%`, '--bar-color': f.color, '--bar-opacity': '0.85' } as React.CSSProperties} className="gv-bar-fill"
+                                                            className="gv-bar-fill"
+                                                            style={{ '--bar-w': `${barPct}%`, '--bar-color': f.color, '--bar-opacity': '0.85' } as React.CSSProperties}
                                                         />
                                                     </div>
                                                 </div>

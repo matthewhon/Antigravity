@@ -792,7 +792,6 @@ export const GivingView: React.FC<GivingViewProps> = ({
                               </div>
                               <div className="relative h-5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
                                   <div
-                                      className="h-full rounded-full transition-all duration-700"
                                       className="gv-gradient-bar" style={{ '--bar-w': `${totalPct}%`, '--bar-gradient': `linear-gradient(90deg, ${totalColor}, ${totalColor}cc)` } as React.CSSProperties}
                                   />
                                   {/* Expected pace marker */}
@@ -837,8 +836,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
                                               {/* Progress bar */}
                                               <div className="relative h-3 bg-slate-100 dark:bg-slate-700/60 rounded-full overflow-hidden">
                                                   <div
-                                                      className="h-full rounded-full transition-all duration-700"
-                                                      style={{ '--bar-w': `${pct}%`, '--bar-color': color, '--bar-opacity': '0.85' } as React.CSSProperties} className="gv-bar-fill"
+                                                      className="gv-bar-fill" style={{ '--bar-w': `${pct}%`, '--bar-color': color, '--bar-opacity': '0.85' } as React.CSSProperties}
                                                   />
                                                   {/* Expected pace marker */}
                                                   {fundExpectedPct > 0 && fundExpectedPct < 99 && (
@@ -1204,8 +1202,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
                                               </div>
                                               <div className="relative h-2 bg-slate-100 dark:bg-slate-700/60 rounded-full overflow-hidden">
                                                   <div
-                                                      className="h-full rounded-full transition-all duration-700"
-                                                      style={{ '--bar-w': `${pct}%`, '--bar-color': color, '--bar-opacity': '0.85' } as React.CSSProperties} className="gv-bar-fill"
+                                                      className="gv-bar-fill" style={{ '--bar-w': `${pct}%`, '--bar-color': color, '--bar-opacity': '0.85' } as React.CSSProperties}
                                                   />
                                               </div>
                                           </div>
@@ -1283,8 +1280,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
                                       return (
                                           <span
                                               key={row.label}
-                                              className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full"
-                                              style={{ '--bubble-bg': `${row.color}22`, color: row.color } as React.CSSProperties} className="msg-bubble-bg"
+                                              className="msg-bubble-bg inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full" style={{ '--bubble-bg': `${row.color}22`, color: row.color } as React.CSSProperties}
                                           >
                                               <span className="color-dot" style={{ '--dot-color': row.color } as React.CSSProperties} />
                                               {row.label} · {pct}%
@@ -1341,8 +1337,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
                                                   <div className="flex items-center gap-3 flex-shrink-0 ml-2">
                                                       <span className="text-xs font-black text-slate-800 dark:text-white">${row.amount.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
                                                       <span
-                                                          className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                                                          style={{ '--bubble-bg': `${row.color}22`, color: row.color } as React.CSSProperties} className="msg-bubble-bg"
+                                                          className="msg-bubble-bg text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ '--bubble-bg': `${row.color}22`, color: row.color } as React.CSSProperties}
                                                       >
                                                           {Math.round(pct)}%
                                                       </span>
@@ -1350,8 +1345,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
                                               </div>
                                               <div className="relative h-2.5 bg-slate-100 dark:bg-slate-700/60 rounded-full overflow-hidden">
                                                   <div
-                                                      className="h-full rounded-full transition-all duration-700"
-                                                      style={{ '--bar-w': `${pct}%`, '--bar-color': row.color, '--bar-opacity': '0.85' } as React.CSSProperties} className="gv-bar-fill"
+                                                      className="gv-bar-fill" style={{ '--bar-w': `${pct}%`, '--bar-color': row.color, '--bar-opacity': '0.85' } as React.CSSProperties}
                                                   />
                                               </div>
                                           </div>
@@ -1439,8 +1433,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
                               </div>
                               <div className="relative h-2 bg-slate-100 dark:bg-slate-700/60 rounded-full overflow-hidden">
                                 <div
-                                  className="h-full rounded-full transition-all duration-700"
-                                  style={{ '--bar-w': `${barPct}%`, '--bar-color': f.color, '--bar-opacity': '0.85' } as React.CSSProperties} className="gv-bar-fill"
+                                  className="gv-bar-fill" style={{ '--bar-w': `${barPct}%`, '--bar-color': f.color, '--bar-opacity': '0.85' } as React.CSSProperties}
                                 />
                               </div>
                             </div>
