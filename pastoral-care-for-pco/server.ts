@@ -486,6 +486,100 @@ Return ONLY the JSON object, no markdown, no explanation:`;
       }
     });
 
+    // GET /polls/:pollId/live-results — aggregated vote counts for the live projector (no auth)
+    app.get('/polls/:pollId/live-results', async (req: any, res: any) => {
+      const { pollId } = req.params;
+      try {
+        const db = getDb();
+        const pollDoc = await db.collection('polls').doc(pollId).get();
+        if (!pollDoc.exists) return res.status(404).json({ error: 'Poll not found' });
+        const poll = pollDoc.data()!;
+
+        // Fetch all responses
+        const responsesSnap = await db.collection('poll_responses').where('pollId', '==', pollId).get();
+        const responses = responsesSnap.docs.map((d: any) => d.data());
+
+        // Build per-question aggregated counts
+        const questionResults: Record<string, any> = {};
+        (poll.questions || []).forEach((q: any) => {
+          const qAnswers = responses.map((r: any) => r.answers?.[q.id]).filter(Boolean);
+          if (q.type === 'text') {
+            questionResults[q.id] = { type: 'text', count: qAnswers.length, answers: qAnswers.map(String).slice(0, 100) };
+          } else if (q.type === 'rating') {
+            const nums = qAnswers.map(Number).filter((n: number) => !isNaN(n));
+            const avg = nums.length > 0 ? (nums.reduce((s: number, n: number) => s + n, 0) / nums.length) : 0;
+            const dist: Record<number, number> = {};
+            for (let i = 1; i <= (q.ratingMax || 5); i++) dist[i] = 0;
+            nums.forEach((n: number) => { dist[n] = (dist[n] || 0) + 1; });
+            questionResults[q.id] = { type: 'rating', avg: Math.round(avg * 10) / 10, dist, count: nums.length, max: q.ratingMax || 5 };
+          } else {
+            const opts = q.type === 'yes_no' ? ['Yes', 'No'] : (q.options || []);
+            const counts: Record<string, number> = {};
+            opts.forEach((o: string) => (counts[o] = 0));
+            qAnswers.forEach((ans: any) => {
+              if (Array.isArray(ans)) ans.forEach((a: string) => { counts[a] = (counts[a] || 0) + 1; });
+              else { counts[String(ans)] = (counts[String(ans)] || 0) + 1; }
+            });
+            questionResults[q.id] = { type: q.type, options: opts, counts, total: qAnswers.length };
+          }
+        });
+
+        res.json({
+          id: pollDoc.id,
+          title: poll.title,
+          status: poll.status,
+          activeQuestionIndex: poll.activeQuestionIndex ?? 0,
+          totalResponses: poll.totalResponses || 0,
+          questions: poll.questions || [],
+          questionResults,
+        });
+      } catch (e: any) {
+        res.status(500).json({ error: e.message });
+      }
+    });
+
+    // PATCH /polls/:pollId/active-question — set which question is shown on the projector
+    app.patch('/polls/:pollId/active-question', express.json(), async (req: any, res: any) => {
+      const { pollId } = req.params;
+      const { activeQuestionIndex } = req.body || {};
+      if (typeof activeQuestionIndex !== 'number') {
+        return res.status(400).json({ error: 'Missing activeQuestionIndex' });
+      }
+      try {
+        const db = getDb();
+        await db.collection('polls').doc(pollId).update({ activeQuestionIndex, updatedAt: Date.now() });
+        res.json({ success: true, activeQuestionIndex });
+      } catch (e: any) {
+        res.status(500).json({ error: e.message });
+      }
+    });
+
+    // POST /polls/:pollId/close-question — close current active question and advance to next
+    app.post('/polls/:pollId/close-question', express.json(), async (req: any, res: any) => {
+      const { pollId } = req.params;
+      const { currentIndex } = req.body || {};
+      try {
+        const db = getDb();
+        const pollDoc = await db.collection('polls').doc(pollId).get();
+        if (!pollDoc.exists) return res.status(404).json({ error: 'Poll not found' });
+        const poll = pollDoc.data()!;
+        const total = (poll.questions || []).length;
+        const nextIndex = typeof currentIndex === 'number' ? currentIndex + 1 : 1;
+        const updates: any = { updatedAt: Date.now() };
+        if (nextIndex >= total) {
+          // All questions done — close the poll
+          updates.status = 'closed';
+          updates.activeQuestionIndex = total; // sentinel: past end
+        } else {
+          updates.activeQuestionIndex = nextIndex;
+        }
+        await db.collection('polls').doc(pollId).update(updates);
+        res.json({ success: true, nextIndex: updates.activeQuestionIndex, pollClosed: updates.status === 'closed' });
+      } catch (e: any) {
+        res.status(500).json({ error: e.message });
+      }
+    });
+
     // Schedule an email campaign
     app.post('/email/schedule', express.json(), async (req: any, res: any) => {
       const { campaignId, churchId, scheduledAt, recurringFrequency } = req.body || {};

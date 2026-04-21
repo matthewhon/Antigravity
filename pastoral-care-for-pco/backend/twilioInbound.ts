@@ -413,7 +413,23 @@ export const handleInboundSms = async (req: any, res: any) => {
         let keywordReplyMessage: string | null = null;
 
         if (kw) {
-            keywordReplyMessage = kw.replyMessage;
+            // Build the reply message, appending a poll link if configured
+            let baseReply = kw.replyMessage;
+            if ((kw as any).linkedPollId) {
+                // Determine the public base URL from system settings (or fall back to host header)
+                let pollBase = '';
+                try {
+                    const sysSnap = await db.collection('system').doc('settings').get();
+                    const sysData = sysSnap.data() || {};
+                    pollBase = sysData.appBaseUrl || sysData.apiBaseUrl || '';
+                    // Strip /api or trailing paths — we want the frontend origin
+                    pollBase = pollBase.replace(/\/api.*$/, '').replace(/\/$/, '');
+                } catch { /* ignore */ }
+                if (!pollBase) pollBase = 'https://pastoralcare.barnabassoftware.com';
+                const pollLink = `${pollBase}/poll/${(kw as any).linkedPollId}`;
+                baseReply = `${baseReply}\n${pollLink}`;
+            }
+            keywordReplyMessage = baseReply;
 
             // Increment keyword match count
             await db.collection('smsKeywords').doc(kw.id).update({
@@ -569,12 +585,82 @@ export const handleInboundSms = async (req: any, res: any) => {
                 });
         }
 
-        // Build TwiML — keyword reply first, then tag auto-replies, then prayer clarifying reply
+        // ─── 5c. SMS Poll Text-to-Vote ─────────────────────────────────────────
+        // If no keyword matched and body is a single digit 1–9, check if this
+        // church has an active poll with smsVotingEnabled. If so, record the vote.
+        let pollVoteReplyMessage: string | null = null;
+
+        try {
+            const trimmedBody = body.trim();
+            const voteNumber = /^[1-9]$/.test(trimmedBody) ? parseInt(trimmedBody, 10) : null;
+
+            if (!kw && !prayerClarifyingReplyMessage && voteNumber !== null) {
+                // Find any active poll for this church with smsVotingEnabled
+                const pollSnap = await db.collection('polls')
+                    .where('churchId', '==', churchId)
+                    .where('status', '==', 'active')
+                    .where('smsVotingEnabled', '==', true)
+                    .limit(1)
+                    .get();
+
+                if (!pollSnap.empty) {
+                    const pollDoc = pollSnap.docs[0];
+                    const poll = pollDoc.data();
+                    const questions: any[] = poll.questions || [];
+
+                    // Find the currently active question (choice-based)
+                    const activeIdx = poll.activeQuestionIndex ?? 0;
+                    const activeQuestion = questions[activeIdx];
+
+                    if (activeQuestion && (activeQuestion.type === 'single_choice' || activeQuestion.type === 'multiple_choice' || activeQuestion.type === 'yes_no')) {
+                        const opts = activeQuestion.type === 'yes_no' ? ['Yes', 'No'] : (activeQuestion.options || []);
+                        const chosenOption = opts[voteNumber - 1];
+
+                        if (chosenOption) {
+                            // Record the response
+                            const responseId = `resp_sms_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+                            const answerMap: Record<string, any> = {};
+                            answerMap[activeQuestion.id] = chosenOption;
+                            await db.collection('poll_responses').doc(responseId).set({
+                                id: responseId,
+                                pollId: pollDoc.id,
+                                churchId,
+                                respondentName: null,
+                                respondentEmail: null,
+                                respondentPhone: from,
+                                answers: answerMap,
+                                submittedAt: Date.now(),
+                                sessionToken: `sms_${from}`,
+                                source: 'sms',
+                            });
+                            // Increment total responses
+                            await db.collection('polls').doc(pollDoc.id).update({
+                                totalResponses: (poll.totalResponses || 0) + 1,
+                                updatedAt: Date.now(),
+                            });
+                            pollVoteReplyMessage = `✓ Your vote for "${chosenOption}" has been recorded! Thank you.`;
+                            log.info(`[SMS Poll] Vote recorded: poll=${pollDoc.id} option=${chosenOption} from=${from}`, 'system', { churchId, pollId: pollDoc.id }, churchId);
+                        } else {
+                            // Out of range
+                            pollVoteReplyMessage = `Please reply with a number between 1 and ${opts.length} to vote.`;
+                        }
+                    }
+                }
+            }
+        } catch (pollVoteErr: any) {
+            log.warn(`[SMS Poll] Error during poll vote processing: ${pollVoteErr.message}`, 'system', { churchId }, churchId);
+        }
+
+        // Build TwiML — keyword reply first, then tag auto-replies, then prayer clarifying reply, then poll vote reply
+        // (prayer clarifying reply is mutually exclusive with keyword pipeline)
+
         // (prayer clarifying reply is mutually exclusive with keyword pipeline)
         const allReplies: string[] = [];
         if (keywordReplyMessage) allReplies.push(keywordReplyMessage);
         for (const r of tagAutoReplies) allReplies.push(r);
         if (prayerClarifyingReplyMessage) allReplies.push(prayerClarifyingReplyMessage);
+        if (pollVoteReplyMessage) allReplies.push(pollVoteReplyMessage);
+
 
         let twiml = '<Response></Response>';
         if (allReplies.length > 0) {

@@ -1629,9 +1629,14 @@ currentUser, onUpdateChurch, activePage, smsTab }) => {
       {/* ─── Polls Tab ────────────────────────────────────────────────── */}
       {effectiveTab === 'polls' && (
         <div className="flex-1 overflow-y-auto">
-          <PollsManager churchId={churchId} currentUserId={currentUserId || ''} />
+          <PollsManager
+            churchId={churchId}
+            currentUserId={currentUserId || ''}
+            churchSmsNumber={church?.smsSettings?.twilioPhoneNumber || undefined}
+          />
         </div>
       )}
+
 
       {/* ─── QR Codes Tab ─────────────────────────────────────────────── */}
       {effectiveTab === 'qrcodes' && (

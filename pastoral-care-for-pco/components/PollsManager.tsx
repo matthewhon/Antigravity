@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   BarChart2, Plus, Trash2, Eye, Pencil, Loader2, X, Copy, Check,
   ChevronDown, ChevronUp, CheckCircle, Circle, GripVertical, ToggleLeft,
-  ToggleRight, Link, ArrowLeft, Users, Clock, Star, AlignLeft, List
+  ToggleRight, Link, ArrowLeft, Users, Clock, Star, AlignLeft, List,
+  Tv2, MessageSquare, Smartphone, ExternalLink, Wifi
 } from 'lucide-react';
 import { firestore } from '../services/firestoreService';
 import { Poll, PollQuestion, PollQuestionType, PollResponse, PollStatus } from '../types';
@@ -35,6 +36,8 @@ const newPoll = (churchId: string, createdBy: string): Poll => ({
   createdAt: Date.now(),
   updatedAt: Date.now(),
   createdBy,
+  activeQuestionIndex: 0,
+  smsVotingEnabled: false,
 });
 
 const STATUS_MAP: Record<PollStatus, { label: string; color: string }> = {
@@ -55,9 +58,13 @@ function getPollShareUrl(pollId: string): string {
   return `${window.location.origin}/poll/${pollId}`;
 }
 
+function getPollLiveUrl(pollId: string, admin = false): string {
+  return `${window.location.origin}/poll/${pollId}/live${admin ? '?admin=1' : ''}`;
+}
+
 // ─── CopyButton ─────────────────────────────────────────────────────────────
 
-const CopyButton: React.FC<{ text: string }> = ({ text }) => {
+const CopyButton: React.FC<{ text: string; label?: string }> = ({ text, label }) => {
   const [copied, setCopied] = useState(false);
   const handle = async () => {
     await navigator.clipboard.writeText(text);
@@ -68,9 +75,9 @@ const CopyButton: React.FC<{ text: string }> = ({ text }) => {
     <button
       onClick={handle}
       className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition"
-      title="Copy share link"
+      title="Copy link"
     >
-      {copied ? <><Check size={12} /> Copied</> : <><Copy size={12} /> Copy Link</>}
+      {copied ? <><Check size={12} /> Copied</> : <><Copy size={12} /> {label || 'Copy Link'}</>}
     </button>
   );
 };
@@ -80,20 +87,51 @@ const CopyButton: React.FC<{ text: string }> = ({ text }) => {
 const ResultsView: React.FC<{ poll: Poll; responses: PollResponse[]; onBack: () => void }> = ({
   poll, responses, onBack
 }) => {
+  const [activeQ, setActiveQ] = useState(0);
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center gap-3 px-6 py-4 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shrink-0">
         <button onClick={onBack} className="p-1.5 rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition">
           <ArrowLeft size={16} />
         </button>
-        <div>
+        <div className="flex-1">
           <div className="font-bold text-slate-900 dark:text-white">{poll.title}</div>
           <div className="text-xs text-slate-500 dark:text-slate-400">{responses.length} response{responses.length !== 1 ? 's' : ''}</div>
         </div>
+        {/* Live projector link */}
+        <a
+          href={getPollLiveUrl(poll.id, true)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-violet-600 hover:bg-violet-700 text-white transition"
+          title="Open Live Projector View"
+        >
+          <Tv2 size={12} /> Present Live
+        </a>
       </div>
 
+      {/* Question tabs */}
+      {poll.questions.length > 1 && (
+        <div className="flex gap-1 p-2 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700 overflow-x-auto shrink-0">
+          {poll.questions.map((q, i) => (
+            <button
+              key={q.id}
+              onClick={() => setActiveQ(i)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition ${
+                activeQ === i
+                  ? 'bg-violet-600 text-white'
+                  : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
+              }`}
+            >
+              Q{i + 1}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
-        {poll.questions.map(q => {
+        {poll.questions.filter((_, i) => poll.questions.length <= 1 || i === activeQ).map(q => {
           const qAnswers = responses
             .map(r => r.answers[q.id])
             .filter(Boolean);
@@ -121,7 +159,6 @@ const ResultsView: React.FC<{ poll: Poll; responses: PollResponse[]; onBack: () 
             const nums = qAnswers.map(a => Number(a)).filter(n => !isNaN(n));
             const avg = nums.length > 0 ? (nums.reduce((s, n) => s + n, 0) / nums.length).toFixed(1) : '—';
             const max = q.ratingMax || 5;
-            // Distribution
             const dist: Record<number, number> = {};
             for (let i = 1; i <= max; i++) dist[i] = 0;
             nums.forEach(n => { dist[n] = (dist[n] || 0) + 1; });
@@ -150,7 +187,6 @@ const ResultsView: React.FC<{ poll: Poll; responses: PollResponse[]; onBack: () 
             );
           }
 
-          // Choice-based (single, multiple, yes_no)
           const opts = q.type === 'yes_no' ? ['Yes', 'No'] : (q.options || []);
           const counts: Record<string, number> = {};
           opts.forEach(o => counts[o] = 0);
@@ -304,7 +340,7 @@ const QuestionEditor: React.FC<{
               <div className="space-y-2">
                 {(question.options || []).map((opt, i) => (
                   <div key={i} className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full border-2 border-slate-300 dark:border-slate-500 shrink-0" />
+                    <div className="w-5 h-5 shrink-0 flex items-center justify-center text-slate-400 text-xs font-bold">{i + 1}</div>
                     <input
                       type="text"
                       className="flex-1 text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-1.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -316,12 +352,14 @@ const QuestionEditor: React.FC<{
                     </button>
                   </div>
                 ))}
-                <button
-                  onClick={addOption}
-                  className="flex items-center gap-1.5 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 transition mt-1"
-                >
-                  <Plus size={12} /> Add option
-                </button>
+                {(question.options || []).length < 10 && (
+                  <button
+                    onClick={addOption}
+                    className="flex items-center gap-1.5 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 transition mt-1"
+                  >
+                    <Plus size={12} /> Add option
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -352,7 +390,8 @@ const PollEditor: React.FC<{
   onBack: () => void;
   onSave: (poll: Poll) => void;
   isSaving: boolean;
-}> = ({ poll: initialPoll, onBack, onSave, isSaving }) => {
+  churchSmsNumber?: string;
+}> = ({ poll: initialPoll, onBack, onSave, isSaving, churchSmsNumber }) => {
   const [poll, setPoll] = useState<Poll>(initialPoll);
 
   const update = (patch: Partial<Poll>) => setPoll(p => ({ ...p, ...patch, updatedAt: Date.now() }));
@@ -387,6 +426,9 @@ const PollEditor: React.FC<{
     </div>
   );
 
+  // First choice-based question for SMS voting
+  const firstChoiceQ = poll.questions.find(q => q.type === 'single_choice' || q.type === 'multiple_choice' || q.type === 'yes_no');
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -401,6 +443,17 @@ const PollEditor: React.FC<{
           </span>
         </div>
         <div className="flex items-center gap-2">
+          {/* Present Live button */}
+          {poll.id && (
+            <a
+              href={getPollLiveUrl(poll.id, true)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-violet-100 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 hover:bg-violet-200 dark:hover:bg-violet-900/40 rounded-xl transition"
+            >
+              <Tv2 size={13} /> Present Live
+            </a>
+          )}
           {/* Status toggle */}
           <select
             className="text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -473,7 +526,7 @@ const PollEditor: React.FC<{
         </div>
 
         {/* Right: Settings */}
-        <div className="w-72 shrink-0 border-l border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 overflow-y-auto p-5 space-y-4">
+        <div className="w-72 shrink-0 border-l border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 overflow-y-auto p-5 space-y-5">
           <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Poll Settings</h3>
 
           <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 divide-y divide-slate-100 dark:divide-slate-700/50 px-4">
@@ -510,20 +563,107 @@ const PollEditor: React.FC<{
             />
           </div>
 
-          {/* Share Link */}
-          {initialPoll.status !== 'draft' || true ? (
-            <div>
-              <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5 flex items-center gap-1.5">
-                <Link size={12} /> Share Link
-              </label>
-              <div className="flex flex-col gap-2">
-                <div className="text-xs font-mono text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 rounded-lg px-3 py-2 break-all">
-                  {getPollShareUrl(poll.id)}
-                </div>
-                <CopyButton text={getPollShareUrl(poll.id)} />
-              </div>
+          {/* ─── SMS Voting ─── */}
+          <div>
+            <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-3 flex items-center gap-1.5">
+              <MessageSquare size={11} /> SMS Text-to-Vote
+            </h3>
+            <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 space-y-3">
+              <Toggle
+                label="Enable SMS Voting"
+                value={!!poll.smsVotingEnabled}
+                onChange={v => update({ smsVotingEnabled: v })}
+                description="Let people text a number to vote"
+              />
+
+              {poll.smsVotingEnabled && (
+                <>
+                  {/* Keyword */}
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Activation Keyword (optional)</label>
+                    <input
+                      type="text"
+                      className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 uppercase"
+                      placeholder="e.g. VOTE"
+                      value={poll.smsVoteKeyword || ''}
+                      onChange={e => update({ smsVoteKeyword: e.target.value.toUpperCase().replace(/\s+/g, '') })}
+                    />
+                    <p className="text-xs text-slate-400 mt-1">Text this keyword to your number to receive the poll prompt</p>
+                  </div>
+
+                  {/* Phone number display */}
+                  {churchSmsNumber && (
+                    <div className="bg-slate-50 dark:bg-slate-700/50 rounded-xl px-3 py-3 space-y-2">
+                      <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                        <Smartphone size={12} /> Text votes to:
+                        <span className="font-mono">{churchSmsNumber}</span>
+                      </div>
+                      {firstChoiceQ && (
+                        <div className="space-y-1">
+                          {(firstChoiceQ.type === 'yes_no' ? ['Yes', 'No'] : (firstChoiceQ.options || [])).slice(0, 10).map((opt, i) => (
+                            <div key={i} className="text-xs text-slate-500 dark:text-slate-400">
+                              Text <span className="font-bold text-indigo-600 dark:text-indigo-400">{i + 1}</span> for {opt}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {!firstChoiceQ && (
+                        <p className="text-xs text-amber-600 dark:text-amber-400">
+                          Add a choice question above to enable numbered voting
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  {!churchSmsNumber && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                      <Wifi size={11} /> SMS not configured — provision a Twilio number first
+                    </p>
+                  )}
+                </>
+              )}
             </div>
-          ) : null}
+          </div>
+
+          {/* ─── Live Projector ─── */}
+          <div>
+            <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-3 flex items-center gap-1.5">
+              <Tv2 size={11} /> Live Display
+            </h3>
+            <div className="space-y-2">
+              <a
+                href={getPollLiveUrl(poll.id, true)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 w-full px-3 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold rounded-xl transition"
+              >
+                <Tv2 size={13} /> Open Projector View (Admin)
+                <ExternalLink size={11} className="ml-auto" />
+              </a>
+              <a
+                href={getPollLiveUrl(poll.id)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 w-full px-3 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 text-xs font-medium rounded-xl transition"
+              >
+                <Eye size={12} /> Audience Display (no controls)
+                <ExternalLink size={11} className="ml-auto" />
+              </a>
+              <CopyButton text={getPollLiveUrl(poll.id)} label="Copy Display URL" />
+            </div>
+          </div>
+
+          {/* Share Link */}
+          <div>
+            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5 flex items-center gap-1.5">
+              <Link size={12} /> Share Link
+            </label>
+            <div className="flex flex-col gap-2">
+              <div className="text-xs font-mono text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 rounded-lg px-3 py-2 break-all">
+                {getPollShareUrl(poll.id)}
+              </div>
+              <CopyButton text={getPollShareUrl(poll.id)} />
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -625,10 +765,24 @@ const PollListView: React.FC<{
                     <span className="flex items-center gap-1"><Users size={10} /> {p.totalResponses} response{p.totalResponses !== 1 ? 's' : ''}</span>
                     <span>·</span>
                     <span>{new Date(p.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                    {p.smsVotingEnabled && (
+                      <><span>·</span><span className="flex items-center gap-0.5 text-violet-500"><MessageSquare size={10} /> SMS</span></>
+                    )}
                   </div>
                 </div>
                 <span className={`text-xs font-semibold px-2.5 py-1 rounded-full shrink-0 ${st.color}`}>{st.label}</span>
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition shrink-0">
+                  {/* Present Live */}
+                  <a
+                    href={getPollLiveUrl(p.id, true)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={e => e.stopPropagation()}
+                    className="p-1.5 text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                    title="Present Live"
+                  >
+                    <Tv2 size={14} />
+                  </a>
                   <button
                     onClick={e => { e.stopPropagation(); onResults(p); }}
                     className="p-1.5 text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition"
@@ -666,11 +820,12 @@ const PollListView: React.FC<{
 interface PollsManagerProps {
   churchId: string;
   currentUserId: string;
+  churchSmsNumber?: string;
 }
 
 type ManagerView = 'list' | 'editor' | 'results';
 
-export const PollsManager: React.FC<PollsManagerProps> = ({ churchId, currentUserId }) => {
+export const PollsManager: React.FC<PollsManagerProps> = ({ churchId, currentUserId, churchSmsNumber }) => {
   const [polls, setPolls] = useState<Poll[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [view, setView] = useState<ManagerView>('list');
@@ -760,6 +915,7 @@ export const PollsManager: React.FC<PollsManagerProps> = ({ churchId, currentUse
           onBack={() => setView('list')}
           onSave={handleSave}
           isSaving={isSaving}
+          churchSmsNumber={churchSmsNumber}
         />
       )}
 

@@ -734,7 +734,7 @@ export interface PollQuestion {
     type: PollQuestionType;
     text: string;
     required: boolean;
-    /** Answer choices � used for single_choice and multiple_choice */
+    /** Answer choices  used for single_choice and multiple_choice */
     options?: string[];
     /** Maximum value for rating questions (e.g. 5 or 10) */
     ratingMax?: number;
@@ -761,11 +761,34 @@ export interface Poll {
     showResultsToRespondents: boolean;
     /** Optional epoch ms timestamp at which the poll auto-closes */
     closesAt?: number | null;
-    /** Denormalized total response count � incremented on each submission */
+    /** Denormalized total response count  incremented on each submission */
     totalResponses: number;
     createdAt: number;
     updatedAt: number;
     createdBy: string;
+
+    // ─── Live Projector Display ─────────────────────────────────────────────
+    /**
+     * Index (0-based) of the question currently displayed on the live projector.
+     * Admin can advance this via the projector control overlay.
+     * A value of -1 hides all questions (e.g. title screen or end screen).
+     */
+    activeQuestionIndex?: number;
+
+    // ─── SMS Text-to-Vote ──────────────────────────────────────────────────
+    /** When true, respondents can text a number (1, 2, 3…) to vote on the first choice question */
+    smsVotingEnabled?: boolean;
+    /**
+     * Optional SMS keyword to activate this poll's text-to-vote mode.
+     * When someone texts this keyword, they receive a numbered prompt.
+     * Must be uppercase with no spaces (e.g. "VOTE", "SURVEY").
+     */
+    smsVoteKeyword?: string;
+    /**
+     * The Twilio E.164 phone number displayed for SMS text-to-vote.
+     * Populated from the church's smsSettings when smsVotingEnabled is turned on.
+     */
+    smsVoteNumber?: string;
 }
 
 export interface PollResponse {
@@ -1089,6 +1112,13 @@ export interface SmsKeyword {
      * Empty / absent = applies to all numbers for the church.
      */
     numberIds?: string[];
+    /**
+     * Optional: link this keyword to a Poll.
+     * When matched, the poll share URL is automatically appended to replyMessage.
+     * Stored as the Poll document ID.
+     */
+    linkedPollId?: string | null;
+    linkedPollTitle?: string | null;
     isActive: boolean;
     matchCount: number;
     createdAt: number;

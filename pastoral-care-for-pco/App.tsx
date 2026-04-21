@@ -21,6 +21,7 @@ import { MetricsView } from './components/MetricsView';
 import LibraryView from './components/LibraryView';
 import WelcomeLayoutModal from './components/WelcomeLayoutModal';
 import { PublicPollView } from './components/PublicPollView';
+import { PollProjectorView } from './components/PollProjectorView';
 import { PublicNoteView } from './components/PublicNoteView';
 import { ToolsView } from './components/ToolsView';
 import { SmsWorkflowsManager } from './components/MessagingModule';
@@ -837,9 +838,13 @@ const App: React.FC = () => {
 
   // --- Render ---
 
-  // ── Public Poll Route (no auth required) ──────────────────────────────────
+  // ── Public Poll Route (no auth required) ───────────────────────────────────
   const pollMatch = window.location.pathname.match(/^\/poll\/([^/]+)/);
   if (pollMatch) {
+    // Sub-path: /poll/:id/live — Live Projector Display
+    if (window.location.pathname.includes('/live')) {
+      return <PollProjectorView pollId={pollMatch[1]} />;
+    }
     return <PublicPollView pollId={pollMatch[1]} />;
   }
 

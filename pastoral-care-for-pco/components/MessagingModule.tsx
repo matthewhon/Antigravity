@@ -8,6 +8,7 @@ import {
     Timestamp, collectionGroup, arrayUnion, arrayRemove
 } from 'firebase/firestore';
 import { pcoService } from '../services/pcoService';
+import { firestore } from '../services/firestoreService';
 import { SmsCampaign, SmsConversation, SmsMessage, SmsKeyword, SmsOptOut, SmsWorkflow, SmsWorkflowStep, SmsWorkflowEnrollment, SmsTag, Church, User, WorkflowChannelType, WorkflowNode, WorkflowActionNode, WorkflowDelayNode, WorkflowBranchNode, WorkflowBranchConditionType, TwilioPhoneNumber, SmsAgentKnowledge, SmsAiSuggestion } from '../types';
 import {
     MessageSquare, Send, Clock, Users, Plus, ArrowLeft, Trash2,
@@ -16,7 +17,7 @@ import {
     Inbox, BarChart3, Copy, Zap, MessageCircle, TrendingUp, TrendingDown,
     Activity, DollarSign, UserX, Edit3, UserCheck, List, Layers,
     Smile, Image as ImageIcon, Link, Sparkles, ChevronRight, RotateCcw,
-    Mail, Tag, Filter, Hash, Upload, ExternalLink, GitBranch, Info, ShieldCheck, Globe2, PlusCircle, Lock, Unlock, ListPlus
+    Mail, Tag, Filter, Hash, Upload, ExternalLink, GitBranch, Info, ShieldCheck, Globe2, PlusCircle, Lock, Unlock, ListPlus, Tv2
 } from 'lucide-react';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -2214,18 +2215,20 @@ interface KeywordModalProps {
     pcoLists: { id: string; name: string; total_people: number }[];
     loadingLists: boolean;
     tags: SmsTag[];
+    polls: { id: string; title: string }[];
     onSave: (kw: Omit<SmsKeyword, 'id' | 'matchCount' | 'createdAt'>) => Promise<void>;
     onClose: () => void;
     isBusy: boolean;
     saveError?: string;
 }
 
-const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingLists, tags, onSave, onClose, isBusy, saveError }) => {
+const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingLists, tags, polls, onSave, onClose, isBusy, saveError }) => {
     const [keyword, setKeyword]           = useState(initial?.keyword || '');
     const [replyMessage, setReplyMessage] = useState(initial?.replyMessage || '');
     const [addToListId, setAddToListId]   = useState(initial?.addToListId || '');
     const [isActive, setIsActive]         = useState(initial?.isActive ?? true);
     const [autoTagIds, setAutoTagIds]     = useState<string[]>(initial?.autoTagIds || []);
+    const [linkedPollId, setLinkedPollId] = useState(initial?.linkedPollId || '');
     const [error, setError]               = useState('');
 
     const segs    = countSegments(replyMessage);
@@ -2238,6 +2241,7 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingL
         if (!/^[A-Z0-9]+$/.test(kw)) { setError('Keywords can only contain letters and numbers.'); return; }
         setError('');
         const selectedList = pcoLists.find(l => l.id === addToListId);
+        const selectedPoll = polls.find(p => p.id === linkedPollId);
         await onSave({
             churchId:      initial?.churchId || '',   // parent will fill in
             keyword:       kw,
@@ -2245,6 +2249,8 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingL
             addToListId:   addToListId || null,
             addToListName: selectedList?.name || null,
             autoTagIds:    autoTagIds.length > 0 ? autoTagIds : [],
+            linkedPollId:  linkedPollId || null,
+            linkedPollTitle: selectedPoll?.title || null,
             isActive,
         });
     };
@@ -2350,6 +2356,28 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingL
                     </div>
                 )}
 
+                {/* Link to Poll (Phase 3) */}
+                {polls.length > 0 && (
+                    <div className="mb-4">
+                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Link to Poll (optional)</label>
+                        <p className="text-[10px] text-slate-400 mb-2">When this keyword matches, the poll participation link is automatically appended to the auto-reply message.</p>
+                        <select
+                            value={linkedPollId}
+                            onChange={e => setLinkedPollId(e.target.value)}
+                            className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                        >
+                            <option value="">— Don't link a poll —</option>
+                            {polls.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
+                        </select>
+                        {linkedPollId && (
+                            <p className="text-[10px] text-violet-600 dark:text-violet-400 mt-1 flex items-center gap-1">
+                                <Tv2 size={10} />
+                                Poll link will be appended: {window.location.origin}/poll/{linkedPollId}
+                            </p>
+                        )}
+                    </div>
+                )}
+
                 {/* Active toggle */}
                 <div className="flex items-center justify-between mb-5 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">
                     <div>
@@ -2414,6 +2442,15 @@ const SmsKeywordsManager: React.FC<{
     const [tagAutoReply, setTagAutoReply]        = useState('');
     const [tagBusy, setTagBusy]                 = useState(false);
     const [activeSection, setActiveSection]     = useState<'keywords' | 'tags'>('keywords');
+
+    // Polls — for the "Link to Poll" picker inside the keyword modal
+    const [polls, setPolls] = useState<{ id: string; title: string }[]>([]);
+    useEffect(() => {
+        firestore.getPolls(churchId)
+            .then(ps => setPolls(ps.filter(p => p.status !== 'closed').map(p => ({ id: p.id, title: p.title }))))
+            .catch(() => {});
+    }, [churchId]);
+
 
     // Real-time keyword listener
     useEffect(() => {
@@ -2661,6 +2698,11 @@ const SmsKeywordsManager: React.FC<{
                                     {kw.addToListName && (
                                         <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1">
                                             <Users size={10} /> → {kw.addToListName}
+                                        </span>
+                                    )}
+                                    {kw.linkedPollTitle && (
+                                        <span className="text-[10px] text-violet-600 dark:text-violet-400 font-semibold flex items-center gap-1">
+                                            <Tv2 size={10} /> Poll: {kw.linkedPollTitle}
                                         </span>
                                     )}
                                     {kwTags.map(t => (
@@ -3029,6 +3071,7 @@ const SmsKeywordsManager: React.FC<{
                     pcoLists={pcoLists}
                     loadingLists={loadingLists}
                     tags={tags}
+                    polls={polls}
                     onSave={handleSave}
                     onClose={() => { setModalOpen(false); setEditKw(null); setSaveError(null); }}
                     isBusy={isBusy}
