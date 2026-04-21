@@ -330,6 +330,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   const [isRegisteringCampaign, setIsRegisteringCampaign]   = useState(false);
   const [isAssigningNumbers, setIsAssigningNumbers]         = useState(false);
   const [isCheckingCampaign, setIsCheckingCampaign]         = useState(false);
+  const [isLookingUpSids, setIsLookingUpSids]               = useState(false);
 
   // Phone Numbers panel state (SMS → Numbers tab)
   const [twilioNumbers, setTwilioNumbers] = useState<any[]>([]);
@@ -2181,6 +2182,9 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
             };
 
             // ── Submit A2P registration to Twilio (saves first, then submits) ──
+            // NOTE: This is the OLD "Re-Submit" path shown inside Step 3 profile section
+            // (for users who already have a profile SID from Twilio Console).
+            // The new pipeline uses handleRegisterBrand (Step 4) instead.
             const handleSubmitToTwilio = async () => {
                 if (!onUpdateChurch) return;
                 setIsA2pSubmitting(true);
@@ -2188,8 +2192,8 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                 try {
                     // Save form data to Firestore first so the backend reads fresh fields
                     await onUpdateChurch({ smsSettings: smsForm });
-                    // Then call the A2P register endpoint
-                    const res = await fetch('/api/messaging/a2p-register', {
+                    // Call the canonical brand registration endpoint
+                    const res = await fetch('/api/messaging/register-brand', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ churchId }),
@@ -2201,10 +2205,9 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                         return;
                     }
                     if (data.brandSid) {
-                        setSmsForm(prev => ({ ...prev, twilioBrandSid: data.brandSid, twilioA2pStatus: 'pending' }));
+                        setSmsForm(prev => ({ ...prev, twilioBrandSid: data.brandSid, twilioA2pStatus: data.status || 'pending' }));
                     }
-                    // Detect the "needs Customer Profile Bundle" path
-                    const needsBundle = !data.success && data.status === 'pending' && !data.brandSid;
+                    const needsBundle = !data.success && !data.brandSid;
                     setA2pResult({
                         success: data.success,
                         message: data.message || (data.error || 'Unknown response'),
@@ -2354,6 +2357,39 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                 }
             };
 
+            // ── Auto-discover Customer Profile SID from brand or TrustHub list ──
+            const handleLookupProfileSids = async () => {
+                setIsLookingUpSids(true);
+                setA2pResult(null);
+                try {
+                    const res  = await fetch(`/api/messaging/lookup-profile-sids?churchId=${encodeURIComponent(churchId)}`);
+                    const data = await res.json();
+                    if (data.success) {
+                        // Patch local form state with newly discovered SIDs
+                        const patch: any = {};
+                        if (data.discovered?.twilioCustomerProfileSid)
+                            patch.twilioCustomerProfileSid = data.discovered.twilioCustomerProfileSid;
+                        if (data.discovered?.twilioA2pProfileSid)
+                            patch.twilioA2pProfileSid = data.discovered.twilioA2pProfileSid;
+                        if (Object.keys(patch).length) setSmsForm(prev => ({ ...prev, ...patch }));
+                        setA2pResult({ success: true, message: data.message || 'SID lookup complete.' });
+                    } else if (data.allProfiles?.length) {
+                        // Ambiguous — show the list for manual selection
+                        const names = data.allProfiles.map((p: any) => `${p.sid} (${p.friendlyName}, ${p.status})`).join('\n');
+                        setA2pResult({
+                            success: false,
+                            message: `${data.message}\n\nAvailable profiles:\n${names}`,
+                        });
+                    } else {
+                        setA2pResult({ success: false, message: data.message || data.error || 'Could not resolve SIDs.' });
+                    }
+                } catch (e: any) {
+                    setA2pResult({ success: false, message: e.message || 'Lookup failed' });
+                } finally {
+                    setIsLookingUpSids(false);
+                }
+            };
+
             // ── Step 4: Submit Brand Registration ────────────────────────────────
             const handleRegisterBrand = async () => {
                 setIsRegisteringBrand(true);
@@ -2490,6 +2526,17 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                     }`}>
                                         Eval: {evalStatus}
                                     </span>
+                                )}
+                                {/* Lookup SIDs — auto-discover BU... from brand or TrustHub */}
+                                {smsForm.twilioSubAccountSid && (
+                                    <button
+                                        onClick={handleLookupProfileSids}
+                                        disabled={isLookingUpSids}
+                                        title="Auto-discover Customer Profile SID from this sub-account's brand registration or TrustHub list"
+                                        className="text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border transition-all disabled:opacity-50 bg-violet-50 dark:bg-violet-900/20 text-violet-600 dark:text-violet-400 border-violet-200 dark:border-violet-800 hover:bg-violet-100 dark:hover:bg-violet-900/40"
+                                    >
+                                        {isLookingUpSids ? '⏳ Looking up…' : '🔍 Lookup SIDs'}
+                                    </button>
                                 )}
                                 {/* Refresh Profile Status — quick pull from Twilio */}
                                 {profileSid && (
@@ -3394,12 +3441,17 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
 
                             {/* ── Step 4: Brand Registration ─────────────────────────────── */}
                             {(() => {
-                                const brandStatus  = smsForm.twilioA2pStatus || 'not_started';
-                                const brandDone    = brandStatus === 'approved';
-                                const brandFailed  = brandStatus === 'failed';
-                                const brandReview  = brandStatus === 'in_review';
-                                const hasBrand     = !!smsForm.twilioBrandSid;
-                                const hasProfile   = !!smsForm.twilioCustomerProfileSid;
+                                const brandStatus    = smsForm.twilioA2pStatus || 'not_started';
+                                const brandDone      = brandStatus === 'approved';
+                                const brandFailed    = brandStatus === 'failed';
+                                const brandReview    = brandStatus === 'in_review';
+                                const hasBrand       = !!smsForm.twilioBrandSid;
+                                const hasProfile     = !!smsForm.twilioCustomerProfileSid;
+                                // Profile must be twilio-approved before brand registration can succeed
+                                const profileApproved = hasProfile && (
+                                    profileStatus === 'twilio-approved' ||
+                                    profileStatus === 'approved'
+                                );
                                 const rawStatus    = (smsForm as any).twilioA2pRawStatus as string | undefined;
                                 const lastChecked  = (smsForm as any).a2pLastStatusCheck as number | undefined;
                                 const s4Colors = brandDone   ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
@@ -3412,8 +3464,14 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                               : brandReview ? '🔍 In Review'
                                               : hasBrand    ? '⏳ Pending'
                                               :               '🔲 Not Started';
+                                // Explain what's blocking
+                                const blockReason = !hasProfile
+                                    ? 'Create a Customer Profile Bundle (Step 3) first.'
+                                    : !profileApproved
+                                    ? `Customer Profile must be Twilio-approved before brand registration. Current status: "${profileStatus || 'pending-review'}". Check back once Twilio approves it.`
+                                    : null;
                                 return (
-                                    <div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800">
+                                    <div className={`bg-white dark:bg-slate-900 p-8 rounded-[2rem] border transition-all ${!profileApproved && !brandDone ? 'opacity-60' : ''} border-slate-100 dark:border-slate-800`}>
                                         <div className="flex items-center justify-between gap-4 mb-4">
                                             <div className="flex items-center gap-3">
                                                 <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-sm ${brandDone ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' : 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'}`}>4</div>
@@ -3431,13 +3489,13 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                 {lastChecked && <span className="ml-3 text-slate-400">(checked {new Date(lastChecked).toLocaleTimeString()})</span>}
                                             </p>
                                         )}
-                                        {!hasProfile && (
-                                            <p className="text-[10px] text-amber-600 dark:text-amber-400 mb-4">⚠ Complete the Customer Profile Bundle (above) before submitting a brand.</p>
+                                        {blockReason && (
+                                            <p className="text-[10px] text-amber-600 dark:text-amber-400 mb-4">⚠ {blockReason}</p>
                                         )}
                                         <button
                                             id="btn-register-brand"
                                             onClick={handleRegisterBrand}
-                                            disabled={isRegisteringBrand || !hasProfile || brandDone}
+                                            disabled={isRegisteringBrand || !profileApproved || brandDone}
                                             className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30 whitespace-nowrap"
                                         >
                                             {isRegisteringBrand ? '📡 Submitting...' : hasBrand ? '🔄 Re-check Brand Status' : '🚀 Submit Brand to Twilio'}
@@ -3542,10 +3600,19 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
 
                             {/* ── Step 7: Link Phone Numbers to Service ───────────────────── */}
                             {(() => {
-                                const hasMgSvc  = !!smsForm.twilioMessagingServiceSid;
-                                const hasPhone  = !!(smsForm.twilioPhoneNumber || smsForm.twilioPhoneSid);
-                                const numLinked = !!(smsForm as any).twilioNumbersLinked;
-                                const canLink   = hasMgSvc && hasPhone;
+                                const hasMgSvc      = !!smsForm.twilioMessagingServiceSid;
+                                const hasPhone      = !!(smsForm.twilioPhoneNumber || smsForm.twilioPhoneSid);
+                                const hasCampaign   = !!(smsForm as any).twilioUsAppToPersonSid;
+                                const numLinked     = !!(smsForm as any).twilioNumbersLinked;
+                                // Require campaign to be registered before linking numbers
+                                const canLink       = hasMgSvc && hasPhone && hasCampaign;
+                                const blockReason7  = !hasMgSvc
+                                    ? 'Create the Messaging Service (Step 5) first.'
+                                    : !hasCampaign
+                                    ? 'Register the A2P Campaign (Step 6) before linking numbers.'
+                                    : !hasPhone
+                                    ? 'Provision a phone number first.'
+                                    : null;
                                 return (
                                     <div className={`bg-white dark:bg-slate-900 p-8 rounded-[2rem] border transition-all ${numLinked ? 'border-emerald-200 dark:border-emerald-800/50' : 'border-slate-100 dark:border-slate-800'} ${!canLink ? 'opacity-60' : ''}`}>
                                         <div className="flex items-center justify-between gap-4 mb-4">
@@ -3557,11 +3624,14 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                 </div>
                                             </div>
                                             <span className={`shrink-0 text-[10px] font-black px-3 py-1.5 rounded-full border ${numLinked ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700'}`}>
-                                                {numLinked ? '✅ Linked' : canLink ? '🔲 Not Linked' : '🔒 Waiting for Messaging Service'}
+                                                {numLinked ? '✅ Linked' : canLink ? '🔲 Ready to Link' : '🔒 Prerequisites Missing'}
                                             </span>
                                         </div>
                                         {smsForm.twilioPhoneNumber && (
-                                            <p className="text-[10px] font-mono text-slate-400 mb-4">Number: <strong className="text-slate-600 dark:text-slate-300">{smsForm.twilioPhoneNumber}</strong></p>
+                                            <p className="text-[10px] font-mono text-slate-400 mb-2">Number: <strong className="text-slate-600 dark:text-slate-300">{smsForm.twilioPhoneNumber}</strong></p>
+                                        )}
+                                        {blockReason7 && (
+                                            <p className="text-[10px] text-amber-600 dark:text-amber-400 mb-4">⚠ {blockReason7}</p>
                                         )}
                                         <button
                                             id="btn-assign-numbers"

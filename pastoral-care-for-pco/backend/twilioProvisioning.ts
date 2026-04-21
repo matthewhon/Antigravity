@@ -844,16 +844,25 @@ export const checkA2pStatus = async (req: any, res: any) => {
         let failureReason: string | null = null;
         let brandDetails: any = {};
 
+        // Also capture the associated SIDs from the brand object
+        let customerProfileBundleSidFromBrand: string | null = null;
+        let a2pProfileBundleSidFromBrand: string | null = null;
+
         try {
             const brandReg = await (master as any).messaging.v1.brandRegistrations(brandSid).fetch();
             twilioStatus   = (brandReg.status || 'pending').toLowerCase();
             failureReason  = brandReg.failureReason || null;
+            // Capture associated profile SIDs — Twilio returns these on the brand object
+            customerProfileBundleSidFromBrand = brandReg.customerProfileBundleSid || null;
+            a2pProfileBundleSidFromBrand      = brandReg.a2PProfileBundleSid      || null;
             brandDetails   = {
-                brandType:   brandReg.brandType,
-                identity:    brandReg.identity,
-                cspId:       brandReg.cspId,
-                dateCreated: brandReg.dateCreated,
-                dateUpdated: brandReg.dateUpdated,
+                brandType:               brandReg.brandType,
+                identity:                brandReg.identity,
+                cspId:                   brandReg.cspId,
+                dateCreated:             brandReg.dateCreated,
+                dateUpdated:             brandReg.dateUpdated,
+                customerProfileBundleSid: customerProfileBundleSidFromBrand,
+                a2PProfileBundleSid:      a2pProfileBundleSidFromBrand,
             };
         } catch (twErr: any) {
             log.warn(
@@ -885,6 +894,16 @@ export const checkA2pStatus = async (req: any, res: any) => {
             'smsSettings.a2pLastStatusCheck':    Date.now(),
         };
         if (failureReason) updates['smsSettings.a2pFailureReason'] = failureReason;
+        // Auto-save SIDs surfaced from the brand object if not already stored
+        const smsAtCheck = churchSnap.data()?.smsSettings || {};
+        if (customerProfileBundleSidFromBrand && !smsAtCheck.twilioCustomerProfileSid) {
+            updates['smsSettings.twilioCustomerProfileSid'] = customerProfileBundleSidFromBrand;
+            log.info(`[checkA2pStatus] Auto-saved customerProfileBundleSid ${customerProfileBundleSidFromBrand} from brand`, 'system', { churchId }, churchId);
+        }
+        if (a2pProfileBundleSidFromBrand && !smsAtCheck.twilioA2pProfileSid) {
+            updates['smsSettings.twilioA2pProfileSid'] = a2pProfileBundleSidFromBrand;
+            log.info(`[checkA2pStatus] Auto-saved a2PProfileBundleSid ${a2pProfileBundleSidFromBrand} from brand`, 'system', { churchId }, churchId);
+        }
 
         await db.collection('churches').doc(churchId).update(updates);
 
@@ -1511,9 +1530,13 @@ export const registerBrand = async (req: any, res: any) => {
             } catch (fetchErr: any) {
                 log.warn(`[registerBrand] Could not fetch existing brand: ${fetchErr.message}`, 'system', { churchId }, churchId);
             }
-            const mapped = twilioStatus === 'approved' ? 'approved'
-                         : twilioStatus === 'failed'   ? 'failed'
-                         : 'pending';
+            const mapped: 'approved' | 'failed' | 'in_review' | 'pending' =
+                twilioStatus === 'approved'       ? 'approved'
+              : twilioStatus === 'failed'         ? 'failed'
+              : twilioStatus === 'suspended'      ? 'failed'
+              : twilioStatus === 'in_review'      ? 'in_review'
+              : twilioStatus === 'pending_review' ? 'in_review'
+              : 'pending';
             await db.collection('churches').doc(churchId).update({
                 'smsSettings.twilioA2pStatus':    mapped,
                 'smsSettings.a2pLastStatusCheck': Date.now(),
@@ -1677,11 +1700,11 @@ function mapUseCase(category: string): string {
         '2fa':            '2FA',
         'charity':        'CHARITY',
         'emergency':      'EMERGENCY_ALERTS',
-        'religious':      'LOW_VOLUME',
-        'religion':       'LOW_VOLUME',
-        'non-profit':     'LOW_VOLUME',
-        'nonprofit':      'LOW_VOLUME',
-        'not_for_profit': 'LOW_VOLUME',
+        'religious':      'MIXED',
+        'religion':       'MIXED',
+        'non-profit':     'MIXED',
+        'nonprofit':      'MIXED',
+        'not_for_profit': 'MIXED',
     };
     const key = (category || 'LOW_VOLUME').toLowerCase().replace(/\s+/g, '_');
     return map[key] || 'LOW_VOLUME';
@@ -2051,5 +2074,148 @@ export const fetchA2pProfileSid = async (req: any, res: any) => {
     } catch (e: any) {
         log.error(`[fetchA2pProfileSid] ${e.message}`, 'system', {}, 'system');
         return res.status(500).json({ error: e.message || 'Failed to fetch A2P Profile Bundles' });
+    }
+};
+
+// ─── GET /api/messaging/lookup-profile-sids ──────────────────────────────────
+// Given a churchId, resolves the Customer Profile Bundle SID (BU...) for
+// that church's secondary profile by:
+//   1. Reading customerProfileBundleSid directly from the stored Brand Registration
+//   2. Falling back to listing TrustHub Customer Profiles and matching by name
+// Saves discovered SIDs back to Firestore so the admin doesn't need to find them manually.
+// Query: ?churchId=xxx
+export const lookupProfileSidsForChurch = async (req: any, res: any) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    const churchId = req.query.churchId as string;
+    if (!churchId) return res.status(400).json({ error: 'Missing churchId' });
+
+    const db  = getDb();
+    const log = createServerLogger(db);
+
+    try {
+        const churchSnap = await db.collection('churches').doc(churchId).get();
+        if (!churchSnap.exists) return res.status(404).json({ error: 'Church not found' });
+        const sms: any = (churchSnap.data() as any)?.smsSettings || {};
+
+        const { accountSid, authToken } = await getMasterCredentials(db);
+        const master = getMasterClient(accountSid, authToken);
+
+        const discovered: Record<string, string> = {};
+        const sources:    Record<string, string> = {};
+
+        // ── Strategy 1: Pull SIDs directly from the stored Brand Registration ──
+        if (sms.twilioBrandSid) {
+            try {
+                const brandReg = await (master as any).messaging.v1
+                    .brandRegistrations(sms.twilioBrandSid).fetch();
+                if (brandReg.customerProfileBundleSid) {
+                    discovered.twilioCustomerProfileSid = brandReg.customerProfileBundleSid;
+                    sources.twilioCustomerProfileSid    = `brand:${sms.twilioBrandSid}`;
+                }
+                if (brandReg.a2PProfileBundleSid) {
+                    discovered.twilioA2pProfileSid = brandReg.a2PProfileBundleSid;
+                    sources.twilioA2pProfileSid    = `brand:${sms.twilioBrandSid}`;
+                }
+                log.info(`[lookupProfileSids] Strategy 1 (brand fetch): found ${Object.keys(discovered).join(', ')}`, 'system', { churchId }, churchId);
+            } catch (brandErr: any) {
+                log.warn(`[lookupProfileSids] Brand fetch failed: ${brandErr.message}`, 'system', { churchId }, churchId);
+            }
+        }
+
+        // ── Strategy 2: List TrustHub Customer Profiles and match by name ──────
+        // Only runs if we still haven't found the Customer Profile SID
+        if (!discovered.twilioCustomerProfileSid) {
+            try {
+                const profiles: any[] = await (master as any).trusthub.v1.customerProfiles.list({ pageSize: 100 });
+                const businessName = (sms.a2pBusinessName || '').toLowerCase().trim();
+
+                // Match preference: exact friendlyName match → partial name match → sub-account SID in entities
+                const exactMatch   = businessName ? profiles.find((p: any) => (p.friendlyName || '').toLowerCase() === businessName) : null;
+                const partialMatch = businessName ? profiles.find((p: any) => (p.friendlyName || '').toLowerCase().includes(businessName)) : null;
+
+                const match = exactMatch || partialMatch;
+                if (match) {
+                    discovered.twilioCustomerProfileSid = match.sid;
+                    sources.twilioCustomerProfileSid    = `trusthub-list:friendlyName=${match.friendlyName}`;
+                    log.info(`[lookupProfileSids] Strategy 2 (name match): ${match.sid} (${match.friendlyName})`, 'system', { churchId }, churchId);
+                } else if (profiles.length > 0) {
+                    // Return the full list so the admin can pick manually
+                    return res.json({
+                        success:      false,
+                        discovered,
+                        sources,
+                        allProfiles:  profiles.map((p: any) => ({
+                            sid:          p.sid,
+                            friendlyName: p.friendlyName,
+                            status:       p.status,
+                        })),
+                        message: `Found ${profiles.length} Customer Profile(s) on this Twilio account but none matched "${sms.a2pBusinessName || '(no business name saved)'}". Select the correct one from allProfiles and save its SID manually.`,
+                    });
+                }
+            } catch (listErr: any) {
+                log.warn(`[lookupProfileSids] TrustHub list failed: ${listErr.message}`, 'system', { churchId }, churchId);
+            }
+        }
+
+        // ── Strategy 3: Use sub-account SID to fetch its own TrustHub profiles ─
+        // Twilio allows sub-accounts to have their own profiles — query with sub-account creds
+        if (!discovered.twilioCustomerProfileSid && sms.twilioSubAccountSid && sms.twilioSubAccountAuthToken) {
+            try {
+                const subClient = getMasterClient(sms.twilioSubAccountSid, sms.twilioSubAccountAuthToken);
+                const subProfiles: any[] = await (subClient as any).trusthub.v1.customerProfiles.list({ pageSize: 20 });
+                if (subProfiles.length > 0) {
+                    const best = subProfiles.find((p: any) => p.status === 'approved')
+                               || subProfiles.find((p: any) => p.status === 'twilio-approved')
+                               || subProfiles.find((p: any) => p.status === 'pending-review')
+                               || subProfiles[0];
+                    discovered.twilioCustomerProfileSid = best.sid;
+                    sources.twilioCustomerProfileSid    = `sub-account-trusthub:${sms.twilioSubAccountSid}`;
+                    log.info(`[lookupProfileSids] Strategy 3 (sub-account): ${best.sid}`, 'system', { churchId }, churchId);
+                }
+            } catch (subErr: any) {
+                log.warn(`[lookupProfileSids] Sub-account TrustHub lookup failed: ${subErr.message}`, 'system', { churchId }, churchId);
+            }
+        }
+
+        if (Object.keys(discovered).length === 0) {
+            return res.json({
+                success:   false,
+                discovered,
+                sources,
+                message:   'Could not automatically resolve any SIDs. Ensure the business name is saved and a Brand Registration or Customer Profile exists on this Twilio account.',
+            });
+        }
+
+        // ── Save discovered SIDs back to Firestore (only if not already set) ───
+        const firestoreUpdates: Record<string, any> = { 'smsSettings.a2pLastStatusCheck': Date.now() };
+        const savedSids: string[] = [];
+
+        if (discovered.twilioCustomerProfileSid && !sms.twilioCustomerProfileSid) {
+            firestoreUpdates['smsSettings.twilioCustomerProfileSid'] = discovered.twilioCustomerProfileSid;
+            savedSids.push(`Customer Profile SID: ${discovered.twilioCustomerProfileSid}`);
+        }
+        if (discovered.twilioA2pProfileSid && !sms.twilioA2pProfileSid) {
+            firestoreUpdates['smsSettings.twilioA2pProfileSid'] = discovered.twilioA2pProfileSid;
+            savedSids.push(`A2P Profile SID: ${discovered.twilioA2pProfileSid}`);
+        }
+
+        if (savedSids.length > 0) {
+            await db.collection('churches').doc(churchId).update(firestoreUpdates);
+            log.info(`[lookupProfileSids] Saved to Firestore: ${savedSids.join(', ')}`, 'system', { churchId }, churchId);
+        }
+
+        return res.json({
+            success:   true,
+            discovered,
+            sources,
+            savedSids,
+            message:   savedSids.length > 0
+                ? `Auto-saved: ${savedSids.join('; ')}`
+                : 'SIDs already on file — no update needed.',
+        });
+
+    } catch (e: any) {
+        log.error(`[lookupProfileSids] ${e.message}`, 'system', { churchId }, churchId);
+        return res.status(500).json({ error: e.message || 'Lookup failed' });
     }
 };

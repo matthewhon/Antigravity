@@ -19,7 +19,7 @@ import { getDb } from './backend/firebase';
 import { handleGeminiProxy } from './backend/geminiProxy';
 import { provisionSubuser, authenticateDomain, verifyDomain, diagnoseDomain } from './backend/emailProvisioning';
 import { getPublicGroups, getPublicRegistrations, getPublicEvents, serveWidgetScript } from './backend/publicApi.js';
-import { getAvailableNumbers, provisionTwilioNumber, releaseTwilioNumber, registerA2p, checkA2pStatus, createCustomerProfile, deleteCustomerProfile, refreshCustomerProfileStatus, addTwilioNumber, releaseSpecificNumber, updateNumberSettings, setDefaultNumber, trustHubStatusCallback, registerBrand, createMessagingService, registerCampaign, assignNumbersToService, checkCampaignStatus, fetchPrimaryProfileSid, fetchA2pProfileSid } from './backend/twilioProvisioning';
+import { getAvailableNumbers, provisionTwilioNumber, releaseTwilioNumber, checkA2pStatus, createCustomerProfile, deleteCustomerProfile, refreshCustomerProfileStatus, addTwilioNumber, releaseSpecificNumber, updateNumberSettings, setDefaultNumber, trustHubStatusCallback, registerBrand, createMessagingService, registerCampaign, assignNumbersToService, checkCampaignStatus, fetchPrimaryProfileSid, fetchA2pProfileSid, lookupProfileSidsForChurch } from './backend/twilioProvisioning';
 import { handleInboundSms } from './backend/twilioInbound';
 import { sendIndividual, sendBulk } from './backend/twilioSend';
 import { handleStatusCallback } from './backend/twilioWebhookStatus';
@@ -178,7 +178,7 @@ async function startServer() {
     app.get('/api/messaging/available-numbers', express.json(), getAvailableNumbers);
     app.post('/api/messaging/provision', express.json(), provisionTwilioNumber);
     app.post('/api/messaging/release', express.json(), releaseTwilioNumber);
-    app.post('/api/messaging/a2p-register', express.json(), registerA2p);
+    // NOTE: /api/messaging/a2p-register was deprecated and removed — use /api/messaging/register-brand instead
     app.get('/api/messaging/a2p-status', checkA2pStatus);
     app.post('/api/messaging/a2p-status', express.json(), checkA2pStatus); // also accept POST
     app.post('/api/messaging/create-customer-profile', express.json(), createCustomerProfile);
@@ -208,6 +208,8 @@ async function startServer() {
     app.get('/api/messaging/primary-profile-sid', fetchPrimaryProfileSid);
     // Fetch A2P Profile Bundle BN... SID from master Twilio account
     app.get('/api/messaging/a2p-profile-sid', fetchA2pProfileSid);
+    // Auto-discover Customer Profile + A2P Profile SIDs from the brand registration or TrustHub list
+    app.get('/api/messaging/lookup-profile-sids', lookupProfileSidsForChurch);
 
     // ─── SMS Agent: Website Scanner ─────────────────────────────────────────────
     // Fetches a church website URL server-side, extracts visible text, and uses
