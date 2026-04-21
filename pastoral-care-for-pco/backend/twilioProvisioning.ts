@@ -863,19 +863,26 @@ export const checkA2pStatus = async (req: any, res: any) => {
             failureReason = `Twilio API error: ${twErr.message}`;
         }
 
-        // Map Twilio's status string → our enum
-        const mappedStatus: 'not_started' | 'pending' | 'approved' | 'failed' =
-            twilioStatus === 'approved'    ? 'approved' :
-            twilioStatus === 'failed'      ? 'failed'   :
-            twilioStatus === 'in_review'   ? 'pending'  :
-            twilioStatus === 'pending'     ? 'pending'  :
-            twilioStatus === 'unverified'  ? 'pending'  :
+        // Map Twilio's raw status string → our internal enum.
+        // Twilio Brand Registration statuses (lowercased after fetch):
+        //   approved, failed, in_review, pending, pending_review,
+        //   unverified, draft, suspended
+        const mappedStatus: 'not_started' | 'pending' | 'in_review' | 'approved' | 'failed' =
+            twilioStatus === 'approved'       ? 'approved'  :
+            twilioStatus === 'failed'         ? 'failed'    :
+            twilioStatus === 'suspended'      ? 'failed'    :
+            twilioStatus === 'in_review'      ? 'in_review' :
+            twilioStatus === 'pending_review' ? 'in_review' :
+            twilioStatus === 'pending'        ? 'pending'   :
+            twilioStatus === 'unverified'     ? 'pending'   :
+            twilioStatus === 'draft'          ? 'pending'   :
             'pending';
 
         // ── Sync back to Firestore ───────────────────────────────────────────────
         const updates: Record<string, any> = {
-            'smsSettings.twilioA2pStatus':    mappedStatus,
-            'smsSettings.a2pLastStatusCheck': Date.now(),
+            'smsSettings.twilioA2pStatus':       mappedStatus,
+            'smsSettings.twilioA2pRawStatus':    twilioStatus,   // raw Twilio string for debugging
+            'smsSettings.a2pLastStatusCheck':    Date.now(),
         };
         if (failureReason) updates['smsSettings.a2pFailureReason'] = failureReason;
 

@@ -3397,15 +3397,20 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 const brandStatus  = smsForm.twilioA2pStatus || 'not_started';
                                 const brandDone    = brandStatus === 'approved';
                                 const brandFailed  = brandStatus === 'failed';
+                                const brandReview  = brandStatus === 'in_review';
                                 const hasBrand     = !!smsForm.twilioBrandSid;
                                 const hasProfile   = !!smsForm.twilioCustomerProfileSid;
+                                const rawStatus    = (smsForm as any).twilioA2pRawStatus as string | undefined;
+                                const lastChecked  = (smsForm as any).a2pLastStatusCheck as number | undefined;
                                 const s4Colors = brandDone   ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
                                                : brandFailed ? 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800'
+                                               : brandReview ? 'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800'
                                                : hasBrand    ? 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
                                                :               'bg-slate-100 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700';
                                 const s4Label = brandDone   ? '✅ Approved'
                                               : brandFailed ? '❌ Failed'
-                                              : hasBrand    ? '⏳ Pending Review'
+                                              : brandReview ? '🔍 In Review'
+                                              : hasBrand    ? '⏳ Pending'
                                               :               '🔲 Not Started';
                                 return (
                                     <div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800">
@@ -3420,7 +3425,11 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             <span className={`shrink-0 text-[10px] font-black px-3 py-1.5 rounded-full border ${s4Colors}`}>{s4Label}</span>
                                         </div>
                                         {smsForm.twilioBrandSid && (
-                                            <p className="text-[10px] font-mono text-slate-400 mb-4">Brand SID: <strong className="text-slate-600 dark:text-slate-300">{smsForm.twilioBrandSid}</strong></p>
+                                            <p className="text-[10px] font-mono text-slate-400 mb-4">
+                                                Brand SID: <strong className="text-slate-600 dark:text-slate-300">{smsForm.twilioBrandSid}</strong>
+                                                {rawStatus && <span className="ml-3 text-blue-500">Twilio: <strong>{rawStatus.toUpperCase()}</strong></span>}
+                                                {lastChecked && <span className="ml-3 text-slate-400">(checked {new Date(lastChecked).toLocaleTimeString()})</span>}
+                                            </p>
                                         )}
                                         {!hasProfile && (
                                             <p className="text-[10px] text-amber-600 dark:text-amber-400 mb-4">⚠ Complete the Customer Profile Bundle (above) before submitting a brand.</p>
