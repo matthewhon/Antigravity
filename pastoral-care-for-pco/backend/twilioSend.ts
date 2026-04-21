@@ -103,7 +103,7 @@ async function getSubClient(
     db: any,
     churchId: string,
     twilioNumberId?: string | null
-): Promise<{ client: any; fromNumber: string }> {
+): Promise<{ client: any; fromNumber: string; messagingServiceSid: string | null }> {
     const snap = await db.collection('churches').doc(churchId).get();
     if (!snap.exists) throw new Error(`Church ${churchId} not found`);
     const sms = snap.data()?.smsSettings || {};
