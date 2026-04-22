@@ -418,6 +418,11 @@ export const PollProjectorView: React.FC<PollProjectorViewProps> = ({ pollId }) 
                 <h1 className="text-4xl lg:text-5xl font-black text-white leading-tight">
                   {activeQ.text || <span className="text-slate-500 italic">Untitled question</span>}
                 </h1>
+                {activeQ.imageUrl && (
+                  <div className="mt-6 rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
+                    <img src={activeQ.imageUrl} alt={activeQ.text} className="w-full max-h-72 object-cover" />
+                  </div>
+                )}
               </div>
 
               {/* Results */}

@@ -517,7 +517,7 @@ Return ONLY the JSON object, no markdown, no explanation:`;
             nums.forEach((n: number) => { dist[n] = (dist[n] || 0) + 1; });
             questionResults[q.id] = { type: 'rating', avg: Math.round(avg * 10) / 10, dist, count: nums.length, max: q.ratingMax || 5 };
           } else {
-            const opts = q.type === 'yes_no' ? ['Yes', 'No'] : (q.options || []);
+            const opts = q.type === 'yes_no' ? ['Yes', 'No'] : q.type === 'thumbs_up_down' ? ['Thumbs Up', 'Thumbs Down'] : (q.options || []);
             const counts: Record<string, number> = {};
             opts.forEach((o: string) => (counts[o] = 0));
             qAnswers.forEach((ans: any) => {

@@ -3,9 +3,11 @@ import {
   BarChart2, Plus, Trash2, Eye, Pencil, Loader2, X, Copy, Check,
   ChevronDown, ChevronUp, CheckCircle, Circle, GripVertical, ToggleLeft,
   ToggleRight, Link, ArrowLeft, Users, Clock, Star, AlignLeft, List,
-  Tv2, MessageSquare, Smartphone, ExternalLink, Wifi
+  Tv2, MessageSquare, Smartphone, ExternalLink, Wifi, ThumbsUp, Image as ImageIcon, Upload
 } from 'lucide-react';
 import { firestore } from '../services/firestoreService';
+import { storage } from '../services/firebase';
+import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { Poll, PollQuestion, PollQuestionType, PollResponse, PollStatus } from '../types';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -52,6 +54,7 @@ const TYPE_LABELS: Record<PollQuestionType, { label: string; icon: React.ReactNo
   text:            { label: 'Free Text',        icon: <AlignLeft size={13} /> },
   rating:          { label: 'Rating',           icon: <Star size={13} /> },
   yes_no:          { label: 'Yes / No',         icon: <ToggleLeft size={13} /> },
+  thumbs_up_down:  { label: 'Thumbs Up/Down',   icon: <ThumbsUp size={13} /> },
 };
 
 function getPollShareUrl(pollId: string): string {
@@ -81,6 +84,32 @@ const CopyButton: React.FC<{ text: string; label?: string }> = ({ text, label })
     </button>
   );
 };
+
+// ─── Shared upload hook ───────────────────────────────────────────────────────
+
+function useUpload(folder: string) {
+  const [uploading, setUploading] = useState(false);
+
+  const upload = useCallback(async (file: File): Promise<string> => {
+    setUploading(true);
+    try {
+      const ext = file.name.split('.').pop();
+      const filename = `${folder}/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
+      const sRef = storageRef(storage, filename);
+      const task = uploadBytesResumable(sRef, file);
+      
+      await task;
+      const url = await getDownloadURL(sRef);
+      setUploading(false);
+      return url;
+    } catch (e) {
+      setUploading(false);
+      throw e;
+    }
+  }, [folder]);
+
+  return { upload, uploading };
+}
 
 // ─── Results View ────────────────────────────────────────────────────────────
 
@@ -187,7 +216,7 @@ const ResultsView: React.FC<{ poll: Poll; responses: PollResponse[]; onBack: () 
             );
           }
 
-          const opts = q.type === 'yes_no' ? ['Yes', 'No'] : (q.options || []);
+          const opts = q.type === 'yes_no' ? ['Yes', 'No'] : q.type === 'thumbs_up_down' ? ['Thumbs Up', 'Thumbs Down'] : (q.options || []);
           const counts: Record<string, number> = {};
           opts.forEach(o => counts[o] = 0);
           qAnswers.forEach(ans => {
@@ -260,6 +289,7 @@ const QuestionEditor: React.FC<{
   onMoveDown: () => void;
 }> = ({ question, index, total, onChange, onRemove, onMoveUp, onMoveDown }) => {
   const [open, setOpen] = useState(true);
+  const imageUpload = useUpload('poll_images');
   const isChoice = question.type === 'single_choice' || question.type === 'multiple_choice';
 
   const update = (patch: Partial<PollQuestion>) => onChange({ ...question, ...patch });
@@ -333,6 +363,48 @@ const QuestionEditor: React.FC<{
             </div>
           </div>
 
+          {/* Question Image */}
+          <div>
+            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Image (optional)</label>
+            {question.imageUrl ? (
+              <div className="relative group rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 w-full max-w-sm">
+                <img src={question.imageUrl} alt="Question" className="w-full h-32 object-cover" />
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                  <button onClick={() => update({ imageUrl: undefined })} className="p-2 bg-white text-red-600 rounded-lg shadow hover:bg-red-50 transition">
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="relative">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={async e => {
+                    const f = e.target.files?.[0];
+                    if (f) {
+                      try {
+                        const url = await imageUpload.upload(f);
+                        update({ imageUrl: url });
+                      } catch (err) {
+                        alert('Failed to upload image.');
+                      }
+                    }
+                  }}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                  disabled={imageUpload.uploading}
+                />
+                <div className="flex items-center gap-2 px-3 py-2 text-sm border border-slate-200 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-700/50 text-slate-600 dark:text-slate-300">
+                  {imageUpload.uploading ? (
+                    <><Loader2 size={15} className="animate-spin text-indigo-500" /> Uploading...</>
+                  ) : (
+                    <><ImageIcon size={15} className="text-slate-400" /> Upload Image</>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Options for choice questions */}
           {isChoice && (
             <div>
@@ -393,6 +465,7 @@ const PollEditor: React.FC<{
   churchSmsNumber?: string;
 }> = ({ poll: initialPoll, onBack, onSave, isSaving, churchSmsNumber }) => {
   const [poll, setPoll] = useState<Poll>(initialPoll);
+  const imageUpload = useUpload('poll_images');
 
   const update = (patch: Partial<Poll>) => setPoll(p => ({ ...p, ...patch, updatedAt: Date.now() }));
   const updateQuestion = (idx: number, q: PollQuestion) => {
@@ -499,6 +572,48 @@ const PollEditor: React.FC<{
                 value={poll.description || ''}
                 onChange={e => update({ description: e.target.value })}
               />
+            </div>
+            
+            {/* Header Image */}
+            <div>
+              <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Header Image (optional)</label>
+              {poll.imageUrl ? (
+                <div className="relative group rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 w-full max-w-sm">
+                  <img src={poll.imageUrl} alt="Poll Header" className="w-full h-32 object-cover" />
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                    <button onClick={() => update({ imageUrl: undefined })} className="p-2 bg-white text-red-600 rounded-lg shadow hover:bg-red-50 transition">
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="relative w-max">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={async e => {
+                      const f = e.target.files?.[0];
+                      if (f) {
+                        try {
+                          const url = await imageUpload.upload(f);
+                          update({ imageUrl: url });
+                        } catch (err) {
+                          alert('Failed to upload image.');
+                        }
+                      }
+                    }}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                    disabled={imageUpload.uploading}
+                  />
+                  <div className="flex items-center gap-2 px-3 py-2 text-sm border border-slate-200 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-700/50 text-slate-600 dark:text-slate-300">
+                    {imageUpload.uploading ? (
+                      <><Loader2 size={15} className="animate-spin text-indigo-500" /> Uploading...</>
+                    ) : (
+                      <><ImageIcon size={15} className="text-slate-400" /> Upload Header Image</>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

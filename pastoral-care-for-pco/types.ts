@@ -727,7 +727,7 @@ export interface PcoRegistrationCampus {
 
 // --- Poll Module --------------------------------------------------------------
 
-export type PollQuestionType = 'single_choice' | 'multiple_choice' | 'text' | 'rating' | 'yes_no';
+export type PollQuestionType = 'single_choice' | 'multiple_choice' | 'text' | 'rating' | 'yes_no' | 'thumbs_up_down';
 
 export interface PollQuestion {
     id: string;
@@ -740,6 +740,8 @@ export interface PollQuestion {
     ratingMax?: number;
     /** Display order (0-based index) */
     order: number;
+    /** Optional image attached to the question */
+    imageUrl?: string;
 }
 
 export type PollStatus = 'draft' | 'active' | 'closed';
@@ -749,6 +751,8 @@ export interface Poll {
     churchId: string;
     title: string;
     description?: string;
+    /** Optional banner/header image for the poll */
+    imageUrl?: string;
     status: PollStatus;
     questions: PollQuestion[];
     /** If false, the session token check is skipped (open responses) */

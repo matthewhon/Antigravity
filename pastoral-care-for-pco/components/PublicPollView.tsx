@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Star, CheckCircle, Loader2, ChevronRight, AlertCircle } from 'lucide-react';
+import { Star, CheckCircle, Loader2, ChevronRight, AlertCircle, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { Poll, PollQuestion, PollResponse } from '../types';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -42,6 +42,7 @@ const SingleChoiceInput: React.FC<{
     {(question.options || []).map((opt, i) => (
       <label
         key={i}
+        onClick={() => onChange(opt)}
         className={`flex items-center gap-3 p-3.5 rounded-xl border-2 cursor-pointer transition-all ${
           value === opt
             ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20'
@@ -79,6 +80,7 @@ const MultipleChoiceInput: React.FC<{
         return (
           <label
             key={i}
+            onClick={() => toggle(opt)}
             className={`flex items-center gap-3 p-3.5 rounded-xl border-2 cursor-pointer transition-all ${
               checked
                 ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20'
@@ -115,6 +117,30 @@ const YesNoInput: React.FC<{ value: string; onChange: (v: string) => void }> = (
         }`}
       >
         {opt}
+      </button>
+    ))}
+  </div>
+);
+
+const ThumbsUpDownInput: React.FC<{ value: string; onChange: (v: string) => void }> = ({ value, onChange }) => (
+  <div className="flex gap-3">
+    {[
+      { label: 'Thumbs Up', icon: <ThumbsUp size={20} className="mb-2" /> },
+      { label: 'Thumbs Down', icon: <ThumbsDown size={20} className="mb-2" /> }
+    ].map(opt => (
+      <button
+        key={opt.label}
+        onClick={() => onChange(opt.label)}
+        className={`flex-1 py-5 flex flex-col items-center justify-center rounded-xl border-2 text-sm font-semibold transition-all ${
+          value === opt.label
+            ? opt.label === 'Thumbs Up'
+              ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300'
+              : 'border-red-400 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400'
+            : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-800/50'
+        }`}
+      >
+        {opt.icon}
+        {opt.label}
       </button>
     ))}
   </div>
@@ -179,7 +205,7 @@ const ResultsSummary: React.FC<{ poll: Poll; rawResponses: any[] }> = ({ poll, r
       <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Current Results</h3>
       {poll.questions.map(q => {
         const answers = rawResponses.map(r => r.answers?.[q.id]).filter(Boolean);
-        const opts = q.type === 'yes_no' ? ['Yes', 'No'] : (q.options || []);
+        const opts = q.type === 'yes_no' ? ['Yes', 'No'] : q.type === 'thumbs_up_down' ? ['Thumbs Up', 'Thumbs Down'] : (q.options || []);
         const total = Math.max(answers.length, 1);
 
         if (q.type === 'text') {
@@ -443,11 +469,16 @@ export const PublicPollView: React.FC<PublicPollViewProps> = ({ pollId }) => {
     <Shell>
       <div className="space-y-5">
         {/* Poll header card */}
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 px-8 py-7">
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{poll.title}</h1>
-          {poll.description && (
-            <p className="text-slate-600 dark:text-slate-400 mt-2 text-sm leading-relaxed">{poll.description}</p>
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+          {poll.imageUrl && (
+            <img src={poll.imageUrl} alt={poll.title} className="w-full h-48 sm:h-64 object-cover" />
           )}
+          <div className="px-8 py-7">
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{poll.title}</h1>
+            {poll.description && (
+              <p className="text-slate-600 dark:text-slate-400 mt-2 text-sm leading-relaxed">{poll.description}</p>
+            )}
+          </div>
         </div>
 
         {/* Respondent info */}
@@ -515,6 +546,12 @@ export const PublicPollView: React.FC<PublicPollViewProps> = ({ pollId }) => {
               )}
             </div>
 
+            {q.imageUrl && (
+              <div className="mb-5 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 w-full">
+                <img src={q.imageUrl} alt={q.text} className="w-full max-h-64 object-cover" />
+              </div>
+            )}
+
             {q.type === 'single_choice' && (
               <SingleChoiceInput
                 question={q}
@@ -531,6 +568,12 @@ export const PublicPollView: React.FC<PublicPollViewProps> = ({ pollId }) => {
             )}
             {q.type === 'yes_no' && (
               <YesNoInput
+                value={(answers[q.id] as string) || ''}
+                onChange={v => setAnswer(q.id, v)}
+              />
+            )}
+            {q.type === 'thumbs_up_down' && (
+              <ThumbsUpDownInput
                 value={(answers[q.id] as string) || ''}
                 onChange={v => setAnswer(q.id, v)}
               />
