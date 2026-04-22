@@ -2028,6 +2028,137 @@ export const fetchPrimaryProfileSid = async (req: any, res: any) => {
     }
 };
 
+// ─── GET /api/messaging/secondary-profiles ───────────────────────────────────
+// Lists all Customer Profile Bundles on the MASTER Twilio account, excluding
+// the primary ISV profile. Used in App Config to identify and clean up profiles
+// that were accidentally created on the master instead of a church sub-account.
+export const listSecondaryProfiles = async (req: any, res: any) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    const db  = getDb();
+    const log = createServerLogger(db);
+    try {
+        const { accountSid, authToken } = await getMasterCredentials(db);
+        const master = getMasterClient(accountSid, authToken);
+
+        // Load system settings to get the primary profile SID to exclude
+        const settingsSnap = await db.collection('system').doc('settings').get();
+        const primarySid   = settingsSnap.data()?.primaryCustomerProfileSid as string | undefined;
+
+        // Fetch all Customer Profiles from Trust Hub on the master account
+        const profiles: any[] = await (master as any).trusthub.v1.customerProfiles.list({ pageSize: 50 });
+
+        // Load all churches once to correlate profiles to church names
+        const churchesSnap = await db.collection('churches').get();
+        const profileToChurch: Record<string, { id: string; name: string }> = {};
+        churchesSnap.forEach((doc: any) => {
+            const sms = doc.data()?.smsSettings || {};
+            if (sms.twilioCustomerProfileSid) {
+                profileToChurch[sms.twilioCustomerProfileSid] = {
+                    id:   doc.id,
+                    name: doc.data()?.name || doc.id,
+                };
+            }
+        });
+
+        const secondary = profiles
+            .filter((p: any) => p.sid !== primarySid)
+            .map((p: any) => ({
+                sid:          p.sid,
+                friendlyName: p.friendlyName,
+                status:       p.status,
+                policySid:    p.policySid,
+                dateCreated:  p.dateCreated,
+                church:       profileToChurch[p.sid] || null,
+                canDelete:    p.status === 'draft' || p.status === 'twilio-rejected',
+            }));
+
+        log.info(`[listSecondaryProfiles] Found ${secondary.length} secondary profiles on master account`, 'system', {}, 'system');
+        return res.json({ success: true, profiles: secondary, primarySid: primarySid || null });
+
+    } catch (e: any) {
+        log.error(`[listSecondaryProfiles] ${e.message}`, 'system', {}, 'system');
+        return res.status(500).json({ error: e.message || 'Failed to list profiles' });
+    }
+};
+
+// ─── DELETE /api/messaging/secondary-profile ─────────────────────────────────
+// Deletes a specific Customer Profile Bundle from the MASTER Twilio account.
+// Safety checks: cannot delete the primary ISV profile, and Twilio only allows
+// deletion of profiles in draft or twilio-rejected status.
+export const deleteSecondaryProfile = async (req: any, res: any) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    const { profileSid } = req.body || {};
+    if (!profileSid?.startsWith('BU')) {
+        return res.status(400).json({ error: 'Invalid or missing profileSid (must start with BU)' });
+    }
+
+    const db  = getDb();
+    const log = createServerLogger(db);
+    try {
+        const { accountSid, authToken } = await getMasterCredentials(db);
+        const master = getMasterClient(accountSid, authToken);
+
+        // Safety: refuse to delete the primary ISV profile
+        const settingsSnap = await db.collection('system').doc('settings').get();
+        const primarySid   = settingsSnap.data()?.primaryCustomerProfileSid as string | undefined;
+        if (primarySid && profileSid === primarySid) {
+            return res.status(400).json({
+                error: 'Cannot delete the primary ISV Customer Profile. This SID is configured in App Config as the master platform profile.',
+            });
+        }
+
+        // Fetch the profile first to confirm it's in a deletable state
+        let profile: any;
+        try {
+            profile = await (master as any).trusthub.v1.customerProfiles(profileSid).fetch();
+        } catch (fetchErr: any) {
+            return res.status(404).json({ error: `Profile ${profileSid} not found on master account: ${fetchErr.message}` });
+        }
+
+        const status = (profile.status || '').toLowerCase();
+        if (status !== 'draft' && status !== 'twilio-rejected') {
+            return res.status(400).json({
+                error: `Profile "${profile.friendlyName}" is in "${status}" status and cannot be deleted via API. ` +
+                    'Only draft or twilio-rejected profiles can be deleted programmatically. ' +
+                    'Contact Twilio Support to cancel approved or pending profiles.',
+                status,
+                friendlyName: profile.friendlyName,
+            });
+        }
+
+        // Delete the profile (Twilio cascades EndUsers and assignments)
+        await (master as any).trusthub.v1.customerProfiles(profileSid).remove();
+
+        // Also clear the Firestore reference if any church is pointing to this SID
+        const churchesSnap = await db.collection('churches').get();
+        const batch = db.batch();
+        let cleared = 0;
+        churchesSnap.forEach((doc: any) => {
+            if (doc.data()?.smsSettings?.twilioCustomerProfileSid === profileSid) {
+                batch.update(doc.ref, {
+                    'smsSettings.twilioCustomerProfileSid':        null,
+                    'smsSettings.twilioCustomerProfileStatus':     null,
+                    'smsSettings.twilioCustomerProfileEvaluation': null,
+                });
+                cleared++;
+            }
+        });
+        if (cleared > 0) await batch.commit();
+
+        log.info(`[deleteSecondaryProfile] Deleted profile ${profileSid} from master account (cleared ${cleared} Firestore church refs)`, 'system', { profileSid, cleared }, 'system');
+
+        return res.json({
+            success: true,
+            message: `Profile ${profileSid} ("${profile.friendlyName}") deleted from master account.${cleared > 0 ? ` Cleared Firestore reference from ${cleared} church(es).` : ''}`,
+            clearedChurches: cleared,
+        });
+
+    } catch (e: any) {
+        log.error(`[deleteSecondaryProfile] ${e.message}`, 'system', { profileSid }, 'system');
+        return res.status(500).json({ error: e.message || 'Delete failed' });
+    }
+};
+
 // ─── GET /api/messaging/a2p-profile-sid ──────────────────────────────────────
 
 // Fetches the ISV A2P Profile Bundle (BN...) from the master Twilio account.

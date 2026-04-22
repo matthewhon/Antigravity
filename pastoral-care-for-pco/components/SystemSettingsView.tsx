@@ -663,6 +663,130 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                     )}
                                 </div>
 
+                                {/* Secondary Profiles Manager */}
+                                {(() => {
+                                    const [secProfiles, setSecProfiles] = React.useState<any[] | null>(null);
+                                    const [secLoading, setSecLoading]   = React.useState(false);
+                                    const [secDeleting, setSecDeleting] = React.useState<string | null>(null);
+                                    const [secError, setSecError]       = React.useState<string | null>(null);
+                                    const [secMsg, setSecMsg]           = React.useState<string | null>(null);
+                                    const apiBase = (settings.apiBaseUrl || DEFAULT_API_URL).replace(/\/$/, '');
+
+                                    const loadProfiles = async () => {
+                                        setSecLoading(true); setSecError(null); setSecMsg(null);
+                                        try {
+                                            const r = await fetch(`${apiBase}/api/messaging/secondary-profiles`);
+                                            const d = await r.json();
+                                            if (!d.success) throw new Error(d.error || 'Failed to load');
+                                            setSecProfiles(d.profiles || []);
+                                        } catch (e: any) {
+                                            setSecError(e.message);
+                                        } finally { setSecLoading(false); }
+                                    };
+
+                                    const handleDelete = async (sid: string, name: string) => {
+                                        if (!window.confirm(`Delete profile "${name}" (${sid})?\n\nThis will permanently remove it from Twilio and clear the Firestore reference on any linked church.`)) return;
+                                        setSecDeleting(sid); setSecError(null); setSecMsg(null);
+                                        try {
+                                            const r = await fetch(`${apiBase}/api/messaging/secondary-profile`, {
+                                                method: 'DELETE',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ profileSid: sid }),
+                                            });
+                                            const d = await r.json();
+                                            if (!d.success) throw new Error(d.error || 'Delete failed');
+                                            setSecMsg(d.message);
+                                            setSecProfiles(prev => prev ? prev.filter(p => p.sid !== sid) : prev);
+                                        } catch (e: any) {
+                                            setSecError(e.message);
+                                        } finally { setSecDeleting(null); }
+                                    };
+
+                                    const STATUS_COLOR: Record<string, string> = {
+                                        'twilio-approved':  'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300',
+                                        'pending-review':   'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300',
+                                        'in-review':        'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300',
+                                        'twilio-rejected':  'bg-rose-100 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300',
+                                        'draft':            'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400',
+                                    };
+
+                                    return (
+                                        <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <div>
+                                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest">Secondary Profiles</label>
+                                                    <p className="text-[9px] text-slate-400 mt-0.5">Customer Profile Bundles on the master account (excluding the primary ISV profile). Draft and rejected profiles can be deleted here.</p>
+                                                </div>
+                                                <button
+                                                    onClick={loadProfiles}
+                                                    disabled={secLoading}
+                                                    className="shrink-0 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 px-3 py-1.5 rounded-xl font-bold text-xs hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors disabled:opacity-50 whitespace-nowrap"
+                                                >
+                                                    {secLoading ? '⏳ Loading…' : '🔍 Load Profiles'}
+                                                </button>
+                                            </div>
+
+                                            {secError && (
+                                                <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-xl px-3 py-2 text-xs text-rose-700 dark:text-rose-300 mb-2">
+                                                    ❌ {secError}
+                                                </div>
+                                            )}
+                                            {secMsg && (
+                                                <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300 mb-2">
+                                                    ✅ {secMsg}
+                                                </div>
+                                            )}
+
+                                            {secProfiles !== null && (
+                                                secProfiles.length === 0 ? (
+                                                    <p className="text-[10px] text-slate-400 italic">No secondary profiles found on the master account.</p>
+                                                ) : (
+                                                    <div className="space-y-2 mt-1">
+                                                        {secProfiles.map((p: any) => (
+                                                            <div key={p.sid} className="flex items-start gap-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5">
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${STATUS_COLOR[p.status] || STATUS_COLOR['draft']}`}>
+                                                                            {p.status}
+                                                                        </span>
+                                                                        <code className="text-[9px] font-mono text-slate-500 dark:text-slate-400">{p.sid}</code>
+                                                                    </div>
+                                                                    <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 mt-1 truncate">{p.friendlyName || '(no name)'}</p>
+                                                                    {p.church ? (
+                                                                        <p className="text-[9px] text-indigo-500 dark:text-indigo-400 mt-0.5">
+                                                                            🏛 {p.church.name} <span className="text-slate-400">({p.church.id})</span>
+                                                                        </p>
+                                                                    ) : (
+                                                                        <p className="text-[9px] text-slate-400 mt-0.5 italic">No church linked in Firestore</p>
+                                                                    )}
+                                                                    {p.dateCreated && (
+                                                                        <p className="text-[8px] text-slate-400 mt-0.5">Created: {new Date(p.dateCreated).toLocaleDateString()}</p>
+                                                                    )}
+                                                                </div>
+                                                                <div className="shrink-0">
+                                                                    {p.canDelete ? (
+                                                                        <button
+                                                                            onClick={() => handleDelete(p.sid, p.friendlyName)}
+                                                                            disabled={secDeleting === p.sid}
+                                                                            className="bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800 px-2.5 py-1.5 rounded-lg font-bold text-[10px] hover:bg-rose-100 dark:hover:bg-rose-900/30 transition-colors disabled:opacity-50 whitespace-nowrap"
+                                                                        >
+                                                                            {secDeleting === p.sid ? '…' : '🗑 Delete'}
+                                                                        </button>
+                                                                    ) : (
+                                                                        <span className="text-[9px] text-slate-400 italic text-right block max-w-[100px]" title="Only draft or rejected profiles can be deleted via API. Contact Twilio Support to cancel approved/pending profiles.">
+                                                                            Requires Twilio Support
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )
+                                            )}
+                                        </div>
+                                    );
+                                })()}
+
                                 {/* Per-segment pricing */}
                                 <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
                                     <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Usage Estimate Pricing <span className="normal-case font-normal">(USD)</span></label>
