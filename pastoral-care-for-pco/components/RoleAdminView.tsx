@@ -2132,9 +2132,10 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
 
         {activeTab === 'SMS' && (() => {
             const A2P_STATUS_COLORS: Record<string, string> = {
-                approved: 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30',
-                pending:  'bg-amber-500/10  text-amber-600  dark:text-amber-400  border border-amber-500/30',
-                failed:   'bg-rose-500/20   text-rose-600   dark:text-rose-400   border border-rose-500/30',
+                approved:    'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30',
+                pending:     'bg-amber-500/10  text-amber-600  dark:text-amber-400  border border-amber-500/30',
+                in_review:   'bg-blue-500/10   text-blue-600   dark:text-blue-400   border border-blue-500/30',
+                failed:      'bg-rose-500/20   text-rose-600   dark:text-rose-400   border border-rose-500/30',
                 not_started: 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400',
             };
             const PROFILE_STATUS_COLORS: Record<string, string> = {
@@ -2152,9 +2153,10 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                 'draft':           'Profile Draft',
             };
             const statusLabel: Record<string, string> = {
-                approved: '✓ Approved',
-                pending: '⏳ Pending Review',
-                failed: '✗ Failed',
+                approved:    '✓ Approved',
+                pending:     '⏳ Pending Review',
+                in_review:   '🔍 In Review',
+                failed:      '✗ Failed',
                 not_started: 'Not Started',
             };
             const a2pStatus      = smsForm.twilioA2pStatus           || 'not_started';
@@ -2744,30 +2746,32 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                     <div>
                                         <label className={labelCn}>A2P Registration Status</label>
                                         <div className={`flex items-center gap-3 px-4 py-2.5 rounded-xl border ${
-                                            a2pStatus === 'approved'   ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800' :
-                                            a2pStatus === 'pending'    ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800' :
-                                            a2pStatus === 'failed'     ? 'bg-rose-50 dark:bg-rose-900/20 border-rose-200 dark:border-rose-800' :
+                                            a2pStatus === 'approved'  ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800' :
+                                            a2pStatus === 'pending'   ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800' :
+                                            a2pStatus === 'in_review' ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' :
+                                            a2pStatus === 'failed'    ? 'bg-rose-50 dark:bg-rose-900/20 border-rose-200 dark:border-rose-800' :
                                             'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700'
                                         }`}>
-                                            <span className={`text-sm ${
-                                                a2pStatus === 'approved' ? '✅' :
-                                                a2pStatus === 'pending'  ? '⏳' :
-                                                a2pStatus === 'failed'   ? '❌' : ''
-                                            }`}>
-                                                {a2pStatus === 'approved' ? '✅' : a2pStatus === 'pending' ? '⏳' : a2pStatus === 'failed' ? '❌' : '⬜'}
+                                            <span className="text-sm">
+                                                {a2pStatus === 'approved'  ? '✅' :
+                                                 a2pStatus === 'pending'   ? '⏳' :
+                                                 a2pStatus === 'in_review' ? '🔍' :
+                                                 a2pStatus === 'failed'    ? '❌' : '⬜'}
                                             </span>
                                             <span className={`text-xs font-black ${
-                                                a2pStatus === 'approved'   ? 'text-emerald-700 dark:text-emerald-300' :
-                                                a2pStatus === 'pending'    ? 'text-amber-700 dark:text-amber-300' :
-                                                a2pStatus === 'failed'     ? 'text-rose-700 dark:text-rose-300' :
+                                                a2pStatus === 'approved'  ? 'text-emerald-700 dark:text-emerald-300' :
+                                                a2pStatus === 'pending'   ? 'text-amber-700 dark:text-amber-300'   :
+                                                a2pStatus === 'in_review' ? 'text-blue-700 dark:text-blue-300'     :
+                                                a2pStatus === 'failed'    ? 'text-rose-700 dark:text-rose-300'     :
                                                 'text-slate-500 dark:text-slate-400'
                                             }`}>
-                                                {statusLabel[a2pStatus]}
+                                                {statusLabel[a2pStatus] || a2pStatus}
                                             </span>
                                             <span className="text-[9px] text-slate-400 dark:text-slate-500 ml-auto">
-                                                {a2pStatus === 'not_started' ? 'Submit to Twilio to begin' :
-                                                 a2pStatus === 'pending'     ? 'Awaiting Twilio review (1–5 days)' :
-                                                 a2pStatus === 'approved'    ? 'Registration complete ✓' :
+                                                {a2pStatus === 'not_started' ? 'Submit to Twilio to begin'                        :
+                                                 a2pStatus === 'pending'     ? 'Awaiting Twilio review (1–5 days)'               :
+                                                 a2pStatus === 'in_review'   ? 'Manual carrier review — no action needed'         :
+                                                 a2pStatus === 'approved'    ? 'Registration complete ✓'                         :
                                                  'Check failure reason below'}
                                             </span>
                                         </div>
@@ -3438,6 +3442,23 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                     )
                                 )}
                             </div>
+
+                            {/* ── PII Expiry Warning — 30-day SupportingDocument MTL ─────── */}
+                            {profileStatus === 'twilio-rejected' &&
+                             (smsForm as any).twilioSupportingDocCreatedAt &&
+                             (Date.now() - ((smsForm as any).twilioSupportingDocCreatedAt as number)) > 25 * 24 * 60 * 60 * 1000 && (
+                                <div className="flex items-start gap-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700/50 rounded-2xl p-4">
+                                    <span className="text-amber-500 text-lg shrink-0">⚠️</span>
+                                    <div>
+                                        <p className="text-xs font-black text-amber-800 dark:text-amber-300">PII Expiry Warning</p>
+                                        <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 leading-relaxed">
+                                            The SupportingDocument for this rejected profile was created over 25 days ago.
+                                            Twilio redacts personal data after <strong>30 days</strong>. If you re-submit,
+                                            you will need to re-enter the church's address and contact information.
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* ── Step 4: Brand Registration ─────────────────────────────── */}
                             {(() => {

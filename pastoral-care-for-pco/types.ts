@@ -848,7 +848,7 @@ export interface SmsSettings {
 
     // -- A2P 10DLC Brand Registration ------------------------------------------
     /** A2P 10DLC registration status */
-    twilioA2pStatus?: 'not_started' | 'pending' | 'approved' | 'failed';
+    twilioA2pStatus?: 'not_started' | 'pending' | 'in_review' | 'approved' | 'failed';
     /** Twilio Brand Registration SID (e.g. BN...) */
     twilioBrandSid?: string;
     /** Twilio Messaging Service Campaign SID (e.g. QE...) */
@@ -927,6 +927,8 @@ export interface SmsSettings {
     twilioRep2EndUserSid?: string;
     twilioAddressSid?: string;
     twilioSupportingDocSid?: string;
+    /** Epoch ms when the SupportingDocument was created — used to track Twilio's 30-day PII data retention limit */
+    twilioSupportingDocCreatedAt?: number;
     twilioCustomerProfileStatus?: string;
     twilioCustomerProfileEvaluation?: string;
     twilioCustomerProfileCreatedAt?: number;

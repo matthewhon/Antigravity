@@ -562,9 +562,14 @@ export const refreshCustomerProfileStatus = async (req: any, res: any) => {
             return res.status(400).json({ error: 'No Customer Profile SID on file for this church.' });
         }
 
-        // Fetch status from Twilio
+        // Fetch status from Twilio — use sub-account credentials so Trust Hub returns the
+        // correct profile. Trust Hub authenticates by credential identity, not URL path.
         const { accountSid, authToken } = await getMasterCredentials(db);
-        const master = getMasterClient(accountSid, authToken);
+        const subAccountSid       = sms.twilioSubAccountSid       as string | undefined;
+        const subAccountAuthToken = sms.twilioSubAccountAuthToken as string | undefined;
+        const master = subAccountSid && subAccountAuthToken
+            ? getMasterClient(subAccountSid, subAccountAuthToken)
+            : getMasterClient(accountSid, authToken, subAccountSid);
 
         const profile = await (master as any).trusthub.v1
             .customerProfiles(profileSid)
@@ -679,132 +684,10 @@ export const setDefaultNumber = async (req: any, res: any) => {
 };
 
 
-// ─── POST /api/messaging/a2p-register ───────────────────────────────────────
-// Submits A2P 10DLC brand registration for the church's sub-account.
-// Reads all brand fields from Firestore (saved via handleSmsSave first).
-// Twilio Brand Registration is async — we store the brandSid and mark pending.
-// Use checkA2pStatus to poll Twilio for the live status.
+// NOTE: registerA2p() was deprecated and removed — the canonical path is:
+//   createCustomerProfile → registerBrand → createMessagingService → registerCampaign → assignNumbersToService
+// The /api/messaging/a2p-register route was decommissioned from server.ts.
 
-export const registerA2p = async (req: any, res: any) => {
-    res.set('Access-Control-Allow-Origin', '*');
-
-    const { churchId } = req.body || {};
-    if (!churchId) {
-        return res.status(400).json({ error: 'Missing churchId' });
-    }
-
-    const db  = getDb();
-    const log = createServerLogger(db);
-
-    try {
-        const { accountSid, authToken } = await getMasterCredentials(db);
-        const master = getMasterClient(accountSid, authToken);
-
-        const churchSnap = await db.collection('churches').doc(churchId).get();
-        if (!churchSnap.exists) return res.status(404).json({ error: 'Church not found' });
-        const smsSettings = churchSnap.data()?.smsSettings || {};
-
-        if (!smsSettings.twilioSubAccountSid) {
-            return res.status(400).json({
-                error: 'No Twilio sub-account provisioned for this church. Complete number setup first.',
-            });
-        }
-
-        // Validate required brand fields are saved in Firestore
-        const required: { key: string; label: string }[] = [
-            { key: 'a2pBusinessName',        label: 'Legal Business Name' },
-            { key: 'a2pEin',                 label: 'Federal EIN' },
-            { key: 'a2pBusinessType',        label: 'Business Type' },
-            { key: 'a2pVertical',            label: 'Industry Vertical' },
-            { key: 'a2pWebsite',             label: 'Website' },
-            { key: 'a2pContactFirstName',    label: 'Contact First Name' },
-            { key: 'a2pContactLastName',     label: 'Contact Last Name' },
-            { key: 'a2pContactEmail',        label: 'Contact Email' },
-            { key: 'a2pContactPhone',        label: 'Contact Phone' },
-            { key: 'a2pContactJobTitle',     label: 'Contact Job Title' },
-            { key: 'a2pContactJobPosition',  label: 'Contact Job Level' },
-            { key: 'a2pAddress',             label: 'Street Address' },
-            { key: 'a2pCity',                label: 'City' },
-            { key: 'a2pState',               label: 'State' },
-            { key: 'a2pZip',                 label: 'ZIP Code' },
-            // Note: Rep 2 fields are required for createCustomerProfile, NOT for registerA2p
-        ];
-        const missing = required.filter(r => !smsSettings[r.key]).map(r => r.label);
-        if (missing.length > 0) {
-            return res.status(400).json({
-                error: `Missing required fields: ${missing.join(', ')}. Save the form first, then submit.`,
-            });
-        }
-
-        // ── Submit Brand Registration to Twilio ──────────────────────────────────
-        // Twilio messaging.v1.brandRegistrations — uses Customer Profile Bundle if available.
-        // For low-volume non-profits without a bundle, Twilio still accepts the create()
-        // with empty bundle SIDs (returns an error code we surface to the admin).
-        let brandSid: string;
-
-        try {
-            const brand = await (master as any).messaging.v1.brandRegistrations.create({
-                customerProfileBundleSid: smsSettings.twilioCustomerProfileSid || '',
-                a2PProfileBundleSid:      smsSettings.twilioA2pProfileSid      || '',
-                friendlyName:             smsSettings.a2pBusinessName,
-                email:                    smsSettings.a2pContactEmail,
-                phone:                    smsSettings.a2pContactPhone,
-                website:                  smsSettings.a2pWebsite,
-            });
-            brandSid = brand.sid;
-        } catch (twilioErr: any) {
-            // Twilio requires a completed Customer Profile Bundle for full registration.
-            // If missing, mark as pending and direct the admin to the Twilio Console.
-            log.warn(
-                `[registerA2p] Twilio API error for ${churchId}: ${twilioErr.message}`,
-                'system', { churchId, code: twilioErr.code }, churchId
-            );
-
-            await db.collection('churches').doc(churchId).update({
-                'smsSettings.twilioA2pStatus': 'pending',
-                'smsSettings.a2pSubmittedAt':  Date.now(),
-            });
-
-            return res.json({
-                success: false,
-                status:  'pending',
-                message:
-                    'Registration info saved to Firestore. To complete A2P submission, your Twilio account ' +
-                    'must have a verified Customer Profile Bundle. Please complete the Business Profile in ' +
-                    'the Twilio Console (Console → Messaging → Regulatory Compliance), then enter the ' +
-                    'Bundle SID here and re-submit. Low-volume sending continues in the meantime.',
-                twilioError: twilioErr.message,
-                twilioCode:  twilioErr.code,
-            });
-        }
-
-        // ── Save brandSid and mark pending ──────────────────────────────────────
-        await db.collection('churches').doc(churchId).update({
-            'smsSettings.twilioBrandSid':  brandSid,
-            'smsSettings.twilioA2pStatus': 'pending',
-            'smsSettings.a2pSubmittedAt':  Date.now(),
-        });
-
-        log.info(
-            `[registerA2p] Brand submitted for ${churchId}: SID=${brandSid}`,
-            'system', { churchId, brandSid }, churchId
-        );
-
-        return res.json({
-            success:  true,
-            brandSid,
-            status:   'pending',
-            message:  'Brand registration submitted to Twilio. Approval typically takes 1–5 business days. Use "Check Status" to refresh.',
-        });
-
-    } catch (e: any) {
-        log.error(
-            `[registerA2p] Unexpected error for ${churchId}: ${e.message}`,
-            'system', { churchId }, churchId
-        );
-        return res.status(500).json({ error: e.message || 'A2P registration failed' });
-    }
-};
 
 // ─── GET /api/messaging/a2p-status ──────────────────────────────────────────
 // Fetches the live A2P brand registration status from Twilio and syncs it
@@ -822,7 +705,6 @@ export const checkA2pStatus = async (req: any, res: any) => {
 
     try {
         const { accountSid, authToken } = await getMasterCredentials(db);
-        const master = getMasterClient(accountSid, authToken);
 
         const churchSnap = await db.collection('churches').doc(churchId).get();
         if (!churchSnap.exists) return res.status(404).json({ error: 'Church not found' });
@@ -838,6 +720,11 @@ export const checkA2pStatus = async (req: any, res: any) => {
                 failureReason: null,
             });
         }
+
+        // Brand lives on the sub-account — scope the client accordingly.
+        // messaging.twilio.com uses auth identity to determine account context.
+        const subAccountSid = smsSettings.twilioSubAccountSid as string | undefined;
+        const master = getMasterClient(accountSid, authToken, subAccountSid);
 
         // ── Fetch brand status from Twilio ───────────────────────────────────────
         let twilioStatus   = 'pending';
@@ -1044,11 +931,27 @@ export const createCustomerProfile = async (req: any, res: any) => {
 
     try {
         const { accountSid, authToken } = await getMasterCredentials(db);
-        const master = getMasterClient(accountSid, authToken);
 
+        // Load church data first so we can extract sub-account credentials
         const churchSnap = await db.collection('churches').doc(churchId).get();
         if (!churchSnap.exists) return res.status(404).json({ error: 'Church not found' });
         const sms = churchSnap.data()?.smsSettings || {};
+
+        // ISV Architecture #1: Trust Hub resources MUST be created on the church's sub-account.
+        // The Trust Hub API (trusthub.twilio.com) determines account ownership by credential
+        // identity — not by URL path. Master credentials always create resources on the master
+        // account regardless of any sub-account scoping option on the SDK client.
+        // Solution: authenticate as the sub-account directly using its stored auth token.
+        const subAccountSid       = sms.twilioSubAccountSid       as string | undefined;
+        const subAccountAuthToken = sms.twilioSubAccountAuthToken as string | undefined;
+        if (!subAccountSid || !subAccountAuthToken) {
+            return res.status(400).json({
+                error: 'No Twilio sub-account provisioned for this church. ' +
+                    'Complete number setup first (Step 1) to create the sub-account.',
+            });
+        }
+        // Sub-account native client — all Trust Hub calls land on the church's sub-account
+        const master = getMasterClient(subAccountSid, subAccountAuthToken);
 
         // Validate required fields (Rep 2 is optional — added in Step 1e if present)
         const required: { key: string; label: string }[] = [
@@ -1109,11 +1012,12 @@ export const createCustomerProfile = async (req: any, res: any) => {
         // ── Step 1c: Create SupportingDocument for the address via direct REST API ──
         // The Twilio Node SDK double-encodes "attributes" for SupportingDocuments,
         // so we bypass it and make a raw form-encoded POST to the TrustHub API.
-        const masterAuth = Buffer.from(`${accountSid}:${authToken}`).toString('base64');
+        // Raw fetch uses sub-account credentials — matching the SDK client above
+        const subAuth = Buffer.from(`${subAccountSid}:${subAccountAuthToken}`).toString('base64');
         const addrDocResp = await fetch('https://trusthub.twilio.com/v1/SupportingDocuments', {
             method: 'POST',
             headers: {
-                'Authorization': `Basic ${masterAuth}`,
+                'Authorization': `Basic ${subAuth}`,
                 'Content-Type':  'application/x-www-form-urlencoded',
             },
             body: new URLSearchParams({
@@ -1270,6 +1174,7 @@ export const createCustomerProfile = async (req: any, res: any) => {
             'smsSettings.twilioRepEndUserSid':             repEndUser.sid,
             'smsSettings.twilioAddressSid':                bizAddress.sid,
             'smsSettings.twilioSupportingDocSid':          addrDocData.sid,
+            'smsSettings.twilioSupportingDocCreatedAt':     Date.now(),   // tracks 30-day PII MTL
             'smsSettings.twilioPrimaryCustomerProfileSid': primaryCpSid,
             'smsSettings.twilioCustomerProfileStatus':     'pending-review',
             'smsSettings.twilioCustomerProfileEvaluation': evaluationStatus,
@@ -1333,12 +1238,21 @@ export const deleteCustomerProfile = async (req: any, res: any) => {
 
     try {
         const { accountSid, authToken } = await getMasterCredentials(db);
-        const master = getMasterClient(accountSid, authToken);
-        const masterAuth = Buffer.from(`${accountSid}:${authToken}`).toString('base64');
 
+        // Load church first so we can use sub-account credentials for Trust Hub operations
         const churchSnap = await db.collection('churches').doc(churchId).get();
         if (!churchSnap.exists) return res.status(404).json({ error: 'Church not found' });
         const sms = churchSnap.data()?.smsSettings || {};
+
+        // Use sub-account credentials for Trust Hub (profiles, EndUsers, SupportingDocuments)
+        const subAccountSid       = sms.twilioSubAccountSid       as string | undefined;
+        const subAccountAuthToken = sms.twilioSubAccountAuthToken as string | undefined;
+        const master = subAccountSid && subAccountAuthToken
+            ? getMasterClient(subAccountSid, subAccountAuthToken)
+            : getMasterClient(accountSid, authToken, subAccountSid);
+        const masterAuth = subAccountSid && subAccountAuthToken
+            ? Buffer.from(`${subAccountSid}:${subAccountAuthToken}`).toString('base64')
+            : Buffer.from(`${accountSid}:${authToken}`).toString('base64');
 
         const profileSid = sms.twilioCustomerProfileSid as string | undefined;
         if (!profileSid) {
@@ -1597,6 +1511,9 @@ export const registerBrand = async (req: any, res: any) => {
             email:        sms.a2pContactEmail,
             phone:        toE164(sms.a2pContactPhone || ''),
             website:      sms.a2pWebsite || '',
+            // mock: true can be passed in body during dev to test without live billing
+            ...(req.body.mockMode === true && process.env.NODE_ENV !== 'production'
+                ? { mock: true } : {}),
         });
 
         await db.collection('churches').doc(churchId).update({
