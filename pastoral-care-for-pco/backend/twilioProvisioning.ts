@@ -2017,7 +2017,12 @@ export const fetchPrimaryProfileSid = async (req: any, res: any) => {
         const { accountSid, authToken } = await getMasterCredentials(db);
         const master = getMasterClient(accountSid, authToken);
 
-        // List all customer profiles on the master account (pageSize 50 captures everything for a small ISV)
+        // Also read system settings so we can match the ISV company name if stored
+        const sysSnap = await db.doc('system/settings').get();
+        const sysData = sysSnap.data() || {};
+        const isvName: string = (sysData.organizationName || sysData.isvName || 'Hon Ventures').toLowerCase();
+
+        // List all customer profiles on the master account
         const profiles = await (master as any).trusthub.v1.customerProfiles.list({ pageSize: 50 });
 
         if (!profiles || profiles.length === 0) {
@@ -2026,20 +2031,6 @@ export const fetchPrimaryProfileSid = async (req: any, res: any) => {
             });
         }
 
-        // The ISV Primary Business Profile is the one that belongs directly to the master account.
-        // Secondary Customer Profiles (created for each church) reference the primary via
-        // `policy_sid` = RN806dd6cd175f314e1f96a9727b9a5d68 (Secondary Customer Profile policy)
-        // Primary profiles use policy_sid = RNb0d4771c2c4747d2a75621abead49828 (Primary Customer Profile)
-        //
-        // Reliable heuristic: the primary profile is either:
-        //   a) The only approved/twilio-approved profile, or
-        //   b) The one whose friendlyName is the ISV company name (Hon Ventures LLC)
-        //   c) Has no sub-account SID association (belongs directly to master)
-        //
-        // We filter: prefer profiles with status approved/twilio-approved,
-        // and exclude obvious church secondaries (those whose friendlyName looks like a church)
-        // by favouring the approved master-level one.
-
         const allProfiles = profiles.map((p: any) => ({
             sid:          p.sid,
             friendlyName: p.friendlyName,
@@ -2047,23 +2038,52 @@ export const fetchPrimaryProfileSid = async (req: any, res: any) => {
             policySid:    p.policySid,
         }));
 
-        // PRIMARY policy SID (Twilio-defined, constant): RNb0d4771c2c4747d2a75621abead49828
-        const PRIMARY_POLICY_SID = 'RNb0d4771c2c4747d2a75621abead49828';
+        // ── Selection strategy ────────────────────────────────────────────────
+        // On this master account, all church secondary profiles share the same
+        // policySid (RNdfbf3fae0e1107f8aded0e7cead80bf5). The ISV primary profile
+        // has a different, unique policySid. We identify the church secondary policy
+        // by finding the policySid used by the majority of profiles, then exclude it.
 
-        // 1. Try: profiles using the Primary Customer Profile policy
-        let candidates = profiles.filter((p: any) => p.policySid === PRIMARY_POLICY_SID);
+        // Count how many profiles use each policySid
+        const policyCounts: Record<string, number> = {};
+        for (const p of profiles) {
+            const ps = p.policySid || 'none';
+            policyCounts[ps] = (policyCounts[ps] || 0) + 1;
+        }
+        // The "church secondary" policy is the one used by more than 1 profile
+        const churchPolicySids = new Set(
+            Object.entries(policyCounts)
+                .filter(([, count]) => count > 1)
+                .map(([sid]) => sid)
+        );
 
-        // 2. Fallback: if policy SID isn't exposed, take approved ones
-        if (candidates.length === 0) {
-            candidates = profiles.filter((p: any) =>
-                p.status === 'twilio-approved' || p.status === 'approved'
-            );
+        // Step 1: exclude profiles that use the church secondary policy
+        let candidates = profiles.filter((p: any) =>
+            !churchPolicySids.has(p.policySid || 'none')
+        );
+
+        // Step 2: among remaining, prefer the one whose name matches the ISV name
+        const nameMatch = candidates.find((p: any) =>
+            (p.friendlyName || '').toLowerCase().includes(isvName)
+        );
+        if (nameMatch) {
+            const best = nameMatch;
+            log.info(`[fetchPrimaryProfileSid] Selected by ISV name match: ${best.sid} "${best.friendlyName}"`, 'system', {}, 'system');
+            return res.json({
+                success:      true,
+                primarySid:   best.sid,
+                friendlyName: best.friendlyName,
+                status:       best.status,
+                policySid:    best.policySid,
+                allProfiles,
+                note: allProfiles.length > 1
+                    ? `Found ${allProfiles.length} profiles. Selected ISV primary by name match (${best.sid}). If wrong, paste the correct BU... SID manually.`
+                    : undefined,
+            });
         }
 
-        // 3. Final fallback: first profile
-        if (candidates.length === 0) candidates = profiles;
-
-        // Among candidates, prefer twilio-approved > approved > pending-review > draft
+        // Step 3: among non-church candidates, prefer approved status
+        if (candidates.length === 0) candidates = profiles; // final fallback
         const priorityOrder = ['twilio-approved', 'approved', 'pending-review', 'draft'];
         let best: any = null;
         for (const status of priorityOrder) {
@@ -2071,6 +2091,8 @@ export const fetchPrimaryProfileSid = async (req: any, res: any) => {
             if (best) break;
         }
         if (!best) best = candidates[0];
+
+        log.info(`[fetchPrimaryProfileSid] Selected by status: ${best.sid} "${best.friendlyName}"`, 'system', {}, 'system');
 
         return res.json({
             success:        true,
@@ -2090,6 +2112,7 @@ export const fetchPrimaryProfileSid = async (req: any, res: any) => {
 };
 
 // ─── GET /api/messaging/a2p-profile-sid ──────────────────────────────────────
+
 // Fetches the ISV A2P Profile Bundle (BN...) from the master Twilio account.
 // This is the ISV-level A2P Trust Product — one per platform, shared across all
 // church brand registrations via the a2PProfileBundleSid parameter.

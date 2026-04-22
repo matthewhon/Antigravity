@@ -29,7 +29,7 @@ options:
   logging: CLOUD_LOGGING_ONLY
 
 substitutions:
-  _PROJECT_ID: pastoral-care-for-pco
+  _PROJECT_ID: gen-lang-client-0779452267
   _SERVICE_NAME: pastoral-care-for-pco
   _REGION: us-central1
 
