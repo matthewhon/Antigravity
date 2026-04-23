@@ -96,7 +96,7 @@ function buildPcoHtml(tab: PcoTab, item: PcoItem): string {
   const typeLabel = tab === 'registrations' ? 'Registration' : tab === 'groups' ? 'Group' : 'Event';
   return `
 <div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin:16px 0;font-family:inherit;">
-  ${item.imageUrl ? `<img src="${item.imageUrl}" alt="${item.name}" style="width:100%;max-height:200px;object-fit:cover;display:block;" />` : ''}
+  ${item.imageUrl ? `<img src="${item.imageUrl}" alt="${item.name}" style="width:100%;height:auto;display:block;" />` : ''}
   <div style="padding:16px 20px;">
     <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#6366f1;margin-bottom:6px;">${typeLabel}</div>
     <div style="font-size:18px;font-weight:800;color:#0f172a;margin-bottom:6px;">${item.name}</div>

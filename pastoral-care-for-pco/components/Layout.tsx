@@ -73,7 +73,7 @@ const Layout: React.FC<LayoutProps> = ({
   const getDropdownStyle = (ref: React.RefObject<HTMLDivElement>) => {
     if (!ref.current) return {};
     const rect = ref.current.getBoundingClientRect();
-    return { top: rect.bottom + 8, left: rect.left };
+    return { top: `${rect.bottom + 8}px`, left: `${rect.left}px` };
   };
 
   if (!user) return null;
