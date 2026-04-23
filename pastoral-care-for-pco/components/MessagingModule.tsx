@@ -1488,7 +1488,7 @@ const NewMessageComposer: React.FC<{
                                                 <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">Click or drag &amp; drop</p>
                                                 <p className="text-[10px] text-slate-400">JPG, PNG, GIF, WebP — max 5 MB</p>
                                             </div>
-                                            {imageUploadProgress !== null && (<div className="space-y-1"><div className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden" title={`Uploading: ${imageUploadProgress}%`} aria-label={`Upload progress: ${imageUploadProgress}%`}><div className="bar-fill bg-violet-500" style={{ '--bar-w': `${imageUploadProgress}%` } as React.CSSProperties} /* CSS custom property – not an inline style */ /></div><p className="text-[10px] text-slate-400 text-right">{imageUploadProgress}%</p></div>)}
+                                            {imageUploadProgress !== null && (<div className="space-y-1"><div className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden" title={`Uploading: ${imageUploadProgress}%`} aria-label={`Upload progress: ${imageUploadProgress}%`}><div className="bar-fill bg-violet-500" ref={el => el?.style.setProperty('--bar-w', `${imageUploadProgress}%`)} /></div><p className="text-[10px] text-slate-400 text-right">{imageUploadProgress}%</p></div>)}
                                             {imageUploadError && <p className="text-xs text-red-500">{imageUploadError}</p>}
                                         </>
                                     ) : (
@@ -3248,7 +3248,7 @@ const MiniBar: React.FC<{ pct: number; color?: string; label?: string }> = ({ pc
         aria-label={label ?? `${Math.round(pct)}%`}
     >
         {/* CSS custom property passed via style – consumed by .bar-fill in components.css */}
-        <div className={`bar-fill ${color}`} style={{ '--bar-w': `${Math.min(100, Math.max(0, pct))}%` } as React.CSSProperties} />
+        <div className={`bar-fill ${color}`} ref={el => el?.style.setProperty('--bar-w', `${Math.min(100, Math.max(0, pct))}%`)} />
     </div>
 );
 
@@ -3451,11 +3451,11 @@ const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[] }> = (
                                                 {/* Sent fill */}
                                                 {/* CSS custom properties – consumed by .msg-col-* classes in components.css */}
                                                 <div
-                                                    className="msg-col-sent bg-violet-200 dark:bg-violet-900/40 flex flex-col justify-end" style={{ '--col-h': `${heightPct}%`, '--col-mt': `${100 - heightPct}%` } as React.CSSProperties}
+                                                    className="msg-col-sent bg-violet-200 dark:bg-violet-900/40 flex flex-col justify-end" ref={el => { if (el) { el.style.setProperty('--col-h', `${heightPct}%`); el.style.setProperty('--col-mt', `${100 - heightPct}%`); } }}
                                                 >
                                                     {/* Delivered overlay */}
                                                     <div
-                                                        className="msg-col-deliv bg-violet-600" style={{ '--col-deliv-h': `${delivPct}%` } as React.CSSProperties}
+                                                        className="msg-col-deliv bg-violet-600" ref={el => el?.style.setProperty('--col-deliv-h', `${delivPct}%`)}
                                                     />
                                                 </div>
                                             </div>

@@ -245,7 +245,7 @@ const Layout: React.FC<LayoutProps> = ({
                 {/* Metrics dropdown — rendered via fixed position to escape overflow-x-auto clipping */}
                 {metricsOpen && hasPermission('metrics') && (
                   <div
-                    className="nav-dropdown-panel" style={getDropdownStyle(metricsRef)}
+                    className="nav-dropdown-panel" ref={el => el && Object.assign(el.style, getDropdownStyle(metricsRef))}
                     onMouseEnter={() => { cancelClose('metrics'); setMetricsOpen(true); }}
                     onMouseLeave={() => scheduleClose('metrics', setMetricsOpen)}
                   >
@@ -275,7 +275,7 @@ const Layout: React.FC<LayoutProps> = ({
                 {/* Care dropdown — fixed position to escape overflow-x-auto clipping */}
                 {careOpen && hasPermission('pastoral') && (
                   <div
-                    className="nav-dropdown-panel" style={getDropdownStyle(careRef)}
+                    className="nav-dropdown-panel" ref={el => el && Object.assign(el.style, getDropdownStyle(careRef))}
                     onMouseEnter={() => { cancelClose('care'); setCareOpen(true); }}
                     onMouseLeave={() => scheduleClose('care', setCareOpen)}
                   >
@@ -307,7 +307,7 @@ const Layout: React.FC<LayoutProps> = ({
                 {/* People dropdown */}
                 {peopleOpen && hasPermission('people') && (
                   <div
-                    className="nav-dropdown-panel" style={getDropdownStyle(peopleRef)}
+                    className="nav-dropdown-panel" ref={el => el && Object.assign(el.style, getDropdownStyle(peopleRef))}
                     onMouseEnter={() => { cancelClose('people'); setPeopleOpen(true); }}
                     onMouseLeave={() => scheduleClose('people', setPeopleOpen)}
                   >
@@ -337,7 +337,7 @@ const Layout: React.FC<LayoutProps> = ({
                 {/* Services dropdown */}
                 {servicesOpen && hasPermission('services') && (
                   <div
-                    className="nav-dropdown-panel" style={getDropdownStyle(servicesRef)}
+                    className="nav-dropdown-panel" ref={el => el && Object.assign(el.style, getDropdownStyle(servicesRef))}
                     onMouseEnter={() => { cancelClose('services'); setServicesOpen(true); }}
                     onMouseLeave={() => scheduleClose('services', setServicesOpen)}
                   >
@@ -367,7 +367,7 @@ const Layout: React.FC<LayoutProps> = ({
                 {/* Giving dropdown */}
                 {givingOpen && hasPermission('giving') && (
                   <div
-                    className="nav-dropdown-panel" style={getDropdownStyle(givingRef)}
+                    className="nav-dropdown-panel" ref={el => el && Object.assign(el.style, getDropdownStyle(givingRef))}
                     onMouseEnter={() => { cancelClose('giving'); setGivingOpen(true); }}
                     onMouseLeave={() => scheduleClose('giving', setGivingOpen)}
                   >
@@ -421,7 +421,7 @@ const Layout: React.FC<LayoutProps> = ({
                 {/* Tools dropdown — fixed position to escape overflow clipping */}
                 {toolsOpen && hasPermission('tools') && (
                   <div
-                    className="nav-dropdown-panel" style={getDropdownStyle(toolsRef)}
+                    className="nav-dropdown-panel" ref={el => el && Object.assign(el.style, getDropdownStyle(toolsRef))}
                     onMouseEnter={() => { cancelClose('tools'); setToolsOpen(true); }}
                     onMouseLeave={() => scheduleClose('tools', setToolsOpen)}
                   >

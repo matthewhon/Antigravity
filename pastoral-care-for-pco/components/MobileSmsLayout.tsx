@@ -34,6 +34,7 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
       <header className="flex items-center justify-between px-4 py-3 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shrink-0 sticky top-0 z-50 shadow-sm">
         <div className="flex items-center gap-3">
           <button
+            title="Back to home"
             onClick={onNavigateHome}
             className="p-1.5 rounded-full text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
           >
