@@ -1840,7 +1840,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
             )}
 
             {/* Conversation list */}
-            <div className="w-[320px] shrink-0 border-r border-slate-200 dark:border-slate-700 flex flex-col bg-white dark:bg-slate-900">
+            <div className={`w-full md:w-[320px] shrink-0 border-r border-slate-200 dark:border-slate-700 flex flex-col bg-white dark:bg-slate-900 ${activeConv ? 'hidden md:flex' : 'flex'}`}>
                 <div className="p-4 border-b border-slate-200 dark:border-slate-700">
                     <div className="flex items-center justify-between mb-3">
                         <h2 className="font-black text-slate-900 dark:text-white text-sm flex items-center gap-2">
@@ -1973,9 +1973,15 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
 
             {/* Message thread */}
             {activeConv ? (
-                <div className="flex-1 flex flex-col">
+                <div className={`flex-1 flex flex-col ${!activeConv ? 'hidden md:flex' : 'flex'}`}>
                     {/* Thread header */}
                     <div className="px-5 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex items-center gap-3">
+                        <button 
+                            onClick={() => setActiveConv(null)} 
+                            className="md:hidden p-1.5 -ml-2 rounded-full text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition shrink-0"
+                        >
+                            <ArrowLeft size={20} />
+                        </button>
                         <div className="relative shrink-0">
                             {activeConv.personAvatar ? (
                                 <img

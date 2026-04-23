@@ -25,7 +25,7 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
     { id: 'campaigns', label: 'Broadcast', icon: <MessageSquare size={20} /> },
     { id: 'keywords', label: 'Keywords', icon: <Key size={20} /> },
     { id: 'analytics', label: 'Stats', icon: <BarChart3 size={20} /> },
-    { id: 'agent', label: 'AI', icon: <Sparkles size={20} /> },
+
   ] as const;
 
   return (
