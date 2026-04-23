@@ -7,7 +7,7 @@ import { refreshCampaignBlocks } from './emailScheduler';
 // 'on-behalf-of' header for Subuser reputation isolation while still using
 // the master API key (which carries the master account's domain authentication).
 
-async function sgSend(
+export async function sgSend(
     messages: {
         to: string;
         from: { email: string; name?: string };
@@ -76,7 +76,7 @@ function extractYouTubeId(url: string): string | null {
  * Minimal HTML renderer for email blocks.
  * Converts the campaign's block array into a sendable HTML string.
  */
-function renderBlocksToHtml(blocks: any[], templateSettings: any, unsubscribeHtml = ''): string {
+export function renderBlocksToHtml(blocks: any[], templateSettings: any, unsubscribeHtml = ''): string {
     const bg = templateSettings?.backgroundColor || '#ffffff';
     const textColor = templateSettings?.textColor || '#1f2937';
     const primaryColor = templateSettings?.primaryColor || '#4f46e5';
@@ -872,7 +872,8 @@ export async function executeSend(
     campaignId: string,
     churchId: string,
     testEmail?: string,
-    skipStatusUpdate?: boolean
+    skipStatusUpdate?: boolean,
+    collectionName: string = 'email_campaigns'
 ): Promise<{ recipientCount: number; message: string }> {
     const log = createServerLogger(db);
 
@@ -927,11 +928,14 @@ export async function executeSend(
     const tenantFromName  = tenantEmail.fromName  || '';
 
     // 3. Load campaign
-    const campaignSnap = await db.collection('email_campaigns').doc(campaignId).get();
+    const campaignSnap = await db.collection(collectionName).doc(campaignId).get();
     if (!campaignSnap.exists) throw new Error('Campaign not found');
     const campaign = campaignSnap.data() as any;
 
     let blocks = campaign.blocks || [];
+    if (blocks.length === 0 && campaign.channelType === 'email' && campaign.body) {
+        blocks = [{ id: 'body', type: 'text', content: { text: campaign.body } }];
+    }
     const hasRefreshable = blocks.some((b: any) => 
         b.type === 'analytics_block' || 
         b.type === 'data_chart' || 
@@ -946,7 +950,7 @@ export async function executeSend(
         campaign.blocks = blocks;
 
         if (!testEmail) {
-            await db.collection('email_campaigns').doc(campaignId).update({
+            await db.collection(collectionName).doc(campaignId).update({
                 blocks: blocks,
                 analyticsRefreshedAt: Date.now()
             });
@@ -955,7 +959,7 @@ export async function executeSend(
 
     const fromEmail = tenantFromEmail || campaign.fromEmail || globalFromEmail;
     const fromName  = tenantFromName  || campaign.fromName  || globalFromName;
-    const subject   = campaign.subject   || '(No Subject)';
+    const subject   = campaign.subject   || campaign.emailSubject || '(No Subject)';
 
     if (!fromEmail) throw new Error('No "From Email" configured. Set it on the campaign or in App Config → SendGrid.');
 
@@ -1156,7 +1160,7 @@ export async function executeSend(
 
     // 6. Mark sent (skip for test or when scheduler is managing recurring dates)
     if (!testEmail && !skipStatusUpdate) {
-        await db.collection('email_campaigns').doc(campaignId).update({
+        await db.collection(collectionName).doc(campaignId).update({
             status: 'sent',
             sentAt: Date.now(),
             updatedAt: Date.now(),
@@ -1186,14 +1190,14 @@ export const sendEmail = async (req: any, res: any) => {
         return;
     }
 
-    const { campaignId, churchId, testEmail } = req.body || {};
+    const { campaignId, churchId, testEmail, collectionName } = req.body || {};
     if (!campaignId || !churchId) {
         res.status(400).json({ error: 'Missing campaignId or churchId' });
         return;
     }
 
     try {
-        const result = await executeSend(db, campaignId, churchId, testEmail);
+        const result = await executeSend(db, campaignId, churchId, testEmail, false, collectionName || 'email_campaigns');
         res.json({ success: true, ...result });
     } catch (e: any) {
         const sendGridErrors = e?.response?.body?.errors;

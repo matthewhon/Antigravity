@@ -38,12 +38,13 @@ function toMmDd(dateStr?: string | null): string {
 }
 
 /** Resolve phone numbers from a PCO List or Group via the stored PCO access token. */
-async function resolvePcoPhones(
+async function resolvePcoRecipients(
     db: any,
     churchId: string,
     listId?: string,
-    groupId?: string
-): Promise<{ phones: string[]; personMap: Record<string, PersonInfo> }> {
+    groupId?: string,
+    channelType: 'sms' | 'email' | 'mms' = 'sms'
+): Promise<{ destinations: string[]; personMap: Record<string, PersonInfo> }> {
 
     const churchSnap = await db.collection('churches').doc(churchId).get();
     const church = churchSnap.data() || {};
@@ -57,7 +58,7 @@ async function resolvePcoPhones(
     } else if (groupId) {
         url = `https://api.planningcenteronline.com/groups/v2/groups/${groupId}/memberships?include=person&per_page=100`;
     } else {
-        return { phones: [], personMap: {} };
+        return { destinations: [], personMap: {} };
     }
 
     const phones: string[]                    = [];
@@ -103,9 +104,16 @@ async function resolvePcoPhones(
             const digits         = rawPhone.replace(/\D/g, '');
             const e164           = digits.length === 10 ? `+1${digits}` : digits.length === 11 ? `+${digits}` : '';
 
-            if (e164) {
-                phones.push(e164);
-                personMap[e164] = {
+            let dest = '';
+            if (channelType === 'email') {
+                dest = emailByPersonId.get(person.id) || '';
+            } else {
+                dest = e164;
+            }
+
+            if (dest) {
+                phones.push(dest);
+                personMap[dest] = {
                     personName:  attrs.name || `${attrs.first_name || ''} ${attrs.last_name || ''}`.trim(),
                     email:       emailByPersonId.get(person.id) || '',
                     phone:       e164,
@@ -121,7 +129,7 @@ async function resolvePcoPhones(
         nextUrl = data.meta?.next?.href || (data.links?.next ?? null);
     }
 
-    return { phones, personMap };
+    return { destinations: phones, personMap };
 }
 
 // ─── Birthday / Anniversary Scanner ──────────────────────────────────────────
@@ -679,31 +687,41 @@ export function startSmsCampaignScheduler(db: any): void {
                             updatedAt: Date.now(),
                         });
 
-                        // Resolve recipient phone numbers
-                        let phones: string[]                    = campaign.toPhones || [];
-                        let personMap: Record<string, PersonInfo> = {};
+                        // Check channel type
+                        const isEmail = campaign.channelType === 'email';
+                        let result: any = { sent: 0, failed: 0, optedOut: 0 };
 
-                        if (phones.length === 0 && (campaign.toListId || campaign.toGroupId)) {
-                            const resolved = await resolvePcoPhones(db, churchId, campaign.toListId, campaign.toGroupId);
-                            phones    = resolved.phones;
-                            personMap = resolved.personMap;
+                        if (isEmail) {
+                            const { executeSend } = await import('./sendEmail.js');
+                            const sendRes = await executeSend(db, campaignId, churchId, undefined, true, 'smsCampaigns');
+                            result.sent = sendRes.recipientCount;
+                        } else {
+                            // Resolve recipient phone numbers for SMS
+                            let phones: string[]                    = campaign.toPhones || [];
+                            let personMap: Record<string, PersonInfo> = {};
+
+                            if (phones.length === 0 && (campaign.toListId || campaign.toGroupId)) {
+                                const resolved = await resolvePcoRecipients(db, churchId, campaign.toListId, campaign.toGroupId, 'sms');
+                                phones    = resolved.destinations;
+                                personMap = resolved.personMap;
+                            }
+
+                            if (phones.length === 0) {
+                                throw new Error('No phone numbers resolved for this campaign.');
+                            }
+
+                            // Delegate actual send to the send-bulk endpoint
+                            const { sendBulkInternal } = await import('./twilioSend.js');
+                            result = await sendBulkInternal({
+                                db,
+                                churchId,
+                                campaignId,
+                                phones,
+                                body:       campaign.body,
+                                mediaUrls:  campaign.mediaUrls || [],
+                                personMap,
+                            });
                         }
-
-                        if (phones.length === 0) {
-                            throw new Error('No phone numbers resolved for this campaign.');
-                        }
-
-                        // Delegate actual send to the send-bulk endpoint (re-use its logic inline)
-                        const { sendBulkInternal } = await import('./twilioSend.js');
-                        const result = await sendBulkInternal({
-                            db,
-                            churchId,
-                            campaignId,
-                            phones,
-                            body:       campaign.body,
-                            mediaUrls:  campaign.mediaUrls || [],
-                            personMap,
-                        });
 
                         log.info(
                             `[SmsScheduler] Campaign ${campaignId} sent: ${result.sent} sent, ${result.failed} failed, ${result.optedOut} opted-out`,

@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
 import { db as firebaseDb } from '../services/firebase';
 import { storage } from '../services/firebase';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
@@ -284,6 +286,49 @@ interface ComposerProps {
     isSending: boolean;
 }
 
+const SimpleRichTextEditor: React.FC<{
+    value: string;
+    onChange: (html: string) => void;
+}> = ({ value, onChange }) => {
+    const editor = useEditor({
+        extensions: [StarterKit],
+        content: value,
+        onUpdate: ({ editor }) => {
+            onChange(editor.getHTML());
+        },
+    });
+
+    useEffect(() => {
+        if (editor && editor.getHTML() !== value) {
+            editor.commands.setContent(value);
+        }
+    }, [value, editor]);
+
+    if (!editor) return null;
+
+    const btn = (active: boolean) =>
+        `p-1.5 rounded transition text-xs flex items-center justify-center ${
+            active ? 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300'
+                   : 'hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400'
+        }`;
+
+    return (
+        <div className="w-full border border-slate-200 dark:border-slate-600 rounded-2xl bg-white dark:bg-slate-800 focus-within:ring-2 focus-within:ring-violet-500 overflow-hidden flex flex-col">
+            <div className="flex flex-wrap items-center gap-1 p-2 bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700">
+                <button type="button" onClick={() => editor.chain().focus().toggleBold().run()} className={btn(editor.isActive('bold'))}><Bold size={14} /></button>
+                <button type="button" onClick={() => editor.chain().focus().toggleItalic().run()} className={btn(editor.isActive('italic'))}><Italic size={14} /></button>
+                <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-1" />
+                <button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} className={btn(editor.isActive('heading', { level: 1 }))}><span className="font-bold text-[11px] leading-none">H1</span></button>
+                <button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} className={btn(editor.isActive('heading', { level: 2 }))}><span className="font-bold text-[11px] leading-none">H2</span></button>
+                <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-1" />
+                <button type="button" onClick={() => editor.chain().focus().toggleBulletList().run()} className={btn(editor.isActive('bulletList'))}><List size={14} /></button>
+                <button type="button" onClick={() => editor.chain().focus().toggleOrderedList().run()} className={btn(editor.isActive('orderedList'))}><ListOrdered size={14} /></button>
+            </div>
+            <EditorContent editor={editor} className="p-4 prose prose-sm max-w-none min-h-[150px] text-slate-900 dark:text-white focus:outline-none flex-1" />
+        </div>
+    );
+};
+
 const CampaignComposer: React.FC<ComposerProps> = ({
     campaign, churchId, onBack, onSave, onSend, onSchedule, isSending,
 }) => {
@@ -307,7 +352,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     const segments = countSegments(local.body || '');
-    const canSend  = !!(local.body?.trim()) && !!(local.toListId || local.toGroupId);
+    const canSend  = !!(local.body?.trim()) && !!(local.toListId || local.toGroupId) && (local.channelType === 'email' ? !!(local.emailSubject?.trim()) : true);
 
     const update = useCallback((patch: Partial<SmsCampaign>) => {
         setLocal(prev => ({ ...prev, ...patch }));
@@ -377,23 +422,23 @@ const CampaignComposer: React.FC<ComposerProps> = ({
     return (
         <div className="flex flex-col h-full">
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shrink-0">
-                <div className="flex items-center gap-3">
-                    <button onClick={onBack} title="Back to campaigns" className="p-1.5 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+            <div className="flex flex-wrap items-center gap-2 px-3 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shrink-0">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <button onClick={onBack} title="Back to campaigns" className="p-1.5 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition shrink-0">
                         <ArrowLeft size={18} />
                     </button>
-                    <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-                        <span className="cursor-pointer hover:text-violet-600 font-medium" onClick={onBack}>Campaigns</span>
-                        <ChevronDown size={14} className="-rotate-90" />
-                        <span className="font-semibold text-slate-900 dark:text-white truncate max-w-[200px]">{local.name}</span>
+                    <div className="flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400 min-w-0">
+                        <span className="cursor-pointer hover:text-violet-600 font-medium hidden sm:inline" onClick={onBack}>Campaigns</span>
+                        <ChevronDown size={14} className="-rotate-90 hidden sm:block" />
+                        <span className="font-semibold text-slate-900 dark:text-white truncate">{local.name}</span>
                     </div>
                     {lastSaved && (
-                        <span className="text-[10px] font-medium text-emerald-500 flex items-center gap-1">
+                        <span className="text-[10px] font-medium text-emerald-500 flex items-center gap-1 shrink-0">
                             <CheckCircle size={11} /> Saved
                         </span>
                     )}
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
                     {local.status !== 'scheduled' && (
                         <button
                             onClick={() => setShowSchedule(true)}
@@ -413,10 +458,10 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                 </div>
             </div>
 
-            {/* Body — side by side on large screens */}
-            <div className="flex flex-1 overflow-hidden">
-                {/* Left: Config column */}
-                <div className="w-[420px] shrink-0 overflow-y-auto border-r border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 p-5 space-y-4">
+            {/* Body — stacked on mobile, side-by-side on desktop */}
+            <div className="flex flex-col md:flex-row flex-1 overflow-hidden overflow-y-auto md:overflow-hidden">
+                {/* Config column */}
+                <div className="w-full md:w-[380px] md:shrink-0 md:overflow-y-auto md:border-r border-b md:border-b-0 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 p-4 space-y-4">
 
                     {/* Campaign name */}
                     <div>
@@ -428,6 +473,25 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                             className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
                             placeholder="e.g. Sunday Service Reminder"
                         />
+                    </div>
+
+                    {/* Channel Toggle */}
+                    <div>
+                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">Broadcast Type</label>
+                        <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
+                            <button
+                                onClick={() => update({ channelType: 'sms' })}
+                                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-bold rounded-lg transition ${(!local.channelType || local.channelType === 'sms') ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm border border-slate-200 dark:border-slate-600' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                            >
+                                <MessageSquare size={14} /> SMS Text
+                            </button>
+                            <button
+                                onClick={() => update({ channelType: 'email' })}
+                                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-bold rounded-lg transition ${local.channelType === 'email' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm border border-slate-200 dark:border-slate-600' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                            >
+                                <Mail size={14} /> Email
+                            </button>
+                        </div>
                     </div>
 
                     {/* Recipients */}
@@ -517,159 +581,180 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                     )}
                 </div>
 
-                {/* Right: Message composer */}
-                <div className="flex-1 overflow-y-auto p-6">
+                {/* Message composer */}
+                <div className="flex-1 md:overflow-y-auto p-4">
                     <div className="max-w-xl mx-auto space-y-4">
 
                         {/* Message body */}
                         <div>
-                            <div className="flex items-center justify-between mb-2">
-                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Message</label>
-                                <span className={`text-xs font-bold ${segments > 3 ? 'text-red-500' : segments > 1 ? 'text-amber-600' : 'text-slate-400'}`}>
-                                    {local.body?.length ?? 0} chars · {segments} segment{segments !== 1 ? 's' : ''}
-                                </span>
-                            </div>
-                            <textarea
-                                ref={textareaRef}
-                                rows={8}
-                                value={local.body || ''}
-                                onChange={e => update({ body: e.target.value })}
-                                placeholder="Type your message here…"
-                                className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none font-medium leading-relaxed"
-                            />
-                            {/* Composer toolbar */}
-                            <div className="flex items-center gap-1 mt-2 flex-wrap">
-                                {/* Emoji picker */}
-                                <div className="relative">
-                                    <button
-                                        type="button"
-                                        title="Insert emoji"
-                                        onClick={() => { setShowEmojis(v => !v); setShowLinkDlg(false); }}
-                                        className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition"
-                                    >
-                                        <Smile size={13} /> Emoji
-                                    </button>
-                                    {showEmojis && (
-                                        <div className="absolute top-full left-0 mt-1 z-30 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-3 grid grid-cols-10 gap-1 min-w-[260px]">
-                                            {COMMON_EMOJIS.map(em => (
-                                                <button key={em} onClick={() => { insertAtCursor(em); setShowEmojis(false); }}
-                                                    className="text-xl hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg p-1 transition leading-none"
-                                                    title={em}>
-                                                    {em}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                                {/* Link inserter */}
-                                <div className="relative">
-                                    <button
-                                        type="button"
-                                        title="Insert link"
-                                        onClick={() => { setShowLinkDlg(v => !v); setShowEmojis(false); }}
-                                        className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition"
-                                    >
-                                        <Link size={13} /> Link
-                                    </button>
-                                    {showLinkDlg && (
-                                        <div className="absolute top-full left-0 mt-1 z-30 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-3 w-72">
-                                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Insert Link URL</p>
-                                            <div className="flex gap-2">
-                                                <input
-                                                    type="url"
-                                                    value={linkUrl}
-                                                    onChange={e => setLinkUrl(e.target.value)}
-                                                    placeholder="https://example.com"
-                                                    className="flex-1 text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
-                                                />
-                                                <button
-                                                    onClick={() => { if (linkUrl.trim()) { insertAtCursor(' ' + linkUrl.trim()); setLinkUrl(''); setShowLinkDlg(false); } }}
-                                                    className="px-3 py-2 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold rounded-xl transition"
-                                                >Insert</button>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                                {/* Image URL */}
-                                <button
-                                    type="button"
-                                    title="Attach image (MMS)"
-                                    onClick={() => {
-                                        const url = window.prompt('Enter image URL (MMS — may incur additional carrier fees):');
-                                        if (url) { setImageUrl(url); update({ mediaUrls: [url] }); }
-                                    }}
-                                    className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition ${
-                                        imageUrl ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
-                                        : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700'
-                                    }`}
-                                >
-                                    <ImageIcon size={13} /> {imageUrl ? 'Image ✓' : 'Image'}
-                                </button>
-                                {imageUrl && (
-                                    <button
-                                        type="button"
-                                        title="Remove image"
-                                        onClick={() => { setImageUrl(''); update({ mediaUrls: [] }); }}
-                                        className="p-1.5 text-red-400 hover:text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition"
-                                    >
-                                        <X size={13} />
-                                    </button>
-                                )}
-                                <div className="flex-1" />
-                                {/* AI Helper */}
-                                <button
-                                    type="button"
-                                    title="AI SMS helper — suggest shorter message"
-                                    onClick={handleAiSuggest}
-                                    disabled={!local.body?.trim() || aiLoading}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-700 hover:bg-violet-100 dark:hover:bg-violet-900/40 disabled:opacity-50 transition"
-                                >
-                                    {aiLoading ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
-                                    AI Shorten
-                                </button>
-                            </div>
-                            {/* Image preview */}
-                            {imageUrl && (
-                                <div className="mt-2 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 max-w-[200px]">
-                                    <img src={imageUrl} alt="MMS attachment" className="w-full h-auto object-cover" onError={() => setImageUrl('')} />
-                                </div>
-                            )}
-                            {/* AI suggestion panel */}
-                            {showAiPanel && (
-                                <div className="mt-3 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700 rounded-2xl p-4">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <span className="text-[10px] font-black uppercase tracking-widest text-violet-500 flex items-center gap-1.5"><Sparkles size={11} /> AI Suggestion</span>
-                                        <button onClick={() => setShowAiPanel(false)} title="Dismiss AI suggestion" className="text-violet-400 hover:text-violet-600"><X size={14} /></button>
+                            {local.channelType === 'email' ? (
+                                <>
+                                    <div className="mb-4">
+                                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">Email Subject</label>
+                                        <input
+                                            type="text"
+                                            value={local.emailSubject || ''}
+                                            onChange={e => update({ emailSubject: e.target.value })}
+                                            className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                            placeholder="Enter subject line…"
+                                        />
                                     </div>
-                                    {aiLoading ? (
-                                        <div className="flex items-center gap-2 text-sm text-violet-500"><Loader2 size={14} className="animate-spin" /> Analyzing your message…</div>
-                                    ) : (
-                                        <>
-                                            <p className="text-sm text-violet-800 dark:text-violet-200 leading-relaxed whitespace-pre-wrap mb-3">{aiSuggestion}</p>
-                                            <div className="flex items-center gap-2">
-                                                <span className={`text-xs font-bold ${ countSegments(aiSuggestion) > 1 ? 'text-amber-600' : 'text-emerald-600' }`}>
-                                                    {aiSuggestion.length} chars · {countSegments(aiSuggestion)} seg
-                                                </span>
-                                                <div className="flex-1" />
-                                                <button
-                                                    onClick={() => { update({ body: aiSuggestion }); setShowAiPanel(false); }}
-                                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-violet-600 hover:bg-violet-700 text-white rounded-xl transition"
-                                                >
-                                                    <ChevronRight size={12} /> Use This
-                                                </button>
-                                                <button
-                                                    onClick={handleAiSuggest}
-                                                    title="Regenerate AI suggestion"
-                                                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 rounded-xl hover:bg-violet-200 transition"
-                                                >
-                                                    <RotateCcw size={11} /> Retry
-                                                </button>
-                                            </div>
-                                        </>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Email Body</label>
+                                    </div>
+                                    <SimpleRichTextEditor value={local.body || ''} onChange={body => update({ body })} />
+                                </>
+                            ) : (
+                                <>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Message</label>
+                                        <span className={`text-xs font-bold ${segments > 3 ? 'text-red-500' : segments > 1 ? 'text-amber-600' : 'text-slate-400'}`}>
+                                            {local.body?.length ?? 0} chars · {segments} segment{segments !== 1 ? 's' : ''}
+                                        </span>
+                                    </div>
+                                    <textarea
+                                        ref={textareaRef}
+                                        rows={8}
+                                        value={local.body || ''}
+                                        onChange={e => update({ body: e.target.value })}
+                                        placeholder="Type your message here…"
+                                        className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none font-medium leading-relaxed"
+                                    />
+                                    {/* Composer toolbar */}
+                                    <div className="flex items-center gap-1 mt-2 flex-wrap">
+                                        {/* Emoji picker */}
+                                        <div className="relative">
+                                            <button
+                                                type="button"
+                                                title="Insert emoji"
+                                                onClick={() => { setShowEmojis(v => !v); setShowLinkDlg(false); }}
+                                                className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition"
+                                            >
+                                                <Smile size={13} /> Emoji
+                                            </button>
+                                            {showEmojis && (
+                                                <div className="absolute top-full left-0 mt-1 z-30 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-3 grid grid-cols-10 gap-1 min-w-[260px]">
+                                                    {COMMON_EMOJIS.map(em => (
+                                                        <button key={em} onClick={() => { insertAtCursor(em); setShowEmojis(false); }}
+                                                            className="text-xl hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg p-1 transition leading-none"
+                                                            title={em}>
+                                                            {em}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                        {/* Link inserter */}
+                                        <div className="relative">
+                                            <button
+                                                type="button"
+                                                title="Insert link"
+                                                onClick={() => { setShowLinkDlg(v => !v); setShowEmojis(false); }}
+                                                className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition"
+                                            >
+                                                <Link size={13} /> Link
+                                            </button>
+                                            {showLinkDlg && (
+                                                <div className="absolute top-full left-0 mt-1 z-30 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-3 w-72">
+                                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Insert Link URL</p>
+                                                    <div className="flex gap-2">
+                                                        <input
+                                                            type="url"
+                                                            value={linkUrl}
+                                                            onChange={e => setLinkUrl(e.target.value)}
+                                                            placeholder="https://example.com"
+                                                            className="flex-1 text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                                        />
+                                                        <button
+                                                            onClick={() => { if (linkUrl.trim()) { insertAtCursor(' ' + linkUrl.trim()); setLinkUrl(''); setShowLinkDlg(false); } }}
+                                                            className="px-3 py-2 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold rounded-xl transition"
+                                                        >Insert</button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                        {/* Image URL */}
+                                        <button
+                                            type="button"
+                                            title="Attach image (MMS)"
+                                            onClick={() => {
+                                                const url = window.prompt('Enter image URL (MMS — may incur additional carrier fees):');
+                                                if (url) { setImageUrl(url); update({ mediaUrls: [url] }); }
+                                            }}
+                                            className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition ${
+                                                imageUrl ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
+                                                : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700'
+                                            }`}
+                                        >
+                                            <ImageIcon size={13} /> {imageUrl ? 'Image ✓' : 'Image'}
+                                        </button>
+                                        {imageUrl && (
+                                            <button
+                                                type="button"
+                                                title="Remove image"
+                                                onClick={() => { setImageUrl(''); update({ mediaUrls: [] }); }}
+                                                className="p-1.5 text-red-400 hover:text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition"
+                                            >
+                                                <X size={13} />
+                                            </button>
+                                        )}
+                                        <div className="flex-1" />
+                                        {/* AI Helper */}
+                                        <button
+                                            type="button"
+                                            title="AI SMS helper — suggest shorter message"
+                                            onClick={handleAiSuggest}
+                                            disabled={!local.body?.trim() || aiLoading}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-700 hover:bg-violet-100 dark:hover:bg-violet-900/40 disabled:opacity-50 transition"
+                                        >
+                                            {aiLoading ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+                                            AI Shorten
+                                        </button>
+                                    </div>
+                                    {/* Image preview */}
+                                    {imageUrl && (
+                                        <div className="mt-2 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 max-w-[200px]">
+                                            <img src={imageUrl} alt="MMS attachment" className="w-full h-auto object-cover" onError={() => setImageUrl('')} />
+                                        </div>
                                     )}
-                                </div>
+                                    {/* AI suggestion panel */}
+                                    {showAiPanel && (
+                                        <div className="mt-3 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700 rounded-2xl p-4">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <span className="text-[10px] font-black uppercase tracking-widest text-violet-500 flex items-center gap-1.5"><Sparkles size={11} /> AI Suggestion</span>
+                                                <button onClick={() => setShowAiPanel(false)} title="Dismiss AI suggestion" className="text-violet-400 hover:text-violet-600"><X size={14} /></button>
+                                            </div>
+                                            {aiLoading ? (
+                                                <div className="flex items-center gap-2 text-sm text-violet-500"><Loader2 size={14} className="animate-spin" /> Analyzing your message…</div>
+                                            ) : (
+                                                <>
+                                                    <p className="text-sm text-violet-800 dark:text-violet-200 leading-relaxed whitespace-pre-wrap mb-3">{aiSuggestion}</p>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={`text-xs font-bold ${ countSegments(aiSuggestion) > 1 ? 'text-amber-600' : 'text-emerald-600' }`}>
+                                                            {aiSuggestion.length} chars · {countSegments(aiSuggestion)} seg
+                                                        </span>
+                                                        <div className="flex-1" />
+                                                        <button
+                                                            onClick={() => { update({ body: aiSuggestion }); setShowAiPanel(false); }}
+                                                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-violet-600 hover:bg-violet-700 text-white rounded-xl transition"
+                                                        >
+                                                            <ChevronRight size={12} /> Use This
+                                                        </button>
+                                                        <button
+                                                            onClick={handleAiSuggest}
+                                                            title="Regenerate AI suggestion"
+                                                            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 rounded-xl hover:bg-violet-200 transition"
+                                                        >
+                                                            <RotateCcw size={11} /> Retry
+                                                        </button>
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
+                                    )}
+                                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">{SEGMENT_NOTE}</p>
+                                </>
                             )}
-                            <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">{SEGMENT_NOTE}</p>
                         </div>
 
                         {/* Merge tag quick-inserts */}
@@ -753,17 +838,17 @@ const CampaignList: React.FC<{
     };
 
     return (
-        <div className="p-6 max-w-4xl mx-auto">
+        <div className="p-4 max-w-4xl mx-auto">
             {/* Header */}
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-wrap items-start justify-between gap-3 mb-5">
                 <div>
-                    <h1 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-3">
-                        <MessageSquare size={26} className="text-violet-500" /> Text Campaigns
+                    <h1 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
+                        <MessageSquare size={22} className="text-violet-500" /> Text Campaigns
                     </h1>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Send bulk SMS to your Planning Center audience</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Send bulk SMS to your congregation</p>
                 </div>
                 <button onClick={onCreate} className="flex items-center gap-2 px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold rounded-xl transition shadow-md shadow-violet-200 dark:shadow-violet-900/40">
-                    <Plus size={16} /> New Campaign
+                    <Plus size={16} /> New
                 </button>
             </div>
 
@@ -801,35 +886,40 @@ const CampaignList: React.FC<{
                         return (
                             <div
                                 key={c.id}
-                                className="flex items-center gap-4 p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl hover:border-violet-300 dark:hover:border-violet-600 transition cursor-pointer group"
+                                className="p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl hover:border-violet-300 dark:hover:border-violet-600 transition cursor-pointer"
                                 onClick={() => onOpen(c)}
                             >
-                                <div className="w-10 h-10 rounded-xl bg-violet-50 dark:bg-violet-900/30 flex items-center justify-center shrink-0">
-                                    <MessageSquare size={18} className="text-violet-500" />
-                                </div>
-                                <div className="flex-grow min-w-0">
-                                    <div className="font-bold text-slate-900 dark:text-white truncate">{c.name}</div>
-                                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 flex flex-wrap gap-x-2">
-                                        {c.toListName && <span>· List: {c.toListName}</span>}
-                                        {c.toGroupName && <span>· Group: {c.toGroupName}</span>}
-                                        {c.status === 'sent' && c.sentAt && (
-                                            <span className="text-emerald-600 dark:text-emerald-400">
-                                                · Sent {new Date(c.sentAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · {c.deliveredCount ?? 0} delivered
-                                            </span>
-                                        )}
-                                        {c.status === 'scheduled' && c.scheduledAt && (
-                                            <span className="text-amber-600 dark:text-amber-400">
-                                                {c.recurringFrequency ? `· Repeats ${c.recurringFrequency}. Next: ` : '· Scheduled: '}
-                                                {new Date(c.scheduledAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
-                                            </span>
-                                        )}
-                                        {c.status === 'failed' && c.lastError && <span className="text-red-500">· Failed</span>}
+                                <div className="flex items-start gap-3">
+                                    <div className="w-9 h-9 rounded-xl bg-violet-50 dark:bg-violet-900/30 flex items-center justify-center shrink-0 mt-0.5">
+                                        {c.channelType === 'email' ? <Mail size={16} className="text-violet-500" /> : <MessageSquare size={16} className="text-violet-500" />}
                                     </div>
-                                </div>
-                                <span className={`text-xs font-bold px-2.5 py-1 rounded-full shrink-0 ${si.color}`}>{si.label}</span>
-                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition shrink-0">
-                                    <button onClick={e => { e.stopPropagation(); onDuplicate(c); }} className="p-1.5 text-slate-400 hover:text-violet-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition" title="Duplicate"><Copy size={14} /></button>
-                                    <button onClick={e => { e.stopPropagation(); onDelete(c.id); }} className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition" title="Delete"><Trash2 size={14} /></button>
+                                    <div className="flex-grow min-w-0">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <span className="font-bold text-slate-900 dark:text-white truncate">{c.name}</span>
+                                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full shrink-0 ${si.color}`}>{si.label}</span>
+                                        </div>
+                                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 space-y-0.5">
+                                            {c.toListName && <div>List: {c.toListName}</div>}
+                                            {c.toGroupName && <div>Group: {c.toGroupName}</div>}
+                                            {c.status === 'sent' && c.sentAt && (
+                                                <div className="text-emerald-600 dark:text-emerald-400">
+                                                    Sent {new Date(c.sentAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · {c.deliveredCount ?? 0} delivered
+                                                </div>
+                                            )}
+                                            {c.status === 'scheduled' && c.scheduledAt && (
+                                                <div className="text-amber-600 dark:text-amber-400">
+                                                    {c.recurringFrequency ? `Repeats ${c.recurringFrequency}. Next: ` : 'Scheduled: '}
+                                                    {new Date(c.scheduledAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                                                </div>
+                                            )}
+                                            {c.status === 'failed' && c.lastError && <div className="text-red-500">Send failed</div>}
+                                        </div>
+                                    </div>
+                                    {/* Always-visible action buttons (no hover-only on touch) */}
+                                    <div className="flex items-center gap-1 shrink-0">
+                                        <button onClick={e => { e.stopPropagation(); onDuplicate(c); }} className="p-1.5 text-slate-400 hover:text-violet-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition" title="Duplicate"><Copy size={14} /></button>
+                                        <button onClick={e => { e.stopPropagation(); onDelete(c.id); }} className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition" title="Delete"><Trash2 size={14} /></button>
+                                    </div>
                                 </div>
                             </div>
                         );
@@ -1589,6 +1679,10 @@ const SmsInbox: React.FC<{
     const [activeConv, setActiveConv]       = useState<SmsConversation | null>(null);
     const [messages, setMessages]           = useState<SmsMessage[]>([]);
     const [replyBody, setReplyBody]         = useState('');
+    const [replyMediaUrl, setReplyMediaUrl] = useState('');
+    const [replyUploading, setReplyUploading] = useState(false);
+    const [replyUploadPct, setReplyUploadPct] = useState(0);
+    const replyFileRef = useRef<HTMLInputElement>(null);
     const [loadingMsgs, setLoadingMsgs]     = useState(false);
     const [isSending, setIsSending]         = useState(false);
     const [search, setSearch]               = useState('');
@@ -1799,25 +1893,60 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
         return matchSearch && matchTag;
     });
 
-    const handleSendReply = async () => {
+    /** Upload a file to Firebase Storage and return the public download URL. */
+    const uploadReplyImage = async (file: File): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            const path = `sms-media/${churchId}/${Date.now()}_${file.name}`;
+            const fileRef = storageRef(storage, path);
+            const task = uploadBytesResumable(fileRef, file);
+            task.on('state_changed',
+                snap => setReplyUploadPct(Math.round((snap.bytesTransferred / snap.totalBytes) * 100)),
+                err => reject(err),
+                () => getDownloadURL(task.snapshot.ref).then(resolve).catch(reject)
+            );
+        });
+    };
 
-        if (!replyBody.trim() || !activeConv || isSending) return;
+    const handleReplyFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setReplyUploading(true);
+        setReplyUploadPct(0);
+        try {
+            const url = await uploadReplyImage(file);
+            setReplyMediaUrl(url);
+        } catch {
+            showInboxToast('Image upload failed. Please try again.', 'error');
+        } finally {
+            setReplyUploading(false);
+            // reset so the same file can be reselected
+            if (replyFileRef.current) replyFileRef.current.value = '';
+        }
+    };
+
+    const handleSendReply = async () => {
+        const hasBody  = !!replyBody.trim();
+        const hasMedia = !!replyMediaUrl;
+        if ((!hasBody && !hasMedia) || !activeConv || isSending) return;
         setIsSending(true);
         try {
+            const payload: Record<string, any> = {
+                churchId,
+                toPhone: activeConv.phoneNumber,
+                body: replyBody,
+                sentBy: currentUser.id,
+                sentByName: currentUser.name,
+            };
+            if (hasMedia) payload.mediaUrls = [replyMediaUrl];
             const res = await fetch(`${API_BASE}/api/messaging/send-individual`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    churchId,
-                    toPhone: activeConv.phoneNumber,
-                    body: replyBody,
-                    sentBy: currentUser.id,
-                    sentByName: currentUser.name,
-                }),
+                body: JSON.stringify(payload),
             });
             const data = await res.json();
             if (!data.success) throw new Error(data.error || 'Send failed');
             setReplyBody('');
+            setReplyMediaUrl('');
         } catch (e: any) {
             alert('Failed to send: ' + e.message);
         } finally {
@@ -2149,7 +2278,53 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                 <AlertTriangle size={13} /> This contact has opted out. You cannot send them messages.
                             </div>
                         ) : (
-                            <div className="space-y-1.5">
+                            <div className="space-y-2">
+                                {/* Image attachment preview */}
+                                {(replyMediaUrl || replyUploading) && (
+                                    <div className="flex items-center gap-2 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-xl">
+                                        {replyUploading ? (
+                                            <>
+                                                <Loader2 size={14} className="animate-spin text-blue-500 shrink-0" />
+                                                <div className="flex-1">
+                                                    <div className="h-1.5 bg-blue-200 dark:bg-blue-800 rounded-full overflow-hidden">
+                                                        <div
+                                                            className="h-full bg-blue-500 rounded-full transition-all"
+                                                            style={{ width: `${replyUploadPct}%` }}
+                                                        />
+                                                    </div>
+                                                    <p className="text-[10px] text-blue-600 dark:text-blue-400 mt-0.5 font-semibold">Uploading… {replyUploadPct}%</p>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <img
+                                                    src={replyMediaUrl}
+                                                    alt="MMS attachment"
+                                                    className="w-12 h-12 object-cover rounded-lg shrink-0 border border-blue-200 dark:border-blue-700"
+                                                />
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-xs font-semibold text-blue-700 dark:text-blue-300 truncate">Image attached (MMS)</p>
+                                                    <p className="text-[10px] text-blue-500 dark:text-blue-400">Will be sent as MMS</p>
+                                                </div>
+                                                <button
+                                                    onClick={() => setReplyMediaUrl('')}
+                                                    title="Remove image"
+                                                    className="p-1 text-blue-400 hover:text-red-500 rounded-lg transition shrink-0"
+                                                >
+                                                    <X size={14} />
+                                                </button>
+                                            </>
+                                        )}
+                                    </div>
+                                )}
+                                {/* Hidden file input */}
+                                <input
+                                    ref={replyFileRef}
+                                    type="file"
+                                    accept="image/jpeg,image/png,image/gif,image/webp"
+                                    className="hidden"
+                                    onChange={handleReplyFileChange}
+                                />
                                 <div className="flex items-end gap-2">
                                     {/* AI suggest button — always visible in inbox */}
                                     <button
@@ -2167,30 +2342,52 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                         rows={2}
                                         value={replyBody}
                                         onChange={e => setReplyBody(e.target.value)}
-                                        placeholder="Type a reply…"
+                                        placeholder={replyMediaUrl ? 'Add a caption (optional)…' : 'Type a reply…'}
                                         onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendReply(); }}}
                                         className="flex-1 text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
                                     />
+                                    {/* Attach image button */}
+                                    <button
+                                        onClick={() => replyFileRef.current?.click()}
+                                        disabled={replyUploading || isSending}
+                                        title="Attach image (sends as MMS)"
+                                        className={`flex items-center justify-center w-10 h-10 shrink-0 rounded-xl border transition disabled:opacity-50 ${
+                                            replyMediaUrl
+                                                ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 border-blue-300 dark:border-blue-700'
+                                                : 'bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-500 hover:border-blue-300'
+                                        }`}
+                                    >
+                                        <ImageIcon size={16} />
+                                    </button>
                                     <button
                                         onClick={handleSendReply}
-                                        disabled={!replyBody.trim() || isSending}
+                                        disabled={(!replyBody.trim() && !replyMediaUrl) || isSending || replyUploading}
                                         className="px-4 py-2.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-xl transition font-bold shrink-0"
                                     >
                                         {isSending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
                                     </button>
                                 </div>
-                                {/* AI shorten + char counter — always visible when there's draft text */}
-                                {replyBody.trim() && (
-                                    <div className="flex items-center justify-between px-1">
-                                        <button
-                                            onClick={handleAiShorten}
-                                            disabled={aiGenerating || replyBody.length <= 160}
-                                            title={replyBody.length <= 160 ? 'Already under 160 characters' : 'AI: Shorten to under 160 characters'}
-                                            className="flex items-center gap-1 text-[10px] font-bold text-violet-500 dark:text-violet-400 hover:text-violet-700 dark:hover:text-violet-200 disabled:opacity-40 transition"
-                                        >
-                                            <Sparkles size={11} />
-                                            {aiGenerating ? 'Shortening…' : 'Shorten to 160'}
-                                        </button>
+                                {/* AI shorten + char counter + MMS badge */}
+                                <div className="flex items-center justify-between px-1">
+                                    <div className="flex items-center gap-2">
+                                        {replyBody.trim() && (
+                                            <button
+                                                onClick={handleAiShorten}
+                                                disabled={aiGenerating || replyBody.length <= 160}
+                                                title={replyBody.length <= 160 ? 'Already under 160 characters' : 'AI: Shorten to under 160 characters'}
+                                                className="flex items-center gap-1 text-[10px] font-bold text-violet-500 dark:text-violet-400 hover:text-violet-700 dark:hover:text-violet-200 disabled:opacity-40 transition"
+                                            >
+                                                <Sparkles size={11} />
+                                                {aiGenerating ? 'Shortening…' : 'Shorten to 160'}
+                                            </button>
+                                        )}
+                                        {replyMediaUrl && (
+                                            <span className="flex items-center gap-1 text-[10px] font-bold text-blue-500 dark:text-blue-400">
+                                                <ImageIcon size={10} /> MMS
+                                            </span>
+                                        )}
+                                    </div>
+                                    {replyBody.trim() && (
                                         <span className={`text-[10px] font-mono tabular-nums font-bold transition-colors ${
                                             replyBody.length > 160 ? 'text-red-500' :
                                             replyBody.length > 120 ? 'text-amber-500' :
@@ -2198,8 +2395,8 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                         }`}>
                                             {replyBody.length}/160
                                         </span>
-                                    </div>
-                                )}
+                                    )}
+                                </div>
                             </div>
                         )}
                     </div>
@@ -2622,31 +2819,31 @@ const SmsKeywordsManager: React.FC<{
     };
 
     return (
-        <div className="p-6 max-w-4xl mx-auto">
+        <div className="p-4 max-w-4xl mx-auto">
             {/* Section toggle */}
-            <div className="flex items-center gap-4 mb-6">
+            <div className="flex flex-wrap items-center gap-3 mb-5">
                 <div className="flex gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
                     <button
                         onClick={() => setActiveSection('keywords')}
-                        className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-semibold transition ${
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition ${
                             activeSection === 'keywords' ? 'bg-white dark:bg-slate-700 text-violet-600 dark:text-violet-300 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'
                         }`}
                     ><Key size={13} /> Keywords</button>
                     <button
                         onClick={() => setActiveSection('tags')}
-                        className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-semibold transition ${
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition ${
                             activeSection === 'tags' ? 'bg-white dark:bg-slate-700 text-violet-600 dark:text-violet-300 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'
                         }`}
                     ><Tag size={13} /> Tags</button>
                 </div>
                 {activeSection === 'keywords' && (
-                    <button onClick={openNew} className="ml-auto flex items-center gap-2 px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold rounded-xl transition shadow-md shadow-violet-200 dark:shadow-violet-900/40">
-                        <Plus size={16} /> New Keyword
+                    <button onClick={openNew} className="ml-auto flex items-center gap-2 px-3 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold rounded-xl transition">
+                        <Plus size={14} /> New Keyword
                     </button>
                 )}
                 {activeSection === 'tags' && (
-                    <button onClick={openNewTag} className="ml-auto flex items-center gap-2 px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold rounded-xl transition shadow-md shadow-violet-200 dark:shadow-violet-900/40">
-                        <Plus size={16} /> New Tag
+                    <button onClick={openNewTag} className="ml-auto flex items-center gap-2 px-3 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold rounded-xl transition">
+                        <Plus size={14} /> New Tag
                     </button>
                 )}
             </div>
@@ -2655,12 +2852,12 @@ const SmsKeywordsManager: React.FC<{
             {activeSection === 'keywords' && (
             <>
             {/* How it works banner */}
-            <div className="flex items-start gap-4 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-2xl p-4 mb-6">
-                <div className="text-3xl">💡</div>
+            <div className="flex items-start gap-3 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-2xl p-3 mb-5">
+                <div className="text-2xl shrink-0">💡</div>
                 <div>
-                    <p className="text-sm font-bold text-violet-800 dark:text-violet-200 mb-1">How Keywords Work</p>
+                    <p className="text-sm font-bold text-violet-800 dark:text-violet-200 mb-0.5">How Keywords Work</p>
                     <p className="text-xs text-violet-700 dark:text-violet-300 leading-relaxed">
-                        When someone texts your church number with just the keyword (e.g. <span className="font-mono font-bold bg-violet-100 dark:bg-violet-900/60 px-1 rounded">YOUTH</span>), they receive your auto-reply instantly. Carrier-mandated STOP/HELP responses take priority and cannot be overridden. Each keyword is matched against the first word of any inbound message.
+                        When someone texts your church number with just the keyword (e.g. <span className="font-mono font-bold bg-violet-100 dark:bg-violet-900/60 px-1 rounded">YOUTH</span>), they receive your auto-reply instantly. Carrier-mandated STOP/HELP responses take priority and cannot be overridden.
                     </p>
                 </div>
             </div>
@@ -2690,60 +2887,60 @@ const SmsKeywordsManager: React.FC<{
                         return (
                         <div
                             key={kw.id}
-                            className="flex items-center gap-4 p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl hover:border-violet-200 dark:hover:border-violet-700 transition group"
+                            className="p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl hover:border-violet-200 dark:hover:border-violet-700 transition"
                         >
-                            {/* Keyword badge */}
-                            <div className={`shrink-0 px-3 py-2 rounded-xl text-sm font-black tracking-widest ${kw.isActive ? 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-200' : 'bg-slate-100 dark:bg-slate-700 text-slate-400 line-through'}`}>
-                                {kw.keyword}
-                            </div>
-
-                            {/* Reply preview */}
-                            <div className="flex-1 min-w-0">
-                                <p className="text-sm text-slate-700 dark:text-slate-300 truncate">{kw.replyMessage}</p>
-                                <div className="flex items-center flex-wrap gap-x-3 gap-y-1 mt-0.5">
-                                    {kw.addToListName && (
-                                        <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1">
-                                            <Users size={10} /> → {kw.addToListName}
-                                        </span>
-                                    )}
-                                    {kw.linkedPollTitle && (
-                                        <span className="text-[10px] text-violet-600 dark:text-violet-400 font-semibold flex items-center gap-1">
-                                            <Tv2 size={10} /> Poll: {kw.linkedPollTitle}
-                                        </span>
-                                    )}
-                                    {kwTags.map(t => (
-                                        <SmsTagChip key={t.id} tag={t} />
-                                    ))}
-                                    <span className="text-[10px] text-slate-400">
-                                        {new Date(kw.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                    </span>
+                            <div className="flex items-start gap-3">
+                                {/* Keyword badge */}
+                                <div className={`shrink-0 px-2.5 py-1.5 rounded-xl text-sm font-black tracking-widest self-start ${kw.isActive ? 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-200' : 'bg-slate-100 dark:bg-slate-700 text-slate-400 line-through'}`}>
+                                    {kw.keyword}
                                 </div>
-                            </div>
 
-                            {/* Match count */}
-                            <div className="text-center shrink-0">
-                                <p className="text-xl font-black text-violet-600 dark:text-violet-300">{kw.matchCount}</p>
-                                <p className="text-[10px] text-slate-400 uppercase tracking-widest">matches</p>
-                            </div>
+                                {/* Reply preview */}
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm text-slate-700 dark:text-slate-300">{kw.replyMessage}</p>
+                                    <div className="flex items-center flex-wrap gap-x-3 gap-y-1 mt-1">
+                                        {kw.addToListName && (
+                                            <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1">
+                                                <Users size={10} /> → {kw.addToListName}
+                                            </span>
+                                        )}
+                                        {kw.linkedPollTitle && (
+                                            <span className="text-[10px] text-violet-600 dark:text-violet-400 font-semibold flex items-center gap-1">
+                                                <Tv2 size={10} /> Poll: {kw.linkedPollTitle}
+                                            </span>
+                                        )}
+                                        {kwTags.map(t => (
+                                            <SmsTagChip key={t.id} tag={t} />
+                                        ))}
+                                        <span className="text-[10px] text-slate-400">
+                                            {new Date(kw.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                        </span>
+                                    </div>
+                                </div>
 
-                            {/* Toggle + actions */}
-                            <div className="flex items-center gap-2 shrink-0">
-                                {/* Active toggle */}
-                                <button
-                                    onClick={() => handleToggleActive(kw)}
-                                    title={kw.isActive ? 'Deactivate' : 'Activate'}
-                                    className={`relative w-11 h-6 rounded-full transition-colors ${kw.isActive ? 'bg-violet-600' : 'bg-slate-300 dark:bg-slate-600'}`}
-                                >
-                                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${kw.isActive ? 'translate-x-5' : 'translate-x-0'}`} />
-                                </button>
-
-                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
-                                    <button onClick={() => openEdit(kw)} className="p-1.5 text-slate-400 hover:text-violet-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition" title="Edit">
-                                        <Pencil size={14} />
+                                {/* Match count + actions */}
+                                <div className="flex items-center gap-2 shrink-0">
+                                    <div className="text-center hidden sm:block">
+                                        <p className="text-lg font-black text-violet-600 dark:text-violet-300">{kw.matchCount}</p>
+                                        <p className="text-[10px] text-slate-400 uppercase tracking-widest">matches</p>
+                                    </div>
+                                    {/* Active toggle */}
+                                    <button
+                                        onClick={() => handleToggleActive(kw)}
+                                        title={kw.isActive ? 'Deactivate' : 'Activate'}
+                                        className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${kw.isActive ? 'bg-violet-600' : 'bg-slate-300 dark:bg-slate-600'}`}
+                                    >
+                                        <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${kw.isActive ? 'translate-x-5' : 'translate-x-0'}`} />
                                     </button>
-                                    <button onClick={() => handleDelete(kw)} className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition" title="Delete">
-                                        <Trash2 size={14} />
-                                    </button>
+                                    {/* Always-visible on mobile */}
+                                    <div className="flex items-center gap-1">
+                                        <button onClick={() => openEdit(kw)} className="p-1.5 text-slate-400 hover:text-violet-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition" title="Edit">
+                                            <Pencil size={14} />
+                                        </button>
+                                        <button onClick={() => handleDelete(kw)} className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition" title="Delete">
+                                            <Trash2 size={14} />
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -4061,7 +4258,8 @@ const BranchNodeCard: React.FC<{
     pcoLists: { id: string; name: string }[];
     pcoGroups: { id: string; name: string }[];
     smsTags: SmsTag[];
-}> = ({ node, onChange, onDelete, pcoLists, pcoGroups, smsTags }) => {
+    churchId: string;
+}> = ({ node, onChange, onDelete, pcoLists, pcoGroups, smsTags, churchId }) => {
     const [expanded, setExpanded] = useState(true);
     const condType = node.conditionType;
 
@@ -4176,7 +4374,7 @@ const BranchNodeCard: React.FC<{
                                             onChange={p => updateThenNode(i, p)}
                                             onDelete={() => deleteThenNode(i)}
                                             onMoveUp={() => {}} onMoveDown={() => {}}
-                                            pcoLists={pcoLists} pcoGroups={pcoGroups} isSubStep
+                                            pcoLists={pcoLists} pcoGroups={pcoGroups} churchId={churchId} isSubStep
                                         />
                                     </div>
                                 ))}
@@ -4201,7 +4399,7 @@ const BranchNodeCard: React.FC<{
                                             onChange={p => updateElseNode(i, p)}
                                             onDelete={() => deleteElseNode(i)}
                                             onMoveUp={() => {}} onMoveDown={() => {}}
-                                            pcoLists={pcoLists} pcoGroups={pcoGroups} isSubStep
+                                            pcoLists={pcoLists} pcoGroups={pcoGroups} churchId={churchId} isSubStep
                                         />
                                     </div>
                                 ))}
@@ -4218,6 +4416,194 @@ const BranchNodeCard: React.FC<{
     );
 };
 
+// ─── Workflow MMS Image Uploader ─────────────────────────────────────────────
+
+const WorkflowMmsUploader: React.FC<{
+    mmsUrl: string;
+    churchId: string;
+    onUrlChange: (url: string) => void;
+}> = ({ mmsUrl, churchId, onUrlChange }) => {
+    const [uploading, setUploading]   = useState(false);
+    const [uploadPct, setUploadPct]   = useState(0);
+    const [urlInput, setUrlInput]     = useState(mmsUrl);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Keep url input in sync with external changes
+    React.useEffect(() => { setUrlInput(mmsUrl); }, [mmsUrl]);
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setUploading(true);
+        setUploadPct(0);
+        try {
+            const path = `sms-media/${churchId}/workflow/${Date.now()}_${file.name}`;
+            const fileRef = storageRef(storage, path);
+            const task = uploadBytesResumable(fileRef, file);
+            await new Promise<void>((resolve, reject) => {
+                task.on('state_changed',
+                    snap => setUploadPct(Math.round((snap.bytesTransferred / snap.totalBytes) * 100)),
+                    reject,
+                    async () => {
+                        const url = await getDownloadURL(task.snapshot.ref);
+                        onUrlChange(url);
+                        setUrlInput(url);
+                        resolve();
+                    }
+                );
+            });
+        } catch {
+            alert('Image upload failed. Please try again.');
+        } finally {
+            setUploading(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
+
+    return (
+        <div className="space-y-2">
+            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400">Image (MMS)</label>
+            {/* Upload button + URL input row */}
+            <div className="flex gap-2 items-center">
+                <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/gif,image/webp"
+                    className="hidden"
+                    onChange={handleFileChange}
+                />
+                <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                    title="Upload image from your device"
+                    className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl border border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition disabled:opacity-50 shrink-0"
+                >
+                    {uploading ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
+                    {uploading ? `${uploadPct}%` : 'Upload'}
+                </button>
+                <input
+                    type="url"
+                    value={urlInput}
+                    onChange={e => { setUrlInput(e.target.value); onUrlChange(e.target.value); }}
+                    placeholder="or paste URL…"
+                    className="flex-1 text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                {mmsUrl && (
+                    <button
+                        type="button"
+                        title="Remove image"
+                        onClick={() => { onUrlChange(''); setUrlInput(''); }}
+                        className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition shrink-0"
+                    >
+                        <X size={14} />
+                    </button>
+                )}
+            </div>
+            {/* Upload progress bar */}
+            {uploading && (
+                <div className="h-1.5 bg-blue-100 dark:bg-blue-900/40 rounded-full overflow-hidden">
+                    <div
+                        className="h-full bg-blue-500 rounded-full transition-all"
+                        style={{ width: `${uploadPct}%` }}
+                    />
+                </div>
+            )}
+            {/* Preview */}
+            {mmsUrl && !uploading && (
+                <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 max-w-[180px]">
+                    <img src={mmsUrl} alt="MMS preview" className="w-full h-auto object-cover" onError={() => onUrlChange('')} />
+                </div>
+            )}
+            <p className="text-[10px] text-slate-400">JPG, PNG, GIF, or WebP — MMS may incur additional carrier fees.</p>
+        </div>
+    );
+};
+
+// ─── Also add upload support to SMS steps in the workflow ────────────────────
+
+const WorkflowSmsImageAttachment: React.FC<{
+    mmsUrl: string;
+    churchId: string;
+    onUrlChange: (url: string) => void;
+}> = ({ mmsUrl, churchId, onUrlChange }) => {
+    const [uploading, setUploading] = useState(false);
+    const [uploadPct, setUploadPct] = useState(0);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setUploading(true);
+        setUploadPct(0);
+        try {
+            const path = `sms-media/${churchId}/workflow/${Date.now()}_${file.name}`;
+            const fileRef = storageRef(storage, path);
+            const task = uploadBytesResumable(fileRef, file);
+            await new Promise<void>((resolve, reject) => {
+                task.on('state_changed',
+                    snap => setUploadPct(Math.round((snap.bytesTransferred / snap.totalBytes) * 100)),
+                    reject,
+                    async () => {
+                        const url = await getDownloadURL(task.snapshot.ref);
+                        onUrlChange(url);
+                        resolve();
+                    }
+                );
+            });
+        } catch {
+            alert('Image upload failed. Please try again.');
+        } finally {
+            setUploading(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
+
+    return (
+        <div className="mt-2 space-y-1.5">
+            <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/gif,image/webp"
+                className="hidden"
+                onChange={handleFileChange}
+            />
+            {mmsUrl ? (
+                <div className="flex items-center gap-2 p-2 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700 rounded-xl">
+                    <img src={mmsUrl} alt="Attached image" className="w-10 h-10 object-cover rounded-lg shrink-0 border border-violet-200 dark:border-violet-700" />
+                    <div className="flex-1 min-w-0">
+                        <p className="text-[10px] font-semibold text-violet-700 dark:text-violet-300 truncate">Image attached (MMS)</p>
+                    </div>
+                    <button
+                        type="button"
+                        title="Remove image"
+                        onClick={() => onUrlChange('')}
+                        className="p-1 text-violet-400 hover:text-red-500 rounded-lg transition shrink-0"
+                    >
+                        <X size={13} />
+                    </button>
+                </div>
+            ) : (
+                <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                    title="Attach image — converts this step to MMS"
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-bold rounded-lg border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 hover:text-violet-600 hover:border-violet-300 dark:hover:border-violet-700 transition disabled:opacity-50"
+                >
+                    {uploading ? <Loader2 size={12} className="animate-spin" /> : <ImageIcon size={12} />}
+                    {uploading ? `Uploading ${uploadPct}%…` : 'Attach Image (MMS)'}
+                </button>
+            )}
+            {uploading && (
+                <div className="h-1 bg-violet-100 dark:bg-violet-900/40 rounded-full overflow-hidden">
+                    <div className="h-full bg-violet-500 rounded-full transition-all" style={{ width: `${uploadPct}%` }} />
+                </div>
+            )}
+        </div>
+    );
+};
+
 const ActionNodeCard: React.FC<{
     step: WorkflowActionNode;
     index: number;
@@ -4228,9 +4614,10 @@ const ActionNodeCard: React.FC<{
     onMoveDown: () => void;
     pcoLists: { id: string; name: string }[];
     pcoGroups: { id: string; name: string }[];
+    churchId: string;
     /** When true, renders in compact mode inside a branch sub-timeline. */
     isSubStep?: boolean;
-}> = ({ step, index, total, onChange, onDelete, onMoveUp, onMoveDown, pcoLists, pcoGroups, isSubStep }) => {
+}> = ({ step, index, total, onChange, onDelete, onMoveUp, onMoveDown, pcoLists, pcoGroups, churchId, isSubStep }) => {
     const channel   = step.channelType  ?? 'sms';
     const segs       = countSegments(step.message);
     const [mmsUrl, setMmsUrl] = React.useState((step.mediaUrls && step.mediaUrls[0]) || '');
@@ -4330,6 +4717,12 @@ const ActionNodeCard: React.FC<{
                             </div>
                         </div>
                     )}
+                    {/* Optional image attachment — converts SMS → MMS */}
+                    <WorkflowSmsImageAttachment
+                        mmsUrl={mmsUrl}
+                        churchId={churchId}
+                        onUrlChange={handleMmsUrl}
+                    />
                 </div>
             )}
 
@@ -4358,22 +4751,11 @@ const ActionNodeCard: React.FC<{
                             ))}
                         </div>
                     </div>
-                    <div>
-                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Image URL (MMS)</label>
-                        <input
-                            type="url"
-                            value={mmsUrl}
-                            onChange={e => handleMmsUrl(e.target.value)}
-                            placeholder="https://example.com/image.jpg"
-                            className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                        <p className="text-[10px] text-slate-400 mt-1">Publicly accessible URL — JPG, PNG, GIF, or WebP. MMS may incur additional carrier fees.</p>
-                    </div>
-                    {mmsUrl && (
-                        <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 max-w-[180px]">
-                            <img src={mmsUrl} alt="MMS preview" className="w-full h-auto object-cover" onError={() => handleMmsUrl('')} />
-                        </div>
-                    )}
+                    <WorkflowMmsUploader
+                        mmsUrl={mmsUrl}
+                        churchId={churchId}
+                        onUrlChange={handleMmsUrl}
+                    />
                 </div>
             )}
 
@@ -5205,6 +5587,7 @@ const WorkflowEditor: React.FC<{
                                             onMoveDown={() => moveNode(idx, 'down')}
                                             pcoLists={pcoLists}
                                             pcoGroups={pcoGroups}
+                                            churchId={churchId}
                                         />
                                     )}
                                     {node.nodeType === 'branch' && (
@@ -5215,6 +5598,7 @@ const WorkflowEditor: React.FC<{
                                             pcoLists={pcoLists}
                                             pcoGroups={pcoGroups}
                                             smsTags={smsTags}
+                                            churchId={churchId}
                                         />
                                     )}
                                 </div>
@@ -7221,25 +7605,39 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
         if (!activeCampaign) return;
         setIsSending(true);
         try {
-            const res = await fetch(`${API_BASE}/api/messaging/send-bulk`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    churchId,
-                    campaignId:  activeCampaign.id,
-                    phones:      [],          // Scheduler / backend resolves from listId/groupId
-                    body:        activeCampaign.body,
-                    mediaUrls:   activeCampaign.mediaUrls || [],
-                    sentBy:      currentUser.id,
-                    sentByName:  currentUser.name,
-                    // Signal the backend to resolve phones itself via PCO:
-                    resolveFromList:  activeCampaign.toListId  || null,
-                    resolveFromGroup: activeCampaign.toGroupId || null,
-                }),
-            });
-            const data = await res.json();
-            if (!data.success && data.error && !data.sent) throw new Error(data.error);
-            showToast(`Sent to ${data.sent} recipients (${data.failed} failed)`);
+            if (activeCampaign.channelType === 'email') {
+                const res = await fetch(`${API_BASE}/api/email/send`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        churchId,
+                        campaignId: activeCampaign.id,
+                        collectionName: 'smsCampaigns' // Let backend know it's stored here
+                    }),
+                });
+                const data = await res.json();
+                if (!res.ok || (data.success === false && data.error)) throw new Error(data.error || 'Email send failed');
+                showToast(`Email sent to ${data.recipientCount} recipients`);
+            } else {
+                const res = await fetch(`${API_BASE}/api/messaging/send-bulk`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        churchId,
+                        campaignId:  activeCampaign.id,
+                        phones:      [],          // Scheduler / backend resolves from listId/groupId
+                        body:        activeCampaign.body,
+                        mediaUrls:   activeCampaign.mediaUrls || [],
+                        sentBy:      currentUser.id,
+                        sentByName:  currentUser.name,
+                        resolveFromList:  activeCampaign.toListId  || null,
+                        resolveFromGroup: activeCampaign.toGroupId || null,
+                    }),
+                });
+                const data = await res.json();
+                if (!data.success && data.error && !data.sent) throw new Error(data.error);
+                showToast(`Sent to ${data.sent} recipients (${data.failed} failed)`);
+            }
             setActiveCampaign(null);
         } catch (e: any) {
             showToast(e.message || 'Send failed', 'error');

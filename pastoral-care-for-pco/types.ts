@@ -1049,7 +1049,10 @@ export interface SmsCampaign {
     churchId: string;
     name: string;
     status: SmsCampaignStatus;
+    channelType?: 'sms' | 'email';
+    emailSubject?: string;
     body: string;
+    blocks?: any[];
     mediaUrls?: string[];
     // Recipients  one of listId, groupId, or toPhones
     toListId?: string | null;
