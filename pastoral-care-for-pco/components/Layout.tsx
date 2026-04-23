@@ -404,7 +404,7 @@ const Layout: React.FC<LayoutProps> = ({
                     onMouseLeave={() => scheduleClose('tools', setToolsOpen)}
                   >
                     <button
-                      onClick={() => onNavigate('tools-emails')}
+                      onClick={() => onNavigate('tools')}
                       className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all border ${
                         currentView.startsWith('tools')
                           ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 ring-1 ring-indigo-500 border-transparent'
@@ -435,7 +435,7 @@ const Layout: React.FC<LayoutProps> = ({
                         { view: 'tools-website',       icon: '🌐', label: 'Website'       },
                         { view: 'tools-qrcodes',       icon: '🔲', label: 'QR Codes'      },
                         { view: 'tools-unsubscribers', icon: '🛋️',  label: 'Unsubscribers' },
-                      ].map(item => (
+                      ].filter(item => hasPermission(item.view)).map(item => (
                         <button
                           key={item.view}
                           onClick={() => { onNavigate(item.view); setToolsOpen(false); }}

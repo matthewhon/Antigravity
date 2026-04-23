@@ -519,7 +519,8 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
 
   const ALL_ROLES: UserRole[] = [
     'Church Admin', 'Pastor', 'Pastor AI', 'People', 'Services',
-    'Groups', 'Giving', 'Finance', 'Pastoral Care', 'Metrics', 'Messaging', 'System Administration'
+    'Groups', 'Giving', 'Finance', 'Pastoral Care', 'Metrics', 'Messaging', 'System Administration',
+    'Email', 'Polls', 'Workflows', 'Notes'
   ];
 
   const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
@@ -535,6 +536,10 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
     'Metrics':               'View aggregated analytics & benchmarks',
     'Messaging':             'Access to SMS messaging, campaigns & inbox',
     'System Administration': 'Platform-wide system settings (super admin)',
+    'Email':                 'Access to the Email Editor and Campaigns',
+    'Polls':                 'Create and manage interactive Polls',
+    'Workflows':             'Configure automated Workflows',
+    'Notes':                 'Access and manage pastoral Notes',
   };
 
   const handleStartEditRoles = (u: User) => {

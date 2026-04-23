@@ -376,17 +376,28 @@ const App: React.FC = () => {
           'metrics-input': 'Metrics',
           'metrics-settings': 'Metrics',
           'messaging': 'Messaging',
+          'tools-emails': 'Email',
+          'tools-polls': 'Polls',
+          'tools-workflows': 'Workflows',
+          'tools-notes': 'Notes',
       };
       
-      if (v === 'tools' || v.startsWith('tools-')) return true; // All tools sub-pages: allow all church users
+      if (v === 'tools') return true; 
+      if (v.startsWith('tools-') && !roleMap[v]) return true; // All other tools sub-pages: allow all church users
 
       const requiredRole = roleMap[v];
       return requiredRole ? user.roles.includes(requiredRole as any) : false;
   };
 
   const handleNavigate = (newView: string) => {
-      // Upgrade legacy bare 'tools' route to first sub-page
-      const resolvedView = newView === 'tools' ? 'tools-emails' : newView;
+      // Upgrade legacy bare 'tools' route to first available sub-page
+      let resolvedView = newView;
+      if (newView === 'tools') {
+          const toolViews = ['tools-emails', 'tools-sms-inbox', 'tools-workflows', 'tools-polls', 'tools-notes', 'tools-website', 'tools-qrcodes', 'tools-unsubscribers'];
+          const availableTool = toolViews.find(tv => hasPermission(tv));
+          resolvedView = availableTool || 'dashboard';
+      }
+      
       if (hasPermission(resolvedView)) {
           setView(resolvedView);
           loadWidgets(user!, resolvedView);
