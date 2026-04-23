@@ -25,6 +25,7 @@ import { PollProjectorView } from './components/PollProjectorView';
 import { PublicNoteView } from './components/PublicNoteView';
 import { ToolsView } from './components/ToolsView';
 import { SmsWorkflowsManager } from './components/MessagingModule';
+import MobileSmsLayout from './components/MobileSmsLayout';
 import { 
   User, Church, PeopleDashboardData, GivingAnalytics, GroupsDashboardData, 
   ServicesDashboardData, AttendanceData, CensusStats, BudgetRecord, PcoFund, 
@@ -877,6 +878,25 @@ const App: React.FC = () => {
 
   if (!church) {
       return <div className="flex h-screen items-center justify-center text-slate-400">No Church Organization Found. Contact Admin.</div>;
+  }
+
+  // ── Mobile SMS App Route ──────────────────────────────────────────────────
+  if (window.location.pathname.startsWith('/mobile/sms')) {
+      return (
+          <MobileSmsLayout
+              churchId={church.id}
+              church={church}
+              currentUser={user}
+              onUpdateChurch={async (updates) => {
+                  await firestore.updateChurch(church.id, updates);
+                  setChurch({ ...church, ...updates });
+              }}
+              onNavigateHome={() => {
+                  // Standard back navigation out of the mobile standalone app
+                  window.location.href = '/';
+              }}
+          />
+      );
   }
 
   const safeEnabledWidgets = (church.enabledWidgets && church.enabledWidgets.length > 0) ? church.enabledWidgets : undefined;
