@@ -225,7 +225,7 @@ export function renderBlocksToHtml(blocks: any[], templateSettings: any, unsubsc
                 const strip = (h: string) => (h || '').replace(/<[^>]*>/g, '').trim();
                 return `
                   <div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:16px;background:#fff;">
-                    ${c.imageUrl ? `<img src="${c.imageUrl}" alt="${c.name || ''}" style="width:100%;height:200px;object-fit:cover;display:block;" />` : ''}
+                    ${c.imageUrl ? `<img src="${c.imageUrl}" alt="${c.name || ''}" style="width:100%;height:auto;display:block;" />` : ''}
                     <div style="padding:12px 16px;">
                       ${c.date ? `<div style="font-size:12px;color:${primaryColor};font-weight:600;margin-bottom:4px;">${c.date}</div>` : ''}
                       <div style="font-size:16px;font-weight:700;color:#1e293b;margin-bottom:4px;">${c.name || ''}</div>

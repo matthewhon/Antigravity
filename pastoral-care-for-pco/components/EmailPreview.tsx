@@ -157,7 +157,7 @@ const PcoContentCard = ({ block, primaryColor }: { block: EmailBlock; primaryCol
         <img
           src={c.imageUrl}
           alt={c.name}
-          style={{ width: '100%', maxHeight: 240, objectFit: 'cover', objectPosition: 'center top', display: 'block' }}
+          style={{ width: '100%', height: 'auto', display: 'block' }}
           onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
         />
       ) : (

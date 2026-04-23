@@ -123,7 +123,7 @@ const BlockThumbnail: React.FC<{ block: EmailBlock }> = ({ block }) => {
               src={c.imageUrl}
               alt={c.name}
               className="w-full block"
-              style={{ maxHeight: 200, objectFit: 'cover', objectPosition: 'center top' }}
+              style={{ height: 'auto' }}
               onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
             />
           ) : (
