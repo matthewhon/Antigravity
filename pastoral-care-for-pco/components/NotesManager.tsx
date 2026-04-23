@@ -4,6 +4,7 @@ import { firestore } from '../services/firestoreService';
 import { storage } from '../services/firebase';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { pcoService } from '../services/pcoService';
+import { SimpleRichTextEditor, SimpleRichTextEditorRef } from './SimpleRichTextEditor';
 import {
   Plus, ArrowLeft, Trash2, Pencil, FileText,
   CheckCircle, Globe, Lock, Clock, Loader2, Link, Eye,
@@ -498,7 +499,7 @@ const NoteEditor: React.FC<{
   const [lastSaved, setLastSaved] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
   const [editorMode, setEditorMode] = useState<'edit' | 'preview'>('edit');
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editorRef = useRef<SimpleRichTextEditorRef>(null);
 
   const update = (patch: Partial<ChurchNote>) => {
     setNote(prev => ({ ...prev, ...patch, updatedAt: Date.now() }));
@@ -506,20 +507,11 @@ const NoteEditor: React.FC<{
 
   /** Insert text/HTML at the current cursor position in the textarea */
   const insertAtCursor = useCallback((insertion: string) => {
-    const ta = textareaRef.current;
-    if (!ta) {
-      update({ content: note.content + '\n' + insertion });
-      return;
+    if (editorRef.current) {
+        editorRef.current.insertHtml(insertion);
+    } else {
+        update({ content: note.content + '\n' + insertion });
     }
-    const start = ta.selectionStart;
-    const end = ta.selectionEnd;
-    const newContent = note.content.slice(0, start) + insertion + note.content.slice(end);
-    update({ content: newContent });
-    requestAnimationFrame(() => {
-      ta.focus();
-      const pos = start + insertion.length;
-      ta.setSelectionRange(pos, pos);
-    });
   }, [note.content]);
 
   const handleImageInsert = useCallback((url: string) => {
@@ -726,14 +718,15 @@ const NoteEditor: React.FC<{
 
           {/* Content — Edit or Preview */}
           {editorMode === 'edit' ? (
-            <textarea
-              ref={textareaRef}
-              value={note.content}
-              onChange={e => update({ content: e.target.value })}
-              placeholder={`Write your note here…\n\nUse the toolbar above to insert images or Planning Center events.`}
-              title="Note content"
-              className="w-full box-border min-h-[360px] text-base leading-[1.8] text-slate-600 border-none outline-none bg-transparent resize-y font-[inherit]"
-            />
+            <div className="min-h-[360px] flex flex-col">
+              <SimpleRichTextEditor
+                  ref={editorRef}
+                  value={note.content}
+                  onChange={content => update({ content })}
+                  placeholder={`Write your note here…\n\nUse the toolbar above to insert images or Planning Center events.`}
+                  minHeight="360px"
+              />
+            </div>
           ) : (
             <div
               className="w-full min-h-[360px] text-base leading-[1.8] text-slate-600"

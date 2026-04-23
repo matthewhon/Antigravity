@@ -286,48 +286,7 @@ interface ComposerProps {
     isSending: boolean;
 }
 
-const SimpleRichTextEditor: React.FC<{
-    value: string;
-    onChange: (html: string) => void;
-}> = ({ value, onChange }) => {
-    const editor = useEditor({
-        extensions: [StarterKit],
-        content: value,
-        onUpdate: ({ editor }) => {
-            onChange(editor.getHTML());
-        },
-    });
-
-    useEffect(() => {
-        if (editor && editor.getHTML() !== value) {
-            editor.commands.setContent(value);
-        }
-    }, [value, editor]);
-
-    if (!editor) return null;
-
-    const btn = (active: boolean) =>
-        `p-1.5 rounded transition text-xs flex items-center justify-center ${
-            active ? 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300'
-                   : 'hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400'
-        }`;
-
-    return (
-        <div className="w-full border border-slate-200 dark:border-slate-600 rounded-2xl bg-white dark:bg-slate-800 focus-within:ring-2 focus-within:ring-violet-500 overflow-hidden flex flex-col">
-            <div className="flex flex-wrap items-center gap-1 p-2 bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700">
-                <button type="button" onClick={() => editor.chain().focus().toggleBold().run()} className={btn(editor.isActive('bold'))}><Bold size={14} /></button>
-                <button type="button" onClick={() => editor.chain().focus().toggleItalic().run()} className={btn(editor.isActive('italic'))}><Italic size={14} /></button>
-                <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-1" />
-                <button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} className={btn(editor.isActive('heading', { level: 1 }))}><span className="font-bold text-[11px] leading-none">H1</span></button>
-                <button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} className={btn(editor.isActive('heading', { level: 2 }))}><span className="font-bold text-[11px] leading-none">H2</span></button>
-                <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-1" />
-                <button type="button" onClick={() => editor.chain().focus().toggleBulletList().run()} className={btn(editor.isActive('bulletList'))}><List size={14} /></button>
-                <button type="button" onClick={() => editor.chain().focus().toggleOrderedList().run()} className={btn(editor.isActive('orderedList'))}><ListOrdered size={14} /></button>
-            </div>
-            <EditorContent editor={editor} className="p-4 prose prose-sm max-w-none min-h-[150px] text-slate-900 dark:text-white focus:outline-none flex-1" />
-        </div>
-    );
-};
+import { SimpleRichTextEditor } from './SimpleRichTextEditor';
 
 const CampaignComposer: React.FC<ComposerProps> = ({
     campaign, churchId, onBack, onSave, onSend, onSchedule, isSending,
