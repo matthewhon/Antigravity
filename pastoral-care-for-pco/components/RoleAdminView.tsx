@@ -1376,6 +1376,20 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         onChange={e => handleChange('scheduledSyncTime', e.target.value)}
                                         className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 font-mono text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
                                     />
+                                    {/* Live UTC → Local time conversion hint */}
+                                    {formData.scheduledSyncTime && (() => {
+                                        try {
+                                            const [hh, mm] = formData.scheduledSyncTime.split(':').map(Number);
+                                            const now = new Date();
+                                            const utcDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), hh, mm));
+                                            const localStr = utcDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZoneName: 'short' });
+                                            return (
+                                                <p className="text-[10px] mt-1.5 text-indigo-600 dark:text-indigo-400 font-semibold">
+                                                    ⏰ {formData.scheduledSyncTime} UTC = <span className="font-mono">{localStr}</span> your local time
+                                                </p>
+                                            );
+                                        } catch { return null; }
+                                    })()}
                                     <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-2 leading-relaxed">
                                         The system syncs daily at this time. <strong className="text-amber-600 dark:text-amber-400">Enter UTC time</strong> — the server runs in UTC.
                                         For example, for 2 AM Central (UTC−5), enter <span className="font-mono">07:00</span>.
@@ -1402,7 +1416,15 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                         </div>
 
                         <div className="bg-slate-50 dark:bg-slate-800/50 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800">
-                            <h4 className="font-bold text-slate-900 dark:text-white mb-4 text-sm">Last Full Sync</h4>
+                            <div className="flex items-center justify-between mb-4">
+                                <h4 className="font-bold text-slate-900 dark:text-white text-sm">Last Full Sync</h4>
+                                {formData.lastSyncTimestamp && (() => {
+                                    const hoursSince = (Date.now() - formData.lastSyncTimestamp) / 3_600_000;
+                                    return hoursSince > 25
+                                        ? <span className="text-[9px] font-black bg-rose-100 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 px-2 py-0.5 rounded-full border border-rose-200 dark:border-rose-800">⚠ Overdue ({Math.floor(hoursSince)}h ago)</span>
+                                        : <span className="text-[9px] font-black bg-emerald-100 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">✓ Recent</span>;
+                                })()}
+                            </div>
                             {formData.lastSyncTimestamp ? (
                                 <div>
                                     <p className="text-2xl font-mono font-bold text-slate-700 dark:text-slate-300">

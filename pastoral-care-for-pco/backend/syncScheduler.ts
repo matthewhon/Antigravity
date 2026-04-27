@@ -10,6 +10,11 @@
  *   The admin UI label has been updated to remind admins of this.
  *   We use getUTC* methods explicitly so the behaviour is identical whether
  *   the server's TZ env-var is set or not.
+ *
+ * ⚠️  SCALING NOTE:
+ *   This scheduler relies on the Cloud Run container staying alive.
+ *   The cloudbuild.yaml must set --min-instances 1 so the container never
+ *   scales to zero between sync windows.
  */
 
 import type { Firestore } from 'firebase-admin/firestore';
@@ -37,6 +42,24 @@ function getCurrentUTCHHMM(): string {
 async function triggerSyncForChurch(churchId: string, db: Firestore): Promise<void> {
     try {
         console.log(`[SyncScheduler] Triggering scheduled sync for church ${churchId}`);
+
+        // Pre-flight: verify the church still has valid PCO tokens before spending
+        // time kicking off a full sync that will fail at the proxy layer anyway.
+        const churchDoc = await db.collection('churches').doc(churchId).get();
+        const churchData = churchDoc.data();
+        if (!churchData?.pcoAccessToken || !churchData?.pcoRefreshToken) {
+            const msg = 'Scheduled sync skipped — PCO tokens are missing. Reconnect Planning Center in Settings → Planning Center Integration.';
+            console.warn(`[SyncScheduler] ${msg} (${churchId})`);
+            await db.collection('logs').add({
+                level: 'warn',
+                source: 'sync',
+                message: msg,
+                churchId,
+                timestamp: Date.now(),
+                details: JSON.stringify({ trigger: 'scheduled', reason: 'missing_tokens' }),
+            });
+            return;
+        }
 
         // Dynamically import the sync function to avoid circular deps at startup
         const { syncAllData } = await import('../services/pcoSyncService.js');
@@ -78,14 +101,31 @@ export function startSyncScheduler(db: Firestore): void {
     // Bug fix: do NOT capture todayKey at startup — recalculate each tick so the
     // midnight-reset logic works correctly after the server has been running for days.
     let lastDayKey = getTodayUTCKey();
+    let tickCount = 0;
 
     schedulerInterval = setInterval(async () => {
+        tickCount++;
         const currentDayKey = getTodayUTCKey();
 
         // Reset the "already synced" tracker when UTC date rolls over
         if (currentDayKey !== lastDayKey) {
             syncedToday.clear();
             lastDayKey = currentDayKey;
+        }
+
+        // Heartbeat log every 10 minutes — proves the scheduler is alive.
+        // Visible in Settings → System Configuration → Logging (filter source: sync).
+        if (tickCount % 10 === 0) {
+            try {
+                await db.collection('logs').add({
+                    level: 'info',
+                    source: 'sync',
+                    message: `Sync scheduler heartbeat — tick ${tickCount}, UTC ${getCurrentUTCHHMM()}`,
+                    churchId: 'system',
+                    timestamp: Date.now(),
+                    details: JSON.stringify({ trigger: 'heartbeat', pendingToday: syncedToday.size }),
+                });
+            } catch { /* best-effort — don't let logging crash the scheduler */ }
         }
 
         const currentTime = getCurrentUTCHHMM();
@@ -99,9 +139,9 @@ export function startSyncScheduler(db: Firestore): void {
                 const church = doc.data();
                 const churchId = doc.id;
 
-                // Support both field names for backwards-compat
-                const scheduledTime: string | undefined =
-                    church.scheduledSyncTimeUTC ?? church.scheduledSyncTime;
+                // `scheduledSyncTime` is the canonical field (set by the Planning Center tab UI).
+                // It must be stored in UTC (HH:MM).
+                const scheduledTime: string | undefined = church.scheduledSyncTime;
 
                 if (!scheduledTime) continue;
 

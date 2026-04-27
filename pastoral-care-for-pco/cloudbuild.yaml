@@ -22,6 +22,8 @@ steps:
     - '8080'
     - '--timeout'
     - '300s'
+    - '--min-instances'
+    - '1'
     - '--project'
     - '${_PROJECT_ID}'
 
