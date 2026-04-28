@@ -276,6 +276,13 @@ export const RegisterView: React.FC<RegisterViewProps> = ({ onCancel }) => {
                 </div>
             </div>
 
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 leading-relaxed mt-2">
+                By providing your phone number and submitting this form, you consent to receive SMS messages from Barnabas Software regarding updates, downtime and announcements. Message frequency varies. Message and data rates may apply. Reply STOP to opt-out or HELP for help. For more information, please read our{' '}
+                <a href="https://www.barnabassoftware.com/privacy.html" target="_blank" rel="noopener noreferrer" className="text-indigo-500 hover:text-indigo-600 underline underline-offset-2 transition-colors">Privacy Policy</a>
+                {' '}and{' '}
+                <a href="https://www.barnabassoftware.com/terms.html" target="_blank" rel="noopener noreferrer" className="text-indigo-500 hover:text-indigo-600 underline underline-offset-2 transition-colors">TOS</a>.
+            </p>
+
             <button 
                 type="submit" 
                 disabled={loading}
