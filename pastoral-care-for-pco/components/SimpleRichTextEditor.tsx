@@ -1,6 +1,7 @@
 import React, { useEffect, forwardRef, useImperativeHandle } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import Image from '@tiptap/extension-image';
 import { Bold, Italic, List, ListOrdered, Link as LinkIcon, Image as ImageIcon } from 'lucide-react';
 
 export interface SimpleRichTextEditorRef {
@@ -16,7 +17,13 @@ export const SimpleRichTextEditor = forwardRef<SimpleRichTextEditorRef, {
     onPcoClick?: () => void;
 }>(({ value, onChange, placeholder, minHeight = '150px', onImageClick, onPcoClick }, ref) => {
     const editor = useEditor({
-        extensions: [StarterKit],
+        extensions: [
+            StarterKit,
+            Image.configure({
+                inline: false,
+                allowBase64: true,
+            }),
+        ],
         content: value,
         onUpdate: ({ editor }) => {
             onChange(editor.getHTML());

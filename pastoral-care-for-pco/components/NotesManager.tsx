@@ -76,10 +76,14 @@ const mapPcoGroup = (item: any): PcoItem => ({
   id: item.id,
   name: item.attributes?.name || 'Unnamed Group',
   description: item.attributes?.description || '',
-  imageUrl: item.attributes?.header_image?.medium || item.attributes?.header_image?.thumbnail,
+  // PCO Groups v2 API returns header_image as a plain URL string (not a nested object)
+  imageUrl: typeof item.attributes?.header_image === 'string'
+    ? item.attributes.header_image
+    : item.attributes?.header_image?.medium || item.attributes?.header_image?.thumbnail || undefined,
   meta: `${item.attributes?.memberships_count ?? '?'} members`,
   raw: item,
 });
+
 
 const mapPcoCalendar = (item: any): PcoItem => ({
   id: item.id,
