@@ -5997,9 +5997,10 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
     const [smsTags, setSmsTags]     = useState<SmsTag[]>([]);
     const [pcoRegistrationEvents, setPcoRegistrationEvents] = useState<{ id: string; pcoId: string; name: string; startsAt?: string | null }[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [editing, setEditing]     = useState<SmsWorkflow | null | 'new'>('new' as any);
+    const [editing, setEditing]     = useState<SmsWorkflow | null>(null);
     const [viewMode, setViewMode]   = useState<'list' | 'editor'>('list');
     const [isBusy, setIsBusy]       = useState(false);
+    const [saveError, setSaveError] = useState<string | null>(null);
     const [enrollTarget, setEnrollTarget]         = useState<SmsWorkflow | null>(null);
     const [listEnrollTarget, setListEnrollTarget] = useState<SmsWorkflow | null>(null);
 
@@ -6042,16 +6043,20 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
 
     const handleSave = async (wf: SmsWorkflow) => {
         setIsBusy(true);
+        setSaveError(null);
         try {
-            const isNew = editing === 'new' as any;
+            const isNew = editing === null; // null = new workflow, SmsWorkflow = editing existing
             if (isNew) {
                 const { id: _id, ...rest } = wf;
-                const ref = await addDoc(collection(firebaseDb, 'smsWorkflows'), rest);
-                // nothing else needed; listener picks it up
+                await addDoc(collection(firebaseDb, 'smsWorkflows'), rest);
             } else {
                 await setDoc(doc(firebaseDb, 'smsWorkflows', wf.id), wf, { merge: true });
             }
+            setSaveError(null);
             setViewMode('list');
+        } catch (err: any) {
+            console.error('[WorkflowSave] failed:', err);
+            setSaveError(err?.message || 'Failed to save workflow. Please try again.');
         } finally {
             setIsBusy(false);
         }
@@ -6066,8 +6071,8 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
         await deleteDoc(doc(firebaseDb, 'smsWorkflows', wf.id));
     };
 
-    const openNew = () => { setEditing('new' as any); setViewMode('editor'); };
-    const openEdit = (wf: SmsWorkflow) => { setEditing(wf); setViewMode('editor'); };
+    const openNew = () => { setEditing(null); setSaveError(null); setViewMode('editor'); };
+    const openEdit = (wf: SmsWorkflow) => { setEditing(wf); setSaveError(null); setViewMode('editor'); };
 
     const TRIGGER_BADGE: Record<string, { label: string; color: string; icon: string }> = {
         manual:             { label: 'Manual',             color: 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300',    icon: '✍️' },
@@ -6081,9 +6086,9 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
     // Show editor view
     if (viewMode === 'editor') {
         return (
-            <div className="h-full">
+            <div className="h-full flex flex-col">
                 <WorkflowEditor
-                    initial={editing !== 'new' as any ? editing as SmsWorkflow : null}
+                    initial={editing}
                     churchId={churchId}
                     keywords={keywords}
                     pcoLists={pcoLists}
@@ -6091,9 +6096,14 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
                     smsTags={smsTags}
                     pcoRegistrationEvents={pcoRegistrationEvents}
                     onSave={handleSave}
-                    onBack={() => setViewMode('list')}
+                    onBack={() => { setViewMode('list'); setSaveError(null); }}
                     isBusy={isBusy}
                 />
+                {saveError && (
+                    <div className="shrink-0 mx-6 mb-4 flex items-center gap-2 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl px-4 py-3">
+                        <span className="font-bold">Save failed:</span> {saveError}
+                    </div>
+                )}
             </div>
         );
     }
