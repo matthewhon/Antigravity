@@ -6041,6 +6041,19 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
             .catch(() => {});
     }, [churchId]);
 
+    /** Recursively remove undefined values — Firestore rejects them */
+    const stripUndefined = (obj: any): any => {
+        if (Array.isArray(obj)) return obj.map(stripUndefined);
+        if (obj !== null && typeof obj === 'object') {
+            return Object.fromEntries(
+                Object.entries(obj)
+                    .filter(([, v]) => v !== undefined)
+                    .map(([k, v]) => [k, stripUndefined(v)])
+            );
+        }
+        return obj;
+    };
+
     const handleSave = async (wf: SmsWorkflow) => {
         setIsBusy(true);
         setSaveError(null);
@@ -6048,9 +6061,9 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
             const isNew = editing === null; // null = new workflow, SmsWorkflow = editing existing
             if (isNew) {
                 const { id: _id, ...rest } = wf;
-                await addDoc(collection(firebaseDb, 'smsWorkflows'), rest);
+                await addDoc(collection(firebaseDb, 'smsWorkflows'), stripUndefined(rest));
             } else {
-                await setDoc(doc(firebaseDb, 'smsWorkflows', wf.id), wf, { merge: true });
+                await setDoc(doc(firebaseDb, 'smsWorkflows', wf.id), stripUndefined(wf), { merge: true });
             }
             setSaveError(null);
             setViewMode('list');
