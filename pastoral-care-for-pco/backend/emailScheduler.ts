@@ -31,7 +31,10 @@ export async function refreshCampaignBlocks(
                         ...block,
                         content: {
                             ...block.content,
-                            data: freshData,
+                            data: {
+                                ...freshData,
+                                _config: config
+                            },
                             refreshedAt: Date.now(),
                         },
                     };
@@ -746,7 +749,7 @@ export function startEmailScheduler(db: any): void {
 
                     // 2. Execute send (skip status update if recurring)
                     const isRecurring = !!campaign.recurringFrequency;
-                    const result = await executeSend(db as any, campaignId, churchId, undefined, isRecurring);
+                    const result = await executeSend(db as any, campaignId, churchId, undefined, isRecurring, 'email_campaigns', true);
 
                     log.info(
                         `[Scheduler] Campaign ${campaignId} sent successfully: ${result.message}`,

@@ -873,7 +873,8 @@ export async function executeSend(
     churchId: string,
     testEmail?: string,
     skipStatusUpdate?: boolean,
-    collectionName: string = 'email_campaigns'
+    collectionName: string = 'email_campaigns',
+    isFromScheduler: boolean = false
 ): Promise<{ recipientCount: number; message: string }> {
     const log = createServerLogger(db);
 
@@ -943,7 +944,7 @@ export async function executeSend(
     );
 
     // Only refresh if NOT called by the scheduler (which already refreshed them)
-    if (hasRefreshable && !skipStatusUpdate) {
+    if (hasRefreshable && !isFromScheduler) {
         log.info(`[SendEmail] Refreshing dynamic blocks for campaign ${campaignId} prior to dispatch.`, 'system', { campaignId }, churchId);
         const refreshedResult = await refreshCampaignBlocks(db, churchId, blocks);
         blocks = refreshedResult.blocks;
