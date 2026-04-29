@@ -3,7 +3,7 @@ import { loadStripe, Stripe } from '@stripe/stripe-js';
 import { firestore } from './firestoreService';
 
 // Updated Default based on provided Cloud Run URL
-const DEFAULT_API_BASE_URL = 'https://api-ejvpnqnz4q-uc.a.run.app'; 
+const DEFAULT_API_BASE_URL = 'https://pastoral-care-for-pco-ejvpnqnz4q-uc.a.run.app';
 
 const STRIPE_CUSTOMER_PORTAL_URL = 'https://billing.stripe.com/p/login/aFaeVd88p7aq6mda7acjS00'; 
 

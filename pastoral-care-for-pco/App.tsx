@@ -154,7 +154,8 @@ const App: React.FC = () => {
         // Fix stale URL — covers: no URL, old api.* subdomain, old Cloud Run URL
         const isStaleUrl = !settings.apiBaseUrl 
             || settings.apiBaseUrl.includes('api.pastoralcare.barnabassoftware.com')
-            || settings.apiBaseUrl.includes('u3gnt7kb5a-uc.a.run.app');
+            || settings.apiBaseUrl.includes('u3gnt7kb5a-uc.a.run.app')
+            || settings.apiBaseUrl.includes('api-ejvpnqnz4q-uc.a.run.app');
         if (isStaleUrl) {
             const newSettings = { ...settings, apiBaseUrl: correctUrl };
             await firestore.saveSystemSettings(newSettings);

@@ -1,2 +1,2 @@
 Deploy command:
-gcloud builds submit --config cloudbuild.yaml --project=gen-lang-client-0779452267 .
+gcloud builds submit --config cloudbuild.yaml --project=pastoral-care-for-pco .
