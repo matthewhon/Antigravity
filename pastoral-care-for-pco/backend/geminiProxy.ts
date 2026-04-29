@@ -8,7 +8,7 @@ import { GoogleGenAI } from '@google/genai';
  * from process.env at runtime — never exposed in the frontend bundle.
  *
  * Body: {
- *   model?:             string   (default: 'gemini-2.0-flash')
+ *   model?:             string   (default: 'gemini-2.5-flash')
  *   prompt:             string
  *   systemInstruction?: string
  *   config?:            object   (forwarded verbatim to Gemini config)
