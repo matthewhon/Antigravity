@@ -283,13 +283,14 @@ interface ComposerProps {
     onSave: (updates: Partial<SmsCampaign>) => Promise<void>;
     onSend: () => void;
     onSchedule: (scheduledAt: number, freq?: 'daily' | 'weekly' | 'monthly') => void;
+    onCancelSchedule?: () => void;
     isSending: boolean;
 }
 
 import { SimpleRichTextEditor } from './SimpleRichTextEditor';
 
 const CampaignComposer: React.FC<ComposerProps> = ({
-    campaign, churchId, onBack, onSave, onSend, onSchedule, isSending,
+    campaign, churchId, onBack, onSave, onSend, onSchedule, onCancelSchedule, isSending,
 }) => {
     const [local, setLocal]         = useState<SmsCampaign>(campaign);
     const [pcoLists, setPcoLists]   = useState<{ id: string; name: string; total_people: number }[]>([]);
@@ -398,6 +399,15 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                     )}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
+                    {local.status === 'scheduled' && onCancelSchedule && (
+                        <button
+                            onClick={onCancelSchedule}
+                            disabled={isSending}
+                            className="flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-xl transition border border-rose-200 dark:border-rose-800 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20"
+                        >
+                            <X size={14} /> Cancel Schedule
+                        </button>
+                    )}
                     {local.status !== 'scheduled' && (
                         <button
                             onClick={() => setShowSchedule(true)}
@@ -407,13 +417,15 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                             <Clock size={14} /> Schedule
                         </button>
                     )}
-                    <button
-                        onClick={onSend}
-                        disabled={!canSend || isSending}
-                        className={`flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-xl transition ${canSend && !isSending ? 'bg-violet-600 hover:bg-violet-700 text-white shadow-md shadow-violet-200 dark:shadow-violet-900/40' : 'bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed'}`}
-                    >
-                        {isSending ? <><Loader2 size={14} className="animate-spin" />Sending…</> : <><Send size={14} />Send Now</>}
-                    </button>
+                    {local.status !== 'scheduled' && (
+                        <button
+                            onClick={onSend}
+                            disabled={!canSend || isSending}
+                            className={`flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-xl transition ${canSend && !isSending ? 'bg-violet-600 hover:bg-violet-700 text-white shadow-md shadow-violet-200 dark:shadow-violet-900/40' : 'bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed'}`}
+                        >
+                            {isSending ? <><Loader2 size={14} className="animate-spin" />Sending…</> : <><Send size={14} />Send Now</>}
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -7618,6 +7630,21 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
         setActiveCampaign(null);
     };
 
+    const handleCancelSchedule = async () => {
+        if (!activeCampaign) return;
+        await updateDoc(doc(firebaseDb, 'smsCampaigns', activeCampaign.id), {
+            status: 'draft',
+            scheduledAt: null,
+            sendAt: null,
+            recurringFrequency: null,
+            retryCount: 0,
+            lastError: null,
+            updatedAt: Date.now(),
+        });
+        showToast('Schedule cancelled');
+        setActiveCampaign(null);
+    };
+
     // ── Not yet set up ──
     // Determine whether the church has already set up their Customer Profile Bundle.
     // A number should NOT be provisioned before the profile exists — otherwise A2P
@@ -7827,6 +7854,7 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                             onSave={handleSave}
                             onSend={handleSendNow}
                             onSchedule={handleSchedule}
+                            onCancelSchedule={handleCancelSchedule}
                             isSending={isSending}
                         />
                     </div>

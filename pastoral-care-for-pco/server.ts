@@ -584,6 +584,98 @@ Return ONLY the JSON object, no markdown, no explanation:`;
       }
     });
 
+    // ─── Tenant Deletion ─────────────────────────────────────────────────────
+    // Permanently deletes all Firebase Auth users + all Firestore data for a tenant.
+    // Requires Admin SDK — must remain server-side.
+    app.post('/tenant/delete', express.json(), async (req: any, res: any) => {
+      const { churchId, confirmationText } = req.body || {};
+      if (!churchId) return res.status(400).json({ error: 'Missing churchId' });
+      if (confirmationText !== 'DELETE') {
+        return res.status(400).json({ error: 'Invalid confirmation. Must send confirmationText: "DELETE"' });
+      }
+
+      try {
+        const admin = await import('firebase-admin');
+        const db = getDb();
+
+        // 1. Find all user records for this tenant in Firestore to get their UIDs
+        const usersSnap = await db.collection('users').where('churchId', '==', churchId).get();
+        const uids = usersSnap.docs.map(d => d.id);
+
+        // 2. Delete each Firebase Auth user (Admin SDK required)
+        const authErrors: string[] = [];
+        for (const uid of uids) {
+          try {
+            await admin.default.auth().deleteUser(uid);
+          } catch (authErr: any) {
+            // Don't abort if one user is already gone
+            if (authErr.code !== 'auth/user-not-found') {
+              authErrors.push(`${uid}: ${authErr.message}`);
+            }
+          }
+        }
+
+        // 3. Purge all Firestore collections scoped to this churchId
+        const collectionsToDelete = [
+          'users',
+          'attendance',
+          'giving',
+          'detailed_donations',
+          'people',
+          'groups',
+          'email_campaigns',
+          'email_unsubscribes',
+          'sms_campaigns',
+          'sms_messages',
+          'sms_keywords',
+          'twilioNumbers',
+          'polls',
+          'poll_responses',
+          'notes',
+          'budgets',
+          'funds',
+          'pastoral_notes',
+          'qr_codes',
+          'workflows',
+          'workflow_enrollments',
+          'log_entries',
+          'metrics',
+          'metrics_settings',
+          'registrations',
+        ];
+
+        for (const colName of collectionsToDelete) {
+          const snap = await db.collection(colName).where('churchId', '==', churchId).get();
+          if (snap.empty) continue;
+          let batch = db.batch();
+          let count = 0;
+          for (const d of snap.docs) {
+            batch.delete(d.ref);
+            count++;
+            if (count >= 450) {
+              await batch.commit();
+              batch = db.batch();
+              count = 0;
+            }
+          }
+          if (count > 0) await batch.commit();
+        }
+
+        // 4. Delete the church document itself
+        await db.collection('churches').doc(churchId).delete();
+
+        console.log(`[TenantDelete] Purged tenant ${churchId}. Auth users deleted: ${uids.length}. Auth errors: ${authErrors.length}`);
+        res.json({
+          success: true,
+          deletedAuthUsers: uids.length,
+          authErrors: authErrors.length > 0 ? authErrors : undefined,
+        });
+      } catch (e: any) {
+        console.error('[TenantDelete] Error:', e?.message || e);
+        res.status(500).json({ error: e?.message || 'Tenant deletion failed' });
+      }
+    });
+
     // Schedule an email campaign
     app.post('/email/schedule', express.json(), async (req: any, res: any) => {
       const { campaignId, churchId, scheduledAt, recurringFrequency } = req.body || {};

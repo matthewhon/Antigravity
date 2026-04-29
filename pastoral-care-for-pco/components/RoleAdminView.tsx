@@ -280,6 +280,12 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'Team' | 'Organization' | 'Planning Center' | 'Community' | 'Widget Directory' | 'Risk Profiles' | 'Subscription' | 'Mail Settings' | 'SMS'>('Team');
 
+  // Delete Organization modal state
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
   // Mail Settings state
   const [mailMode, setMailMode] = useState<'shared' | 'custom'>(church.emailSettings?.mode || 'shared');
   const [mailPrefix, setMailPrefix] = useState(church.emailSettings?.sharedPrefix || '');
@@ -665,18 +671,24 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   };
 
   const handleDeleteOrganization = async () => {
-      const confirmMessage = `WARNING: YOU ARE ABOUT TO PERMANENTLY DELETE THIS ORGANIZATION.\n\nTenant: ${church.name}\n\nThis will delete:\n- All People & Households\n- All Donation Records\n- All Groups & Service Plans\n- All User Accounts (including yours)\n\nThis action CANNOT be undone.\n\nType "DELETE" to confirm.`;
-      
-      if (window.prompt(confirmMessage) === 'DELETE') {
-          try {
-              await firestore.deleteChurchAndData(churchId);
-              // Sign out immediately as user no longer exists
-              await auth.signOut();
-              window.location.reload();
-          } catch (e: any) {
-              console.error(e);
-              alert("Error deleting organization: " + e.message);
-          }
+      if (deleteConfirmText !== 'DELETE') return;
+      setIsDeleting(true);
+      setDeleteError(null);
+      try {
+          const res = await fetch('/tenant/delete', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ churchId, confirmationText: 'DELETE' }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Deletion failed');
+          // Sign out immediately — auth user is gone
+          await auth.signOut();
+          window.location.href = '/';
+      } catch (e: any) {
+          console.error(e);
+          setDeleteError(e.message || 'An unexpected error occurred.');
+          setIsDeleting(false);
       }
   };
 
@@ -1209,13 +1221,100 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                     Flush Synced Data
                                 </button>
                                 <button 
-                                    onClick={handleDeleteOrganization}
+                                    onClick={() => { setShowDeleteModal(true); setDeleteConfirmText(''); setDeleteError(null); }}
                                     className="w-full bg-rose-100 dark:bg-rose-600/10 hover:bg-rose-200 dark:hover:bg-rose-600 text-rose-700 dark:text-rose-500 dark:hover:text-white border border-rose-200 dark:border-rose-600/50 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all"
                                 >
                                     Delete Organization
                                 </button>
                             </div>
                         </div>
+
+                        {/* Delete Confirmation Modal */}
+                        {showDeleteModal && (
+                            <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="delete-org-title">
+                                {/* Backdrop */}
+                                <div
+                                    className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                                    onClick={() => !isDeleting && setShowDeleteModal(false)}
+                                />
+                                {/* Panel */}
+                                <div className="relative bg-white dark:bg-slate-900 rounded-3xl border border-rose-200 dark:border-rose-800 shadow-2xl shadow-rose-900/20 p-8 w-full max-w-md animate-in zoom-in-95 fade-in duration-200">
+                                    {/* Icon */}
+                                    <div className="w-14 h-14 rounded-2xl bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center mb-6 mx-auto">
+                                        <svg className="w-7 h-7 text-rose-600 dark:text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                                        </svg>
+                                    </div>
+
+                                    <h2 id="delete-org-title" className="text-xl font-black text-slate-900 dark:text-white text-center mb-2">
+                                        Delete Organization
+                                    </h2>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 text-center mb-6 leading-relaxed">
+                                        You are about to permanently delete <strong className="text-rose-600 dark:text-rose-400">{church.name}</strong> and all associated data.
+                                        This includes all people, donations, groups, campaigns, and <strong>all user accounts</strong>.
+                                        <br /><br />
+                                        <span className="font-black text-rose-600 dark:text-rose-400">This action cannot be undone.</span>
+                                    </p>
+
+                                    <div className="bg-rose-50 dark:bg-rose-950/40 rounded-2xl border border-rose-200 dark:border-rose-800 p-4 mb-6">
+                                        <p className="text-[10px] font-black text-rose-700 dark:text-rose-400 uppercase tracking-widest mb-3">What will be deleted:</p>
+                                        <ul className="space-y-1">
+                                            {['All People & Households', 'All Donation Records', 'All Groups & Service Plans', 'All Email & SMS Campaigns', 'All User Accounts (Firebase Auth)', 'Organization Settings & Configuration'].map(item => (
+                                                <li key={item} className="flex items-center gap-2 text-[11px] text-rose-700 dark:text-rose-300">
+                                                    <svg className="w-3 h-3 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
+                                                    {item}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+
+                                    <label className="block text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-widest mb-2">
+                                        Type <span className="text-rose-600 font-mono">DELETE</span> to confirm
+                                    </label>
+                                    <input
+                                        id="delete-org-confirm-input"
+                                        type="text"
+                                        value={deleteConfirmText}
+                                        onChange={e => setDeleteConfirmText(e.target.value)}
+                                        placeholder="DELETE"
+                                        disabled={isDeleting}
+                                        className="w-full bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 focus:border-rose-500 dark:focus:border-rose-500 rounded-xl px-4 py-3 font-mono text-sm text-slate-900 dark:text-white outline-none transition-colors mb-4 disabled:opacity-50"
+                                    />
+
+                                    {deleteError && (
+                                        <div className="mb-4 p-3 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-xl">
+                                            <p className="text-[11px] text-rose-600 dark:text-rose-400 font-bold">⚠ {deleteError}</p>
+                                        </div>
+                                    )}
+
+                                    <div className="flex gap-3">
+                                        <button
+                                            onClick={() => setShowDeleteModal(false)}
+                                            disabled={isDeleting}
+                                            className="flex-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all disabled:opacity-50"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            id="delete-org-confirm-btn"
+                                            onClick={handleDeleteOrganization}
+                                            disabled={deleteConfirmText !== 'DELETE' || isDeleting}
+                                            className="flex-1 bg-rose-600 hover:bg-rose-700 disabled:bg-rose-300 dark:disabled:bg-rose-900 disabled:cursor-not-allowed text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+                                        >
+                                            {isDeleting ? (
+                                                <>
+                                                    <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
+                                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                                                    </svg>
+                                                    Deleting…
+                                                </>
+                                            ) : 'Delete Forever'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

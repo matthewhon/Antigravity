@@ -1,6 +1,14 @@
 {
   "indexes": [
     {
+      "collectionGroup": "email_campaigns",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status",      "order": "ASCENDING" },
+        { "fieldPath": "scheduledAt", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "people",
       "queryScope": "COLLECTION",
       "fields": [

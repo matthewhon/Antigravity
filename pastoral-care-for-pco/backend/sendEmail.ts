@@ -1025,12 +1025,14 @@ export async function executeSend(
             });
 
             if (!pcoRes.ok) {
-                log.warn(`Failed to fetch PCO list members (page ${pcoPage}): ${pcoRes.status}`, 'system', { churchId, listId: campaign.toListId }, churchId);
-                // Fall back to local Firestore cache
-                const peopleSnap = await db.collection('people').where('churchId', '==', churchId).get();
-                recipients = peopleSnap.docs.map((d: any) => d.data().email as string).filter(Boolean);
-                break;
+                const errBody = await pcoRes.text().catch(() => '');
+                const errDetail = pcoRes.status === 401
+                    ? 'PCO access token expired or revoked — re-connect Planning Center in Settings.'
+                    : `PCO API returned HTTP ${pcoRes.status} for list ${campaign.toListId}.`;
+                log.warn(`Failed to fetch PCO list members (page ${pcoPage}): ${pcoRes.status} — ${errDetail}`, 'system', { churchId, listId: campaign.toListId }, churchId);
+                throw new Error(errDetail);
             }
+
 
             const pcoData = await pcoRes.json();
             const people: any[] = pcoData.data || [];

@@ -800,8 +800,10 @@ export function startEmailScheduler(db: any): void {
             }));
 
         } catch (e: any) {
-            // Top-level scheduler error (e.g. Firestore query failed)
+            // Top-level scheduler error (e.g. Firestore query failed, missing index, etc.)
             console.error('[EmailScheduler] Tick error:', e?.message);
+            // Also surface in the admin log portal so it isn't silently swallowed
+            try { log.error(`[EmailScheduler] Tick failed: ${e?.message}`, 'system', {}, ''); } catch {}
         }
     };
 
