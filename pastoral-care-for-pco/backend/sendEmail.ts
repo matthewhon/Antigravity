@@ -1136,7 +1136,20 @@ export async function executeSend(
         throw new Error('All recipients have unsubscribed. No emails were sent.');
     }
 
-    // 6. Send via SendGrid — each recipient gets a personalised unsubscribe link,
+    // 6. Check Starter subscription limit
+    const now = new Date();
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const usage = churchData.emailUsage || {};
+    const currentUsage = usage[currentMonth] || 0;
+
+    if (!testEmail && churchData.subscription?.planId === 'starter') {
+        const remaining = 500 - currentUsage;
+        if (recipients.length > remaining) {
+            throw new Error(`Starter plan limit reached: You can only send ${remaining} more emails this month (500 max). You are trying to send ${recipients.length}.`);
+        }
+    }
+
+    // 7. Send via SendGrid — each recipient gets a personalised unsubscribe link,
     //    so we build per-recipient HTML and send in batches of individual messages.
     const BATCH = 50; // smaller batches since each message has unique HTML
     for (let i = 0; i < recipients.length; i += BATCH) {
@@ -1163,7 +1176,7 @@ export async function executeSend(
         }
     }
 
-    // 6. Mark sent (skip for test or when scheduler is managing recurring dates)
+    // 8. Mark sent (skip for test or when scheduler is managing recurring dates)
     if (!testEmail && !skipStatusUpdate) {
         await db.collection(collectionName).doc(campaignId).update({
             status: 'sent',
@@ -1172,6 +1185,13 @@ export async function executeSend(
             retryCount: 0,
             lastError: null,
         });
+    }
+
+    // 9. Update usage count
+    if (!testEmail) {
+        const emailUsage = churchData.emailUsage || {};
+        emailUsage[currentMonth] = (emailUsage[currentMonth] || 0) + recipients.length;
+        await db.collection('churches').doc(churchId).update({ emailUsage });
     }
 
     const msg = testEmail

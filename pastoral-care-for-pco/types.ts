@@ -74,6 +74,7 @@ export interface Church {
     groupRiskSettings?: GroupRiskSettings;
     donorLifecycleSettings?: DonorLifecycleSettings;
     subscription?: { status: string, planId: string, currentPeriodEnd?: number, customerId?: string };
+    emailUsage?: { [month: string]: number };
     metricsSettings?: { showCensusWidgets?: boolean, showCityPenetration?: boolean, showMissionalGap?: boolean, dashboardOrder?: string[] };
     address?: string;
     city?: string;
