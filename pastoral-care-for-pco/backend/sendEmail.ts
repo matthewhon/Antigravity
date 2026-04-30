@@ -1262,8 +1262,17 @@ export const getEmailStats = async (req: any, res: any) => {
         }
         const campaign = campaignSnap.data();
         
-        // SendGrid requires start_date in YYYY-MM-DD
-        const startDate = new Date(campaign.createdAt || Date.now()).toISOString().split('T')[0];
+        // SendGrid requires start_date in YYYY-MM-DD and only allows up to 30 days of retention
+        const timeToUse = campaign.sentAt || campaign.createdAt || Date.now();
+        let startDateObj = new Date(timeToUse);
+        
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        if (startDateObj < thirtyDaysAgo) {
+            startDateObj = thirtyDaysAgo;
+        }
+        
+        const startDate = startDateObj.toISOString().split('T')[0];
 
         // 2. Load system settings (global API key)
         const settingsSnap = await db.doc('system/settings').get();
@@ -1312,6 +1321,7 @@ export const getEmailStats = async (req: any, res: any) => {
         }
 
         const data = await sgRes.json();
+        log.info(`[SendGrid Stats] Response for ${campaignId}: ${JSON.stringify(data)}`, 'system', { campaignId }, churchId);
         
         // Aggregate daily data over the returned period
         const aggregated = {
@@ -1329,18 +1339,21 @@ export const getEmailStats = async (req: any, res: any) => {
 
         if (Array.isArray(data)) {
             data.forEach((dayData: any) => {
-                const metrics = dayData.stats?.[0]?.metrics;
-                if (metrics) {
-                    aggregated.requests += metrics.requests || 0;
-                    aggregated.delivered += metrics.delivered || 0;
-                    aggregated.opens += metrics.opens || 0;
-                    aggregated.unique_opens += metrics.unique_opens || 0;
-                    aggregated.clicks += metrics.clicks || 0;
-                    aggregated.unique_clicks += metrics.unique_clicks || 0;
-                    aggregated.bounces += metrics.bounces || 0;
-                    aggregated.spam_reports += metrics.spam_reports || 0;
-                    aggregated.unsubscribes += metrics.unsubscribes || 0;
-                    aggregated.drops += metrics.drops || 0;
+                if (Array.isArray(dayData.stats)) {
+                    const catStat = dayData.stats.find((s: any) => s.name === campaignId);
+                    const metrics = catStat ? catStat.metrics : dayData.stats[0]?.metrics;
+                    if (metrics) {
+                        aggregated.requests += Number(metrics.requests) || 0;
+                        aggregated.delivered += Number(metrics.delivered) || 0;
+                        aggregated.opens += Number(metrics.opens) || 0;
+                        aggregated.unique_opens += Number(metrics.unique_opens) || 0;
+                        aggregated.clicks += Number(metrics.clicks) || 0;
+                        aggregated.unique_clicks += Number(metrics.unique_clicks) || 0;
+                        aggregated.bounces += Number(metrics.bounces) || 0;
+                        aggregated.spam_reports += Number(metrics.spam_reports) || 0;
+                        aggregated.unsubscribes += Number(metrics.unsubscribes) || 0;
+                        aggregated.drops += Number(metrics.drops) || 0;
+                    }
                 }
             });
         }
