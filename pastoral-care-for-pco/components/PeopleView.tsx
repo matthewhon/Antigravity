@@ -896,6 +896,8 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
               </div>
           )}
       </div>
+      )}
     </div>
   );
 };
+
