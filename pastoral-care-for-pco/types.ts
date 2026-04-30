@@ -227,6 +227,7 @@ export interface PeopleDashboardData {
     householdStats?: { totalHouseholds: number, pcoHouseholds: number, avgSize: number, sizeDistribution: any[], composition: any[], householdList: any[] };
     progressStats?: ProgressStats;
     recentRiskChanges?: RiskChangeRecord[];
+    recentStatusChanges?: StatusChangeRecord[];
 }
 
 export interface GroupsDashboardData {
@@ -816,6 +817,18 @@ export interface RiskChangeRecord {
     date: string;           // ISO date string
     oldCategory: string;    // 'Healthy' | 'At Risk' | 'Disconnected'
     newCategory: string;
+    timestamp: number;
+}
+
+export interface StatusChangeRecord {
+    id: string;             // e.g. `${churchId}_${personId}_${timestamp}`
+    churchId: string;
+    personId: string;
+    personName: string;
+    date: string;           // ISO date string
+    type: 'status' | 'membership';
+    oldValue: string | null;
+    newValue: string | null;
     timestamp: number;
 }
 

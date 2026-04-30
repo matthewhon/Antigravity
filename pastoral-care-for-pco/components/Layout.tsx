@@ -316,6 +316,7 @@ const Layout: React.FC<LayoutProps> = ({
                         { view: 'people',            icon: '📊', label: 'Overview'   },
                         { view: 'people-households', icon: '🏠', label: 'Households' },
                         { view: 'people-risk',       icon: '⚠️', label: 'Risk Profiles' },
+                        { view: 'people-reports',    icon: '📄', label: 'Reports'    },
                       ].map(item => (
                         <button
                           key={item.view}

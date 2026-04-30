@@ -5,7 +5,7 @@ import {
     PcoPerson, PcoGroup, DetailedDonation, PcoFund, AttendanceRecord, 
     ServicePlanSnapshot, ServicesTeam, CheckInRecord,
     PcoRegistrationEvent, PcoRegistrationAttendee, PcoRegistrationCampus,
-    RiskChangeRecord
+    RiskChangeRecord, StatusChangeRecord
 } from '../types';
 import { initializeWebhooks } from './pcoWebhookService';
 import { calculateBulkRisk, DEFAULT_RISK_SETTINGS } from './riskService';
@@ -311,6 +311,62 @@ export const syncPeopleData = async (churchId: string) => {
     );
 
     if (people.length > 0) {
+        // 1. Fetch existing people to detect changes
+        let existingPeople: PcoPerson[] = [];
+        try {
+            existingPeople = await firestore.getPeople(churchId);
+        } catch (e) {
+            logger.warn('Could not fetch existing people for change detection', 'sync', { churchId }, churchId);
+        }
+
+        // 2. Detect status & membership changes
+        const existingMap = new Map(existingPeople.map(p => [p.id, p]));
+        const statusChanges: StatusChangeRecord[] = [];
+        const nowMs = Date.now();
+        const nowIso = new Date().toISOString();
+
+        for (const newPerson of people) {
+            const oldPerson = existingMap.get(newPerson.id);
+            if (!oldPerson) continue; // New person, no change to track
+
+            // Status Change
+            if (oldPerson.status !== newPerson.status) {
+                statusChanges.push({
+                    id: `${churchId}_${newPerson.id}_status_${nowMs}`,
+                    churchId,
+                    personId: newPerson.id,
+                    personName: newPerson.name,
+                    date: nowIso,
+                    type: 'status',
+                    oldValue: oldPerson.status || 'null',
+                    newValue: newPerson.status || 'null',
+                    timestamp: nowMs
+                });
+            }
+
+            // Membership Change
+            if (oldPerson.membership !== newPerson.membership) {
+                statusChanges.push({
+                    id: `${churchId}_${newPerson.id}_membership_${nowMs}`,
+                    churchId,
+                    personId: newPerson.id,
+                    personName: newPerson.name,
+                    date: nowIso,
+                    type: 'membership',
+                    oldValue: oldPerson.membership || 'null',
+                    newValue: newPerson.membership || 'null',
+                    timestamp: nowMs
+                });
+            }
+        }
+
+        // 3. Upsert Changes
+        if (statusChanges.length > 0) {
+            await firestore.upsertStatusChanges(statusChanges);
+            logger.info(`Logged ${statusChanges.length} status/membership changes`, 'sync', { churchId }, churchId);
+        }
+
+        // 4. Upsert People Data
         await firestore.upsertPeople(people);
     }
     logger.info(`People sync complete`, 'sync', { churchId, count: people.length }, churchId);

@@ -57,6 +57,7 @@ const App: React.FC = () => {
   const [budgets, setBudgets] = useState<BudgetRecord[]>([]);
   const [teams, setTeams] = useState<ServicesTeam[]>([]);
   const [recentRiskChanges, setRecentRiskChanges] = useState<RiskChangeRecord[]>([]);
+  const [recentStatusChanges, setRecentStatusChanges] = useState<StatusChangeRecord[]>([]);
   
   // Dashboard Aggregates
   const [servicesData, setServicesData] = useState<ServicesDashboardData | null>(null);
@@ -311,7 +312,7 @@ const App: React.FC = () => {
   }, [church?.city, church?.state, church?.communityLocations]);
 
   const loadTenantData = async (churchId: string) => {
-      const [p, g, a, d, f, b, t, rc] = await Promise.all([
+      const [p, g, a, d, f, b, t, rc, sc] = await Promise.all([
           firestore.getPeople(churchId),
           firestore.getGroups(churchId),
           firestore.getAttendance(churchId),
@@ -319,7 +320,8 @@ const App: React.FC = () => {
           firestore.getFunds(churchId),
           firestore.getBudgets(churchId),
           firestore.getServicesTeams(churchId),
-          firestore.getRecentRiskChanges(churchId)
+          firestore.getRecentRiskChanges(churchId),
+          firestore.getRecentStatusChanges(churchId)
       ]);
       setPeople(p);
       setGroups(g);
@@ -329,6 +331,7 @@ const App: React.FC = () => {
       setBudgets(b);
       setTeams(t);
       setRecentRiskChanges(rc);
+      setRecentStatusChanges(sc);
   };
 
   const loadServicesData = async (churchId: string, filter: ServicesFilter) => {
@@ -364,6 +367,7 @@ const App: React.FC = () => {
           'people': 'People',
           'people-households': 'People',
           'people-risk': 'People',
+          'people-reports': 'People',
           'groups': 'Groups',
           'services': 'Services',
           'services-attendance': 'Services',
@@ -700,9 +704,10 @@ const App: React.FC = () => {
               composition,
               householdList
           },
-          recentRiskChanges
+          recentRiskChanges,
+          recentStatusChanges
       };
-  }, [people, riskEnrichedPeople, recentRiskChanges]);
+  }, [people, riskEnrichedPeople, recentRiskChanges, recentStatusChanges]);
 
   const givingAnalyticsData = useMemo(() => {
       return calculateGivingAnalytics(
@@ -962,12 +967,13 @@ const App: React.FC = () => {
                 churchName={church.name}
             />
         )}
-        {(view === 'people' || view === 'people-households' || view === 'people-risk') && (
+        {(view === 'people' || view === 'people-households' || view === 'people-risk' || view === 'people-reports') && (
             <PeopleView 
                 data={peopleDashboardData}
                 activePage={
                     view === 'people-households' ? 'households' :
                     view === 'people-risk'       ? 'risk'       :
+                    view === 'people-reports'    ? 'reports'    :
                     'overview'
                 }
                 overviewWidgets={widgets}

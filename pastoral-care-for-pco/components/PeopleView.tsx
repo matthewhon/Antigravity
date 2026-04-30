@@ -11,10 +11,11 @@ import { PEOPLE_OVERVIEW_WIDGETS, PEOPLE_HOUSEHOLD_WIDGETS, PEOPLE_RISK_WIDGETS 
 import { WidgetWrapper, StatCard, PersonList } from './SharedUI';
 import { RiskDistributionWidget, AtRiskListWidget, StatusChangesWidget, RiskFactorsWidget, PeopleDirectoryWidget } from './RiskWidgets';
 import { CommunityComparison } from './CommunityComparison';
+import { PeopleReportsTab } from './PeopleReportsTab';
 
 interface PeopleViewProps {
   data: PeopleDashboardData;
-  activePage?: 'overview' | 'households' | 'risk';
+  activePage?: 'overview' | 'households' | 'risk' | 'reports';
   overviewWidgets: string[];
   householdWidgets: string[];
   riskWidgets: string[];
@@ -830,8 +831,12 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
     <div className="space-y-10 animate-in fade-in duration-500">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <h3 className="text-4xl font-black tracking-tighter text-slate-900 dark:text-white">People Analytics</h3>
-          <p className="text-slate-400 dark:text-slate-500 font-medium uppercase text-[10px] tracking-widest mt-1">Demographics & Engagement</p>
+          <h3 className="text-4xl font-black tracking-tighter text-slate-900 dark:text-white">
+            {activePage === 'reports' ? 'Reports' : 'People Analytics'}
+          </h3>
+          <p className="text-slate-400 dark:text-slate-500 font-medium uppercase text-[10px] tracking-widest mt-1">
+            {activePage === 'reports' ? 'Status Trends Over Time' : 'Demographics & Engagement'}
+          </p>
         </div>
         
         <div className="flex items-center gap-4">
@@ -846,23 +851,27 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
                 </button>
             )}
 
-
-            <WidgetsController 
-                availableWidgets={availableWidgets} 
-                visibleWidgets={safeVisibleWidgets} 
-                onUpdate={onUpdateWidgets} 
-                onUpdateTheme={onUpdateTheme}
-                currentTheme={currentTheme}
-            />
+            {activePage !== 'reports' && (
+                <WidgetsController 
+                    availableWidgets={availableWidgets} 
+                    visibleWidgets={safeVisibleWidgets} 
+                    onUpdate={onUpdateWidgets} 
+                    onUpdateTheme={onUpdateTheme}
+                    currentTheme={currentTheme}
+                />
+            )}
         </div>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-      {safeVisibleWidgets.map((id, index) => {
-          // Full-width stat rows span all columns and skip DnD to avoid layout jumps
-          if (id === 'people_stats' || id === 'householdSummary') return renderWidget(id);
-          
-          let spanClass = "col-span-1";
+      {activePage === 'reports' ? (
+        <PeopleReportsTab data={data} />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+        {safeVisibleWidgets.map((id, index) => {
+            // Full-width stat rows span all columns and skip DnD to avoid layout jumps
+            if (id === 'people_stats' || id === 'householdSummary') return renderWidget(id);
+            
+            let spanClass = "col-span-1";
           if (id === 'map' || id === 'riskDistribution' || id === 'atRiskList' || id === 'householdList' || id === 'risk_factors' || id === 'benchmark_age' || id === 'upcoming_registrations') spanClass = "col-span-1 lg:col-span-2";
           if (id === 'people_directory') spanClass = "col-span-1 lg:col-span-4";
           
