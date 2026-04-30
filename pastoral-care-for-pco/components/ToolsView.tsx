@@ -230,6 +230,7 @@ const ScheduleModal: React.FC<{
 
 interface CampaignListViewProps {
   churchId: string;
+  church?: Church;
   campaigns: EmailCampaign[];
   isLoading: boolean;
   onOpen: (c: EmailCampaign) => void;
@@ -240,7 +241,7 @@ interface CampaignListViewProps {
 }
 
 const CampaignListView: React.FC<CampaignListViewProps> = ({
-  campaigns, isLoading, onOpen, onPreview, onDelete, onDuplicate, onCreate
+  churchId, church, campaigns, isLoading, onOpen, onPreview, onDelete, onDuplicate, onCreate
 }) => {
   const [tab, setTab] = React.useState<'all' | 'draft' | 'sent'>('all');
   const filtered = tab === 'all' ? campaigns : campaigns.filter(c => c.status === tab);
@@ -250,8 +251,16 @@ const CampaignListView: React.FC<CampaignListViewProps> = ({
     sent: campaigns.filter(c => c.status === 'sent').length,
   };
 
+  const now = new Date();
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const usage = church?.emailUsage || {};
+  const currentUsage = usage[currentMonth] || 0;
+  const isStarter = church?.subscription?.planId === 'starter';
+  const planLimit = isStarter ? 500 : 'Unlimited';
+  const usagePercent = isStarter ? Math.min(100, Math.round((currentUsage / 500) * 100)) : 0;
+
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="p-6 max-w-6xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -270,9 +279,12 @@ const CampaignListView: React.FC<CampaignListViewProps> = ({
         </button>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl mb-5 w-fit">
-        {(['all', 'draft', 'sent'] as const).map(t => (
+      <div className="flex flex-col lg:flex-row gap-8 items-start">
+        {/* Main Content Column */}
+        <div className="flex-1 w-full min-w-0">
+          {/* Tabs */}
+          <div className="flex gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl mb-5 w-fit">
+            {(['all', 'draft', 'sent'] as const).map(t => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -383,6 +395,70 @@ const CampaignListView: React.FC<CampaignListViewProps> = ({
           })}
         </div>
       )}
+      </div>
+
+      {/* Sidebar */}
+      <div className="w-full lg:w-72 shrink-0 space-y-4">
+        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5 shadow-sm">
+          <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2 mb-4">
+            <BarChart2 size={16} className="text-indigo-500" /> Monthly Email Usage
+          </h3>
+          
+          <div className="flex items-end justify-between mb-2">
+            <div className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">
+              {currentUsage.toLocaleString()}
+            </div>
+            <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">
+              / {isStarter ? '500 limit' : 'Unlimited'}
+            </div>
+          </div>
+
+          {isStarter && (
+            <>
+              <div className="h-2 w-full bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden mb-3">
+                <div 
+                  className={`h-full rounded-full transition-all duration-500 ${usagePercent > 90 ? 'bg-red-500' : usagePercent > 75 ? 'bg-amber-500' : 'bg-indigo-500'}`}
+                  style={{ width: `${usagePercent}%` }}
+                />
+              </div>
+              {usagePercent >= 100 ? (
+                <p className="text-[11px] font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-2.5 py-2 rounded-lg">
+                  You have reached your starter plan limit. You cannot send more emails this month.
+                </p>
+              ) : (
+                <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                  You have <strong className="text-slate-700 dark:text-slate-300">{500 - currentUsage}</strong> emails remaining this month.
+                </p>
+              )}
+            </>
+          )}
+          
+          {!isStarter && (
+            <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-900/50 px-2.5 py-2 rounded-lg mt-3">
+              You are on an unlimited plan. Email sends are not capped.
+            </p>
+          )}
+        </div>
+
+        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5 shadow-sm">
+          <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-4">Overview</h3>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-slate-500 dark:text-slate-400 font-medium">Sent Campaigns</span>
+              <span className="font-bold text-slate-900 dark:text-white">{counts.sent}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-slate-500 dark:text-slate-400 font-medium">Draft & Scheduled</span>
+              <span className="font-bold text-slate-900 dark:text-white">{counts.draft}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm pt-3 border-t border-slate-100 dark:border-slate-700/50">
+              <span className="text-slate-500 dark:text-slate-400 font-medium">Total Campaigns</span>
+              <span className="font-bold text-slate-900 dark:text-white">{counts.all}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      </div>
     </div>
   );
 };
@@ -1774,6 +1850,7 @@ currentUser, onUpdateChurch, activePage, smsTab }) => {
       ) : (
         <CampaignListView
           churchId={churchId}
+          church={church}
           campaigns={campaigns}
           isLoading={isLoading}
           onOpen={c => setActiveCampaign(c)}
