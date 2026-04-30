@@ -413,8 +413,44 @@ export const handleInboundSms = async (req: any, res: any) => {
         let keywordReplyMessage: string | null = null;
 
         if (kw) {
-            // Build the reply message, appending a poll link if configured
-            let baseReply = kw.replyMessage;
+            // Build the reply message
+            let baseReply = kw.replyMessage || '';
+            const actionType = kw.actionType || 'static';
+
+            if (actionType === 'registration_events' || actionType === 'small_groups') {
+                try {
+                    const churchSnap = await db.collection('churches').doc(churchId).get();
+                    const subdomain = churchSnap.data()?.subdomain;
+                    if (subdomain) {
+                        const path = actionType === 'registration_events' ? 'registrations' : 'groups';
+                        const link = `https://${subdomain}.churchcenter.com/${path}`;
+                        baseReply = baseReply ? `${baseReply}\n\n${link}` : link;
+                    } else {
+                        const msg = '(Church Center link unavailable)';
+                        baseReply = baseReply ? `${baseReply}\n\n${msg}` : msg;
+                    }
+                } catch (e) {
+                    // Ignore errors
+                }
+            } else if (actionType === 'giving_ytd') {
+                if (personMatch?.personId) {
+                    try {
+                        const personSnap = await db.collection('people').doc(personMatch.personId).get();
+                        const ytd = personSnap.data()?.givingStats?.ytd || 0;
+                        const formattedYtd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(ytd);
+                        const msg = `Hi ${personMatch.personName?.split(' ')[0] || 'there'}, your year-to-date giving is ${formattedYtd}. Thank you for your generosity!`;
+                        baseReply = baseReply ? `${baseReply}\n\n${msg}` : msg;
+                    } catch (e) {
+                        const msg = '(Unable to retrieve giving information)';
+                        baseReply = baseReply ? `${baseReply}\n\n${msg}` : msg;
+                    }
+                } else {
+                    const msg = `We couldn't find a donor profile linked to this phone number.`;
+                    baseReply = baseReply ? `${baseReply}\n\n${msg}` : msg;
+                }
+            }
+
+            // Append poll link if configured
             if ((kw as any).linkedPollId) {
                 // Determine the public base URL from system settings (or fall back to host header)
                 let pollBase = '';
@@ -427,7 +463,7 @@ export const handleInboundSms = async (req: any, res: any) => {
                 } catch { /* ignore */ }
                 if (!pollBase) pollBase = 'https://pastoralcare.barnabassoftware.com';
                 const pollLink = `${pollBase}/poll/${(kw as any).linkedPollId}`;
-                baseReply = `${baseReply}\n${pollLink}`;
+                baseReply = baseReply ? `${baseReply}\n${pollLink}` : pollLink;
             }
             keywordReplyMessage = baseReply;
 

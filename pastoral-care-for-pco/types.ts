@@ -1119,13 +1119,17 @@ export interface SmsTag {
     createdAt: number;
 }
 
+export type SmsKeywordAction = 'static' | 'registration_events' | 'small_groups' | 'giving_ytd';
+
 export interface SmsKeyword {
     id: string;
     churchId: string;
     /** The trigger word (stored uppercase), e.g. "YOUTH" */
     keyword: string;
-    /** Auto-reply message body */
+    /** Auto-reply message body. Acts as a prefix if an actionType is set. */
     replyMessage: string;
+    /** Action to take when this keyword matches */
+    actionType?: SmsKeywordAction;
     /** Optionally add the replying contact to this PCO list */
     addToListId?: string | null;
     addToListName?: string | null;

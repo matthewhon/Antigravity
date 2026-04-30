@@ -11,7 +11,7 @@ import {
 } from 'firebase/firestore';
 import { pcoService } from '../services/pcoService';
 import { firestore } from '../services/firestoreService';
-import { SmsCampaign, SmsConversation, SmsMessage, SmsKeyword, SmsOptOut, SmsWorkflow, SmsWorkflowStep, SmsWorkflowEnrollment, SmsTag, Church, User, WorkflowChannelType, WorkflowNode, WorkflowActionNode, WorkflowDelayNode, WorkflowBranchNode, WorkflowBranchConditionType, TwilioPhoneNumber, SmsAgentKnowledge, SmsAiSuggestion } from '../types';
+import { SmsCampaign, SmsConversation, SmsMessage, SmsKeyword, SmsKeywordAction, SmsOptOut, SmsWorkflow, SmsWorkflowStep, SmsWorkflowEnrollment, SmsTag, Church, User, WorkflowChannelType, WorkflowNode, WorkflowActionNode, WorkflowDelayNode, WorkflowBranchNode, WorkflowBranchConditionType, TwilioPhoneNumber, SmsAgentKnowledge, SmsAiSuggestion } from '../types';
 import {
     MessageSquare, Send, Clock, Users, Plus, ArrowLeft, Trash2,
     Eye, Pencil, ChevronDown, CheckCircle, Circle, Loader2, X,
@@ -2398,6 +2398,7 @@ interface KeywordModalProps {
 
 const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingLists, tags, polls, onSave, onClose, isBusy, saveError }) => {
     const [keyword, setKeyword]           = useState(initial?.keyword || '');
+    const [actionType, setActionType]     = useState<SmsKeywordAction>(initial?.actionType || 'static');
     const [replyMessage, setReplyMessage] = useState(initial?.replyMessage || '');
     const [addToListId, setAddToListId]   = useState(initial?.addToListId || '');
     const [isActive, setIsActive]         = useState(initial?.isActive ?? true);
@@ -2419,6 +2420,7 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingL
         await onSave({
             churchId:      initial?.churchId || '',   // parent will fill in
             keyword:       kw,
+            actionType:    actionType,
             replyMessage:  replyMessage.trim(),
             addToListId:   addToListId || null,
             addToListName: selectedList?.name || null,
@@ -2453,10 +2455,30 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingL
                     <p className="text-[10px] text-slate-400 mt-1">Letters &amp; numbers only, no spaces. Stored as UPPERCASE.</p>
                 </div>
 
+                {/* Action Type */}
+                <div className="mb-4">
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Action Type</label>
+                    <select
+                        value={actionType}
+                        onChange={e => setActionType(e.target.value as SmsKeywordAction)}
+                        className="w-full text-sm font-semibold border-2 border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500"
+                    >
+                        <option value="static">Static Reply Message</option>
+                        <option value="registration_events">Send Registration Events</option>
+                        <option value="small_groups">Send Small Groups</option>
+                        <option value="giving_ytd">Send Giving YTD (by Phone Number)</option>
+                    </select>
+                    {actionType === 'registration_events' && <p className="text-[10px] text-slate-400 mt-1">Replies with a link to your Church Center Registrations page.</p>}
+                    {actionType === 'small_groups' && <p className="text-[10px] text-slate-400 mt-1">Replies with a link to your Church Center Groups page.</p>}
+                    {actionType === 'giving_ytd' && <p className="text-[10px] text-slate-400 mt-1">Looks up the person by their phone number and replies with their Year-to-Date giving total.</p>}
+                </div>
+
                 {/* Auto-reply message */}
                 <div className="mb-4">
                     <div className="flex items-center justify-between mb-2">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Auto-Reply Message</label>
+                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                            {actionType === 'static' ? 'Auto-Reply Message' : 'Prefix Message (Optional)'}
+                        </label>
                         <span className={`text-xs font-bold ${segs > 3 ? 'text-red-500' : segs > 1 ? 'text-amber-600' : 'text-slate-400'}`}>
                             {replyMessage.length} chars · {segs} seg{segs !== 1 ? 's' : ''}
                         </span>
@@ -2465,7 +2487,7 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingL
                         rows={4}
                         value={replyMessage}
                         onChange={e => setReplyMessage(e.target.value)}
-                        placeholder={`Thanks for texting ${keyword || 'YOUTH'}! Here's what you need to know…`}
+                        placeholder={actionType === 'static' ? `Thanks for texting ${keyword || 'YOUTH'}! Here's what you need to know…` : 'Here is the link you requested:'}
                         className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
                     />
 
@@ -2474,6 +2496,9 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingL
                         <div className="mt-2 bg-slate-100 dark:bg-slate-800/60 rounded-2xl p-3 flex justify-end">
                             <div className="bg-violet-600 text-white text-xs px-3 py-2 rounded-2xl rounded-br-sm max-w-[85%] leading-relaxed whitespace-pre-wrap break-words">
                                 {replyMessage}
+                                {actionType === 'registration_events' && "\n\nhttps://[your-church].churchcenter.com/registrations"}
+                                {actionType === 'small_groups' && "\n\nhttps://[your-church].churchcenter.com/groups"}
+                                {actionType === 'giving_ytd' && "\n\nHi John, your year-to-date giving is $1,234.56. Thank you!"}
                             </div>
                         </div>
                     )}
