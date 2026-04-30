@@ -1,5 +1,6 @@
 import { executeSend } from './sendEmail';
 import { createServerLogger } from '../services/logService';
+import { calculateGivingAnalytics, DEFAULT_LIFECYCLE_SETTINGS } from '../services/analyticsService';
 
 // ─── Analytics data refresher (server-side) ─────────────────────────────────
 
@@ -182,26 +183,20 @@ async function fetchWidgetData(
             }
 
             if (widgetId === 'giving_donor_lifecycle' || widgetId === 'giving_donor_acquisition') {
-                // Simplified lifecycle count
-                const donorHistory = new Map<string, any[]>();
-                donations.forEach(d => {
-                    if (!donorHistory.has(d.donorId)) donorHistory.set(d.donorId, []);
-                    donorHistory.get(d.donorId)!.push(d);
-                });
-                let newDonors = 0, activeDonors = 0, lapsedDonors = 0, recoveredDonors = 0;
-                donorHistory.forEach(gifts => {
-                    const sorted = gifts.sort((a, b) => a.date.localeCompare(b.date));
-                    const lastGift = new Date(sorted[sorted.length - 1].date);
-                    const daysSince = (now.getTime() - lastGift.getTime()) / 86400000;
-                    if (daysSince <= 30) newDonors++;
-                    else if (daysSince <= 90) activeDonors++;
-                    else if (daysSince <= 365) lapsedDonors++;
-                    else recoveredDonors++;
-                });
+                const churchSnap = await db.collection('churches').doc(churchId).get();
+                const church = churchSnap.data();
+                const lifecycleSettings = church?.donorLifecycleSettings || DEFAULT_LIFECYCLE_SETTINGS;
+                const analytics = calculateGivingAnalytics(donations, 'Year', undefined, [], lifecycleSettings);
+                
                 if (widgetId === 'giving_donor_lifecycle') {
-                    return { donorLifecycle: { new: newDonors, active: activeDonors, lapsed: lapsedDonors, recovered: recoveredDonors, occasional: 0, inactive: 0, secondTime: 0 } };
+                    return { donorLifecycle: analytics.donorLifecycle };
                 }
-                return { newDonors, recoveredDonors, lapsedDonors, secondTimeDonors: 0 };
+                return { 
+                    newDonors: analytics.donorLifecycle.new, 
+                    recoveredDonors: analytics.donorLifecycle.recovered, 
+                    lapsedDonors: analytics.donorLifecycle.lapsed, 
+                    secondTimeDonors: analytics.donorLifecycle.secondTime 
+                };
             }
             break;
         }
