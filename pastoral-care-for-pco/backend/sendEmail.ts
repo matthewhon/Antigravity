@@ -28,6 +28,10 @@ export async function sgSend(
         from: firstMsg.from,
         subject: firstMsg.subject,
         content: [{ type: 'text/html', value: firstMsg.html }],
+        tracking_settings: {
+            click_tracking: { enable: true, enable_text: false },
+            open_tracking: { enable: true }
+        }
     };
     if (campaignId) {
         payload.categories = [campaignId];
