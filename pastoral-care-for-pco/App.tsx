@@ -30,7 +30,7 @@ import {
   User, Church, PeopleDashboardData, GivingAnalytics, GroupsDashboardData, 
   ServicesDashboardData, AttendanceData, CensusStats, BudgetRecord, PcoFund, 
   DetailedDonation, PcoPerson, ServicesFilter, GivingFilter, GeoInsight,
-  PcoGroup, AttendanceRecord, ServicesTeam, RiskSettings, SystemSettings, RiskChangeRecord
+  PcoGroup, AttendanceRecord, ServicesTeam, RiskSettings, SystemSettings, RiskChangeRecord, StatusChangeRecord
 } from './types';
 import { getDefaultWidgets } from './constants/widgetRegistry';
 import { calculateGivingAnalytics, DEFAULT_LIFECYCLE_SETTINGS } from './services/analyticsService';

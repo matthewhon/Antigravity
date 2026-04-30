@@ -276,7 +276,7 @@ async function fetchWidgetSnapshot(
         const monthEnd = new Date(yearNow, i + 1, 0, 23, 59, 59, 999);
         const actualInMonth = donations
           .filter(d => { const dd = new Date(d.date); return dd >= monthStart && dd <= monthEnd; })
-          .reduce((s, d) => s + d.amount, 0);
+          .reduce((s, d) => s + Number(d.amount || 0), 0);
         // Only add actual for months that have passed or are current
         if (i <= currentMonth) runningActual += actualInMonth;
         const budgetInMonth = activeBudgets.reduce(
@@ -326,7 +326,7 @@ async function fetchWidgetSnapshot(
       rawDonations.forEach(d => {
         const dDate = new Date(d.date);
         if (dDate >= lwStart && dDate <= lwEnd) {
-          fundTotals[d.fundName] = (fundTotals[d.fundName] || 0) + d.amount;
+          fundTotals[d.fundName] = (fundTotals[d.fundName] || 0) + Number(d.amount || 0);
         }
       });
 
@@ -356,7 +356,7 @@ async function fetchWidgetSnapshot(
       rawDonations.forEach(d => {
         const dDate = new Date(d.date);
         if (dDate >= yearStart && dDate <= now) {
-          fundActuals[d.fundName] = (fundActuals[d.fundName] || 0) + d.amount;
+          fundActuals[d.fundName] = (fundActuals[d.fundName] || 0) + Number(d.amount || 0);
         }
       });
       const totalBudget = yearBudgets.reduce((s, b) => s + b.totalAmount, 0);
@@ -660,7 +660,7 @@ async function fetchWidgetSnapshot(
         donations.forEach(d => {
           const dDate = new Date(d.date);
           if (dDate >= w.weekStart && dDate <= w.weekEnd) {
-            byFund[d.fundName] = (byFund[d.fundName] || 0) + d.amount;
+            byFund[d.fundName] = (byFund[d.fundName] || 0) + Number(d.amount || 0);
           }
         });
         const total = Object.values(byFund).reduce((s, v) => s + v, 0);

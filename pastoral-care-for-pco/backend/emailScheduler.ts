@@ -138,7 +138,7 @@ async function fetchWidgetData(
                 const monthMap = new Map<string, number>();
                 ytd.forEach(d => {
                     const m = d.date.slice(0, 7);
-                    monthMap.set(m, (monthMap.get(m) || 0) + d.amount);
+                    monthMap.set(m, (monthMap.get(m) || 0) + Number(d.amount || 0));
                 });
                 const months = Array.from(monthMap.entries()).sort((a, b) => a[0].localeCompare(b[0]));
                 let running = 0;
@@ -154,7 +154,7 @@ async function fetchWidgetData(
             yearAgo.setFullYear(now.getFullYear() - 1);
             const current = donations.filter(d => new Date(d.date) >= yearAgo);
 
-            const totalGiving = current.reduce((s, d) => s + d.amount, 0);
+            const totalGiving = current.reduce((s, d) => s + Number(d.amount || 0), 0);
             const uniqueDonors = new Set(current.map(d => d.donorId)).size;
             const recurringGivers = new Set(current.filter(d => d.isRecurring).map(d => d.donorId)).size;
             const averageGift = current.length > 0 ? totalGiving / current.length : 0;
@@ -167,13 +167,13 @@ async function fetchWidgetData(
                     const dd = new Date(d.date);
                     return dd >= prevYearAgo && dd < yearAgo;
                 });
-                const previousTotalGiving = prev.reduce((s, d) => s + d.amount, 0);
+                const previousTotalGiving = prev.reduce((s, d) => s + Number(d.amount || 0), 0);
                 return { totalGiving, previousTotalGiving, contributingPeople: uniqueDonors, recurringGivers, averageGift };
             }
 
             if (widgetId === 'giving_fund_performance') {
                 const fundMap = new Map<string, number>();
-                current.forEach(d => fundMap.set(d.fundName || 'General', (fundMap.get(d.fundName || 'General') || 0) + d.amount));
+                current.forEach(d => fundMap.set(d.fundName || 'General', (fundMap.get(d.fundName || 'General') || 0) + Number(d.amount || 0)));
                 const givingByFund = Array.from(fundMap.entries())
                     .map(([name, value]) => ({ name, value }))
                     .sort((a, b) => b.value - a.value)
@@ -277,7 +277,7 @@ async function fetchWidgetData(
             allDonations.forEach(d => {
                 const dDate = new Date(d.date);
                 if (dDate >= lwStart && dDate <= lwEnd) {
-                    fundTotals[d.fundName] = (fundTotals[d.fundName] || 0) + d.amount;
+                    fundTotals[d.fundName] = (fundTotals[d.fundName] || 0) + Number(d.amount || 0);
                 }
             });
 
@@ -309,7 +309,7 @@ async function fetchWidgetData(
             allDonations.forEach((d: any) => {
                 const dDate = new Date(d.date);
                 if (dDate >= yearStart && dDate <= now2) {
-                    fundActuals[d.fundName] = (fundActuals[d.fundName] || 0) + d.amount;
+                    fundActuals[d.fundName] = (fundActuals[d.fundName] || 0) + Number(d.amount || 0);
                 }
             });
             const totalBudget = yearBudgets.reduce((s: number, b: any) => s + b.totalAmount, 0);
@@ -593,7 +593,7 @@ async function fetchWidgetData(
                 donations.forEach((d: any) => {
                     const dd = new Date(d.date);
                     if (dd >= w.start && dd <= w.end) {
-                        byFund[d.fundName] = (byFund[d.fundName] || 0) + d.amount;
+                        byFund[d.fundName] = (byFund[d.fundName] || 0) + Number(d.amount || 0);
                     }
                 });
                 const total = Object.values(byFund).reduce((s: number, v: number) => s + v, 0);

@@ -1150,7 +1150,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
               donations.forEach(d => {
                   const dDate = new Date(d.date);
                   if (dDate >= lwStart && dDate <= lwEnd) {
-                      fundTotals[d.fundName] = (fundTotals[d.fundName] || 0) + d.amount;
+                      fundTotals[d.fundName] = (fundTotals[d.fundName] || 0) + Number(d.amount || 0);
                   }
               });
 
