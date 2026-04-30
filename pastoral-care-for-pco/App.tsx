@@ -45,7 +45,7 @@ const App: React.FC = () => {
   const [allChurches, setAllChurches] = useState<Church[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState('dashboard');
-  const [isRegistering, setIsRegistering] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(window.location.pathname === '/register');
   const [settingsTab, setSettingsTab] = useState<string>('Team'); // Controls initial tab in Settings
 
   // Raw Data States
@@ -878,8 +878,14 @@ const App: React.FC = () => {
 
   if (!user) {
     return isRegistering 
-        ? <RegisterView onCancel={() => setIsRegistering(false)} /> 
-        : <LoginView onRegister={() => setIsRegistering(true)} />;
+        ? <RegisterView onCancel={() => {
+            window.history.pushState({}, '', '/');
+            setIsRegistering(false);
+          }} /> 
+        : <LoginView onRegister={() => {
+            window.history.pushState({}, '', '/register');
+            setIsRegistering(true);
+          }} />;
   }
 
   if (!church) {

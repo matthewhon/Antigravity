@@ -123,12 +123,16 @@ export const LoginView: React.FC<LoginViewProps> = ({ onRegister }) => {
 
         <div className="mt-8 text-center border-t border-slate-100 dark:border-slate-800 pt-6">
             <p className="text-xs font-medium text-slate-400">Don't have an account?</p>
-            <button 
-                onClick={onRegister}
-                className="mt-2 text-xs font-black text-indigo-600 hover:text-indigo-800 transition-colors uppercase tracking-widest"
+            <a 
+                href="/register"
+                onClick={(e) => {
+                    e.preventDefault();
+                    onRegister();
+                }}
+                className="mt-2 inline-block text-xs font-black text-indigo-600 hover:text-indigo-800 transition-colors uppercase tracking-widest"
             >
                 Create Organization
-            </button>
+            </a>
         </div>
       </div>
     </div>

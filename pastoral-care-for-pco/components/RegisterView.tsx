@@ -293,12 +293,16 @@ export const RegisterView: React.FC<RegisterViewProps> = ({ onCancel }) => {
         </form>
 
         <div className="mt-8 text-center border-t border-slate-100 dark:border-slate-800 pt-6">
-            <button 
-                onClick={onCancel}
-                className="text-xs font-bold text-slate-500 hover:text-indigo-600 transition-colors"
+            <a 
+                href="/"
+                onClick={(e) => {
+                    e.preventDefault();
+                    onCancel();
+                }}
+                className="inline-block text-xs font-bold text-slate-500 hover:text-indigo-600 transition-colors"
             >
                 Already have an account? Sign In
-            </button>
+            </a>
         </div>
       </div>
     </div>
