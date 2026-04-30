@@ -109,7 +109,7 @@ async function fetchWidgetData(
     db: any,
     churchId: string,
     widgetId: string,
-    config: { fundName?: string; dayRange?: number; timePeriod?: string } = {}
+    config: { fundName?: string; dayRange?: number; timePeriod?: string; pcoListId?: string; pcoListName?: string } = {}
 ): Promise<any> {
     const fundFilter = config.fundName?.trim() || '';
     const dayRange   = config.dayRange  || 14;
@@ -613,8 +613,40 @@ async function fetchWidgetData(
         // ── Birthdays / Anniversaries ────────────────────────────────────────
         case 'people_birthdays':
         case 'people_anniversaries': {
+            let pcoListPeopleIds: Set<string> | null = null;
+            if (config.pcoListId) {
+                const churchSnap = await db.collection('churches').doc(churchId).get();
+                const token = churchSnap.data()?.pcoAccessToken;
+                if (token) {
+                    try {
+                        const ids = new Set<string>();
+                        let pcoPage = 1;
+                        let hasMore = true;
+                        while (hasMore) {
+                            const res = await fetch(`https://api.planningcenteronline.com/people/v2/lists/${config.pcoListId}/people?per_page=100&offset=${(pcoPage - 1) * 100}`, {
+                                headers: { Authorization: `Bearer ${token}` }
+                            });
+                            if (!res.ok) break;
+                            const data = await res.json();
+                            const items = data.data || [];
+                            for (const item of items) ids.add(item.id);
+                            hasMore = !!data.meta?.next?.offset && items.length === 100;
+                            pcoPage++;
+                        }
+                        pcoListPeopleIds = ids;
+                    } catch (e) {
+                        console.warn('Failed to fetch PCO list for widget', e);
+                    }
+                }
+            }
+
             const snap = await db.collection('people').where('churchId', '==', churchId).get();
-            const people: any[] = snap.docs.map((d: any) => d.data());
+            let people: any[] = snap.docs.map((d: any) => d.data());
+            
+            if (pcoListPeopleIds) {
+                people = people.filter((p: any) => pcoListPeopleIds!.has(p.id));
+            }
+
             const EXCLUDED = ['Inactive', 'Archived'];
             const now = new Date();
 
@@ -631,7 +663,7 @@ async function fetchWidgetData(
                     .filter((p: any) => p.daysUntil <= 30)
                     .sort((a: any, b: any) => a.daysUntil - b.daysUntil)
                     .slice(0, 15);
-                return { upcoming, listFilter: null };
+                return { upcoming, listFilter: config.pcoListName || null };
             } else {
                 const upcoming = people
                     .filter((p: any) => !!p.anniversary && !EXCLUDED.includes(p.status || ''))
@@ -646,7 +678,7 @@ async function fetchWidgetData(
                     .filter((p: any) => p.daysUntil <= 30)
                     .sort((a: any, b: any) => a.daysUntil - b.daysUntil)
                     .slice(0, 15);
-                return { upcoming, listFilter: null };
+                return { upcoming, listFilter: config.pcoListName || null };
             }
         }
 

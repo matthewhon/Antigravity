@@ -822,6 +822,7 @@ function renderAnalyticsBlockHtml(
                 <table width="100%" cellpadding="0" cellspacing="0"><tr>
                   <td align="left" valign="middle">
                     <div style="font-size:10px;font-weight:800;color:#fef3c7;text-transform:uppercase;letter-spacing:1px;font-family:${fontFamily};">Upcoming Birthdays</div>
+                    ${data.listFilter ? `<div style="font-size:9px;color:#fde68a;font-family:${fontFamily};margin-top:2px;">List: ${data.listFilter}</div>` : ''}
                   </td>
                   <td align="right" valign="middle">
                     <div style="font-size:10px;color:#fde68a;font-family:${fontFamily};">Next 30 Days</div>
@@ -850,6 +851,7 @@ function renderAnalyticsBlockHtml(
                 <table width="100%" cellpadding="0" cellspacing="0"><tr>
                   <td align="left" valign="middle">
                     <div style="font-size:10px;font-weight:800;color:#ede9fe;text-transform:uppercase;letter-spacing:1px;font-family:${fontFamily};">Upcoming Anniversaries</div>
+                    ${data.listFilter ? `<div style="font-size:9px;color:#d8b4fe;font-family:${fontFamily};margin-top:2px;">List: ${data.listFilter}</div>` : ''}
                   </td>
                   <td align="right" valign="middle">
                     <div style="font-size:10px;color:#c4b5fd;font-family:${fontFamily};">Next 30 Days</div>
