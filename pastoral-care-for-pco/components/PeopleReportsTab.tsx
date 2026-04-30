@@ -26,6 +26,13 @@ const AGE_COLORS: Record<string, string> = {
   'Unknown': '#cbd5e1' // Light Slate
 };
 
+const RISK_COLORS: Record<string, string> = {
+  'Healthy': '#10b981',      // Emerald
+  'At Risk': '#f59e0b',      // Amber
+  'Disconnected': '#f43f5e', // Rose
+  'Unknown': '#94a3b8',      // Slate
+};
+
 export const PeopleReportsTab: React.FC<PeopleReportsTabProps> = ({ data }) => {
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('12_months');
 
@@ -187,6 +194,64 @@ export const PeopleReportsTab: React.FC<PeopleReportsTabProps> = ({ data }) => {
 
   const ageKeys = ['0-18', '19-30', '31-50', '51-70', '70+', 'Unknown'];
 
+  const riskChartData = useMemo(() => {
+    if (months.length === 0) return [];
+
+    return months.map(m => {
+      const monthEnd = new Date(m.date);
+      monthEnd.setMonth(monthEnd.getMonth() + 1);
+      monthEnd.setDate(0); 
+      monthEnd.setHours(23, 59, 59, 999);
+
+      const riskBuckets: Record<string, number> = { 'Healthy': 0, 'At Risk': 0, 'Disconnected': 0, 'Unknown': 0 };
+
+      data.allPeople.forEach(p => {
+        const created = new Date(p.createdAt);
+        if (created <= monthEnd) {
+          // Reconstruct historical status to see if they were Active
+          let currentStatus = p.status || 'Unknown';
+          if (data.recentStatusChanges) {
+            const futureStatusChanges = data.recentStatusChanges.filter(
+                c => c.personId === p.id && c.type === 'status' && new Date(c.date) > monthEnd
+            );
+            futureStatusChanges.sort((a, b) => b.timestamp - a.timestamp);
+            for (const change of futureStatusChanges) {
+                currentStatus = change.oldValue || 'Unknown';
+            }
+          }
+
+          // Only count Active people for risk profile over time
+          if (currentStatus === 'Active') {
+              let currentRisk = p.riskProfile?.category || 'Disconnected'; 
+              
+              if (data.recentRiskChanges) {
+                const futureRiskChanges = data.recentRiskChanges.filter(
+                    c => c.personId === p.id && new Date(c.date) > monthEnd
+                );
+                futureRiskChanges.sort((a, b) => b.timestamp - a.timestamp);
+                for (const change of futureRiskChanges) {
+                    currentRisk = change.oldCategory || 'Disconnected';
+                }
+              }
+
+              if (riskBuckets[currentRisk] !== undefined) {
+                  riskBuckets[currentRisk]++;
+              } else {
+                  riskBuckets['Unknown']++;
+              }
+          }
+        }
+      });
+
+      return {
+        name: m.label,
+        ...riskBuckets
+      };
+    });
+  }, [data.allPeople, data.recentStatusChanges, data.recentRiskChanges, months]);
+
+  const riskKeys = ['Healthy', 'At Risk', 'Disconnected', 'Unknown'];
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 lg:p-8 shadow-sm">
@@ -327,6 +392,75 @@ export const PeopleReportsTab: React.FC<PeopleReportsTabProps> = ({ data }) => {
                     stroke={AGE_COLORS[key]} 
                     strokeWidth={2}
                     fill={`url(#ageColor${key.replace('+','plus')})`} 
+                  />
+                ))}
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-full flex items-center justify-center text-slate-400">
+              No data available for the selected time range.
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 lg:p-8 shadow-sm">
+        <div className="mb-8">
+          <h4 className="text-xl font-black text-slate-900 dark:text-white">Risk Profile Over Time</h4>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Changes in risk categories over time (Active people only).</p>
+        </div>
+
+        <div className="h-[400px] w-full">
+          {riskChartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={riskChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <defs>
+                  {riskKeys.map(key => (
+                    <linearGradient key={`risk-${key}`} id={`colorRisk${key.replace(/\s+/g, '')}`} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={RISK_COLORS[key] || '#6366f1'} stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor={RISK_COLORS[key] || '#6366f1'} stopOpacity={0}/>
+                    </linearGradient>
+                  ))}
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.2} />
+                <XAxis 
+                  dataKey="name" 
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 12, fill: '#64748b' }}
+                  dy={10}
+                />
+                <YAxis 
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 12, fill: '#64748b' }}
+                />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: '#1e293b', 
+                    border: 'none', 
+                    borderRadius: '12px',
+                    color: '#f8fafc',
+                    boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'
+                  }}
+                  itemStyle={{ fontSize: '13px', fontWeight: 600 }}
+                />
+                <Legend 
+                  verticalAlign="top" 
+                  height={36} 
+                  iconType="circle"
+                  wrapperStyle={{ fontSize: '12px', fontWeight: 600, color: '#64748b' }}
+                />
+                {riskKeys.map(key => (
+                  <Area 
+                    key={key}
+                    type="monotone" 
+                    dataKey={key} 
+                    stackId="1"
+                    stroke={RISK_COLORS[key] || '#6366f1'} 
+                    strokeWidth={2}
+                    fill={`url(#colorRisk${key.replace(/\s+/g, '')})`} 
+                    activeDot={{ r: 6, strokeWidth: 0, fill: RISK_COLORS[key] || '#6366f1' }}
                   />
                 ))}
               </AreaChart>

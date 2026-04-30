@@ -463,6 +463,7 @@ export const syncRiskChanges = async (churchId: string) => {
                     date: nowIso,
                     oldCategory: oldCat,
                     newCategory: currentCat,
+                    reasons: person.riskProfile?.factors || [],
                     timestamp: nowMs
                 });
                 

@@ -205,7 +205,8 @@ export const StatusChangesWidget: React.FC<RiskProps> = ({ recentRiskChanges = [
                 name: c.personName,
                 changeType: type,
                 oldCategory: c.oldCategory,
-                newCategory: c.newCategory
+                newCategory: c.newCategory,
+                reasons: c.reasons || []
             };
         });
 
@@ -237,23 +238,34 @@ export const StatusChangesWidget: React.FC<RiskProps> = ({ recentRiskChanges = [
                         <p className="text-[10px] text-slate-400 font-medium">No recent status changes</p>
                     </div>
                 ) : recentMovements.map(m => (
-                    <div key={m.id} className="flex items-center justify-between p-2 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors">
-                        <div className="flex items-center gap-3">
-                            <div className={`w-2 h-2 rounded-full ${
-                                m.changeType === 'improved' ? 'bg-emerald-500' : 
-                                m.changeType === 'declined' ? 'bg-amber-500' : 'bg-rose-500'
-                            }`}></div>
-                            <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300 truncate max-w-[120px]">{m.name}</span>
+                    <div key={m.id} className="flex flex-col p-2 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className={`w-2 h-2 rounded-full ${
+                                    m.changeType === 'improved' ? 'bg-emerald-500' : 
+                                    m.changeType === 'declined' ? 'bg-amber-500' : 'bg-rose-500'
+                                }`}></div>
+                                <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300 truncate max-w-[120px]">{m.name}</span>
+                            </div>
+                            <div className="text-right">
+                                <p className={`text-[9px] font-black uppercase tracking-wider ${
+                                     m.changeType === 'improved' ? 'text-emerald-600 dark:text-emerald-400' : 
+                                     m.changeType === 'declined' ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'
+                                }`}>
+                                    {m.newCategory} {m.changeType === 'improved' ? '↗' : '↘'}
+                                </p>
+                                <p className="text-[8px] text-slate-400 uppercase font-medium mt-0.5">was {m.oldCategory}</p>
+                            </div>
                         </div>
-                        <div className="text-right">
-                            <p className={`text-[9px] font-black uppercase tracking-wider ${
-                                 m.changeType === 'improved' ? 'text-emerald-600 dark:text-emerald-400' : 
-                                 m.changeType === 'declined' ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'
-                            }`}>
-                                {m.newCategory} {m.changeType === 'improved' ? '↗' : '↘'}
-                            </p>
-                            <p className="text-[8px] text-slate-400 uppercase font-medium mt-0.5">was {m.oldCategory}</p>
-                        </div>
+                        {m.reasons && m.reasons.length > 0 && (
+                            <div className="flex gap-1 flex-wrap mt-1.5 ml-5">
+                                {m.reasons.map(r => (
+                                    <span key={r} className="text-[7.5px] bg-slate-100 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400 px-1.5 py-0.5 rounded uppercase tracking-tight">
+                                        {r}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 ))}
             </div>

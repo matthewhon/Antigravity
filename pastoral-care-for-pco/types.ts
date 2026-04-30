@@ -817,6 +817,7 @@ export interface RiskChangeRecord {
     date: string;           // ISO date string
     oldCategory: string;    // 'Healthy' | 'At Risk' | 'Disconnected'
     newCategory: string;
+    reasons?: string[];
     timestamp: number;
 }
 
