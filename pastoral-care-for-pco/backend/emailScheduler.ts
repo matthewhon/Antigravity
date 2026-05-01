@@ -530,6 +530,7 @@ async function fetchWidgetData(
             const attendance: any[] = attendanceSnap.docs.map((d: any) => d.data());
             const startStr = toLocalDateStr(start2);
             const endStr   = toLocalDateStr(end2);
+            console.log(`[Scheduler/events] churchId=${churchId} period=${period} range=${startStr}→${endStr} totalAttendanceDocs=${attendance.length}`);
 
             const checkInTrends = attendance
                 .map(a => ({ ...a, _dateStr: toDateStr(a.date) }))
@@ -542,16 +543,20 @@ async function fetchWidgetData(
                     volunteers: a.volunteers || 0,
                     headcount: a.headcount || a.count || 0,
                     total: a.count || a.headcount || 0,
-                    events: a.events || []
+                    events: Array.isArray(a.events) ? a.events : []
                 }));
+            console.log(`[Scheduler/events] matchingDocs=${checkInTrends.length} samples=${checkInTrends.slice(0,3).map((t: any)=>`${t.date}:total=${t.total},evts=${t.events.length}`).join(' | ')}`);
 
             const eventsData: any[] = [];
-            checkInTrends.forEach(trend => {
-                if (trend.events && Array.isArray(trend.events) && trend.events.length > 0) {
-                    eventsData.push(...trend.events);
-                } else {
+            checkInTrends.forEach((trend: any) => {
+                // Prefer per-event breakdown but only include events with real headcounts
+                const validEvents = trend.events.filter((ev: any) => (ev.total || ev.headcount || 0) > 0);
+                if (validEvents.length > 0) {
+                    eventsData.push(...validEvents);
+                } else if (trend.total > 0) {
+                    // Only add daily-total fallback if there's actual headcount data
                     eventsData.push({
-                        name: `Daily Total`,
+                        name: 'Daily Total',
                         startsAt: trend.date,
                         guests: trend.guests,
                         regulars: trend.regulars,
@@ -561,8 +566,31 @@ async function fetchWidgetData(
                     });
                 }
             });
-            eventsData.sort((a,b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
 
+            // ── Deep fallback: if attendance has no useful data, query check_ins directly ──
+            if (eventsData.length === 0) {
+                console.log(`[Scheduler/events] No data from attendance — falling back to check_ins collection`);
+                try {
+                    const ciSnap = await db.collection('check_ins').where('churchId', '==', churchId).get();
+                    const allCi: any[] = ciSnap.docs.map((d: any) => d.data());
+                    const dateMap = new Map<string, number>();
+                    allCi.forEach((ci: any) => {
+                        const d = toDateStr(ci.date || ci.checkedInAt || ci.createdAt);
+                        if (d && d >= startStr && d <= endStr) {
+                            dateMap.set(d, (dateMap.get(d) || 0) + 1);
+                        }
+                    });
+                    dateMap.forEach((count, date) => {
+                        eventsData.push({ name: 'Check-Ins', startsAt: date, total: count, headcount: count });
+                    });
+                    console.log(`[Scheduler/events] Fallback found ${eventsData.length} date groups from check_ins`);
+                } catch (fbErr: any) {
+                    console.warn(`[Scheduler/events] check_ins fallback failed: ${fbErr.message}`);
+                }
+            }
+
+            eventsData.sort((a: any, b: any) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
+            console.log(`[Scheduler/events] Final eventsData count=${eventsData.length}`);
             return { period, events: eventsData.slice(0, 10) };
         }
 
