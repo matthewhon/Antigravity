@@ -35,7 +35,7 @@ interface ServicesViewProps {
   churchId?: string;
 }
 
-type CheckinTrendFilter = 'Last Week' | 'Last Month' | 'Last Quarter' | 'Current Week' | 'Current Month' | 'Current Quarter';
+type CheckinTrendFilter = 'Last 30 Days' | 'Last Week' | 'Last Month' | 'Last Quarter' | 'Current Week' | 'Current Month' | 'Current Quarter';
 
 const TOOLTIP_STYLE = {
     borderRadius: '12px',
@@ -306,6 +306,11 @@ const ServicesView: React.FC<ServicesViewProps> = ({
       let endDate: Date;
 
       switch (checkinFilter) {
+          case 'Last 30 Days': {
+              startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30);
+              endDate   = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+              break;
+          }
           case 'Current Week': {
               startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
               endDate   = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay() + 6);
@@ -892,6 +897,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                 onChange={(e) => setCheckinFilter(e.target.value as CheckinTrendFilter)}
                                 className="bg-slate-100 dark:bg-slate-800 border-none text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 rounded-lg py-1 px-2 cursor-pointer outline-none focus:ring-2 focus:ring-indigo-500"
                             >
+                                <option value="Last 30 Days">Last 30 Days</option>
                                 <option value="Current Week">Current Week</option>
                                 <option value="Last Week">Last Week</option>
                                 <option value="Current Month">Current Month</option>
@@ -960,6 +966,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                 onChange={(e) => setCheckinFilter(e.target.value as CheckinTrendFilter)}
                                 className="bg-slate-100 dark:bg-slate-800 border-none text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 rounded-lg py-1 px-2 cursor-pointer outline-none focus:ring-2 focus:ring-indigo-500"
                             >
+                                <option value="Last 30 Days">Last 30 Days</option>
                                 <option value="Current Week">Current Week</option>
                                 <option value="Last Week">Last Week</option>
                                 <option value="Current Month">Current Month</option>
