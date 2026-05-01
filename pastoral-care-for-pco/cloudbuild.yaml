@@ -1,5 +1,6 @@
 steps:
 - name: 'gcr.io/cloud-builders/docker'
+  dir: 'pastoral-care-for-pco'
   args: ['build', '-t', 'gcr.io/${_PROJECT_ID}/${_SERVICE_NAME}', '.']
 
 - name: 'gcr.io/cloud-builders/docker'
