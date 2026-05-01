@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+<<<<<<< HEAD
     "postbuild": "node -e \"const fs = require('fs'); const file = 'dist/index.html'; let html = fs.readFileSync(file, 'utf8'); html = html.replace(/ crossorigin/g, ''); fs.writeFileSync(file, html);\"",
+=======
+>>>>>>> 02fed810c9ad65f3b654e5673377302410d6cc61
     "lint": "eslint .",
     "preview": "vite preview"
   },
@@ -27,14 +30,20 @@
     "@types/node": "^24.12.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+<<<<<<< HEAD
     "@vitejs/plugin-legacy": "^8.0.1",
+=======
+>>>>>>> 02fed810c9ad65f3b654e5673377302410d6cc61
     "@vitejs/plugin-react": "^6.0.1",
     "eslint": "^10.2.1",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.5.0",
     "tailwindcss": "^4.2.4",
+<<<<<<< HEAD
     "terser": "^5.46.2",
+=======
+>>>>>>> 02fed810c9ad65f3b654e5673377302410d6cc61
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.58.2",
     "vite": "^8.0.10"

@@ -2,9 +2,13 @@ import React, { useState, useMemo } from 'react';
 import { Church, User, SmsConversation } from '../types';
 import { useTwilioNumbers, canUserSeeNumber } from '../hooks/useTwilioNumbers';
 import { ConversationList } from './ConversationList';
+<<<<<<< HEAD
 import { BroadcastView } from './BroadcastView';
 import { Inbox, MessageSquare, Settings } from 'lucide-react';
 import { ChatView } from './ChatView';
+=======
+import { Inbox, MessageSquare, Settings } from 'lucide-react';
+>>>>>>> 02fed810c9ad65f3b654e5673377302410d6cc61
 
 interface DashboardProps {
     user: User;
@@ -33,12 +37,27 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, church }) => {
     // If viewing a conversation, render the chat view instead of dashboard
     if (activeConversation) {
         return (
+<<<<<<< HEAD
             <ChatView 
                 church={church} 
                 currentUser={user} 
                 conversation={activeConversation} 
                 onBack={() => setActiveConversation(null)} 
             />
+=======
+            <div className="flex h-[100dvh] items-center justify-center bg-slate-50 dark:bg-slate-950">
+                {/* ChatView placeholder */}
+                <div className="p-4 text-center">
+                    <h2 className="font-bold">Chat with {activeConversation.personName || activeConversation.phoneNumber}</h2>
+                    <button 
+                        onClick={() => setActiveConversation(null)}
+                        className="mt-4 px-4 py-2 bg-violet-600 text-white rounded-lg"
+                    >
+                        Back to Inbox
+                    </button>
+                </div>
+            </div>
+>>>>>>> 02fed810c9ad65f3b654e5673377302410d6cc61
         );
     }
 
@@ -92,7 +111,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, church }) => {
                 )}
                 
                 {activeTab === 'broadcast' && activeNumber && (
+<<<<<<< HEAD
                     <BroadcastView church={church} twilioNumber={activeNumber} />
+=======
+                    <div className="p-4">
+                        <h2 className="font-semibold text-slate-700 dark:text-slate-300 mb-4">Bulk SMS Campaigns</h2>
+                        <div className="text-center text-slate-400 p-8 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
+                            Campaign creation UI will go here.
+                        </div>
+                    </div>
+>>>>>>> 02fed810c9ad65f3b654e5673377302410d6cc61
                 )}
             </main>
 

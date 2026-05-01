@@ -1,8 +1,13 @@
+<<<<<<< HEAD
 import { StrictMode, Component, ErrorInfo, ReactNode } from 'react'
+=======
+import { StrictMode } from 'react'
+>>>>>>> 02fed810c9ad65f3b654e5673377302410d6cc61
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 
+<<<<<<< HEAD
 // Removed global error handlers because Vite legacy plugin intentionally throws cross-origin errors during feature detection
 
 class ErrorBoundary extends Component<{children: ReactNode}, {hasError: boolean, error: Error | null}> {
@@ -38,5 +43,10 @@ createRoot(document.getElementById('root')!).render(
     <ErrorBoundary>
       <App />
     </ErrorBoundary>
+=======
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <App />
+>>>>>>> 02fed810c9ad65f3b654e5673377302410d6cc61
   </StrictMode>,
 )
