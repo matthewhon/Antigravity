@@ -978,8 +978,8 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
       <Drawer isOpen={isDataChartDrawerOpen} onClose={() => setIsDataChartDrawerOpen(false)} title="Analytics Widgets">
         <DataChartSelector
           churchId={churchId}
-          onInsert={(widgetId, label, data) => {
-            const b = [...blocks, { id: Date.now().toString(), type: 'data_chart' as const, content: { widgetId, label, data } }];
+          onInsert={(widgetId, label, data, config) => {
+            const b = [...blocks, { id: Date.now().toString(), type: 'data_chart' as const, content: { widgetId, label, data, config: config || {} } }];
             update({ blocks: b });
             setIsDataChartDrawerOpen(false);
           }}

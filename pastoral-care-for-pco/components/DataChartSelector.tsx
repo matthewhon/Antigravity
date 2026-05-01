@@ -1531,7 +1531,7 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
 
 interface Props {
   churchId: string;
-  onInsert: (widgetId: AnalyticsWidgetId, label: string, data: any) => void;
+  onInsert: (widgetId: AnalyticsWidgetId, label: string, data: any, config?: Record<string, any>) => void;
 }
 
 // ─── Widget Config Panel ──────────────────────────────────────────────────────
@@ -1781,8 +1781,18 @@ export const DataChartSelector: React.FC<Props> = ({ churchId, onInsert }) => {
       let label = widget.label;
       if (config.fundName) label = `${label} — ${config.fundName}`;
       if (config.pcoListName) label = `${label} — ${config.pcoListName}`;
-      // Also attach the config to the block so it can be refreshed server-side
-      onInsert(widget.id, label, { ...data, _config: { pcoListId: config.pcoListId, pcoListName: config.pcoListName } });
+      // Persist the full config so the server-side refresh uses the same settings.
+      // Store in both content.config (primary, read by refreshCampaignBlocks) and
+      // content.data._config (legacy fallback path).
+      const fullConfig = {
+        timePeriod:      config.timePeriod,
+        fundName:        config.fundName,
+        dayRange:        config.dayRange,
+        pcoListId:       config.pcoListId,
+        pcoListName:     config.pcoListName,
+        pcoListPeopleIds: config.pcoListPeopleIds,
+      };
+      onInsert(widget.id, label, { ...data, _config: fullConfig }, fullConfig);
       setConfiguringWidget(null);
     } catch (e: any) {
       setError(e?.message || 'Failed to load data');
