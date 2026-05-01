@@ -494,6 +494,8 @@ async function fetchWidgetData(
                 end2.setHours(23, 59, 59, 999);
             } else if (period === 'This Month') {
                 start2.setDate(1);
+            } else if (period === 'Last 30 Days') {
+                start2.setDate(start2.getDate() - 30);
             } else if (period === 'Last Month') {
                 start2.setDate(1);
                 start2.setMonth(start2.getMonth() - 1);

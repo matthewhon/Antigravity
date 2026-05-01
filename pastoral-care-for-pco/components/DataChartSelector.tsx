@@ -543,6 +543,8 @@ async function fetchWidgetSnapshot(
         end2.setHours(23, 59, 59, 999);
       } else if (period === 'This Month') {
         start2.setDate(1);
+      } else if (period === 'Last 30 Days') {
+        start2.setDate(start2.getDate() - 30);
       } else if (period === 'Last Month') {
         start2.setDate(1);
         start2.setMonth(start2.getMonth() - 1);
@@ -1545,7 +1547,7 @@ const WidgetConfigPanel: React.FC<{
   const [loadingFunds, setLoadingFunds] = useState(false);
   const [fundName, setFundName] = useState('');
   const [dayRange, setDayRange] = useState('14');
-  const [timePeriod, setTimePeriod] = useState('This Month');
+  const [timePeriod, setTimePeriod] = useState('Last 30 Days');
 
   // PCO List state
   const [pcoLists, setPcoLists] = useState<{ id: string; name: string; totalPeople: number }[]>([]);
@@ -1730,6 +1732,7 @@ const WidgetConfigPanel: React.FC<{
             <option value="This Week">This Week</option>
             <option value="Last Week">Last Week</option>
             <option value="This Month">This Month</option>
+            <option value="Last 30 Days">Last 30 Days</option>
             <option value="Last Month">Last Month</option>
             <option value="Last Quarter">Last Quarter (90 days)</option>
           </select>
