@@ -596,9 +596,12 @@ async function fetchWidgetSnapshot(
           });
         }
       });
-      eventsData.sort((a,b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
+      // Sort descending → keep the most recent events → re-sort ascending for display
+      eventsData.sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime());
+      const recentEvents = eventsData.slice(0, 20);
+      recentEvents.sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
 
-      return { period, events: eventsData.slice(0, 10) };
+      return { period, events: recentEvents };
     }
     case 'upcoming_registrations': {
       const regs = await firestore.getRegistrations(churchId);

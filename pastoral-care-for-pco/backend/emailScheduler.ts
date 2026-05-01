@@ -591,9 +591,12 @@ async function fetchWidgetData(
                 }
             }
 
-            eventsData.sort((a: any, b: any) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
-            console.log(`[Scheduler/events] Final eventsData count=${eventsData.length}`);
-            return { period, events: eventsData.slice(0, 10) };
+            // Sort descending → keep most recent events → re-sort ascending for email display
+            eventsData.sort((a: any, b: any) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime());
+            const recentEvents = eventsData.slice(0, 20);
+            recentEvents.sort((a: any, b: any) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
+            console.log(`[Scheduler/events] Final eventsData count=${recentEvents.length}`);
+            return { period, events: recentEvents };
         }
 
         // ── Average Giving (12-week rolling) ────────────────────────────────
