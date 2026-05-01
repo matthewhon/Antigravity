@@ -512,27 +512,42 @@ async function fetchWidgetData(
                 return `${y}-${m}-${day}`;
             };
 
+            // Helper: normalise a Firestore date field (may be a Timestamp object, a string, or a Date)
+            const toDateStr = (raw: any): string => {
+                if (!raw) return '';
+                // Firestore Admin Timestamp: { _seconds, toDate() }
+                if (typeof raw === 'object' && typeof raw.toDate === 'function') {
+                    return toLocalDateStr(raw.toDate());
+                }
+                // Already a string like 'YYYY-MM-DD'
+                if (typeof raw === 'string') return raw.slice(0, 10);
+                // JS Date
+                if (raw instanceof Date) return toLocalDateStr(raw);
+                return '';
+            };
+
             const attendanceSnap = await db.collection('attendance').where('churchId', '==', churchId).get();
             const attendance: any[] = attendanceSnap.docs.map((d: any) => d.data());
             const startStr = toLocalDateStr(start2);
             const endStr   = toLocalDateStr(end2);
 
             const checkInTrends = attendance
-                .filter(a => a.date >= startStr && a.date <= endStr)
+                .map(a => ({ ...a, _dateStr: toDateStr(a.date) }))
+                .filter(a => a._dateStr >= startStr && a._dateStr <= endStr)
                 .map(a => ({
-                    date: a.date,
-                    isoDate: a.date,
+                    date: a._dateStr,
+                    isoDate: a._dateStr,
                     guests: a.guests || 0,
                     regulars: a.regulars || 0,
                     volunteers: a.volunteers || 0,
-                    headcount: a.headcount || 0,
-                    total: a.count,
+                    headcount: a.headcount || a.count || 0,
+                    total: a.count || a.headcount || 0,
                     events: a.events || []
                 }));
 
             const eventsData: any[] = [];
             checkInTrends.forEach(trend => {
-                if (trend.events && Array.isArray(trend.events)) {
+                if (trend.events && Array.isArray(trend.events) && trend.events.length > 0) {
                     eventsData.push(...trend.events);
                 } else {
                     eventsData.push({
