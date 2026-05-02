@@ -26,6 +26,24 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
   const [toast, setToast] = useState('');
   const [copiedScript, setCopiedScript] = useState(false);
   const [copiedIframe, setCopiedIframe] = useState(false);
+  
+  // Forms specifics
+  const [forms, setForms] = useState<any[]>([]);
+  const [singleFormId, setSingleFormId] = useState<string>('');
+
+  React.useEffect(() => {
+    if (type === 'forms' && forms.length === 0) {
+      const apiBaseUrl = process.env.NODE_ENV === 'production' 
+        ? 'https://pastoralcare.barnabassoftware.com' 
+        : 'http://localhost:8080';
+      fetch(`${apiBaseUrl}/api/public/forms/${churchId}`)
+        .then(r => r.json())
+        .then(data => {
+          if (Array.isArray(data)) setForms(data);
+        })
+        .catch(console.error);
+    }
+  }, [type, churchId, forms.length]);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -72,6 +90,7 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
       + (type === 'groups' && groupType ? `&groupType=${encodeURIComponent(groupType)}` : '')
       + (type === 'groups' ? `&showTags=${showTags}` : '')
       + (type === 'registrations' ? `&dateFilter=${dateFilter}&tagFilter=${encodeURIComponent(tagFilter)}&includeArchived=${includeArchived}` : '')
+      + (type === 'forms' && singleFormId ? `&singleFormId=${singleFormId}` : '')
       + `&imageRatio=${imageRatio}`
       + (autoHeight ? `&autoHeight=true` : '')
       + (scale !== 1 ? `&scale=${scale}` : '')
@@ -308,6 +327,25 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
                   className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                 />
                 <p className="text-[10px] text-slate-400 mt-1">Leave empty to show all tags.</p>
+              </div>
+            </div>
+          )}
+
+          {type === 'forms' && (
+            <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+              <div>
+                 <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Select Form</label>
+                 <select 
+                    value={singleFormId}
+                    onChange={e => setSingleFormId(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                 >
+                    <option value="">All Forms</option>
+                    {forms.map(f => (
+                      <option key={f.id} value={f.id}>{f.name}</option>
+                    ))}
+                 </select>
+                 <p className="text-[10px] text-slate-400 mt-1">Leave as "All Forms" to display a list/grid of all active forms, or select a specific form to embed just that one.</p>
               </div>
             </div>
           )}

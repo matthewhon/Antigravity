@@ -23,6 +23,7 @@ export default function WidgetApp() {
   const scale = params.get('scale') || '1';
   const maxItems = parseInt(params.get('maxItems') || '0', 10);
   const includeArchived = params.get('includeArchived') === 'true';
+  const singleFormId = params.get('singleFormId') || '';
 
   useEffect(() => {
     if (autoHeight && iframeId) {
@@ -70,7 +71,7 @@ export default function WidgetApp() {
       {type === 'groups' && <GroupsWidget churchId={churchId} layout={layout} color={color} gridCols={gridCols} groupType={groupType} showTags={showTags} imageRatio={imageRatio} maxItems={maxItems} />}
       {type === 'registrations' && <RegistrationsWidget churchId={churchId} layout={layout} color={color} gridCols={gridCols} dateFilter={dateFilter} tagFilter={tagFilter} imageRatio={imageRatio} maxItems={maxItems} includeArchived={includeArchived} />}
       {(type === 'events' || type === 'calendar') && <EventsWidget churchId={churchId} layout={layout} color={color} gridCols={gridCols} imageRatio={imageRatio} maxItems={maxItems} />}
-      {type === 'forms' && <FormsWidget churchId={churchId} layout={layout} color={color} gridCols={gridCols} maxItems={maxItems} />}
+      {type === 'forms' && <FormsWidget churchId={churchId} layout={layout} color={color} gridCols={gridCols} maxItems={maxItems} singleFormId={singleFormId} />}
     </div>
   );
 }
@@ -477,7 +478,7 @@ function EventsWidget({ churchId, layout, color, gridCols, imageRatio, maxItems 
   );
 }
 
-function FormsWidget({ churchId, layout, color, gridCols, maxItems }: any) {
+function FormsWidget({ churchId, layout, color, gridCols, maxItems, singleFormId }: any) {
   const [forms, setForms] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -499,9 +500,12 @@ function FormsWidget({ churchId, layout, color, gridCols, maxItems }: any) {
 
   const filteredForms = useMemo(() => {
     let result = forms;
-    if (maxItems > 0) result = result.slice(0, maxItems);
+    if (singleFormId) {
+      result = result.filter(f => f.id === singleFormId);
+    }
+    if (maxItems > 0 && !singleFormId) result = result.slice(0, maxItems);
     return result;
-  }, [forms, maxItems]);
+  }, [forms, maxItems, singleFormId]);
 
   if (loading) return <div className="text-center p-8 animate-pulse text-slate-400">Loading Forms...</div>;
   if (error) return <div className="text-center p-8 text-rose-500 border-2 border-dashed border-rose-200 dark:border-rose-900/30 rounded-xl bg-rose-50 dark:bg-rose-900/10"><strong>Connection Error:</strong> {error}. <br/>Please ensure Planning Center is securely connected with the required permissions.</div>;
