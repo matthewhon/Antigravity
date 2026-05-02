@@ -70,6 +70,7 @@ export default function WidgetApp() {
       {type === 'groups' && <GroupsWidget churchId={churchId} layout={layout} color={color} gridCols={gridCols} groupType={groupType} showTags={showTags} imageRatio={imageRatio} maxItems={maxItems} />}
       {type === 'registrations' && <RegistrationsWidget churchId={churchId} layout={layout} color={color} gridCols={gridCols} dateFilter={dateFilter} tagFilter={tagFilter} imageRatio={imageRatio} maxItems={maxItems} includeArchived={includeArchived} />}
       {(type === 'events' || type === 'calendar') && <EventsWidget churchId={churchId} layout={layout} color={color} gridCols={gridCols} imageRatio={imageRatio} maxItems={maxItems} />}
+      {type === 'forms' && <FormsWidget churchId={churchId} layout={layout} color={color} gridCols={gridCols} maxItems={maxItems} />}
     </div>
   );
 }
@@ -469,6 +470,73 @@ function EventsWidget({ churchId, layout, color, gridCols, imageRatio, maxItems 
                     <a href={e.publicUrl} target="_blank" rel="noreferrer" className={`text-sm font-bold text-${color}-600 dark:text-${color}-400 hover:text-${color}-700 transition`}>More Info →</a>
                 </div>
             )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function FormsWidget({ churchId, layout, color, gridCols, maxItems }: any) {
+  const [forms, setForms] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const queryStr = window.location.search.includes('refresh=true') ? '?refresh=true' : '';
+    fetch(`${apiBaseUrl}/api/public/forms/${churchId}${queryStr}`)
+      .then(r => r.json().then(data => ({ status: r.status, ok: r.ok, data })))
+      .then(({ ok, data }) => {
+        if (!ok || data.error) throw new Error(data.error || 'Failed to fetch forms');
+        setForms(Array.isArray(data) ? data : []);
+        setLoading(false);
+      })
+      .catch((e) => {
+        setError(e.message);
+        setLoading(false);
+      });
+  }, [churchId]);
+
+  const filteredForms = useMemo(() => {
+    let result = forms;
+    if (maxItems > 0) result = result.slice(0, maxItems);
+    return result;
+  }, [forms, maxItems]);
+
+  if (loading) return <div className="text-center p-8 animate-pulse text-slate-400">Loading Forms...</div>;
+  if (error) return <div className="text-center p-8 text-rose-500 border-2 border-dashed border-rose-200 dark:border-rose-900/30 rounded-xl bg-rose-50 dark:bg-rose-900/10"><strong>Connection Error:</strong> {error}. <br/>Please ensure Planning Center is securely connected with the required permissions.</div>;
+  if (!filteredForms.length) return <div className="text-center p-8 text-slate-400 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl">No active forms available.</div>;
+
+  if (layout === 'list') {
+    return (
+      <div className="space-y-4">
+        {filteredForms.map(f => (
+          <div key={f.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition flex flex-col sm:flex-row group hover:border-indigo-500 dark:hover:border-indigo-500">
+            <div className="p-5 flex-1 flex flex-col">
+              <h3 className="font-bold text-lg text-slate-900 dark:text-slate-100 mb-1 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">{f.name || 'Unnamed Form'}</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-3 mb-4">{f.description?.replace(/<[^>]+>/g, '') || 'No description provided.'}</p>
+              <div className="mt-auto pt-4 flex items-center justify-end border-t border-slate-100 dark:border-slate-800">
+                <a href={f.publicUrl || '#'} target="_blank" rel="noreferrer" className={`text-sm font-bold text-${color}-600 dark:text-${color}-400`}>Fill Out Form →</a>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className={`grid gap-4 ${getGridClass(layout, gridCols)}`}>
+      {filteredForms.map(f => (
+        <div key={f.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition flex flex-col group hover:border-indigo-500 dark:hover:border-indigo-500">
+          <div className="p-5 flex-1 flex flex-col">
+            <h3 className="font-bold text-lg text-slate-900 dark:text-slate-100 mb-1 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">{f.name || 'Unnamed Form'}</h3>
+            <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2">{f.description?.replace(/<[^>]+>/g, '') || 'No description provided.'}</p>
+            <div className="mt-auto pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end">
+              <a href={f.publicUrl || '#'} target="_blank" rel="noreferrer" className={`px-4 py-1.5 rounded-lg text-xs font-bold text-white bg-${color}-500 group-hover:bg-${color}-600 transition`}>
+                Start
+              </a>
+            </div>
           </div>
         </div>
       ))}

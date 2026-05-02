@@ -129,7 +129,8 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
               {[
                 { id: 'groups', label: 'Small Groups' },
                 { id: 'registrations', label: 'Registrations' },
-                { id: 'events', label: 'Calendar/Events' }
+                { id: 'events', label: 'Calendar/Events' },
+                { id: 'forms', label: 'Forms' }
               ].map(opt => (
                 <button 
                   key={opt.id}
@@ -165,11 +166,11 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
                )}
                <button onClick={() => setLayout('grid')} className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border transition ${layout==='grid'?'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-400':'border-slate-200 text-slate-500 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
                  <LayoutGrid size={20} />
-                 <span className="text-[10px] uppercase font-bold tracking-widest">{(type === 'registrations' || type === 'events') ? 'Tiles' : 'Grid'}</span>
+                 <span className="text-[10px] uppercase font-bold tracking-widest">{(type === 'registrations' || type === 'events' || type === 'forms') ? 'Tiles' : 'Grid'}</span>
                </button>
                <button onClick={() => setLayout('list')} className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border transition ${layout==='list'?'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-400':'border-slate-200 text-slate-500 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
                  <MonitorPlay size={20} />
-                 <span className="text-[10px] uppercase font-bold tracking-widest">{(type === 'registrations' || type === 'events') ? 'Detailed' : 'List'}</span>
+                 <span className="text-[10px] uppercase font-bold tracking-widest">{(type === 'registrations' || type === 'events' || type === 'forms') ? 'Detailed' : 'List'}</span>
                </button>
                {type === 'registrations' && (
                  <button onClick={() => setLayout('simplified_list')} className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border transition ${layout==='simplified_list'?'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-400':'border-slate-200 text-slate-500 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>

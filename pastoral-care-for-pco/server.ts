@@ -18,7 +18,7 @@ import { startSyncScheduler } from './backend/syncScheduler';
 import { getDb } from './backend/firebase';
 import { handleGeminiProxy } from './backend/geminiProxy';
 import { provisionSubuser, authenticateDomain, verifyDomain, diagnoseDomain } from './backend/emailProvisioning';
-import { getPublicGroups, getPublicRegistrations, getPublicEvents, serveWidgetScript } from './backend/publicApi.js';
+import { getPublicGroups, getPublicRegistrations, getPublicEvents, serveWidgetScript, getPublicForms } from './backend/publicApi.js';
 import { getAvailableNumbers, provisionTwilioNumber, releaseTwilioNumber, checkA2pStatus, createCustomerProfile, deleteCustomerProfile, refreshCustomerProfileStatus, addTwilioNumber, releaseSpecificNumber, updateNumberSettings, setDefaultNumber, trustHubStatusCallback, registerBrand, createMessagingService, registerCampaign, assignNumbersToService, checkCampaignStatus, fetchPrimaryProfileSid, fetchA2pProfileSid, lookupProfileSidsForChurch, diagnoseAndRepairA2p, listSecondaryProfiles, deleteSecondaryProfile } from './backend/twilioProvisioning';
 import { handleInboundSms } from './backend/twilioInbound';
 import { sendIndividual, sendBulk } from './backend/twilioSend';
@@ -167,6 +167,7 @@ async function startServer() {
     app.get('/api/public/groups/:churchId', getPublicGroups);
     app.get('/api/public/registrations/:churchId', getPublicRegistrations);
     app.get('/api/public/events/:churchId', getPublicEvents);
+    app.get('/api/public/forms/:churchId', getPublicForms);
     app.get('/widget.js', serveWidgetScript);
 
     // ─── SMS / Messaging Endpoints ────────────────────────────────────────────

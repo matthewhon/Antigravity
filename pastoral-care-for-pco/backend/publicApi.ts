@@ -170,6 +170,34 @@ export async function getPublicEvents(req: any, res: any) {
   }
 }
 
+export async function getPublicForms(req: any, res: any) {
+  const { churchId } = req.params;
+  const cacheKey = `${churchId}_forms`;
+  
+  if (req.query.refresh !== 'true' && cache[cacheKey] && Date.now() - cache[cacheKey].timestamp < CACHE_TTL) {
+    return res.json(cache[cacheKey].data);
+  }
+
+  try {
+    const data = await fetchFromPco(churchId, 'https://api.planningcenteronline.com/people/v2/forms?per_page=100');
+    
+    // Filter active forms
+    const rawForms = (data.data || []).filter((f: any) => f.attributes.active !== false && !f.attributes.archived_at);
+
+    const forms = rawForms.map((f: any) => ({
+      id: f.id,
+      name: f.attributes.name,
+      description: f.attributes.description || null,
+      active: f.attributes.active !== false,
+      publicUrl: f.attributes.church_center_url || f.attributes.public_url || null,
+    }));
+    cache[cacheKey] = { data: forms, timestamp: Date.now() };
+    res.json(forms);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+}
+
 export async function serveWidgetScript(req: any, res: any) {
   res.setHeader('Content-Type', 'application/javascript');
   
