@@ -1047,7 +1047,10 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
 
             const labelRefs = d.relationships?.labels?.data || [];
             const labels = labelRefs
-                .map((ref: any) => included.find(i => i.type === 'Label' && String(i.id) === String(ref.id))?.attributes?.name)
+                .map((ref: any) => {
+                    const labelObj = included.find(i => i.type === 'Label' && String(i.id) === String(ref.id));
+                    return labelObj?.attributes?.slug || labelObj?.attributes?.name;
+                })
                 .filter(Boolean) as string[];
 
             // Designations map specific amounts to funds
