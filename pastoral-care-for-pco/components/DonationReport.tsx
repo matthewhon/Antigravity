@@ -307,15 +307,9 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
         });
     }, [buckets, filteredDonations, filters.interval, filters.startDate, donorAllHistory]);
 
-    // 5b. Avg Giving by Tag — total given per tag ÷ weeks in period
+    // 5b. Giving by Label — total given per label, broken down by fund
     const givingByLabelData = useMemo(() => {
         const COLORS = ['#10b981', '#f59e0b', '#06b6d4', '#f43f5e', '#8b5cf6', '#ec4899', '#14b8a6', '#6366f1'];
-
-        const start = parseISO(filters.startDate);
-        const end   = parseISO(filters.endDate);
-        const daysDiff = Math.max((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24), 1);
-        const totalWeeks = Math.max(daysDiff / 7, 1);
-        const midPoint = new Date((start.getTime() + end.getTime()) / 2);
 
         const allLabelsSet = new Set<string>();
         filteredDonations.forEach(d => {
@@ -328,22 +322,22 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
 
             const labelDonations = filteredDonations.filter(d => d.labels?.includes(labelName));
             const totalGiven = labelDonations.reduce((s, d) => s + d.amount, 0);
-            const avgPerWeek = totalGiven / totalWeeks;
 
-            const firstHalf  = labelDonations.filter(d => parseISO(d.date) <= midPoint).reduce((s, d) => s + d.amount, 0) / (totalWeeks / 2);
-            const secondHalf = labelDonations.filter(d => parseISO(d.date) >  midPoint).reduce((s, d) => s + d.amount, 0) / (totalWeeks / 2);
-            const trendPct   = firstHalf > 0 ? ((secondHalf - firstHalf) / firstHalf) * 100 : null;
-            const trend: 'up' | 'down' | 'flat' =
-                trendPct === null ? 'flat' : trendPct > 3 ? 'up' : trendPct < -3 ? 'down' : 'flat';
+            const fundsMap = new Map<string, number>();
+            labelDonations.forEach(d => {
+                fundsMap.set(d.fundName, (fundsMap.get(d.fundName) || 0) + d.amount);
+            });
+            const funds = Array.from(fundsMap.entries())
+                .map(([fundName, amount]) => ({ fundName, amount }))
+                .sort((a, b) => b.amount - a.amount);
 
-            return { labelName, color, totalGiven, avgPerWeek, trendPct, trend };
+            return { labelName, color, totalGiven, funds };
         });
 
-        const overallAvgPerWeek = labelData.reduce((s, t) => s + t.avgPerWeek, 0);
-        const overallTotal      = labelData.reduce((s, t) => s + t.totalGiven, 0);
+        const overallTotal = labelData.reduce((s, t) => s + t.totalGiven, 0);
 
-        return { labelData, overallAvgPerWeek, overallTotal, totalWeeks };
-    }, [filteredDonations, filters.startDate, filters.endDate]);
+        return { labelData, overallTotal };
+    }, [filteredDonations]);
 
     // 5. Avg Giving by Fund — total given per fund ÷ weeks in period
     const avgGivingByQuarter = useMemo(() => {
@@ -876,16 +870,10 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                     </div>
                 );
             })()}
-            {/* ── Average Giving by Label ─────────────────────────────── */}
+            {/* ── Giving by Label ─────────────────────────────── */}
             {activeTab === 'giving_by_label' && (() => {
-                const { labelData, overallAvgPerWeek, overallTotal, totalWeeks } = givingByLabelData;
+                const { labelData, overallTotal } = givingByLabelData;
                 const hasLabels = labelData.length > 0;
-
-                const trendIcon = (t: 'up' | 'down' | 'flat') => t === 'up' ? '↑' : t === 'down' ? '↓' : '→';
-                const trendCls  = (t: 'up' | 'down' | 'flat') =>
-                    t === 'up'   ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400'
-                    : t === 'down' ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-400'
-                    : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400';
 
                 return (
                     <div className="space-y-6">
@@ -893,20 +881,17 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                             {/* Header */}
                             <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-8">
                                 <div>
-                                    <h3 className="text-lg font-black text-slate-900 dark:text-white">Average Giving by Label</h3>
+                                    <h3 className="text-lg font-black text-slate-900 dark:text-white">Giving by Label</h3>
                                     <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1">
-                                        Avg weekly giving per label · {Math.round(totalWeeks)} weeks
+                                        Total giving per label
                                     </p>
                                     <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">{filters.startDate} – {filters.endDate}</p>
                                 </div>
                                 {hasLabels && (
                                     <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Avg / Week (Selected Labels)</p>
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Given</p>
                                         <p className="text-3xl font-black text-indigo-600 dark:text-indigo-400">
-                                            ${overallAvgPerWeek.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                                        </p>
-                                        <p className="text-[10px] text-slate-400 dark:text-slate-500">
-                                            ${overallTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })} total
+                                            ${overallTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </p>
                                     </div>
                                 )}
@@ -919,38 +904,26 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                                     <p className="text-[10px] text-slate-400">Only donations with labels will appear here.</p>
                                 </div>
                             ) : (
-                                <div className="space-y-4">
+                                <div className="space-y-6">
                                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
-                                        Avg / Week by Label — {filters.startDate} to {filters.endDate}
+                                        Total Given by Label — {filters.startDate} to {filters.endDate}
                                     </p>
                                     {labelData
                                         .slice()
-                                        .sort((a, b) => b.avgPerWeek - a.avgPerWeek)
+                                        .sort((a, b) => b.totalGiven - a.totalGiven)
                                         .map(t => {
-                                            const maxAvg = Math.max(...labelData.map(d => d.avgPerWeek), 1);
-                                            const barPct = (t.avgPerWeek / maxAvg) * 100;
+                                            const maxTotal = Math.max(...labelData.map(d => d.totalGiven), 1);
+                                            const barPct = (t.totalGiven / maxTotal) * 100;
                                             return (
-                                                <div key={t.labelName} className="space-y-2">
+                                                <div key={t.labelName} className="space-y-3">
                                                     <div className="flex items-center justify-between gap-3">
                                                         <div className="flex items-center gap-2 min-w-0">
                                                             <div className="report-dot" style={{ '--dot-color': t.color } as React.CSSProperties} />
                                                             <span className="text-sm font-bold text-slate-700 dark:text-slate-300 truncate">{t.labelName}</span>
                                                         </div>
                                                         <div className="flex items-center gap-3 flex-shrink-0">
-                                                            <div className="text-right">
-                                                                <span className="text-sm font-black text-slate-900 dark:text-white font-mono">
-                                                                    ${t.avgPerWeek.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                                                                    <span className="text-xs font-semibold text-slate-400">/wk</span>
-                                                                </span>
-                                                                <p className="text-[9px] text-slate-400 dark:text-slate-500 text-right">
-                                                                    ${t.totalGiven.toLocaleString(undefined, { maximumFractionDigits: 0 })} total
-                                                                </p>
-                                                            </div>
-                                                            <span className={`inline-flex items-center gap-0.5 text-xs font-black px-2.5 py-1 rounded-full ${trendCls(t.trend)}`}>
-                                                                {trendIcon(t.trend)}
-                                                                {t.trendPct !== null && Math.abs(t.trendPct) >= 1
-                                                                    ? ` ${Math.abs(Math.round(t.trendPct))}%`
-                                                                    : ''}
+                                                            <span className="text-sm font-black text-slate-900 dark:text-white font-mono">
+                                                                ${t.totalGiven.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                             </span>
                                                         </div>
                                                     </div>
@@ -960,6 +933,22 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                                                             style={{ '--bar-w': `${barPct}%`, '--bar-color': t.color, '--bar-opacity': '0.85' } as React.CSSProperties}
                                                         />
                                                     </div>
+                                                    {t.funds.length > 0 && (
+                                                        <div className="pl-6 pt-1">
+                                                            <table className="w-full text-left text-xs">
+                                                                <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
+                                                                    {t.funds.map(f => (
+                                                                        <tr key={f.fundName}>
+                                                                            <td className="py-1 text-slate-500 dark:text-slate-400">{f.fundName}</td>
+                                                                            <td className="py-1 text-right text-slate-600 dark:text-slate-300 font-mono">
+                                                                                ${f.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                                            </td>
+                                                                        </tr>
+                                                                    ))}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             );
                                         })}
