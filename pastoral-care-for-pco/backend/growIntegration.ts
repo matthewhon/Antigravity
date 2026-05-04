@@ -2,13 +2,136 @@ import { getDb } from './firebase.js';
 import { sgSend } from './sendEmail.js';
 import { createServerLogger } from '../services/logService.js';
 
+/** Helper: generate a cryptographically-random 32-byte hex string */
+function generateSecret(): string {
+    const bytes = Array.from({ length: 32 }, () =>
+        Math.floor(Math.random() * 256)
+    );
+    return bytes.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * POST /api/integrations/grow/request-access
+ *
+ * The Grow Application calls this endpoint to request permission to integrate
+ * with a specific Pastoral Care tenant. No secret is needed at this stage —
+ * the tenant admin must review and approve the request from within the
+ * "Grow Integration" settings tab.
+ *
+ * Body: { churchId, appName }
+ *
+ * Responses:
+ *   200 – request stored (status: pending)
+ *   400 – missing required fields
+ *   404 – church not found
+ */
+export async function requestGrowAccess(req: any, res: any) {
+    const { churchId, appName } = req.body || {};
+
+    if (!churchId || !appName) {
+        return res.status(400).json({ error: 'Missing churchId or appName.' });
+    }
+
+    const db = getDb();
+    const churchRef = db.collection('churches').doc(churchId);
+
+    try {
+        const doc = await churchRef.get();
+        if (!doc.exists) {
+            return res.status(404).json({ error: 'Church not found. Verify your churchId is correct.' });
+        }
+
+        const data = doc.data() || {};
+        const existingRequest = (data as any).growSettings?.growPendingRequest;
+
+        // If already approved, tell the Grow App immediately so it doesn't spam requests
+        if (existingRequest?.status === 'approved' && (data as any).growSettings?.growIntegrationSecret) {
+            return res.json({
+                status: 'approved',
+                message: 'This church has already approved the Grow integration.',
+                // Do not return secret here — use GET /status to fetch it securely
+            });
+        }
+
+        // Record the pending request
+        await churchRef.update({
+            'growSettings.growPendingRequest': {
+                appName: String(appName).slice(0, 120),
+                requestedAt: new Date().toISOString(),
+                status: 'pending',
+            },
+        });
+
+        return res.json({
+            status: 'pending',
+            message: 'Access request received. A tenant administrator will review and approve it. Poll GET /api/integrations/grow/status?churchId={churchId} to check.',
+        });
+    } catch (e: any) {
+        return res.status(500).json({ error: e.message });
+    }
+}
+
+/**
+ * GET /api/integrations/grow/status?churchId=...
+ *
+ * The Grow Application polls this endpoint to check whether its access request
+ * has been approved by the tenant admin. On approval the shared secret is
+ * returned so the Grow App can store it and begin sending emails automatically.
+ *
+ * Query: churchId
+ *
+ * Responses:
+ *   200 – { status: 'pending' | 'approved' | 'rejected', secret? }
+ *   400 – missing churchId
+ *   404 – church not found
+ */
+export async function getGrowStatus(req: any, res: any) {
+    const churchId = (req.query?.churchId || req.body?.churchId) as string | undefined;
+
+    if (!churchId) {
+        return res.status(400).json({ error: 'Missing churchId query parameter.' });
+    }
+
+    const db = getDb();
+
+    try {
+        const doc = await db.collection('churches').doc(churchId).get();
+        if (!doc.exists) {
+            return res.status(404).json({ error: 'Church not found.' });
+        }
+
+        const data = doc.data() || {};
+        const growSettings = (data as any).growSettings || {};
+        const pendingRequest = growSettings.growPendingRequest;
+
+        if (!pendingRequest) {
+            return res.json({ status: 'no_request', message: 'No access request on record. Submit a request first via POST /api/integrations/grow/request-access.' });
+        }
+
+        if (pendingRequest.status === 'rejected') {
+            return res.json({ status: 'rejected', message: 'Your access request was rejected by the tenant administrator. Please contact them directly.' });
+        }
+
+        if (pendingRequest.status === 'approved' && growSettings.growIntegrationSecret) {
+            return res.json({
+                status: 'approved',
+                secret: growSettings.growIntegrationSecret,
+                churchId,
+                endpoint: 'https://pastoralcare.barnabassoftware.com/api/integrations/grow/daily-email',
+                message: 'Integration approved. Store the secret as PASTORAL_CARE_API_SECRET in your Grow App settings.',
+            });
+        }
+
+        // Still pending
+        return res.json({ status: 'pending', message: 'Waiting for tenant administrator approval. Check back in a few minutes.' });
+    } catch (e: any) {
+        return res.status(500).json({ error: e.message });
+    }
+}
+
+
 export async function setupGrowIntegration(req: any, res: any) {
     const { churchId, secret, churchName } = req.body || {};
-
-    const expectedSecret = process.env.GROW_INTEGRATION_SECRET || 'GROW_TEMP_SECRET_123';
-    if (secret !== expectedSecret) {
-        return res.status(401).json({ error: 'Unauthorized: Invalid integration secret.' });
-    }
 
     if (!churchId) {
         return res.status(400).json({ error: 'Missing churchId.' });
@@ -16,9 +139,22 @@ export async function setupGrowIntegration(req: any, res: any) {
 
     const db = getDb();
     const churchRef = db.collection('churches').doc(churchId);
-    
+
     try {
         const doc = await churchRef.get();
+
+        // Determine the expected secret:
+        //   1. Per-tenant growIntegrationSecret stored in Firestore (preferred)
+        //   2. Global GROW_INTEGRATION_SECRET env var (fallback / initial setup)
+        const churchData = doc.exists ? (doc.data() || {}) : {};
+        const tenantSecret: string | undefined = (churchData as any).growSettings?.growIntegrationSecret;
+        const globalSecret: string = process.env.GROW_INTEGRATION_SECRET || 'GROW_TEMP_SECRET_123';
+        const expectedSecret = tenantSecret || globalSecret;
+
+        if (secret !== expectedSecret) {
+            return res.status(401).json({ error: 'Unauthorized: Invalid integration secret.' });
+        }
+
         if (!doc.exists) {
             await churchRef.set({
                 id: churchId,
@@ -40,12 +176,6 @@ export async function setupGrowIntegration(req: any, res: any) {
 
 export async function handleGrowDailyEmail(req: any, res: any) {
     const { churchId, recipients, secret } = req.body || {};
-
-    // Basic Authentication - the Grow backend must send the correct shared secret
-    const expectedSecret = process.env.GROW_INTEGRATION_SECRET || 'GROW_TEMP_SECRET_123';
-    if (secret !== expectedSecret) {
-        return res.status(401).json({ error: 'Unauthorized: Invalid integration secret.' });
-    }
 
     if (!churchId || !Array.isArray(recipients) || recipients.length === 0) {
         return res.status(400).json({ error: 'Missing churchId or recipients array.' });
@@ -73,6 +203,16 @@ export async function handleGrowDailyEmail(req: any, res: any) {
         }
         
         const churchData = churchSnap.data() || {};
+
+        // Per-tenant secret auth — look up the Grow integration secret from Firestore.
+        // Falls back to the global env var so existing deployments keep working.
+        const tenantSecret: string | undefined = (churchData as any).growSettings?.growIntegrationSecret;
+        const globalSecret: string = process.env.GROW_INTEGRATION_SECRET || 'GROW_TEMP_SECRET_123';
+        const expectedSecret = tenantSecret || globalSecret;
+        if (secret !== expectedSecret) {
+            return res.status(401).json({ error: 'Unauthorized: Invalid integration secret.' });
+        }
+
         const tenantEmail = churchData.emailSettings || {};
         const isCustomDomainMode = tenantEmail.mode === 'custom';
         const subuserId: string | undefined = tenantEmail.sendGridSubuserId || undefined;

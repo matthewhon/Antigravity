@@ -4382,112 +4382,233 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
             );
         })()}
 
-        {activeTab === 'Grow Integration' && (
-            <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] border border-slate-100 dark:border-slate-800 shadow-sm">
-                <div className="mb-8">
-                    <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tighter">Grow Integration</h3>
-                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Configure discipleship app settings</p>
-                </div>
+        {activeTab === 'Grow Integration' && (() => {
+            const pendingRequest = church.growSettings?.growPendingRequest;
+            const isConnected = !!church.growSettings?.growIntegrationSecret;
+            const [growApproving, setGrowApproving] = React.useState(false);
+            const [growMsg, setGrowMsg] = React.useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-                <div className="space-y-6">
-                    {/* Connection Details Card */}
-                    <div className="flex flex-col p-6 bg-indigo-50 dark:bg-indigo-900/10 rounded-2xl border border-indigo-200 dark:border-indigo-800">
-                        <div className="mb-4">
-                            <p className="text-sm font-black text-indigo-900 dark:text-indigo-300">API Connection Details</p>
-                            <p className="text-[10px] text-indigo-600 dark:text-indigo-400 mt-1">Use these details to connect your Grow application to your Pastoral Care tenant. This allows your Grow app to send Daily Devotionals and other emails using your Pastoral Care email sender settings.</p>
+            const handleApprove = async () => {
+                if (!onUpdateChurch) return;
+                setGrowApproving(true);
+                setGrowMsg(null);
+                try {
+                    // Generate a new secret server-side style (CSPRNG via Math.random fallback)
+                    const array = new Uint8Array(32);
+                    crypto.getRandomValues(array);
+                    const secret = Array.from(array).map(b => b.toString(16).padStart(2, '0')).join('');
+                    await onUpdateChurch({
+                        growSettings: {
+                            ...church.growSettings,
+                            growIntegrationSecret: secret,
+                            growPendingRequest: {
+                                ...(pendingRequest as any),
+                                status: 'approved',
+                            },
+                        },
+                    });
+                    setGrowMsg({ type: 'success', text: 'Access approved! The Grow App will automatically receive the secret when it polls /api/integrations/grow/status.' });
+                } catch (e: any) {
+                    setGrowMsg({ type: 'error', text: 'Failed to approve: ' + e.message });
+                } finally {
+                    setGrowApproving(false);
+                }
+            };
+
+            const handleReject = async () => {
+                if (!onUpdateChurch || !window.confirm('Reject the Grow App access request? The requesting app will be told it was rejected.')) return;
+                await onUpdateChurch({
+                    growSettings: {
+                        ...church.growSettings,
+                        growPendingRequest: { ...(pendingRequest as any), status: 'rejected' },
+                    },
+                });
+            };
+
+            const handleRevoke = async () => {
+                if (!onUpdateChurch || !window.confirm('Revoke Grow App access? The integration will stop working immediately.')) return;
+                await onUpdateChurch({
+                    growSettings: {
+                        ...church.growSettings,
+                        growIntegrationSecret: undefined,
+                        growPendingRequest: null,
+                    },
+                });
+                setGrowMsg({ type: 'success', text: 'Access revoked. The Grow App can re-request access if needed.' });
+            };
+
+            return (
+                <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] border border-slate-100 dark:border-slate-800 shadow-sm">
+                    <div className="mb-8 flex items-center justify-between flex-wrap gap-4">
+                        <div>
+                            <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tighter">Grow Integration</h3>
+                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Discipleship app email sending</p>
                         </div>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-[10px] font-bold text-indigo-900/70 dark:text-indigo-300/70 mb-1 uppercase tracking-widest">Your Tenant ID (Church ID)</label>
-                                <div className="flex items-center gap-2">
-                                    <code className="px-3 py-2 bg-white dark:bg-slate-900 border border-indigo-100 dark:border-indigo-800 rounded-lg text-xs font-mono text-slate-700 dark:text-slate-300 flex-1">{churchId}</code>
-                                    <button onClick={() => navigator.clipboard.writeText(churchId)} className="px-3 py-2 bg-indigo-100 hover:bg-indigo-200 dark:bg-indigo-800 dark:hover:bg-indigo-700 text-indigo-700 dark:text-indigo-300 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-colors">Copy</button>
+                        {isConnected && (
+                            <span className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 px-3 py-1.5 rounded-full">
+                                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                Connected
+                            </span>
+                        )}
+                    </div>
+
+                    <div className="space-y-6">
+
+                        {/* ── Pending Request Banner ─────────────────────────── */}
+                        {pendingRequest && pendingRequest.status === 'pending' && (
+                            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-2xl p-6">
+                                <div className="flex items-start gap-4">
+                                    <div className="w-10 h-10 rounded-2xl bg-amber-100 dark:bg-amber-800/40 flex items-center justify-center text-xl shrink-0">🔔</div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-black text-amber-900 dark:text-amber-300">Access Request from Grow App</p>
+                                        <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
+                                            <strong>{pendingRequest.appName}</strong> is requesting permission to send emails through this Pastoral Care account.
+                                        </p>
+                                        <p className="text-[10px] text-amber-600/70 dark:text-amber-500/70 mt-1 font-mono">
+                                            Requested: {new Date(pendingRequest.requestedAt).toLocaleString()}
+                                        </p>
+                                        {growMsg && (
+                                            <p className={`text-xs mt-2 font-bold ${growMsg.type === 'success' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                                                {growMsg.text}
+                                            </p>
+                                        )}
+                                        <div className="flex gap-3 mt-4">
+                                            <button
+                                                onClick={handleApprove}
+                                                disabled={growApproving}
+                                                className="bg-emerald-600 text-white px-5 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all disabled:opacity-50 shadow-sm"
+                                            >
+                                                {growApproving ? 'Approving…' : '✓ Approve'}
+                                            </button>
+                                            <button
+                                                onClick={handleReject}
+                                                className="bg-white dark:bg-slate-800 border border-rose-200 dark:border-rose-800 text-rose-600 dark:text-rose-400 px-5 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-all"
+                                            >
+                                                ✕ Reject
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                            <div>
-                                <label className="block text-[10px] font-bold text-indigo-900/70 dark:text-indigo-300/70 mb-1 uppercase tracking-widest">Daily Email Integration Endpoint</label>
-                                <div className="flex items-center gap-2">
-                                    <code className="px-3 py-2 bg-white dark:bg-slate-900 border border-indigo-100 dark:border-indigo-800 rounded-lg text-xs font-mono text-slate-700 dark:text-slate-300 flex-1">https://pastoralcare.barnabassoftware.com/api/integrations/grow/daily-email</code>
-                                    <button onClick={() => navigator.clipboard.writeText('https://pastoralcare.barnabassoftware.com/api/integrations/grow/daily-email')} className="px-3 py-2 bg-indigo-100 hover:bg-indigo-200 dark:bg-indigo-800 dark:hover:bg-indigo-700 text-indigo-700 dark:text-indigo-300 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-colors">Copy</button>
+                        )}
+
+                        {pendingRequest?.status === 'rejected' && (
+                            <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-2xl p-4 text-xs text-rose-700 dark:text-rose-300 font-bold">
+                                ✕ The last access request from <strong>{pendingRequest.appName}</strong> was rejected.
+                                <button onClick={() => onUpdateChurch && onUpdateChurch({ growSettings: { ...church.growSettings, growPendingRequest: null } })}
+                                    className="ml-3 underline text-rose-500 font-normal">Clear</button>
+                            </div>
+                        )}
+
+                        {pendingRequest?.status === 'approved' && growMsg && (
+                            <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-2xl p-4 text-xs text-emerald-700 dark:text-emerald-300 font-bold">
+                                ✅ {growMsg.text}
+                            </div>
+                        )}
+
+                        {/* ── API Connection Details ─────────────────────────── */}
+                        <div className="flex flex-col p-6 bg-indigo-50 dark:bg-indigo-900/10 rounded-2xl border border-indigo-200 dark:border-indigo-800">
+                            <div className="mb-4">
+                                <p className="text-sm font-black text-indigo-900 dark:text-indigo-300">API Connection Details</p>
+                                <p className="text-[10px] text-indigo-600 dark:text-indigo-400 mt-1">
+                                    Use these details to connect your Grow application to this Pastoral Care tenant.
+                                    The Grow App can also request access automatically — see the instructions below.
+                                </p>
+                            </div>
+                            <div className="space-y-3">
+                                <div>
+                                    <label className="block text-[10px] font-bold text-indigo-900/70 dark:text-indigo-300/70 mb-1 uppercase tracking-widest">Your Tenant ID (Church ID)</label>
+                                    <div className="flex items-center gap-2">
+                                        <code className="px-3 py-2 bg-white dark:bg-slate-900 border border-indigo-100 dark:border-indigo-800 rounded-lg text-xs font-mono text-slate-700 dark:text-slate-300 flex-1 truncate">{churchId}</code>
+                                        <button onClick={() => navigator.clipboard.writeText(churchId)} className="shrink-0 px-3 py-2 bg-indigo-100 hover:bg-indigo-200 dark:bg-indigo-800 dark:hover:bg-indigo-700 text-indigo-700 dark:text-indigo-300 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-colors">Copy</button>
+                                    </div>
                                 </div>
+                                <div>
+                                    <label className="block text-[10px] font-bold text-indigo-900/70 dark:text-indigo-300/70 mb-1 uppercase tracking-widest">Daily Email Endpoint</label>
+                                    <div className="flex items-center gap-2">
+                                        <code className="px-3 py-2 bg-white dark:bg-slate-900 border border-indigo-100 dark:border-indigo-800 rounded-lg text-xs font-mono text-slate-700 dark:text-slate-300 flex-1 truncate">https://pastoralcare.barnabassoftware.com/api/integrations/grow/daily-email</code>
+                                        <button onClick={() => navigator.clipboard.writeText('https://pastoralcare.barnabassoftware.com/api/integrations/grow/daily-email')} className="shrink-0 px-3 py-2 bg-indigo-100 hover:bg-indigo-200 dark:bg-indigo-800 dark:hover:bg-indigo-700 text-indigo-700 dark:text-indigo-300 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-colors">Copy</button>
+                                    </div>
+                                </div>
+                                {isConnected && (
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-indigo-900/70 dark:text-indigo-300/70 mb-1 uppercase tracking-widest">PASTORAL_CARE_API_SECRET</label>
+                                        <div className="flex items-center gap-2">
+                                            <code className="px-3 py-2 bg-white dark:bg-slate-900 border border-indigo-100 dark:border-indigo-800 rounded-lg text-xs font-mono text-slate-700 dark:text-slate-300 flex-1 truncate">{'•'.repeat(32)}</code>
+                                            <button onClick={() => navigator.clipboard.writeText(church.growSettings?.growIntegrationSecret || '')} className="shrink-0 px-3 py-2 bg-indigo-100 hover:bg-indigo-200 dark:bg-indigo-800 dark:hover:bg-indigo-700 text-indigo-700 dark:text-indigo-300 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-colors">Copy</button>
+                                        </div>
+                                        <p className="text-[9px] text-indigo-500 dark:text-indigo-400 mt-1">Secret is masked for security. Use the Copy button to paste it into the Grow App.</p>
+                                    </div>
+                                )}
+                                {isConnected && (
+                                    <div className="pt-2 border-t border-indigo-200 dark:border-indigo-800">
+                                        <button onClick={handleRevoke} className="text-[10px] font-bold text-rose-500 hover:text-rose-700 uppercase tracking-widest transition-colors">
+                                            ⚠ Revoke Access
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
-                    </div>
 
-                    <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700">
-                        <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-widest">Grow Application ID / Token</label>
-                        <input
-                            type="text"
-                            value={church.growSettings?.appId || ''}
-                            onChange={e => onUpdateChurch && onUpdateChurch({ growSettings: { ...church.growSettings, appId: e.target.value } })}
-                            placeholder="e.g. grow-app-xyz123"
-                            className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                        />
-                        <p className="text-[10px] text-slate-400 mt-2">Enter your Grow application identifier to securely link your databases if needed.</p>
-                    </div>
-
-                    <div className="flex items-center justify-between p-6 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700">
-                        <div>
-                            <p className="text-sm font-black text-slate-900 dark:text-white">Grow Tracks</p>
-                            <p className="text-[10px] text-slate-400 mt-1">Enable structured growth tracks for members.</p>
+                        {/* ── Auto-Connect Instructions ─────────────────────── */}
+                        <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl p-6">
+                            <p className="text-xs font-black text-slate-900 dark:text-white mb-3">🔌 Automatic Connection Flow (for Grow App developers)</p>
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400 mb-4 leading-relaxed">
+                                The Grow App can request permission automatically without manual secret sharing.
+                                Configure the Grow App with the two endpoints below — no secret is needed upfront.
+                            </p>
+                            <ol className="text-[11px] text-slate-600 dark:text-slate-300 space-y-3 list-decimal list-inside leading-relaxed">
+                                <li>
+                                    In Grow App settings, set <code className="bg-slate-200 dark:bg-slate-700 px-1 rounded">PASTORAL_CARE_CHURCH_ID</code> = <code className="bg-slate-200 dark:bg-slate-700 px-1 rounded">{churchId}</code>
+                                </li>
+                                <li>
+                                    Call <strong>POST</strong>{' '}
+                                    <button onClick={() => navigator.clipboard.writeText('https://pastoralcare.barnabassoftware.com/api/integrations/grow/request-access')} className="font-mono text-indigo-600 dark:text-indigo-400 underline hover:no-underline">
+                                        /api/integrations/grow/request-access
+                                    </button>{' '}
+                                    with body <code className="bg-slate-200 dark:bg-slate-700 px-1 rounded">{'{"churchId":"...",'} "appName":"Grow"{'}'}</code>
+                                </li>
+                                <li>
+                                    Poll <strong>GET</strong>{' '}
+                                    <button onClick={() => navigator.clipboard.writeText(`https://pastoralcare.barnabassoftware.com/api/integrations/grow/status?churchId=${churchId}`)} className="font-mono text-indigo-600 dark:text-indigo-400 underline hover:no-underline">
+                                        /api/integrations/grow/status?churchId={churchId}
+                                    </button>{' '}
+                                    every 30–60 seconds.
+                                </li>
+                                <li>When the tenant admin approves (from this page), the status changes to <code className="bg-slate-200 dark:bg-slate-700 px-1 rounded">"approved"</code> and the response includes the <code className="bg-slate-200 dark:bg-slate-700 px-1 rounded">secret</code> field.</li>
+                                <li>Store the secret as <code className="bg-slate-200 dark:bg-slate-700 px-1 rounded">PASTORAL_CARE_API_SECRET</code> and begin sending emails via the daily-email endpoint.</li>
+                            </ol>
                         </div>
-                        <button
-                            role="switch"
-                            aria-checked={!!church.growSettings?.growTracksEnabled}
-                            onClick={() => onUpdateChurch && onUpdateChurch({ growSettings: { ...church.growSettings, growTracksEnabled: !church.growSettings?.growTracksEnabled } })}
-                            className={`ml-4 shrink-0 w-12 h-6 rounded-full p-1 transition-colors ${church.growSettings?.growTracksEnabled ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'}`}
-                        >
-                            <div className={`w-4 h-4 bg-white rounded-full transition-transform ${church.growSettings?.growTracksEnabled ? 'translate-x-6' : ''}`} />
-                        </button>
-                    </div>
 
-                    <div className="flex items-center justify-between p-6 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700">
-                        <div>
-                            <p className="text-sm font-black text-slate-900 dark:text-white">Bible Studies</p>
-                            <p className="text-[10px] text-slate-400 mt-1">Allow creation and participation in Bible studies.</p>
+                        {/* ── Feature Toggles ───────────────────────────────── */}
+                        <div className="space-y-3">
+                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Feature Toggles</p>
+                            {([
+                                { key: 'growTracksEnabled', label: 'Grow Tracks', desc: 'Enable structured growth tracks for members.' },
+                                { key: 'bibleStudiesEnabled', label: 'Bible Studies', desc: 'Allow creation and participation in Bible studies.' },
+                                { key: 'dailyEmailsEnabled', label: 'Daily Devotional Emails', desc: 'Enable automated daily spiritual growth emails for users who opt in.' },
+                                { key: 'collectionsEnabled', label: 'Collections', desc: 'Enable collections functionality for users to save and organize content.' },
+                            ] as const).map(({ key, label, desc }) => (
+                                <div key={key} className="flex items-center justify-between p-5 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700">
+                                    <div>
+                                        <p className="text-sm font-black text-slate-900 dark:text-white">{label}</p>
+                                        <p className="text-[10px] text-slate-400 mt-0.5">{desc}</p>
+                                    </div>
+                                    <button
+                                        role="switch"
+                                        aria-checked={!!(church.growSettings as any)?.[key]}
+                                        onClick={() => onUpdateChurch && onUpdateChurch({ growSettings: { ...church.growSettings, [key]: !(church.growSettings as any)?.[key] } })}
+                                        className={`ml-4 shrink-0 w-12 h-6 rounded-full p-1 transition-colors ${(church.growSettings as any)?.[key] ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'}`}
+                                    >
+                                        <div className={`w-4 h-4 bg-white rounded-full transition-transform ${(church.growSettings as any)?.[key] ? 'translate-x-6' : ''}`} />
+                                    </button>
+                                </div>
+                            ))}
                         </div>
-                        <button
-                            role="switch"
-                            aria-checked={!!church.growSettings?.bibleStudiesEnabled}
-                            onClick={() => onUpdateChurch && onUpdateChurch({ growSettings: { ...church.growSettings, bibleStudiesEnabled: !church.growSettings?.bibleStudiesEnabled } })}
-                            className={`ml-4 shrink-0 w-12 h-6 rounded-full p-1 transition-colors ${church.growSettings?.bibleStudiesEnabled ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'}`}
-                        >
-                            <div className={`w-4 h-4 bg-white rounded-full transition-transform ${church.growSettings?.bibleStudiesEnabled ? 'translate-x-6' : ''}`} />
-                        </button>
-                    </div>
-
-                    <div className="flex items-center justify-between p-6 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700">
-                        <div>
-                            <p className="text-sm font-black text-slate-900 dark:text-white">Daily Devotional Emails</p>
-                            <p className="text-[10px] text-slate-400 mt-1">Enable automated daily spiritual growth emails for users who opt in.</p>
-                        </div>
-                        <button
-                            role="switch"
-                            aria-checked={!!church.growSettings?.dailyEmailsEnabled}
-                            onClick={() => onUpdateChurch && onUpdateChurch({ growSettings: { ...church.growSettings, dailyEmailsEnabled: !church.growSettings?.dailyEmailsEnabled } })}
-                            className={`ml-4 shrink-0 w-12 h-6 rounded-full p-1 transition-colors ${church.growSettings?.dailyEmailsEnabled ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'}`}
-                        >
-                            <div className={`w-4 h-4 bg-white rounded-full transition-transform ${church.growSettings?.dailyEmailsEnabled ? 'translate-x-6' : ''}`} />
-                        </button>
-                    </div>
-
-                    <div className="flex items-center justify-between p-6 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700">
-                        <div>
-                            <p className="text-sm font-black text-slate-900 dark:text-white">Collections</p>
-                            <p className="text-[10px] text-slate-400 mt-1">Enable collections functionality for users to save and organize content.</p>
-                        </div>
-                        <button
-                            role="switch"
-                            aria-checked={!!church.growSettings?.collectionsEnabled}
-                            onClick={() => onUpdateChurch && onUpdateChurch({ growSettings: { ...church.growSettings, collectionsEnabled: !church.growSettings?.collectionsEnabled } })}
-                            className={`ml-4 shrink-0 w-12 h-6 rounded-full p-1 transition-colors ${church.growSettings?.collectionsEnabled ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'}`}
-                        >
-                            <div className={`w-4 h-4 bg-white rounded-full transition-transform ${church.growSettings?.collectionsEnabled ? 'translate-x-6' : ''}`} />
-                        </button>
                     </div>
                 </div>
-            </div>
-        )}
+            );
+        })()}
 
         {activeTab === 'Risk Profiles' && (
             <div className="space-y-12">

@@ -25,7 +25,7 @@ import { sendIndividual, sendBulk } from './backend/twilioSend';
 import { handleStatusCallback } from './backend/twilioWebhookStatus';
 import { startSmsCampaignScheduler } from './backend/smsCampaignScheduler';
 import { workflowEnrollList, workflowEnrollPreview } from './backend/workflowEnrollEndpoint';
-import { handleGrowDailyEmail, setupGrowIntegration } from './backend/growIntegration';
+import { handleGrowDailyEmail, setupGrowIntegration, requestGrowAccess, getGrowStatus } from './backend/growIntegration';
 
 // Fix for bundled CJS environment
 const __dirname = process.cwd();
@@ -167,6 +167,9 @@ async function startServer() {
     // Integrations
     app.post('/api/integrations/grow/daily-email', express.json(), handleGrowDailyEmail);
     app.post('/api/integrations/grow/setup', express.json(), setupGrowIntegration);
+    // Grow permission / auto-connect flow
+    app.post('/api/integrations/grow/request-access', express.json(), requestGrowAccess);
+    app.get('/api/integrations/grow/status', getGrowStatus);
 
     // ─── Public Widget Sync Endpoints ───────────────────────────────
     app.get('/api/public/groups/:churchId', getPublicGroups);

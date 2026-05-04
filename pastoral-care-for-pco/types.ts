@@ -127,6 +127,26 @@ export interface Church {
         bibleStudiesEnabled?: boolean;
         dailyEmailsEnabled?: boolean;
         collectionsEnabled?: boolean;
+        /**
+         * Shared secret used to authenticate requests from the Grow Application.
+         * The Grow App must send this value as `PASTORAL_CARE_API_SECRET` in its
+         * integration settings. Generate a new one from System Settings → Tenants
+         * or approve a pending access request from the Grow Integration tab.
+         */
+        growIntegrationSecret?: string;
+        /**
+         * Tracks a pending access-request from the Grow Application.
+         * Set when Grow calls POST /api/integrations/grow/request-access.
+         * Cleared (with a generated secret) when the admin approves it.
+         */
+        growPendingRequest?: {
+            /** Human-readable name the Grow App sent to identify itself */
+            appName: string;
+            /** ISO timestamp when the request was received */
+            requestedAt: string;
+            /** 'pending' | 'approved' | 'rejected' */
+            status: 'pending' | 'approved' | 'rejected';
+        } | null;
     };
 }
 

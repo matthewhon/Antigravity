@@ -158,6 +158,13 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
   const [logSourceFilter, setLogSourceFilter] = useState<string>('');
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
 
+  // Grow Integration panel state
+  const [selectedGrowChurchId, setSelectedGrowChurchId] = useState<string>('');
+  const [growSecret, setGrowSecret] = useState<string>('');
+  const [growSecretSaving, setGrowSecretSaving] = useState(false);
+  const [growSecretMsg, setGrowSecretMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [growSecretVisible, setGrowSecretVisible] = useState(false);
+
   useEffect(() => {
     loadSettings();
   }, []);
@@ -1157,6 +1164,155 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                 )}
                             </tbody>
                         </table>
+                    </div>
+                </div>
+
+                {/* ── Grow Integration ───────────────────────────────────── */}
+                <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] border border-slate-100 dark:border-slate-800 shadow-sm">
+                    <div className="flex items-center gap-3 mb-6">
+                        <div className="w-9 h-9 rounded-2xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-lg">🌱</div>
+                        <div>
+                            <h3 className="text-lg font-black text-slate-900 dark:text-white">Grow Integration</h3>
+                            <p className="text-[10px] text-slate-400 mt-0.5">Configure the shared secret that authorises the Grow Application to send emails through Pastoral Care.</p>
+                        </div>
+                    </div>
+
+                    <div className="space-y-5">
+                        {/* Tenant selector */}
+                        <div>
+                            <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Select Tenant</label>
+                            <select
+                                value={selectedGrowChurchId}
+                                onChange={e => {
+                                    const id = e.target.value;
+                                    setSelectedGrowChurchId(id);
+                                    setGrowSecretMsg(null);
+                                    setGrowSecretVisible(false);
+                                    // Pre-fill any existing secret for the selected church
+                                    const church = churches.find(c => c.id === id);
+                                    setGrowSecret((church as any)?.growSettings?.growIntegrationSecret || '');
+                                }}
+                                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
+                            >
+                                <option value="">— choose a tenant —</option>
+                                {churches.map(c => (
+                                    <option key={c.id} value={c.id}>{c.name} ({c.id})</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {selectedGrowChurchId && (
+                            <>
+                                {/* Secret field */}
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">
+                                        PASTORAL_CARE_API_SECRET
+                                        <span className="ml-2 normal-case font-normal text-slate-400">(Grow App integration secret)</span>
+                                    </label>
+                                    <p className="text-[9px] text-slate-400 mb-2 leading-relaxed">
+                                        Set this exact value as <code className="bg-slate-100 dark:bg-slate-700 px-1 rounded">PASTORAL_CARE_API_SECRET</code> in your Grow Application's integration settings.
+                                        The Grow backend will include it in every request it sends to Pastoral Care.
+                                    </p>
+                                    <div className="flex gap-2">
+                                        <div className="relative flex-1">
+                                            <input
+                                                type={growSecretVisible ? 'text' : 'password'}
+                                                value={growSecret}
+                                                onChange={e => setGrowSecret(e.target.value)}
+                                                readOnly={!growSecretVisible}
+                                                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 pr-24"
+                                                placeholder="Generate a secret below…"
+                                            />
+                                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
+                                                <button
+                                                    onClick={() => setGrowSecretVisible(v => !v)}
+                                                    className="text-slate-400 hover:text-indigo-500 transition-colors p-1 text-xs"
+                                                    title={growSecretVisible ? 'Hide' : 'Show'}
+                                                >
+                                                    {growSecretVisible ? '🙈' : '👁'}
+                                                </button>
+                                                {growSecret && (
+                                                    <button
+                                                        onClick={() => { navigator.clipboard.writeText(growSecret); setGrowSecretMsg({ type: 'success', text: 'Secret copied to clipboard!' }); }}
+                                                        className="text-slate-400 hover:text-indigo-500 transition-colors p-1 text-xs"
+                                                        title="Copy"
+                                                    >
+                                                        📋
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => {
+                                                // Generate a cryptographically random 32-byte hex secret
+                                                const array = new Uint8Array(32);
+                                                crypto.getRandomValues(array);
+                                                const secret = Array.from(array).map(b => b.toString(16).padStart(2, '0')).join('');
+                                                setGrowSecret(secret);
+                                                setGrowSecretVisible(true);
+                                                setGrowSecretMsg(null);
+                                            }}
+                                            className="shrink-0 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 px-3 py-2 rounded-xl font-bold text-xs hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-colors whitespace-nowrap border border-emerald-200 dark:border-emerald-800"
+                                        >
+                                            ✨ Generate
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {growSecretMsg && (
+                                    <div className={`px-4 py-3 rounded-xl text-xs font-bold flex items-center gap-2 ${
+                                        growSecretMsg.type === 'success'
+                                            ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                                            : 'bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
+                                    }`}>
+                                        {growSecretMsg.type === 'success' ? '✅' : '❌'} {growSecretMsg.text}
+                                    </div>
+                                )}
+
+                                {/* Save button */}
+                                <div className="flex justify-end">
+                                    <button
+                                        disabled={!growSecret || growSecretSaving}
+                                        onClick={async () => {
+                                            if (!growSecret.trim()) return;
+                                            setGrowSecretSaving(true);
+                                            setGrowSecretMsg(null);
+                                            try {
+                                                await firestore.updateChurch(selectedGrowChurchId, {
+                                                    growSettings: {
+                                                        ...(churches.find(c => c.id === selectedGrowChurchId) as any)?.growSettings,
+                                                        growIntegrationSecret: growSecret.trim(),
+                                                    }
+                                                });
+                                                // Refresh church list so the newly stored secret is reflected
+                                                const list = await firestore.getAllChurches();
+                                                setChurches(list);
+                                                setGrowSecretMsg({ type: 'success', text: 'Secret saved! Configure the same value as PASTORAL_CARE_API_SECRET in the Grow Application.' });
+                                            } catch (e: any) {
+                                                setGrowSecretMsg({ type: 'error', text: 'Failed to save: ' + e.message });
+                                            } finally {
+                                                setGrowSecretSaving(false);
+                                            }
+                                        }}
+                                        className="bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all disabled:opacity-50 shadow-sm"
+                                    >
+                                        {growSecretSaving ? 'Saving…' : 'Save Secret to Tenant'}
+                                    </button>
+                                </div>
+
+                                {/* Instructions callout */}
+                                <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-2xl p-5 space-y-2">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400">Setup Instructions for the Grow App</p>
+                                    <ol className="text-[11px] text-slate-600 dark:text-slate-300 space-y-1.5 list-decimal list-inside leading-relaxed">
+                                        <li>In the Grow Application, navigate to <strong>Settings → Integrations</strong>.</li>
+                                        <li>Find the <strong>Pastoral Care Integration</strong> section.</li>
+                                        <li>Set <code className="bg-slate-200 dark:bg-slate-700 px-1 rounded">PASTORAL_CARE_API_SECRET</code> to the secret generated above.</li>
+                                        <li>Set the endpoint to <code className="bg-slate-200 dark:bg-slate-700 px-1 rounded">{(settings.apiBaseUrl || DEFAULT_API_URL).replace(/\/$/, '')}/api/integrations/grow/daily-email</code></li>
+                                        <li>Include the tenant's <code className="bg-slate-200 dark:bg-slate-700 px-1 rounded">churchId</code> (<code className="bg-slate-200 dark:bg-slate-700 px-1 rounded">{selectedGrowChurchId}</code>) in every request body.</li>
+                                    </ol>
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
 
