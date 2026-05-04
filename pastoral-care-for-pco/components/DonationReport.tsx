@@ -17,7 +17,7 @@ interface DonationReportProps {
 type IntervalType = 'Weekly' | 'Monthly' | 'Quarterly' | 'YTD';
 type SortField = 'totalAmount' | 'name' | 'lastGiftDate';
 type SortDirection = 'asc' | 'desc';
-type ReportTab = 'donors' | 'age_trends' | 'status_trends' | 'avg_giving' | 'giving_by_tag';
+type ReportTab = 'donors' | 'age_trends' | 'status_trends' | 'avg_giving' | 'giving_by_label';
 
 interface FilterState {
     startDate: string;
@@ -25,7 +25,7 @@ interface FilterState {
     minAmount: string;
     maxAmount: string;
     interval: IntervalType;
-    selectedTag: string;
+    selectedLabel: string;
 }
 
 interface SortState {
@@ -129,7 +129,7 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
         minAmount: '',
         maxAmount: '',
         interval:  'Monthly',
-        selectedTag: '',
+        selectedLabel: '',
     });
     const [sort, setSort] = useState<SortState>({ field: 'totalAmount', direction: 'desc' });
 
@@ -149,7 +149,7 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
     }, [donations]);
 
     // Extract unique tags globally
-    const availableTags = useMemo(() => {
+    const availableLabels = useMemo(() => {
         const tags = new Set<string>();
         donations.forEach(d => {
             if (d.labels) d.labels.forEach(l => tags.add(l));
@@ -164,11 +164,11 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
         end.setHours(23, 59, 59, 999);
         
         let filtered = donations.filter(d => isWithinInterval(parseISO(d.date), { start, end }));
-        if (filters.selectedTag) {
-            filtered = filtered.filter(d => d.labels?.includes(filters.selectedTag));
+        if (filters.selectedLabel) {
+            filtered = filtered.filter(d => d.labels?.includes(filters.selectedLabel));
         }
         return filtered;
-    }, [donations, filters.startDate, filters.endDate, filters.selectedTag]);
+    }, [donations, filters.startDate, filters.endDate, filters.selectedLabel]);
 
     // 1b. Generate ordered bucket list
     const buckets = useMemo(() => {
@@ -308,7 +308,7 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
     }, [buckets, filteredDonations, filters.interval, filters.startDate, donorAllHistory]);
 
     // 5b. Avg Giving by Tag — total given per tag ÷ weeks in period
-    const givingByTagData = useMemo(() => {
+    const givingByLabelData = useMemo(() => {
         const COLORS = ['#10b981', '#f59e0b', '#06b6d4', '#f43f5e', '#8b5cf6', '#ec4899', '#14b8a6', '#6366f1'];
 
         const start = parseISO(filters.startDate);
@@ -317,32 +317,32 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
         const totalWeeks = Math.max(daysDiff / 7, 1);
         const midPoint = new Date((start.getTime() + end.getTime()) / 2);
 
-        const allTagsSet = new Set<string>();
+        const allLabelsSet = new Set<string>();
         filteredDonations.forEach(d => {
-            if (d.labels) d.labels.forEach(l => allTagsSet.add(l));
+            if (d.labels) d.labels.forEach(l => allLabelsSet.add(l));
         });
-        const allTags = Array.from(allTagsSet).sort();
+        const allLabels = Array.from(allLabelsSet).sort();
 
-        const tagData = allTags.map((tagName, idx) => {
+        const labelData = allLabels.map((labelName, idx) => {
             const color = COLORS[idx % COLORS.length];
 
-            const tagDonations = filteredDonations.filter(d => d.labels?.includes(tagName));
-            const totalGiven = tagDonations.reduce((s, d) => s + d.amount, 0);
+            const labelDonations = filteredDonations.filter(d => d.labels?.includes(labelName));
+            const totalGiven = labelDonations.reduce((s, d) => s + d.amount, 0);
             const avgPerWeek = totalGiven / totalWeeks;
 
-            const firstHalf  = tagDonations.filter(d => parseISO(d.date) <= midPoint).reduce((s, d) => s + d.amount, 0) / (totalWeeks / 2);
-            const secondHalf = tagDonations.filter(d => parseISO(d.date) >  midPoint).reduce((s, d) => s + d.amount, 0) / (totalWeeks / 2);
+            const firstHalf  = labelDonations.filter(d => parseISO(d.date) <= midPoint).reduce((s, d) => s + d.amount, 0) / (totalWeeks / 2);
+            const secondHalf = labelDonations.filter(d => parseISO(d.date) >  midPoint).reduce((s, d) => s + d.amount, 0) / (totalWeeks / 2);
             const trendPct   = firstHalf > 0 ? ((secondHalf - firstHalf) / firstHalf) * 100 : null;
             const trend: 'up' | 'down' | 'flat' =
                 trendPct === null ? 'flat' : trendPct > 3 ? 'up' : trendPct < -3 ? 'down' : 'flat';
 
-            return { tagName, color, totalGiven, avgPerWeek, trendPct, trend };
+            return { labelName, color, totalGiven, avgPerWeek, trendPct, trend };
         });
 
-        const overallAvgPerWeek = tagData.reduce((s, t) => s + t.avgPerWeek, 0);
-        const overallTotal      = tagData.reduce((s, t) => s + t.totalGiven, 0);
+        const overallAvgPerWeek = labelData.reduce((s, t) => s + t.avgPerWeek, 0);
+        const overallTotal      = labelData.reduce((s, t) => s + t.totalGiven, 0);
 
-        return { tagData, overallAvgPerWeek, overallTotal, totalWeeks };
+        return { labelData, overallAvgPerWeek, overallTotal, totalWeeks };
     }, [filteredDonations, filters.startDate, filters.endDate]);
 
     // 5. Avg Giving by Fund — total given per fund ÷ weeks in period
@@ -427,15 +427,15 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                 </div>
 
                 <div>
-                    <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Tag Filter</label>
+                    <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Label Filter</label>
                     <select
-                        aria-label="Filter by Tag"
-                        value={filters.selectedTag}
-                        onChange={(e) => setFilters(prev => ({ ...prev, selectedTag: e.target.value }))}
+                        aria-label="Filter by Label"
+                        value={filters.selectedLabel}
+                        onChange={(e) => setFilters(prev => ({ ...prev, selectedLabel: e.target.value }))}
                         className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-4 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500 min-w-[120px]"
                     >
-                        <option value="">All Tags</option>
-                        {availableTags.map(tag => (
+                        <option value="">All Labels</option>
+                        {availableLabels.map(tag => (
                             <option key={tag} value={tag}>{tag}</option>
                         ))}
                     </select>
@@ -505,7 +505,7 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                     { id: 'age_trends',    label: '🎂 Age Demographics' },
                     { id: 'status_trends', label: '🏷️ Giving By Status' },
                     { id: 'avg_giving',    label: '📊 Avg Giving by Fund' },
-                    { id: 'giving_by_tag', label: '🏷️ Giving by Tag' },
+                    { id: 'giving_by_label', label: '🏷️ Giving by Label' },
                 ] as { id: ReportTab; label: string }[]).map(tab => (
                     <button
                         key={tab.id}
@@ -876,10 +876,10 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                     </div>
                 );
             })()}
-            {/* ── Average Giving by Tag ─────────────────────────────── */}
-            {activeTab === 'giving_by_tag' && (() => {
-                const { tagData, overallAvgPerWeek, overallTotal, totalWeeks } = givingByTagData;
-                const hasTags = tagData.length > 0;
+            {/* ── Average Giving by Label ─────────────────────────────── */}
+            {activeTab === 'giving_by_label' && (() => {
+                const { labelData, overallAvgPerWeek, overallTotal, totalWeeks } = givingByLabelData;
+                const hasLabels = labelData.length > 0;
 
                 const trendIcon = (t: 'up' | 'down' | 'flat') => t === 'up' ? '↑' : t === 'down' ? '↓' : '→';
                 const trendCls  = (t: 'up' | 'down' | 'flat') =>
@@ -893,15 +893,15 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                             {/* Header */}
                             <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-8">
                                 <div>
-                                    <h3 className="text-lg font-black text-slate-900 dark:text-white">Average Giving by Tag</h3>
+                                    <h3 className="text-lg font-black text-slate-900 dark:text-white">Average Giving by Label</h3>
                                     <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1">
-                                        Avg weekly giving per tag · {Math.round(totalWeeks)} weeks
+                                        Avg weekly giving per label · {Math.round(totalWeeks)} weeks
                                     </p>
                                     <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">{filters.startDate} – {filters.endDate}</p>
                                 </div>
-                                {hasTags && (
+                                {hasLabels && (
                                     <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Avg / Week (Selected Tags)</p>
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Avg / Week (Selected Labels)</p>
                                         <p className="text-3xl font-black text-indigo-600 dark:text-indigo-400">
                                             ${overallAvgPerWeek.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                                         </p>
@@ -912,29 +912,29 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                                 )}
                             </div>
 
-                            {!hasTags ? (
+                            {!hasLabels ? (
                                 <div className="flex flex-col items-center justify-center h-48 text-center gap-3">
                                     <span className="text-4xl opacity-20">🏷️</span>
-                                    <p className="text-xs font-bold text-slate-400">No tags found in selected range</p>
+                                    <p className="text-xs font-bold text-slate-400">No labels found in selected range</p>
                                     <p className="text-[10px] text-slate-400">Only donations with labels will appear here.</p>
                                 </div>
                             ) : (
                                 <div className="space-y-4">
                                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
-                                        Avg / Week by Tag — {filters.startDate} to {filters.endDate}
+                                        Avg / Week by Label — {filters.startDate} to {filters.endDate}
                                     </p>
-                                    {tagData
+                                    {labelData
                                         .slice()
                                         .sort((a, b) => b.avgPerWeek - a.avgPerWeek)
                                         .map(t => {
-                                            const maxAvg = Math.max(...tagData.map(d => d.avgPerWeek), 1);
+                                            const maxAvg = Math.max(...labelData.map(d => d.avgPerWeek), 1);
                                             const barPct = (t.avgPerWeek / maxAvg) * 100;
                                             return (
-                                                <div key={t.tagName} className="space-y-2">
+                                                <div key={t.labelName} className="space-y-2">
                                                     <div className="flex items-center justify-between gap-3">
                                                         <div className="flex items-center gap-2 min-w-0">
                                                             <div className="report-dot" style={{ '--dot-color': t.color } as React.CSSProperties} />
-                                                            <span className="text-sm font-bold text-slate-700 dark:text-slate-300 truncate">{t.tagName}</span>
+                                                            <span className="text-sm font-bold text-slate-700 dark:text-slate-300 truncate">{t.labelName}</span>
                                                         </div>
                                                         <div className="flex items-center gap-3 flex-shrink-0">
                                                             <div className="text-right">
