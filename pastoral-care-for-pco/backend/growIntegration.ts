@@ -2,6 +2,42 @@ import { getDb } from './firebase.js';
 import { sgSend } from './sendEmail.js';
 import { createServerLogger } from '../services/logService.js';
 
+export async function setupGrowIntegration(req: any, res: any) {
+    const { churchId, secret, churchName } = req.body || {};
+
+    const expectedSecret = process.env.GROW_INTEGRATION_SECRET || 'GROW_TEMP_SECRET_123';
+    if (secret !== expectedSecret) {
+        return res.status(401).json({ error: 'Unauthorized: Invalid integration secret.' });
+    }
+
+    if (!churchId) {
+        return res.status(400).json({ error: 'Missing churchId.' });
+    }
+
+    const db = getDb();
+    const churchRef = db.collection('churches').doc(churchId);
+    
+    try {
+        const doc = await churchRef.get();
+        if (!doc.exists) {
+            await churchRef.set({
+                id: churchId,
+                name: churchName || 'Grow Integration Church',
+                createdAt: Date.now(),
+                // Basic email settings
+                emailSettings: {
+                    mode: 'global'
+                }
+            });
+            return res.json({ success: true, message: 'Integration setup successfully. Church document created.' });
+        } else {
+            return res.json({ success: true, message: 'Integration verified. Church already exists.' });
+        }
+    } catch (e: any) {
+        return res.status(500).json({ error: e.message });
+    }
+}
+
 export async function handleGrowDailyEmail(req: any, res: any) {
     const { churchId, recipients, secret } = req.body || {};
 
