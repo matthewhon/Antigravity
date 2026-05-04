@@ -121,6 +121,13 @@ export interface Church {
         /** SendGrid API key scoped to this church's Subuser */
         sendGridSubuserApiKey?: string;
     };
+    /** Grow integration settings */
+    growSettings?: {
+        growTracksEnabled?: boolean;
+        bibleStudiesEnabled?: boolean;
+        dailyEmailsEnabled?: boolean;
+        collectionsEnabled?: boolean;
+    };
 }
 
 export interface AttendanceData {

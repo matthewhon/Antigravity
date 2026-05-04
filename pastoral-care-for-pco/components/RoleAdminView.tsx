@@ -278,7 +278,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
 }) => {
   const [users, setUsers] = useState<User[]>([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'Team' | 'Organization' | 'Planning Center' | 'Community' | 'Widget Directory' | 'Risk Profiles' | 'Subscription' | 'Mail Settings' | 'SMS'>('Team');
+  const [activeTab, setActiveTab] = useState<'Team' | 'Organization' | 'Planning Center' | 'Community' | 'Widget Directory' | 'Risk Profiles' | 'Subscription' | 'Mail Settings' | 'SMS' | 'Grow Integration'>('Team');
 
   // Delete Organization modal state
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -857,7 +857,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
             </div>
             
             <div className="flex flex-row lg:flex-col gap-2 overflow-x-auto lg:overflow-visible pb-4 lg:pb-0 no-scrollbar border-b lg:border-b-0 border-slate-200 dark:border-slate-800">
-                {['Team', 'Organization', 'Planning Center', 'Community', 'Mail Settings', 'SMS', 'Widget Directory', 'Risk Profiles', 'Subscription'].map(tab => (
+                {['Team', 'Organization', 'Planning Center', 'Community', 'Mail Settings', 'SMS', 'Grow Integration', 'Widget Directory', 'Risk Profiles', 'Subscription'].map(tab => (
                     <button 
                         key={tab}
                         onClick={() => setActiveTab(tab as any)}
@@ -4381,6 +4381,77 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                 </div>
             );
         })()}
+
+        {activeTab === 'Grow Integration' && (
+            <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] border border-slate-100 dark:border-slate-800 shadow-sm">
+                <div className="mb-8">
+                    <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tighter">Grow Integration</h3>
+                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Configure discipleship app settings</p>
+                </div>
+
+                <div className="space-y-6">
+                    <div className="flex items-center justify-between p-6 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700">
+                        <div>
+                            <p className="text-sm font-black text-slate-900 dark:text-white">Grow Tracks</p>
+                            <p className="text-[10px] text-slate-400 mt-1">Enable structured growth tracks for members.</p>
+                        </div>
+                        <button
+                            role="switch"
+                            aria-checked={!!church.growSettings?.growTracksEnabled}
+                            onClick={() => onUpdateChurch && onUpdateChurch({ growSettings: { ...church.growSettings, growTracksEnabled: !church.growSettings?.growTracksEnabled } })}
+                            className={`ml-4 shrink-0 w-12 h-6 rounded-full p-1 transition-colors ${church.growSettings?.growTracksEnabled ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'}`}
+                        >
+                            <div className={`w-4 h-4 bg-white rounded-full transition-transform ${church.growSettings?.growTracksEnabled ? 'translate-x-6' : ''}`} />
+                        </button>
+                    </div>
+
+                    <div className="flex items-center justify-between p-6 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700">
+                        <div>
+                            <p className="text-sm font-black text-slate-900 dark:text-white">Bible Studies</p>
+                            <p className="text-[10px] text-slate-400 mt-1">Allow creation and participation in Bible studies.</p>
+                        </div>
+                        <button
+                            role="switch"
+                            aria-checked={!!church.growSettings?.bibleStudiesEnabled}
+                            onClick={() => onUpdateChurch && onUpdateChurch({ growSettings: { ...church.growSettings, bibleStudiesEnabled: !church.growSettings?.bibleStudiesEnabled } })}
+                            className={`ml-4 shrink-0 w-12 h-6 rounded-full p-1 transition-colors ${church.growSettings?.bibleStudiesEnabled ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'}`}
+                        >
+                            <div className={`w-4 h-4 bg-white rounded-full transition-transform ${church.growSettings?.bibleStudiesEnabled ? 'translate-x-6' : ''}`} />
+                        </button>
+                    </div>
+
+                    <div className="flex items-center justify-between p-6 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700">
+                        <div>
+                            <p className="text-sm font-black text-slate-900 dark:text-white">Daily Devotional Emails</p>
+                            <p className="text-[10px] text-slate-400 mt-1">Enable automated daily spiritual growth emails for users who opt in.</p>
+                        </div>
+                        <button
+                            role="switch"
+                            aria-checked={!!church.growSettings?.dailyEmailsEnabled}
+                            onClick={() => onUpdateChurch && onUpdateChurch({ growSettings: { ...church.growSettings, dailyEmailsEnabled: !church.growSettings?.dailyEmailsEnabled } })}
+                            className={`ml-4 shrink-0 w-12 h-6 rounded-full p-1 transition-colors ${church.growSettings?.dailyEmailsEnabled ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'}`}
+                        >
+                            <div className={`w-4 h-4 bg-white rounded-full transition-transform ${church.growSettings?.dailyEmailsEnabled ? 'translate-x-6' : ''}`} />
+                        </button>
+                    </div>
+
+                    <div className="flex items-center justify-between p-6 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700">
+                        <div>
+                            <p className="text-sm font-black text-slate-900 dark:text-white">Collections</p>
+                            <p className="text-[10px] text-slate-400 mt-1">Enable collections functionality for users to save and organize content.</p>
+                        </div>
+                        <button
+                            role="switch"
+                            aria-checked={!!church.growSettings?.collectionsEnabled}
+                            onClick={() => onUpdateChurch && onUpdateChurch({ growSettings: { ...church.growSettings, collectionsEnabled: !church.growSettings?.collectionsEnabled } })}
+                            className={`ml-4 shrink-0 w-12 h-6 rounded-full p-1 transition-colors ${church.growSettings?.collectionsEnabled ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'}`}
+                        >
+                            <div className={`w-4 h-4 bg-white rounded-full transition-transform ${church.growSettings?.collectionsEnabled ? 'translate-x-6' : ''}`} />
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
 
         {activeTab === 'Risk Profiles' && (
             <div className="space-y-12">
