@@ -372,6 +372,10 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [geocodeMessage, setGeocodeMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  // Grow Integration tab state (must be at top-level — cannot be inside an IIFE)
+  const [growApproving, setGrowApproving] = useState(false);
+  const [growMsg, setGrowMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
   useEffect(() => {
     loadUsers();
   }, [churchId]);
@@ -845,6 +849,54 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
           await onUpdateChurch({ communityLocations: updatedLocations });
           setSaveMessage('Default location updated');
       }
+  };
+
+  // ── Grow Integration handlers (component-level so hooks are valid) ──────────
+  const handleGrowApprove = async () => {
+      if (!onUpdateChurch) return;
+      const pendingRequest = church.growSettings?.growPendingRequest;
+      setGrowApproving(true);
+      setGrowMsg(null);
+      try {
+          const array = new Uint8Array(32);
+          crypto.getRandomValues(array);
+          const secret = Array.from(array).map(b => b.toString(16).padStart(2, '0')).join('');
+          await onUpdateChurch({
+              growSettings: {
+                  ...church.growSettings,
+                  growIntegrationSecret: secret,
+                  growPendingRequest: { ...(pendingRequest as any), status: 'approved' },
+              },
+          });
+          setGrowMsg({ type: 'success', text: 'Access approved! The Grow App will automatically receive the secret when it polls /api/integrations/grow/status.' });
+      } catch (e: any) {
+          setGrowMsg({ type: 'error', text: 'Failed to approve: ' + e.message });
+      } finally {
+          setGrowApproving(false);
+      }
+  };
+
+  const handleGrowReject = async () => {
+      if (!onUpdateChurch || !window.confirm('Reject the Grow App access request? The requesting app will be told it was rejected.')) return;
+      const pendingRequest = church.growSettings?.growPendingRequest;
+      await onUpdateChurch({
+          growSettings: {
+              ...church.growSettings,
+              growPendingRequest: { ...(pendingRequest as any), status: 'rejected' },
+          },
+      });
+  };
+
+  const handleGrowRevoke = async () => {
+      if (!onUpdateChurch || !window.confirm('Revoke Grow App access? The integration will stop working immediately.')) return;
+      await onUpdateChurch({
+          growSettings: {
+              ...church.growSettings,
+              growIntegrationSecret: undefined,
+              growPendingRequest: null,
+          },
+      });
+      setGrowMsg({ type: 'success', text: 'Access revoked. The Grow App can re-request access if needed.' });
   };
 
   return (
@@ -4385,57 +4437,6 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
         {activeTab === 'Grow Integration' && (() => {
             const pendingRequest = church.growSettings?.growPendingRequest;
             const isConnected = !!church.growSettings?.growIntegrationSecret;
-            const [growApproving, setGrowApproving] = React.useState(false);
-            const [growMsg, setGrowMsg] = React.useState<{ type: 'success' | 'error'; text: string } | null>(null);
-
-            const handleApprove = async () => {
-                if (!onUpdateChurch) return;
-                setGrowApproving(true);
-                setGrowMsg(null);
-                try {
-                    // Generate a new secret server-side style (CSPRNG via Math.random fallback)
-                    const array = new Uint8Array(32);
-                    crypto.getRandomValues(array);
-                    const secret = Array.from(array).map(b => b.toString(16).padStart(2, '0')).join('');
-                    await onUpdateChurch({
-                        growSettings: {
-                            ...church.growSettings,
-                            growIntegrationSecret: secret,
-                            growPendingRequest: {
-                                ...(pendingRequest as any),
-                                status: 'approved',
-                            },
-                        },
-                    });
-                    setGrowMsg({ type: 'success', text: 'Access approved! The Grow App will automatically receive the secret when it polls /api/integrations/grow/status.' });
-                } catch (e: any) {
-                    setGrowMsg({ type: 'error', text: 'Failed to approve: ' + e.message });
-                } finally {
-                    setGrowApproving(false);
-                }
-            };
-
-            const handleReject = async () => {
-                if (!onUpdateChurch || !window.confirm('Reject the Grow App access request? The requesting app will be told it was rejected.')) return;
-                await onUpdateChurch({
-                    growSettings: {
-                        ...church.growSettings,
-                        growPendingRequest: { ...(pendingRequest as any), status: 'rejected' },
-                    },
-                });
-            };
-
-            const handleRevoke = async () => {
-                if (!onUpdateChurch || !window.confirm('Revoke Grow App access? The integration will stop working immediately.')) return;
-                await onUpdateChurch({
-                    growSettings: {
-                        ...church.growSettings,
-                        growIntegrationSecret: undefined,
-                        growPendingRequest: null,
-                    },
-                });
-                setGrowMsg({ type: 'success', text: 'Access revoked. The Grow App can re-request access if needed.' });
-            };
 
             return (
                 <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] border border-slate-100 dark:border-slate-800 shadow-sm">
@@ -4474,14 +4475,14 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         )}
                                         <div className="flex gap-3 mt-4">
                                             <button
-                                                onClick={handleApprove}
+                                                onClick={handleGrowApprove}
                                                 disabled={growApproving}
                                                 className="bg-emerald-600 text-white px-5 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all disabled:opacity-50 shadow-sm"
                                             >
                                                 {growApproving ? 'Approving…' : '✓ Approve'}
                                             </button>
                                             <button
-                                                onClick={handleReject}
+                                                onClick={handleGrowReject}
                                                 className="bg-white dark:bg-slate-800 border border-rose-200 dark:border-rose-800 text-rose-600 dark:text-rose-400 px-5 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-all"
                                             >
                                                 ✕ Reject
@@ -4542,7 +4543,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 )}
                                 {isConnected && (
                                     <div className="pt-2 border-t border-indigo-200 dark:border-indigo-800">
-                                        <button onClick={handleRevoke} className="text-[10px] font-bold text-rose-500 hover:text-rose-700 uppercase tracking-widest transition-colors">
+                                        <button onClick={handleGrowRevoke} className="text-[10px] font-bold text-rose-500 hover:text-rose-700 uppercase tracking-widest transition-colors">
                                             ⚠ Revoke Access
                                         </button>
                                     </div>
