@@ -376,6 +376,7 @@ export interface DetailedDonation {
     donorId: string;
     donorName: string;
     isRecurring: boolean;
+    labels?: string[];
 }
 
 export interface AttendanceEventSummary {

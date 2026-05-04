@@ -1040,10 +1040,15 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
     let donations: DetailedDonation[] = [];
     try {
         // We still include designations to get the amounts and fund IDs
-        donations = await fetchAllPages(churchId, `giving/v2/donations?where[received_at][gte]=${since}&include=designations`, (d: any, included: any[] = []) => {
+        donations = await fetchAllPages(churchId, `giving/v2/donations?where[received_at][gte]=${since}&include=designations,labels`, (d: any, included: any[] = []) => {
             const donationDate = d.attributes.received_at;
             const donorId = d.relationships?.person?.data?.id || 'anonymous';
             const isRecurring = !!d.relationships?.recurring_donation?.data;
+
+            const labelRefs = d.relationships?.labels?.data || [];
+            const labels = labelRefs
+                .map((ref: any) => included.find(i => i.type === 'Label' && String(i.id) === String(ref.id))?.attributes?.name)
+                .filter(Boolean) as string[];
 
             // Designations map specific amounts to funds
             const designationRefs = d.relationships?.designations?.data || [];
@@ -1060,7 +1065,8 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
                     fundId: undefined,
                     donorId,
                     donorName: 'Donor',
-                    isRecurring
+                    isRecurring,
+                    labels
                 }] as DetailedDonation[];
             }
 
@@ -1092,7 +1098,8 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
                         fundId,
                         donorId,
                         donorName: 'Donor', 
-                        isRecurring
+                        isRecurring,
+                        labels
                     });
                 }
             });

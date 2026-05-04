@@ -17,7 +17,7 @@ interface DonationReportProps {
 type IntervalType = 'Weekly' | 'Monthly' | 'Quarterly' | 'YTD';
 type SortField = 'totalAmount' | 'name' | 'lastGiftDate';
 type SortDirection = 'asc' | 'desc';
-type ReportTab = 'donors' | 'age_trends' | 'status_trends' | 'avg_giving';
+type ReportTab = 'donors' | 'age_trends' | 'status_trends' | 'avg_giving' | 'giving_by_tag';
 
 interface FilterState {
     startDate: string;
@@ -25,6 +25,7 @@ interface FilterState {
     minAmount: string;
     maxAmount: string;
     interval: IntervalType;
+    selectedTag: string;
 }
 
 interface SortState {
@@ -128,6 +129,7 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
         minAmount: '',
         maxAmount: '',
         interval:  'Monthly',
+        selectedTag: '',
     });
     const [sort, setSort] = useState<SortState>({ field: 'totalAmount', direction: 'desc' });
 
@@ -146,13 +148,27 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
         return map;
     }, [donations]);
 
-    // 1a. Filter Donations by Date
+    // Extract unique tags globally
+    const availableTags = useMemo(() => {
+        const tags = new Set<string>();
+        donations.forEach(d => {
+            if (d.labels) d.labels.forEach(l => tags.add(l));
+        });
+        return Array.from(tags).sort();
+    }, [donations]);
+
+    // 1a. Filter Donations by Date and Tag
     const filteredDonations = useMemo(() => {
         const start = parseISO(filters.startDate);
         const end   = parseISO(filters.endDate);
         end.setHours(23, 59, 59, 999);
-        return donations.filter(d => isWithinInterval(parseISO(d.date), { start, end }));
-    }, [donations, filters.startDate, filters.endDate]);
+        
+        let filtered = donations.filter(d => isWithinInterval(parseISO(d.date), { start, end }));
+        if (filters.selectedTag) {
+            filtered = filtered.filter(d => d.labels?.includes(filters.selectedTag));
+        }
+        return filtered;
+    }, [donations, filters.startDate, filters.endDate, filters.selectedTag]);
 
     // 1b. Generate ordered bucket list
     const buckets = useMemo(() => {
@@ -291,6 +307,44 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
         });
     }, [buckets, filteredDonations, filters.interval, filters.startDate, donorAllHistory]);
 
+    // 5b. Avg Giving by Tag — total given per tag ÷ weeks in period
+    const givingByTagData = useMemo(() => {
+        const COLORS = ['#10b981', '#f59e0b', '#06b6d4', '#f43f5e', '#8b5cf6', '#ec4899', '#14b8a6', '#6366f1'];
+
+        const start = parseISO(filters.startDate);
+        const end   = parseISO(filters.endDate);
+        const daysDiff = Math.max((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24), 1);
+        const totalWeeks = Math.max(daysDiff / 7, 1);
+        const midPoint = new Date((start.getTime() + end.getTime()) / 2);
+
+        const allTagsSet = new Set<string>();
+        filteredDonations.forEach(d => {
+            if (d.labels) d.labels.forEach(l => allTagsSet.add(l));
+        });
+        const allTags = Array.from(allTagsSet).sort();
+
+        const tagData = allTags.map((tagName, idx) => {
+            const color = COLORS[idx % COLORS.length];
+
+            const tagDonations = filteredDonations.filter(d => d.labels?.includes(tagName));
+            const totalGiven = tagDonations.reduce((s, d) => s + d.amount, 0);
+            const avgPerWeek = totalGiven / totalWeeks;
+
+            const firstHalf  = tagDonations.filter(d => parseISO(d.date) <= midPoint).reduce((s, d) => s + d.amount, 0) / (totalWeeks / 2);
+            const secondHalf = tagDonations.filter(d => parseISO(d.date) >  midPoint).reduce((s, d) => s + d.amount, 0) / (totalWeeks / 2);
+            const trendPct   = firstHalf > 0 ? ((secondHalf - firstHalf) / firstHalf) * 100 : null;
+            const trend: 'up' | 'down' | 'flat' =
+                trendPct === null ? 'flat' : trendPct > 3 ? 'up' : trendPct < -3 ? 'down' : 'flat';
+
+            return { tagName, color, totalGiven, avgPerWeek, trendPct, trend };
+        });
+
+        const overallAvgPerWeek = tagData.reduce((s, t) => s + t.avgPerWeek, 0);
+        const overallTotal      = tagData.reduce((s, t) => s + t.totalGiven, 0);
+
+        return { tagData, overallAvgPerWeek, overallTotal, totalWeeks };
+    }, [filteredDonations, filters.startDate, filters.endDate]);
+
     // 5. Avg Giving by Fund — total given per fund ÷ weeks in period
     const avgGivingByQuarter = useMemo(() => {
         const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#06b6d4', '#f43f5e', '#8b5cf6', '#ec4899', '#14b8a6'];
@@ -373,6 +427,21 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                 </div>
 
                 <div>
+                    <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Tag Filter</label>
+                    <select
+                        aria-label="Filter by Tag"
+                        value={filters.selectedTag}
+                        onChange={(e) => setFilters(prev => ({ ...prev, selectedTag: e.target.value }))}
+                        className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-4 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500 min-w-[120px]"
+                    >
+                        <option value="">All Tags</option>
+                        {availableTags.map(tag => (
+                            <option key={tag} value={tag}>{tag}</option>
+                        ))}
+                    </select>
+                </div>
+
+                <div>
                     <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Date Range</label>
                     <div className="flex items-center gap-2">
                         <input
@@ -436,6 +505,7 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                     { id: 'age_trends',    label: '🎂 Age Demographics' },
                     { id: 'status_trends', label: '🏷️ Giving By Status' },
                     { id: 'avg_giving',    label: '📊 Avg Giving by Fund' },
+                    { id: 'giving_by_tag', label: '🏷️ Giving by Tag' },
                 ] as { id: ReportTab; label: string }[]).map(tab => (
                     <button
                         key={tab.id}
@@ -795,6 +865,99 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                                                         <div
                                                             className="gv-bar-fill"
                                                             style={{ '--bar-w': `${barPct}%`, '--bar-color': f.color, '--bar-opacity': '0.85' } as React.CSSProperties}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                );
+            })()}
+            {/* ── Average Giving by Tag ─────────────────────────────── */}
+            {activeTab === 'giving_by_tag' && (() => {
+                const { tagData, overallAvgPerWeek, overallTotal, totalWeeks } = givingByTagData;
+                const hasTags = tagData.length > 0;
+
+                const trendIcon = (t: 'up' | 'down' | 'flat') => t === 'up' ? '↑' : t === 'down' ? '↓' : '→';
+                const trendCls  = (t: 'up' | 'down' | 'flat') =>
+                    t === 'up'   ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400'
+                    : t === 'down' ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-400'
+                    : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400';
+
+                return (
+                    <div className="space-y-6">
+                        <div className="bg-white dark:bg-slate-800 rounded-[2rem] border border-slate-100 dark:border-slate-700 shadow-sm p-8">
+                            {/* Header */}
+                            <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-8">
+                                <div>
+                                    <h3 className="text-lg font-black text-slate-900 dark:text-white">Average Giving by Tag</h3>
+                                    <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1">
+                                        Avg weekly giving per tag · {Math.round(totalWeeks)} weeks
+                                    </p>
+                                    <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">{filters.startDate} – {filters.endDate}</p>
+                                </div>
+                                {hasTags && (
+                                    <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Avg / Week (Selected Tags)</p>
+                                        <p className="text-3xl font-black text-indigo-600 dark:text-indigo-400">
+                                            ${overallAvgPerWeek.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                        </p>
+                                        <p className="text-[10px] text-slate-400 dark:text-slate-500">
+                                            ${overallTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })} total
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+
+                            {!hasTags ? (
+                                <div className="flex flex-col items-center justify-center h-48 text-center gap-3">
+                                    <span className="text-4xl opacity-20">🏷️</span>
+                                    <p className="text-xs font-bold text-slate-400">No tags found in selected range</p>
+                                    <p className="text-[10px] text-slate-400">Only donations with labels will appear here.</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                                        Avg / Week by Tag — {filters.startDate} to {filters.endDate}
+                                    </p>
+                                    {tagData
+                                        .slice()
+                                        .sort((a, b) => b.avgPerWeek - a.avgPerWeek)
+                                        .map(t => {
+                                            const maxAvg = Math.max(...tagData.map(d => d.avgPerWeek), 1);
+                                            const barPct = (t.avgPerWeek / maxAvg) * 100;
+                                            return (
+                                                <div key={t.tagName} className="space-y-2">
+                                                    <div className="flex items-center justify-between gap-3">
+                                                        <div className="flex items-center gap-2 min-w-0">
+                                                            <div className="report-dot" style={{ '--dot-color': t.color } as React.CSSProperties} />
+                                                            <span className="text-sm font-bold text-slate-700 dark:text-slate-300 truncate">{t.tagName}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-3 flex-shrink-0">
+                                                            <div className="text-right">
+                                                                <span className="text-sm font-black text-slate-900 dark:text-white font-mono">
+                                                                    ${t.avgPerWeek.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                                                    <span className="text-xs font-semibold text-slate-400">/wk</span>
+                                                                </span>
+                                                                <p className="text-[9px] text-slate-400 dark:text-slate-500 text-right">
+                                                                    ${t.totalGiven.toLocaleString(undefined, { maximumFractionDigits: 0 })} total
+                                                                </p>
+                                                            </div>
+                                                            <span className={`inline-flex items-center gap-0.5 text-xs font-black px-2.5 py-1 rounded-full ${trendCls(t.trend)}`}>
+                                                                {trendIcon(t.trend)}
+                                                                {t.trendPct !== null && Math.abs(t.trendPct) >= 1
+                                                                    ? ` ${Math.abs(Math.round(t.trendPct))}%`
+                                                                    : ''}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="relative h-2.5 bg-slate-100 dark:bg-slate-700/60 rounded-full overflow-hidden">
+                                                        <div
+                                                            className="gv-bar-fill"
+                                                            style={{ '--bar-w': `${barPct}%`, '--bar-color': t.color, '--bar-opacity': '0.85' } as React.CSSProperties}
                                                         />
                                                     </div>
                                                 </div>
