@@ -27,6 +27,7 @@ interface FilterState {
     maxAmount: string;
     interval: IntervalType;
     selectedLabel: string;
+    selectedFund: string;
     timePeriod: string;
 }
 
@@ -132,6 +133,7 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
         maxAmount: '',
         interval:  'Monthly',
         selectedLabel: '',
+        selectedFund: '',
         timePeriod: 'ytd',
     });
 
@@ -175,9 +177,11 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                 timePeriod: period,
                 startDate: format(start, 'yyyy-MM-dd'),
                 endDate: format(end, 'yyyy-MM-dd'),
+                selectedFund: '',
+                selectedLabel: '',
             }));
         } else {
-            setFilters(prev => ({ ...prev, timePeriod: period }));
+            setFilters(prev => ({ ...prev, timePeriod: period, selectedFund: '', selectedLabel: '' }));
         }
     };
     const [sort, setSort] = useState<SortState>({ field: 'totalAmount', direction: 'desc' });
@@ -197,27 +201,44 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
         return map;
     }, [donations]);
 
-    // Extract unique tags globally
-    const availableLabels = useMemo(() => {
-        const tags = new Set<string>();
-        donations.forEach(d => {
-            if (d.labels) d.labels.forEach(l => tags.add(l));
-        });
-        return Array.from(tags).sort();
-    }, [donations]);
-
-    // 1a. Filter Donations by Date and Tag
-    const filteredDonations = useMemo(() => {
+    // Donations filtered by date only (used to derive available funds/labels for the period)
+    const dateFilteredDonations = useMemo(() => {
         const start = parseISO(filters.startDate);
         const end   = parseISO(filters.endDate);
         end.setHours(23, 59, 59, 999);
-        
-        let filtered = donations.filter(d => isWithinInterval(parseISO(d.date), { start, end }));
+        return donations.filter(d => isWithinInterval(parseISO(d.date), { start, end }));
+    }, [donations, filters.startDate, filters.endDate]);
+
+    // Available funds in the selected time period
+    const availableFunds = useMemo(() => {
+        const funds = new Set<string>();
+        dateFilteredDonations.forEach(d => funds.add(d.fundName));
+        return Array.from(funds).sort();
+    }, [dateFilteredDonations]);
+
+    // Available labels in the selected time period (optionally scoped to selected fund)
+    const availableLabels = useMemo(() => {
+        const tags = new Set<string>();
+        const source = filters.selectedFund
+            ? dateFilteredDonations.filter(d => d.fundName === filters.selectedFund)
+            : dateFilteredDonations;
+        source.forEach(d => {
+            if (d.labels) d.labels.forEach(l => tags.add(l));
+        });
+        return Array.from(tags).sort();
+    }, [dateFilteredDonations, filters.selectedFund]);
+
+    // 1a. Filter Donations by Date, Fund, and Label
+    const filteredDonations = useMemo(() => {
+        let filtered = dateFilteredDonations;
+        if (filters.selectedFund) {
+            filtered = filtered.filter(d => d.fundName === filters.selectedFund);
+        }
         if (filters.selectedLabel) {
             filtered = filtered.filter(d => d.labels?.includes(filters.selectedLabel));
         }
         return filtered;
-    }, [donations, filters.startDate, filters.endDate, filters.selectedLabel]);
+    }, [dateFilteredDonations, filters.selectedFund, filters.selectedLabel]);
 
     // 1b. Generate ordered bucket list
     const buckets = useMemo(() => {
@@ -454,6 +475,7 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
 
             {/* ── Controls ───────────────────────────────────────────────────── */}
             <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm flex flex-wrap gap-4 items-end">
+                {/* Non-label tabs: Interval + Label Filter + Date Range */}
                 {activeTab !== 'giving_by_label' && (
                     <div>
                         <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Interval</label>
@@ -471,59 +493,121 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                     </div>
                 )}
 
+                {/* Giving By Label tab: Time Period → Fund → Label (cascading) */}
                 {activeTab === 'giving_by_label' && (
+                    <>
+                        <div>
+                            <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Time Period</label>
+                            <select
+                                aria-label="Time period"
+                                value={filters.timePeriod}
+                                onChange={(e) => handleTimePeriodChange(e.target.value)}
+                                className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-4 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500"
+                            >
+                                <option value="this_month">This Month</option>
+                                <option value="last_month">Last Month</option>
+                                <option value="this_quarter">This Quarter</option>
+                                <option value="ytd">Year To Date</option>
+                                <option value="last_year">Last Year</option>
+                                <option value="custom">Custom Range</option>
+                            </select>
+                        </div>
+
+                        {filters.timePeriod === 'custom' && (
+                            <div>
+                                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Date Range</label>
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="date"
+                                        aria-label="Start date"
+                                        value={filters.startDate}
+                                        onChange={(e) => setFilters(prev => ({ ...prev, startDate: e.target.value, selectedFund: '', selectedLabel: '' }))}
+                                        className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-xs font-bold outline-none"
+                                    />
+                                    <span className="text-slate-300">–</span>
+                                    <input
+                                        type="date"
+                                        aria-label="End date"
+                                        value={filters.endDate}
+                                        onChange={(e) => setFilters(prev => ({ ...prev, endDate: e.target.value, selectedFund: '', selectedLabel: '' }))}
+                                        className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-xs font-bold outline-none"
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        <div>
+                            <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Fund</label>
+                            <select
+                                aria-label="Filter by Fund"
+                                value={filters.selectedFund}
+                                onChange={(e) => setFilters(prev => ({ ...prev, selectedFund: e.target.value, selectedLabel: '' }))}
+                                className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-4 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500 min-w-[140px]"
+                            >
+                                <option value="">All Funds</option>
+                                {availableFunds.map(fund => (
+                                    <option key={fund} value={fund}>{fund}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Label</label>
+                            <select
+                                aria-label="Filter by Label"
+                                value={filters.selectedLabel}
+                                onChange={(e) => setFilters(prev => ({ ...prev, selectedLabel: e.target.value }))}
+                                className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-4 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500 min-w-[140px]"
+                            >
+                                <option value="">All Labels</option>
+                                {availableLabels.map(tag => (
+                                    <option key={tag} value={tag}>{tag}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </>
+                )}
+
+                {/* Non-label tabs: shared Label Filter + Date Range */}
+                {activeTab !== 'giving_by_label' && (
                     <div>
-                        <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Time Period</label>
+                        <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Label Filter</label>
                         <select
-                            value={filters.timePeriod}
-                            onChange={(e) => handleTimePeriodChange(e.target.value)}
-                            className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-4 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500"
+                            aria-label="Filter by Label"
+                            value={filters.selectedLabel}
+                            onChange={(e) => setFilters(prev => ({ ...prev, selectedLabel: e.target.value }))}
+                            className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-4 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500 min-w-[120px]"
                         >
-                            <option value="this_month">This Month</option>
-                            <option value="last_month">Last Month</option>
-                            <option value="this_quarter">This Quarter</option>
-                            <option value="ytd">Year To Date</option>
-                            <option value="last_year">Last Year</option>
-                            <option value="custom">Custom</option>
+                            <option value="">All Labels</option>
+                            {availableLabels.map(tag => (
+                                <option key={tag} value={tag}>{tag}</option>
+                            ))}
                         </select>
                     </div>
                 )}
 
-                <div>
-                    <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Label Filter</label>
-                    <select
-                        aria-label="Filter by Label"
-                        value={filters.selectedLabel}
-                        onChange={(e) => setFilters(prev => ({ ...prev, selectedLabel: e.target.value }))}
-                        className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-4 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500 min-w-[120px]"
-                    >
-                        <option value="">All Labels</option>
-                        {availableLabels.map(tag => (
-                            <option key={tag} value={tag}>{tag}</option>
-                        ))}
-                    </select>
-                </div>
-
-                <div>
-                    <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Date Range</label>
-                    <div className="flex items-center gap-2">
-                        <input
-                            type="date"
-                            aria-label="Start date"
-                            value={filters.startDate}
-                            onChange={(e) => setFilters(prev => ({ ...prev, startDate: e.target.value, timePeriod: 'custom' }))}
-                            className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-xs font-bold outline-none"
-                        />
-                        <span className="text-slate-300">-</span>
-                        <input
-                            type="date"
-                            aria-label="End date"
-                            value={filters.endDate}
-                            onChange={(e) => setFilters(prev => ({ ...prev, endDate: e.target.value, timePeriod: 'custom' }))}
-                            className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-xs font-bold outline-none"
-                        />
+                {activeTab !== 'giving_by_label' && (
+                    <div>
+                        <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Date Range</label>
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="date"
+                                aria-label="Start date"
+                                value={filters.startDate}
+                                onChange={(e) => setFilters(prev => ({ ...prev, startDate: e.target.value, timePeriod: 'custom' }))}
+                                className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-xs font-bold outline-none"
+                            />
+                            <span className="text-slate-300">-</span>
+                            <input
+                                type="date"
+                                aria-label="End date"
+                                value={filters.endDate}
+                                onChange={(e) => setFilters(prev => ({ ...prev, endDate: e.target.value, timePeriod: 'custom' }))}
+                                className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-xs font-bold outline-none"
+                            />
+                        </div>
                     </div>
-                </div>
+                )}
 
                 {activeTab === 'donors' && (
                     <div>
