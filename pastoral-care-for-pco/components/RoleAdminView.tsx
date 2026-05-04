@@ -4390,6 +4390,42 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                 </div>
 
                 <div className="space-y-6">
+                    {/* Connection Details Card */}
+                    <div className="flex flex-col p-6 bg-indigo-50 dark:bg-indigo-900/10 rounded-2xl border border-indigo-200 dark:border-indigo-800">
+                        <div className="mb-4">
+                            <p className="text-sm font-black text-indigo-900 dark:text-indigo-300">API Connection Details</p>
+                            <p className="text-[10px] text-indigo-600 dark:text-indigo-400 mt-1">Use these details to connect your Grow application to your Pastoral Care tenant. This allows your Grow app to send Daily Devotionals and other emails using your Pastoral Care email sender settings.</p>
+                        </div>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-[10px] font-bold text-indigo-900/70 dark:text-indigo-300/70 mb-1 uppercase tracking-widest">Your Tenant ID (Church ID)</label>
+                                <div className="flex items-center gap-2">
+                                    <code className="px-3 py-2 bg-white dark:bg-slate-900 border border-indigo-100 dark:border-indigo-800 rounded-lg text-xs font-mono text-slate-700 dark:text-slate-300 flex-1">{churchId}</code>
+                                    <button onClick={() => navigator.clipboard.writeText(churchId)} className="px-3 py-2 bg-indigo-100 hover:bg-indigo-200 dark:bg-indigo-800 dark:hover:bg-indigo-700 text-indigo-700 dark:text-indigo-300 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-colors">Copy</button>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-bold text-indigo-900/70 dark:text-indigo-300/70 mb-1 uppercase tracking-widest">Daily Email Integration Endpoint</label>
+                                <div className="flex items-center gap-2">
+                                    <code className="px-3 py-2 bg-white dark:bg-slate-900 border border-indigo-100 dark:border-indigo-800 rounded-lg text-xs font-mono text-slate-700 dark:text-slate-300 flex-1">https://pastoralcare.barnabassoftware.com/api/integrations/grow/daily-email</code>
+                                    <button onClick={() => navigator.clipboard.writeText('https://pastoralcare.barnabassoftware.com/api/integrations/grow/daily-email')} className="px-3 py-2 bg-indigo-100 hover:bg-indigo-200 dark:bg-indigo-800 dark:hover:bg-indigo-700 text-indigo-700 dark:text-indigo-300 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-colors">Copy</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700">
+                        <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-widest">Grow Application ID / Token</label>
+                        <input
+                            type="text"
+                            value={church.growSettings?.appId || ''}
+                            onChange={e => onUpdateChurch && onUpdateChurch({ growSettings: { ...church.growSettings, appId: e.target.value } })}
+                            placeholder="e.g. grow-app-xyz123"
+                            className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                        <p className="text-[10px] text-slate-400 mt-2">Enter your Grow application identifier to securely link your databases if needed.</p>
+                    </div>
+
                     <div className="flex items-center justify-between p-6 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700">
                         <div>
                             <p className="text-sm font-black text-slate-900 dark:text-white">Grow Tracks</p>
