@@ -1036,6 +1036,22 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
         console.error("Funds sync error", e);
     }
 
+    // 1a. Fetch Labels First to build a lookup map
+    const labelMap = new Map<string, string>();
+    try {
+        const labelsData = await fetchAllPages(churchId, 'giving/v2/labels', (l: any) => ({
+            id: l.id,
+            name: l.attributes.slug || l.attributes.name
+        }));
+        
+        if (labelsData.length > 0) {
+            labelsData.forEach(l => labelMap.set(l.id, l.name));
+            console.log(`Synced ${labelsData.length} labels.`);
+        }
+    } catch (e) {
+        console.error("Labels sync error", e);
+    }
+
     // 2. Fetch Donations
     let donations: DetailedDonation[] = [];
     try {
@@ -1048,7 +1064,11 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
             const labelRefs = d.relationships?.labels?.data || [];
             const labels = labelRefs
                 .map((ref: any) => {
-                    const labelObj = included.find(i => i.type === 'Label' && String(i.id) === String(ref.id));
+                    const idStr = String(ref.id);
+                    if (labelMap.has(idStr)) {
+                        return labelMap.get(idStr);
+                    }
+                    const labelObj = included.find(i => i.type === 'Label' && String(i.id) === idStr);
                     return labelObj?.attributes?.slug || labelObj?.attributes?.name;
                 })
                 .filter(Boolean) as string[];

@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { DetailedDonation, PcoPerson } from '../types';
 import { 
-    startOfWeek, startOfYear,
+    startOfWeek, startOfYear, endOfYear,
+    startOfMonth, endOfMonth, subMonths, startOfQuarter, endOfQuarter, subYears,
     format, isWithinInterval, parseISO, getYear, getQuarter
 } from 'date-fns';
 import {
@@ -26,6 +27,7 @@ interface FilterState {
     maxAmount: string;
     interval: IntervalType;
     selectedLabel: string;
+    timePeriod: string;
 }
 
 interface SortState {
@@ -130,7 +132,54 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
         maxAmount: '',
         interval:  'Monthly',
         selectedLabel: '',
+        timePeriod: 'ytd',
     });
+
+    const handleTimePeriodChange = (period: string) => {
+        const now = new Date();
+        let start = now;
+        let end = now;
+        
+        switch (period) {
+            case 'this_month':
+                start = startOfMonth(now);
+                end = endOfMonth(now);
+                break;
+            case 'last_month': {
+                const lastMo = subMonths(now, 1);
+                start = startOfMonth(lastMo);
+                end = endOfMonth(lastMo);
+                break;
+            }
+            case 'this_quarter':
+                start = startOfQuarter(now);
+                end = endOfQuarter(now);
+                break;
+            case 'ytd':
+                start = startOfYear(now);
+                end = endOfYear(now);
+                break;
+            case 'last_year': {
+                const lastYr = subYears(now, 1);
+                start = startOfYear(lastYr);
+                end = endOfYear(lastYr);
+                break;
+            }
+            default:
+                break;
+        }
+        
+        if (period !== 'custom') {
+            setFilters(prev => ({
+                ...prev,
+                timePeriod: period,
+                startDate: format(start, 'yyyy-MM-dd'),
+                endDate: format(end, 'yyyy-MM-dd'),
+            }));
+        } else {
+            setFilters(prev => ({ ...prev, timePeriod: period }));
+        }
+    };
     const [sort, setSort] = useState<SortState>({ field: 'totalAmount', direction: 'desc' });
 
     const currentYear = new Date().getFullYear();
@@ -405,20 +454,40 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
 
             {/* ── Controls ───────────────────────────────────────────────────── */}
             <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm flex flex-wrap gap-4 items-end">
-                <div>
-                    <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Interval</label>
-                    <select
-                        aria-label="Reporting interval"
-                        value={filters.interval}
-                        onChange={(e) => setFilters(prev => ({ ...prev, interval: e.target.value as IntervalType }))}
-                        className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-4 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500"
-                    >
-                        <option value="Weekly">Weekly</option>
-                        <option value="Monthly">Monthly</option>
-                        <option value="Quarterly">Quarterly</option>
-                        <option value="YTD">Yearly (YTD)</option>
-                    </select>
-                </div>
+                {activeTab !== 'giving_by_label' && (
+                    <div>
+                        <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Interval</label>
+                        <select
+                            aria-label="Reporting interval"
+                            value={filters.interval}
+                            onChange={(e) => setFilters(prev => ({ ...prev, interval: e.target.value as IntervalType }))}
+                            className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-4 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500"
+                        >
+                            <option value="Weekly">Weekly</option>
+                            <option value="Monthly">Monthly</option>
+                            <option value="Quarterly">Quarterly</option>
+                            <option value="YTD">Yearly (YTD)</option>
+                        </select>
+                    </div>
+                )}
+
+                {activeTab === 'giving_by_label' && (
+                    <div>
+                        <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Time Period</label>
+                        <select
+                            value={filters.timePeriod}
+                            onChange={(e) => handleTimePeriodChange(e.target.value)}
+                            className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-4 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500"
+                        >
+                            <option value="this_month">This Month</option>
+                            <option value="last_month">Last Month</option>
+                            <option value="this_quarter">This Quarter</option>
+                            <option value="ytd">Year To Date</option>
+                            <option value="last_year">Last Year</option>
+                            <option value="custom">Custom</option>
+                        </select>
+                    </div>
+                )}
 
                 <div>
                     <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Label Filter</label>
@@ -442,7 +511,7 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                             type="date"
                             aria-label="Start date"
                             value={filters.startDate}
-                            onChange={(e) => setFilters(prev => ({ ...prev, startDate: e.target.value }))}
+                            onChange={(e) => setFilters(prev => ({ ...prev, startDate: e.target.value, timePeriod: 'custom' }))}
                             className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-xs font-bold outline-none"
                         />
                         <span className="text-slate-300">-</span>
@@ -450,7 +519,7 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                             type="date"
                             aria-label="End date"
                             value={filters.endDate}
-                            onChange={(e) => setFilters(prev => ({ ...prev, endDate: e.target.value }))}
+                            onChange={(e) => setFilters(prev => ({ ...prev, endDate: e.target.value, timePeriod: 'custom' }))}
                             className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-xs font-bold outline-none"
                         />
                     </div>
