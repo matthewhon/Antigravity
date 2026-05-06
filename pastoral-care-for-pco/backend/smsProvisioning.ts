@@ -539,7 +539,7 @@ export const registerSmsBrand = async (req: any, res: any) => {
         const payload: BrandRegistrationPayload = {
             legalName,
             ein: ein.replace(/[^0-9]/g, ''), // strip dashes
-            legalEntityType: legalEntityType || 'Non-Profit',
+            legalEntityType: legalEntityType || 'NON_PROFIT',
             contactEmail,
             contactPhone,
             website,
