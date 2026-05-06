@@ -1,6 +1,12 @@
 import { getDb } from './firebase';
 import { createServerLogger } from '../services/logService';
-import { getSignalWireClient, getSmsWebhookBaseUrl, getSignalWireCampaignId, callSignalWireApi } from './signalwireClient';
+import {
+    getSignalWireClient, getSmsWebhookBaseUrl, getChurchCampaignId,
+    assignNumbersToCampaign,
+    registerTenantBrand, checkBrandStatus,
+    registerTenantCampaign, checkCampaignStatus,
+    type BrandRegistrationPayload, type CampaignRegistrationPayload,
+} from './signalwireClient';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -47,12 +53,12 @@ async function assignNumberToCampaign(
     phoneNumber: string,
     churchId: string
 ): Promise<void> {
-    const campaignId = await getSignalWireCampaignId();
+    const campaignId = await getChurchCampaignId(churchId);
 
     if (!campaignId) {
         log.warn(
-            '[smsProvisioning] signalwireCampaignId not set in System Settings — TCR campaign assignment skipped. ' +
-            'Set it after completing brand/campaign registration in the SignalWire Dashboard.',
+            '[smsProvisioning] No campaign configured for this church — TCR campaign assignment skipped. ' +
+            'Complete Brand and Campaign registration in Admin → SMS → Compliance.',
             'system', { numDocId, phoneNumber }, churchId
         );
         await db.collection('smsNumbers').doc(numDocId).update({
@@ -63,12 +69,8 @@ async function assignNumberToCampaign(
     }
 
     try {
-        const result = await callSignalWireApi('/campaign-registry/phone-number-assignments', 'POST', {
-            campaign_id:  campaignId,
-            phone_number: phoneNumber,
-        });
+        const { orderId } = await assignNumbersToCampaign(campaignId, [phoneNumber]);
 
-        const orderId = result?.id || result?.order_id || result?.assignment_id || '';
         log.info(
             `[smsProvisioning] TCR campaign assignment submitted for ${phoneNumber} (orderId: ${orderId})`,
             'system', { numDocId, phoneNumber, campaignId, orderId }, churchId
@@ -500,5 +502,222 @@ export const setDefaultNumber = async (req: any, res: any) => {
     } catch (e: any) {
         log.error(`[setDefaultNumber] Failed: ${e.message}`, 'system', { churchId, numberId }, churchId);
         return res.status(500).json({ error: e.message || 'Failed to set default' });
+    }
+};
+
+// ─── POST /api/messaging/register-brand ──────────────────────────────────────
+// Registers a 10DLC Brand for a church tenant with the SignalWire Campaign Registry.
+// Body: { churchId, legalName, ein, legalEntityType, contactEmail, contactPhone,
+//         website, address, city, state, zip }
+
+export const registerSmsBrand = async (req: any, res: any) => {
+    res.set('Access-Control-Allow-Origin', '*');
+
+    const {
+        churchId, legalName, ein, legalEntityType,
+        contactEmail, contactPhone, website,
+        address, city, state, zip,
+    } = req.body || {};
+
+    if (!churchId)     return res.status(400).json({ error: 'Missing churchId' });
+    if (!legalName)    return res.status(400).json({ error: 'Missing legalName' });
+    if (!ein)          return res.status(400).json({ error: 'Missing ein (Tax ID)' });
+    if (!contactEmail) return res.status(400).json({ error: 'Missing contactEmail' });
+    if (!contactPhone) return res.status(400).json({ error: 'Missing contactPhone' });
+    if (!website)      return res.status(400).json({ error: 'Missing website' });
+    if (!address || !city || !state || !zip) {
+        return res.status(400).json({ error: 'Missing address fields (address, city, state, zip)' });
+    }
+
+    const db  = getDb();
+    const log = createServerLogger(db);
+
+    try {
+        const churchSnap = await db.collection('churches').doc(churchId).get();
+        if (!churchSnap.exists) return res.status(404).json({ error: 'Church not found' });
+
+        const payload: BrandRegistrationPayload = {
+            legalName,
+            ein: ein.replace(/[^0-9]/g, ''), // strip dashes
+            legalEntityType: legalEntityType || 'NONPROFIT',
+            contactEmail,
+            contactPhone,
+            website,
+            address,
+            city,
+            state,
+            zip,
+        };
+
+        const { brandId, status } = await registerTenantBrand(churchId, payload);
+        log.info(`[registerSmsBrand] Brand submitted for church ${churchId} (brandId: ${brandId})`, 'system', { churchId, brandId, status }, churchId);
+
+        return res.json({
+            success: true,
+            brandId,
+            status,
+            message: `Brand registration submitted. Status: ${status}. Approval typically takes a few minutes to several hours.`,
+        });
+    } catch (e: any) {
+        log.error(`[registerSmsBrand] Failed for church ${churchId}: ${e.message}`, 'system', { churchId }, churchId);
+        return res.status(500).json({ error: e.message || 'Brand registration failed' });
+    }
+};
+
+// ─── POST /api/messaging/register-campaign ────────────────────────────────────
+// Registers a 10DLC Campaign for a church tenant after their brand is approved.
+// Body: { churchId, name, usecase, description, sample1, sample2?,
+//         messageFlow, optOutMessage, helpMessage }
+
+export const registerSmsCampaign = async (req: any, res: any) => {
+    res.set('Access-Control-Allow-Origin', '*');
+
+    const {
+        churchId, name, usecase, description,
+        sample1, sample2, messageFlow, optOutMessage, helpMessage,
+    } = req.body || {};
+
+    if (!churchId)     return res.status(400).json({ error: 'Missing churchId' });
+    if (!description)  return res.status(400).json({ error: 'Missing description' });
+    if (!sample1)      return res.status(400).json({ error: 'Missing sample1 message' });
+    if (!messageFlow)  return res.status(400).json({ error: 'Missing messageFlow (opt-in description)' });
+
+    const db  = getDb();
+    const log = createServerLogger(db);
+
+    try {
+        const churchSnap = await db.collection('churches').doc(churchId).get();
+        if (!churchSnap.exists) return res.status(404).json({ error: 'Church not found' });
+
+        const smsSettings = churchSnap.data()?.smsSettings || {};
+        const brandId = smsSettings.brandId;
+        if (!brandId) {
+            return res.status(400).json({ error: 'Brand registration must be completed before creating a Campaign. Please register your brand first.' });
+        }
+        if (smsSettings.brandStatus !== 'approved') {
+            return res.status(400).json({
+                error: `Your brand is currently "${smsSettings.brandStatus}". Campaign registration requires an approved brand.`,
+            });
+        }
+
+        const churchName = churchSnap.data()?.name || 'Church';
+
+        const payload: CampaignRegistrationPayload = {
+            brandId,
+            name:          name || `${churchName} SMS`,
+            usecase:       usecase || 'MIXED',
+            description,
+            sample1,
+            sample2:       sample2 || undefined,
+            messageFlow,
+            optOutMessage: optOutMessage || 'Reply STOP to unsubscribe. Reply HELP for help.',
+            helpMessage:   helpMessage || `For assistance contact ${churchName}. Reply STOP to unsubscribe.`,
+        };
+
+        const { campaignId, status } = await registerTenantCampaign(churchId, payload);
+        log.info(`[registerSmsCampaign] Campaign submitted for church ${churchId} (campaignId: ${campaignId})`, 'system', { churchId, campaignId, status }, churchId);
+
+        // Auto-assign any existing provisioned numbers to this campaign
+        const numsSnap = await db.collection('smsNumbers').where('churchId', '==', churchId).get();
+        if (!numsSnap.empty && campaignId) {
+            const phones = numsSnap.docs.map(d => d.data().phoneNumber).filter(Boolean);
+            if (phones.length > 0) {
+                try {
+                    const { orderId } = await (await import('./signalwireClient')).assignNumbersToCampaign(campaignId, phones);
+                    const batch = db.batch();
+                    numsSnap.docs.forEach(d => {
+                        batch.update(d.ref, {
+                            campaignId,
+                            campaignAssigned:          false,
+                            campaignAssignmentStatus:  'pending',
+                            campaignAssignmentOrderId: orderId,
+                            campaignAssignedAt:        Date.now(),
+                        });
+                    });
+                    await batch.commit();
+                    log.info(`[registerSmsCampaign] Auto-assigned ${phones.length} existing numbers to campaign ${campaignId}`, 'system', { churchId, campaignId }, churchId);
+                } catch (assignErr: any) {
+                    log.warn(`[registerSmsCampaign] Auto-assign numbers failed (non-fatal): ${assignErr.message}`, 'system', { churchId, campaignId }, churchId);
+                }
+            }
+        }
+
+        return res.json({
+            success: true,
+            campaignId,
+            status,
+            message: `Campaign registration submitted. Status: ${status}. Carrier approval takes up to 24 hours.`,
+        });
+    } catch (e: any) {
+        log.error(`[registerSmsCampaign] Failed for church ${churchId}: ${e.message}`, 'system', { churchId }, churchId);
+        return res.status(500).json({ error: e.message || 'Campaign registration failed' });
+    }
+};
+
+// ─── GET /api/messaging/registration-status ───────────────────────────────────
+// Returns current brand and campaign registration status for a church.
+// Also re-polls SignalWire for live status and updates Firestore.
+// Query: { churchId }
+
+export const getSmsRegistrationStatus = async (req: any, res: any) => {
+    res.set('Access-Control-Allow-Origin', '*');
+
+    const { churchId } = req.query as Record<string, string>;
+    if (!churchId) return res.status(400).json({ error: 'Missing churchId' });
+
+    const db  = getDb();
+    const log = createServerLogger(db);
+
+    try {
+        const churchSnap = await db.collection('churches').doc(churchId).get();
+        if (!churchSnap.exists) return res.status(404).json({ error: 'Church not found' });
+
+        const sms = churchSnap.data()?.smsSettings || {};
+        let brandStatus    = sms.brandStatus    || null;
+        let campaignStatus = sms.campaignStatus || null;
+        let brandRaw: any    = null;
+        let campaignRaw: any = null;
+
+        // Re-poll live status from SignalWire if IDs are present
+        if (sms.brandId) {
+            try {
+                const result = await checkBrandStatus(churchId, sms.brandId);
+                brandStatus = result.status;
+                brandRaw    = result.raw;
+            } catch (e: any) {
+                log.warn(`[getSmsRegistrationStatus] Brand status check failed: ${e.message}`, 'system', { churchId }, churchId);
+            }
+        }
+
+        if (sms.campaignId) {
+            try {
+                const result = await checkCampaignStatus(churchId, sms.campaignId);
+                campaignStatus = result.status;
+                campaignRaw    = result.raw;
+            } catch (e: any) {
+                log.warn(`[getSmsRegistrationStatus] Campaign status check failed: ${e.message}`, 'system', { churchId }, churchId);
+            }
+        }
+
+        return res.json({
+            success: true,
+            brand: {
+                id:          sms.brandId     || null,
+                status:      brandStatus,
+                submittedAt: sms.brandSubmittedAt || null,
+                legalName:   sms.brandLegalName  || null,
+                raw:         brandRaw,
+            },
+            campaign: {
+                id:          sms.campaignId     || null,
+                status:      campaignStatus,
+                submittedAt: sms.campaignSubmittedAt || null,
+                usecase:     sms.campaignUsecase     || null,
+                raw:         campaignRaw,
+            },
+        });
+    } catch (e: any) {
+        log.error(`[getSmsRegistrationStatus] Failed for ${churchId}: ${e.message}`, 'system', { churchId }, churchId);
+        return res.status(500).json({ error: e.message || 'Status check failed' });
     }
 };

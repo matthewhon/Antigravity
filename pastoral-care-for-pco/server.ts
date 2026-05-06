@@ -19,7 +19,7 @@ import { getDb } from './backend/firebase';
 import { handleGeminiProxy } from './backend/geminiProxy';
 import { provisionSubuser, authenticateDomain, verifyDomain, diagnoseDomain } from './backend/emailProvisioning';
 import { getPublicGroups, getPublicRegistrations, getPublicEvents, serveWidgetScript, getPublicForms } from './backend/publicApi.js';
-import { getAvailableNumbers, provisionSmsNumber, releaseSpecificNumber, addSmsNumber, updateNumberSettings, setDefaultNumber } from './backend/smsProvisioning';
+import { getAvailableNumbers, provisionSmsNumber, releaseSpecificNumber, addSmsNumber, updateNumberSettings, setDefaultNumber, registerSmsBrand, registerSmsCampaign, getSmsRegistrationStatus } from './backend/smsProvisioning';
 import { handleInboundSms } from './backend/smsInbound';
 import { sendIndividual, sendBulk } from './backend/smsSend';
 import { handleStatusCallback } from './backend/smsWebhookStatus';
@@ -197,6 +197,10 @@ async function startServer() {
     // Workflow bulk-enrollment from a PCO List or Group
     app.post('/api/messaging/workflow-enroll-list', express.json(), workflowEnrollList);
     app.post('/api/messaging/workflow-enroll-preview', express.json(), workflowEnrollPreview);
+    // 10DLC Brand & Campaign registration (per-tenant)
+    app.post('/api/messaging/register-brand',       express.json(), registerSmsBrand);
+    app.post('/api/messaging/register-campaign',    express.json(), registerSmsCampaign);
+    app.get('/api/messaging/registration-status',   getSmsRegistrationStatus);
 
     // ─── SMS Agent: Website Scanner ─────────────────────────────────────────────
     // Fetches a church website URL server-side, extracts visible text, and uses

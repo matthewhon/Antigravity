@@ -914,6 +914,49 @@ export interface SmsSettings {
     /** User ID of the admin who accepted the terms */
     termsAcceptedByUserId?: string;
 
+    // -- 10DLC Brand Registration (per-tenant) ----------------------------------
+    /** TCR Brand UUID returned by SignalWire after POST /brands */
+    brandId?: string;
+    /** Current brand approval status */
+    brandStatus?: 'pending' | 'approved' | 'failed';
+    /** Legal organization name submitted for brand registration */
+    brandLegalName?: string;
+    /** EIN / Tax ID */
+    brandEin?: string;
+    /** Legal entity type */
+    brandLegalEntityType?: 'PRIVATE_PROFIT' | 'PUBLIC_PROFIT' | 'NONPROFIT' | 'GOVERNMENT' | 'SOLE_PROPRIETOR';
+    /** Contact email address for the brand */
+    brandContactEmail?: string;
+    /** Contact phone number for the brand */
+    brandContactPhone?: string;
+    /** Church website URL */
+    brandWebsite?: string;
+    /** Street address */
+    brandAddress?: string;
+    brandCity?: string;
+    brandState?: string;
+    brandZip?: string;
+    /** Epoch ms when brand was submitted to TCR */
+    brandSubmittedAt?: number;
+
+    // -- 10DLC Campaign Registration (per-tenant) -------------------------------
+    /** TCR Campaign UUID returned by SignalWire after POST /brands/:id/campaigns */
+    campaignId?: string;
+    /** Current campaign approval status */
+    campaignStatus?: 'pending' | 'approved' | 'failed';
+    /** TCR use-case code, e.g. 'MIXED', 'CUSTOMER_CARE', '2FA' */
+    campaignUsecase?: string;
+    /** Campaign description submitted to TCR */
+    campaignDescription?: string;
+    /** Sample message 1 */
+    campaignSample1?: string;
+    /** Sample message 2 */
+    campaignSample2?: string;
+    /** How subscribers opt-in (required by TCR) */
+    campaignMessageFlow?: string;
+    /** Epoch ms when campaign was submitted */
+    campaignSubmittedAt?: number;
+
 
 }
 
@@ -1116,12 +1159,17 @@ export interface SmsPhoneNumber {
      * Church Admins always bypass this restriction.
      */
     allowedUserIds: string[];
-    /** Webhook URL configured on this number in Twilio */
+    /** Webhook URL configured on this number in SignalWire */
     webhookUrl?: string;
-    /** Twilio Messaging Service SID linked to this number */
-    messagingServiceSid?: string;
     /** Sender name prefix shown to recipients */
     senderName?: string;
+    /** Campaign assignment status for this number */
+    campaignAssigned?: boolean;
+    campaignAssignmentStatus?: 'not_configured' | 'pending' | 'approved' | 'error';
+    campaignAssignmentOrderId?: string;
+    campaignId?: string;
+    campaignAssignedAt?: number;
+    campaignAssignmentError?: string;
     createdAt: number;
     updatedAt: number;
 }
