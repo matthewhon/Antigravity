@@ -404,6 +404,7 @@ export interface DetailedDonation {
     donorName: string;
     isRecurring: boolean;
     labels?: string[];
+    paymentSource?: string;
 }
 
 export interface AttendanceEventSummary {

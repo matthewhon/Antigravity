@@ -1056,10 +1056,20 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
     let donations: DetailedDonation[] = [];
     try {
         // We still include designations to get the amounts and fund IDs
-        donations = await fetchAllPages(churchId, `giving/v2/donations?where[received_at][gte]=${since}&include=designations,labels`, (d: any, included: any[] = []) => {
+        donations = await fetchAllPages(churchId, `giving/v2/donations?where[received_at][gte]=${since}&include=designations,labels,payment_source`, (d: any, included: any[] = []) => {
             const donationDate = d.attributes.received_at;
             const donorId = d.relationships?.person?.data?.id || 'anonymous';
             const isRecurring = !!d.relationships?.recurring_donation?.data;
+
+            // Resolve Payment Source
+            let paymentSource = 'Unknown';
+            const paymentSourceRef = d.relationships?.payment_source?.data;
+            if (paymentSourceRef) {
+                const ps = included.find(i => i.type === 'PaymentSource' && String(i.id) === String(paymentSourceRef.id));
+                if (ps) {
+                    paymentSource = ps.attributes?.name || ps.attributes?.method || 'Unknown';
+                }
+            }
 
             const labelRefs = d.relationships?.labels?.data || [];
             const labels = labelRefs
@@ -1089,7 +1099,8 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
                     donorId,
                     donorName: 'Donor',
                     isRecurring,
-                    labels
+                    labels,
+                    paymentSource
                 }] as DetailedDonation[];
             }
 
@@ -1122,7 +1133,8 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
                         donorId,
                         donorName: 'Donor', 
                         isRecurring,
-                        labels
+                        labels,
+                        paymentSource
                     });
                 }
             });

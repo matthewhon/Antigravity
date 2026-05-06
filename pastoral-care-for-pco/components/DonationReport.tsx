@@ -28,6 +28,7 @@ interface FilterState {
     interval: IntervalType;
     selectedLabel: string;
     selectedFund: string;
+    selectedPaymentSource: string;
     timePeriod: string;
 }
 
@@ -134,6 +135,7 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
         interval:  'Monthly',
         selectedLabel: '',
         selectedFund: '',
+        selectedPaymentSource: '',
         timePeriod: 'ytd',
     });
 
@@ -178,10 +180,11 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                 startDate: format(start, 'yyyy-MM-dd'),
                 endDate: format(end, 'yyyy-MM-dd'),
                 selectedFund: '',
+                selectedPaymentSource: '',
                 selectedLabel: '',
             }));
         } else {
-            setFilters(prev => ({ ...prev, timePeriod: period, selectedFund: '', selectedLabel: '' }));
+            setFilters(prev => ({ ...prev, timePeriod: period, selectedFund: '', selectedPaymentSource: '', selectedLabel: '' }));
         }
     };
     const [sort, setSort] = useState<SortState>({ field: 'totalAmount', direction: 'desc' });
@@ -216,6 +219,15 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
         return Array.from(funds).sort();
     }, [dateFilteredDonations]);
 
+    // Available payment sources in the selected time period
+    const availablePaymentSources = useMemo(() => {
+        const sources = new Set<string>();
+        dateFilteredDonations.forEach(d => {
+            if (d.paymentSource) sources.add(d.paymentSource);
+        });
+        return Array.from(sources).sort();
+    }, [dateFilteredDonations]);
+
     // Available labels in the selected time period (optionally scoped to selected fund)
     const availableLabels = useMemo(() => {
         const tags = new Set<string>();
@@ -228,17 +240,20 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
         return Array.from(tags).sort();
     }, [dateFilteredDonations, filters.selectedFund]);
 
-    // 1a. Filter Donations by Date, Fund, and Label
+    // 1a. Filter Donations by Date, Fund, Payment Source, and Label
     const filteredDonations = useMemo(() => {
         let filtered = dateFilteredDonations;
         if (filters.selectedFund) {
             filtered = filtered.filter(d => d.fundName === filters.selectedFund);
         }
+        if (filters.selectedPaymentSource) {
+            filtered = filtered.filter(d => d.paymentSource === filters.selectedPaymentSource);
+        }
         if (filters.selectedLabel) {
             filtered = filtered.filter(d => d.labels?.includes(filters.selectedLabel));
         }
         return filtered;
-    }, [dateFilteredDonations, filters.selectedFund, filters.selectedLabel]);
+    }, [dateFilteredDonations, filters.selectedFund, filters.selectedPaymentSource, filters.selectedLabel]);
 
     // 1b. Generate ordered bucket list
     const buckets = useMemo(() => {
@@ -475,118 +490,25 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
 
             {/* ── Controls ───────────────────────────────────────────────────── */}
             <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm flex flex-wrap gap-4 items-end">
-                {/* Non-label tabs: Interval + Label Filter + Date Range */}
-                {activeTab !== 'giving_by_label' && (
-                    <div>
-                        <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Interval</label>
-                        <select
-                            aria-label="Reporting interval"
-                            value={filters.interval}
-                            onChange={(e) => setFilters(prev => ({ ...prev, interval: e.target.value as IntervalType }))}
-                            className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-4 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500"
-                        >
-                            <option value="Weekly">Weekly</option>
-                            <option value="Monthly">Monthly</option>
-                            <option value="Quarterly">Quarterly</option>
-                            <option value="YTD">Yearly (YTD)</option>
-                        </select>
-                    </div>
-                )}
+                {/* Shared filters for all tabs */}
+                <div>
+                    <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Time Period</label>
+                    <select
+                        aria-label="Time period"
+                        value={filters.timePeriod}
+                        onChange={(e) => handleTimePeriodChange(e.target.value)}
+                        className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-4 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                        <option value="this_month">This Month</option>
+                        <option value="last_month">Last Month</option>
+                        <option value="this_quarter">This Quarter</option>
+                        <option value="ytd">Year To Date</option>
+                        <option value="last_year">Last Year</option>
+                        <option value="custom">Custom Range</option>
+                    </select>
+                </div>
 
-                {/* Giving By Label tab: Time Period → Fund → Label (cascading) */}
-                {activeTab === 'giving_by_label' && (
-                    <>
-                        <div>
-                            <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Time Period</label>
-                            <select
-                                aria-label="Time period"
-                                value={filters.timePeriod}
-                                onChange={(e) => handleTimePeriodChange(e.target.value)}
-                                className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-4 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500"
-                            >
-                                <option value="this_month">This Month</option>
-                                <option value="last_month">Last Month</option>
-                                <option value="this_quarter">This Quarter</option>
-                                <option value="ytd">Year To Date</option>
-                                <option value="last_year">Last Year</option>
-                                <option value="custom">Custom Range</option>
-                            </select>
-                        </div>
-
-                        {filters.timePeriod === 'custom' && (
-                            <div>
-                                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Date Range</label>
-                                <div className="flex items-center gap-2">
-                                    <input
-                                        type="date"
-                                        aria-label="Start date"
-                                        value={filters.startDate}
-                                        onChange={(e) => setFilters(prev => ({ ...prev, startDate: e.target.value, selectedFund: '', selectedLabel: '' }))}
-                                        className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-xs font-bold outline-none"
-                                    />
-                                    <span className="text-slate-300">–</span>
-                                    <input
-                                        type="date"
-                                        aria-label="End date"
-                                        value={filters.endDate}
-                                        onChange={(e) => setFilters(prev => ({ ...prev, endDate: e.target.value, selectedFund: '', selectedLabel: '' }))}
-                                        className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-xs font-bold outline-none"
-                                    />
-                                </div>
-                            </div>
-                        )}
-
-                        <div>
-                            <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Fund</label>
-                            <select
-                                aria-label="Filter by Fund"
-                                value={filters.selectedFund}
-                                onChange={(e) => setFilters(prev => ({ ...prev, selectedFund: e.target.value, selectedLabel: '' }))}
-                                className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-4 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500 min-w-[140px]"
-                            >
-                                <option value="">All Funds</option>
-                                {availableFunds.map(fund => (
-                                    <option key={fund} value={fund}>{fund}</option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div>
-                            <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Label</label>
-                            <select
-                                aria-label="Filter by Label"
-                                value={filters.selectedLabel}
-                                onChange={(e) => setFilters(prev => ({ ...prev, selectedLabel: e.target.value }))}
-                                className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-4 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500 min-w-[140px]"
-                            >
-                                <option value="">All Labels</option>
-                                {availableLabels.map(tag => (
-                                    <option key={tag} value={tag}>{tag}</option>
-                                ))}
-                            </select>
-                        </div>
-                    </>
-                )}
-
-                {/* Non-label tabs: shared Label Filter + Date Range */}
-                {activeTab !== 'giving_by_label' && (
-                    <div>
-                        <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Label Filter</label>
-                        <select
-                            aria-label="Filter by Label"
-                            value={filters.selectedLabel}
-                            onChange={(e) => setFilters(prev => ({ ...prev, selectedLabel: e.target.value }))}
-                            className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-4 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500 min-w-[120px]"
-                        >
-                            <option value="">All Labels</option>
-                            {availableLabels.map(tag => (
-                                <option key={tag} value={tag}>{tag}</option>
-                            ))}
-                        </select>
-                    </div>
-                )}
-
-                {activeTab !== 'giving_by_label' && (
+                {filters.timePeriod === 'custom' && (
                     <div>
                         <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Date Range</label>
                         <div className="flex items-center gap-2">
@@ -606,6 +528,68 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                                 className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-3 py-2 text-xs font-bold outline-none"
                             />
                         </div>
+                    </div>
+                )}
+
+                <div>
+                    <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Fund</label>
+                    <select
+                        aria-label="Filter by Fund"
+                        value={filters.selectedFund}
+                        onChange={(e) => setFilters(prev => ({ ...prev, selectedFund: e.target.value }))}
+                        className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-4 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500 min-w-[120px]"
+                    >
+                        <option value="">All Funds</option>
+                        {availableFunds.map(fund => (
+                            <option key={fund} value={fund}>{fund}</option>
+                        ))}
+                    </select>
+                </div>
+
+                <div>
+                    <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Payment Source</label>
+                    <select
+                        aria-label="Filter by Payment Source"
+                        value={filters.selectedPaymentSource}
+                        onChange={(e) => setFilters(prev => ({ ...prev, selectedPaymentSource: e.target.value }))}
+                        className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-4 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500 min-w-[140px]"
+                    >
+                        <option value="">All Sources</option>
+                        {availablePaymentSources.map(source => (
+                            <option key={source} value={source}>{source}</option>
+                        ))}
+                    </select>
+                </div>
+
+                <div>
+                    <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Label</label>
+                    <select
+                        aria-label="Filter by Label"
+                        value={filters.selectedLabel}
+                        onChange={(e) => setFilters(prev => ({ ...prev, selectedLabel: e.target.value }))}
+                        className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-4 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500 min-w-[120px]"
+                    >
+                        <option value="">All Labels</option>
+                        {availableLabels.map(tag => (
+                            <option key={tag} value={tag}>{tag}</option>
+                        ))}
+                    </select>
+                </div>
+
+                {activeTab !== 'giving_by_label' && (
+                    <div>
+                        <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Interval</label>
+                        <select
+                            aria-label="Reporting interval"
+                            value={filters.interval}
+                            onChange={(e) => setFilters(prev => ({ ...prev, interval: e.target.value as IntervalType }))}
+                            className="bg-slate-50 dark:bg-slate-900 border-none rounded-xl px-4 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500"
+                        >
+                            <option value="Weekly">Weekly</option>
+                            <option value="Monthly">Monthly</option>
+                            <option value="Quarterly">Quarterly</option>
+                            <option value="YTD">Yearly (YTD)</option>
+                        </select>
                     </div>
                 )}
 
