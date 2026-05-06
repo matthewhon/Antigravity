@@ -314,6 +314,9 @@ export async function registerTenantCampaign(
 ): Promise<{ campaignId: string; status: string }> {
     const db = getDb();
 
+    const baseUrl = await getSmsWebhookBaseUrl();
+    const webhookUrl = baseUrl ? `${baseUrl}/api/messaging/campaign-status` : undefined;
+
     const body: Record<string, unknown> = {
         name:              payload.name,
         brand_id:          payload.brandId,
@@ -326,6 +329,7 @@ export async function registerTenantCampaign(
         terms_and_conditions: true,
     };
     if (payload.sample2) body.sample2 = payload.sample2;
+    if (webhookUrl) body.webhook_url = webhookUrl;
 
     const result = await callRegistryApi(`/brands/${payload.brandId}/campaigns`, 'POST', body);
 
@@ -373,9 +377,15 @@ export async function assignNumbersToCampaign(
     campaignId: string,
     phoneNumbers: string[]
 ): Promise<{ orderId: string; status: string }> {
-    const result = await callRegistryApi(`/campaigns/${campaignId}/orders`, 'POST', {
+    const baseUrl = await getSmsWebhookBaseUrl();
+    const webhookUrl = baseUrl ? `${baseUrl}/api/messaging/assignment-status` : undefined;
+
+    const body: Record<string, unknown> = {
         phone_numbers: phoneNumbers,
-    });
+    };
+    if (webhookUrl) body.webhook_url = webhookUrl;
+
+    const result = await callRegistryApi(`/campaigns/${campaignId}/orders`, 'POST', body);
 
     const orderId = result.id || result.order_id || '';
     const status  = result.status || 'pending';

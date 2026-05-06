@@ -520,7 +520,8 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                     {[
                                         { path: '/api/messaging/inbound', label: 'Inbound Message Webhook' },
                                         { path: '/api/messaging/status', label: 'Delivery Status Webhook' },
-                                        { path: '/api/messaging/campaign-status', label: '10DLC Campaign Webhook' }
+                                        { path: '/api/messaging/campaign-status', label: '10DLC Campaign Webhook' },
+                                        { path: '/api/messaging/assignment-status', label: 'Number Assignment Webhook' }
                                     ].map(({ path, label }) => {
                                         const base = (settings.smsWebhookBaseUrl || settings.apiBaseUrl || '').replace(/\/$/, '');
                                         const url = base + path;

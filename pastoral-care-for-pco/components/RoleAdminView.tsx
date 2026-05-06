@@ -317,10 +317,26 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
 
   // SignalWire Compliance Wizard State
   const [brandForm, setBrandForm] = useState({
-      legalName: church.name || '', ein: '', legalEntityType: 'NONPROFIT', contactEmail: '', contactPhone: '', website: '', address: '', city: '', state: '', zip: ''
+      legalName: church.name || '',
+      ein: '',
+      legalEntityType: 'NONPROFIT',
+      contactEmail: church.email || '',
+      contactPhone: church.phone || '',
+      website: church.website || '',
+      address: church.address || '',
+      city: church.city || '',
+      state: church.state || '',
+      zip: church.zip || ''
   });
   const [campaignForm, setCampaignForm] = useState({
-      name: `${church.name || 'Church'} SMS`, usecase: 'MIXED', description: '', sample1: '', sample2: '', messageFlow: '', optOutMessage: 'Reply STOP to unsubscribe. Reply HELP for help.', helpMessage: `For assistance contact ${church.name || 'us'}. Reply STOP to unsubscribe.`
+      name: `${church.name || 'Church'} SMS`,
+      usecase: 'MIXED',
+      description: 'Sending updates, announcements, prayer requests, and volunteer scheduling to congregation members.',
+      sample1: `Hi [Name], just a reminder that service times this Sunday are at 9am and 11am! - ${church.name || 'Church'}`,
+      sample2: `We are looking for volunteers for the upcoming food drive. Reply YES if you can help! - ${church.name || 'Church'}`,
+      messageFlow: `Members opt-in by filling out a physical or digital connect card explicitly agreeing to receive SMS updates, or by texting a keyword to the church's phone number.`,
+      optOutMessage: 'Reply STOP to unsubscribe. Reply HELP for help.',
+      helpMessage: `For assistance contact ${church.name || 'us'}. Reply STOP to unsubscribe.`
   });
   const [regStatus, setRegStatus] = useState<any>(null);
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);

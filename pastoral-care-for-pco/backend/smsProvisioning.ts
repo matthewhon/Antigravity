@@ -782,3 +782,63 @@ export const handleCampaignStatusWebhook = async (req: any, res: any) => {
         log.error(`[handleCampaignStatusWebhook] Error processing webhook: ${e.message}`, 'system', { body: req.body }, 'system');
     }
 };
+
+/**
+ * Webhook handler for SignalWire Number Assignment state changes.
+ * Updates the campaignAssignmentStatus of smsNumbers documents.
+ */
+export const handleAssignmentStatusWebhook = async (req: any, res: any) => {
+    const db = getDb();
+    const log = createServerLogger(db);
+    
+    // Ensure we always return 200 OK quickly to SignalWire
+    res.status(200).send('OK');
+
+    try {
+        const body = req.body || {};
+        const orderId = body.id || body.order_id;
+        const newStatus = (body.status || '').toLowerCase();
+        
+        log.info(`[handleAssignmentStatusWebhook] Received webhook`, 'system', { body }, 'system');
+
+        if (!orderId && !body.phone_number) {
+            return;
+        }
+
+        let query = db.collection('smsNumbers');
+        if (orderId) {
+            query = query.where('campaignAssignmentOrderId', '==', orderId);
+        } else if (body.phone_number) {
+            // SignalWire might send updates for individual numbers
+            query = query.where('phoneNumber', '==', body.phone_number);
+        }
+
+        const snap = await query.get();
+        if (snap.empty) {
+            log.warn(`[handleAssignmentStatusWebhook] No smsNumbers found for order ${orderId} / number ${body.phone_number}`, 'system', { orderId }, 'system');
+            return;
+        }
+
+        for (const doc of snap.docs) {
+            const updates: any = {};
+            if (newStatus) {
+                updates.campaignAssignmentStatus = newStatus;
+            }
+
+            if (newStatus === 'successful' || newStatus === 'active') {
+                updates.campaignAssigned = true;
+            } else if (newStatus === 'failed') {
+                updates.campaignAssigned = false;
+                updates.campaignAssignmentError = body.error_message || body.reason || 'Assignment failed via webhook';
+            }
+
+            if (Object.keys(updates).length > 0) {
+                await doc.ref.update(updates);
+                log.info(`[handleAssignmentStatusWebhook] Updated number ${doc.data().phoneNumber} to status ${newStatus}`, 'system', { numberId: doc.id, newStatus }, doc.data().churchId);
+            }
+        }
+
+    } catch (e: any) {
+        log.error(`[handleAssignmentStatusWebhook] Error processing webhook: ${e.message}`, 'system', { body: req.body }, 'system');
+    }
+};

@@ -19,7 +19,7 @@ import { getDb } from './backend/firebase';
 import { handleGeminiProxy } from './backend/geminiProxy';
 import { provisionSubuser, authenticateDomain, verifyDomain, diagnoseDomain } from './backend/emailProvisioning';
 import { getPublicGroups, getPublicRegistrations, getPublicEvents, serveWidgetScript, getPublicForms } from './backend/publicApi.js';
-import { getAvailableNumbers, provisionSmsNumber, releaseSpecificNumber, addSmsNumber, updateNumberSettings, setDefaultNumber, registerSmsBrand, registerSmsCampaign, getSmsRegistrationStatus, handleCampaignStatusWebhook } from './backend/smsProvisioning';
+import { getAvailableNumbers, provisionSmsNumber, releaseSpecificNumber, addSmsNumber, updateNumberSettings, setDefaultNumber, registerSmsBrand, registerSmsCampaign, getSmsRegistrationStatus, handleCampaignStatusWebhook, handleAssignmentStatusWebhook } from './backend/smsProvisioning';
 import { handleInboundSms } from './backend/smsInbound';
 import { sendIndividual, sendBulk } from './backend/smsSend';
 import { handleStatusCallback } from './backend/smsWebhookStatus';
@@ -202,6 +202,7 @@ async function startServer() {
     app.post('/api/messaging/register-campaign',    express.json(), registerSmsCampaign);
     app.get('/api/messaging/registration-status',   getSmsRegistrationStatus);
     app.post('/api/messaging/campaign-status',      express.json(), handleCampaignStatusWebhook);
+    app.post('/api/messaging/assignment-status',    express.json(), handleAssignmentStatusWebhook);
 
     // ─── SMS Agent: Website Scanner ─────────────────────────────────────────────
     // Fetches a church website URL server-side, extracts visible text, and uses
