@@ -488,6 +488,16 @@ export interface SystemSettings {
     smsSegmentCostUsd?: number;
     /** Cost per MMS in USD (default 0.0200) */
     smsMmsSegmentCostUsd?: number;
+    /**
+     * SignalWire Webhook Signing Key — from Dashboard → API → API Credentials → Signing Key.
+     * Used to verify the HMAC-SHA256 signature on all inbound webhook requests.
+     */
+    signalwireSigningKey?: string;
+    /**
+     * 10DLC Campaign ID (TCR) — from SignalWire Dashboard → Messaging Campaigns.
+     * Newly provisioned church numbers are auto-assigned to this campaign for carrier approval.
+     */
+    signalwireCampaignId?: string;
 }
 
 export interface TemplateSettings {
