@@ -487,6 +487,31 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                 </p>
                             </div>
                         </div>
+                        <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+                            <div className="flex items-center gap-2 mb-3">
+                                <span className="text-[11px] font-black uppercase text-slate-500 tracking-widest">10DLC Campaign Registration</span>
+                                <span className="text-[9px] bg-amber-500/10 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded-full border border-amber-500/20 font-bold">Required for outbound SMS</span>
+                            </div>
+                            <p className="text-[9px] text-slate-400 mb-3">
+                                Register <strong className="text-slate-600 dark:text-slate-300">Barnabas Software</strong> as a Brand and create a Campaign in the{' '}
+                                <a href="https://barnabassoftware.signalwire.com/messaging_campaigns" target="_blank" rel="noopener noreferrer" className="underline text-indigo-400 hover:text-indigo-300">SignalWire Dashboard &rarr; Messaging Campaigns</a>.
+                                {' '}Paste the resulting Campaign ID here. All newly provisioned church numbers will be auto-assigned to this campaign.
+                            </p>
+                            <div>
+                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Campaign ID (TCR)</label>
+                                <input
+                                    type="text"
+                                    value={(settings as any).signalwireCampaignId || ''}
+                                    onChange={e => handleChange('signalwireCampaignId' as any, e.target.value.trim())}
+                                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                    placeholder="e.g. CXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+                                />
+                                <p className="text-[9px] text-slate-400 mt-1">
+                                    Found in Dashboard &rarr; Messaging Campaigns &rarr; Campaigns &rarr; click your campaign &rarr; Campaign ID.
+                                    Once set, newly provisioned numbers are auto-submitted for carrier approval (takes up to 24h).
+                                </p>
+                            </div>
+                        </div>
                         {(settings.smsWebhookBaseUrl || settings.apiBaseUrl) && (
                             <div className="mt-4 space-y-1.5">
                                 {['/api/messaging/inbound', '/api/messaging/status'].map(path => {

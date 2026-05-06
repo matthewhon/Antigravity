@@ -1,6 +1,6 @@
 import { getDb } from './firebase';
 import { createServerLogger } from '../services/logService';
-import { getSignalWireClient, getSmsWebhookBaseUrl } from './signalwireClient';
+import { getSignalWireClient, getSmsWebhookBaseUrl, getSignalWireCampaignId, callSignalWireApi } from './signalwireClient';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -28,6 +28,71 @@ async function resolveWebhookUrls(): Promise<{ inboundUrl: string; statusCallbac
         inboundUrl:     `${baseUrl}/api/messaging/inbound`,
         statusCallback: `${baseUrl}/api/messaging/status`,
     };
+}
+
+/**
+ * Fire-and-forget: assign a freshly provisioned number to the configured TCR campaign.
+ * Non-blocking — a missing or misconfigured campaignId logs a warning but never
+ * throws, so provisioning always succeeds regardless of TCR state.
+ *
+ * Status values written to smsNumbers doc:
+ *   campaignAssignmentStatus: 'not_configured' | 'pending' | 'error'
+ * Carriers take up to 24h to confirm; mark 'active' via a status webhook or
+ * manual update once the number appears in the SignalWire Dashboard as Processed.
+ */
+async function assignNumberToCampaign(
+    db: any,
+    log: any,
+    numDocId: string,
+    phoneNumber: string,
+    churchId: string
+): Promise<void> {
+    const campaignId = await getSignalWireCampaignId();
+
+    if (!campaignId) {
+        log.warn(
+            '[smsProvisioning] signalwireCampaignId not set in System Settings — TCR campaign assignment skipped. ' +
+            'Set it after completing brand/campaign registration in the SignalWire Dashboard.',
+            'system', { numDocId, phoneNumber }, churchId
+        );
+        await db.collection('smsNumbers').doc(numDocId).update({
+            campaignAssigned:         false,
+            campaignAssignmentStatus: 'not_configured',
+        });
+        return;
+    }
+
+    try {
+        const result = await callSignalWireApi('/campaign-registry/phone-number-assignments', 'POST', {
+            campaign_id:  campaignId,
+            phone_number: phoneNumber,
+        });
+
+        const orderId = result?.id || result?.order_id || result?.assignment_id || '';
+        log.info(
+            `[smsProvisioning] TCR campaign assignment submitted for ${phoneNumber} (orderId: ${orderId})`,
+            'system', { numDocId, phoneNumber, campaignId, orderId }, churchId
+        );
+
+        await db.collection('smsNumbers').doc(numDocId).update({
+            campaignAssigned:          false,        // true once carrier confirms (~24h)
+            campaignAssignmentStatus:  'pending',
+            campaignAssignmentOrderId: orderId,
+            campaignId,
+            campaignAssignedAt:        Date.now(),
+        });
+
+    } catch (e: any) {
+        log.error(
+            `[smsProvisioning] TCR campaign assignment failed for ${phoneNumber}: ${e.message}`,
+            'system', { numDocId, phoneNumber, campaignId }, churchId
+        );
+        await db.collection('smsNumbers').doc(numDocId).update({
+            campaignAssigned:         false,
+            campaignAssignmentStatus: 'error',
+            campaignAssignmentError:  e.message,
+        });
+    }
 }
 
 // ─── GET /api/messaging/available-numbers ─────────────────────────────────────
@@ -175,11 +240,14 @@ export const provisionSmsNumber = async (req: any, res: any) => {
 
         log.info(`[provisionSmsNumber] Wrote smsNumbers doc ${numDocId} (isDefault=${isFirstNumber})`, 'system', { churchId, numDocId, isFirstNumber }, churchId);
 
+        // Auto-assign to TCR campaign (non-blocking — logs on failure, never throws)
+        assignNumberToCampaign(db, log, numDocId, phoneNumber, churchId).catch(() => {/* already logged inside */});
+
         return res.json({
             success:      true,
             phoneNumber,
             smsNumberId:  numDocId,
-            message:      `Phone number ${phoneNumber} provisioned successfully.`,
+            message:      `Phone number ${phoneNumber} provisioned successfully. Campaign registration is pending carrier approval (up to 24h).`,
         });
     } catch (e: any) {
         log.error(`[provisionSmsNumber] failed: ${e.message}`, 'system', { churchId, phoneNumber }, churchId);
@@ -254,11 +322,14 @@ export const addSmsNumber = async (req: any, res: any) => {
 
         log.info(`[addSmsNumber] Added ${phoneNumber} (SID: ${purchased.sid}) for church ${churchId}`, 'system', { churchId, numDocId }, churchId);
 
+        // Auto-assign to TCR campaign (non-blocking)
+        assignNumberToCampaign(db, log, numDocId, phoneNumber, churchId).catch(() => {/* already logged inside */});
+
         return res.json({
             success:     true,
             phoneNumber,
             smsNumberId: numDocId,
-            message:     `Phone number ${phoneNumber} added successfully.`,
+            message:     `Phone number ${phoneNumber} added successfully. Campaign registration is pending carrier approval (up to 24h).`,
         });
 
     } catch (e: any) {

@@ -1,4 +1,4 @@
-﻿
+
 import React, { useState, useEffect, useRef } from 'react';
 import { User, Church, RiskSettings, ChurchRiskSettings, DonorLifecycleSettings, GroupRiskSettings, CommunityLocation, UserRole } from '../types';
 import { CreateUserModal } from './CreateUserModal';
@@ -3164,9 +3164,38 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                                 </span>
                                                             )}
                                                         </div>
-                                                        {num.senderName && (
+                                                         {num.senderName && (
                                                             <p className="text-[10px] text-slate-400 mt-0.5">Sender: {num.senderName}</p>
                                                         )}
+                                                        {/* Campaign / TCR status */}
+                                                        {(() => {
+                                                            const status = num.campaignAssignmentStatus as string | undefined;
+                                                            if (!status || status === 'not_configured') return (
+                                                                <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
+                                                                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                                                                    Campaign not configured — contact Barnabas Software support to enable outbound SMS
+                                                                </p>
+                                                            );
+                                                            if (status === 'pending') return (
+                                                                <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1 flex items-center gap-1">
+                                                                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+                                                                    Campaign registration pending carrier approval — SMS enabled within 24h
+                                                                </p>
+                                                            );
+                                                            if (status === 'active' || num.campaignAssigned) return (
+                                                                <p className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
+                                                                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                                                    Campaign approved — outbound SMS active
+                                                                </p>
+                                                            );
+                                                            if (status === 'error') return (
+                                                                <p className="text-[10px] text-rose-500 mt-1 flex items-center gap-1" title={num.campaignAssignmentError}>
+                                                                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                                                                    Campaign assignment error — contact support
+                                                                </p>
+                                                            );
+                                                            return null;
+                                                        })()}
                                                     </div>
                                                     {/* Actions */}
                                                     <div className="flex items-center gap-2 shrink-0">
