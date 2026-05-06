@@ -425,6 +425,33 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
       });
   }, [smsSubTab, churchId]);
 
+  // Check A2P 10DLC Compliance status automatically when entering the compliance tab
+  useEffect(() => {
+      if (smsSubTab !== 'compliance') return;
+      if (regStatus !== null) return; // Only fetch if we haven't yet
+
+      const checkStatus = async () => {
+          setIsCheckingStatus(true);
+          setComplianceMessage(null);
+          try {
+              const res = await fetch(`/api/messaging/registration-status?churchId=${encodeURIComponent(churchId)}`);
+              const data = await res.json();
+              if (data.success) {
+                  setRegStatus(data);
+              } else {
+                  setComplianceMessage({ type: 'error', text: data.error || 'Failed to get status' });
+              }
+          } catch (e: any) {
+              setComplianceMessage({ type: 'error', text: e.message || 'Status check failed' });
+          } finally {
+              setIsCheckingStatus(false);
+          }
+      };
+      
+      checkStatus();
+  }, [smsSubTab, churchId, regStatus]);
+
+
   // Sync mail state when church prop changes
   useEffect(() => {
       const es = church.emailSettings;
