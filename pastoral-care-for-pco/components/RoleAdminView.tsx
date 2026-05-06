@@ -74,7 +74,7 @@ const SmsAdminTermsModal: React.FC<{
                             <p><strong>Acceptance.</strong> By activating SMS messaging through Barnabas Software ("Platform"), your organization ("Church") agrees to these Terms of Service and all applicable laws and carrier regulations governing commercial text messaging in the United States.</p>
                             <p><strong>Permitted Use.</strong> The SMS service may only be used for legitimate pastoral, ministry, and organizational communications with individuals who have explicitly opted in to receive messages from your church. Permitted uses include service reminders, event announcements, prayer follow-ups, group updates, and pastoral care outreach.</p>
                             <p><strong>Prohibited Content.</strong> You may not use this service to send spam, unsolicited commercial messages, illegal content, harassment, or any content that violates TCPA, CTIA guidelines, or applicable carrier acceptable-use policies. Violations may result in immediate suspension of your account without refund.</p>
-                            <p><strong>A2P 10DLC Compliance.</strong> Your church is required to complete Twilio's A2P 10DLC brand and campaign registration. You represent that all information submitted during registration is accurate and truthful. Submitting false information is a violation of these terms and federal law.</p>
+                            <p><strong>Carrier Compliance.</strong> Your church is responsible for sending only to recipients who have opted in to receive messages. Barnabas Software routes SMS through SignalWire under its platform account. You represent that your use complies with TCPA and all applicable carrier requirements.</p>
                             <p><strong>Opt-Out Management.</strong> You must honor all STOP requests immediately and permanently. Sending messages to contacts who have opted out is a violation of TCPA and these terms.</p>
                             <p><strong>Limitation of Liability.</strong> Barnabas Software provides this service "as is" without warranty. We are not liable for carrier delivery failures, message filtering by carriers, or any damages beyond amounts paid in the 30 days prior to the claim.</p>
                         </div>
@@ -88,9 +88,9 @@ const SmsAdminTermsModal: React.FC<{
                             Privacy Policy — SMS Data
                         </h3>
                         <div className="space-y-2">
-                            <p><strong>Data We Collect.</strong> To provide SMS services, we collect and process: phone numbers of message recipients, message content, delivery status events, opt-out records, and Twilio account credentials associated with your church's sub-account.</p>
+                            <p><strong>Data We Collect.</strong> To provide SMS services, we collect and process: phone numbers of message recipients, message content, delivery status events, and opt-out records.</p>
                             <p><strong>How We Use Data.</strong> Recipient phone numbers and message content are used solely to deliver messages on your church's behalf. We do not sell, rent, or share this data with third parties except as required to operate the service.</p>
-                            <p><strong>Twilio.</strong> Messages are routed through Twilio, Inc. By using this service, your data is also subject to Twilio's Privacy Policy. Twilio acts as a data processor on your behalf.</p>
+                            <p><strong>SignalWire.</strong> Messages are routed through SignalWire, Inc. By using this service, your data is also subject to SignalWire's Privacy Policy. SignalWire acts as a data processor on your behalf.</p>
                             <p><strong>Your Responsibilities.</strong> As the data controller for your congregation's contact information, you are responsible for maintaining a lawful basis for processing and complying with applicable privacy laws such as CCPA.</p>
                         </div>
                     </section>
@@ -100,13 +100,13 @@ const SmsAdminTermsModal: React.FC<{
                     <section>
                         <h3 className="text-sm font-black text-slate-900 dark:text-white mb-2 flex items-center gap-2">
                             <span className="w-5 h-5 bg-indigo-600 text-white rounded-full flex items-center justify-center text-[10px] font-black">3</span>
-                            A2P 10DLC Compliance Acknowledgment
+                            Messaging Compliance Acknowledgment
                         </h3>
                         <ul className="list-disc list-inside space-y-1 ml-2">
-                            <li>You are an authorized representative of the church with authority to register for commercial texting services.</li>
+                            <li>You are an authorized representative of the church with authority to activate commercial texting services.</li>
                             <li>Your church will only send messages to recipients who have <strong>explicitly opted in</strong> and will honor all STOP requests immediately.</li>
-                            <li>You will submit accurate legal entity information (name, EIN, physical address) during brand registration.</li>
-                            <li>You understand that carrier approval is not guaranteed and may take 1–10 business days.</li>
+                            <li>You understand that carrier delivery is not guaranteed and message filtering may occur.</li>
+                            <li>You will promptly remove opted-out contacts and maintain accurate opt-in records.</li>
                         </ul>
                     </section>
                 </div>
@@ -302,15 +302,9 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   const [formData, setFormData] = useState<Partial<Church>>(church);
 
   // SMS Settings state
-  const [smsSubTab, setSmsSubTab] = useState<'a2p' | 'optout' | 'numbers'>('a2p');
+  const [smsSubTab, setSmsSubTab] = useState<'setup' | 'optout' | 'numbers'>('setup');
   const [showRep2, setShowRep2] = useState(false);
-  const [expandedSteps, setExpandedSteps] = useState<Set<number>>(() => {
-    const s = church.smsSettings || {};
-    if (!s.twilioSubAccountSid) return new Set([1]); // Fresh — start at step 1
-    if (!s.a2pBusinessName)  return new Set([2]);    // Sub-account done, open brand
-    if (!s.a2pDescription)   return new Set([3]);    // Brand done, open campaign
-    return new Set<number>();                        // All complete — all collapsed
-  });
+  const [expandedSteps, setExpandedSteps] = useState<Set<number>>(new Set([1]));
   const toggleStep = (n: number) => setExpandedSteps(prev => {
     const next = new Set(prev);
     next.has(n) ? next.delete(n) : next.add(n);
@@ -339,7 +333,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   const [isLookingUpSids, setIsLookingUpSids]               = useState(false);
 
   // Phone Numbers panel state (SMS → Numbers tab)
-  const [twilioNumbers, setTwilioNumbers] = useState<any[]>([]);
+  const [smsNumbers, setSmsNumbers] = useState<any[]>([]);
   const [numLoading, setNumLoading] = useState(false);
   const [numError, setNumError] = useState('');
   const [numToast, setNumToast] = useState('');
@@ -399,48 +393,19 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   }, [church.smsSettings]);
 
   // Load phone numbers directly from Firestore when 'numbers' sub-tab is opened.
-  // Also auto-migrates the legacy smsSettings.twilioPhoneNumber into the twilioNumbers
-  // collection if no docs exist yet but a real sub-account is present.
   useEffect(() => {
       if (smsSubTab !== 'numbers') return;
       setNumLoading(true);
       setNumError('');
-      import('firebase/firestore').then(({ collection, query, where, orderBy, getDocs, setDoc, doc: fsDoc }) => {
+      import('firebase/firestore').then(({ collection, query, where, orderBy, getDocs }) => {
           const q = query(
-              collection(firebaseDb, 'twilioNumbers'),
+              collection(firebaseDb, 'smsNumbers'),
               where('churchId', '==', churchId),
               orderBy('createdAt', 'asc')
           );
           getDocs(q)
-              .then(async snap => {
-                  const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                  if (docs.length === 0) {
-                      // Auto-migrate legacy number if church has a real provisioned sub-account
-                      const legacyPhone = church.smsSettings?.twilioPhoneNumber;
-                      const hasSubAccount = !!church.smsSettings?.twilioSubAccountSid;
-                      if (legacyPhone && hasSubAccount) {
-                          const migratedId = `${churchId}_migrated`;
-                          const migratedDoc = {
-                              id: migratedId,
-                              churchId,
-                              phoneNumber: legacyPhone,
-                              phoneSid: church.smsSettings?.twilioPhoneSid || '',
-                              friendlyLabel: 'Main Line',
-                              isDefault: true,
-                              smsEnabled: true,
-                              allowedUserIds: [],
-                              createdAt: Date.now(),
-                              updatedAt: Date.now(),
-                          };
-                          await setDoc(fsDoc(firebaseDb, 'twilioNumbers', migratedId), migratedDoc)
-                              .catch(() => {/* silent race */});
-                          setTwilioNumbers([migratedDoc]);
-                      } else {
-                          setTwilioNumbers([]);
-                      }
-                  } else {
-                      setTwilioNumbers(docs);
-                  }
+              .then(snap => {
+                  setSmsNumbers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
               })
               .catch(e => setNumError(e.message || 'Failed to load numbers'))
               .finally(() => setNumLoading(false));
@@ -2763,17 +2728,10 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         {isA2pChecking ? '⏳ Checking…' : '🔄 Check Status'}
                                     </button>
                                 )}
-                                {smsForm.twilioPhoneNumber && smsForm.twilioSubAccountSid && twilioNumbers.length === 0 && (
-                                    // Legacy field shown only if number AND sub-account are both provisioned
+                                {smsNumbers.length > 0 && (
                                     <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-1.5 rounded-full border border-emerald-100 dark:border-emerald-900/30">
-                                        📱 {smsForm.twilioPhoneNumber}
-                                    </span>
-                                )}
-                                {twilioNumbers.length > 0 && (
-                                    // Prefer showing the default number from the new twilioNumbers collection
-                                    <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-1.5 rounded-full border border-emerald-100 dark:border-emerald-900/30">
-                                        📱 {(twilioNumbers.find(n => n.isDefault) || twilioNumbers[0])?.phoneNumber}
-                                        {twilioNumbers.length > 1 && <span className="ml-1 text-[9px]">+{twilioNumbers.length - 1} more</span>}
+                                        📱 {(smsNumbers.find((n: any) => n.isDefault) || smsNumbers[0])?.phoneNumber}
+                                        {smsNumbers.length > 1 && <span className="ml-1 text-[9px]">+{smsNumbers.length - 1} more</span>}
                                     </span>
                                 )}
                             </div>
@@ -4076,12 +4034,12 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 setNumLoading(true);
                                 import('firebase/firestore').then(({ collection, query, where, orderBy, getDocs }) => {
                                     const q = query(
-                                        collection(firebaseDb, 'twilioNumbers'),
+                                        collection(firebaseDb, 'smsNumbers'),
                                         where('churchId', '==', churchId),
                                         orderBy('createdAt', 'asc')
                                     );
                                     getDocs(q)
-                                        .then(snap => setTwilioNumbers(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
+                                        .then(snap => setSmsNumbers(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
                                         .finally(() => setNumLoading(false));
                                 });
                                 setTimeout(() => setNumToast(''), 4000);
@@ -4098,24 +4056,24 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 const res = await fetch('/api/messaging/set-default-number', {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ churchId, twilioNumberId: numId }),
+                                    body: JSON.stringify({ churchId, smsNumberId: numId }),
                                 });
                                 const data = await res.json();
                                 if (!data.success) throw new Error(data.error || 'Failed');
                                 setNumToast('✓ Default number updated.');
-                                setTwilioNumbers(prev => prev.map(n => ({ ...n, isDefault: n.id === numId })));
+                                setSmsNumbers(prev => prev.map(n => ({ ...n, isDefault: n.id === numId })));
                                 setTimeout(() => setNumToast(''), 3000);
                             } catch (e: any) {
                                 setNumError(e.message || 'Failed to set default');
                             }
                         };
 
-                        const profileApproved =
-                            (smsForm.twilioCustomerProfileStatus || '').toLowerCase() === 'twilio-approved';
+                        // SignalWire flat-project model: no A2P pre-approval gate needed
+                        const profileApproved = true;
 
                         const handleReleaseNumber = async (num: any) => {
                             const confirmed = window.confirm(
-                                `Release ${num.phoneNumber} ("${num.friendlyLabel || num.senderName || 'this number'}")? \n\nThis will permanently release the number back to Twilio and cannot be undone.`
+                                `Release ${num.phoneNumber} ("${num.friendlyLabel || num.senderName || 'this number'}")? \n\nThis will permanently release the number back to SignalWire and cannot be undone.`
                             );
                             if (!confirmed) return;
                             setNumError('');
@@ -4123,14 +4081,14 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 const res = await fetch('/api/messaging/release-number', {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ churchId, twilioNumberId: num.id }),
+                                    body: JSON.stringify({ churchId, smsNumberId: num.id }),
                                 });
                                 const raw = await res.text();
                                 let data: any;
                                 try { data = JSON.parse(raw); } catch { data = { error: raw.slice(0, 200) }; }
                                 if (!data.success) throw new Error(data.error || 'Release failed');
                                 setNumToast(`✓ ${num.phoneNumber} released.`);
-                                setTwilioNumbers(prev => prev.filter(n => n.id !== num.id));
+                                setSmsNumbers(prev => prev.filter(n => n.id !== num.id));
                                 setTimeout(() => setNumToast(''), 4000);
                             } catch (e: any) {
                                 setNumError(e.message || 'Failed to release number');
@@ -4145,7 +4103,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                     <div className="flex items-center justify-between mb-4">
                                         <div>
                                             <h4 className="text-sm font-black text-slate-900 dark:text-white">Provisioned Phone Numbers</h4>
-                                            <p className="text-[10px] text-slate-400 mt-0.5">All Twilio numbers associated with this church. The default number is used for outbound replies when no inbox is specified.</p>
+                                            <p className="text-[10px] text-slate-400 mt-0.5">SignalWire numbers assigned to this church. The default number is used for outbound replies when no inbox is specified.</p>
                                         </div>
                                         <button
                                             onClick={() => {
@@ -4165,21 +4123,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         </button>
                                     </div>
 
-                                    {!profileApproved && (
-                                        <div className="mb-4 flex items-start gap-3 px-4 py-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl">
-                                            <span className="text-lg shrink-0">⚠️</span>
-                                            <div>
-                                                <p className="text-xs font-bold text-amber-800 dark:text-amber-300">Customer Profile approval required</p>
-                                                <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-0.5">
-                                                    You cannot provision phone numbers until your Twilio Customer Profile (A2P 10DLC) has been approved.
-                                                    Complete the A2P Registration tab first, then return here once Twilio approves it.
-                                                    {smsForm.twilioCustomerProfileSid && (
-                                                        <> Current status: <strong>{smsForm.twilioCustomerProfileStatus || 'pending-review'}</strong>.</>
-                                                    )}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    )}
+                                    {/* No approval gate needed with SignalWire flat-project model */}
 
                                     {/* Toast */}
                                     {numToast && (
@@ -4196,19 +4140,15 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                     {/* Numbers list */}
                                     {numLoading ? (
                                         <p className="text-xs text-slate-400 py-4 text-center">Loading numbers…</p>
-                                    ) : twilioNumbers.length === 0 ? (
+                                    ) : smsNumbers.length === 0 ? (
                                         <div className="py-10 text-center">
                                             <p className="text-3xl mb-3">📱</p>
                                             <p className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">No Numbers Provisioned</p>
-                                            <p className="text-xs text-slate-400">
-                                                {profileApproved
-                                                    ? 'Use "Request a Number" to add your first Twilio number.'
-                                                    : 'Complete A2P Registration and get your Customer Profile approved first.'}
-                                            </p>
+                                            <p className="text-xs text-slate-400">Use "Request a Number" to provision a SignalWire number for this church.</p>
                                         </div>
                                     ) : (
                                         <div className="space-y-3">
-                                            {twilioNumbers.map((num: any) => (
+                                            {smsNumbers.map((num: any) => (
                                                 <div
                                                     key={num.id}
                                                     className={`flex items-center gap-4 p-4 rounded-2xl border transition-all ${
@@ -4248,13 +4188,13 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                         )}
                                                         <button
                                                             onClick={() => handleReleaseNumber(num)}
-                                                            disabled={num.isDefault && twilioNumbers.length > 1}
-                                                            title={num.isDefault && twilioNumbers.length > 1
+                                                            disabled={num.isDefault && smsNumbers.length > 1}
+                                                            title={num.isDefault && smsNumbers.length > 1
                                                                 ? 'Set another number as default before releasing this one'
                                                                 : `Release ${num.phoneNumber}`}
                                                             className="text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border transition-all disabled:cursor-not-allowed disabled:opacity-40 border-rose-200 dark:border-rose-800 text-rose-500 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 hover:border-rose-400"
                                                         >
-                                                            {num.isDefault && twilioNumbers.length > 1 ? '🔒 Release' : '🗑 Release'}
+                                                            {num.isDefault && smsNumbers.length > 1 ? '🔒 Release' : '🗑 Release'}
                                                         </button>
                                                     </div>
                                                 </div>

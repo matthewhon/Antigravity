@@ -1,4 +1,4 @@
-
+﻿
 import React, { useState, useEffect, useCallback } from 'react';
 import { SystemSettings, Church, User, LogEntry } from '../types';
 import { firestore } from '../services/firestoreService';
@@ -14,129 +14,6 @@ interface SystemSettingsViewProps {
 // Default based on provided custom domain
 const DEFAULT_API_URL = 'https://api.pastoralcare.barnabassoftware.com';
 
-// ─── Secondary Profiles Panel ───────────────────────────────────────────────
-// Extracted as a standalone component so it can legally use React hooks.
-const STATUS_COLOR: Record<string, string> = {
-    'twilio-approved':  'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300',
-    'pending-review':   'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300',
-    'in-review':        'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300',
-    'twilio-rejected':  'bg-rose-100 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300',
-    'draft':            'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400',
-};
-
-const SecondaryProfilesPanel: React.FC<{ apiBase: string }> = ({ apiBase }) => {
-    const [secProfiles, setSecProfiles] = useState<any[] | null>(null);
-    const [secLoading, setSecLoading]   = useState(false);
-    const [secDeleting, setSecDeleting] = useState<string | null>(null);
-    const [secError, setSecError]       = useState<string | null>(null);
-    const [secMsg, setSecMsg]           = useState<string | null>(null);
-
-    const loadProfiles = async () => {
-        setSecLoading(true); setSecError(null); setSecMsg(null);
-        try {
-            const r = await fetch(`${apiBase}/api/messaging/secondary-profiles`);
-            const d = await r.json();
-            if (!d.success) throw new Error(d.error || 'Failed to load');
-            setSecProfiles(d.profiles || []);
-        } catch (e: any) {
-            setSecError(e.message);
-        } finally { setSecLoading(false); }
-    };
-
-    const handleDelete = async (sid: string, name: string) => {
-        if (!window.confirm(`Delete profile "${name}" (${sid})?\n\nThis will permanently remove it from Twilio and clear the Firestore reference on any linked church.`)) return;
-        setSecDeleting(sid); setSecError(null); setSecMsg(null);
-        try {
-            const r = await fetch(`${apiBase}/api/messaging/secondary-profile`, {
-                method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ profileSid: sid }),
-            });
-            const d = await r.json();
-            if (!d.success) throw new Error(d.error || 'Delete failed');
-            setSecMsg(d.message);
-            setSecProfiles(prev => prev ? prev.filter(p => p.sid !== sid) : prev);
-        } catch (e: any) {
-            setSecError(e.message);
-        } finally { setSecDeleting(null); }
-    };
-
-    return (
-        <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
-            <div className="flex items-center justify-between mb-2">
-                <div>
-                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest">Secondary Profiles</label>
-                    <p className="text-[9px] text-slate-400 mt-0.5">Customer Profile Bundles on the master account (excluding the primary ISV profile). Draft and rejected profiles can be deleted here.</p>
-                </div>
-                <button
-                    onClick={loadProfiles}
-                    disabled={secLoading}
-                    className="shrink-0 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 px-3 py-1.5 rounded-xl font-bold text-xs hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors disabled:opacity-50 whitespace-nowrap"
-                >
-                    {secLoading ? '⏳ Loading…' : '🔍 Load Profiles'}
-                </button>
-            </div>
-
-            {secError && (
-                <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-xl px-3 py-2 text-xs text-rose-700 dark:text-rose-300 mb-2">
-                    ❌ {secError}
-                </div>
-            )}
-            {secMsg && (
-                <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300 mb-2">
-                    ✅ {secMsg}
-                </div>
-            )}
-
-            {secProfiles !== null && (
-                secProfiles.length === 0 ? (
-                    <p className="text-[10px] text-slate-400 italic">No secondary profiles found on the master account.</p>
-                ) : (
-                    <div className="space-y-2 mt-1">
-                        {secProfiles.map((p: any) => (
-                            <div key={p.sid} className="flex items-start gap-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5">
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${STATUS_COLOR[p.status] || STATUS_COLOR['draft']}`}>
-                                            {p.status}
-                                        </span>
-                                        <code className="text-[9px] font-mono text-slate-500 dark:text-slate-400">{p.sid}</code>
-                                    </div>
-                                    <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 mt-1 truncate">{p.friendlyName || '(no name)'}</p>
-                                    {p.church ? (
-                                        <p className="text-[9px] text-indigo-500 dark:text-indigo-400 mt-0.5">
-                                            🏛 {p.church.name} <span className="text-slate-400">({p.church.id})</span>
-                                        </p>
-                                    ) : (
-                                        <p className="text-[9px] text-slate-400 mt-0.5 italic">No church linked in Firestore</p>
-                                    )}
-                                    {p.dateCreated && (
-                                        <p className="text-[8px] text-slate-400 mt-0.5">Created: {new Date(p.dateCreated).toLocaleDateString()}</p>
-                                    )}
-                                </div>
-                                <div className="shrink-0">
-                                    {p.canDelete ? (
-                                        <button
-                                            onClick={() => handleDelete(p.sid, p.friendlyName)}
-                                            disabled={secDeleting === p.sid}
-                                            className="bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800 px-2.5 py-1.5 rounded-lg font-bold text-[10px] hover:bg-rose-100 dark:hover:bg-rose-900/30 transition-colors disabled:opacity-50 whitespace-nowrap"
-                                        >
-                                            {secDeleting === p.sid ? '…' : '🗑 Delete'}
-                                        </button>
-                                    ) : (
-                                        <span className="text-[9px] text-slate-400 italic text-right block max-w-[100px]" title="Only draft or rejected profiles can be deleted via API. Contact Twilio Support to cancel approved/pending profiles.">
-                                            Requires Twilio Support
-                                        </span>
-                                    )}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )
-            )}
-        </div>
-    );
-};
 
 export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings: initialSettings, onSave, onRecalculateBenchmarks }) => {
   const [activeTab, setActiveTab] = useState<'Configuration' | 'Tenants' | 'Users' | 'Logging' | 'Planning Center'>('Configuration');
@@ -424,7 +301,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
 
         {message && (
             <div className={`p-4 rounded-xl text-xs font-bold flex items-center gap-2 ${message.type === 'success' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                <span>{message.type === 'success' ? '✓' : '⚠️'}</span>
+                <span>{message.type === 'success' ? 'Ã¢Å“â€œ' : 'Ã¢Å¡Â Ã¯Â¸Â'}</span>
                 {message.text}
             </div>
         )}
@@ -534,7 +411,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                             </div>
                             <p className="text-[10px] text-slate-400 mb-4 leading-relaxed">
                                 This is the <strong>master</strong> SendGrid account. Each church tenant gets an isolated Subuser for reputation separation.
-                                Tenants configure their From address in <strong>Settings &amp; Administration → Mail Settings</strong>.
+                                Tenants configure their From address in <strong>Settings &amp; Administration Ã¢â€ â€™ Mail Settings</strong>.
                             </p>
                             <div className="space-y-4">
                                 <div>
@@ -547,7 +424,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                         placeholder="SG.xxxxxxxxxxxxxxxx"
                                     />
                                     <p className="text-[9px] text-slate-400 mt-1.5">
-                                        Find this in your <a href="https://app.sendgrid.com/settings/api_keys" target="_blank" rel="noopener noreferrer" className="underline text-indigo-400 hover:text-indigo-300">SendGrid Dashboard → Settings → API Keys</a>.
+                                        Find this in your <a href="https://app.sendgrid.com/settings/api_keys" target="_blank" rel="noopener noreferrer" className="underline text-indigo-400 hover:text-indigo-300">SendGrid Dashboard Ã¢â€ â€™ Settings Ã¢â€ â€™ API Keys</a>.
                                         Requires <strong>Full Access</strong> permissions to create Subusers and authenticate domains.
                                     </p>
                                 </div>
@@ -588,205 +465,89 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                             </div>
                         </div>
 
-                        {/* ── Twilio SMS ── */}
+                        {/* Ã¢â€â‚¬Ã¢â€â‚¬ SignalWire SMS Ã¢â€â‚¬Ã¢â€â‚¬ */}
                         <div className="pt-6 border-t border-slate-100 dark:border-slate-800">
                             <div className="flex justify-between items-center mb-2">
-                                <h4 className="text-xs font-bold text-indigo-600 dark:text-indigo-400">Twilio SMS (Master Account)</h4>
-                                {settings.twilioMasterAccountSid?.startsWith('AC') && settings.twilioMasterAuthToken ? (
+                                <h4 className="text-xs font-bold text-indigo-600 dark:text-indigo-400">SignalWire SMS</h4>
+                                {settings.signalwireProjectId && settings.signalwireApiToken && settings.signalwireSpaceUrl ? (
                                     <span className="text-[9px] font-black bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">CONFIGURED</span>
                                 ) : (
                                     <span className="text-[9px] font-black bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/30">INCOMPLETE</span>
                                 )}
                             </div>
                             <p className="text-[10px] text-slate-400 mb-4 leading-relaxed">
-                                The <strong>master</strong> Twilio account is used to provision per-church sub-accounts and phone numbers. 
-                                Tenants never share credentials — each church gets an isolated sub-account for billing and reputation separation.
+                                Credentials for the <strong>SignalWire</strong> project used to provision numbers and send/receive SMS.
+                                All churches share a single project Ã¢â‚¬â€ number routing is handled by inbound webhook lookup.
+                                Find these values at{' '}
+                                <a href="https://barnabassoftware.signalwire.com" target="_blank" rel="noopener noreferrer" className="underline text-indigo-400 hover:text-indigo-300">
+                                    barnabassoftware.signalwire.com
+                                </a>{' '}Ã¢â€ â€™ API Ã¢â€ â€™ API Tokens.
                             </p>
 
                             <div className="space-y-4">
-                                {/* Account SID */}
+                                {/* Project ID */}
                                 <div>
-                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Account SID</label>
+                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Project ID</label>
                                     <input
                                         type="text"
-                                        value={settings.twilioMasterAccountSid || ''}
-                                        onChange={e => handleChange('twilioMasterAccountSid', e.target.value)}
+                                        value={settings.signalwireProjectId || ''}
+                                        onChange={e => handleChange('signalwireProjectId', e.target.value.trim())}
                                         className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                                        placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                                        placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
                                     />
-                                    <p className="text-[9px] text-slate-400 mt-1.5">
-                                        Found in your <a href="https://console.twilio.com/" target="_blank" rel="noopener noreferrer" className="underline text-indigo-400 hover:text-indigo-300">Twilio Console</a> → Account Info.
-                                    </p>
+                                    <p className="text-[9px] text-slate-400 mt-1.5">UUID from Dashboard Ã¢â€ â€™ API Ã¢â€ â€™ API Tokens.</p>
                                 </div>
 
-                                {/* Auth Token */}
+                                {/* API Token */}
                                 <div>
-                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Auth Token</label>
+                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">API Token</label>
                                     <input
                                         type="password"
-                                        value={settings.twilioMasterAuthToken || ''}
-                                        onChange={e => handleChange('twilioMasterAuthToken', e.target.value)}
+                                        value={settings.signalwireApiToken || ''}
+                                        onChange={e => handleChange('signalwireApiToken', e.target.value.trim())}
                                         className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                                        placeholder="●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●"
+                                        placeholder="PTxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
                                     />
-                                    <p className="text-[9px] text-slate-400 mt-1.5">
-                                        Keep this secret. Prefer an API Key pair below for tighter scope — this is only needed if you don't use API Keys.
-                                    </p>
+                                    <p className="text-[9px] text-slate-400 mt-1.5">Keep this secret. Generated under Dashboard Ã¢â€ â€™ API Ã¢â€ â€™ API Tokens.</p>
                                 </div>
 
-                                {/* ── Primary Customer Profile SID ── */}
-                                <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
-                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">
-                                        Primary Customer Profile SID
-                                        {settings.primaryCustomerProfileSid?.startsWith('BU') ? (
-                                            <span className="ml-2 normal-case font-black text-[9px] bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded-full">SET</span>
-                                        ) : (
-                                            <span className="ml-2 normal-case font-black text-[9px] bg-rose-500/10 text-rose-500 px-1.5 py-0.5 rounded-full">REQUIRED</span>
-                                        )}
-                                    </label>
-                                    <p className="text-[9px] text-slate-400 mb-2">
-                                        The <strong>BU...</strong> SID for <strong>Hon Ventures LLC</strong> — the master ISV Primary Customer Profile in the{' '}
-                                        <a href="https://console.twilio.com/us1/develop/trust-hub/customer-profiles" target="_blank" rel="noopener noreferrer" className="underline text-indigo-400 hover:text-indigo-300">
-                                            Twilio Console → Trust Hub → Customer Profiles
-                                        </a>.
-                                        This is assigned as an entity in every secondary church profile to satisfy Twilio's ISV compliance requirement.
-                                    </p>
-                                    <div className="flex gap-2">
-                                        <input
-                                            type="text"
-                                            value={settings.primaryCustomerProfileSid || ''}
-                                            onChange={e => handleChange('primaryCustomerProfileSid', e.target.value.trim())}
-                                            className="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                                            placeholder="BUxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                                        />
-                                        <button
-                                            onClick={async () => {
-                                                setIsVerifying(true);
-                                                setMessage(null);
-                                                try {
-                                                    const base = (settings.apiBaseUrl || DEFAULT_API_URL).replace(/\/$/, '');
-                                                    const res = await fetch(`${base}/api/messaging/primary-profile-sid`);
-                                                    const data = await res.json();
-                                                    if (!res.ok) { setMessage({ type: 'error', text: data.error || 'Failed to fetch profiles' }); return; }
-                                                    handleChange('primaryCustomerProfileSid', data.primarySid);
-                                                    setMessage({ type: 'success', text: `Auto-filled: ${data.friendlyName} (${data.status}) — ${data.primarySid}` });
-                                                } catch (e: any) {
-                                                    setMessage({ type: 'error', text: e.message || 'Failed to fetch from Twilio' });
-                                                } finally {
-                                                    setIsVerifying(false);
-                                                }
-                                            }}
-                                            disabled={isVerifying}
-                                            className="shrink-0 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 px-3 py-2 rounded-xl font-bold text-xs hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors disabled:opacity-50 whitespace-nowrap"
-                                        >
-                                            {isVerifying ? '...' : '🔍 Fetch from Twilio'}
-                                        </button>
-                                    </div>
+                                {/* Space URL */}
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Space URL</label>
+                                    <input
+                                        type="text"
+                                        value={settings.signalwireSpaceUrl || ''}
+                                        onChange={e => handleChange('signalwireSpaceUrl', e.target.value.trim().replace(/^https?:\/\//, ''))}
+                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                        placeholder="barnabassoftware.signalwire.com"
+                                    />
+                                    <p className="text-[9px] text-slate-400 mt-1.5">Your SignalWire subdomain, e.g. <code>barnabassoftware.signalwire.com</code> (no https://).</p>
                                 </div>
 
-                                {/* ── A2P Profile Bundle SID ── */}
-                                <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
-                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">
-                                        A2P Profile Bundle SID
-                                        {settings.twilioA2pProfileBundleSid?.startsWith('BN') ? (
-                                            <span className="ml-2 normal-case font-black text-[9px] bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded-full">SET</span>
-                                        ) : (
-                                            <span className="ml-2 normal-case font-black text-[9px] bg-rose-500/10 text-rose-500 px-1.5 py-0.5 rounded-full">REQUIRED</span>
-                                        )}
-                                    </label>
-                                    <p className="text-[9px] text-slate-400 mb-2">
-                                        The <strong>BN...</strong> SID for <strong>Hon Ventures LLC</strong> — the ISV master A2P Profile Bundle. Required when registering church brands.
-                                        Find it at:{' '}
-                                        <a href="https://console.twilio.com/us1/develop/sms/regulatory/a2p-registration" target="_blank" rel="noopener noreferrer" className="underline text-indigo-400 hover:text-indigo-300">
-                                            Twilio Console → Messaging → Regulatory → A2P Registration
-                                        </a>.
-                                    </p>
-                                    <div className="flex gap-2">
-                                        <input
-                                            type="text"
-                                            value={settings.twilioA2pProfileBundleSid || ''}
-                                            onChange={e => handleChange('twilioA2pProfileBundleSid', e.target.value.trim())}
-                                            className="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                                            placeholder="BNxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                                        />
-                                        <button
-                                            onClick={async () => {
-                                                setIsVerifying(true);
-                                                setMessage(null);
-                                                try {
-                                                    const base = (settings.apiBaseUrl || DEFAULT_API_URL).replace(/\/$/, '');
-                                                    const res = await fetch(`${base}/api/messaging/a2p-profile-sid`);
-                                                    const data = await res.json();
-                                                    if (!res.ok) { setMessage({ type: 'error', text: data.error || 'Failed to fetch A2P profiles' }); return; }
-                                                    handleChange('twilioA2pProfileBundleSid', data.primarySid);
-                                                    setMessage({ type: 'success', text: `Auto-filled A2P Bundle: ${data.friendlyName} (${data.status}) — ${data.primarySid}` });
-                                                } catch (e: any) {
-                                                    setMessage({ type: 'error', text: e.message || 'Failed to fetch from Twilio' });
-                                                } finally {
-                                                    setIsVerifying(false);
-                                                }
-                                            }}
-                                            disabled={isVerifying}
-                                            className="shrink-0 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 px-3 py-2 rounded-xl font-bold text-xs hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors disabled:opacity-50 whitespace-nowrap"
-                                        >
-                                            {isVerifying ? '...' : '🔍 Fetch from Twilio'}
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* API Key pair (optional, tighter scope than Auth Token) */}
-                                <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
-                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">API Key SID <span className="normal-case font-normal text-slate-400">(optional, preferred)</span></label>
-                                    <p className="text-[9px] text-slate-400 mb-2">Create scoped API Keys in Console → Account → API Keys &amp; Tokens. Recommended over the Auth Token.</p>
-                                    <div className="grid grid-cols-1 gap-3">
-                                        <input
-                                            type="text"
-                                            value={settings.twilioApiKeySid || ''}
-                                            onChange={e => handleChange('twilioApiKeySid', e.target.value)}
-                                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                                            placeholder="SKxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                                        />
-                                        <input
-                                            type="password"
-                                            value={settings.twilioApiKeySecret || ''}
-                                            onChange={e => handleChange('twilioApiKeySecret', e.target.value)}
-                                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                                            placeholder="API Key Secret"
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Webhook base URL */}
+                                {/* Webhook Base URL */}
                                 <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
                                     <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Webhook Base URL</label>
                                     <input
                                         type="text"
-                                        value={settings.twilioWebhookBaseUrl || ''}
-                                        onChange={e => handleChange('twilioWebhookBaseUrl', e.target.value)}
+                                        value={settings.smsWebhookBaseUrl || ''}
+                                        onChange={e => handleChange('smsWebhookBaseUrl', e.target.value)}
                                         className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                                        placeholder={settings.apiBaseUrl || DEFAULT_API_URL}
+                                        placeholder={settings.apiBaseUrl || 'https://api.example.com'}
                                     />
                                     <p className="text-[9px] text-slate-400 mt-1.5">
-                                        Defaults to Backend API URL above. Twilio will send inbound SMS + status callbacks here.
-                                        The generated webhook URLs are:<br/>
+                                        Defaults to Backend API URL above. SignalWire will POST inbound SMS + status callbacks here.<br/>
                                         <code className="text-[9px]">{`{base}/api/messaging/inbound`}</code><br/>
                                         <code className="text-[9px]">{`{base}/api/messaging/status`}</code>
                                     </p>
-
-                                    {/* Live webhook URL display */}
-                                    {(settings.twilioWebhookBaseUrl || settings.apiBaseUrl) && (
+                                    {(settings.smsWebhookBaseUrl || settings.apiBaseUrl) && (
                                         <div className="mt-3 space-y-1.5">
                                             {['/api/messaging/inbound', '/api/messaging/status'].map(path => {
-                                                const base = (settings.twilioWebhookBaseUrl || settings.apiBaseUrl || DEFAULT_API_URL).replace(/\/$/, '');
+                                                const base = (settings.smsWebhookBaseUrl || settings.apiBaseUrl || '').replace(/\/$/, '');
                                                 const url  = base + path;
                                                 return (
                                                     <div key={path} className="bg-slate-100 dark:bg-slate-800 rounded-lg px-3 py-1.5 flex items-center justify-between gap-2">
                                                         <code className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 truncate">{url}</code>
-                                                        <button
-                                                            onClick={() => navigator.clipboard.writeText(url)}
-                                                            className="text-slate-400 hover:text-indigo-500 transition-colors shrink-0 text-xs"
-                                                            title="Copy"
-                                                        >📋</button>
+                                                        <button onClick={() => navigator.clipboard.writeText(url)} className="text-slate-400 hover:text-indigo-500 transition-colors shrink-0 text-xs" title="Copy">Ã°Å¸â€œâ€¹</button>
                                                     </div>
                                                 );
                                             })}
@@ -794,13 +555,10 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                     )}
                                 </div>
 
-                                {/* Secondary Profiles Manager */}
-                                <SecondaryProfilesPanel apiBase={(settings.apiBaseUrl || DEFAULT_API_URL).replace(/\/$/, '')} />
-
                                 {/* Per-segment pricing */}
                                 <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
                                     <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Usage Estimate Pricing <span className="normal-case font-normal">(USD)</span></label>
-                                    <p className="text-[9px] text-slate-400 mb-3">Used only for the in-app cost estimate in the Analytics tab. Actual billing is in your Twilio Console.</p>
+                                    <p className="text-[9px] text-slate-400 mb-3">Used only for the in-app cost estimate. Actual billing is in your SignalWire Dashboard.</p>
                                     <div className="grid grid-cols-2 gap-3">
                                         <div>
                                             <label className="block text-[9px] font-bold text-slate-500 mb-1">SMS per segment</label>
@@ -812,66 +570,28 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                                     placeholder="0.0079"
                                                     step="0.0001"
                                                     min="0"
-                                                    value={settings.twilioSegmentCostUsd ?? 0.0079}
-                                                    onChange={e => handleChange('twilioSegmentCostUsd', parseFloat(e.target.value) || 0.0079)}
+                                                    value={settings.smsSegmentCostUsd ?? 0.0079}
+                                                    onChange={e => handleChange('smsSegmentCostUsd', parseFloat(e.target.value) || 0.0079)}
                                                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-7 pr-3 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
                                                 />
                                             </div>
                                         </div>
                                         <div>
-                                            <label className="block text-[9px] font-bold text-slate-500 mb-1">MMS per segment</label>
+                                            <label className="block text-[9px] font-bold text-slate-500 mb-1">MMS per message</label>
                                             <div className="relative">
                                                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">$</span>
                                                 <input
                                                     type="number"
-                                                    aria-label="MMS cost per segment in USD"
+                                                    aria-label="MMS cost per message in USD"
                                                     placeholder="0.0200"
                                                     step="0.001"
                                                     min="0"
-                                                    value={settings.twilioMmsSegmentCostUsd ?? 0.02}
-                                                    onChange={e => handleChange('twilioMmsSegmentCostUsd', parseFloat(e.target.value) || 0.02)}
+                                                    value={settings.smsMmsSegmentCostUsd ?? 0.02}
+                                                    onChange={e => handleChange('smsMmsSegmentCostUsd', parseFloat(e.target.value) || 0.02)}
                                                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-7 pr-3 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
                                                 />
                                             </div>
                                         </div>
-                                    </div>
-                                </div>
-
-                                {/* Feature toggles */}
-                                <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-3">
-                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Feature Flags</label>
-
-                                    <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">
-                                        <div>
-                                            <p className="text-xs font-bold text-slate-900 dark:text-white">Require A2P 10DLC Registration</p>
-                                            <p className="text-[10px] text-slate-400 leading-snug mt-0.5">Block number provisioning until the tenant has a registered Brand + Campaign. Required for US carrier compliance at scale.</p>
-                                        </div>
-                                        <button
-                                            role="switch"
-                                            aria-checked={settings.twilioRequireA2PRegistration ? 'true' : 'false'}
-                                            aria-label="Require A2P 10DLC Registration"
-                                            onClick={() => handleChange('twilioRequireA2PRegistration', !settings.twilioRequireA2PRegistration)}
-                                            className={`ml-4 shrink-0 w-12 h-6 rounded-full p-1 transition-colors ${settings.twilioRequireA2PRegistration ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'}`}
-                                        >
-                                            <div className={`w-4 h-4 bg-white rounded-full transition-transform ${settings.twilioRequireA2PRegistration ? 'translate-x-6' : ''}`} />
-                                        </button>
-                                    </div>
-
-                                    <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">
-                                        <div>
-                                            <p className="text-xs font-bold text-slate-900 dark:text-white">Carrier Lookup on Inbound Numbers</p>
-                                            <p className="text-[10px] text-slate-400 leading-snug mt-0.5">Enrich every inbound sender with carrier + line-type data via Twilio Lookup. Adds ~$0.005 per unique number.</p>
-                                        </div>
-                                        <button
-                                            role="switch"
-                                            aria-checked={settings.twilioEnableCarrierLookup ? 'true' : 'false'}
-                                            aria-label="Enable Carrier Lookup on Inbound Numbers"
-                                            onClick={() => handleChange('twilioEnableCarrierLookup', !settings.twilioEnableCarrierLookup)}
-                                            className={`ml-4 shrink-0 w-12 h-6 rounded-full p-1 transition-colors ${settings.twilioEnableCarrierLookup ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'}`}
-                                        >
-                                            <div className={`w-4 h-4 bg-white rounded-full transition-transform ${settings.twilioEnableCarrierLookup ? 'translate-x-6' : ''}`} />
-                                        </button>
-                                    </div>
                                     </div>
                                 </div>
 
@@ -879,25 +599,17 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                 <div className="pt-4 mt-2 flex items-center justify-between gap-3">
                                     <button
                                         onClick={async () => {
-                                            if (!settings.twilioMasterAccountSid?.startsWith('AC')) {
-                                                setMessage({ type: 'error', text: 'Account SID must start with "AC".' });
+                                            if (!settings.signalwireProjectId || !settings.signalwireApiToken || !settings.signalwireSpaceUrl) {
+                                                setMessage({ type: 'error', text: 'Project ID, API Token, and Space URL are all required.' });
                                                 return;
                                             }
-                                            if (!settings.twilioMasterAuthToken) {
-                                                setMessage({ type: 'error', text: 'Auth Token is required.' });
-                                                return;
-                                            }
-                                            // Quick smoke-test: hit the backend's available-numbers endpoint
-                                            const base = (settings.apiBaseUrl || DEFAULT_API_URL).replace(/\/$/, '');
+                                            const base = (settings.apiBaseUrl || '').replace(/\/$/, '');
                                             setIsVerifying(true);
                                             setMessage(null);
                                             try {
-                                                const res = await fetch(
-                                                    `${base}/api/messaging/available-numbers?churchId=test&areaCode=615`
-                                                );
+                                                const res = await fetch(`${base}/api/messaging/available-numbers?churchId=test&areaCode=615`);
                                                 if (res.ok || res.status === 400) {
-                                                    // 400 = missing churchId/areaCode param but credentials passed
-                                                    setMessage({ type: 'success', text: 'Twilio credentials verified successfully.' });
+                                                    setMessage({ type: 'success', text: 'SignalWire credentials verified successfully.' });
                                                 } else {
                                                     const data = await res.json().catch(() => ({}));
                                                     setMessage({ type: 'error', text: `Verification failed: ${data.error || res.status}` });
@@ -908,10 +620,10 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                                 setIsVerifying(false);
                                             }
                                         }}
-                                        disabled={isVerifying || !settings.twilioMasterAccountSid || !settings.twilioMasterAuthToken}
+                                        disabled={isVerifying || !settings.signalwireProjectId || !settings.signalwireApiToken}
                                         className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
                                     >
-                                        {isVerifying ? 'Testing…' : 'Test Connection'}
+                                        {isVerifying ? 'TestingÃ¢â‚¬Â¦' : 'Test Connection'}
                                     </button>
 
                                     <button
@@ -919,14 +631,13 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                         disabled={isSaving}
                                         className="bg-indigo-600 text-white px-5 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-700 transition-all disabled:opacity-50 shadow-sm"
                                     >
-                                        {isSaving ? 'Saving…' : 'Save Twilio Config'}
+                                        {isSaving ? 'SavingÃ¢â‚¬Â¦' : 'Save SignalWire Config'}
                                     </button>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
-
 
                 {/* Stripe & Modules */}
                 <div className="space-y-8">
@@ -1085,6 +796,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
 
                 </div>
             </div>
+        </div>
         )}
 
 
@@ -1167,10 +879,10 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                     </div>
                 </div>
 
-                {/* ── Grow Integration ───────────────────────────────────── */}
+                {/* Ã¢â€â‚¬Ã¢â€â‚¬ Grow Integration Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
                 <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] border border-slate-100 dark:border-slate-800 shadow-sm">
                     <div className="flex items-center gap-3 mb-6">
-                        <div className="w-9 h-9 rounded-2xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-lg">🌱</div>
+                        <div className="w-9 h-9 rounded-2xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-lg">Ã°Å¸Å’Â±</div>
                         <div>
                             <h3 className="text-lg font-black text-slate-900 dark:text-white">Grow Integration</h3>
                             <p className="text-[10px] text-slate-400 mt-0.5">Configure the shared secret that authorises the Grow Application to send emails through Pastoral Care.</p>
@@ -1194,7 +906,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                 }}
                                 className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
                             >
-                                <option value="">— choose a tenant —</option>
+                                <option value="">Ã¢â‚¬â€ choose a tenant Ã¢â‚¬â€</option>
                                 {churches.map(c => (
                                     <option key={c.id} value={c.id}>{c.name} ({c.id})</option>
                                 ))}
@@ -1221,7 +933,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                                 onChange={e => setGrowSecret(e.target.value)}
                                                 readOnly={!growSecretVisible}
                                                 className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 pr-24"
-                                                placeholder="Generate a secret below…"
+                                                placeholder="Generate a secret belowÃ¢â‚¬Â¦"
                                             />
                                             <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
                                                 <button
@@ -1229,7 +941,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                                     className="text-slate-400 hover:text-indigo-500 transition-colors p-1 text-xs"
                                                     title={growSecretVisible ? 'Hide' : 'Show'}
                                                 >
-                                                    {growSecretVisible ? '🙈' : '👁'}
+                                                    {growSecretVisible ? 'Ã°Å¸â„¢Ë†' : 'Ã°Å¸â€˜Â'}
                                                 </button>
                                                 {growSecret && (
                                                     <button
@@ -1237,7 +949,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                                         className="text-slate-400 hover:text-indigo-500 transition-colors p-1 text-xs"
                                                         title="Copy"
                                                     >
-                                                        📋
+                                                        Ã°Å¸â€œâ€¹
                                                     </button>
                                                 )}
                                             </div>
@@ -1254,7 +966,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                             }}
                                             className="shrink-0 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 px-3 py-2 rounded-xl font-bold text-xs hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-colors whitespace-nowrap border border-emerald-200 dark:border-emerald-800"
                                         >
-                                            ✨ Generate
+                                            Ã¢Å“Â¨ Generate
                                         </button>
                                     </div>
                                 </div>
@@ -1265,7 +977,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                             ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
                                             : 'bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
                                     }`}>
-                                        {growSecretMsg.type === 'success' ? '✅' : '❌'} {growSecretMsg.text}
+                                        {growSecretMsg.type === 'success' ? 'Ã¢Å“â€¦' : 'Ã¢ÂÅ’'} {growSecretMsg.text}
                                     </div>
                                 )}
 
@@ -1296,7 +1008,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                         }}
                                         className="bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all disabled:opacity-50 shadow-sm"
                                     >
-                                        {growSecretSaving ? 'Saving…' : 'Save Secret to Tenant'}
+                                        {growSecretSaving ? 'SavingÃ¢â‚¬Â¦' : 'Save Secret to Tenant'}
                                     </button>
                                 </div>
 
@@ -1304,7 +1016,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                 <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-2xl p-5 space-y-2">
                                     <p className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400">Setup Instructions for the Grow App</p>
                                     <ol className="text-[11px] text-slate-600 dark:text-slate-300 space-y-1.5 list-decimal list-inside leading-relaxed">
-                                        <li>In the Grow Application, navigate to <strong>Settings → Integrations</strong>.</li>
+                                        <li>In the Grow Application, navigate to <strong>Settings Ã¢â€ â€™ Integrations</strong>.</li>
                                         <li>Find the <strong>Pastoral Care Integration</strong> section.</li>
                                         <li>Set <code className="bg-slate-200 dark:bg-slate-700 px-1 rounded">PASTORAL_CARE_API_SECRET</code> to the secret generated above.</li>
                                         <li>Set the endpoint to <code className="bg-slate-200 dark:bg-slate-700 px-1 rounded">{(settings.apiBaseUrl || DEFAULT_API_URL).replace(/\/$/, '')}/api/integrations/grow/daily-email</code></li>
@@ -1372,7 +1084,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                             className="text-slate-400 hover:text-white transition-colors"
                                             title="Copy to Clipboard"
                                         >
-                                            📋
+                                            Ã°Å¸â€œâ€¹
                                         </button>
                                     </div>
                                     <p className="text-[10px] text-slate-500 mt-2">
@@ -1543,7 +1255,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                         >
                             {isLoading ? (
                                 <><span className="animate-spin inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full"></span> Loading...</>
-                            ) : '↻ Refresh'}
+                            ) : 'Ã¢â€ Â» Refresh'}
                         </button>
                     </div>
 
@@ -1591,7 +1303,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                 onClick={() => { setLogFilter(''); setLogLevelFilter(''); setLogSourceFilter(''); }}
                                 className="text-[10px] font-bold text-rose-500 hover:text-rose-700 px-3 py-2 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors"
                             >
-                                ✕ Clear Filters
+                                Ã¢Å“â€¢ Clear Filters
                             </button>
                         )}
                     </div>
@@ -1689,7 +1401,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                                     <div className="flex items-start justify-between gap-2">
                                                         <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{log.message}</p>
                                                         {hasContext && (
-                                                            <span className="text-[9px] text-slate-400 shrink-0 mt-0.5">{isExpanded ? '▲' : '▼'} details</span>
+                                                            <span className="text-[9px] text-slate-400 shrink-0 mt-0.5">{isExpanded ? 'Ã¢â€“Â²' : 'Ã¢â€“Â¼'} details</span>
                                                         )}
                                                     </div>
                                                 </td>
@@ -1709,7 +1421,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                 {logs.length === 0 && !isLoading && (
                                     <tr>
                                         <td colSpan={5} className="p-12 text-center">
-                                            <div className="text-4xl mb-3">📋</div>
+                                            <div className="text-4xl mb-3">Ã°Å¸â€œâ€¹</div>
                                             <p className="text-slate-400 text-sm font-bold">No logs found</p>
                                             <p className="text-slate-400 text-xs mt-1">Logs will appear here after sync or webhook events occur.</p>
                                         </td>

@@ -1,5 +1,5 @@
 import { createServerLogger } from '../services/logService';
-import type { PersonInfo } from './twilioSend';
+import type { PersonInfo } from './smsSend';
 
 // ─── SMS Campaign Scheduler ───────────────────────────────────────────────────
 // Polls Firestore every 60 seconds for SmsCampaigns with status='scheduled'
@@ -411,7 +411,7 @@ async function runWorkflowStepExecutor(db: any): Promise<void> {
 
                 // ── Fire the step ─────────────────────────────────────────────
                 if (channelType === 'sms' || channelType === 'mms') {
-                    const { sendBulkInternal } = await import('./twilioSend.js');
+                    const { sendBulkInternal } = await import('./smsSend.js');
                     await sendBulkInternal({
                         db,
                         churchId,
@@ -711,7 +711,7 @@ export function startSmsCampaignScheduler(db: any): void {
                             }
 
                             // Delegate actual send to the send-bulk endpoint
-                            const { sendBulkInternal } = await import('./twilioSend.js');
+                            const { sendBulkInternal } = await import('./smsSend.js');
                             result = await sendBulkInternal({
                                 db,
                                 churchId,

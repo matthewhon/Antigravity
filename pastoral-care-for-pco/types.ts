@@ -472,41 +472,22 @@ export interface SystemSettings {
     sendGridFromName?: string;  // Default "From Name" if campaign doesn't specify one
     // Scripture Library feature flag
     enableLibrary?: boolean;
-    // -- Twilio SMS (Master Account) -------------------------------------------
-    /** Twilio master Account SID � used to create per-church sub-accounts */
-    twilioMasterAccountSid?: string;
-    /** Twilio master Auth Token */
-    twilioMasterAuthToken?: string;
+    // -- SignalWire SMS ---------------------------------------------------------
+    /** SignalWire Project ID (UUID) — from Dashboard → API → API Tokens */
+    signalwireProjectId?: string;
+    /** SignalWire API Token — from Dashboard → API → API Tokens */
+    signalwireApiToken?: string;
+    /** SignalWire Space URL, e.g. "barnabassoftware.signalwire.com" */
+    signalwireSpaceUrl?: string;
     /**
-     * Base URL where the backend is reachable by Twilio's webhook callbacks.
+     * Base URL where the backend is reachable for SignalWire webhook callbacks.
      * Defaults to apiBaseUrl.  Example: https://api.pastoralcare.barnabassoftware.com
      */
-    twilioWebhookBaseUrl?: string;
+    smsWebhookBaseUrl?: string;
     /** Cost per SMS segment in USD, used for the in-app usage estimate (default 0.0079) */
-    twilioSegmentCostUsd?: number;
-    /** Cost per MMS segment in USD (default 0.0200) */
-    twilioMmsSegmentCostUsd?: number;
-    /** When true, require A2P 10DLC brand + campaign registration before provisioning numbers */
-    twilioRequireA2PRegistration?: boolean;
-    /** When true, perform a Carrier Lookup on every inbound number (adds ~$0.005/lookup) */
-    twilioEnableCarrierLookup?: boolean;
-    /** Twilio API Key SID (alternative to Auth Token for tighter scope) */
-    twilioApiKeySid?: string;
-    /** Twilio API Key Secret */
-    twilioApiKeySecret?: string;
-    /**
-     * Primary Customer Profile SID (BU...) for Hon Ventures LLC.
-     * This is Barnabas Software's master ISV profile in Twilio Trust Hub.
-     * It must be assigned as an entity in every secondary (per-church) customer profile
-     * so Twilio can validate the ISV chain before approving. Set in System Settings → Twilio SMS.
-     */
-    primaryCustomerProfileSid?: string;
-    /**
-     * A2P Profile Bundle SID (BN...) — the ISV master A2P profile bundle for Hon Ventures LLC.
-     * Required when submitting brand registrations via the Twilio messaging.v1.brandRegistrations API.
-     * Find it at: Twilio Console → Messaging → Regulatory → A2P Registration.
-     */
-    twilioA2pProfileBundleSid?: string;
+    smsSegmentCostUsd?: number;
+    /** Cost per MMS in USD (default 0.0200) */
+    smsMmsSegmentCostUsd?: number;
 }
 
 export interface TemplateSettings {
@@ -569,7 +550,7 @@ export interface EmailCampaign {
     templateSettings?: TemplateSettings;
     // Scheduling
     sendAt?: string | null;         // ISO string display value set by UI
-    scheduledAt?: number | null;    // Epoch ms � authoritative trigger for the scheduler
+    scheduledAt?: number | null;    // Epoch ms  authoritative trigger for the scheduler
     sentAt?: number | null;
     recurringFrequency?: 'daily' | 'weekly' | 'monthly' | null;
     lastSentAt?: number | null;
@@ -697,7 +678,7 @@ export interface PcoRegistrationEvent {
     visibility?: string | null;    // 'public' | 'private' | 'link_only'
     registrationType?: string | null; // 'detailed' | 'simple'
     // Dates
-    startsAt?: string | null;      // ISO � first event date
+    startsAt?: string | null;      // ISO  first event date
     endsAt?: string | null;
     openAt?: string | null;        // when registration opens
     closeAt?: string | null;       // when registration closes
@@ -884,113 +865,15 @@ export interface ChurchNote {
 export interface SmsSettings {
     /** Whether SMS module is enabled for this tenant */
     smsEnabled?: boolean;
-    /** Twilio Sub-Account SID for this church */
-    twilioSubAccountSid?: string;
-    /** Twilio Sub-Account Auth Token */
-    twilioSubAccountAuthToken?: string;
-    /** E.164 Twilio number assigned to this church, e.g. +15551234567 */
-    twilioPhoneNumber?: string;
-    /** Twilio Phone Number SID */
-    twilioPhoneSid?: string;
-
-    // -- A2P 10DLC Brand Registration ------------------------------------------
-    /** A2P 10DLC registration status */
-    twilioA2pStatus?: 'not_started' | 'pending' | 'in_review' | 'approved' | 'failed';
-    /** Twilio Brand Registration SID (e.g. BN...) */
-    twilioBrandSid?: string;
-    /** Twilio Messaging Service Campaign SID (e.g. QE...) */
-    twilioCampaignSid?: string;
-    /** Twilio Messaging Service SID (e.g. MG...) � required for campaigns */
-    twilioMessagingServiceSid?: string;
-    /** Legal business name (must match IRS / EIN records) */
-    a2pBusinessName?: string;
-    /** Federal Employer Identification Number (EIN) e.g. 12-3456789 */
-    a2pEin?: string;
-    /** Business type for 10DLC registration — must match Twilio's exact enum value */
-    a2pBusinessType?: 'Sole Proprietorship' | 'Partnership' | 'Limited Liability Corporation' | 'Co-operative' | 'Non-profit Corporation' | 'Corporation';
-    /** Industry vertical for TCR brand registration */
-    a2pVertical?: string;
-    /** Website URL submitted during brand registration */
-    a2pWebsite?: string;
-    /** Stock ticker (only for publicly traded entities) */
-    a2pStockTicker?: string;
-    /** Stock exchange (only for publicly traded entities) */
-    a2pStockExchange?: string;
-    /** Contact first name for brand registration */
-    a2pContactFirstName?: string;
-    /** Contact last name */
-    a2pContactLastName?: string;
-    /** Contact email */
-    a2pContactEmail?: string;
-    /** Contact phone (E.164) */
-    a2pContactPhone?: string;
-    /**
-     * Contact's specific job title, e.g. "Senior Pastor", "Executive Director".
-     * Maps to Twilio Trust Hub authorized_representative_1 `business_title`.
-     */
-    a2pContactJobTitle?: string;
-    /**
-     * Contact's job level — must be one of Twilio's accepted enum values:
-     * Director | VP | GM | CEO | CFO | General Counsel
-     * Maps to Twilio Trust Hub authorized_representative_1 `job_position`.
-     */
-    a2pContactJobPosition?: 'Director' | 'VP' | 'GM' | 'CEO' | 'CFO' | 'General Counsel';
-    /** Street address for brand registration */
-    a2pAddress?: string;
-    /** City */
-    a2pCity?: string;
-    /** 2-letter state code */
-    a2pState?: string;
-    /** ZIP code */
-    a2pZip?: string;
-    /** Use case / campaign type e.g. "MIXED" | "2FA" | "CUSTOMER_CARE" | "DELIVERY_NOTIFICATION" | "MARKETING" | "MIXED" | "POLLING_VOTING" | "PUBLIC_SERVICE_ANNOUNCEMENT" | "SECURITY_ALERT" */
-    a2pUseCaseCategory?: string;
-    /** Short description of how the church uses SMS (140 chars max) */
-    a2pDescription?: string;
-    /** Sample message 1 submitted to TCR */
-    a2pSampleMessage1?: string;
-    /** Sample message 2 submitted to TCR */
-    a2pSampleMessage2?: string;
-    /** Whether subscribers can opt in via a web form */
-    a2pOptInWebForm?: boolean;
-    /** Whether subscribers opt in via a text-to-join keyword */
-    a2pOptInSmsKeyword?: boolean;
-    /** Whether subscribers opt in via a paper / verbal process */
-    a2pOptInPaperVoice?: boolean;
-    /** Freeform description of opt-in process */
-    a2pOptInDescription?: string;
-    /** Epoch ms when A2P form was submitted to Twilio */
-    a2pSubmittedAt?: number;
-    /** Epoch ms of last Twilio status check */
-    a2pLastStatusCheck?: number;
-    /** Failure reason returned by Twilio (if status = failed) */
-    a2pFailureReason?: string | null;
-    /** Twilio Customer Profile Bundle SID � required for full brand registration */
-    twilioCustomerProfileSid?: string;
-    /** Twilio A2P Profile Bundle SID � required for full brand registration */
-    twilioA2pProfileSid?: string;
-    twilioEndUserSid?: string;
-    twilioRepEndUserSid?: string;
-    twilioRep2EndUserSid?: string;
-    twilioAddressSid?: string;
-    twilioSupportingDocSid?: string;
-    /** Epoch ms when the SupportingDocument was created — used to track Twilio's 30-day PII data retention limit */
-    twilioSupportingDocCreatedAt?: number;
-    twilioCustomerProfileStatus?: string;
-    twilioCustomerProfileEvaluation?: string;
-    twilioCustomerProfileCreatedAt?: number;
-    twilioCustomerProfileUpdatedAt?: number;
-    a2pRep2FirstName?: string;
-    a2pRep2LastName?: string;
-    a2pRep2Email?: string;
-    a2pRep2Phone?: string;
-    a2pRep2JobTitle?: string;
-    a2pRep2JobPosition?: string;
+    /** E.164 phone number assigned to this church, e.g. +15551234567 */
+    smsPhoneNumber?: string;
+    /** SignalWire Phone Number SID */
+    smsPhoneSid?: string;
 
     // -- Opt-Out / Sender ID Settings ------------------------------------------
     /** Display name used as sender context in message headers */
     senderName?: string;
-    /** Custom opt-out reply (STOP keyword auto-response). If blank, Twilio's default is used. */
+    /** Custom opt-out reply (STOP keyword auto-response). If blank, provider default is used. */
     optOutMessage?: string;
     /** Custom opt-in / double-opt-in reply (START keyword) */
     optInMessage?: string;
@@ -1020,6 +903,52 @@ export interface SmsSettings {
     termsAcceptedAt?: number;
     /** User ID of the admin who accepted the terms */
     termsAcceptedByUserId?: string;
+
+    // -- Deprecated Twilio / A2P fields (kept for backward-compat; not used by SignalWire) --
+    /** @deprecated Use smsPhoneNumber instead */
+    twilioPhoneNumber?: string;
+    /** @deprecated Use smsPhoneSid instead */
+    twilioPhoneSid?: string;
+    /** @deprecated Sub-account no longer used (SignalWire is single-project) */
+    twilioSubAccountSid?: string;
+    /** @deprecated Sub-account no longer used */
+    twilioSubAccountAuthToken?: string;
+    /** @deprecated Messaging service SID (Twilio A2P) */
+    twilioMessagingServiceSid?: string;
+    /** @deprecated A2P brand SID */
+    twilioBrandSid?: string;
+    /** @deprecated A2P campaign SID */
+    twilioCampaignSid?: string;
+    /** @deprecated A2P registration status */
+    twilioA2pStatus?: string;
+    /** @deprecated A2P customer profile SID */
+    twilioCustomerProfileSid?: string;
+    /** @deprecated A2P customer profile status */
+    twilioCustomerProfileStatus?: string;
+    /** @deprecated A2P business registration fields */
+    a2pBusinessName?: string;
+    a2pEin?: string;
+    a2pBusinessType?: string;
+    a2pVertical?: string;
+    a2pWebsite?: string;
+    a2pAddress?: string;
+    a2pCity?: string;
+    a2pState?: string;
+    a2pZip?: string;
+    a2pContactFirstName?: string;
+    a2pContactLastName?: string;
+    a2pContactEmail?: string;
+    a2pContactPhone?: string;
+    a2pContactJobTitle?: string;
+    a2pContactJobPosition?: string;
+    a2pSampleMessage1?: string;
+    a2pSampleMessage2?: string;
+    a2pOptInWebForm?: boolean;
+    a2pOptInSmsKeyword?: boolean;
+    a2pOptInPaperVoice?: boolean;
+    a2pOptInDescription?: string;
+    a2pUseCaseCategory?: string;
+    a2pDescription?: string;
 }
 
 export type SmsDirection = 'inbound' | 'outbound';
@@ -1040,7 +969,7 @@ export interface SmsMessage {
     mediaUrls?: string[];
     status: SmsStatus;
     errorCode?: string | null;
-    twilioSid?: string | null;
+    messageSid?: string | null;
     /** userId of the staff member who sent it (outbound), or null for inbound / auto-reply */
     sentBy?: string | null;
     sentByName?: string | null;
@@ -1203,7 +1132,7 @@ export interface SmsInbox {
  * Stored in the top-level `twilioNumbers` collection (one doc per number).
  * Replaces the single-number pattern in Church.smsSettings.
  */
-export interface TwilioPhoneNumber {
+export interface SmsPhoneNumber {
     id: string;                   // Firestore doc ID (auto)
     churchId: string;
     /** E.164 phone number, e.g. "+15551234567" */

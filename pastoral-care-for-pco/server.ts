@@ -19,10 +19,10 @@ import { getDb } from './backend/firebase';
 import { handleGeminiProxy } from './backend/geminiProxy';
 import { provisionSubuser, authenticateDomain, verifyDomain, diagnoseDomain } from './backend/emailProvisioning';
 import { getPublicGroups, getPublicRegistrations, getPublicEvents, serveWidgetScript, getPublicForms } from './backend/publicApi.js';
-import { getAvailableNumbers, provisionTwilioNumber, releaseTwilioNumber, checkA2pStatus, createCustomerProfile, deleteCustomerProfile, refreshCustomerProfileStatus, addTwilioNumber, releaseSpecificNumber, updateNumberSettings, setDefaultNumber, trustHubStatusCallback, registerBrand, createMessagingService, registerCampaign, assignNumbersToService, checkCampaignStatus, fetchPrimaryProfileSid, fetchA2pProfileSid, lookupProfileSidsForChurch, diagnoseAndRepairA2p, listSecondaryProfiles, deleteSecondaryProfile } from './backend/twilioProvisioning';
-import { handleInboundSms } from './backend/twilioInbound';
-import { sendIndividual, sendBulk } from './backend/twilioSend';
-import { handleStatusCallback } from './backend/twilioWebhookStatus';
+import { getAvailableNumbers, provisionSmsNumber, releaseSpecificNumber, addSmsNumber, updateNumberSettings, setDefaultNumber } from './backend/smsProvisioning';
+import { handleInboundSms } from './backend/smsInbound';
+import { sendIndividual, sendBulk } from './backend/smsSend';
+import { handleStatusCallback } from './backend/smsWebhookStatus';
 import { startSmsCampaignScheduler } from './backend/smsCampaignScheduler';
 import { workflowEnrollList, workflowEnrollPreview } from './backend/workflowEnrollEndpoint';
 import { handleGrowDailyEmail, setupGrowIntegration, requestGrowAccess, getGrowStatus } from './backend/growIntegration';
@@ -179,24 +179,15 @@ async function startServer() {
     app.get('/widget.js', serveWidgetScript);
 
     // ─── SMS / Messaging Endpoints ────────────────────────────────────────────
-    // Twilio inbound webhook — use raw body so Twilio's x-www-form-urlencoded POST parses correctly
+    // SignalWire inbound webhook — use urlencoded so form-encoded POST parses correctly
     app.post('/api/messaging/inbound', express.urlencoded({ extended: false }), handleInboundSms);
-    // Twilio delivery status callback
+    // SignalWire delivery status callback
     app.post('/api/messaging/status', express.urlencoded({ extended: false }), handleStatusCallback);
     // Provisioning
     app.get('/api/messaging/available-numbers', express.json(), getAvailableNumbers);
-    app.post('/api/messaging/provision', express.json(), provisionTwilioNumber);
-    app.post('/api/messaging/release', express.json(), releaseTwilioNumber);
-    // NOTE: /api/messaging/a2p-register was deprecated and removed — use /api/messaging/register-brand instead
-    app.get('/api/messaging/a2p-status', checkA2pStatus);
-    app.post('/api/messaging/a2p-status', express.json(), checkA2pStatus); // also accept POST
-    app.post('/api/messaging/create-customer-profile', express.json(), createCustomerProfile);
-    app.delete('/api/messaging/customer-profile', express.json(), deleteCustomerProfile);
-    app.get('/api/messaging/customer-profile-status', refreshCustomerProfileStatus);  // manual refresh from UI
-    // TrustHub status webhook — Twilio posts form-urlencoded when a bundle status changes
-    app.post('/api/messaging/trust-hub-status', express.urlencoded({ extended: false }), trustHubStatusCallback);
+    app.post('/api/messaging/provision', express.json(), provisionSmsNumber);
     // Multi-number endpoints
-    app.post('/api/messaging/add-number', express.json(), addTwilioNumber);
+    app.post('/api/messaging/add-number', express.json(), addSmsNumber);
     app.post('/api/messaging/release-number', express.json(), releaseSpecificNumber);
     app.patch('/api/messaging/number-settings', express.json(), updateNumberSettings);
     app.post('/api/messaging/set-default-number', express.json(), setDefaultNumber);
@@ -206,25 +197,6 @@ async function startServer() {
     // Workflow bulk-enrollment from a PCO List or Group
     app.post('/api/messaging/workflow-enroll-list', express.json(), workflowEnrollList);
     app.post('/api/messaging/workflow-enroll-preview', express.json(), workflowEnrollPreview);
-    // A2P full pipeline (brand → service → campaign → numbers)
-    app.post('/api/messaging/register-brand', express.json(), registerBrand);
-    app.post('/api/messaging/create-messaging-service', express.json(), createMessagingService);
-    app.post('/api/messaging/register-campaign', express.json(), registerCampaign);
-    app.post('/api/messaging/assign-numbers-to-service', express.json(), assignNumbersToService);
-    app.get('/api/messaging/campaign-status', checkCampaignStatus);
-    app.post('/api/messaging/campaign-status', express.json(), checkCampaignStatus);
-    // Fetch primary customer profile BU... SID from master Twilio account
-    app.get('/api/messaging/primary-profile-sid', fetchPrimaryProfileSid);
-    // Fetch A2P Profile Bundle BN... SID from master Twilio account
-    app.get('/api/messaging/a2p-profile-sid', fetchA2pProfileSid);
-    // Auto-discover Customer Profile + A2P Profile SIDs from the brand registration or TrustHub list
-    app.get('/api/messaging/lookup-profile-sids', lookupProfileSidsForChurch);
-    // Diagnose + repair a church with a corrupted A2P pipeline (wrong account, missing SIDs, etc.)
-    app.post('/api/messaging/diagnose-repair', express.json(), diagnoseAndRepairA2p);
-    // List all secondary (non-primary) Customer Profiles on the master account
-    app.get('/api/messaging/secondary-profiles', listSecondaryProfiles);
-    // Delete a specific secondary profile by SID (draft or twilio-rejected only)
-    app.delete('/api/messaging/secondary-profile', express.json(), deleteSecondaryProfile);
 
     // ─── SMS Agent: Website Scanner ─────────────────────────────────────────────
     // Fetches a church website URL server-side, extracts visible text, and uses
@@ -637,7 +609,7 @@ Return ONLY the JSON object, no markdown, no explanation:`;
           'sms_campaigns',
           'sms_messages',
           'sms_keywords',
-          'twilioNumbers',
+          'smsNumbers',
           'polls',
           'poll_responses',
           'notes',
