@@ -747,7 +747,7 @@ export const handleCampaignStatusWebhook = async (req: any, res: any) => {
         }
 
         // Try to find a church with this campaign ID or brand ID
-        let query = db.collection('churches');
+        let query: any = db.collection('churches');
         if (campaignId) {
             query = query.where('smsSettings.campaignId', '==', campaignId);
         } else if (brandId) {
@@ -806,7 +806,7 @@ export const handleAssignmentStatusWebhook = async (req: any, res: any) => {
             return;
         }
 
-        let query = db.collection('smsNumbers');
+        let query: any = db.collection('smsNumbers');
         if (orderId) {
             query = query.where('campaignAssignmentOrderId', '==', orderId);
         } else if (body.phone_number) {

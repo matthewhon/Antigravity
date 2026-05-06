@@ -17,7 +17,9 @@ import { PcoImportModal } from './PcoImportModal';
 import MessagingModule from './MessagingModule';
 import QrCodeGenerator from './QrCodeGenerator';
 import { EmailCampaign, TemplateSettings, PcoList, Church, User, EmailUnsubscribe, SmsOptOut } from '../types';
-  Trash2, Eye, Pencil, Loader2, X, List, UserMinus, Search, Copy, Globe, BarChart2, MessageSquare, Phone
+import { 
+  Trash2, Eye, Pencil, Loader2, X, List, UserMinus, Search, Copy, Globe, BarChart2, MessageSquare, Phone,
+  Mail, CheckCircle, Circle, ChevronUp, ChevronDown, Clock, Calendar, Plus, Send, ArrowLeft, AlignLeft, Users, AtSign, FileText
 } from 'lucide-react';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
