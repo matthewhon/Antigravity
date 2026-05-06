@@ -222,8 +222,22 @@ export const sendIndividual = async (req: any, res: any) => {
 
         return res.json({ success: true, messageSid: msg.sid, segments });
     } catch (e: any) {
-        log.error(`[Send] sendIndividual failed: ${e.message}`, 'system', { churchId, toPhone }, churchId);
-        return res.status(500).json({ error: e.message || 'Send failed' });
+        // Extract structured error info from SignalWire SDK errors
+        // (per Core API Error Codes spec: e.code contains identifiers like
+        // 'inactive_campaign', 'rate_limit_exceeded', 'invalid_from_number', etc.)
+        const errorCode   = e.code || e.errorCode || null;
+        const errorStatus = e.status || null;
+
+        log.error(
+            `[Send] sendIndividual failed: ${e.message}`,
+            'system',
+            { churchId, toPhone, errorCode, errorStatus },
+            churchId
+        );
+        return res.status(errorStatus || 500).json({
+            error: e.message || 'Send failed',
+            errorCode,
+        });
     }
 };
 
@@ -310,8 +324,9 @@ export async function sendBulkInternal(params: {
                 sent++;
             } catch (e: any) {
                 failed++;
-                errors.push({ phone: to, error: e.message });
-                log.warn(`[BulkSend] Failed to send to ${to}: ${e.message}`, 'system', { campaignId, to }, churchId);
+                const errorCode = e.code || e.errorCode || null;
+                errors.push({ phone: to, error: e.message, ...(errorCode ? { errorCode } : {}) } as any);
+                log.warn(`[BulkSend] Failed to send to ${to}: ${e.message} (code: ${errorCode || 'none'})`, 'system', { campaignId, to, errorCode }, churchId);
             }
         }));
 
@@ -356,7 +371,8 @@ export const sendBulk = async (req: any, res: any) => {
         return res.json({ success: true, ...result });
     } catch (e: any) {
         const log = createServerLogger(db);
-        log.error(`[BulkSend] sendBulk HTTP failed: ${e.message}`, 'system', { churchId, campaignId }, churchId);
-        return res.status(500).json({ error: e.message || 'Bulk send failed' });
+        const errorCode = e.code || e.errorCode || null;
+        log.error(`[BulkSend] sendBulk HTTP failed: ${e.message} (code: ${errorCode || 'none'})`, 'system', { churchId, campaignId, errorCode }, churchId);
+        return res.status(e.status || 500).json({ error: e.message || 'Bulk send failed', errorCode });
     }
 };

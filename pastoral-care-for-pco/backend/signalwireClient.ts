@@ -3,6 +3,23 @@ import https from 'https';
 import { getDb } from './firebase';
 
 /**
+ * Sanitize the SignalWire Space URL to prevent malformed API URLs.
+ * Handles common admin input mistakes:
+ *   - "https://demo.signalwire.com" → "demo.signalwire.com"
+ *   - "demo.signalwire.com/"        → "demo.signalwire.com"
+ *   - "  demo.signalwire.com  "      → "demo.signalwire.com"
+ *
+ * Per SignalWire Core API Base URL spec, the space URL is just the hostname
+ * (e.g., "demo.signalwire.com"), and the scheme is added by the caller.
+ */
+function sanitizeSpaceUrl(raw: string): string {
+    return raw
+        .trim()
+        .replace(/^https?:\/\//i, '')   // Strip scheme if accidentally included
+        .replace(/\/+$/, '');            // Strip trailing slashes
+}
+
+/**
  * Returns a SignalWire RestClient initialised with credentials stored in
  * Firestore system/settings.  The client exposes the same API surface as the
  * Twilio Node.js SDK — messages.create(), incomingPhoneNumbers.create(),
@@ -14,7 +31,7 @@ export async function getSignalWireClient(): Promise<any> {
 
     const projectId = (data.signalwireProjectId  || '').trim();
     const apiToken  = (data.signalwireApiToken   || '').trim();
-    const spaceUrl  = (data.signalwireSpaceUrl   || '').trim();
+    const spaceUrl  = sanitizeSpaceUrl(data.signalwireSpaceUrl || '');
 
     if (!projectId || !apiToken || !spaceUrl) {
         throw new Error(
@@ -24,6 +41,29 @@ export async function getSignalWireClient(): Promise<any> {
     }
 
     return RestClient(projectId, apiToken, { signalwireSpaceUrl: spaceUrl });
+}
+
+/**
+ * Validates that the configured SignalWire API token has the minimum required
+ * permissions. Call on server startup to catch misconfiguration early.
+ * Required token scopes: messaging, numbers, management.
+ */
+export async function validateSignalWireCredentials(): Promise<{ valid: boolean; error?: string }> {
+    try {
+        const client = await getSignalWireClient();
+        // Minimal read-only call to verify the token works and has number-read scope
+        await client.incomingPhoneNumbers.list({ limit: 1 });
+        return { valid: true };
+    } catch (e: any) {
+        if (e.status === 401 || e.message?.includes('401')) {
+            return {
+                valid: false,
+                error: 'SignalWire API token is invalid or missing required scopes (messaging, numbers, management). '
+                     + 'Check API Credentials in the SignalWire Dashboard.',
+            };
+        }
+        return { valid: false, error: e.message };
+    }
 }
 
 /** Read the webhook base URL (same logic as before, provider-neutral field first). */
@@ -120,7 +160,7 @@ export async function callSignalWireApi(
     const data      = await getSystemSettings();
     const projectId = (data.signalwireProjectId || '').trim();
     const apiToken  = (data.signalwireApiToken  || '').trim();
-    const spaceUrl  = (data.signalwireSpaceUrl  || '').trim();
+    const spaceUrl  = sanitizeSpaceUrl(data.signalwireSpaceUrl || '');
 
     if (!projectId || !apiToken || !spaceUrl) {
         throw new Error('SignalWire credentials are not fully configured in System Settings.');
@@ -144,7 +184,7 @@ export async function callRegistryApi(
     const data      = await getSystemSettings();
     const projectId = (data.signalwireProjectId || '').trim();
     const apiToken  = (data.signalwireApiToken  || '').trim();
-    const spaceUrl  = (data.signalwireSpaceUrl  || '').trim();
+    const spaceUrl  = sanitizeSpaceUrl(data.signalwireSpaceUrl || '');
 
     if (!projectId || !apiToken || !spaceUrl) {
         throw new Error('SignalWire credentials are not fully configured in System Settings.');
@@ -157,6 +197,34 @@ export async function callRegistryApi(
         apiToken,
         body
     );
+}
+
+/**
+ * Fetches all pages from a paginated SignalWire REST endpoint.
+ * Follows the `links.next` pattern per the Core API paging spec:
+ *   { "links": { "self": "...", "next": "...", ... }, "data": [...] }
+ *
+ * @param path  Initial path (e.g. '/brands')
+ * @returns     Flat array of all items across all pages
+ */
+export async function callRegistryApiPaginated(
+    path: string,
+): Promise<any[]> {
+    const allData: any[] = [];
+    let currentPath: string | null = path;
+
+    while (currentPath) {
+        const result = await callRegistryApi(currentPath, 'GET');
+        if (Array.isArray(result.data)) {
+            allData.push(...result.data);
+        } else if (result.data) {
+            allData.push(result.data);
+        }
+        // Follow the pagination link if present; stop if there's no next page
+        currentPath = result.links?.next || null;
+    }
+
+    return allData;
 }
 
 /** Shared HTTPS request helper with Basic auth. */
