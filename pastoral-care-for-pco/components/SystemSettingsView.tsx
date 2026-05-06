@@ -246,7 +246,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
           }
           
           const data = await response.json();
-          setMessage({ type: 'success', text: `Connection Successful: ${data.message}` });
+          setMessage({ type: 'success', text: `Connection Successful: ${data.message ?? data.status ?? 'OK'}` });
           setBackendStatus('online');
       } catch (e: any) {
           console.error(e);
@@ -301,7 +301,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
 
         {message && (
             <div className={`p-4 rounded-xl text-xs font-bold flex items-center gap-2 ${message.type === 'success' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                <span>{message.type === 'success' ? 'âœ“' : 'âš ï¸'}</span>
+                <span>{message.type === 'success' ? '\u2713' : '\u26A0\uFE0F'}</span>
                 {message.text}
             </div>
         )}
