@@ -302,7 +302,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   const [formData, setFormData] = useState<Partial<Church>>(church);
 
   // SMS Settings state
-  const [smsSubTab, setSmsSubTab] = useState<'setup' | 'optout' | 'numbers'>('setup');
+  const [smsSubTab, setSmsSubTab] = useState<'setup' | 'compliance' | 'optout' | 'numbers'>('setup');
   const [showRep2, setShowRep2] = useState(false);
   const [expandedSteps, setExpandedSteps] = useState<Set<number>>(new Set([1]));
   const toggleStep = (n: number) => setExpandedSteps(prev => {
@@ -313,24 +313,20 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   const [smsForm, setSmsForm] = useState<NonNullable<Church['smsSettings']>>(church.smsSettings || {});
   const [isSmsSaving, setIsSmsSaving] = useState(false);
   const [smsMessage, setSmsMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [isA2pSubmitting, setIsA2pSubmitting] = useState(false);
-  const [isA2pChecking, setIsA2pChecking] = useState(false);
-  const [isCreatingProfile, setIsCreatingProfile] = useState(false);
-  const [isDeletingProfile, setIsDeletingProfile] = useState(false);
-  const [a2pResult, setA2pResult] = useState<{ success: boolean; message: string; brandSid?: string; failureReason?: string | null; twilioStatus?: string; needsBundle?: boolean; needsPrimaryProfile?: boolean; evaluationStatus?: string } | null>(null);
-  const [isRefreshingProfile, setIsRefreshingProfile] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
-  // 'create-profile' | 'submit-a2p' — which action to run after terms are accepted
-  const [pendingTermsAction, setPendingTermsAction] = useState<'create-profile' | 'submit-a2p' | null>(null);
-  // Ref that the SMS tab IIFE populates with its handler functions
-  const smsActionRef = useRef<{ handleCreateProfile: () => void; handleSubmitToTwilio: () => void } | null>(null);
-  // A2P pipeline step loading states
-  const [isRegisteringBrand, setIsRegisteringBrand]         = useState(false);
-  const [isCreatingMsgSvc, setIsCreatingMsgSvc]             = useState(false);
-  const [isRegisteringCampaign, setIsRegisteringCampaign]   = useState(false);
-  const [isAssigningNumbers, setIsAssigningNumbers]         = useState(false);
-  const [isCheckingCampaign, setIsCheckingCampaign]         = useState(false);
-  const [isLookingUpSids, setIsLookingUpSids]               = useState(false);
+
+  // SignalWire Compliance Wizard State
+  const [brandForm, setBrandForm] = useState({
+      legalName: church.name || '', ein: '', legalEntityType: 'NONPROFIT', contactEmail: '', contactPhone: '', website: '', address: '', city: '', state: '', zip: ''
+  });
+  const [campaignForm, setCampaignForm] = useState({
+      name: `${church.name || 'Church'} SMS`, usecase: 'MIXED', description: '', sample1: '', sample2: '', messageFlow: '', optOutMessage: 'Reply STOP to unsubscribe. Reply HELP for help.', helpMessage: `For assistance contact ${church.name || 'us'}. Reply STOP to unsubscribe.`
+  });
+  const [regStatus, setRegStatus] = useState<any>(null);
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
+  const [isSubmittingBrand, setIsSubmittingBrand] = useState(false);
+  const [isSubmittingCampaign, setIsSubmittingCampaign] = useState(false);
+  const [complianceMessage, setComplianceMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
 
   // Phone Numbers panel state (SMS → Numbers tab)
   const [smsNumbers, setSmsNumbers] = useState<any[]>([]);
@@ -2281,39 +2277,6 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
         })()}
 
         {activeTab === 'SMS' && (() => {
-            const A2P_STATUS_COLORS: Record<string, string> = {
-                approved:    'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30',
-                pending:     'bg-amber-500/10  text-amber-600  dark:text-amber-400  border border-amber-500/30',
-                in_review:   'bg-blue-500/10   text-blue-600   dark:text-blue-400   border border-blue-500/30',
-                failed:      'bg-rose-500/20   text-rose-600   dark:text-rose-400   border border-rose-500/30',
-                not_started: 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400',
-            };
-            const PROFILE_STATUS_COLORS: Record<string, string> = {
-                'twilio-approved':  'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30',
-                'pending-review':   'bg-amber-500/10  text-amber-600  dark:text-amber-400  border border-amber-500/30',
-                'in-review':        'bg-blue-500/10   text-blue-600   dark:text-blue-400   border border-blue-500/30',
-                'twilio-rejected':  'bg-rose-500/20   text-rose-600   dark:text-rose-400   border border-rose-500/30',
-                'draft':            'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400',
-            };
-            const PROFILE_STATUS_LABEL: Record<string, string> = {
-                'twilio-approved': '✓ Profile Approved',
-                'pending-review':  '⏳ Profile Pending',
-                'in-review':       '🔍 In Review',
-                'twilio-rejected': '✗ Profile Rejected',
-                'draft':           'Profile Draft',
-            };
-            const statusLabel: Record<string, string> = {
-                approved:    '✓ Approved',
-                pending:     '⏳ Pending Review',
-                in_review:   '🔍 In Review',
-                failed:      '✗ Failed',
-                not_started: 'Not Started',
-            };
-            const a2pStatus      = smsForm.twilioA2pStatus           || 'not_started';
-            const profileStatus  = smsForm.twilioCustomerProfileStatus || '';
-            const profileSid     = smsForm.twilioCustomerProfileSid   || '';
-            const evalStatus     = smsForm.twilioCustomerProfileEvaluation || '';
-
             const handleSmsChange = (key: string, value: any) => {
                 setSmsForm((prev: any) => ({ ...prev, [key]: value }));
             };
@@ -2333,307 +2296,67 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                 }
             };
 
-            // ── Submit A2P registration to Twilio (saves first, then submits) ──
-            // NOTE: This is the OLD "Re-Submit" path shown inside Step 3 profile section
-            // (for users who already have a profile SID from Twilio Console).
-            // The new pipeline uses handleRegisterBrand (Step 4) instead.
-            const handleSubmitToTwilio = async () => {
-                if (!onUpdateChurch) return;
-                setIsA2pSubmitting(true);
-                setA2pResult(null);
+            const handleCheckRegistrationStatus = async () => {
+                setIsCheckingStatus(true);
+                setComplianceMessage(null);
                 try {
-                    // Save form data to Firestore first so the backend reads fresh fields
-                    await onUpdateChurch({ smsSettings: smsForm });
-                    // Call the canonical brand registration endpoint
+                    const res = await fetch(`/api/messaging/registration-status?churchId=${encodeURIComponent(churchId)}`);
+                    const data = await res.json();
+                    if (data.success) {
+                        setRegStatus(data);
+                        setComplianceMessage({ type: 'success', text: 'Status retrieved successfully.' });
+                    } else {
+                        setComplianceMessage({ type: 'error', text: data.error || 'Failed to get status' });
+                    }
+                } catch (e: any) {
+                    setComplianceMessage({ type: 'error', text: e.message || 'Status check failed' });
+                } finally {
+                    setIsCheckingStatus(false);
+                }
+            };
+
+            const handleSubmitBrand = async () => {
+                setIsSubmittingBrand(true);
+                setComplianceMessage(null);
+                try {
                     const res = await fetch('/api/messaging/register-brand', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ churchId }),
+                        body: JSON.stringify({ churchId, ...brandForm }),
                     });
-                    const raw = await res.text();
-                    let data: any;
-                    try { data = JSON.parse(raw); } catch {
-                        setA2pResult({ success: false, message: `Server error (HTTP ${res.status}): ${raw.slice(0, 200)}` });
-                        return;
-                    }
-                    if (data.brandSid) {
-                        setSmsForm(prev => ({ ...prev, twilioBrandSid: data.brandSid, twilioA2pStatus: data.status || 'pending' }));
-                    }
-                    const needsBundle = !data.success && !data.brandSid;
-                    setA2pResult({
-                        success: data.success,
-                        message: data.message || (data.error || 'Unknown response'),
-                        brandSid: data.brandSid,
-                        twilioStatus: data.status,
-                        needsBundle,
-                    });
-                } catch (e: any) {
-                    setA2pResult({ success: false, message: e.message || 'Submission failed' });
-                } finally {
-                    setIsA2pSubmitting(false);
-                }
-            };
-
-            // ── Check live A2P status from Twilio ──────────────────────────────
-            const handleCheckA2pStatus = async () => {
-                setIsA2pChecking(true);
-                setA2pResult(null);
-                try {
-                    const res = await fetch(`/api/messaging/a2p-status?churchId=${encodeURIComponent(churchId)}`);
                     const data = await res.json();
-                    if (data.status) {
-                        setSmsForm(prev => ({ ...prev, twilioA2pStatus: data.status as any }));
-                    }
-                    setA2pResult({
-                        success: data.success ?? true,
-                        message: data.failureReason
-                            ? `Twilio status: ${data.twilioStatus}. Reason: ${data.failureReason}`
-                            : `Twilio status: ${data.twilioStatus || data.status}. Checked at ${new Date(data.checkedAt || Date.now()).toLocaleTimeString()}.`,
-                        brandSid: data.brandSid,
-                        twilioStatus: data.twilioStatus || data.status,
-                        failureReason: data.failureReason,
-                    });
+                    if (!data.success) throw new Error(data.error || 'Brand registration failed');
+                    setComplianceMessage({ type: 'success', text: data.message });
+                    handleCheckRegistrationStatus();
                 } catch (e: any) {
-                    setA2pResult({ success: false, message: e.message || 'Status check failed' });
+                    setComplianceMessage({ type: 'error', text: e.message || 'Brand registration failed' });
                 } finally {
-                    setIsA2pChecking(false);
+                    setIsSubmittingBrand(false);
                 }
             };
 
-            // ── Programmatically create Twilio Customer Profile Bundle ──────────
-            const handleCreateProfile = async () => {
-                if (!onUpdateChurch) return;
-                setIsCreatingProfile(true);
-                setA2pResult(null);
+            const handleSubmitCampaign = async () => {
+                setIsSubmittingCampaign(true);
+                setComplianceMessage(null);
                 try {
-                    // Save the form first so the backend reads fresh values
-                    await onUpdateChurch({ smsSettings: smsForm });
-                    const res = await fetch('/api/messaging/create-customer-profile', {
+                    const res = await fetch('/api/messaging/register-campaign', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ churchId }),
+                        body: JSON.stringify({ churchId, ...campaignForm }),
                     });
-                    const cpRaw = await res.text();
-                    let data: any;
-                    try { data = JSON.parse(cpRaw); } catch {
-                        setA2pResult({ success: false, message: `Server error (HTTP ${res.status}): ${cpRaw.slice(0, 200)}`, needsBundle: true });
-                        return;
-                    }
-                    if (data.profileSid) {
-                        setSmsForm(prev => ({
-                            ...prev,
-                            twilioCustomerProfileSid:        data.profileSid,
-                            twilioCustomerProfileStatus:     'pending-review',
-                            twilioCustomerProfileEvaluation: data.evaluationStatus || '',
-                        }));
-                    }
-                    setA2pResult({
-                        success: !!data.success,
-                        message: data.success
-                            ? data.message
-                            : (data.error || 'Profile creation failed'),
-                        needsBundle: !data.success,
-                        needsPrimaryProfile: !!data.needsPrimaryProfile,
-                        evaluationStatus: data.evaluationStatus || '',
-                    });
+                    const data = await res.json();
+                    if (!data.success) throw new Error(data.error || 'Campaign registration failed');
+                    setComplianceMessage({ type: 'success', text: data.message });
+                    handleCheckRegistrationStatus();
                 } catch (e: any) {
-                    setA2pResult({ success: false, message: e.message || 'Profile creation failed', needsBundle: true });
+                    setComplianceMessage({ type: 'error', text: e.message || 'Campaign registration failed' });
                 } finally {
-                    setIsCreatingProfile(false);
+                    setIsSubmittingCampaign(false);
                 }
-            };
-
-            // ── Programmatically DELETE Twilio Customer Profile Bundle ─────────
-            const handleDeleteProfile = async () => {
-                const canDelete = profileStatus === 'draft' || profileStatus === 'twilio-rejected' || !profileStatus;
-                if (!canDelete) {
-                    alert(`This profile is in "${profileStatus}" status and cannot be deleted via the API.\n\nOnly draft or rejected profiles can be deleted programmatically. To remove an approved or pending profile, please contact Twilio Support.`);
-                    return;
-                }
-                if (!window.confirm('Delete this Customer Profile Bundle from Twilio? This will also delete the associated EndUsers, Address, and SupportingDocument. This cannot be undone.')) return;
-                setIsDeletingProfile(true);
-                setA2pResult(null);
-                try {
-                    const res = await fetch('/api/messaging/customer-profile', {
-                        method: 'DELETE',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ churchId }),
-                    });
-                    const raw = await res.text();
-                    let data: any;
-                    try { data = JSON.parse(raw); } catch {
-                        setA2pResult({ success: false, message: `Server error (HTTP ${res.status}): ${raw.slice(0, 200)}` });
-                        return;
-                    }
-                    if (data.success) {
-                        setSmsForm(prev => ({
-                            ...prev,
-                            twilioCustomerProfileSid:        undefined,
-                            twilioCustomerProfileStatus:     undefined,
-                            twilioCustomerProfileEvaluation: undefined,
-                            twilioEndUserSid:                undefined,
-                            twilioRepEndUserSid:             undefined,
-                            twilioRep2EndUserSid:            undefined,
-                            twilioAddressSid:                undefined,
-                            twilioSupportingDocSid:          undefined,
-                        } as any));
-                        setA2pResult({ success: true, message: data.message || 'Customer Profile deleted successfully.' });
-                    } else {
-                        setA2pResult({ success: false, message: data.error || 'Delete failed' });
-                    }
-                } catch (e: any) {
-                    setA2pResult({ success: false, message: e.message || 'Delete failed' });
-                } finally {
-                    setIsDeletingProfile(false);
-                }
-            };
-
-            const handleRefreshProfileStatus = async () => {
-                if (!smsForm.twilioCustomerProfileSid) return;
-                setIsRefreshingProfile(true);
-                setA2pResult(null);
-                try {
-                    const res = await fetch(`/api/messaging/customer-profile-status?churchId=${encodeURIComponent(churchId)}`);
-                    const data = await res.json();
-                    if (data.success) {
-                        const liveStatus = data.status || 'unknown';
-                        setSmsForm(prev => ({ ...prev, twilioCustomerProfileStatus: liveStatus }));
-                        setA2pResult({ success: true, message: `Profile status refreshed from Twilio: ${liveStatus.toUpperCase()}` });
-                    } else {
-                        setA2pResult({ success: false, message: data.error || 'Refresh failed' });
-                    }
-                } catch (e: any) {
-                    setA2pResult({ success: false, message: e.message || 'Refresh failed' });
-                } finally {
-                    setIsRefreshingProfile(false);
-                }
-            };
-
-            // ── Auto-discover Customer Profile SID from brand or TrustHub list ──
-            const handleLookupProfileSids = async () => {
-                setIsLookingUpSids(true);
-                setA2pResult(null);
-                try {
-                    const res  = await fetch(`/api/messaging/lookup-profile-sids?churchId=${encodeURIComponent(churchId)}`);
-                    const data = await res.json();
-                    if (data.success) {
-                        // Patch local form state with newly discovered SIDs
-                        const patch: any = {};
-                        if (data.discovered?.twilioCustomerProfileSid)
-                            patch.twilioCustomerProfileSid = data.discovered.twilioCustomerProfileSid;
-                        if (data.discovered?.twilioA2pProfileSid)
-                            patch.twilioA2pProfileSid = data.discovered.twilioA2pProfileSid;
-                        if (Object.keys(patch).length) setSmsForm(prev => ({ ...prev, ...patch }));
-                        setA2pResult({ success: true, message: data.message || 'SID lookup complete.' });
-                    } else if (data.allProfiles?.length) {
-                        // Ambiguous — show the list for manual selection
-                        const names = data.allProfiles.map((p: any) => `${p.sid} (${p.friendlyName}, ${p.status})`).join('\n');
-                        setA2pResult({
-                            success: false,
-                            message: `${data.message}\n\nAvailable profiles:\n${names}`,
-                        });
-                    } else {
-                        setA2pResult({ success: false, message: data.message || data.error || 'Could not resolve SIDs.' });
-                    }
-                } catch (e: any) {
-                    setA2pResult({ success: false, message: e.message || 'Lookup failed' });
-                } finally {
-                    setIsLookingUpSids(false);
-                }
-            };
-
-            // ── Step 4: Submit Brand Registration ────────────────────────────────
-            const handleRegisterBrand = async () => {
-                setIsRegisteringBrand(true);
-                setA2pResult(null);
-                try {
-                    const res  = await fetch('/api/messaging/register-brand', {
-                        method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ churchId }),
-                    });
-                    const data = await res.json();
-                    if (!res.ok) { setA2pResult({ success: false, message: data.error || 'Brand registration failed' }); return; }
-                    if (data.brandSid) setSmsForm(prev => ({ ...prev, twilioBrandSid: data.brandSid, twilioA2pStatus: data.status }));
-                    setA2pResult({ success: true, message: data.message || 'Brand submitted!' });
-                } catch (e: any) {
-                    setA2pResult({ success: false, message: e.message || 'Brand registration failed' });
-                } finally { setIsRegisteringBrand(false); }
-            };
-
-            // ── Step 5: Create Messaging Service ─────────────────────────────────
-            const handleCreateMessagingService = async () => {
-                setIsCreatingMsgSvc(true);
-                setA2pResult(null);
-                try {
-                    const res  = await fetch('/api/messaging/create-messaging-service', {
-                        method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ churchId }),
-                    });
-                    const data = await res.json();
-                    if (!res.ok) { setA2pResult({ success: false, message: data.error || 'Failed to create Messaging Service' }); return; }
-                    if (data.messagingServiceSid) setSmsForm(prev => ({ ...prev, twilioMessagingServiceSid: data.messagingServiceSid }));
-                    setA2pResult({ success: true, message: data.message || 'Messaging Service created!' });
-                } catch (e: any) {
-                    setA2pResult({ success: false, message: e.message || 'Failed to create Messaging Service' });
-                } finally { setIsCreatingMsgSvc(false); }
-            };
-
-            // ── Step 6: Register A2P Campaign ────────────────────────────────────
-            const handleRegisterCampaign = async () => {
-                setIsRegisteringCampaign(true);
-                setA2pResult(null);
-                try {
-                    const res  = await fetch('/api/messaging/register-campaign', {
-                        method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ churchId }),
-                    });
-                    const data = await res.json();
-                    if (!res.ok) { setA2pResult({ success: false, message: data.error || 'Campaign registration failed' }); return; }
-                    if (data.usAppToPersonSid) setSmsForm(prev => ({ ...prev, twilioUsAppToPersonSid: data.usAppToPersonSid, twilioA2pCampaignStatus: 'pending' } as any));
-                    setA2pResult({ success: true, message: data.message || 'Campaign registered!' });
-                } catch (e: any) {
-                    setA2pResult({ success: false, message: e.message || 'Campaign registration failed' });
-                } finally { setIsRegisteringCampaign(false); }
-            };
-
-            // ── Step 7: Assign Numbers to Messaging Service ───────────────────────
-            const handleAssignNumbers = async () => {
-                setIsAssigningNumbers(true);
-                setA2pResult(null);
-                try {
-                    const res  = await fetch('/api/messaging/assign-numbers-to-service', {
-                        method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ churchId }),
-                    });
-                    const data = await res.json();
-                    if (!res.ok) { setA2pResult({ success: false, message: data.error || 'Failed to link numbers' }); return; }
-                    if (data.success) setSmsForm(prev => ({ ...prev, twilioNumbersLinked: true } as any));
-                    setA2pResult({ success: data.success, message: data.message || 'Numbers linked!' });
-                } catch (e: any) {
-                    setA2pResult({ success: false, message: e.message || 'Failed to link numbers' });
-                } finally { setIsAssigningNumbers(false); }
-            };
-
-            // ── Poll live campaign status ─────────────────────────────────────────
-            const handleCheckCampaignStatus = async () => {
-                setIsCheckingCampaign(true);
-                setA2pResult(null);
-                try {
-                    const res  = await fetch(`/api/messaging/campaign-status?churchId=${encodeURIComponent(churchId)}`);
-                    const data = await res.json();
-                    if (data.status) setSmsForm(prev => ({ ...prev, twilioA2pCampaignStatus: data.status } as any));
-                    setA2pResult({ success: true, message: `Campaign status: ${data.twilioStatus || data.status || 'unknown'}` });
-                } catch (e: any) {
-                    setA2pResult({ success: false, message: e.message || 'Status check failed' });
-                } finally { setIsCheckingCampaign(false); }
             };
 
             const inputCn = 'w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-colors';
             const labelCn = 'block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-2';
-
-            // Expose handlers to the top-level terms modal via ref
-            smsActionRef.current = { handleCreateProfile, handleSubmitToTwilio };
-
 
             return (
                 <div className="space-y-6">
@@ -2643,13 +2366,10 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                             <div>
                                 <h3 className="text-xl font-black text-slate-900 dark:text-white">SMS Settings</h3>
                                 <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mt-1">
-                                    A2P 10DLC Registration &amp; Messaging Compliance
+                                    Messaging Compliance &amp; Setup
                                 </p>
                             </div>
                             <div className="flex items-center gap-3 flex-wrap">
-                                <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full ${A2P_STATUS_COLORS[a2pStatus]}`}>
-                                    A2P: {statusLabel[a2pStatus]}
-                                </span>
                                 {/* Terms badge */}
                                 {smsForm.termsAcceptedAt ? (
                                     <span className="text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/25" title={`Terms accepted on ${new Date(smsForm.termsAcceptedAt).toLocaleString()}`}>
@@ -2657,68 +2377,12 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                     </span>
                                 ) : (
                                     <button
-                                        onClick={() => { setPendingTermsAction(null); setShowTermsModal(true); }}
+                                        onClick={() => setShowTermsModal(true)}
                                         className="text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/25 hover:bg-amber-500/20 transition"
                                     >
                                         ⚠ ToS Not Accepted — Click to Review
                                     </button>
                                 )}
-                                {profileSid && (
-                                    <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full ${
-                                        PROFILE_STATUS_COLORS[profileStatus] || 'bg-slate-100 dark:bg-slate-800 text-slate-500'
-                                    }`}>
-                                        {PROFILE_STATUS_LABEL[profileStatus] || `Profile: ${profileStatus || 'unknown'}`}
-                                    </span>
-                                )}
-                                {profileSid && evalStatus && (
-                                    <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full ${
-                                        evalStatus === 'compliant'
-                                            ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
-                                            : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30'
-                                    }`}>
-                                        Eval: {evalStatus}
-                                    </span>
-                                )}
-                                {/* Lookup SIDs — auto-discover BU... from brand or TrustHub */}
-                                {smsForm.twilioSubAccountSid && (
-                                    <button
-                                        onClick={handleLookupProfileSids}
-                                        disabled={isLookingUpSids}
-                                        title="Auto-discover Customer Profile SID from this sub-account's brand registration or TrustHub list"
-                                        className="text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border transition-all disabled:opacity-50 bg-violet-50 dark:bg-violet-900/20 text-violet-600 dark:text-violet-400 border-violet-200 dark:border-violet-800 hover:bg-violet-100 dark:hover:bg-violet-900/40"
-                                    >
-                                        {isLookingUpSids ? '⏳ Looking up…' : '🔍 Lookup SIDs'}
-                                    </button>
-                                )}
-                                {/* Refresh Profile Status — quick pull from Twilio */}
-                                {profileSid && (
-                                    <button
-                                        onClick={handleRefreshProfileStatus}
-                                        disabled={isRefreshingProfile}
-                                        title="Pull latest Customer Profile & A2P status from Twilio"
-                                        className="text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border transition-all disabled:opacity-50 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/40"
-                                    >
-                                        {isRefreshingProfile ? '⏳ Refreshing…' : '🔄 Refresh Status'}
-                                    </button>
-                                )}
-                                {/* Delete Profile button — only shown when profile exists */}
-                                {profileSid && (() => {
-                                    const canDelete = profileStatus === 'draft' || profileStatus === 'twilio-rejected' || !profileStatus;
-                                    return (
-                                        <button
-                                            onClick={handleDeleteProfile}
-                                            disabled={isDeletingProfile || !canDelete}
-                                            title={canDelete ? 'Delete Customer Profile Bundle from Twilio' : `Profile in "${profileStatus}" status — contact Twilio Support to remove`}
-                                            className={`text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border transition-all disabled:cursor-not-allowed ${
-                                                canDelete
-                                                    ? 'bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-800 hover:bg-rose-100 dark:hover:bg-rose-900/40'
-                                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-700'
-                                            }`}
-                                        >
-                                            {isDeletingProfile ? '🗑 Deleting…' : canDelete ? '🗑 Delete Profile' : '🔒 Cannot Delete'}
-                                        </button>
-                                    );
-                                })()}
                                 {smsNumbers.length > 0 && (
                                     <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-1.5 rounded-full border border-emerald-100 dark:border-emerald-900/30">
                                         📱 {(smsNumbers.find((n: any) => n.isDefault) || smsNumbers[0])?.phoneNumber}
@@ -2729,8 +2393,8 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                         </div>
 
                         {/* Sub-tab switcher */}
-                        <div className="flex bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl gap-1 w-fit">
-                            {(['setup', 'numbers', 'optout'] as const).map(st => (
+                        <div className="flex bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl gap-1 w-fit flex-wrap">
+                            {(['setup', 'compliance', 'numbers', 'optout'] as const).map(st => (
                                 <button
                                     key={st}
                                     onClick={() => setSmsSubTab(st as any)}
@@ -2740,7 +2404,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             : 'text-slate-500 dark:text-slate-400 hover:bg-white/50 dark:hover:bg-slate-700/50'
                                     }`}
                                 >
-                                    {st === 'setup' ? '⚡ SMS Setup' : st === 'numbers' ? '📱 Phone Numbers' : '🔕 Opt-Out & Sender'}
+                                    {st === 'setup' ? '⚡ SMS Setup' : st === 'compliance' ? '⚖️ Compliance' : st === 'numbers' ? '📱 Phone Numbers' : '🔕 Opt-Out & Sender'}
                                 </button>
                             ))}
                         </div>
@@ -2948,6 +2612,187 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 </ul>
                             </div>
 
+                        </div>
+                    )}
+
+                    {/* ── Compliance Sub-tab ─────────────────────────────────────────── */}
+                    {smsSubTab === 'compliance' && (
+                        <div className="space-y-6">
+                            <div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800">
+                                <div className="flex justify-between items-start mb-6">
+                                    <div>
+                                        <h4 className="text-xl font-black text-slate-900 dark:text-white">A2P 10DLC Compliance</h4>
+                                        <p className="text-[11px] text-slate-400 mt-1 max-w-2xl leading-relaxed">
+                                            To send outbound messages, carriers require businesses to register a Brand (who you are) and a Campaign (what you are sending).
+                                            Registration typically takes a few minutes to hours.
+                                        </p>
+                                    </div>
+                                    <button
+                                        onClick={handleCheckRegistrationStatus}
+                                        disabled={isCheckingStatus}
+                                        className="text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-full border transition-all disabled:opacity-50 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/40"
+                                    >
+                                        {isCheckingStatus ? '⏳ Checking…' : '🔄 Check Status'}
+                                    </button>
+                                </div>
+
+                                {complianceMessage && (
+                                    <div className={`mb-6 p-4 rounded-xl text-sm font-bold border ${
+                                        complianceMessage.type === 'success' 
+                                            ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
+                                            : 'bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800'
+                                    }`}>
+                                        {complianceMessage.text}
+                                    </div>
+                                )}
+
+                                {/* Status View */}
+                                {regStatus && (
+                                    <div className="flex flex-col gap-4 mb-8 bg-slate-50 dark:bg-slate-800/50 p-5 rounded-2xl border border-slate-100 dark:border-slate-700/50">
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <p className="text-[10px] font-bold uppercase text-slate-400 tracking-widest mb-1">Brand Status</p>
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-widest ${
+                                                        regStatus.brand?.status === 'APPROVED' ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' :
+                                                        regStatus.brand?.status === 'PENDING' ? 'bg-amber-500/10 text-amber-600 border border-amber-500/20' :
+                                                        regStatus.brand?.status ? 'bg-rose-500/10 text-rose-600 border border-rose-500/20' :
+                                                        'bg-slate-200 text-slate-500 border border-slate-300'
+                                                    }`}>
+                                                        {regStatus.brand?.status || 'NOT SUBMITTED'}
+                                                    </span>
+                                                    {regStatus.brand?.legalName && <span className="text-xs text-slate-500 font-bold">{regStatus.brand.legalName}</span>}
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <p className="text-[10px] font-bold uppercase text-slate-400 tracking-widest mb-1">Campaign Status</p>
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-widest ${
+                                                        regStatus.campaign?.status === 'APPROVED' ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' :
+                                                        regStatus.campaign?.status === 'PENDING' ? 'bg-amber-500/10 text-amber-600 border border-amber-500/20' :
+                                                        regStatus.campaign?.status ? 'bg-rose-500/10 text-rose-600 border border-rose-500/20' :
+                                                        'bg-slate-200 text-slate-500 border border-slate-300'
+                                                    }`}>
+                                                        {regStatus.campaign?.status || 'NOT SUBMITTED'}
+                                                    </span>
+                                                    {regStatus.campaign?.id && <span className="text-[10px] text-slate-400 font-mono">{regStatus.campaign.id}</span>}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    {/* Brand Form */}
+                                    <div className="space-y-4">
+                                        <div className="flex items-center gap-2 mb-4">
+                                            <div className="w-6 h-6 rounded-full bg-violet-100 text-violet-600 flex items-center justify-center text-xs font-black">1</div>
+                                            <h5 className="font-bold text-slate-800 dark:text-slate-200">Register Brand</h5>
+                                        </div>
+                                        
+                                        <div>
+                                            <label className={labelCn}>Legal Entity Name</label>
+                                            <input className={inputCn} value={brandForm.legalName} onChange={e => setBrandForm({...brandForm, legalName: e.target.value})} placeholder="Exact name on tax docs" />
+                                        </div>
+                                        <div>
+                                            <label className={labelCn}>EIN (Tax ID)</label>
+                                            <input className={inputCn} value={brandForm.ein} onChange={e => setBrandForm({...brandForm, ein: e.target.value})} placeholder="xx-xxxxxxx" />
+                                        </div>
+                                        <div>
+                                            <label className={labelCn}>Entity Type</label>
+                                            <select className={inputCn} value={brandForm.legalEntityType} onChange={e => setBrandForm({...brandForm, legalEntityType: e.target.value})}>
+                                                <option value="NONPROFIT">Non-Profit (501c3)</option>
+                                                <option value="PRIVATE_PROFIT">Private Company</option>
+                                                <option value="PUBLIC_PROFIT">Public Company</option>
+                                            </select>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className={labelCn}>Contact Email</label>
+                                                <input className={inputCn} value={brandForm.contactEmail} onChange={e => setBrandForm({...brandForm, contactEmail: e.target.value})} placeholder="admin@..." />
+                                            </div>
+                                            <div>
+                                                <label className={labelCn}>Contact Phone</label>
+                                                <input className={inputCn} value={brandForm.contactPhone} onChange={e => setBrandForm({...brandForm, contactPhone: e.target.value})} placeholder="+1234567890" />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className={labelCn}>Website</label>
+                                            <input className={inputCn} value={brandForm.website} onChange={e => setBrandForm({...brandForm, website: e.target.value})} placeholder="https://..." />
+                                        </div>
+                                        <div>
+                                            <label className={labelCn}>Address</label>
+                                            <input className={inputCn} value={brandForm.address} onChange={e => setBrandForm({...brandForm, address: e.target.value})} placeholder="123 Main St" />
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            <div className="col-span-1">
+                                                <label className={labelCn}>City</label>
+                                                <input className={inputCn} value={brandForm.city} onChange={e => setBrandForm({...brandForm, city: e.target.value})} />
+                                            </div>
+                                            <div className="col-span-1">
+                                                <label className={labelCn}>State</label>
+                                                <input className={inputCn} value={brandForm.state} onChange={e => setBrandForm({...brandForm, state: e.target.value})} placeholder="CA" />
+                                            </div>
+                                            <div className="col-span-1">
+                                                <label className={labelCn}>Zip</label>
+                                                <input className={inputCn} value={brandForm.zip} onChange={e => setBrandForm({...brandForm, zip: e.target.value})} />
+                                            </div>
+                                        </div>
+                                        
+                                        <button
+                                            onClick={handleSubmitBrand}
+                                            disabled={isSubmittingBrand}
+                                            className="w-full mt-4 bg-violet-600 hover:bg-violet-700 text-white font-black text-xs uppercase tracking-widest py-3 rounded-xl transition-all disabled:opacity-50"
+                                        >
+                                            {isSubmittingBrand ? 'Submitting...' : 'Submit Brand'}
+                                        </button>
+                                    </div>
+
+                                    {/* Campaign Form */}
+                                    <div className="space-y-4">
+                                        <div className="flex items-center gap-2 mb-4">
+                                            <div className="w-6 h-6 rounded-full bg-violet-100 text-violet-600 flex items-center justify-center text-xs font-black">2</div>
+                                            <h5 className="font-bold text-slate-800 dark:text-slate-200">Register Campaign</h5>
+                                        </div>
+                                        
+                                        <div>
+                                            <label className={labelCn}>Campaign Name</label>
+                                            <input className={inputCn} value={campaignForm.name} onChange={e => setCampaignForm({...campaignForm, name: e.target.value})} />
+                                        </div>
+                                        <div>
+                                            <label className={labelCn}>Use Case</label>
+                                            <select className={inputCn} value={campaignForm.usecase} onChange={e => setCampaignForm({...campaignForm, usecase: e.target.value})}>
+                                                <option value="MIXED">Mixed / General (Recommended)</option>
+                                                <option value="CHARITY">Charity / 501c3 (Requires status)</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className={labelCn}>Campaign Description</label>
+                                            <textarea rows={2} className={inputCn} value={campaignForm.description} onChange={e => setCampaignForm({...campaignForm, description: e.target.value})} placeholder="Sending transactional and informational text messages to church members..." />
+                                        </div>
+                                        <div>
+                                            <label className={labelCn}>Opt-In Flow Description</label>
+                                            <textarea rows={2} className={inputCn} value={campaignForm.messageFlow} onChange={e => setCampaignForm({...campaignForm, messageFlow: e.target.value})} placeholder="Users opt-in by filling out a contact card at the church or checking a box on our website..." />
+                                        </div>
+                                        <div>
+                                            <label className={labelCn}>Sample Message 1</label>
+                                            <textarea rows={2} className={inputCn} value={campaignForm.sample1} onChange={e => setCampaignForm({...campaignForm, sample1: e.target.value})} placeholder="Hi [Name], just a reminder that service starts at 9am tomorrow. Reply STOP to unsubscribe." />
+                                        </div>
+                                        <div>
+                                            <label className={labelCn}>Sample Message 2</label>
+                                            <textarea rows={2} className={inputCn} value={campaignForm.sample2} onChange={e => setCampaignForm({...campaignForm, sample2: e.target.value})} placeholder="Thank you for visiting! To get connected, fill out this link: ..." />
+                                        </div>
+                                        
+                                        <button
+                                            onClick={handleSubmitCampaign}
+                                            disabled={isSubmittingCampaign}
+                                            className="w-full mt-4 bg-violet-600 hover:bg-violet-700 text-white font-black text-xs uppercase tracking-widest py-3 rounded-xl transition-all disabled:opacity-50"
+                                        >
+                                            {isSubmittingCampaign ? 'Submitting...' : 'Submit Campaign'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     )}
 
@@ -3616,12 +3461,8 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                     setSmsForm((prev: any) => ({ ...prev, termsAcceptedAt: ts, termsAcceptedByUserId: currentUser.id }));
                     if (onUpdateChurch) await onUpdateChurch({ smsSettings: { ...smsForm, termsAcceptedAt: ts, termsAcceptedByUserId: currentUser.id } });
                     setShowTermsModal(false);
-                    // Use the ref to call handlers that live inside the SMS IIFE
-                    if (pendingTermsAction === 'create-profile') smsActionRef.current?.handleCreateProfile();
-                    if (pendingTermsAction === 'submit-a2p') smsActionRef.current?.handleSubmitToTwilio();
-                    setPendingTermsAction(null);
                 }}
-                onCancel={() => { setShowTermsModal(false); setPendingTermsAction(null); }}
+                onCancel={() => setShowTermsModal(false)}
             />
         )}
         </div>
