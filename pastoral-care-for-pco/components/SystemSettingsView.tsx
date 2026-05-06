@@ -307,497 +307,289 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
         )}
 
         {activeTab === 'Configuration' && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* Integration Keys */}
-                <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm">
-                    <h3 className="text-lg font-black text-slate-900 dark:text-white mb-6">API Integrations</h3>
-                    
-                    <div className="space-y-6">
+            <div className="space-y-6">
+
+                {/* ── Backend Status Banner ───────────────────────────────────── */}
+                <div className="bg-white dark:bg-slate-900 px-6 py-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col sm:flex-row sm:items-center gap-4">
+                    <div className="flex items-center gap-3 flex-1">
                         <div>
-                            <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Google Maps API Key</label>
-                            <input 
-                                type="text" 
-                                value={settings.googleMapsApiKey || ''}
-                                onChange={e => handleChange('googleMapsApiKey', e.target.value)}
-                                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                                placeholder="AIza..."
-                            />
+                            <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Backend API URL</p>
+                            <p className="font-mono text-xs text-slate-600 dark:text-slate-300 mt-0.5 truncate">{settings.apiBaseUrl || DEFAULT_API_URL}</p>
                         </div>
+                        <span className={`ml-2 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border whitespace-nowrap ${backendStatus === 'online' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/30' : backendStatus === 'offline' ? 'bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 border-rose-100 dark:border-rose-900/30' : 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700'}`}>
+                            {backendStatus === 'online' && <span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span></span>}
+                            {backendStatus === 'offline' && <span className="h-2 w-2 rounded-full bg-rose-500"></span>}
+                            {backendStatus === 'checking' ? 'Checking…' : backendStatus}
+                        </span>
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                        <input
+                            type="text"
+                            value={settings.apiBaseUrl || DEFAULT_API_URL}
+                            onChange={e => handleChange('apiBaseUrl', e.target.value)}
+                            className="w-72 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                            placeholder={DEFAULT_API_URL}
+                        />
+                        <button onClick={testBackendConnection} disabled={isVerifying} className="bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 px-4 py-2 rounded-xl font-bold text-xs hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors disabled:opacity-50 whitespace-nowrap">
+                            {isVerifying ? '…' : 'Test'}
+                        </button>
+                        <button onClick={handleSave} disabled={isSaving} className="bg-indigo-600 text-white px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-700 transition-all disabled:opacity-50 whitespace-nowrap">
+                            {isSaving ? 'Saving…' : 'Save All'}
+                        </button>
+                    </div>
+                </div>
 
-                        <div>
-                            <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Census.gov API Key</label>
-                            <input 
-                                type="text" 
-                                aria-label="Census.gov API Key"
-                                placeholder="Enter Census.gov API key"
-                                value={settings.censusApiKey || ''}
-                                onChange={e => handleChange('censusApiKey', e.target.value)}
-                                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                            />
-                        </div>
+                {/* ── Row 1: Planning Center | Maps & Census | SendGrid ───────── */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-                        <div className="pt-6 border-t border-slate-100 dark:border-slate-800">
-                            <div className="flex justify-between items-center mb-4">
-                                <h4 className="text-xs font-bold text-indigo-600 dark:text-indigo-400">Backend Configuration</h4>
-                                <div className="flex items-center gap-2">
-                                    <span className={`w-2 h-2 rounded-full ${backendStatus === 'online' ? 'bg-emerald-500' : backendStatus === 'offline' ? 'bg-rose-500' : 'bg-slate-300'}`}></span>
-                                    <span className="text-[9px] uppercase font-bold text-slate-400">
-                                        {backendStatus === 'checking' ? 'Checking...' : backendStatus}
-                                    </span>
-                                </div>
+                    {/* Planning Center */}
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
+                        <h3 className="text-sm font-black text-slate-900 dark:text-white mb-1">Planning Center</h3>
+                        <p className="text-[10px] text-slate-400 mb-5 leading-relaxed">Global OAuth app credentials shared across all tenants.</p>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Client ID</label>
+                                <input type="text" aria-label="Planning Center Client ID" placeholder="Enter PCO Client ID" value={settings.pcoClientId || ''} onChange={e => handleChange('pcoClientId', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" />
                             </div>
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Backend API URL</label>
-                                    <div className="flex gap-2">
-                                        <input 
-                                            type="text" 
-                                            value={settings.apiBaseUrl || DEFAULT_API_URL}
-                                            onChange={e => handleChange('apiBaseUrl', e.target.value)}
-                                            className="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                                            placeholder={DEFAULT_API_URL}
-                                        />
-                                        <button
-                                            onClick={testBackendConnection}
-                                            disabled={isVerifying}
-                                            className="bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 px-4 py-2 rounded-xl font-bold text-xs hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors disabled:opacity-50"
-                                        >
-                                            {isVerifying ? '...' : 'Test'}
-                                        </button>
-                                    </div>
-                                    <p className="text-[9px] text-slate-400 mt-2">
-                                        Default: <code>{DEFAULT_API_URL}</code>
-                                    </p>
-                                </div>
+                            <div>
+                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Client Secret</label>
+                                <input type="password" aria-label="Planning Center Client Secret" placeholder="Enter PCO Client Secret" value={settings.pcoClientSecret || ''} onChange={e => handleChange('pcoClientSecret', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" />
                             </div>
                         </div>
+                    </div>
 
-                        <div className="pt-6 border-t border-slate-100 dark:border-slate-800">
-                            <h4 className="text-xs font-bold text-indigo-600 dark:text-indigo-400 mb-4">Planning Center (Global App)</h4>
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Client ID</label>
-                                    <input 
-                                        type="text" 
-                                        aria-label="Planning Center Client ID"
-                                        placeholder="Enter PCO Client ID"
-                                        value={settings.pcoClientId || ''}
-                                        onChange={e => handleChange('pcoClientId', e.target.value)}
-                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Client Secret</label>
-                                    <input 
-                                        type="password" 
-                                        aria-label="Planning Center Client Secret"
-                                        placeholder="Enter PCO Client Secret"
-                                        value={settings.pcoClientSecret || ''}
-                                        onChange={e => handleChange('pcoClientSecret', e.target.value)}
-                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                                    />
-                                </div>
-                        </div>
-
-                        {/* SendGrid */}
-                        <div className="pt-6 border-t border-slate-100 dark:border-slate-800">
-                            <div className="flex justify-between items-center mb-2">
-                                <h4 className="text-xs font-bold text-indigo-600 dark:text-indigo-400">SendGrid (Email Delivery)</h4>
-                                {settings.sendGridApiKey?.startsWith('SG.') ? (
-                                    <span className="text-[9px] font-black bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">ACTIVE</span>
-                                ) : (
-                                    <span className="text-[9px] font-black bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/30">INCOMPLETE</span>
-                                )}
+                    {/* Maps & Census */}
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
+                        <h3 className="text-sm font-black text-slate-900 dark:text-white mb-1">Maps &amp; Census APIs</h3>
+                        <p className="text-[10px] text-slate-400 mb-5 leading-relaxed">Geographic mapping and demographic data integrations.</p>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Google Maps API Key</label>
+                                <input type="text" value={settings.googleMapsApiKey || ''} onChange={e => handleChange('googleMapsApiKey', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="AIza..." />
                             </div>
-                            <p className="text-[10px] text-slate-400 mb-4 leading-relaxed">
-                                This is the <strong>master</strong> SendGrid account. Each church tenant gets an isolated Subuser for reputation separation.
-                                Tenants configure their From address in <strong>Settings &amp; Administration â†’ Mail Settings</strong>.
-                            </p>
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Master API Key</label>
-                                    <input 
-                                        type="password" 
-                                        value={settings.sendGridApiKey || ''}
-                                        onChange={e => handleChange('sendGridApiKey', e.target.value)}
-                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                                        placeholder="SG.xxxxxxxxxxxxxxxx"
-                                    />
-                                    <p className="text-[9px] text-slate-400 mt-1.5">
-                                        Find this in your <a href="https://app.sendgrid.com/settings/api_keys" target="_blank" rel="noopener noreferrer" className="underline text-indigo-400 hover:text-indigo-300">SendGrid Dashboard â†’ Settings â†’ API Keys</a>.
-                                        Requires <strong>Full Access</strong> permissions to create Subusers and authenticate domains.
-                                    </p>
-                                </div>
-
-                                <div>
-                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Shared Subdomain</label>
-                                    <div className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-600 dark:text-slate-400 select-all">
-                                        pastoralcare.barnabassoftware.com
-                                    </div>
-                                    <p className="text-[9px] text-slate-400 mt-1.5">
-                                        Tenants on the shared plan send from <code>prefix@pastoralcare.barnabassoftware.com</code>. They choose their prefix in Mail Settings.
-                                    </p>
-                                </div>
-
-                                <div>
-                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Global Fallback From Email</label>
-                                    <input 
-                                        type="email" 
-                                        value={settings.sendGridFromEmail || ''}
-                                        onChange={e => handleChange('sendGridFromEmail', e.target.value)}
-                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                                        placeholder="noreply@pastoralcare.barnabassoftware.com"
-                                    />
-                                    <p className="text-[9px] text-slate-400 mt-1.5">
-                                        Used only if a tenant has no Mail Settings configured. Tenant-level settings take priority over this.
-                                    </p>
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Global Fallback From Name</label>
-                                    <input 
-                                        type="text" 
-                                        value={settings.sendGridFromName || ''}
-                                        onChange={e => handleChange('sendGridFromName', e.target.value)}
-                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                                        placeholder="Pastoral Care"
-                                    />
-                                </div>
+                            <div>
+                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Census.gov API Key</label>
+                                <input type="text" aria-label="Census.gov API Key" placeholder="Enter Census.gov API key" value={settings.censusApiKey || ''} onChange={e => handleChange('censusApiKey', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" />
                             </div>
                         </div>
+                    </div>
 
-                        {/* â”€â”€ SignalWire SMS â”€â”€ */}
-                        <div className="pt-6 border-t border-slate-100 dark:border-slate-800">
-                            <div className="flex justify-between items-center mb-2">
-                                <h4 className="text-xs font-bold text-indigo-600 dark:text-indigo-400">SignalWire SMS</h4>
+                    {/* SendGrid */}
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
+                        <div className="flex items-center justify-between mb-1">
+                            <h3 className="text-sm font-black text-slate-900 dark:text-white">SendGrid</h3>
+                            {settings.sendGridApiKey?.startsWith('SG.') ? (
+                                <span className="text-[9px] font-black bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">ACTIVE</span>
+                            ) : (
+                                <span className="text-[9px] font-black bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/30">INCOMPLETE</span>
+                            )}
+                        </div>
+                        <p className="text-[10px] text-slate-400 mb-5 leading-relaxed">Master account — each tenant gets an isolated Subuser for reputation separation.</p>
+                        <div className="space-y-3">
+                            <div>
+                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Master API Key</label>
+                                <input type="password" value={settings.sendGridApiKey || ''} onChange={e => handleChange('sendGridApiKey', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="SG.xxxxxxxxxxxxxxxx" />
+                                <p className="text-[9px] text-slate-400 mt-1.5">Find in <a href="https://app.sendgrid.com/settings/api_keys" target="_blank" rel="noopener noreferrer" className="underline text-indigo-400 hover:text-indigo-300">SendGrid → Settings → API Keys</a>. Requires Full Access.</p>
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Shared Subdomain</label>
+                                <div className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-600 dark:text-slate-400 select-all">pastoralcare.barnabassoftware.com</div>
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Fallback From Email</label>
+                                <input type="email" value={settings.sendGridFromEmail || ''} onChange={e => handleChange('sendGridFromEmail', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="noreply@pastoralcare.barnabassoftware.com" />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Fallback From Name</label>
+                                <input type="text" value={settings.sendGridFromName || ''} onChange={e => handleChange('sendGridFromName', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Pastoral Care" />
+                            </div>
+                        </div>
+                    </div>
+
+                </div>{/* end Row 1 */}
+
+                {/* ── Row 2: SignalWire (2 cols) + Feature Modules (1 col) ─── */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+                    {/* SignalWire SMS */}
+                    <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
+                        <div className="flex items-center justify-between mb-1">
+                            <h3 className="text-sm font-black text-slate-900 dark:text-white">SignalWire SMS</h3>
+                            <div className="flex items-center gap-2">
                                 {settings.signalwireProjectId && settings.signalwireApiToken && settings.signalwireSpaceUrl ? (
                                     <span className="text-[9px] font-black bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">CONFIGURED</span>
                                 ) : (
                                     <span className="text-[9px] font-black bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/30">INCOMPLETE</span>
                                 )}
-                            </div>
-                            <p className="text-[10px] text-slate-400 mb-4 leading-relaxed">
-                                Credentials for the <strong>SignalWire</strong> project used to provision numbers and send/receive SMS.
-                                All churches share a single project â€” number routing is handled by inbound webhook lookup.
-                                Find these values at{' '}
-                                <a href="https://barnabassoftware.signalwire.com" target="_blank" rel="noopener noreferrer" className="underline text-indigo-400 hover:text-indigo-300">
-                                    barnabassoftware.signalwire.com
-                                </a>{' '}â†’ API â†’ API Tokens.
-                            </p>
-
-                            <div className="space-y-4">
-                                {/* Project ID */}
-                                <div>
-                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Project ID</label>
-                                    <input
-                                        type="text"
-                                        value={settings.signalwireProjectId || ''}
-                                        onChange={e => handleChange('signalwireProjectId', e.target.value.trim())}
-                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                                        placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                                    />
-                                    <p className="text-[9px] text-slate-400 mt-1.5">UUID from Dashboard â†’ API â†’ API Tokens.</p>
-                                </div>
-
-                                {/* API Token */}
-                                <div>
-                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">API Token</label>
-                                    <input
-                                        type="password"
-                                        value={settings.signalwireApiToken || ''}
-                                        onChange={e => handleChange('signalwireApiToken', e.target.value.trim())}
-                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                                        placeholder="PTxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                                    />
-                                    <p className="text-[9px] text-slate-400 mt-1.5">Keep this secret. Generated under Dashboard â†’ API â†’ API Tokens.</p>
-                                </div>
-
-                                {/* Space URL */}
-                                <div>
-                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Space URL</label>
-                                    <input
-                                        type="text"
-                                        value={settings.signalwireSpaceUrl || ''}
-                                        onChange={e => handleChange('signalwireSpaceUrl', e.target.value.trim().replace(/^https?:\/\//, ''))}
-                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                                        placeholder="barnabassoftware.signalwire.com"
-                                    />
-                                    <p className="text-[9px] text-slate-400 mt-1.5">Your SignalWire subdomain, e.g. <code>barnabassoftware.signalwire.com</code> (no https://).</p>
-                                </div>
-
-                                {/* Webhook Base URL */}
-                                <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
-                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Webhook Base URL</label>
-                                    <input
-                                        type="text"
-                                        value={settings.smsWebhookBaseUrl || ''}
-                                        onChange={e => handleChange('smsWebhookBaseUrl', e.target.value)}
-                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                                        placeholder={settings.apiBaseUrl || 'https://api.example.com'}
-                                    />
-                                    <p className="text-[9px] text-slate-400 mt-1.5">
-                                        Defaults to Backend API URL above. SignalWire will POST inbound SMS + status callbacks here.<br/>
-                                        <code className="text-[9px]">{`{base}/api/messaging/inbound`}</code><br/>
-                                        <code className="text-[9px]">{`{base}/api/messaging/status`}</code>
-                                    </p>
-                                    {(settings.smsWebhookBaseUrl || settings.apiBaseUrl) && (
-                                        <div className="mt-3 space-y-1.5">
-                                            {['/api/messaging/inbound', '/api/messaging/status'].map(path => {
-                                                const base = (settings.smsWebhookBaseUrl || settings.apiBaseUrl || '').replace(/\/$/, '');
-                                                const url  = base + path;
-                                                return (
-                                                    <div key={path} className="bg-slate-100 dark:bg-slate-800 rounded-lg px-3 py-1.5 flex items-center justify-between gap-2">
-                                                        <code className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 truncate">{url}</code>
-                                                        <button onClick={() => navigator.clipboard.writeText(url)} className="text-slate-400 hover:text-indigo-500 transition-colors shrink-0 text-xs" title="Copy">ðŸ“‹</button>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Per-segment pricing */}
-                                <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
-                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Usage Estimate Pricing <span className="normal-case font-normal">(USD)</span></label>
-                                    <p className="text-[9px] text-slate-400 mb-3">Used only for the in-app cost estimate. Actual billing is in your SignalWire Dashboard.</p>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div>
-                                            <label className="block text-[9px] font-bold text-slate-500 mb-1">SMS per segment</label>
-                                            <div className="relative">
-                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">$</span>
-                                                <input
-                                                    type="number"
-                                                    aria-label="SMS cost per segment in USD"
-                                                    placeholder="0.0079"
-                                                    step="0.0001"
-                                                    min="0"
-                                                    value={settings.smsSegmentCostUsd ?? 0.0079}
-                                                    onChange={e => handleChange('smsSegmentCostUsd', parseFloat(e.target.value) || 0.0079)}
-                                                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-7 pr-3 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                                                />
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <label className="block text-[9px] font-bold text-slate-500 mb-1">MMS per message</label>
-                                            <div className="relative">
-                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">$</span>
-                                                <input
-                                                    type="number"
-                                                    aria-label="MMS cost per message in USD"
-                                                    placeholder="0.0200"
-                                                    step="0.001"
-                                                    min="0"
-                                                    value={settings.smsMmsSegmentCostUsd ?? 0.02}
-                                                    onChange={e => handleChange('smsMmsSegmentCostUsd', parseFloat(e.target.value) || 0.02)}
-                                                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-7 pr-3 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Save row */}
-                                <div className="pt-4 mt-2 flex items-center justify-between gap-3">
-                                    <button
-                                        onClick={async () => {
-                                            if (!settings.signalwireProjectId || !settings.signalwireApiToken || !settings.signalwireSpaceUrl) {
-                                                setMessage({ type: 'error', text: 'Project ID, API Token, and Space URL are all required.' });
-                                                return;
+                                <button
+                                    onClick={async () => {
+                                        if (!settings.signalwireProjectId || !settings.signalwireApiToken || !settings.signalwireSpaceUrl) {
+                                            setMessage({ type: 'error', text: 'Project ID, API Token, and Space URL are all required.' });
+                                            return;
+                                        }
+                                        const base = (settings.apiBaseUrl || '').replace(/\/$/, '');
+                                        setIsVerifying(true);
+                                        setMessage(null);
+                                        try {
+                                            const res = await fetch(`${base}/api/messaging/available-numbers?churchId=test&areaCode=615`);
+                                            if (res.ok || res.status === 400) {
+                                                setMessage({ type: 'success', text: 'SignalWire credentials verified successfully.' });
+                                            } else {
+                                                const data = await res.json().catch(() => ({}));
+                                                setMessage({ type: 'error', text: `Verification failed: ${data.error || res.status}` });
                                             }
-                                            const base = (settings.apiBaseUrl || '').replace(/\/$/, '');
-                                            setIsVerifying(true);
-                                            setMessage(null);
-                                            try {
-                                                const res = await fetch(`${base}/api/messaging/available-numbers?churchId=test&areaCode=615`);
-                                                if (res.ok || res.status === 400) {
-                                                    setMessage({ type: 'success', text: 'SignalWire credentials verified successfully.' });
-                                                } else {
-                                                    const data = await res.json().catch(() => ({}));
-                                                    setMessage({ type: 'error', text: `Verification failed: ${data.error || res.status}` });
-                                                }
-                                            } catch (e: any) {
-                                                setMessage({ type: 'error', text: `Could not reach backend to verify: ${e.message}` });
-                                            } finally {
-                                                setIsVerifying(false);
-                                            }
-                                        }}
-                                        disabled={isVerifying || !settings.signalwireProjectId || !settings.signalwireApiToken}
-                                        className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
-                                    >
-                                        {isVerifying ? 'Testingâ€¦' : 'Test Connection'}
-                                    </button>
-
-                                    <button
-                                        onClick={handleSave}
-                                        disabled={isSaving}
-                                        className="bg-indigo-600 text-white px-5 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-700 transition-all disabled:opacity-50 shadow-sm"
-                                    >
-                                        {isSaving ? 'Savingâ€¦' : 'Save SignalWire Config'}
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Stripe & Modules */}
-                <div className="space-y-8">
-                    <div className="bg-slate-900 text-white p-8 rounded-[2.5rem] border border-slate-800 shadow-xl">
-                        <div className="flex justify-between items-center mb-6">
-                            <div className="flex items-center gap-3">
-                                <h3 className="text-lg font-black">Stripe Billing</h3>
-                                {isStripeConfigured ? (
-                                    <span className="text-[9px] font-black bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">ACTIVE</span>
-                                ) : (
-                                    <span className="text-[9px] font-black bg-rose-500/20 text-rose-400 px-2 py-0.5 rounded-full border border-rose-500/30">INCOMPLETE</span>
-                                )}
-                            </div>
-                            <button 
-                                onClick={verifyStripeConfig}
-                                disabled={isVerifying}
-                                className="text-[10px] font-bold text-slate-400 hover:text-white transition-colors disabled:opacity-50"
-                            >
-                                {isVerifying ? 'Testing...' : 'Test Config'}
-                            </button>
-                        </div>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-[10px] font-black uppercase text-slate-500 tracking-widest mb-2">Publishable Key</label>
-                                <input 
-                                    type="text" 
-                                    value={settings.stripePublishableKey || ''}
-                                    onChange={e => handleChange('stripePublishableKey', e.target.value)}
-                                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                                    placeholder="pk_live_..."
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-[10px] font-black uppercase text-slate-500 tracking-widest mb-2">Secret Key</label>
-                                <input 
-                                    type="password" 
-                                    value={settings.stripeSecretKey || ''}
-                                    onChange={e => handleChange('stripeSecretKey', e.target.value)}
-                                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                                    placeholder="sk_live_..."
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-[10px] font-black uppercase text-slate-500 tracking-widest mb-2">Webhook Secret</label>
-                                <input 
-                                    type="password" 
-                                    value={settings.stripeWebhookSecret || ''}
-                                    onChange={e => handleChange('stripeWebhookSecret', e.target.value)}
-                                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                                    placeholder="whsec_..."
-                                />
-                            </div>
-
-                            <div className="pt-4 border-t border-slate-700 mt-4">
-                                <div className="flex justify-between items-center mb-3">
-                                    <label className="text-[10px] font-black uppercase text-indigo-400 tracking-widest">Plan Price IDs (Stripe)</label>
-                                    {!arePricesConfigured && (
-                                        <span className="text-[9px] text-rose-400 font-bold">Missing IDs</span>
-                                    )}
-                                </div>
-                                <div className="grid grid-cols-1 gap-3">
-                                    <div>
-                                        <label className="block text-[9px] font-bold text-slate-500 mb-1">Starter Plan Price ID</label>
-                                        <input 
-                                            type="text" 
-                                            value={settings.stripePriceIds?.starter || ''}
-                                            onChange={e => setSettings(prev => ({ 
-                                                ...prev, 
-                                                stripePriceIds: { ...prev.stripePriceIds, starter: e.target.value } 
-                                            }))}
-                                            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 font-mono text-xs text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                                            placeholder="price_..."
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-[9px] font-bold text-slate-500 mb-1">Growth Plan Price ID</label>
-                                        <input 
-                                            type="text" 
-                                            value={settings.stripePriceIds?.growth || ''}
-                                            onChange={e => setSettings(prev => ({ 
-                                                ...prev, 
-                                                stripePriceIds: { ...prev.stripePriceIds, growth: e.target.value } 
-                                            }))}
-                                            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 font-mono text-xs text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                                            placeholder="price_..."
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-[9px] font-bold text-slate-500 mb-1">Kingdom Plan Price ID</label>
-                                        <input 
-                                            type="text" 
-                                            value={settings.stripePriceIds?.kingdom || ''}
-                                            onChange={e => setSettings(prev => ({ 
-                                                ...prev, 
-                                                stripePriceIds: { ...prev.stripePriceIds, kingdom: e.target.value } 
-                                            }))}
-                                            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 font-mono text-xs text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                                            placeholder="price_..."
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="pt-6 mt-2 flex justify-end">
-                                <button 
-                                    onClick={handleSave}
-                                    disabled={isSaving}
-                                    className="bg-white text-slate-900 px-5 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-all disabled:opacity-50"
+                                        } catch (e: any) {
+                                            setMessage({ type: 'error', text: `Could not reach backend to verify: ${e.message}` });
+                                        } finally {
+                                            setIsVerifying(false);
+                                        }
+                                    }}
+                                    disabled={isVerifying || !settings.signalwireProjectId || !settings.signalwireApiToken}
+                                    className="bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 px-3 py-1.5 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
-                                    {isSaving ? 'Saving...' : 'Save Billing Config'}
+                                    {isVerifying ? 'Testing…' : 'Test Connection'}
                                 </button>
                             </div>
                         </div>
+                        <p className="text-[10px] text-slate-400 mb-5 leading-relaxed">
+                            Shared project for all tenants — routing is handled by inbound webhook lookup.{' '}
+                            <a href="https://barnabassoftware.signalwire.com" target="_blank" rel="noopener noreferrer" className="underline text-indigo-400 hover:text-indigo-300">barnabassoftware.signalwire.com</a>{' '}→ API → API Tokens.
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Project ID</label>
+                                <input type="text" value={settings.signalwireProjectId || ''} onChange={e => handleChange('signalwireProjectId', e.target.value.trim())} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
+                                <p className="text-[9px] text-slate-400 mt-1">UUID — Dashboard → API → API Tokens.</p>
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Space URL</label>
+                                <input type="text" value={settings.signalwireSpaceUrl || ''} onChange={e => handleChange('signalwireSpaceUrl', e.target.value.trim().replace(/^https?:\/\//, ''))} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="barnabassoftware.signalwire.com" />
+                                <p className="text-[9px] text-slate-400 mt-1">Your subdomain — no https://.</p>
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">API Token</label>
+                                <input type="password" value={settings.signalwireApiToken || ''} onChange={e => handleChange('signalwireApiToken', e.target.value.trim())} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="PTxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" />
+                                <p className="text-[9px] text-slate-400 mt-1">Keep secret. Dashboard → API → API Tokens.</p>
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Webhook Base URL</label>
+                                <input type="text" value={settings.smsWebhookBaseUrl || ''} onChange={e => handleChange('smsWebhookBaseUrl', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder={settings.apiBaseUrl || 'https://api.example.com'} />
+                                <p className="text-[9px] text-slate-400 mt-1">Defaults to Backend API URL. SignalWire posts callbacks here.</p>
+                            </div>
+                        </div>
+                        {(settings.smsWebhookBaseUrl || settings.apiBaseUrl) && (
+                            <div className="mt-4 space-y-1.5">
+                                {['/api/messaging/inbound', '/api/messaging/status'].map(path => {
+                                    const base = (settings.smsWebhookBaseUrl || settings.apiBaseUrl || '').replace(/\/$/, '');
+                                    const url = base + path;
+                                    return (
+                                        <div key={path} className="bg-slate-100 dark:bg-slate-800 rounded-lg px-3 py-1.5 flex items-center justify-between gap-2">
+                                            <code className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 truncate">{url}</code>
+                                            <button onClick={() => navigator.clipboard.writeText(url)} className="text-slate-400 hover:text-indigo-500 transition-colors shrink-0 text-xs" title="Copy">📋</button>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                        <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+                            <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">Usage Estimate Pricing <span className="normal-case font-normal">(USD)</span></label>
+                            <p className="text-[9px] text-slate-400 mb-3">For in-app cost estimates only. Actual billing is in your SignalWire Dashboard.</p>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-[9px] font-bold text-slate-500 mb-1">SMS per segment</label>
+                                    <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">$</span><input type="number" aria-label="SMS cost per segment in USD" placeholder="0.0079" step="0.0001" min="0" value={settings.smsSegmentCostUsd ?? 0.0079} onChange={e => handleChange('smsSegmentCostUsd', parseFloat(e.target.value) || 0.0079)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-7 pr-3 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" /></div>
+                                </div>
+                                <div>
+                                    <label className="block text-[9px] font-bold text-slate-500 mb-1">MMS per message</label>
+                                    <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">$</span><input type="number" aria-label="MMS cost per message in USD" placeholder="0.0200" step="0.001" min="0" value={settings.smsMmsSegmentCostUsd ?? 0.02} onChange={e => handleChange('smsMmsSegmentCostUsd', parseFloat(e.target.value) || 0.02)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-7 pr-3 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" /></div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
-                    <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-lg font-black text-slate-900 dark:text-white">Feature Modules</h3>
-                            <button 
-                                onClick={handleSave} 
-                                disabled={isSaving}
-                                className="bg-indigo-600 text-white px-5 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-700 transition-all disabled:opacity-50"
-                            >
-                                {isSaving ? 'Saving...' : 'Save All'}
-                            </button>
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-4">
+                    {/* Feature Modules */}
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col">
+                        <h3 className="text-sm font-black text-slate-900 dark:text-white mb-1">Feature Modules</h3>
+                        <p className="text-[10px] text-slate-400 mb-4 leading-relaxed">Enable or disable top-level feature areas globally.</p>
+                        <div className="grid grid-cols-1 gap-2 flex-1">
                             {['pastoral', 'people', 'groups', 'services', 'giving', 'metrics', 'communication'].map(mod => (
-                                <label key={mod} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded-xl cursor-pointer">
+                                <label key={mod} className="flex items-center justify-between px-3 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-colors">
                                     <span className="text-xs font-bold text-slate-700 dark:text-slate-300 capitalize">{mod}</span>
-                                    <input 
-                                        type="checkbox" 
-                                        checked={settings.enabledModules ? settings.enabledModules[mod as keyof typeof settings.enabledModules] : true}
-                                        onChange={() => handleModuleToggle(mod)}
-                                        className="w-4 h-4 accent-indigo-600 rounded"
-                                    />
+                                    <input type="checkbox" checked={settings.enabledModules ? settings.enabledModules[mod as keyof typeof settings.enabledModules] : true} onChange={() => handleModuleToggle(mod)} className="w-4 h-4 accent-indigo-600 rounded" />
                                 </label>
                             ))}
                         </div>
-                        
-                        <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                        <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
                             <span className="text-xs font-bold text-slate-900 dark:text-white">Allow Public Signups</span>
-                            <button 
-                                role="switch"
-                                aria-checked={settings.allowSignups ? 'true' : 'false'}
-                                aria-label="Allow Public Signups"
-                                onClick={() => handleChange('allowSignups', !settings.allowSignups)}
-                                className={`w-12 h-6 rounded-full p-1 transition-colors ${settings.allowSignups ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'}`}
-                            >
+                            <button role="switch" aria-checked={settings.allowSignups ? 'true' : 'false'} aria-label="Allow Public Signups" onClick={() => handleChange('allowSignups', !settings.allowSignups)} className={`w-12 h-6 rounded-full p-1 transition-colors ${settings.allowSignups ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'}`}>
                                 <div className={`w-4 h-4 bg-white rounded-full transition-transform ${settings.allowSignups ? 'translate-x-6' : ''}`}></div>
                             </button>
                         </div>
                     </div>
 
+                </div>{/* end Row 2 */}
 
+                {/* ── Row 3: Stripe Billing ─────────────────────────────────── */}
+                <div className="bg-slate-900 text-white p-8 rounded-2xl border border-slate-800 shadow-xl">
+                    <div className="flex justify-between items-center mb-6">
+                        <div className="flex items-center gap-3">
+                            <h3 className="text-base font-black">Stripe Billing</h3>
+                            {isStripeConfigured ? (
+                                <span className="text-[9px] font-black bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">ACTIVE</span>
+                            ) : (
+                                <span className="text-[9px] font-black bg-rose-500/20 text-rose-400 px-2 py-0.5 rounded-full border border-rose-500/30">INCOMPLETE</span>
+                            )}
+                        </div>
+                        <button onClick={verifyStripeConfig} disabled={isVerifying} className="text-[10px] font-bold text-slate-400 hover:text-white transition-colors disabled:opacity-50">
+                            {isVerifying ? 'Testing...' : 'Test Config'}
+                        </button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-[10px] font-black uppercase text-slate-500 tracking-widest mb-2">Publishable Key</label>
+                                <input type="text" value={settings.stripePublishableKey || ''} onChange={e => handleChange('stripePublishableKey', e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="pk_live_..." />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-black uppercase text-slate-500 tracking-widest mb-2">Secret Key</label>
+                                <input type="password" value={settings.stripeSecretKey || ''} onChange={e => handleChange('stripeSecretKey', e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="sk_live_..." />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-black uppercase text-slate-500 tracking-widest mb-2">Webhook Secret</label>
+                                <input type="password" value={settings.stripeWebhookSecret || ''} onChange={e => handleChange('stripeWebhookSecret', e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="whsec_..." />
+                            </div>
+                        </div>
+                        <div>
+                            <div className="flex justify-between items-center mb-3">
+                                <label className="text-[10px] font-black uppercase text-indigo-400 tracking-widest">Plan Price IDs</label>
+                                {!arePricesConfigured && <span className="text-[9px] text-rose-400 font-bold">Missing IDs</span>}
+                            </div>
+                            <div className="space-y-3">
+                                <div>
+                                    <label className="block text-[9px] font-bold text-slate-500 mb-1">Starter Plan</label>
+                                    <input type="text" value={settings.stripePriceIds?.starter || ''} onChange={e => setSettings(prev => ({ ...prev, stripePriceIds: { ...prev.stripePriceIds, starter: e.target.value } }))} className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 font-mono text-xs text-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="price_..." />
+                                </div>
+                                <div>
+                                    <label className="block text-[9px] font-bold text-slate-500 mb-1">Growth Plan</label>
+                                    <input type="text" value={settings.stripePriceIds?.growth || ''} onChange={e => setSettings(prev => ({ ...prev, stripePriceIds: { ...prev.stripePriceIds, growth: e.target.value } }))} className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 font-mono text-xs text-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="price_..." />
+                                </div>
+                                <div>
+                                    <label className="block text-[9px] font-bold text-slate-500 mb-1">Kingdom Plan</label>
+                                    <input type="text" value={settings.stripePriceIds?.kingdom || ''} onChange={e => setSettings(prev => ({ ...prev, stripePriceIds: { ...prev.stripePriceIds, kingdom: e.target.value } }))} className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 font-mono text-xs text-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="price_..." />
+                                </div>
+                            </div>
+                            <div className="pt-5 flex justify-end">
+                                <button onClick={handleSave} disabled={isSaving} className="bg-white text-slate-900 px-5 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-all disabled:opacity-50">
+                                    {isSaving ? 'Saving...' : 'Save Billing Config'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
+
             </div>
-        </div>
         )}
+
 
 
         {activeTab === 'Tenants' && (
