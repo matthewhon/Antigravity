@@ -2314,8 +2314,8 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
             const profileSid     = smsForm.twilioCustomerProfileSid   || '';
             const evalStatus     = smsForm.twilioCustomerProfileEvaluation || '';
 
-            const handleSmsChange = (key: keyof NonNullable<Church['smsSettings']>, value: any) => {
-                setSmsForm(prev => ({ ...prev, [key]: value }));
+            const handleSmsChange = (key: string, value: any) => {
+                setSmsForm((prev: any) => ({ ...prev, [key]: value }));
             };
 
             const handleSmsSave = async () => {

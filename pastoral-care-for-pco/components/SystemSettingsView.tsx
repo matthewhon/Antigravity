@@ -1,4 +1,4 @@
-﻿
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { SystemSettings, Church, User, LogEntry } from '../types';
 import { firestore } from '../services/firestoreService';
@@ -301,7 +301,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
 
         {message && (
             <div className={`p-4 rounded-xl text-xs font-bold flex items-center gap-2 ${message.type === 'success' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                <span>{message.type === 'success' ? 'Ã¢Å“â€œ' : 'Ã¢Å¡Â Ã¯Â¸Â'}</span>
+                <span>{message.type === 'success' ? 'âœ“' : 'âš ï¸'}</span>
                 {message.text}
             </div>
         )}
@@ -411,7 +411,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                             </div>
                             <p className="text-[10px] text-slate-400 mb-4 leading-relaxed">
                                 This is the <strong>master</strong> SendGrid account. Each church tenant gets an isolated Subuser for reputation separation.
-                                Tenants configure their From address in <strong>Settings &amp; Administration Ã¢â€ â€™ Mail Settings</strong>.
+                                Tenants configure their From address in <strong>Settings &amp; Administration â†’ Mail Settings</strong>.
                             </p>
                             <div className="space-y-4">
                                 <div>
@@ -424,7 +424,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                         placeholder="SG.xxxxxxxxxxxxxxxx"
                                     />
                                     <p className="text-[9px] text-slate-400 mt-1.5">
-                                        Find this in your <a href="https://app.sendgrid.com/settings/api_keys" target="_blank" rel="noopener noreferrer" className="underline text-indigo-400 hover:text-indigo-300">SendGrid Dashboard Ã¢â€ â€™ Settings Ã¢â€ â€™ API Keys</a>.
+                                        Find this in your <a href="https://app.sendgrid.com/settings/api_keys" target="_blank" rel="noopener noreferrer" className="underline text-indigo-400 hover:text-indigo-300">SendGrid Dashboard â†’ Settings â†’ API Keys</a>.
                                         Requires <strong>Full Access</strong> permissions to create Subusers and authenticate domains.
                                     </p>
                                 </div>
@@ -465,7 +465,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                             </div>
                         </div>
 
-                        {/* Ã¢â€â‚¬Ã¢â€â‚¬ SignalWire SMS Ã¢â€â‚¬Ã¢â€â‚¬ */}
+                        {/* â”€â”€ SignalWire SMS â”€â”€ */}
                         <div className="pt-6 border-t border-slate-100 dark:border-slate-800">
                             <div className="flex justify-between items-center mb-2">
                                 <h4 className="text-xs font-bold text-indigo-600 dark:text-indigo-400">SignalWire SMS</h4>
@@ -477,11 +477,11 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                             </div>
                             <p className="text-[10px] text-slate-400 mb-4 leading-relaxed">
                                 Credentials for the <strong>SignalWire</strong> project used to provision numbers and send/receive SMS.
-                                All churches share a single project Ã¢â‚¬â€ number routing is handled by inbound webhook lookup.
+                                All churches share a single project â€” number routing is handled by inbound webhook lookup.
                                 Find these values at{' '}
                                 <a href="https://barnabassoftware.signalwire.com" target="_blank" rel="noopener noreferrer" className="underline text-indigo-400 hover:text-indigo-300">
                                     barnabassoftware.signalwire.com
-                                </a>{' '}Ã¢â€ â€™ API Ã¢â€ â€™ API Tokens.
+                                </a>{' '}â†’ API â†’ API Tokens.
                             </p>
 
                             <div className="space-y-4">
@@ -495,7 +495,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                         className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
                                         placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
                                     />
-                                    <p className="text-[9px] text-slate-400 mt-1.5">UUID from Dashboard Ã¢â€ â€™ API Ã¢â€ â€™ API Tokens.</p>
+                                    <p className="text-[9px] text-slate-400 mt-1.5">UUID from Dashboard â†’ API â†’ API Tokens.</p>
                                 </div>
 
                                 {/* API Token */}
@@ -508,7 +508,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                         className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
                                         placeholder="PTxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
                                     />
-                                    <p className="text-[9px] text-slate-400 mt-1.5">Keep this secret. Generated under Dashboard Ã¢â€ â€™ API Ã¢â€ â€™ API Tokens.</p>
+                                    <p className="text-[9px] text-slate-400 mt-1.5">Keep this secret. Generated under Dashboard â†’ API â†’ API Tokens.</p>
                                 </div>
 
                                 {/* Space URL */}
@@ -547,7 +547,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                                 return (
                                                     <div key={path} className="bg-slate-100 dark:bg-slate-800 rounded-lg px-3 py-1.5 flex items-center justify-between gap-2">
                                                         <code className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 truncate">{url}</code>
-                                                        <button onClick={() => navigator.clipboard.writeText(url)} className="text-slate-400 hover:text-indigo-500 transition-colors shrink-0 text-xs" title="Copy">Ã°Å¸â€œâ€¹</button>
+                                                        <button onClick={() => navigator.clipboard.writeText(url)} className="text-slate-400 hover:text-indigo-500 transition-colors shrink-0 text-xs" title="Copy">ðŸ“‹</button>
                                                     </div>
                                                 );
                                             })}
@@ -623,7 +623,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                         disabled={isVerifying || !settings.signalwireProjectId || !settings.signalwireApiToken}
                                         className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
                                     >
-                                        {isVerifying ? 'TestingÃ¢â‚¬Â¦' : 'Test Connection'}
+                                        {isVerifying ? 'Testingâ€¦' : 'Test Connection'}
                                     </button>
 
                                     <button
@@ -631,7 +631,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                         disabled={isSaving}
                                         className="bg-indigo-600 text-white px-5 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-700 transition-all disabled:opacity-50 shadow-sm"
                                     >
-                                        {isSaving ? 'SavingÃ¢â‚¬Â¦' : 'Save SignalWire Config'}
+                                        {isSaving ? 'Savingâ€¦' : 'Save SignalWire Config'}
                                     </button>
                                 </div>
                             </div>
@@ -879,10 +879,10 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                     </div>
                 </div>
 
-                {/* Ã¢â€â‚¬Ã¢â€â‚¬ Grow Integration Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
+                {/* â”€â”€ Grow Integration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
                 <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] border border-slate-100 dark:border-slate-800 shadow-sm">
                     <div className="flex items-center gap-3 mb-6">
-                        <div className="w-9 h-9 rounded-2xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-lg">Ã°Å¸Å’Â±</div>
+                        <div className="w-9 h-9 rounded-2xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-lg">ðŸŒ±</div>
                         <div>
                             <h3 className="text-lg font-black text-slate-900 dark:text-white">Grow Integration</h3>
                             <p className="text-[10px] text-slate-400 mt-0.5">Configure the shared secret that authorises the Grow Application to send emails through Pastoral Care.</p>
@@ -906,7 +906,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                 }}
                                 className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
                             >
-                                <option value="">Ã¢â‚¬â€ choose a tenant Ã¢â‚¬â€</option>
+                                <option value="">â€” choose a tenant â€”</option>
                                 {churches.map(c => (
                                     <option key={c.id} value={c.id}>{c.name} ({c.id})</option>
                                 ))}
@@ -933,7 +933,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                                 onChange={e => setGrowSecret(e.target.value)}
                                                 readOnly={!growSecretVisible}
                                                 className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 pr-24"
-                                                placeholder="Generate a secret belowÃ¢â‚¬Â¦"
+                                                placeholder="Generate a secret belowâ€¦"
                                             />
                                             <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
                                                 <button
@@ -941,7 +941,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                                     className="text-slate-400 hover:text-indigo-500 transition-colors p-1 text-xs"
                                                     title={growSecretVisible ? 'Hide' : 'Show'}
                                                 >
-                                                    {growSecretVisible ? 'Ã°Å¸â„¢Ë†' : 'Ã°Å¸â€˜Â'}
+                                                    {growSecretVisible ? 'ðŸ™ˆ' : 'ðŸ‘'}
                                                 </button>
                                                 {growSecret && (
                                                     <button
@@ -949,7 +949,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                                         className="text-slate-400 hover:text-indigo-500 transition-colors p-1 text-xs"
                                                         title="Copy"
                                                     >
-                                                        Ã°Å¸â€œâ€¹
+                                                        ðŸ“‹
                                                     </button>
                                                 )}
                                             </div>
@@ -966,7 +966,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                             }}
                                             className="shrink-0 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 px-3 py-2 rounded-xl font-bold text-xs hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-colors whitespace-nowrap border border-emerald-200 dark:border-emerald-800"
                                         >
-                                            Ã¢Å“Â¨ Generate
+                                            âœ¨ Generate
                                         </button>
                                     </div>
                                 </div>
@@ -977,7 +977,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                             ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
                                             : 'bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
                                     }`}>
-                                        {growSecretMsg.type === 'success' ? 'Ã¢Å“â€¦' : 'Ã¢ÂÅ’'} {growSecretMsg.text}
+                                        {growSecretMsg.type === 'success' ? '\u2705' : '\u274C'} {growSecretMsg.text}
                                     </div>
                                 )}
 
@@ -1008,7 +1008,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                         }}
                                         className="bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all disabled:opacity-50 shadow-sm"
                                     >
-                                        {growSecretSaving ? 'SavingÃ¢â‚¬Â¦' : 'Save Secret to Tenant'}
+                                        {growSecretSaving ? 'Savingâ€¦' : 'Save Secret to Tenant'}
                                     </button>
                                 </div>
 
@@ -1016,7 +1016,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                 <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-2xl p-5 space-y-2">
                                     <p className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400">Setup Instructions for the Grow App</p>
                                     <ol className="text-[11px] text-slate-600 dark:text-slate-300 space-y-1.5 list-decimal list-inside leading-relaxed">
-                                        <li>In the Grow Application, navigate to <strong>Settings Ã¢â€ â€™ Integrations</strong>.</li>
+                                        <li>In the Grow Application, navigate to <strong>Settings â†’ Integrations</strong>.</li>
                                         <li>Find the <strong>Pastoral Care Integration</strong> section.</li>
                                         <li>Set <code className="bg-slate-200 dark:bg-slate-700 px-1 rounded">PASTORAL_CARE_API_SECRET</code> to the secret generated above.</li>
                                         <li>Set the endpoint to <code className="bg-slate-200 dark:bg-slate-700 px-1 rounded">{(settings.apiBaseUrl || DEFAULT_API_URL).replace(/\/$/, '')}/api/integrations/grow/daily-email</code></li>
@@ -1084,7 +1084,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                             className="text-slate-400 hover:text-white transition-colors"
                                             title="Copy to Clipboard"
                                         >
-                                            Ã°Å¸â€œâ€¹
+                                            ðŸ“‹
                                         </button>
                                     </div>
                                     <p className="text-[10px] text-slate-500 mt-2">
@@ -1255,7 +1255,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                         >
                             {isLoading ? (
                                 <><span className="animate-spin inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full"></span> Loading...</>
-                            ) : 'Ã¢â€ Â» Refresh'}
+                            ) : 'â†» Refresh'}
                         </button>
                     </div>
 
@@ -1303,7 +1303,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                 onClick={() => { setLogFilter(''); setLogLevelFilter(''); setLogSourceFilter(''); }}
                                 className="text-[10px] font-bold text-rose-500 hover:text-rose-700 px-3 py-2 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors"
                             >
-                                Ã¢Å“â€¢ Clear Filters
+                                âœ• Clear Filters
                             </button>
                         )}
                     </div>
@@ -1401,7 +1401,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                                     <div className="flex items-start justify-between gap-2">
                                                         <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{log.message}</p>
                                                         {hasContext && (
-                                                            <span className="text-[9px] text-slate-400 shrink-0 mt-0.5">{isExpanded ? 'Ã¢â€“Â²' : 'Ã¢â€“Â¼'} details</span>
+                                                            <span className="text-[9px] text-slate-400 shrink-0 mt-0.5">{isExpanded ? 'â–²' : 'â–¼'} details</span>
                                                         )}
                                                     </div>
                                                 </td>
@@ -1421,7 +1421,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                 {logs.length === 0 && !isLoading && (
                                     <tr>
                                         <td colSpan={5} className="p-12 text-center">
-                                            <div className="text-4xl mb-3">Ã°Å¸â€œâ€¹</div>
+                                            <div className="text-4xl mb-3">ðŸ“‹</div>
                                             <p className="text-slate-400 text-sm font-bold">No logs found</p>
                                             <p className="text-slate-400 text-xs mt-1">Logs will appear here after sync or webhook events occur.</p>
                                         </td>
