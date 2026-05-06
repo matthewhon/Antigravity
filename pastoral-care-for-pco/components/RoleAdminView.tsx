@@ -2701,7 +2701,16 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                     {/* Brand Form */}
-                                    <div className="space-y-4">
+                                    <div className={`space-y-4 ${(regStatus?.brand?.status || '').toUpperCase() === 'PENDING' ? 'opacity-60 pointer-events-none select-none relative' : ''}`}>
+                                        { (regStatus?.brand?.status || '').toUpperCase() === 'PENDING' && (
+                                            <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-auto">
+                                                <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm px-4 py-2 rounded-full border border-amber-200 dark:border-amber-800 shadow-sm">
+                                                    <p className="text-[10px] font-black uppercase tracking-widest text-amber-700 dark:text-amber-400">
+                                                        ⏳ Brand Registration Pending — Editing Disabled
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        )}
                                         <div className="flex items-center gap-2 mb-4">
                                             <div className="w-6 h-6 rounded-full bg-violet-100 text-violet-600 flex items-center justify-center text-xs font-black">1</div>
                                             <h5 className="font-bold text-slate-800 dark:text-slate-200">Register Brand</h5>
@@ -2760,10 +2769,10 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         
                                         <button
                                             onClick={handleSubmitBrand}
-                                            disabled={isSubmittingBrand}
+                                            disabled={isSubmittingBrand || (regStatus?.brand?.status || '').toUpperCase() === 'PENDING'}
                                             className="w-full mt-4 bg-violet-600 hover:bg-violet-700 text-white font-black text-xs uppercase tracking-widest py-3 rounded-xl transition-all disabled:opacity-50"
                                         >
-                                            {isSubmittingBrand ? 'Submitting...' : 'Submit Brand'}
+                                            {isSubmittingBrand ? 'Submitting...' : (regStatus?.brand?.status || '').toUpperCase() === 'PENDING' ? 'Registration Pending' : 'Submit Brand'}
                                         </button>
                                     </div>
 

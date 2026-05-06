@@ -33,6 +33,15 @@ const RISK_COLORS: Record<string, string> = {
   'Unknown': '#94a3b8',      // Slate
 };
 
+const MEMBERSHIP_COLORS: Record<string, string> = {
+  'Member': '#10b981',
+  'Friend of Victory': '#6366f1',
+  'Regular Attender': '#8b5cf6',
+  'Non-Member': '#f43f5e',
+  'Visitor': '#f59e0b',
+  'Unknown': '#94a3b8',
+};
+
 export const PeopleReportsTab: React.FC<PeopleReportsTabProps> = ({ data }) => {
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('12_months');
 
@@ -250,6 +259,54 @@ export const PeopleReportsTab: React.FC<PeopleReportsTabProps> = ({ data }) => {
     });
   }, [data.allPeople, data.recentStatusChanges, data.recentRiskChanges, months]);
 
+  const membershipChartData = useMemo(() => {
+    if (months.length === 0) return [];
+
+    return months.map(m => {
+      const monthEnd = new Date(m.date);
+      monthEnd.setMonth(monthEnd.getMonth() + 1);
+      monthEnd.setDate(0); 
+      monthEnd.setHours(23, 59, 59, 999);
+
+      const counts: Record<string, number> = {};
+
+      data.allPeople.forEach(p => {
+        const created = new Date(p.createdAt);
+        if (created <= monthEnd) {
+          let currentMembership = p.membership || 'Unknown';
+          
+          if (data.recentStatusChanges) {
+            const futureChanges = data.recentStatusChanges.filter(
+                c => c.personId === p.id && c.type === 'membership' && new Date(c.date) > monthEnd
+            );
+            
+            futureChanges.sort((a, b) => b.timestamp - a.timestamp);
+            for (const change of futureChanges) {
+                currentMembership = change.oldValue || 'Unknown';
+            }
+          }
+
+          counts[currentMembership] = (counts[currentMembership] || 0) + 1;
+        }
+      });
+
+      return {
+        name: m.label,
+        ...counts
+      };
+    });
+  }, [data.allPeople, data.recentStatusChanges, months]);
+
+  const membershipKeys = useMemo(() => {
+    const keys = new Set<string>();
+    membershipChartData.forEach(d => {
+      Object.keys(d).forEach(k => {
+        if (k !== 'name') keys.add(k);
+      });
+    });
+    return Array.from(keys).sort();
+  }, [membershipChartData]);
+
   const riskKeys = ['Healthy', 'At Risk', 'Disconnected', 'Unknown'];
 
   return (
@@ -257,8 +314,8 @@ export const PeopleReportsTab: React.FC<PeopleReportsTabProps> = ({ data }) => {
       <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 lg:p-8 shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
-            <h4 className="text-xl font-black text-slate-900 dark:text-white">Status Over Time</h4>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Cumulative growth of people by their current status.</p>
+            <h4 className="text-xl font-black text-slate-900 dark:text-white">Lifecycle Status Over Time</h4>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Cumulative growth of people by their Active/Inactive status.</p>
           </div>
           
           <select
@@ -461,6 +518,75 @@ export const PeopleReportsTab: React.FC<PeopleReportsTabProps> = ({ data }) => {
                     strokeWidth={2}
                     fill={`url(#colorRisk${key.replace(/\s+/g, '')})`} 
                     activeDot={{ r: 6, strokeWidth: 0, fill: RISK_COLORS[key] || '#6366f1' }}
+                  />
+                ))}
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-full flex items-center justify-center text-slate-400">
+              No data available for the selected time range.
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 lg:p-8 shadow-sm">
+        <div className="mb-8">
+          <h4 className="text-xl font-black text-slate-900 dark:text-white">Membership Status Over Time</h4>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Changes in PCO membership categories (Member, Friend of Victory, etc.) over time.</p>
+        </div>
+
+        <div className="h-[400px] w-full">
+          {membershipChartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={membershipChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <defs>
+                  {membershipKeys.map(key => (
+                    <linearGradient key={`membership-${key}`} id={`colorMem${key.replace(/\s+/g, '')}`} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={MEMBERSHIP_COLORS[key] || '#6366f1'} stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor={MEMBERSHIP_COLORS[key] || '#6366f1'} stopOpacity={0}/>
+                    </linearGradient>
+                  ))}
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.2} />
+                <XAxis 
+                  dataKey="name" 
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 12, fill: '#64748b' }}
+                  dy={10}
+                />
+                <YAxis 
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 12, fill: '#64748b' }}
+                />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: '#1e293b', 
+                    border: 'none', 
+                    borderRadius: '12px',
+                    color: '#f8fafc',
+                    boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'
+                  }}
+                  itemStyle={{ fontSize: '13px', fontWeight: 600 }}
+                />
+                <Legend 
+                  verticalAlign="top" 
+                  height={36} 
+                  iconType="circle"
+                  wrapperStyle={{ fontSize: '12px', fontWeight: 600, color: '#64748b' }}
+                />
+                {membershipKeys.map(key => (
+                  <Area 
+                    key={key}
+                    type="monotone" 
+                    dataKey={key} 
+                    stackId="1"
+                    stroke={MEMBERSHIP_COLORS[key] || '#6366f1'} 
+                    strokeWidth={2}
+                    fill={`url(#colorMem${key.replace(/\s+/g, '')})`} 
+                    activeDot={{ r: 6, strokeWidth: 0, fill: MEMBERSHIP_COLORS[key] || '#6366f1' }}
                   />
                 ))}
               </AreaChart>
