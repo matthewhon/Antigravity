@@ -319,7 +319,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   const [brandForm, setBrandForm] = useState({
       legalName: church.name || '',
       ein: '',
-      legalEntityType: 'NONPROFIT',
+      legalEntityType: 'Non-Profit',
       contactEmail: church.email || '',
       contactPhone: church.phone || '',
       website: church.website || '',
@@ -331,6 +331,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   const [campaignForm, setCampaignForm] = useState({
       name: `${church.name || 'Church'} SMS`,
       usecase: 'MIXED',
+      subUsecases: [] as string[],
       description: 'Sending updates, announcements, prayer requests, and volunteer scheduling to congregation members.',
       sample1: `Hi [Name], just a reminder that service times this Sunday are at 9am and 11am! - ${church.name || 'Church'}`,
       sample2: `We are looking for volunteers for the upcoming food drive. Reply YES if you can help! - ${church.name || 'Church'}`,
@@ -2717,9 +2718,11 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         <div>
                                             <label className={labelCn}>Entity Type</label>
                                             <select className={inputCn} value={brandForm.legalEntityType} onChange={e => setBrandForm({...brandForm, legalEntityType: e.target.value})}>
-                                                <option value="NONPROFIT">Non-Profit (501c3)</option>
-                                                <option value="PRIVATE_PROFIT">Private Company</option>
-                                                <option value="PUBLIC_PROFIT">Public Company</option>
+                                                <option value="Non-Profit">Non-Profit (501c3)</option>
+                                                <option value="Private Profit">Private Company</option>
+                                                <option value="Public Profit">Public Company</option>
+                                                <option value="Government">Government</option>
+                                                <option value="Sole Proprietor">Sole Proprietor</option>
                                             </select>
                                         </div>
                                         <div className="grid grid-cols-2 gap-4">
@@ -2777,11 +2780,63 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         </div>
                                         <div>
                                             <label className={labelCn}>Use Case</label>
-                                            <select className={inputCn} value={campaignForm.usecase} onChange={e => setCampaignForm({...campaignForm, usecase: e.target.value})}>
+                                            <select className={inputCn} value={campaignForm.usecase} onChange={e => setCampaignForm({...campaignForm, usecase: e.target.value, subUsecases: []})}>
                                                 <option value="MIXED">Mixed / General (Recommended)</option>
+                                                <option value="LOW_VOLUME">Low Volume</option>
+                                                <option value="2FA">Two-Factor Authentication</option>
+                                                <option value="ACCOUNT_NOTIFICATION">Account Notifications</option>
+                                                <option value="CUSTOMER_CARE">Customer Care</option>
+                                                <option value="DELIVERY_NOTIFICATION">Delivery Notifications</option>
+                                                <option value="FRAUD_ALERT">Fraud Alerts</option>
+                                                <option value="HIGHER_EDUCATION">Higher Education</option>
+                                                <option value="MARKETING">Marketing</option>
+                                                <option value="POLLING_VOTING">Polling and Voting</option>
+                                                <option value="PUBLIC_SERVICE_ANNOUNCEMENT">Public Service Announcement</option>
+                                                <option value="SECURITY_ALERT">Security Alerts</option>
                                                 <option value="CHARITY">Charity / 501c3 (Requires status)</option>
+                                                <option value="EMERGENCY">Emergency</option>
+                                                <option value="K12_EDUCATION">K-12 Education</option>
+                                                <option value="POLITICAL">Political</option>
+                                                <option value="SOCIAL">Social</option>
+                                                <option value="SWEEPSTAKE">Sweepstakes</option>
                                             </select>
                                         </div>
+                                        {(campaignForm.usecase === 'MIXED' || campaignForm.usecase === 'LOW_VOLUME') && (
+                                            <div>
+                                                <label className={labelCn}>Sub Use Cases (Select 1 to 5)</label>
+                                                <div className="grid grid-cols-2 gap-2 mt-2">
+                                                    {[
+                                                        { id: '2FA', label: '2FA' },
+                                                        { id: 'ACCOUNT_NOTIFICATION', label: 'Account Notifications' },
+                                                        { id: 'CUSTOMER_CARE', label: 'Customer Care' },
+                                                        { id: 'DELIVERY_NOTIFICATION', label: 'Delivery Notifications' },
+                                                        { id: 'FRAUD_ALERT', label: 'Fraud Alerts' },
+                                                        { id: 'MARKETING', label: 'Marketing' },
+                                                        { id: 'POLLING_VOTING', label: 'Polling & Voting' },
+                                                        { id: 'PUBLIC_SERVICE_ANNOUNCEMENT', label: 'Public Service Announcement' },
+                                                        { id: 'SECURITY_ALERT', label: 'Security Alerts' }
+                                                    ].map(sc => (
+                                                        <label key={sc.id} className="flex items-center gap-2 text-[11px] text-slate-700 dark:text-slate-300">
+                                                            <input 
+                                                                type="checkbox" 
+                                                                className="rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+                                                                checked={campaignForm.subUsecases.includes(sc.id)}
+                                                                onChange={e => {
+                                                                    const current = campaignForm.subUsecases;
+                                                                    if (e.target.checked) {
+                                                                        if (current.length >= 5) return; // Max 5 sub-usecases
+                                                                        setCampaignForm({...campaignForm, subUsecases: [...current, sc.id]});
+                                                                    } else {
+                                                                        setCampaignForm({...campaignForm, subUsecases: current.filter(id => id !== sc.id)});
+                                                                    }
+                                                                }}
+                                                            />
+                                                            {sc.label}
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
                                         <div>
                                             <label className={labelCn}>Campaign Description</label>
                                             <textarea rows={2} className={inputCn} value={campaignForm.description} onChange={e => setCampaignForm({...campaignForm, description: e.target.value})} placeholder="Sending transactional and informational text messages to church members..." />

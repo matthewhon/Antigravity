@@ -216,7 +216,7 @@ function _httpsRequest(
 export interface BrandRegistrationPayload {
     legalName:       string;   // company_name
     ein:             string;
-    legalEntityType: 'PRIVATE_PROFIT' | 'PUBLIC_PROFIT' | 'NONPROFIT' | 'GOVERNMENT' | 'SOLE_PROPRIETOR';
+    legalEntityType: 'Private Profit' | 'Public Profit' | 'Non-Profit' | 'Government' | 'Sole Proprietor';
     contactEmail:    string;
     contactPhone:    string;
     website:         string;
@@ -294,6 +294,7 @@ export interface CampaignRegistrationPayload {
     brandId:         string;
     name:            string;
     usecase:         string;   // e.g. 'MIXED', 'CUSTOMER_CARE', '2FA'
+    subUsecases?:    string[]; // Required if usecase is 'MIXED' or 'LOW_VOLUME'
     description:     string;
     sample1:         string;
     sample2?:        string;
@@ -329,6 +330,7 @@ export async function registerTenantCampaign(
         terms_and_conditions: true,
     };
     if (payload.sample2) body.sample2 = payload.sample2;
+    if (payload.subUsecases && payload.subUsecases.length > 0) body.sub_usecases = payload.subUsecases;
     if (webhookUrl) body.webhook_url = webhookUrl;
 
     const result = await callRegistryApi(`/brands/${payload.brandId}/campaigns`, 'POST', body);
@@ -338,9 +340,10 @@ export async function registerTenantCampaign(
 
     await db.collection('churches').doc(churchId).update({
         'smsSettings.campaignId':          campaignId,
-        'smsSettings.campaignStatus':      status.toLowerCase(),
-        'smsSettings.campaignUsecase':     payload.usecase,
-        'smsSettings.campaignDescription': payload.description,
+        'smsSettings.campaignStatus':       status.toLowerCase(),
+        'smsSettings.campaignUsecase':      payload.usecase,
+        'smsSettings.campaignSubUsecases':  payload.subUsecases || [],
+        'smsSettings.campaignDescription':  payload.description,
         'smsSettings.campaignSample1':     payload.sample1,
         'smsSettings.campaignSample2':     payload.sample2 || null,
         'smsSettings.campaignMessageFlow': payload.messageFlow,

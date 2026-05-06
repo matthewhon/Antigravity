@@ -924,7 +924,7 @@ export interface SmsSettings {
     /** EIN / Tax ID */
     brandEin?: string;
     /** Legal entity type */
-    brandLegalEntityType?: 'PRIVATE_PROFIT' | 'PUBLIC_PROFIT' | 'NONPROFIT' | 'GOVERNMENT' | 'SOLE_PROPRIETOR';
+    brandLegalEntityType?: 'Private Profit' | 'Public Profit' | 'Non-Profit' | 'Government' | 'Sole Proprietor';
     /** Contact email address for the brand */
     brandContactEmail?: string;
     /** Contact phone number for the brand */
@@ -946,6 +946,8 @@ export interface SmsSettings {
     campaignStatus?: 'pending' | 'approved' | 'failed';
     /** TCR use-case code, e.g. 'MIXED', 'CUSTOMER_CARE', '2FA' */
     campaignUsecase?: string;
+    /** Sub use cases (required if usecase is MIXED or LOW_VOLUME) */
+    campaignSubUsecases?: string[];
     /** Campaign description submitted to TCR */
     campaignDescription?: string;
     /** Sample message 1 */
