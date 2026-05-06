@@ -2671,8 +2671,8 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                 <p className="text-[10px] font-bold uppercase text-slate-400 tracking-widest mb-1">Brand Status</p>
                                                 <div className="flex items-center gap-2">
                                                     <span className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-widest ${
-                                                        regStatus.brand?.status === 'APPROVED' ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' :
-                                                        regStatus.brand?.status === 'PENDING' ? 'bg-amber-500/10 text-amber-600 border border-amber-500/20' :
+                                                        (regStatus.brand?.status || '').toUpperCase() === 'APPROVED' || (regStatus.brand?.status || '').toUpperCase() === 'VERIFIED' ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' :
+                                                        (regStatus.brand?.status || '').toUpperCase() === 'PENDING' ? 'bg-amber-500/10 text-amber-600 border border-amber-500/20' :
                                                         regStatus.brand?.status ? 'bg-rose-500/10 text-rose-600 border border-rose-500/20' :
                                                         'bg-slate-200 text-slate-500 border border-slate-300'
                                                     }`}>
@@ -2685,8 +2685,8 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                 <p className="text-[10px] font-bold uppercase text-slate-400 tracking-widest mb-1">Campaign Status</p>
                                                 <div className="flex items-center gap-2">
                                                     <span className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-widest ${
-                                                        regStatus.campaign?.status === 'APPROVED' ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' :
-                                                        regStatus.campaign?.status === 'PENDING' ? 'bg-amber-500/10 text-amber-600 border border-amber-500/20' :
+                                                        (regStatus.campaign?.status || '').toUpperCase() === 'APPROVED' || (regStatus.campaign?.status || '').toUpperCase() === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' :
+                                                        (regStatus.campaign?.status || '').toUpperCase() === 'PENDING' || (regStatus.campaign?.status || '').includes('DCA') ? 'bg-amber-500/10 text-amber-600 border border-amber-500/20' :
                                                         regStatus.campaign?.status ? 'bg-rose-500/10 text-rose-600 border border-rose-500/20' :
                                                         'bg-slate-200 text-slate-500 border border-slate-300'
                                                     }`}>
@@ -2769,9 +2769,16 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
 
                                     {/* Campaign Form */}
                                     <div className="space-y-4">
-                                        <div className="flex items-center gap-2 mb-4">
-                                            <div className="w-6 h-6 rounded-full bg-violet-100 text-violet-600 flex items-center justify-center text-xs font-black">2</div>
-                                            <h5 className="font-bold text-slate-800 dark:text-slate-200">Register Campaign</h5>
+                                        <div className="flex items-center justify-between mb-4">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-6 h-6 rounded-full bg-violet-100 text-violet-600 flex items-center justify-center text-xs font-black">2</div>
+                                                <h5 className="font-bold text-slate-800 dark:text-slate-200">Register Campaign</h5>
+                                            </div>
+                                            {regStatus?.brand?.id && (
+                                                <span className="text-[9px] font-mono bg-slate-100 dark:bg-slate-800 text-slate-400 px-2 py-0.5 rounded" title="Brand ID to be associated">
+                                                    Brand: {regStatus.brand.id.slice(0,8)}...
+                                                </span>
+                                            )}
                                         </div>
                                         
                                         <div>
@@ -2854,13 +2861,22 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             <textarea rows={2} className={inputCn} value={campaignForm.sample2} onChange={e => setCampaignForm({...campaignForm, sample2: e.target.value})} placeholder="Thank you for visiting! To get connected, fill out this link: ..." />
                                         </div>
                                         
-                                        <button
-                                            onClick={handleSubmitCampaign}
-                                            disabled={isSubmittingCampaign}
-                                            className="w-full mt-4 bg-violet-600 hover:bg-violet-700 text-white font-black text-xs uppercase tracking-widest py-3 rounded-xl transition-all disabled:opacity-50"
-                                        >
-                                            {isSubmittingCampaign ? 'Submitting...' : 'Submit Campaign'}
-                                        </button>
+                                        {regStatus?.brand?.status?.toLowerCase() !== 'verified' && regStatus?.brand?.status?.toLowerCase() !== 'approved' ? (
+                                            <div className="mt-4 p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 rounded-xl">
+                                                <p className="text-[10px] font-bold text-amber-700 dark:text-amber-400 leading-relaxed">
+                                                    🔒 Campaign registration is locked until your Brand status is <strong>VERIFIED</strong>. 
+                                                    Carriers require a verified identity before they will accept new message campaigns.
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            <button
+                                                onClick={handleSubmitCampaign}
+                                                disabled={isSubmittingCampaign}
+                                                className="w-full mt-4 bg-violet-600 hover:bg-violet-700 text-white font-black text-xs uppercase tracking-widest py-3 rounded-xl transition-all disabled:opacity-50"
+                                            >
+                                                {isSubmittingCampaign ? 'Submitting...' : 'Submit Campaign'}
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                             </div>

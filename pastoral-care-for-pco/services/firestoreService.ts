@@ -900,6 +900,34 @@ class FirestoreService {
       } catch (e) { this.handleFirestoreError(e); }
   }
 
+  // --- SMS Opt-Outs ---
+
+  async getSmsOptOuts(churchId: string): Promise<import('../types').SmsOptOut[]> {
+      try {
+          const q = query(collection(db, 'smsOptOuts'), where('churchId', '==', churchId));
+          const snapshot = await getDocs(q);
+          return snapshot.docs
+              .map(d => d.data() as import('../types').SmsOptOut)
+              .sort((a, b) => (b.optedOutAt || 0) - (a.optedOutAt || 0));
+      } catch (e) {
+          console.error('[FirestoreService] getSmsOptOuts failed:', e);
+          return [];
+      }
+  }
+
+  async removeSmsOptOut(churchId: string, phoneNumber: string): Promise<void> {
+      try {
+          const id = `${churchId}_${phoneNumber.replace(/\+/g, '')}`;
+          await deleteDoc(doc(db, 'smsOptOuts', id));
+          // Also update the conversation if it exists
+          const convRef = doc(db, 'smsConversations', id);
+          const convSnap = await getDoc(convRef);
+          if (convSnap.exists()) {
+              await updateDoc(convRef, { isOptedOut: false });
+          }
+      } catch (e) { this.handleFirestoreError(e); }
+  }
+
   // --- Logging ---
 
   async saveLog(entry: LogEntry): Promise<void> {

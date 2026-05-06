@@ -16,11 +16,8 @@ import { NotesManager } from './NotesManager';
 import { PcoImportModal } from './PcoImportModal';
 import MessagingModule from './MessagingModule';
 import QrCodeGenerator from './QrCodeGenerator';
-import { EmailCampaign, TemplateSettings, PcoList, Church, User, EmailUnsubscribe } from '../types';
-import {
-  Mail, Plus, ChevronDown, ChevronUp, CheckCircle, Circle, Send,
-  Clock, Users, AtSign, FileText, AlignLeft, Calendar, ArrowLeft,
-  Trash2, Eye, Pencil, Loader2, X, List, UserMinus, Search, Copy, Globe, BarChart2
+import { EmailCampaign, TemplateSettings, PcoList, Church, User, EmailUnsubscribe, SmsOptOut } from '../types';
+  Trash2, Eye, Pencil, Loader2, X, List, UserMinus, Search, Copy, Globe, BarChart2, MessageSquare, Phone
 } from 'lucide-react';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -1306,10 +1303,13 @@ currentUser, onUpdateChurch, activePage, smsTab }) => {
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
   // ── Unsubscribers state ──────────────────────────────────────────────────────
+  const [unsubMode, setUnsubMode] = useState<'email' | 'sms'>('email');
   const [unsubscribers, setUnsubscribers] = useState<EmailUnsubscribe[]>([]);
+  const [smsOptOuts, setSmsOptOuts] = useState<SmsOptOut[]>([]);
   const [unsubLoading, setUnsubLoading] = useState(false);
   const [unsubSearch, setUnsubSearch] = useState('');
   const [unsubLoaded, setUnsubLoaded] = useState(false);
+  const [smsUnsubLoaded, setSmsUnsubLoaded] = useState(false);
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type });
@@ -1327,14 +1327,22 @@ currentUser, onUpdateChurch, activePage, smsTab }) => {
 
   // Load unsubscribers lazily when the tab is first opened
   useEffect(() => {
-    if (activeTab === 'unsubscribers' && !unsubLoaded) {
-      setUnsubLoading(true);
-      firestore.getEmailUnsubscribes(churchId)
-        .then(list => { setUnsubscribers(list); setUnsubLoaded(true); })
-        .catch(() => {})
-        .finally(() => setUnsubLoading(false));
+    if (effectiveTab === 'unsubscribers') {
+      if (unsubMode === 'email' && !unsubLoaded) {
+        setUnsubLoading(true);
+        firestore.getEmailUnsubscribes(churchId)
+          .then(list => { setUnsubscribers(list); setUnsubLoaded(true); })
+          .catch(() => {})
+          .finally(() => setUnsubLoading(false));
+      } else if (unsubMode === 'sms' && !smsUnsubLoaded) {
+        setUnsubLoading(true);
+        firestore.getSmsOptOuts(churchId)
+          .then(list => { setSmsOptOuts(list); setSmsUnsubLoaded(true); })
+          .catch(() => {})
+          .finally(() => setUnsubLoading(false));
+      }
     }
-  }, [activeTab, churchId, unsubLoaded]);
+  }, [effectiveTab, unsubMode, churchId, unsubLoaded, smsUnsubLoaded]);
 
   const handleRemoveUnsubscribe = async (unsub: EmailUnsubscribe) => {
     if (!confirm(`Re-subscribe ${unsub.email}? They will be able to receive emails from this list again.`)) return;
@@ -1343,9 +1351,20 @@ currentUser, onUpdateChurch, activePage, smsTab }) => {
     showToast(`${unsub.email} has been re-subscribed.`);
   };
 
+  const handleRemoveSmsOptOut = async (optOut: SmsOptOut) => {
+    if (!confirm(`Re-subscribe ${optOut.phoneNumber}? Note: If they previously texted STOP, they may also need to text START to their assigned number to receive messages again.`)) return;
+    await firestore.removeSmsOptOut(churchId, optOut.phoneNumber);
+    setSmsOptOuts(prev => prev.filter(o => o.id !== optOut.id));
+    showToast(`${optOut.phoneNumber} has been re-subscribed.`);
+  };
+
   const filteredUnsubs = unsubSearch.trim()
     ? unsubscribers.filter(u => u.email.toLowerCase().includes(unsubSearch.toLowerCase()))
     : unsubscribers;
+
+  const filteredSmsUnsubs = unsubSearch.trim()
+    ? smsOptOuts.filter(o => o.phoneNumber.toLowerCase().includes(unsubSearch.toLowerCase()))
+    : smsOptOuts;
 
   const handleCreate = async (name: string) => {
     setShowNewModal(false);
@@ -1602,23 +1621,47 @@ currentUser, onUpdateChurch, activePage, smsTab }) => {
                 <UserMinus size={20} className="text-red-500" /> Unsubscribers
               </h2>
               <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                People who have opted out of your emails. They are automatically excluded from future sends.
+                People who have opted out of your {unsubMode === 'email' ? 'emails' : 'SMS messages'}. They are automatically excluded from future sends.
               </p>
             </div>
-            {unsubscribers.length > 0 && (
+            {(unsubMode === 'email' ? unsubscribers.length : smsOptOuts.length) > 0 && (
               <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">
-                {unsubscribers.length} total
+                {unsubMode === 'email' ? unsubscribers.length : smsOptOuts.length} total
               </span>
             )}
           </div>
 
+          {/* Toggle Switch */}
+          <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl mb-6 w-fit">
+            <button
+              onClick={() => { setUnsubMode('email'); setUnsubSearch(''); }}
+              className={`flex items-center gap-2 px-4 py-1.5 text-sm font-semibold rounded-lg transition ${
+                unsubMode === 'email'
+                  ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+              }`}
+            >
+              <Mail size={14} /> Email
+            </button>
+            <button
+              onClick={() => { setUnsubMode('sms'); setUnsubSearch(''); }}
+              className={`flex items-center gap-2 px-4 py-1.5 text-sm font-semibold rounded-lg transition ${
+                unsubMode === 'sms'
+                  ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+              }`}
+            >
+              <MessageSquare size={14} /> SMS
+            </button>
+          </div>
+
           {/* Search */}
-          {unsubscribers.length > 0 && (
+          {(unsubMode === 'email' ? unsubscribers.length : smsOptOuts.length) > 0 && (
             <div className="relative mb-4">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search by email…"
+                placeholder={unsubMode === 'email' ? "Search by email…" : "Search by phone number…"}
                 value={unsubSearch}
                 onChange={e => setUnsubSearch(e.target.value)}
                 className="w-full pl-8 pr-3 py-2 text-sm border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-400"
@@ -1631,15 +1674,17 @@ currentUser, onUpdateChurch, activePage, smsTab }) => {
             <div className="flex items-center justify-center h-40 text-slate-400">
               <Loader2 size={22} className="animate-spin mr-2" /> Loading…
             </div>
-          ) : filteredUnsubs.length === 0 ? (
+          ) : (unsubMode === 'email' ? filteredUnsubs.length : filteredSmsUnsubs.length) === 0 ? (
             <div className="text-center py-20 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
-              <UserMinus size={36} className="mx-auto text-slate-300 dark:text-slate-600 mb-3" />
+              {unsubMode === 'email' ? <UserMinus size={36} className="mx-auto text-slate-300 dark:text-slate-600 mb-3" /> : <Phone size={36} className="mx-auto text-slate-300 dark:text-slate-600 mb-3" />}
               <p className="text-slate-500 dark:text-slate-400 font-medium">
-                {unsubSearch ? 'No results match your search' : 'No unsubscribers yet'}
+                {unsubSearch ? 'No results match your search' : `No ${unsubMode === 'email' ? 'email' : 'SMS'} unsubscribers yet`}
               </p>
               {!unsubSearch && (
                 <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">
-                  When someone clicks "Unsubscribe" in an email, they'll appear here.
+                  {unsubMode === 'email' 
+                    ? 'When someone clicks "Unsubscribe" in an email, they\'ll appear here.'
+                    : 'When someone replies STOP to an SMS, they\'ll appear here.'}
                 </p>
               )}
             </div>
@@ -1648,14 +1693,18 @@ currentUser, onUpdateChurch, activePage, smsTab }) => {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80">
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Email</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      {unsubMode === 'email' ? 'Email' : 'Phone Number'}
+                    </th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Unsubscribed</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Campaign</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      {unsubMode === 'email' ? 'Campaign' : 'Source'}
+                    </th>
                     <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60">
-                  {filteredUnsubs.map(u => (
+                  {unsubMode === 'email' ? filteredUnsubs.map(u => (
                     <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition">
                       <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-200">{u.email}</td>
                       <td className="px-4 py-3 text-slate-500 dark:text-slate-400">
@@ -1669,6 +1718,27 @@ currentUser, onUpdateChurch, activePage, smsTab }) => {
                       <td className="px-4 py-3 text-right">
                         <button
                           onClick={() => handleRemoveUnsubscribe(u)}
+                          title="Re-subscribe (remove from list)"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition"
+                        >
+                          <CheckCircle size={12} /> Re-subscribe
+                        </button>
+                      </td>
+                    </tr>
+                  )) : filteredSmsUnsubs.map(o => (
+                    <tr key={o.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition">
+                      <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-200">{o.phoneNumber}</td>
+                      <td className="px-4 py-3 text-slate-500 dark:text-slate-400">
+                        {o.optedOutAt
+                          ? new Date(o.optedOutAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                          : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-slate-500 dark:text-slate-400 text-xs">
+                        {o.source === 'STOP_reply' ? 'STOP keyword' : o.source === 'admin' ? 'Admin manual' : o.source}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          onClick={() => handleRemoveSmsOptOut(o)}
                           title="Re-subscribe (remove from list)"
                           className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition"
                         >
