@@ -1,6 +1,8 @@
 import http from 'http';
+import { validateRequest } from '@signalwire/compatibility-api';
 import { getDb } from './firebase';
 import { createServerLogger } from '../services/logService';
+import { getSignalWireSigningKey, getSmsWebhookBaseUrl } from './signalwireClient';
 
 // â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -242,6 +244,30 @@ async function getOrCreatePrayerTag(db: any, churchId: string, log: any): Promis
 // Responds with TwiML (200 + empty response body, or keyword auto-reply).
 
 export const handleInboundSms = async (req: any, res: any) => {
+    const db  = getDb();
+    const log = createServerLogger(db);
+
+    // ── Webhook signature validation (required for production per SignalWire docs) ──
+    try {
+        const signingKey = await getSignalWireSigningKey();
+        if (signingKey) {
+            const baseUrl    = await getSmsWebhookBaseUrl();
+            const webhookUrl = `${baseUrl}/api/messaging/inbound`;
+            const signature  = (req.headers['x-signalwire-signature'] || '') as string;
+            const isValid    = validateRequest(signingKey, signature, webhookUrl, req.body || {});
+            if (!isValid) {
+                log.warn('[Inbound SMS] Invalid webhook signature — request rejected', 'system', { signature }, '');
+                return res.status(401).send('Invalid signature');
+            }
+        } else {
+            // Soft-fail: log warning but process the request until the key is added to System Settings
+            log.warn('[Inbound SMS] signalwireSigningKey not configured — signature validation skipped. Add it in System Settings.', 'system', {}, '');
+        }
+    } catch (sigErr: any) {
+        // Non-blocking — log but allow through in case of transient Firestore issue
+        log.warn(`[Inbound SMS] Signature validation error: ${sigErr.message}`, 'system', {}, '');
+    }
+
     const {
         From: fromRaw,
         To: toRaw,
@@ -258,8 +284,6 @@ export const handleInboundSms = async (req: any, res: any) => {
         if (url) mediaUrls.push(url);
     }
 
-    const db  = getDb();
-    const log = createServerLogger(db);
 
     try {
         const from = normaliseE164(fromRaw || '');

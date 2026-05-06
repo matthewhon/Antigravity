@@ -43,3 +43,19 @@ export async function getSmsWebhookBaseUrl(): Promise<string | null> {
         return null;
     }
 }
+
+/**
+ * Returns the SignalWire Signing Key used to verify inbound webhook signatures.
+ * Found in SignalWire Dashboard → API → API Credentials → Signing Key.
+ * Store in Firestore system/settings as "signalwireSigningKey".
+ * Returns null if not yet configured (signature validation will be skipped with a warning).
+ */
+export async function getSignalWireSigningKey(): Promise<string | null> {
+    try {
+        const snap = await getDb().doc('system/settings').get();
+        const key  = (snap.data() || {}).signalwireSigningKey || '';
+        return key.trim() || null;
+    } catch {
+        return null;
+    }
+}

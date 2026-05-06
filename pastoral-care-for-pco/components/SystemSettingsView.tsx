@@ -476,6 +476,16 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                 <input type="text" value={settings.smsWebhookBaseUrl || ''} onChange={e => handleChange('smsWebhookBaseUrl', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder={settings.apiBaseUrl || 'https://api.example.com'} />
                                 <p className="text-[9px] text-slate-400 mt-1">Defaults to Backend API URL. SignalWire posts callbacks here.</p>
                             </div>
+                            <div className="sm:col-span-2">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest">Signing Key</label>
+                                    <span className="text-[9px] font-black bg-rose-500/10 text-rose-500 px-1.5 py-0.5 rounded-full border border-rose-500/20">REQUIRED for security</span>
+                                </div>
+                                <input type="password" value={(settings as any).signalwireSigningKey || ''} onChange={e => handleChange('signalwireSigningKey' as any, e.target.value.trim())} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="SK..." />
+                                <p className="text-[9px] text-slate-400 mt-1">
+                                    Found in <a href="https://barnabassoftware.signalwire.com/credentials" target="_blank" rel="noopener noreferrer" className="underline text-indigo-400 hover:text-indigo-300">Dashboard &rarr; API &rarr; API Credentials &rarr; Signing Key</a>. Used to verify all inbound webhook requests.
+                                </p>
+                            </div>
                         </div>
                         {(settings.smsWebhookBaseUrl || settings.apiBaseUrl) && (
                             <div className="mt-4 space-y-1.5">
