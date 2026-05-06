@@ -721,3 +721,64 @@ export const getSmsRegistrationStatus = async (req: any, res: any) => {
         return res.status(500).json({ error: e.message || 'Status check failed' });
     }
 };
+
+/**
+ * Webhook handler for SignalWire Campaign state changes.
+ * Automatically updates the church's campaign status when SignalWire posts an update.
+ */
+export const handleCampaignStatusWebhook = async (req: any, res: any) => {
+    const db = getDb();
+    const log = createServerLogger(db);
+    
+    // Ensure we always return 200 OK quickly to SignalWire
+    res.status(200).send('OK');
+
+    try {
+        const body = req.body || {};
+        const campaignId = body.id || body.campaign_id;
+        const newStatus = (body.status || '').toLowerCase();
+        const brandId = body.brand_id;
+
+        log.info(`[handleCampaignStatusWebhook] Received webhook`, 'system', { body }, 'system');
+
+        if (!campaignId && !brandId) {
+            return;
+        }
+
+        // Try to find a church with this campaign ID or brand ID
+        let query = db.collection('churches');
+        if (campaignId) {
+            query = query.where('smsSettings.campaignId', '==', campaignId);
+        } else if (brandId) {
+            query = query.where('smsSettings.brandId', '==', brandId);
+        }
+
+        const snap = await query.limit(1).get();
+        if (snap.empty) {
+            log.warn(`[handleCampaignStatusWebhook] No church found for campaign ${campaignId} / brand ${brandId}`, 'system', { campaignId, brandId }, 'system');
+            return;
+        }
+
+        const churchDoc = snap.docs[0];
+        const churchId = churchDoc.id;
+        
+        const updates: any = {
+            'smsSettings.webhookLastReceivedAt': Date.now(),
+        };
+
+        if (campaignId && newStatus) {
+            updates['smsSettings.campaignStatus'] = newStatus;
+        }
+        
+        // Sometimes webhooks update brand status too if they are related to the brand
+        if (body.type === 'brand' && newStatus) {
+             updates['smsSettings.brandStatus'] = newStatus;
+        }
+
+        await churchDoc.ref.update(updates);
+        log.info(`[handleCampaignStatusWebhook] Updated status for church ${churchId} to ${newStatus}`, 'system', { churchId, campaignId, newStatus }, churchId);
+
+    } catch (e: any) {
+        log.error(`[handleCampaignStatusWebhook] Error processing webhook: ${e.message}`, 'system', { body: req.body }, 'system');
+    }
+};

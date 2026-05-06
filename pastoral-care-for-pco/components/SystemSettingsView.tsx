@@ -513,17 +513,28 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                             </div>
                         </div>
                         {(settings.smsWebhookBaseUrl || settings.apiBaseUrl) && (
-                            <div className="mt-4 space-y-1.5">
-                                {['/api/messaging/inbound', '/api/messaging/status'].map(path => {
-                                    const base = (settings.smsWebhookBaseUrl || settings.apiBaseUrl || '').replace(/\/$/, '');
-                                    const url = base + path;
-                                    return (
-                                        <div key={path} className="bg-slate-100 dark:bg-slate-800 rounded-lg px-3 py-1.5 flex items-center justify-between gap-2">
-                                            <code className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 truncate">{url}</code>
-                                            <button onClick={() => navigator.clipboard.writeText(url)} className="text-slate-400 hover:text-indigo-500 transition-colors shrink-0 text-xs" title="Copy">📋</button>
-                                        </div>
-                                    );
-                                })}
+                            <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">Webhook URLs</label>
+                                <p className="text-[9px] text-slate-400 mb-3">Copy these URLs into your SignalWire space settings and Campaign Registry webhook settings.</p>
+                                <div className="space-y-1.5">
+                                    {[
+                                        { path: '/api/messaging/inbound', label: 'Inbound Message Webhook' },
+                                        { path: '/api/messaging/status', label: 'Delivery Status Webhook' },
+                                        { path: '/api/messaging/campaign-status', label: '10DLC Campaign Webhook' }
+                                    ].map(({ path, label }) => {
+                                        const base = (settings.smsWebhookBaseUrl || settings.apiBaseUrl || '').replace(/\/$/, '');
+                                        const url = base + path;
+                                        return (
+                                            <div key={path} className="flex flex-col gap-1">
+                                                <span className="text-[9px] font-bold text-slate-500">{label}</span>
+                                                <div className="bg-slate-100 dark:bg-slate-800 rounded-lg px-3 py-1.5 flex items-center justify-between gap-2">
+                                                    <code className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 truncate">{url}</code>
+                                                    <button onClick={() => navigator.clipboard.writeText(url)} className="text-slate-400 hover:text-indigo-500 transition-colors shrink-0 text-xs" title="Copy">📋</button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
                             </div>
                         )}
                         <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
