@@ -89,7 +89,7 @@ export interface Church {
     allowSignups?: boolean;
     scheduledSyncTime?: string;
     communityLocations?: CommunityLocation[];
-    /** SMS / Twilio settings for this church */
+    /** SMS settings for this church (SignalWire) */
     smsSettings?: SmsSettings;
     /** Church-wide logo URL (stored in Firebase Storage, used as default in email templates) */
     logoUrl?: string;
@@ -904,51 +904,7 @@ export interface SmsSettings {
     /** User ID of the admin who accepted the terms */
     termsAcceptedByUserId?: string;
 
-    // -- Deprecated Twilio / A2P fields (kept for backward-compat; not used by SignalWire) --
-    /** @deprecated Use smsPhoneNumber instead */
-    twilioPhoneNumber?: string;
-    /** @deprecated Use smsPhoneSid instead */
-    twilioPhoneSid?: string;
-    /** @deprecated Sub-account no longer used (SignalWire is single-project) */
-    twilioSubAccountSid?: string;
-    /** @deprecated Sub-account no longer used */
-    twilioSubAccountAuthToken?: string;
-    /** @deprecated Messaging service SID (Twilio A2P) */
-    twilioMessagingServiceSid?: string;
-    /** @deprecated A2P brand SID */
-    twilioBrandSid?: string;
-    /** @deprecated A2P campaign SID */
-    twilioCampaignSid?: string;
-    /** @deprecated A2P registration status */
-    twilioA2pStatus?: string;
-    /** @deprecated A2P customer profile SID */
-    twilioCustomerProfileSid?: string;
-    /** @deprecated A2P customer profile status */
-    twilioCustomerProfileStatus?: string;
-    /** @deprecated A2P business registration fields */
-    a2pBusinessName?: string;
-    a2pEin?: string;
-    a2pBusinessType?: string;
-    a2pVertical?: string;
-    a2pWebsite?: string;
-    a2pAddress?: string;
-    a2pCity?: string;
-    a2pState?: string;
-    a2pZip?: string;
-    a2pContactFirstName?: string;
-    a2pContactLastName?: string;
-    a2pContactEmail?: string;
-    a2pContactPhone?: string;
-    a2pContactJobTitle?: string;
-    a2pContactJobPosition?: string;
-    a2pSampleMessage1?: string;
-    a2pSampleMessage2?: string;
-    a2pOptInWebForm?: boolean;
-    a2pOptInSmsKeyword?: boolean;
-    a2pOptInPaperVoice?: boolean;
-    a2pOptInDescription?: string;
-    a2pUseCaseCategory?: string;
-    a2pDescription?: string;
+
 }
 
 export type SmsDirection = 'inbound' | 'outbound';
