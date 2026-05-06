@@ -10,7 +10,7 @@ import {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-async function resolveWebhookUrls(): Promise<{ inboundUrl: string; statusCallback: string }> {
+async function resolveWebhookUrls(): Promise<{ inboundUrl: string; inboundFallbackUrl: string; statusCallback: string }> {
     const baseUrl = await getSmsWebhookBaseUrl();
     if (!baseUrl) {
         throw new Error(
@@ -31,8 +31,9 @@ async function resolveWebhookUrls(): Promise<{ inboundUrl: string; statusCallbac
         );
     }
     return {
-        inboundUrl:     `${baseUrl}/api/messaging/inbound`,
-        statusCallback: `${baseUrl}/api/messaging/status`,
+        inboundUrl:         `${baseUrl}/api/messaging/inbound`,
+        inboundFallbackUrl: `${baseUrl}/api/messaging/inbound`,  // Fallback URL per SignalWire best practice
+        statusCallback:     `${baseUrl}/api/messaging/status`,
     };
 }
 
@@ -193,14 +194,17 @@ export const provisionSmsNumber = async (req: any, res: any) => {
         if (!churchSnap.exists) return res.status(404).json({ error: 'Church not found' });
         const church = churchSnap.data() || {};
 
-        const { inboundUrl, statusCallback } = await resolveWebhookUrls();
+        const { inboundUrl, inboundFallbackUrl, statusCallback } = await resolveWebhookUrls();
         const client = await getSignalWireClient();
 
         // Purchase the number directly on the project (no sub-account needed)
+        // Configures inbound webhook, fallback URL, and status callback per SignalWire best practices.
         const purchased = await client.incomingPhoneNumbers.create({
             phoneNumber,
             smsUrl:               inboundUrl,
             smsMethod:            'POST',
+            smsFallbackUrl:       inboundFallbackUrl,
+            smsFallbackMethod:    'POST',
             statusCallback,
             statusCallbackMethod: 'POST',
         });
@@ -227,6 +231,7 @@ export const provisionSmsNumber = async (req: any, res: any) => {
             smsEnabled:     true,
             allowedUserIds: [],
             webhookUrl:     inboundUrl,
+            messageHandler: 'laml_webhooks',  // Explicit record of handler type per SignalWire API
             senderName:     senderName || church.name || 'Church',
             createdAt:      now,
             updatedAt:      now,
@@ -279,13 +284,15 @@ export const addSmsNumber = async (req: any, res: any) => {
         const church     = churchSnap.data() || {};
         const smsSettings = church.smsSettings || {};
 
-        const { inboundUrl, statusCallback } = await resolveWebhookUrls();
+        const { inboundUrl, inboundFallbackUrl, statusCallback } = await resolveWebhookUrls();
         const client = await getSignalWireClient();
 
         const purchased = await client.incomingPhoneNumbers.create({
             phoneNumber,
             smsUrl:               inboundUrl,
             smsMethod:            'POST',
+            smsFallbackUrl:       inboundFallbackUrl,
+            smsFallbackMethod:    'POST',
             statusCallback,
             statusCallbackMethod: 'POST',
         });
@@ -309,6 +316,7 @@ export const addSmsNumber = async (req: any, res: any) => {
             smsEnabled:     true,
             allowedUserIds: [],
             webhookUrl:     inboundUrl,
+            messageHandler: 'laml_webhooks',  // Explicit record of handler type per SignalWire API
             senderName:     smsSettings.senderName || church.name || 'Church',
             createdAt:      now,
             updatedAt:      now,

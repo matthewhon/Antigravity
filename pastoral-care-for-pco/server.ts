@@ -179,10 +179,10 @@ async function startServer() {
     app.get('/widget.js', serveWidgetScript);
 
     // ─── SMS / Messaging Endpoints ────────────────────────────────────────────
-    // SignalWire inbound webhook — use urlencoded so form-encoded POST parses correctly
-    app.post('/api/messaging/inbound', express.urlencoded({ extended: false }), handleInboundSms);
-    // SignalWire delivery status callback
-    app.post('/api/messaging/status', express.urlencoded({ extended: false }), handleStatusCallback);
+    // SignalWire webhooks — support both form-encoded (compatibility SDK) and
+    // JSON (native REST API) payloads for future-proofing.
+    app.post('/api/messaging/inbound', express.urlencoded({ extended: false }), express.json(), handleInboundSms);
+    app.post('/api/messaging/status',  express.urlencoded({ extended: false }), express.json(), handleStatusCallback);
     // Provisioning
     app.get('/api/messaging/available-numbers', express.json(), getAvailableNumbers);
     app.post('/api/messaging/provision', express.json(), provisionSmsNumber);
