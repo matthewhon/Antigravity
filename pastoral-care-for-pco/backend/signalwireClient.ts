@@ -216,7 +216,7 @@ function _httpsRequest(
 export interface BrandRegistrationPayload {
     legalName:       string;   // company_name
     ein:             string;
-    legalEntityType: 'Private Profit' | 'Public Profit' | 'Non-Profit' | 'Government' | 'Sole Proprietor';
+    legalEntityType: 'private' | 'public' | 'non_profit' | 'government' | 'sole_proprietor';
     contactEmail:    string;
     contactPhone:    string;
     website:         string;

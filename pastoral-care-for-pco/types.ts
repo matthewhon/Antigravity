@@ -924,7 +924,7 @@ export interface SmsSettings {
     /** EIN / Tax ID */
     brandEin?: string;
     /** Legal entity type */
-    brandLegalEntityType?: 'Private Profit' | 'Public Profit' | 'Non-Profit' | 'Government' | 'Sole Proprietor';
+    brandLegalEntityType?: 'private' | 'public' | 'non_profit' | 'government' | 'sole_proprietor';
     /** Contact email address for the brand */
     brandContactEmail?: string;
     /** Contact phone number for the brand */

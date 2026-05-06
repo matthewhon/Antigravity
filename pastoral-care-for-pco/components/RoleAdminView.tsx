@@ -319,7 +319,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   const [brandForm, setBrandForm] = useState({
       legalName: church.name || '',
       ein: '',
-      legalEntityType: 'Non-Profit',
+      legalEntityType: 'non_profit',
       contactEmail: church.email || '',
       contactPhone: church.phone || '',
       website: church.website || '',
@@ -2718,11 +2718,11 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         <div>
                                             <label className={labelCn}>Entity Type</label>
                                             <select className={inputCn} value={brandForm.legalEntityType} onChange={e => setBrandForm({...brandForm, legalEntityType: e.target.value})}>
-                                                <option value="Non-Profit">Non-Profit (501c3)</option>
-                                                <option value="Private Profit">Private Company</option>
-                                                <option value="Public Profit">Public Company</option>
-                                                <option value="Government">Government</option>
-                                                <option value="Sole Proprietor">Sole Proprietor</option>
+                                                <option value="non_profit">Non-Profit (501c3)</option>
+                                                <option value="private">Private Company</option>
+                                                <option value="public">Public Company</option>
+                                                <option value="government">Government</option>
+                                                <option value="sole_proprietor">Sole Proprietor</option>
                                             </select>
                                         </div>
                                         <div className="grid grid-cols-2 gap-4">
