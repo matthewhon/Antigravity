@@ -118,6 +118,10 @@ export const PeopleReportsTab: React.FC<PeopleReportsTabProps> = ({ data }) => {
             }
           }
 
+          if (currentStatus) {
+              currentStatus = currentStatus.charAt(0).toUpperCase() + currentStatus.slice(1).toLowerCase();
+          }
+
           if (counts[currentStatus] !== undefined) {
             counts[currentStatus]++;
           } else {
@@ -163,6 +167,10 @@ export const PeopleReportsTab: React.FC<PeopleReportsTabProps> = ({ data }) => {
             for (const change of futureChanges) {
                 currentStatus = change.oldValue || 'Unknown';
             }
+          }
+
+          if (currentStatus) {
+              currentStatus = currentStatus.charAt(0).toUpperCase() + currentStatus.slice(1).toLowerCase();
           }
 
           // Only count Active people for demographics
@@ -227,6 +235,10 @@ export const PeopleReportsTab: React.FC<PeopleReportsTabProps> = ({ data }) => {
             for (const change of futureStatusChanges) {
                 currentStatus = change.oldValue || 'Unknown';
             }
+          }
+
+          if (currentStatus) {
+              currentStatus = currentStatus.charAt(0).toUpperCase() + currentStatus.slice(1).toLowerCase();
           }
 
           // Only count Active people for risk profile over time
