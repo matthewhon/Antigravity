@@ -1,5 +1,34 @@
 import http from 'http';
-import { validateRequest } from '@signalwire/compatibility-api';
+import { createHmac } from 'crypto';
+
+/**
+ * Verify a SignalWire (Twilio-compatible) webhook signature.
+ * SignalWire signs with HMAC-SHA1: the key is the signing key, the message
+ * is the full webhook URL concatenated with alphabetically-sorted POST params.
+ * @see https://developer.signalwire.com/guides/how-to-secure-your-signalwire-webhooks
+ */
+function validateRequest(signingKey: string, signature: string, webhookUrl: string, params: Record<string, string>): boolean {
+    try {
+        // Build the signed string: URL + alphabetically sorted param key+value pairs
+        const sortedKeys = Object.keys(params).sort();
+        const paramStr = sortedKeys.reduce((acc, key) => acc + key + (params[key] ?? ''), '');
+        const signedStr = webhookUrl + paramStr;
+
+        const expected = createHmac('sha1', signingKey)
+            .update(signedStr, 'utf8')
+            .digest('base64');
+
+        // Constant-time comparison to prevent timing attacks
+        if (expected.length !== signature.length) return false;
+        let diff = 0;
+        for (let i = 0; i < expected.length; i++) {
+            diff |= expected.charCodeAt(i) ^ signature.charCodeAt(i);
+        }
+        return diff === 0;
+    } catch {
+        return false;
+    }
+}
 import { getDb } from './firebase';
 import { createServerLogger } from '../services/logService';
 import { getSignalWireSigningKey, getSmsWebhookBaseUrl } from './signalwireClient';
@@ -254,7 +283,7 @@ export const handleInboundSms = async (req: any, res: any) => {
             const baseUrl    = await getSmsWebhookBaseUrl();
             const webhookUrl = `${baseUrl}/api/messaging/inbound`;
             const signature  = (req.headers['x-signalwire-signature'] || '') as string;
-            const isValid    = validateRequest(signingKey, signature, webhookUrl, req.body || {});
+            const isValid    = validateRequest(signingKey, signature, webhookUrl, req.body as Record<string, string> || {});
             if (!isValid) {
                 log.warn('[Inbound SMS] Invalid webhook signature — request rejected', 'system', { signature }, '');
                 return res.status(401).send('Invalid signature');
