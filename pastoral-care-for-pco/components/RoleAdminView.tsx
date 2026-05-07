@@ -344,6 +344,8 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   const [isSubmittingBrand, setIsSubmittingBrand] = useState(false);
   const [isSubmittingCampaign, setIsSubmittingCampaign] = useState(false);
   const [complianceMessage, setComplianceMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
+  const [showBrandFormOverride, setShowBrandFormOverride] = useState(false);
+  const [showCampaignFormOverride, setShowCampaignFormOverride] = useState(false);
 
   // Phone Numbers panel state (SMS → Numbers tab)
   const [smsNumbers, setSmsNumbers] = useState<any[]>([]);
@@ -2728,6 +2730,16 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                     {/* Brand Form */}
+                                    {['APPROVED', 'VERIFIED', 'COMPLETED'].includes((regStatus?.brand?.status || '').toUpperCase()) && !showBrandFormOverride ? (
+                                        <div className="bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-900/50 p-6 rounded-2xl flex flex-col justify-start h-full">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-xs font-black">✓</div>
+                                                <h5 className="font-bold text-emerald-800 dark:text-emerald-400">1. Brand Registered</h5>
+                                            </div>
+                                            <p className="text-xs text-slate-500 mb-4">Your brand identity has been verified.</p>
+                                            <button onClick={() => setShowBrandFormOverride(true)} className="text-xs font-bold text-slate-400 hover:text-slate-600 self-start mt-auto">Edit Details</button>
+                                        </div>
+                                    ) : (
                                     <div className={`space-y-4 ${(regStatus?.brand?.status || '').toUpperCase() === 'PENDING' ? 'opacity-60 pointer-events-none select-none relative' : ''}`}>
                                         { (regStatus?.brand?.status || '').toUpperCase() === 'PENDING' && (
                                             <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-auto">
@@ -2801,9 +2813,23 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         >
                                             {isSubmittingBrand ? 'Submitting...' : (regStatus?.brand?.status || '').toUpperCase() === 'PENDING' ? 'Registration Pending' : 'Submit Brand'}
                                         </button>
+                                        {['APPROVED', 'VERIFIED', 'COMPLETED'].includes((regStatus?.brand?.status || '').toUpperCase()) && (
+                                            <button onClick={() => setShowBrandFormOverride(false)} className="w-full mt-2 text-xs font-bold text-slate-500">Cancel Edit</button>
+                                        )}
                                     </div>
+                                    )}
 
                                     {/* Campaign Form */}
+                                    {['APPROVED', 'ACTIVE'].includes((regStatus?.campaign?.status || '').toUpperCase()) && !showCampaignFormOverride ? (
+                                        <div className="bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-900/50 p-6 rounded-2xl flex flex-col justify-start h-full">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-xs font-black">✓</div>
+                                                <h5 className="font-bold text-emerald-800 dark:text-emerald-400">2. Campaign Registered</h5>
+                                            </div>
+                                            <p className="text-xs text-slate-500 mb-4">Your messaging campaign is active and approved.</p>
+                                            <button onClick={() => setShowCampaignFormOverride(true)} className="text-xs font-bold text-slate-400 hover:text-slate-600 self-start mt-auto">Edit Details</button>
+                                        </div>
+                                    ) : (
                                     <div className="space-y-4">
                                         <div className="flex items-center justify-between mb-4">
                                             <div className="flex items-center gap-2">
