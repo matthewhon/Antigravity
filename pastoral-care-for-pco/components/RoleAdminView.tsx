@@ -2830,7 +2830,16 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             <button onClick={() => setShowCampaignFormOverride(true)} className="text-xs font-bold text-slate-400 hover:text-slate-600 self-start mt-auto">Edit Details</button>
                                         </div>
                                     ) : (
-                                    <div className="space-y-4">
+                                    <div className={`space-y-4 ${(regStatus?.campaign?.status || '').toUpperCase() === 'PENDING' ? 'opacity-60 pointer-events-none select-none relative' : ''}`}>
+                                        { (regStatus?.campaign?.status || '').toUpperCase() === 'PENDING' && (
+                                            <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-auto">
+                                                <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm px-4 py-2 rounded-full border border-amber-200 dark:border-amber-800 shadow-sm">
+                                                    <p className="text-[10px] font-black uppercase tracking-widest text-amber-700 dark:text-amber-400">
+                                                        ⏳ Campaign Registration Pending — Editing Disabled
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        )}
                                         <div className="flex items-center justify-between mb-4">
                                             <div className="flex items-center gap-2">
                                                 <div className="w-6 h-6 rounded-full bg-violet-100 text-violet-600 flex items-center justify-center text-xs font-black">2</div>
@@ -2933,10 +2942,10 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         ) : (
                                             <button
                                                 onClick={handleSubmitCampaign}
-                                                disabled={isSubmittingCampaign}
+                                                disabled={isSubmittingCampaign || (regStatus?.campaign?.status || '').toUpperCase() === 'PENDING'}
                                                 className="w-full mt-4 bg-violet-600 hover:bg-violet-700 text-white font-black text-xs uppercase tracking-widest py-3 rounded-xl transition-all disabled:opacity-50"
                                             >
-                                                {isSubmittingCampaign ? 'Submitting...' : 'Submit Campaign'}
+                                                {isSubmittingCampaign ? 'Submitting...' : (regStatus?.campaign?.status || '').toUpperCase() === 'PENDING' ? 'Registration Pending' : 'Submit Campaign'}
                                             </button>
                                         )}
                                         {['APPROVED', 'ACTIVE'].includes((regStatus?.campaign?.status || '').toUpperCase()) && (
