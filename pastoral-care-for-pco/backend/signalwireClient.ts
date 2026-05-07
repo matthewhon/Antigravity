@@ -396,9 +396,15 @@ export async function registerTenantCampaign(
         opt_out_message:   payload.optOutMessage,
         help_message:      payload.helpMessage,
         terms_and_conditions: true,
+        number_pooling_required: false,
+        direct_lending: false,
+        embedded_link: true,
+        embedded_phone: true,
+        age_gated_content: false,
+        lead_generation: false,
     };
     if (payload.sample2) body.sample2 = payload.sample2;
-    if (payload.subUsecases && payload.subUsecases.length > 0) body.sub_usecases = payload.subUsecases;
+    if (payload.subUsecases && payload.subUsecases.length > 0) body.sub_use_cases = payload.subUsecases;
     if (webhookUrl) body.webhook_url = webhookUrl;
 
     const result = await callRegistryApi(`/brands/${payload.brandId}/campaigns`, 'POST', body);
