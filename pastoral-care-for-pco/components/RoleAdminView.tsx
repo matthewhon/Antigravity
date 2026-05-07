@@ -2698,7 +2698,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                 <p className="text-[10px] font-bold uppercase text-slate-400 tracking-widest mb-1">Brand Status</p>
                                                 <div className="flex items-center gap-2">
                                                     <span className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-widest ${
-                                                        (regStatus.brand?.status || '').toUpperCase() === 'APPROVED' || (regStatus.brand?.status || '').toUpperCase() === 'VERIFIED' ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' :
+                                                        (regStatus.brand?.status || '').toUpperCase() === 'APPROVED' || (regStatus.brand?.status || '').toUpperCase() === 'VERIFIED' || (regStatus.brand?.status || '').toUpperCase() === 'COMPLETED' ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' :
                                                         (regStatus.brand?.status || '').toUpperCase() === 'PENDING' ? 'bg-amber-500/10 text-amber-600 border border-amber-500/20' :
                                                         regStatus.brand?.status ? 'bg-rose-500/10 text-rose-600 border border-rose-500/20' :
                                                         'bg-slate-200 text-slate-500 border border-slate-300'
@@ -2897,7 +2897,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             <textarea rows={2} className={inputCn} value={campaignForm.sample2} onChange={e => setCampaignForm({...campaignForm, sample2: e.target.value})} placeholder="Thank you for visiting! To get connected, fill out this link: ..." />
                                         </div>
                                         
-                                        {regStatus?.brand?.status?.toLowerCase() !== 'verified' && regStatus?.brand?.status?.toLowerCase() !== 'approved' ? (
+                                        {regStatus?.brand?.status?.toLowerCase() !== 'verified' && regStatus?.brand?.status?.toLowerCase() !== 'approved' && regStatus?.brand?.status?.toLowerCase() !== 'completed' ? (
                                             <div className="mt-4 p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 rounded-xl">
                                                 <p className="text-[10px] font-bold text-amber-700 dark:text-amber-400 leading-relaxed">
                                                     🔒 Campaign registration is locked until your Brand status is <strong>VERIFIED</strong>. 

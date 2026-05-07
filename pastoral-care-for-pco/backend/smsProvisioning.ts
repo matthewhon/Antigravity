@@ -602,7 +602,7 @@ export const registerSmsCampaign = async (req: any, res: any) => {
         if (!brandId) {
             return res.status(400).json({ error: 'Brand registration must be completed before creating a Campaign. Please register your brand first.' });
         }
-        const isBrandReady = smsSettings.brandStatus === 'approved' || smsSettings.brandStatus === 'verified';
+        const isBrandReady = smsSettings.brandStatus === 'approved' || smsSettings.brandStatus === 'verified' || smsSettings.brandStatus === 'completed';
         if (!isBrandReady) {
             return res.status(400).json({
                 error: `Your brand is currently "${smsSettings.brandStatus || 'unregistered'}". Campaign registration requires a "verified" or "approved" brand status.`,

@@ -319,7 +319,7 @@ export async function registerTenantBrand(
     });
 
     const brandId = result.id || result.brand_id || '';
-    const status  = result.status || 'pending';
+    const status  = result.state || result.status || 'pending';
 
     await db.collection('churches').doc(churchId).update({
         'smsSettings.brandId':              brandId,
@@ -347,7 +347,7 @@ export async function registerTenantBrand(
  */
 export async function checkBrandStatus(churchId: string, brandId: string): Promise<{ status: string; raw: any }> {
     const result = await callRegistryApi(`/brands/${brandId}`, 'GET');
-    const status = (result.status || 'pending').toLowerCase();
+    const status = (result.state || result.status || 'pending').toLowerCase();
 
     await getDb().collection('churches').doc(churchId).update({
         'smsSettings.brandStatus': status,
@@ -404,7 +404,7 @@ export async function registerTenantCampaign(
     const result = await callRegistryApi(`/brands/${payload.brandId}/campaigns`, 'POST', body);
 
     const campaignId = result.id || result.campaign_id || '';
-    const status     = result.status || 'pending';
+    const status     = result.state || result.status || 'pending';
 
     await db.collection('churches').doc(churchId).update({
         'smsSettings.campaignId':          campaignId,
@@ -428,7 +428,7 @@ export async function registerTenantCampaign(
  */
 export async function checkCampaignStatus(churchId: string, campaignId: string): Promise<{ status: string; raw: any }> {
     const result = await callRegistryApi(`/campaigns/${campaignId}`, 'GET');
-    const status = (result.status || 'pending').toLowerCase();
+    const status = (result.state || result.status || 'pending').toLowerCase();
 
     await getDb().collection('churches').doc(churchId).update({
         'smsSettings.campaignStatus': status,
@@ -459,7 +459,7 @@ export async function assignNumbersToCampaign(
     const result = await callRegistryApi(`/campaigns/${campaignId}/orders`, 'POST', body);
 
     const orderId = result.id || result.order_id || '';
-    const status  = result.status || 'pending';
+    const status  = result.state || result.status || 'pending';
 
     return { orderId, status };
 }
