@@ -510,12 +510,18 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                                     <p className="text-[9px] font-bold text-rose-500 uppercase tracking-widest mb-2">Open Positions</p>
                                                     {openPositions.length > 0 ? (
                                                         <div className="space-y-1.5">
-                                                            {openPositions.map((op, idx) => (
+                                                            {openPositions.map((op, idx) => {
+                                                                const filledCount = plan.teamMembers?.filter(m => m.teamName === op.teamName && (m.status === 'Confirmed' || m.status === 'C')).length || 0;
+                                                                return (
                                                                 <div key={idx} className="flex justify-between items-center bg-white dark:bg-slate-800 px-2 py-1 rounded border border-slate-100 dark:border-slate-700">
-                                                                    <span className="text-[9px] font-medium text-slate-600 dark:text-slate-400 truncate max-w-[80px]">{op.teamName}</span>
-                                                                    <span className="text-[9px] font-black text-rose-500 bg-rose-50 dark:bg-rose-900/20 px-1.5 rounded">{op.quantity}</span>
+                                                                    <span className="text-[9px] font-medium text-slate-600 dark:text-slate-400 truncate max-w-[80px]" title={op.teamName}>{op.teamName}</span>
+                                                                    <div className="flex gap-1 items-center">
+                                                                        {filledCount > 0 && <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-1.5 py-0.5 rounded" title={`${filledCount} Confirmed`}>{filledCount} Filled</span>}
+                                                                        <span className="text-[9px] font-black text-rose-500 bg-rose-50 dark:bg-rose-900/20 px-1.5 py-0.5 rounded" title={`${op.quantity} Needed`}>{op.quantity} Open</span>
+                                                                    </div>
                                                                 </div>
-                                                            ))}
+                                                                );
+                                                            })}
                                                         </div>
                                                     ) : genericOpenCount > 0 ? (
                                                         <div className="flex items-center gap-2">
@@ -663,12 +669,16 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                                         <div className="mb-4">
                                                             <p className="text-[9px] font-black uppercase text-rose-500 tracking-widest mb-2">Needs Attention</p>
                                                             <div className="flex flex-wrap gap-2">
-                                                                {plan.neededPositions.map((np, i) => (
-                                                                    <div key={i} className="flex items-center gap-2 bg-rose-50 dark:bg-rose-900/20 border border-rose-100 dark:border-rose-800 px-2 py-1 rounded text-[10px]">
-                                                                        <span className="font-bold text-rose-700 dark:text-rose-300">{np.teamName}</span>
-                                                                        <span className="bg-rose-200 dark:bg-rose-800 text-rose-800 dark:text-white px-1.5 rounded font-black">{np.quantity}</span>
+                                                                {plan.neededPositions.map((np, i) => {
+                                                                    const filledCount = plan.teamMembers?.filter(m => m.teamName === np.teamName && (m.status === 'Confirmed' || m.status === 'C')).length || 0;
+                                                                    return (
+                                                                    <div key={i} className="flex items-center gap-1.5 bg-rose-50 dark:bg-rose-900/20 border border-rose-100 dark:border-rose-800 px-2 py-1 rounded text-[10px]">
+                                                                        <span className="font-bold text-rose-700 dark:text-rose-300 mr-1">{np.teamName}</span>
+                                                                        {filledCount > 0 && <span className="bg-emerald-200 dark:bg-emerald-800/50 text-emerald-800 dark:text-emerald-300 px-1.5 rounded font-black">{filledCount} Filled</span>}
+                                                                        <span className="bg-rose-200 dark:bg-rose-800 text-rose-800 dark:text-white px-1.5 rounded font-black">{np.quantity} Open</span>
                                                                     </div>
-                                                                ))}
+                                                                    );
+                                                                })}
                                                             </div>
                                                         </div>
                                                     )}
