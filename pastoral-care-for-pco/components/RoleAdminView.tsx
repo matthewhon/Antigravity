@@ -2939,7 +2939,11 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                 {isSubmittingCampaign ? 'Submitting...' : 'Submit Campaign'}
                                             </button>
                                         )}
+                                        {['APPROVED', 'ACTIVE'].includes((regStatus?.campaign?.status || '').toUpperCase()) && (
+                                            <button onClick={() => setShowCampaignFormOverride(false)} className="w-full mt-2 text-xs font-bold text-slate-500">Cancel Edit</button>
+                                        )}
                                     </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
