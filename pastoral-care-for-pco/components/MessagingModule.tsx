@@ -2619,8 +2619,9 @@ const SmsKeywordsManager: React.FC<{
     churchId: string;
     church: Church;
     currentUser: User;
+    twilioNumberId?: string | null;
     onUpdateChurch?: (updates: Partial<Church>) => void;
-}> = ({ churchId, church, currentUser, onUpdateChurch }) => {
+}> = ({ churchId, church, currentUser, twilioNumberId, onUpdateChurch }) => {
     const [keywords, setKeywords]   = useState<SmsKeyword[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [listError, setListError] = useState<string | null>(null);
@@ -2732,6 +2733,7 @@ const SmsKeywordsManager: React.FC<{
                 await updateDoc(doc(firebaseDb, 'smsKeywords', editKw.id), {
                     ...data,
                     churchId,
+                    twilioNumberId: twilioNumberId || null,
                 });
             } else {
                 // Creating new keyword
@@ -2741,6 +2743,7 @@ const SmsKeywordsManager: React.FC<{
                     churchId,
                     matchCount: 0,
                     createdAt: now,
+                    twilioNumberId: twilioNumberId || null,
                 });
             }
             setModalOpen(false);
@@ -2847,39 +2850,35 @@ const SmsKeywordsManager: React.FC<{
             {/* ─── KEYWORDS section ─────────────────────────────────────────── */}
             {activeSection === 'keywords' && (
             <>
-            {/* How it works banner */}
-            <div className="flex items-start gap-3 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-2xl p-3 mb-5">
-                <div className="text-2xl shrink-0">💡</div>
-                <div>
-                    <p className="text-sm font-bold text-violet-800 dark:text-violet-200 mb-0.5">How Keywords Work</p>
-                    <p className="text-xs text-violet-700 dark:text-violet-300 leading-relaxed">
-                        When someone texts your church number with just the keyword (e.g. <span className="font-mono font-bold bg-violet-100 dark:bg-violet-900/60 px-1 rounded">YOUTH</span>), they receive your auto-reply instantly. Carrier-mandated STOP/HELP responses take priority and cannot be overridden.
-                    </p>
-                </div>
-            </div>
-
-            {/* List */}
-            {listError && (
-                <div className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl px-4 py-3 mb-4">
-                    <AlertTriangle size={14} className="shrink-0 mt-0.5 text-amber-500" />
-                    <span>{listError}</span>
-                </div>
-            )}
-            {isLoading ? (
-                <div className="flex items-center justify-center h-40 text-slate-400"><Loader2 size={20} className="animate-spin mr-2" /> Loading keywords…</div>
-            ) : keywords.length === 0 && !listError ? (
-                <div className="text-center py-20 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
-                    <Key size={40} className="mx-auto text-slate-300 dark:text-slate-600 mb-3" />
-                    <p className="text-slate-600 dark:text-slate-400 font-semibold">No keywords yet</p>
-                    <p className="text-sm text-slate-400 dark:text-slate-500 mt-1 mb-4">Create your first keyword to start auto-replying to texts.</p>
-                    <button onClick={openNew} className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold rounded-xl transition">
-                        <span className="flex items-center gap-1.5"><Plus size={14} /> New Keyword</span>
-                    </button>
-                </div>
-            ) : (
-                <div className="space-y-3">
-                    {keywords.map(kw => {
-                        const kwTags = tags.filter(t => (kw.autoTagIds || []).includes(t.id));
+            {(() => {
+                const filteredKeywords = twilioNumberId 
+                    ? keywords.filter(k => !k.twilioNumberId || k.twilioNumberId === twilioNumberId)
+                    : keywords;
+                
+                return (
+                    <>
+                    {/* List */}
+                    {listError && (
+                        <div className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl px-4 py-3 mb-4">
+                            <AlertTriangle size={14} className="shrink-0 mt-0.5 text-amber-500" />
+                            <span>{listError}</span>
+                        </div>
+                    )}
+                    {isLoading ? (
+                        <div className="flex items-center justify-center h-40 text-slate-400"><Loader2 size={20} className="animate-spin mr-2" /> Loading keywords…</div>
+                    ) : filteredKeywords.length === 0 && !listError ? (
+                        <div className="text-center py-20 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
+                            <Key size={40} className="mx-auto text-slate-300 dark:text-slate-600 mb-3" />
+                            <p className="text-slate-600 dark:text-slate-400 font-semibold">No keywords yet</p>
+                            <p className="text-sm text-slate-400 dark:text-slate-500 mt-1 mb-4">Create your first keyword to start auto-replying to texts.</p>
+                            <button onClick={openNew} className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold rounded-xl transition">
+                                <span className="flex items-center gap-1.5"><Plus size={14} /> New Keyword</span>
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            {filteredKeywords.map(kw => {
+                                const kwTags = tags.filter(t => (kw.autoTagIds || []).includes(t.id));
                         return (
                         <div
                             key={kw.id}
@@ -2952,6 +2951,9 @@ const SmsKeywordsManager: React.FC<{
                     <strong>Reserved words:</strong> STOP, STOPALL, UNSUBSCRIBE, CANCEL, END, QUIT, HELP, and START are reserved by carriers and cannot be used as custom keywords. These responses are handled automatically.
                 </span>
             </div>
+            </>
+            );
+            })()}
             </>
             )}
 
@@ -3445,7 +3447,7 @@ const MiniBar: React.FC<{ pct: number; color?: string; label?: string }> = ({ pc
     </div>
 );
 
-const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[] }> = ({ churchId, campaigns }) => {
+const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[]; twilioNumberId?: string | null }> = ({ churchId, campaigns, twilioNumberId }) => {
     const [summary, setSummary]     = useState<UsageSummary | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [optOuts, setOptOuts]     = useState(0);
@@ -3473,7 +3475,10 @@ const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[] }> = (
                         limit(5000)
                     )
                 );
-                const usageRecords: any[] = usageSnap.docs.map(d => d.data());
+                let usageRecords: any[] = usageSnap.docs.map(d => d.data());
+                if (twilioNumberId) {
+                    usageRecords = usageRecords.filter(r => r.twilioNumberId === twilioNumberId || r.numberId === twilioNumberId);
+                }
 
                 // Derive summary from sent campaigns + usage records
                 const sentCampaigns = campaigns.filter(c => c.status === 'sent');
@@ -7580,7 +7585,8 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
             orderBy('createdAt', 'desc')
         );
         const unsub = onSnapshot(q, snap => {
-            setCampaigns(snap.docs.map(d => ({ id: d.id, ...d.data() } as SmsCampaign)));
+            const allCampaigns = snap.docs.map(d => ({ id: d.id, ...d.data() } as SmsCampaign));
+            setCampaigns(allCampaigns);
             setIsLoading(false);
         });
         return unsub;
@@ -7593,6 +7599,7 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
             churchId, name, status: 'draft', body: '',
             toListId: null, toGroupId: null,
             createdAt: now, updatedAt: now,
+            twilioNumberId: activeNumberId || null,
         };
         const ref = await addDoc(collection(firebaseDb, 'smsCampaigns'), data);
         setActiveCampaign({ id: ref.id, ...data });
@@ -7614,7 +7621,7 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
 
     const handleDuplicate = async (c: SmsCampaign) => {
         const now  = Date.now();
-        const data = { ...c, name: `Copy of ${c.name}`, status: 'draft' as const, sentAt: null, scheduledAt: null, createdAt: now, updatedAt: now };
+        const data = { ...c, name: `Copy of ${c.name}`, status: 'draft' as const, sentAt: null, scheduledAt: null, createdAt: now, updatedAt: now, twilioNumberId: activeNumberId || null };
         delete (data as any).id;
         await addDoc(collection(firebaseDb, 'smsCampaigns'), data);
         showToast('Campaign duplicated');
@@ -7787,6 +7794,10 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
     }
 
 
+    const filteredCampaigns = activeNumberId 
+        ? campaigns.filter(c => !c.twilioNumberId || c.twilioNumberId === activeNumberId) 
+        : campaigns;
+
     return (
         <div className="flex flex-col h-full">
             {/* Toast */}
@@ -7813,67 +7824,49 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                             </button>
                         ))}
                     </div>
-                    {/* Phone badge — prefer the canonical default twilioNumbers doc; fall back to
-                        smsSettings.twilioPhoneNumber only when a real sub-account exists. */}
-                    {(() => {
-                        const hasRealSubAccount = !!church.smsSettings?.twilioSubAccountSid;
-                        const badgePhone =
-                            visibleNumbers.find(n => n.isDefault)?.phoneNumber ??
-                            visibleNumbers[0]?.phoneNumber ??
-                            (hasRealSubAccount ? church.smsSettings?.twilioPhoneNumber : undefined);
-                        return badgePhone ? (
-                            <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-full px-3 py-1.5">
+                    {/* Number selector dropdown */}
+                    {smsEnabled && visibleNumbers.length > 0 ? (
+                        <div className="flex items-center gap-2 shrink-0">
+                            <div className="relative">
+                                <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400">
+                                    <Phone size={12} />
+                                </div>
+                                <select
+                                    value={activeNumberId || ''}
+                                    onChange={e => setActiveNumberId(e.target.value)}
+                                    title="Active Phone Number"
+                                    className="appearance-none text-xs font-semibold text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-8 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                                >
+                                    {visibleNumbers.map(num => (
+                                        <option key={num.id} value={num.id}>
+                                            {num.friendlyLabel} - {formatPhone(num.phoneNumber)} {num.isDefault ? '(Default)' : ''}
+                                        </option>
+                                    ))}
+                                </select>
+                                <div className="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none text-slate-400">
+                                    <ChevronDown size={12} />
+                                </div>
+                            </div>
+                            {(currentUser.roles.includes('Church Admin') || currentUser.roles.includes('System Administration')) && (
+                                <button
+                                    onClick={() => setShowNumberManager(true)}
+                                    className="p-1.5 rounded-xl text-slate-500 hover:text-violet-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition border border-transparent hover:border-slate-200 dark:hover:border-slate-700 bg-white dark:bg-slate-900 shadow-sm"
+                                    title="Manage Numbers"
+                                >
+                                    <Settings size={14} />
+                                </button>
+                            )}
+                        </div>
+                    ) : (
+                        // Fallback phone badge if no numbers but has subaccount
+                        !activeCampaign && controlledTab && visibleNumbers.length === 0 && church.smsSettings?.twilioSubAccountSid && church.smsSettings?.twilioPhoneNumber && (
+                            <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-full px-3 py-1.5 shrink-0">
                                 <Phone size={12} />
-                                {formatPhone(badgePhone)}
+                                {formatPhone(church.smsSettings.twilioPhoneNumber)}
                                 <span className="text-[10px] opacity-70">· SMS Active</span>
                             </div>
-                        ) : null;
-                    })()}
-                </div>
-            )}
-
-            {/* ── Number / Inbox switcher strip ───────────────────────────────────
-                Shown when SMS is enabled and at least one number exists.        */}
-            {!activeCampaign && smsEnabled && visibleNumbers.length > 0 && (
-                <div className="flex items-center gap-2 px-6 pt-2 pb-1 shrink-0 overflow-x-auto">
-                    {/* Per-number pills */}
-                    {visibleNumbers.map(num => (
-                        <button
-                            key={num.id}
-                            onClick={() => setActiveNumberId(num.id)}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition border ${
-                                activeNumberId === num.id
-                                    ? 'bg-violet-600 text-white border-violet-600 shadow-sm'
-                                    : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-violet-400'
-                            }`}
-                        >
-                            <Phone size={10} />
-                            <span>{num.friendlyLabel}</span>
-                            <span className={`font-mono ${ activeNumberId === num.id ? 'opacity-80' : 'opacity-50' }`}>{formatPhone(num.phoneNumber)}</span>
-                            {num.isDefault && (<span className="text-[8px] uppercase tracking-wider opacity-70">·default</span>)}
-                        </button>
-                    ))}
-
-                    {/* Manage button (admin only) */}
-                    {(currentUser.roles.includes('Church Admin') || currentUser.roles.includes('System Administration')) && (
-                        <button
-                            onClick={() => setShowNumberManager(true)}
-                            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:border-violet-400 hover:text-violet-600 transition whitespace-nowrap bg-white dark:bg-slate-800"
-                        >
-                            <Settings size={10} /> Manage Numbers
-                        </button>
+                        )
                     )}
-                </div>
-            )}
-
-            {/* Phone badge only — shown when tab is externally controlled AND no numbers yet (fallback) */}
-            {!activeCampaign && controlledTab && visibleNumbers.length === 0 && church.smsSettings?.twilioSubAccountSid && church.smsSettings?.twilioPhoneNumber && (
-                <div className="flex justify-end px-6 pt-2 shrink-0">
-                    <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-full px-3 py-1.5">
-                        <Phone size={12} />
-                        {formatPhone(church.smsSettings.twilioPhoneNumber)}
-                        <span className="text-[10px] opacity-70">· SMS Active</span>
-                    </div>
                 </div>
             )}
 
@@ -7882,7 +7875,7 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                 {effectiveTab === 'campaigns' && !activeCampaign && (
                     <div className="h-full overflow-y-auto">
                         <CampaignList
-                            campaigns={campaigns}
+                            campaigns={filteredCampaigns}
                             isLoading={isLoading}
                             onOpen={c => setActiveCampaign(c)}
                             onDelete={handleDelete}
@@ -7927,6 +7920,7 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                             churchId={churchId}
                             church={church}
                             currentUser={currentUser}
+                            twilioNumberId={activeNumberId}
                             onUpdateChurch={onUpdateChurch}
                         />
                     </div>
@@ -7942,7 +7936,7 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                 {/* Analytics tab */}
                 {effectiveTab === 'analytics' && (
                     <div className="h-full overflow-y-auto">
-                        <SmsAnalytics churchId={churchId} campaigns={campaigns} />
+                        <SmsAnalytics churchId={churchId} campaigns={filteredCampaigns} twilioNumberId={activeNumberId} />
                     </div>
                 )}
 

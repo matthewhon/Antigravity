@@ -1045,6 +1045,8 @@ export interface SmsCampaign {
     toGroupName?: string | null;
     /** Flat array of E.164 numbers for ad-hoc sends */
     toPhones?: string[];
+    /** The Twilio phone number ID to send from */
+    twilioNumberId?: string | null;
     // Scheduling
     sendAt?: string | null;       // ISO string for UI display
     scheduledAt?: number | null;  // epoch ms  authoritative trigger for the scheduler
@@ -1102,6 +1104,8 @@ export interface SmsKeyword {
     /** Optionally add the replying contact to this PCO list */
     addToListId?: string | null;
     addToListName?: string | null;
+    /** The Twilio phone number ID this keyword applies to */
+    twilioNumberId?: string | null;
     /** Tag IDs (SmsTag.id) to automatically apply to the conversation when this keyword matches */
     autoTagIds?: string[];
     /**
