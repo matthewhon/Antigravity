@@ -2541,133 +2541,6 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
 
                     {/* placeholder so closing brace below still resolves — DO NOT REMOVE */}
 
-
-                    {/* ── Opt-Out & Sender ID Sub-tab ───────────────────────────────────── */}
-                    {smsSubTab === 'optout' && (
-                        <div className="space-y-6">
-
-                            {/* Sender Identity */}
-                            <div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800">
-                                <h4 className="text-sm font-black text-slate-900 dark:text-white mb-1">Sender Identity</h4>
-                                <p className="text-[10px] text-slate-400 mb-6 leading-relaxed">Controls how your church identifies itself in outbound messages.</p>
-
-                                <div className="space-y-5">
-                                    <div>
-                                        <label className={labelCn}>Sender / Display Name</label>
-                                        <input type="text" value={smsForm.senderName || ''}
-                                            onChange={e => handleSmsChange('senderName', e.target.value)}
-                                            className={inputCn} placeholder="Grace Church"
-                                        />
-                                        <p className="text-[9px] text-slate-400 mt-1.5">Used in the app to identify who sent the message. On carrier-delivered SMS, recipients see your phone number — carriers do not pass a display name.</p>
-                                    </div>
-
-                                    <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
-                                        <div>
-                                            <p className="text-xs font-bold text-slate-900 dark:text-white">Prefix Messages with Church Name</p>
-                                            <p className="text-[10px] text-slate-400 mt-0.5">Automatically prepend &quot;&#123;Church Name&#125;:&quot; to the start of every outbound SMS. Helps recipients immediately recognize who is texting them.</p>
-                                        </div>
-                                        <button
-                                            role="switch"
-                                            aria-checked={!!smsForm.prefixMessagesWithName}
-                                            aria-label="Prefix Messages with Church Name"
-                                            onClick={() => handleSmsChange('prefixMessagesWithName', !smsForm.prefixMessagesWithName)}
-                                            className={`ml-4 shrink-0 w-12 h-6 rounded-full p-1 transition-colors ${smsForm.prefixMessagesWithName ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'}`}
-                                        >
-                                            <div className={`w-4 h-4 bg-white rounded-full transition-transform ${smsForm.prefixMessagesWithName ? 'translate-x-6' : ''}`} />
-                                        </button>
-                                    </div>
-
-                                    <div>
-                                        <label className={labelCn}>Message Footer <span className="normal-case font-normal text-slate-400">(appended to every message)</span></label>
-                                        <input type="text" value={smsForm.messageFooter || ''}
-                                            onChange={e => handleSmsChange('messageFooter', e.target.value)}
-                                            className={inputCn} placeholder="Reply STOP to unsubscribe"
-                                        />
-                                        <p className="text-[9px] text-slate-400 mt-1.5">If set, this text is automatically appended to every outbound message. The TCPA requires opt-out instructions on marketing messages. Leave blank to manage manually.</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Auto-Reply Messages */}
-                            <div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800">
-                                <h4 className="text-sm font-black text-slate-900 dark:text-white mb-1">Keyword Auto-Replies</h4>
-                                <p className="text-[10px] text-slate-400 mb-2 leading-relaxed">
-                                    Twilio automatically handles STOP, START, and HELP keywords per CTIA guidelines. You can customize the response messages below.
-                                    If left blank, Twilio sends its default carrier-compliant responses.
-                                </p>
-                                <div className="p-3 bg-indigo-50 dark:bg-indigo-900/10 border border-indigo-100 dark:border-indigo-900/30 rounded-xl mb-6">
-                                    <p className="text-[10px] text-indigo-700 dark:text-indigo-400">
-                                        <strong>Important:</strong> Your STOP response must include your organization name and confirmation of opt-out.
-                                        Your START response must confirm re-enrollment. Your HELP response must include a contact method.
-                                        These are <strong>CTIA-mandated</strong> requirements.
-                                    </p>
-                                </div>
-
-                                <div className="space-y-6">
-                                    <div>
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <span className="bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full">STOP</span>
-                                            <label className={labelCn + ' mb-0'}>Opt-Out Confirmation Message</label>
-                                        </div>
-                                        <textarea
-                                            value={smsForm.optOutMessage || ''}
-                                            onChange={e => handleSmsChange('optOutMessage', e.target.value)}
-                                            rows={3}
-                                            className={inputCn + ' resize-none'}
-                                            placeholder={`${smsForm.senderName || church.name || 'Grace Church'}: You have been unsubscribed and will receive no further messages. Reply START to re-subscribe.`}
-                                        />
-                                        <p className="text-[9px] text-slate-400 mt-1.5">Sent when a contact replies STOP. Must include your church name and confirmation of opt-out. Max 160 chars recommended.</p>
-                                    </div>
-
-                                    <div>
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <span className="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full">START</span>
-                                            <label className={labelCn + ' mb-0'}>Opt-In Confirmation Message</label>
-                                        </div>
-                                        <textarea
-                                            value={smsForm.optInMessage || ''}
-                                            onChange={e => handleSmsChange('optInMessage', e.target.value)}
-                                            rows={3}
-                                            className={inputCn + ' resize-none'}
-                                            placeholder={`${smsForm.senderName || church.name || 'Grace Church'}: Welcome back! You're subscribed again and will receive messages from us. Reply STOP at any time to unsubscribe.`}
-                                        />
-                                        <p className="text-[9px] text-slate-400 mt-1.5">Sent when a contact replies START after previously opting out. Must confirm re-enrollment.</p>
-                                    </div>
-
-                                    <div>
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <span className="bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full">HELP</span>
-                                            <label className={labelCn + ' mb-0'}>Help Response Message</label>
-                                        </div>
-                                        <textarea
-                                            value={smsForm.helpMessage || ''}
-                                            onChange={e => handleSmsChange('helpMessage', e.target.value)}
-                                            rows={3}
-                                            className={inputCn + ' resize-none'}
-                                            placeholder={`${smsForm.senderName || church.name || 'Grace Church'}: For help, call us at ${church.phone || '(555) 555-5555'} or visit ${church.website || 'www.mychurch.org'}. Reply STOP to unsubscribe.`}
-                                        />
-                                        <p className="text-[9px] text-slate-400 mt-1.5">Sent when a contact replies HELP. Must include a contact method (phone, email, or website).</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* TCPA / CTIA guidance */}
-                            <div className="bg-indigo-900/10 dark:bg-indigo-900/20 p-6 rounded-2xl border border-indigo-500/20">
-                                <h4 className="font-bold text-indigo-400 mb-3 text-sm">⚖️ TCPA & CTIA Compliance Notes</h4>
-                                <ul className="text-xs text-slate-400 space-y-1.5 list-disc list-inside leading-relaxed">
-                                    <li>Always honor STOP requests immediately and do not send further messages.</li>
-                                    <li>Maintain a record of all opt-outs. Our system automatically tracks these.</li>
-                                    <li>You must obtain prior express written consent before sending marketing messages.</li>
-                                    <li>Include your church name and opt-out instructions in every marketing message.</li>
-                                    <li>HELP and STOP must always work, even after opting out.</li>
-                                    <li>Under TCPA, violations can carry fines of $500–$1,500 per message — compliance is critical.</li>
-                                    <li>Consult legal counsel for advice specific to your ministry context.</li>
-                                </ul>
-                            </div>
-
-                        </div>
-                    )}
-
                     {/* ── Compliance Sub-tab ─────────────────────────────────────────── */}
                     {smsSubTab === 'compliance' && (
                         <div className="space-y-6">
@@ -3074,6 +2947,63 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                     )}
                                 </div>
                             </div>
+
+                            {/* Sender Identity */}
+                            <div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800">
+                                <h4 className="text-sm font-black text-slate-900 dark:text-white mb-1">Sender Identity</h4>
+                                <p className="text-[10px] text-slate-400 mb-6 leading-relaxed">Controls how your church identifies itself in outbound messages.</p>
+
+                                <div className="space-y-5">
+                                    <div>
+                                        <label className={labelCn}>Sender / Display Name</label>
+                                        <input type="text" value={smsForm.senderName || ''}
+                                            onChange={e => handleSmsChange('senderName', e.target.value)}
+                                            className={inputCn} placeholder="Grace Church"
+                                        />
+                                        <p className="text-[9px] text-slate-400 mt-1.5">Used in the app to identify who sent the message. On carrier-delivered SMS, recipients see your phone number — carriers do not pass a display name.</p>
+                                    </div>
+
+                                    <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+                                        <div>
+                                            <p className="text-xs font-bold text-slate-900 dark:text-white">Prefix Messages with Church Name</p>
+                                            <p className="text-[10px] text-slate-400 mt-0.5">Automatically prepend &quot;&#123;Church Name&#125;:&quot; to the start of every outbound SMS. Helps recipients immediately recognize who is texting them.</p>
+                                        </div>
+                                        <button
+                                            role="switch"
+                                            aria-checked={!!smsForm.prefixMessagesWithName}
+                                            aria-label="Prefix Messages with Church Name"
+                                            onClick={() => handleSmsChange('prefixMessagesWithName', !smsForm.prefixMessagesWithName)}
+                                            className={`ml-4 shrink-0 w-12 h-6 rounded-full p-1 transition-colors ${smsForm.prefixMessagesWithName ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'}`}
+                                        >
+                                            <div className={`w-4 h-4 bg-white rounded-full transition-transform ${smsForm.prefixMessagesWithName ? 'translate-x-6' : ''}`} />
+                                        </button>
+                                    </div>
+
+                                    <div>
+                                        <label className={labelCn}>Message Footer <span className="normal-case font-normal text-slate-400">(appended to every message)</span></label>
+                                        <input type="text" value={smsForm.messageFooter || ''}
+                                            onChange={e => handleSmsChange('messageFooter', e.target.value)}
+                                            className={inputCn} placeholder="Reply STOP to unsubscribe"
+                                        />
+                                        <p className="text-[9px] text-slate-400 mt-1.5">If set, this text is automatically appended to every outbound message. The TCPA requires opt-out instructions on marketing messages. Leave blank to manage manually.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* TCPA / CTIA guidance */}
+                            <div className="bg-indigo-900/10 dark:bg-indigo-900/20 p-6 rounded-2xl border border-indigo-500/20">
+                                <h4 className="font-bold text-indigo-400 mb-3 text-sm">⚖️ TCPA & CTIA Compliance Notes</h4>
+                                <ul className="text-xs text-slate-400 space-y-1.5 list-disc list-inside leading-relaxed">
+                                    <li>Always honor STOP requests immediately and do not send further messages.</li>
+                                    <li>Maintain a record of all opt-outs. Our system automatically tracks these.</li>
+                                    <li>You must obtain prior express written consent before sending marketing messages.</li>
+                                    <li>Include your church name and opt-out instructions in every marketing message.</li>
+                                    <li>HELP and STOP must always work, even after opting out.</li>
+                                    <li>Under TCPA, violations can carry fines of $500–$1,500 per message — compliance is critical.</li>
+                                    <li>Consult legal counsel for advice specific to your ministry context.</li>
+                                </ul>
+                            </div>
+
                         </div>
                     )}
 
