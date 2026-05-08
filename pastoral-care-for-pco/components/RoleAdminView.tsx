@@ -3,8 +3,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { User, Church, RiskSettings, ChurchRiskSettings, DonorLifecycleSettings, GroupRiskSettings, CommunityLocation, UserRole } from '../types';
 import { CreateUserModal } from './CreateUserModal';
 import { firestore } from '../services/firestoreService';
-import { auth, db as firebaseDb } from '../services/firebase';
+import { auth, db as firebaseDb, storage } from '../services/firebase';
 import { setDoc, doc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import RiskSettingsView from './RiskSettingsView';
 import ChurchRiskSettingsView from './ChurchRiskSettingsView';
 import GroupRiskSettingsView from './GroupRiskSettingsView';
@@ -302,7 +303,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   const [formData, setFormData] = useState<Partial<Church>>(church);
 
   // SMS Settings state
-  const [smsSubTab, setSmsSubTab] = useState<'setup' | 'compliance' | 'optout' | 'numbers'>('setup');
+  const [smsSubTab, setSmsSubTab] = useState<'setup' | 'compliance' | 'numbers'>('setup');
   const [showRep2, setShowRep2] = useState(false);
   const [expandedSteps, setExpandedSteps] = useState<Set<number>>(new Set([1]));
   const toggleStep = (n: number) => setExpandedSteps(prev => {
@@ -335,10 +336,16 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
       description: 'Sending updates, announcements, prayer requests, and volunteer scheduling to congregation members.',
       sample1: `Hi [Name], just a reminder that service times this Sunday are at 9am and 11am! - ${church.name || 'Church'}`,
       sample2: `We are looking for volunteers for the upcoming food drive. Reply YES if you can help! - ${church.name || 'Church'}`,
+      sample3: '',
+      sample4: '',
+      sample5: '',
       messageFlow: `Members opt-in by filling out a physical or digital connect card explicitly agreeing to receive SMS updates, or by texting a keyword to the church's phone number.`,
-      optOutMessage: 'Reply STOP to unsubscribe. Reply HELP for help.',
-      helpMessage: `For assistance contact ${church.name || 'us'}. Reply STOP to unsubscribe.`
+      optOutMessage: church.smsSettings?.optOutMessage || 'Reply STOP to unsubscribe. Reply HELP for help.',
+      optInMessage: church.smsSettings?.optInMessage || `Welcome back! You're subscribed again and will receive messages from us. Reply STOP at any time to unsubscribe.`,
+      helpMessage: church.smsSettings?.helpMessage || `For assistance contact ${church.name || 'us'}. Reply STOP to unsubscribe.`,
+      consentFormUrl: ''
   });
+  const [isUploadingConsent, setIsUploadingConsent] = useState(false);
   const [regStatus, setRegStatus] = useState<any>(null);
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [isSubmittingBrand, setIsSubmittingBrand] = useState(false);
@@ -2440,7 +2447,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
 
                         {/* Sub-tab switcher */}
                         <div className="flex bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl gap-1 w-fit flex-wrap">
-                            {(['setup', 'compliance', 'numbers', 'optout'] as const).map(st => (
+                            {(['setup', 'compliance', 'numbers'] as const).map(st => (
                                 <button
                                     key={st}
                                     onClick={() => setSmsSubTab(st as any)}
@@ -2450,7 +2457,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             : 'text-slate-500 dark:text-slate-400 hover:bg-white/50 dark:hover:bg-slate-700/50'
                                     }`}
                                 >
-                                    {st === 'setup' ? '⚡ SMS Setup' : st === 'compliance' ? '⚖️ Compliance' : st === 'numbers' ? '📱 Phone Numbers' : '🔕 Opt-Out & Sender'}
+                                    {st === 'setup' ? '⚡ SMS Setup' : st === 'compliance' ? '⚖️ Compliance & Sender' : '📱 Phone Numbers'}
                                 </button>
                             ))}
                         </div>
@@ -2930,6 +2937,118 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         <div>
                                             <label className={labelCn}>Sample Message 2</label>
                                             <textarea rows={2} className={inputCn} value={campaignForm.sample2} onChange={e => setCampaignForm({...campaignForm, sample2: e.target.value})} placeholder="Thank you for visiting! To get connected, fill out this link: ..." />
+                                        </div>
+                                        <div>
+                                            <label className={labelCn}>Sample Message 3 (Optional)</label>
+                                            <textarea rows={2} className={inputCn} value={campaignForm.sample3} onChange={e => setCampaignForm({...campaignForm, sample3: e.target.value})} placeholder="Optional sample message..." />
+                                        </div>
+                                        <div>
+                                            <label className={labelCn}>Sample Message 4 (Optional)</label>
+                                            <textarea rows={2} className={inputCn} value={campaignForm.sample4} onChange={e => setCampaignForm({...campaignForm, sample4: e.target.value})} placeholder="Optional sample message..." />
+                                        </div>
+                                        <div>
+                                            <label className={labelCn}>Sample Message 5 (Optional)</label>
+                                            <textarea rows={2} className={inputCn} value={campaignForm.sample5} onChange={e => setCampaignForm({...campaignForm, sample5: e.target.value})} placeholder="Optional sample message..." />
+                                        </div>
+                                        
+                                        <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+                                            <h6 className="font-bold text-slate-800 dark:text-slate-200 text-sm mb-4">Keyword Auto-Replies</h6>
+                                            <div className="space-y-4">
+                                                <div>
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <span className="bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full">STOP</span>
+                                                        <label className={labelCn + ' mb-0'}>Opt-Out Confirmation Message</label>
+                                                    </div>
+                                                    <textarea
+                                                        value={campaignForm.optOutMessage}
+                                                        onChange={e => setCampaignForm({...campaignForm, optOutMessage: e.target.value})}
+                                                        rows={2}
+                                                        className={inputCn + ' resize-none'}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <span className="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full">START</span>
+                                                        <label className={labelCn + ' mb-0'}>Opt-In Confirmation Message</label>
+                                                    </div>
+                                                    <textarea
+                                                        value={campaignForm.optInMessage}
+                                                        onChange={e => setCampaignForm({...campaignForm, optInMessage: e.target.value})}
+                                                        rows={2}
+                                                        className={inputCn + ' resize-none'}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <span className="bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full">HELP</span>
+                                                        <label className={labelCn + ' mb-0'}>Help Response Message</label>
+                                                    </div>
+                                                    <textarea
+                                                        value={campaignForm.helpMessage}
+                                                        onChange={e => setCampaignForm({...campaignForm, helpMessage: e.target.value})}
+                                                        rows={2}
+                                                        className={inputCn + ' resize-none'}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+                                            <h6 className="font-bold text-slate-800 dark:text-slate-200 text-sm mb-4">Consent Form Evidence</h6>
+                                            <p className="text-[10px] text-slate-500 mb-3">Upload an image or screenshot of your digital/physical consent form that people fill out to opt-in to SMS messages.</p>
+                                            
+                                            <div className="flex flex-col gap-3">
+                                                {campaignForm.consentFormUrl ? (
+                                                    <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+                                                        <a href={campaignForm.consentFormUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 font-bold hover:underline truncate flex-1">
+                                                            View Uploaded Form
+                                                        </a>
+                                                        <button 
+                                                            onClick={() => setCampaignForm({...campaignForm, consentFormUrl: ''})}
+                                                            className="text-[10px] text-rose-500 font-bold uppercase tracking-widest hover:text-rose-600 px-2 py-1 bg-white dark:bg-slate-900 rounded shadow-sm border border-slate-200 dark:border-slate-700"
+                                                        >
+                                                            Remove
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <div className="relative group">
+                                                        <input 
+                                                            type="file" 
+                                                            accept="image/*,.pdf"
+                                                            disabled={isUploadingConsent}
+                                                            onChange={async (e) => {
+                                                                const file = e.target.files?.[0];
+                                                                if (!file) return;
+                                                                setIsUploadingConsent(true);
+                                                                try {
+                                                                    const path = `churches/${churchId}/consent_forms/${Date.now()}_${file.name}`;
+                                                                    const storageRef = ref(storage, path);
+                                                                    await uploadBytes(storageRef, file);
+                                                                    const url = await getDownloadURL(storageRef);
+                                                                    setCampaignForm({...campaignForm, consentFormUrl: url});
+                                                                } catch (err: any) {
+                                                                    alert('Failed to upload consent form: ' + err.message);
+                                                                } finally {
+                                                                    setIsUploadingConsent(false);
+                                                                }
+                                                            }}
+                                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed"
+                                                        />
+                                                        <div className={`w-full border-2 border-dashed rounded-xl p-6 text-center transition-all ${isUploadingConsent ? 'bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700' : 'bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 border-slate-300 dark:border-slate-700 group-hover:border-indigo-400'}`}>
+                                                            {isUploadingConsent ? (
+                                                                <span className="text-xs font-bold text-slate-500 flex items-center justify-center gap-2">
+                                                                    <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
+                                                                    Uploading...
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-xs font-bold text-slate-500">
+                                                                    Click or drag file to upload
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                         
                                         {regStatus?.brand?.status?.toLowerCase() !== 'verified' && regStatus?.brand?.status?.toLowerCase() !== 'approved' && regStatus?.brand?.status?.toLowerCase() !== 'completed' ? (

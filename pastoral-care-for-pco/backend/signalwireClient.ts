@@ -366,9 +366,14 @@ export interface CampaignRegistrationPayload {
     description:     string;
     sample1:         string;
     sample2?:        string;
+    sample3?:        string;
+    sample4?:        string;
+    sample5?:        string;
     messageFlow:     string;   // opt-in description
     optOutMessage:   string;
+    optInMessage?:   string;
     helpMessage:     string;
+    consentFormUrl?: string;
 }
 
 /**
@@ -392,7 +397,7 @@ export async function registerTenantCampaign(
         sms_use_case:      payload.usecase,
         description:       payload.description,
         sample1:           payload.sample1,
-        message_flow:      payload.messageFlow,
+        message_flow:      payload.consentFormUrl ? `${payload.messageFlow}\n\nConsent Form Link: ${payload.consentFormUrl}` : payload.messageFlow,
         opt_out_message:   payload.optOutMessage,
         help_message:      payload.helpMessage,
         terms_and_conditions: true,
@@ -403,7 +408,11 @@ export async function registerTenantCampaign(
         age_gated_content: false,
         lead_generation: false,
     };
+    if (payload.optInMessage) body.opt_in_message = payload.optInMessage;
     if (payload.sample2) body.sample2 = payload.sample2;
+    if (payload.sample3) body.sample3 = payload.sample3;
+    if (payload.sample4) body.sample4 = payload.sample4;
+    if (payload.sample5) body.sample5 = payload.sample5;
     if (payload.subUsecases && payload.subUsecases.length > 0) body.sub_use_cases = payload.subUsecases;
     if (webhookUrl) body.webhook_url = webhookUrl;
 

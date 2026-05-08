@@ -582,7 +582,8 @@ export const registerSmsCampaign = async (req: any, res: any) => {
 
     const {
         churchId, name, usecase, description,
-        sample1, sample2, messageFlow, optOutMessage, helpMessage,
+        sample1, sample2, sample3, sample4, sample5,
+        messageFlow, optOutMessage, optInMessage, helpMessage, consentFormUrl,
     } = req.body || {};
 
     if (!churchId)     return res.status(400).json({ error: 'Missing churchId' });
@@ -618,9 +619,14 @@ export const registerSmsCampaign = async (req: any, res: any) => {
             description,
             sample1,
             sample2:       sample2 || undefined,
+            sample3:       sample3 || undefined,
+            sample4:       sample4 || undefined,
+            sample5:       sample5 || undefined,
             messageFlow,
             optOutMessage: optOutMessage || 'Reply STOP to unsubscribe. Reply HELP for help.',
+            optInMessage:  optInMessage || undefined,
             helpMessage:   helpMessage || `For assistance contact ${churchName}. Reply STOP to unsubscribe.`,
+            consentFormUrl: consentFormUrl || undefined,
         };
 
         const { campaignId, status } = await registerTenantCampaign(churchId, payload);
