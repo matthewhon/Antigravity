@@ -689,8 +689,11 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                                             <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                                                                 {membersList.map((m, i) => (
                                                                     <div key={i} className="flex items-center justify-between text-[10px]">
-                                                                        <span className="text-slate-600 dark:text-slate-300 truncate">{m.name}</span>
-                                                                        <span className={`font-bold ${
+                                                                        <div className="min-w-0 mr-2">
+                                                                            <p className="text-slate-600 dark:text-slate-300 truncate font-medium">{m.name}</p>
+                                                                            <p className="text-[8px] text-slate-400 truncate">{m.teamPositionName || m.teamName}</p>
+                                                                        </div>
+                                                                        <span className={`font-bold shrink-0 ${
                                                                             m.status === 'Confirmed' ? 'text-emerald-500' : 
                                                                             m.status === 'Pending' ? 'text-amber-500' : 
                                                                             'text-rose-500'
@@ -1049,7 +1052,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                         <th className="p-4 text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">Team Name</th>
                                         <th className="p-4 text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">Leaders</th>
                                         <th className="p-4 text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest text-center">Members</th>
-                                        <th className="p-4 text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest text-center">Positions / Serving</th>
+                                        <th className="p-4 text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest text-center">Actively Serving</th>
                                         <th className="p-4 text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest text-right">Action</th>
                                     </tr>
                                 </thead>
@@ -1075,30 +1078,20 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                                 <td className="p-4 text-center">
                                                     <div className="flex flex-col items-center">
                                                         <span className="inline-flex items-center justify-center bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 px-3 py-1 rounded-full text-xs font-black">
-                                                            {totalMembers > 0 ? totalMembers : activeMembers}
+                                                            {totalMembers}
                                                         </span>
                                                         <span className="text-[8px] text-slate-400 mt-1 uppercase tracking-wider font-bold">
-                                                            {activeMembers} Active
+                                                            Roster
                                                         </span>
                                                     </div>
                                                 </td>
                                                 <td className="p-4 text-center">
-                                                    {(() => {
-                                                        // positionCount = unique named position roles (e.g. "Drummer").
-                                                        // Falls back to scheduled member count when teams don't use named positions.
-                                                        const posCount = team.positionCount || 0;
-                                                        const servingCount = team.scheduledMemberIds?.length || 0;
-                                                        const displayCount = posCount > 0 ? posCount : servingCount;
-                                                        const label = posCount > 0 ? 'Named Roles' : 'Serving Now';
-                                                        return (
-                                                            <div className="flex flex-col items-center">
-                                                                <span className="inline-flex items-center justify-center bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-3 py-1 rounded-full text-xs font-black">
-                                                                    {displayCount}
-                                                                </span>
-                                                                <span className="text-[8px] text-slate-400 mt-1 uppercase tracking-wider font-bold">{label}</span>
-                                                            </div>
-                                                        );
-                                                    })()}
+                                                    <div className="flex flex-col items-center">
+                                                        <span className="inline-flex items-center justify-center bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 px-3 py-1 rounded-full text-xs font-black">
+                                                            {activeMembers}
+                                                        </span>
+                                                        <span className="text-[8px] text-slate-400 mt-1 uppercase tracking-wider font-bold">Serving Now</span>
+                                                    </div>
                                                 </td>
                                                 <td className="p-4 text-right">
                                                     <button 
