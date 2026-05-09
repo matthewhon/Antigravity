@@ -15,6 +15,11 @@ const defaultReminders: SmsServicesReminders = {
   memberReminderEnabled: true,
   memberDaysBefore: 3,
   memberMessageTemplate: "Hi {name}, you are scheduled for {team_name} for {service_name} on {date}. Please confirm your status in PCO!",
+  leaderWarningUnderstaffedEnabled: false,
+  leaderWarningUnderstaffedTemplate: "Warning: {team_name} for {service_name} on {date} still needs {needed_count} more people. Please check PCO.",
+  leaderWarningOverScheduledEnabled: false,
+  leaderWarningOverScheduledThreshold: 3,
+  leaderWarningOverScheduledTemplate: "Warning: {person_name} is scheduled {count} times in the next 30 days (including {service_name} on {date}). You may want to find a replacement.",
 };
 
 const ServicesRemindersTab: React.FC<Props> = ({ church, onUpdateChurch }) => {
@@ -156,6 +161,77 @@ const ServicesRemindersTab: React.FC<Props> = ({ church, onUpdateChurch }) => {
                             <p className="text-[10px] font-bold text-slate-400 mt-2">
                                 Available tags: <span className="text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 px-1.5 py-0.5 rounded">{'{name}'}</span> <span className="text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 px-1.5 py-0.5 rounded">{'{team_name}'}</span> <span className="text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 px-1.5 py-0.5 rounded">{'{service_name}'}</span> <span className="text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 px-1.5 py-0.5 rounded">{'{date}'}</span>
                             </p>
+                        </div>
+
+                        {/* Leader Warnings */}
+                        <div className="mt-8 pt-6 border-t border-slate-200 dark:border-slate-700 space-y-8">
+                            <h6 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                ⚠️ Advanced Warnings
+                            </h6>
+
+                            {/* Understaffed Warning */}
+                            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-5 rounded-2xl">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h6 className="text-xs font-black uppercase tracking-widest text-slate-700 dark:text-slate-300">Understaffed Warning</h6>
+                                    <label className="relative inline-flex items-center cursor-pointer">
+                                        <input 
+                                            type="checkbox" 
+                                            className="sr-only peer" 
+                                            checked={settings.leaderWarningUnderstaffedEnabled || false}
+                                            onChange={(e) => updateSetting('leaderWarningUnderstaffedEnabled', e.target.checked)}
+                                        />
+                                        <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-indigo-500"></div>
+                                    </label>
+                                </div>
+                                <div className={`space-y-4 ${!settings.leaderWarningUnderstaffedEnabled ? 'opacity-40 pointer-events-none hidden' : ''}`}>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">Sends a message if the team still has open needed positions when the reminder runs.</p>
+                                    <textarea 
+                                        className="w-full h-24 px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                                        value={settings.leaderWarningUnderstaffedTemplate || defaultReminders.leaderWarningUnderstaffedTemplate}
+                                        onChange={(e) => updateSetting('leaderWarningUnderstaffedTemplate', e.target.value)}
+                                    />
+                                    <p className="text-[10px] font-bold text-slate-400">
+                                        Available tags: <span className="text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 px-1 py-0.5 rounded">{'{needed_count}'}</span> <span className="text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 px-1 py-0.5 rounded">{'{team_name}'}</span> <span className="text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 px-1 py-0.5 rounded">{'{service_name}'}</span> <span className="text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 px-1 py-0.5 rounded">{'{date}'}</span>
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Over-scheduled Warning */}
+                            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-5 rounded-2xl">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h6 className="text-xs font-black uppercase tracking-widest text-slate-700 dark:text-slate-300">Over-scheduled Warning</h6>
+                                    <label className="relative inline-flex items-center cursor-pointer">
+                                        <input 
+                                            type="checkbox" 
+                                            className="sr-only peer" 
+                                            checked={settings.leaderWarningOverScheduledEnabled || false}
+                                            onChange={(e) => updateSetting('leaderWarningOverScheduledEnabled', e.target.checked)}
+                                        />
+                                        <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-indigo-500"></div>
+                                    </label>
+                                </div>
+                                <div className={`space-y-4 ${!settings.leaderWarningOverScheduledEnabled ? 'opacity-40 pointer-events-none hidden' : ''}`}>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs text-slate-500 dark:text-slate-400">Warn if person is scheduled</span>
+                                        <input 
+                                            type="number" 
+                                            min="1" max="20"
+                                            className="w-16 px-2 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded text-xs font-bold text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-indigo-500"
+                                            value={settings.leaderWarningOverScheduledThreshold || 3}
+                                            onChange={(e) => updateSetting('leaderWarningOverScheduledThreshold', parseInt(e.target.value) || 3)}
+                                        />
+                                        <span className="text-xs text-slate-500 dark:text-slate-400">or more times in a 30-day window</span>
+                                    </div>
+                                    <textarea 
+                                        className="w-full h-24 px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                                        value={settings.leaderWarningOverScheduledTemplate || defaultReminders.leaderWarningOverScheduledTemplate}
+                                        onChange={(e) => updateSetting('leaderWarningOverScheduledTemplate', e.target.value)}
+                                    />
+                                    <p className="text-[10px] font-bold text-slate-400">
+                                        Available tags: <span className="text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 px-1 py-0.5 rounded">{'{person_name}'}</span> <span className="text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 px-1 py-0.5 rounded">{'{count}'}</span> <span className="text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 px-1 py-0.5 rounded">{'{team_name}'}</span> <span className="text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 px-1 py-0.5 rounded">{'{service_name}'}</span> <span className="text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 px-1 py-0.5 rounded">{'{date}'}</span>
+                                    </p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

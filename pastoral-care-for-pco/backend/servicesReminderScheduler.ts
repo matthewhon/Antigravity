@@ -30,6 +30,57 @@ function fmtDate(raw?: string): string {
     return isNaN(d.getTime()) ? raw : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+async function sendReminder(
+    db: any, churchId: string, planId: string, personId: string, role: string, body: string, historyId: string, log: any
+): Promise<number> {
+    const historyDoc = await db.collection('smsServicesSentHistory').doc(historyId).get();
+    if (historyDoc.exists) {
+        return 2; // deduplicated
+    }
+    
+    const personDoc = await db.collection('people').doc(personId).get().catch(() => null);
+    if (!personDoc?.exists) return 0;
+    
+    const person = personDoc.data();
+    const rawPhone: string = (person.phone || '').replace(/\D/g, '');
+    const e164 = rawPhone.length === 10 ? `+1${rawPhone}` : rawPhone.length === 11 ? `+${rawPhone}` : '';
+    
+    if (!e164) return 0;
+    
+    const personInfo: PersonInfo = {
+        personName: person.name,
+        email: person.email,
+        phone: e164
+    };
+    
+    const { sendBulkInternal } = await import('./smsSend.js');
+    try {
+        const sendResult = await sendBulkInternal({
+            db,
+            churchId,
+            campaignId: `services_reminder_${planId}`,
+            phones: [e164],
+            body,
+            personMap: { [e164]: personInfo }
+        });
+        
+        if (sendResult.sent > 0 || sendResult.optedOut > 0) {
+            await db.collection('smsServicesSentHistory').doc(historyId).set({
+                id: historyId,
+                churchId,
+                planId,
+                personId,
+                role,
+                sentAt: Date.now()
+            });
+            return 1; // Sent
+        }
+    } catch (err: any) {
+        log.warn(`[ServicesReminder] Failed to send to ${e164} for plan ${planId}: ${err.message}`, 'system', { churchId, planId, personId }, churchId);
+    }
+    return 0;
+}
+
 export async function runServicesReminderScanner(db: any): Promise<void> {
     const log = createServerLogger(db);
 
@@ -80,29 +131,98 @@ export async function runServicesReminderScanner(db: any): Promise<void> {
                     teamLeadersMap.set(t.name, new Set(t.leaderPersonIds || []));
                 });
                 
+                // Pre-calculate 30-day schedule counts for over-scheduled warning
+                const scheduleCounts30Days = new Map<string, number>();
+                if (reminders.leaderWarningOverScheduledEnabled) {
+                    const thirtyDaysFromNowStr = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().substring(0, 10);
+                    plansSnap.docs.forEach(doc => {
+                        const p = doc.data() as ServicePlanSnapshot;
+                        if (p.sortDate >= nowStr && p.sortDate <= thirtyDaysFromNowStr) {
+                            if (p.teamMembers) {
+                                p.teamMembers.forEach(m => {
+                                    if (m.personId) {
+                                        scheduleCounts30Days.set(m.personId, (scheduleCounts30Days.get(m.personId) || 0) + 1);
+                                    }
+                                });
+                            }
+                        }
+                    });
+                }
+                
                 let sentCount = 0;
                 let deduplicatedCount = 0;
 
                 for (const planDoc of plansSnap.docs) {
                     const plan = planDoc.data() as ServicePlanSnapshot;
                     const planId = plan.id;
-                    if (!plan.teamMembers || plan.teamMembers.length === 0) continue;
-                    
                     const daysDiff = getDaysUntil(plan.sortDate);
                     if (daysDiff < 0) continue; // Past plan
+                    
+                    const serviceName = plan.serviceTypeName || plan.seriesTitle || 'Service';
+                    const dateFormatted = fmtDate(plan.sortDate);
+
+                    // 1. Understaffed Warning (sent to leaders)
+                    if (reminders.leaderWarningUnderstaffedEnabled && daysDiff === reminders.leaderDaysBefore && plan.neededPositions) {
+                        for (const needed of plan.neededPositions) {
+                            if (needed.quantity > 0) {
+                                const leadersSet = teamLeadersMap.get(needed.teamName);
+                                if (leadersSet) {
+                                    for (const leaderId of leadersSet) {
+                                        const role = `warning_understaffed_${needed.teamName.replace(/[^a-zA-Z0-9]/g, '_')}`;
+                                        const historyId = `${churchId}_${planId}_${leaderId}_${role}`;
+                                        
+                                        const template = reminders.leaderWarningUnderstaffedTemplate || "Warning: {team_name} for {service_name} on {date} still needs {needed_count} more people. Please check PCO.";
+                                        const body = template
+                                            .replace(/\{needed_count\}/gi, needed.quantity.toString())
+                                            .replace(/\{team_name\}/gi, needed.teamName)
+                                            .replace(/\{service_name\}/gi, serviceName)
+                                            .replace(/\{date\}/gi, dateFormatted);
+                                            
+                                        const didSend = await sendReminder(db, churchId, planId, leaderId, role, body, historyId, log);
+                                        if (didSend === 1) sentCount++; else if (didSend === 2) deduplicatedCount++;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (!plan.teamMembers || plan.teamMembers.length === 0) continue;
                     
                     for (const member of plan.teamMembers) {
                         const personId = member.personId;
                         if (!personId) continue;
                         
-                        // Check if they need to be reminded based on status
+                        const leadersSet = teamLeadersMap.get(member.teamName);
+                        const isLeader = leadersSet && leadersSet.has(personId);
+                        
+                        // 2. Over-scheduled Warning
+                        if (reminders.leaderWarningOverScheduledEnabled && daysDiff === reminders.leaderDaysBefore) {
+                            const count = scheduleCounts30Days.get(personId) || 0;
+                            const threshold = reminders.leaderWarningOverScheduledThreshold || 3;
+                            if (count >= threshold && leadersSet) {
+                                for (const leaderId of leadersSet) {
+                                    const role = `warning_overscheduled_${personId}`;
+                                    const historyId = `${churchId}_${planId}_${leaderId}_${role}`;
+                                    
+                                    const template = reminders.leaderWarningOverScheduledTemplate || "Warning: {person_name} is scheduled {count} times in the next 30 days (including {service_name} on {date}). You may want to find a replacement.";
+                                    const body = template
+                                        .replace(/\{person_name\}/gi, member.name || 'Team Member')
+                                        .replace(/\{count\}/gi, count.toString())
+                                        .replace(/\{team_name\}/gi, member.teamName)
+                                        .replace(/\{service_name\}/gi, serviceName)
+                                        .replace(/\{date\}/gi, dateFormatted);
+                                        
+                                    const didSend = await sendReminder(db, churchId, planId, leaderId, role, body, historyId, log);
+                                    if (didSend === 1) sentCount++; else if (didSend === 2) deduplicatedCount++;
+                                }
+                            }
+                        }
+                        
+                        // 3. Standard Reminders
                         if (reminders.remindOnlyUnconfirmed && member.status !== 'Pending' && member.status !== 'U') {
                             continue;
                         }
 
-                        const leadersSet = teamLeadersMap.get(member.teamName);
-                        const isLeader = leadersSet && leadersSet.has(personId);
-                        
                         let shouldRemind = false;
                         let template = '';
                         let role = '';
@@ -119,62 +239,11 @@ export async function runServicesReminderScanner(db: any): Promise<void> {
                         
                         if (!shouldRemind) continue;
                         
-                        // Check deduplication
                         const historyId = `${churchId}_${planId}_${personId}_${role}`;
-                        const historyDoc = await db.collection('smsServicesSentHistory').doc(historyId).get();
-                        if (historyDoc.exists) {
-                            deduplicatedCount++;
-                            continue;
-                        }
+                        const body = resolveTemplate(template, member.name || 'Team Member', serviceName, member.teamName, dateFormatted);
                         
-                        // Fetch person to get phone number
-                        const personDoc = await db.collection('people').doc(personId).get().catch(() => null);
-                        if (!personDoc?.exists) continue;
-                        
-                        const person = personDoc.data();
-                        const rawPhone: string = (person.phone || '').replace(/\D/g, '');
-                        const e164 = rawPhone.length === 10 ? `+1${rawPhone}` : rawPhone.length === 11 ? `+${rawPhone}` : '';
-                        
-                        if (!e164) continue;
-                        
-                        // Format message
-                        const serviceName = plan.serviceTypeName || plan.seriesTitle || 'Service';
-                        const dateFormatted = fmtDate(plan.sortDate);
-                        const body = resolveTemplate(template, member.name || person.name || 'Team Member', serviceName, member.teamName, dateFormatted);
-                        
-                        // Send via sendBulkInternal
-                        const personInfo: PersonInfo = {
-                            personName: person.name || member.name,
-                            email: person.email,
-                            phone: e164
-                        };
-                        
-                        const { sendBulkInternal } = await import('./smsSend.js');
-                        try {
-                            const sendResult = await sendBulkInternal({
-                                db,
-                                churchId,
-                                campaignId: `services_reminder_${planId}`,
-                                phones: [e164],
-                                body,
-                                personMap: { [e164]: personInfo }
-                            });
-                            
-                            // If successful, record history
-                            if (sendResult.sent > 0 || sendResult.optedOut > 0) {
-                                await db.collection('smsServicesSentHistory').doc(historyId).set({
-                                    id: historyId,
-                                    churchId,
-                                    planId,
-                                    personId,
-                                    role,
-                                    sentAt: Date.now()
-                                });
-                                sentCount++;
-                            }
-                        } catch (err: any) {
-                            log.warn(`[ServicesReminder] Failed to send reminder to ${e164} for plan ${planId}: ${err.message}`, 'system', { churchId, planId, personId }, churchId);
-                        }
+                        const didSend = await sendReminder(db, churchId, planId, personId, role, body, historyId, log);
+                        if (didSend === 1) sentCount++; else if (didSend === 2) deduplicatedCount++;
                     }
                 }
                 

@@ -882,6 +882,14 @@ export interface SmsServicesReminders {
     memberReminderEnabled: boolean;
     memberDaysBefore: number;
     memberMessageTemplate: string;
+    
+    // Warnings for Leaders
+    leaderWarningUnderstaffedEnabled?: boolean;
+    leaderWarningUnderstaffedTemplate?: string;
+    
+    leaderWarningOverScheduledEnabled?: boolean;
+    leaderWarningOverScheduledThreshold?: number; // e.g. scheduled more than X times in 30 days
+    leaderWarningOverScheduledTemplate?: string;
 }
 
 export interface SmsSettings {
