@@ -70,7 +70,6 @@ export const SERVICES_OVERVIEW_WIDGETS: WidgetDefinition[] = [
     { id: 'upcoming_plans_list', label: 'Upcoming Plans', icon: '📅' },
     { id: 'staffing_needs', label: 'Staffing Needs', icon: '🚨' },
     { id: 'top_songs', label: 'Top Songs', icon: '🎵' },
-    { id: 'team_breakdown', label: 'Team Roster', icon: '📋' },
     { id: 'positions', label: 'Positions', icon: '🪑' },
     { id: 'checkin_history', label: 'Check-ins', icon: '✅' },
 ];
@@ -212,7 +211,7 @@ export const getRoleBasedDefaults = (roles: string[]): Record<string, string[]> 
             : ['groups_health', 'groups_stats', 'event_attendance'],
         // Services
         services_overview: isServices || isPastor
-            ? ['services_stats', 'upcoming_plans_list', 'staffing_needs', 'team_breakdown', 'checkin_history']
+            ? ['services_stats', 'upcoming_plans_list', 'staffing_needs', 'checkin_history']
             : ['services_stats', 'upcoming_plans_list'],
         services_attendance: ['checkin_history', 'events', 'services_stats'],
         services_teams: isServices
@@ -246,8 +245,8 @@ export const getDefaultWidgets = (view: string): string[] => {
         case 'people_households': return ['householdSummary', 'householdComp', 'householdSize'];
         case 'people_risk': return ['riskDistribution', 'atRiskList'];
         case 'groups': return ['groups_ai_agent', 'groups_health', 'groups_stats', 'event_attendance', 'groups_gender'];
-        case 'services': return ['services_stats', 'upcoming_plans_list', 'staffing_needs', 'team_breakdown', 'checkin_history'];
-        case 'services_overview': return ['services_stats', 'upcoming_plans_list', 'staffing_needs', 'team_breakdown', 'checkin_history'];
+        case 'services': return ['services_stats', 'upcoming_plans_list', 'staffing_needs', 'checkin_history'];
+        case 'services_overview': return ['services_stats', 'upcoming_plans_list', 'staffing_needs', 'checkin_history'];
         case 'services_attendance': return ['checkin_history', 'events', 'services_stats'];
         case 'services_teams': return ['services_teams_list', 'burnout_watchlist', 'team_roster'];
         case 'giving': return ['keyMetrics', 'trendsComparison', 'funds'];

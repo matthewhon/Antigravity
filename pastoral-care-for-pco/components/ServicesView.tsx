@@ -190,14 +190,46 @@ const ServicesView: React.FC<ServicesViewProps> = ({
       return new Date(plan.sortDate);
   };
 
-  // Calculate breakdown for upcoming 30 days specifically for the 'positions' widget
-  const upcoming30DayStats = useMemo(() => {
-      if (!data?.futurePlans) return null;
-      
+  // Human-readable label for the current filter period
+  const positionFilterLabel = useMemo(() => {
+      switch (filter) {
+          case 'Week': return 'Past Week';
+          case 'Month': return 'Past Month';
+          case 'Quarter': return 'Past Quarter';
+          case 'Year': return 'Past Year';
+          case 'Next Week': return 'Next Week';
+          case 'Next Month': return 'Next Month';
+          default: return filter;
+      }
+  }, [filter]);
+
+  // Calculate position breakdown respecting the page-level time period filter
+  const positionBreakdownStats = useMemo(() => {
+      if (!data) return null;
+
+      // For past-looking filters, use the pre-computed teamStats from the analytics service
+      // (already filtered by the correct date range in calculateServicesAnalytics)
+      if (filter === 'Week' || filter === 'Month' || filter === 'Quarter' || filter === 'Year') {
+          const ts = data.teamStats;
+          if (!ts || (ts.confirmed === 0 && ts.pending === 0 && ts.declined === 0 && ts.open === 0)) return null;
+          const filled = ts.confirmed + ts.pending;
+          const totalCapacity = filled + ts.open;
+          const fillRate = totalCapacity > 0 ? Math.round((filled / totalCapacity) * 100) : 0;
+          return { confirmed: ts.confirmed, pending: ts.pending, declined: ts.declined, totalCapacity, open: ts.open, fillRate };
+      }
+
+      // For forward-looking filters, compute from futurePlans with the correct window
+      if (!data.futurePlans) return null;
+
       const now = new Date();
       now.setHours(0,0,0,0);
       const end = new Date(now);
-      end.setDate(end.getDate() + 30);
+      if (filter === 'Next Week') {
+          end.setDate(end.getDate() + 14); // Match analytics service: 14 days to capture upcoming Sunday
+      } else {
+          // 'Next Month' or fallback
+          end.setDate(end.getDate() + 30);
+      }
       end.setHours(23, 59, 59, 999);
 
       let confirmed = 0;
@@ -238,7 +270,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
       const fillRate = totalCapacity > 0 ? Math.round((filled / totalCapacity) * 100) : 0;
 
       return { confirmed, pending, declined, totalCapacity, open, fillRate };
-  }, [data?.futurePlans]);
+  }, [data, filter]);
 
   const filteredUpcomingPlans = useMemo<ServicePlanSnapshot[]>(() => {
       if (!data?.futurePlans) return [];
@@ -770,57 +802,16 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                     </WidgetWrapper>
                 </div>
             );
-        case 'team_breakdown':
-            const teamChartData = data.teams
-                .filter(t => (t.memberIds?.length || 0) > 0 || (t.scheduledMemberIds?.length || 0) > 0)
-                .map(t => ({
-                    name: t.name.length > 18 ? t.name.slice(0, 18) + '…' : t.name,
-                    Roster: t.memberIds?.length || 0,
-                    'Serving (Period)': t.scheduledMemberIds?.length || 0,
-                }))
-                .sort((a, b) => b['Serving (Period)'] - a['Serving (Period)'])
-                .slice(0, 12);
 
-            return (
-                <div key="team_breakdown" className="col-span-1 lg:col-span-2">
-                    <WidgetWrapper title="Team Roster Breakdown" onRemove={() => handleRemoveWidget('team_breakdown')} source="PCO Services Teams">
-                        {teamChartData.length > 0 ? (
-                            <div className="h-72">
-                                <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={1}>
-                                    <BarChart data={teamChartData} layout="vertical" margin={{ top: 0, right: 20, left: 10, bottom: 0 }}>
-                                        <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: axisColor }} />
-                                        <YAxis type="category" dataKey="name" width={110} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: axisColor }} />
-                                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={gridColor} />
-                                        <Tooltip
-                                            contentStyle={TOOLTIP_STYLE}
-                                            itemStyle={{ color: '#fff' }}
-                                            cursor={{ fill: currentTheme === 'dark' ? '#334155' : '#f8fafc' }}
-                                        />
-                                        <Legend verticalAlign="top" height={28} iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', color: axisColor }} />
-                                        <Bar dataKey="Roster" fill="#6366f1" radius={[0, 4, 4, 0]} barSize={10} />
-                                        <Bar dataKey="Serving (Period)" fill="#10b981" radius={[0, 4, 4, 0]} barSize={10} />
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
-                        ) : (
-                            <div className="h-full flex flex-col items-center justify-center text-center p-6">
-                                <div className="text-3xl mb-2 grayscale opacity-20">👥</div>
-                                <p className="text-xs font-bold text-slate-400 dark:text-slate-500">No Team Data</p>
-                                <p className="text-[10px] text-slate-400 mt-1">Sync Services data to populate team rosters.</p>
-                            </div>
-                        )}
-                    </WidgetWrapper>
-                </div>
-            );
         case 'positions':
-            if (!upcoming30DayStats) {
+            if (!positionBreakdownStats) {
                 return (
                     <div key="positions" className="col-span-1 lg:col-span-2">
-                        <WidgetWrapper title="Position Breakdown (Next 30 Days)" onRemove={() => handleRemoveWidget('positions')} source="PCO Services Plans">
+                        <WidgetWrapper title={`Position Breakdown (${positionFilterLabel})`} onRemove={() => handleRemoveWidget('positions')} source="PCO Services Plans">
                             <div className="h-full flex flex-col items-center justify-center text-center p-6">
                                 <div className="text-4xl mb-4 grayscale opacity-20">📅</div>
-                                <p className="text-slate-400 font-bold text-sm uppercase tracking-widest">No Scheduled Plans</p>
-                                <p className="text-xs text-slate-400 mt-2">No service plans found in the next 30 days to analyze.</p>
+                                <p className="text-slate-400 font-bold text-sm uppercase tracking-widest">No Plans Found</p>
+                                <p className="text-xs text-slate-400 mt-2">No service plans found for {positionFilterLabel.toLowerCase()} to analyze.</p>
                             </div>
                         </WidgetWrapper>
                     </div>
@@ -829,12 +820,12 @@ const ServicesView: React.FC<ServicesViewProps> = ({
 
             return (
                 <div key="positions" className="col-span-1 lg:col-span-2">
-                    <WidgetWrapper title="Position Breakdown (Next 30 Days)" onRemove={() => handleRemoveWidget('positions')} source="PCO Services Plans">
+                    <WidgetWrapper title={`Position Breakdown (${positionFilterLabel})`} onRemove={() => handleRemoveWidget('positions')} source="PCO Services Plans">
                         <div className="grid grid-cols-2 gap-4 h-full items-center">
                             {/* Confirmed */}
                             <div className="bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-2xl border border-emerald-100 dark:border-emerald-900/30 flex flex-col justify-center items-center text-center">
                                 <span className="text-3xl font-black text-emerald-600 dark:text-emerald-400">
-                                    {upcoming30DayStats.confirmed}
+                                    {positionBreakdownStats.confirmed}
                                 </span>
                                 <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-600/70 dark:text-emerald-400/70 mt-1">Confirmed</span>
                             </div>
@@ -842,7 +833,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                             {/* Pending */}
                             <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-2xl border border-amber-100 dark:border-amber-900/30 flex flex-col justify-center items-center text-center">
                                 <span className="text-3xl font-black text-amber-500 dark:text-amber-400">
-                                    {upcoming30DayStats.pending}
+                                    {positionBreakdownStats.pending}
                                 </span>
                                 <span className="text-[10px] font-bold uppercase tracking-widest text-amber-500/70 dark:text-amber-400/70 mt-1">Pending</span>
                             </div>
@@ -850,7 +841,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                             {/* Declined */}
                             <div className="bg-rose-50 dark:bg-rose-900/20 p-4 rounded-2xl border border-rose-100 dark:border-rose-900/30 flex flex-col justify-center items-center text-center">
                                 <span className="text-3xl font-black text-rose-500 dark:text-rose-400">
-                                    {upcoming30DayStats.declined}
+                                    {positionBreakdownStats.declined}
                                 </span>
                                 <span className="text-[10px] font-bold uppercase tracking-widest text-rose-500/70 dark:text-rose-400/70 mt-1">Declined</span>
                             </div>
@@ -858,7 +849,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                             {/* Still Needed */}
                             <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 flex flex-col justify-center items-center text-center">
                                 <span className="text-3xl font-black text-slate-600 dark:text-slate-300">
-                                    {upcoming30DayStats.open}
+                                    {positionBreakdownStats.open}
                                 </span>
                                 <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mt-1">Still Needed</span>
                             </div>
@@ -866,14 +857,14 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                         <div className="mt-4 space-y-2">
                             <div className="flex justify-between text-[10px] font-bold text-slate-500 dark:text-slate-400">
                                 <span>Fill Rate</span>
-                                <span className="text-slate-700 dark:text-slate-200">{upcoming30DayStats.fillRate}%</span>
+                                <span className="text-slate-700 dark:text-slate-200">{positionBreakdownStats.fillRate}%</span>
                             </div>
                             <div className="h-2 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden flex">
-                                <div className="h-full bg-emerald-500 transition-all" style={{ width: `${(upcoming30DayStats.confirmed / (upcoming30DayStats.totalCapacity || 1)) * 100}%` }} />
-                                <div className="h-full bg-amber-400 transition-all" style={{ width: `${(upcoming30DayStats.pending / (upcoming30DayStats.totalCapacity || 1)) * 100}%` }} />
+                                <div className="h-full bg-emerald-500 transition-all" style={{ width: `${(positionBreakdownStats.confirmed / (positionBreakdownStats.totalCapacity || 1)) * 100}%` }} />
+                                <div className="h-full bg-amber-400 transition-all" style={{ width: `${(positionBreakdownStats.pending / (positionBreakdownStats.totalCapacity || 1)) * 100}%` }} />
                             </div>
                             <p className="text-[10px] text-slate-400 font-medium text-center">
-                                Total Capacity: <span className="text-slate-600 dark:text-slate-300 font-bold">{upcoming30DayStats.totalCapacity.toLocaleString()}</span> positions across upcoming plans.
+                                Total Capacity: <span className="text-slate-600 dark:text-slate-300 font-bold">{positionBreakdownStats.totalCapacity.toLocaleString()}</span> positions across {positionFilterLabel.toLowerCase()} plans.
                             </p>
                         </div>
                     </WidgetWrapper>
