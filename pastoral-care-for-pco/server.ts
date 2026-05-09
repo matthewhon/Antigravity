@@ -24,6 +24,7 @@ import { handleInboundSms } from './backend/smsInbound';
 import { sendIndividual, sendBulk } from './backend/smsSend';
 import { handleStatusCallback } from './backend/smsWebhookStatus';
 import { startSmsCampaignScheduler } from './backend/smsCampaignScheduler';
+import { startServicesReminderScheduler } from './backend/servicesReminderScheduler';
 import { workflowEnrollList, workflowEnrollPreview } from './backend/workflowEnrollEndpoint';
 import { handleGrowDailyEmail, setupGrowIntegration, requestGrowAccess, getGrowStatus } from './backend/growIntegration';
 
@@ -769,6 +770,7 @@ Return ONLY the JSON object, no markdown, no explanation:`;
       try {
         const db = getDb();
         startSmsCampaignScheduler(db as any);
+        startServicesReminderScheduler(db as any);
       } catch (e) {
         console.warn('[SmsScheduler] Could not start scheduler:', e);
       }

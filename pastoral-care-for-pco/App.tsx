@@ -1033,8 +1033,10 @@ const App: React.FC = () => {
                 groupRiskSettings={church.groupRiskSettings}
             />
         )}
-        {(view === 'services' || view === 'services-attendance' || view === 'services-teams') && (
+        {(view === 'services' || view === 'services-attendance' || view === 'services-teams' || view === 'services-reminders') && (
             <ServicesView 
+                church={church}
+                onUpdateChurch={(updates) => { firestore.updateChurch(church.id, updates); setChurch({ ...church, ...updates }); }}
                 data={servicesData}
                 isLoading={!servicesData}
                 filter={servicesFilter}
@@ -1043,6 +1045,7 @@ const App: React.FC = () => {
                 activePage={
                     view === 'services-attendance' ? 'Attendance' :
                     view === 'services-teams'      ? 'Teams'      :
+                    view === 'services-reminders'  ? 'Reminders'  :
                     'Overview'
                 }
                 overviewWidgets={user.widgetPreferences?.['services_overview'] || getDefaultWidgets('services_overview')}

@@ -873,7 +873,20 @@ export interface ChurchNote {
 
 // --- SMS / Messaging Module ---------------------------------------------------
 
+export interface SmsServicesReminders {
+    enabled: boolean;
+    remindOnlyUnconfirmed: boolean;
+    leaderReminderEnabled: boolean;
+    leaderDaysBefore: number;
+    leaderMessageTemplate: string;
+    memberReminderEnabled: boolean;
+    memberDaysBefore: number;
+    memberMessageTemplate: string;
+}
+
 export interface SmsSettings {
+    /** Automated reminders for upcoming service plans */
+    servicesReminders?: SmsServicesReminders;
     /** Whether SMS module is enabled for this tenant */
     smsEnabled?: boolean;
     /** E.164 phone number assigned to this church, e.g. +15551234567 */
@@ -1056,7 +1069,6 @@ export interface SmsCampaign {
     sentHistory?: { sentAt: number; recipientCount: number }[];
     // Sending number override
     /** TwilioPhoneNumber doc ID to use for this campaign. Falls back to the church default number. */
-    twilioNumberId?: string | null;
     // Analytics
     recipientCount?: number;
     deliveredCount?: number;

@@ -11,6 +11,7 @@ import WidgetsController from './WidgetsController';
 import { SERVICES_OVERVIEW_WIDGETS, SERVICES_ATTENDANCE_WIDGETS, SERVICES_TEAMS_WIDGETS } from '../constants/widgetRegistry';
 import { WidgetWrapper, StatCard } from './SharedUI';
 import { syncServicesData, syncCheckInsData } from '../services/pcoSyncService'; 
+import ServicesRemindersTab from './ServicesRemindersTab';
 
 interface ServicesViewProps {
   data: ServicesDashboardData | null;
@@ -18,7 +19,7 @@ interface ServicesViewProps {
   filter: ServicesFilter;
   onFilterChange: (filter: ServicesFilter) => void;
   pcoConnected: boolean;
-  activePage?: 'Overview' | 'Attendance' | 'Teams';
+  activePage?: 'Overview' | 'Attendance' | 'Teams' | 'Reminders';
   overviewWidgets: string[];
   attendanceWidgets: string[];
   teamsWidgets: string[];
@@ -33,6 +34,8 @@ interface ServicesViewProps {
   currentTheme?: 'traditional' | 'dark';
   globalStats?: GlobalStats | null;
   churchId?: string;
+  church?: import('../types').Church;
+  onUpdateChurch?: (updates: Partial<import('../types').Church>) => void;
 }
 
 type CheckinTrendFilter = 'Last 30 Days' | 'Last Week' | 'Last Month' | 'Last Quarter' | 'Current Week' | 'Current Month' | 'Current Quarter';
@@ -65,7 +68,9 @@ const ServicesView: React.FC<ServicesViewProps> = ({
   onUpdateTheme, 
   currentTheme,
   globalStats, 
-  churchId
+  churchId,
+  church,
+  onUpdateChurch
 }) => {
   const activeTab = activePage ?? 'Overview';
   const [upcomingPlansFilter, setUpcomingPlansFilter] = useState<'7 Days' | '14 Days' | '30 Days'>('14 Days');
@@ -548,7 +553,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                                                 if (!acc[op.teamName]) acc[op.teamName] = { teamName: op.teamName, quantity: 0 };
                                                                 acc[op.teamName].quantity += op.quantity;
                                                                 return acc;
-                                                            }, {} as Record<string, { teamName: string, quantity: number }>)).map((op, idx) => {
+                                                            }, {} as Record<string, { teamName: string, quantity: number }>)).map((op: { teamName: string, quantity: number }, idx) => {
                                                                 const filledCount = plan.teamMembers?.filter(m => m.teamName === op.teamName && (m.status === 'Confirmed' || m.status === 'C')).length || 0;
                                                                 return (
                                                                 <div key={idx} className="flex justify-between items-center bg-white dark:bg-slate-800 px-2 py-1 rounded border border-slate-100 dark:border-slate-700">
@@ -1283,6 +1288,15 @@ const ServicesView: React.FC<ServicesViewProps> = ({
             );
         default: return null;
     }
+  }
+
+  if (activePage === 'Reminders') {
+    return (
+      <ServicesRemindersTab 
+        church={church} 
+        onUpdateChurch={onUpdateChurch} 
+      />
+    );
   }
 
   return (
