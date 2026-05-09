@@ -85,14 +85,9 @@ export function renderBlocksToHtml(blocks: any[], templateSettings: any, unsubsc
     const textColor = templateSettings?.textColor || '#1f2937';
     const primaryColor = templateSettings?.primaryColor || '#4f46e5';
     const fontFamily = templateSettings?.fontFamily || 'sans-serif';
-    const header = templateSettings?.header || '';
     const footer = templateSettings?.footer || '';
 
-    const headerHtml = header
-        ? `<div style="background:${primaryColor};padding:24px 32px;text-align:center;">
-             <h1 style="margin:0;color:#ffffff;font-family:${fontFamily};font-size:22px;">${header}</h1>
-           </div>`
-        : '';
+    const headerHtml = '';
 
     const footerHtml = footer
         ? `<div style="padding:16px 32px;text-align:center;border-top:1px solid #e5e7eb;">

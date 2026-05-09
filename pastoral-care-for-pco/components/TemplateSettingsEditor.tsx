@@ -21,7 +21,6 @@ const LABEL: Record<string, string> = {
   backgroundColor: 'Background Color',
   linkColor: 'Link Color',
   fontFamily: 'Font Family',
-  header: 'Header Text',
   footer: 'Footer Text',
 };
 
@@ -286,28 +285,17 @@ export const TemplateSettingsEditor: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* ── Header & Footer ────────────────────────────────────────── */}
+      {/* ── Footer ─────────────────────────────────────────────────── */}
       <div className="p-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm">
-        <h3 className="font-bold text-xs text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-4">Header &amp; Footer</h3>
-        <div className="space-y-3">
-          <div>
-            <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Header Text</label>
-            <input
-              type="text"
-              value={settings.header || ''}
-              onChange={e => set('header', e.target.value)}
-              className="w-full text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
-            />
-          </div>
-          <div>
-            <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Footer Text</label>
-            <textarea
-              value={settings.footer || ''}
-              onChange={e => set('footer', e.target.value)}
-              rows={2}
-              className="w-full text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-none"
-            />
-          </div>
+        <h3 className="font-bold text-xs text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-4">Footer</h3>
+        <div>
+          <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Footer Text</label>
+          <textarea
+            value={settings.footer || ''}
+            onChange={e => set('footer', e.target.value)}
+            rows={2}
+            className="w-full text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-none"
+          />
         </div>
       </div>
 

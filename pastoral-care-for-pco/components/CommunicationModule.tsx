@@ -316,10 +316,9 @@ const CampaignListView: React.FC<CampaignListViewProps> = ({
                   <Mail size={18} className="text-indigo-500" />
                 </div>
                 <div className="flex-grow min-w-0">
-                  <div className="font-semibold text-slate-900 dark:text-white truncate">{c.name}</div>
+                  <div className="font-semibold text-slate-900 dark:text-white truncate">{c.subject || c.name || 'Untitled'}</div>
                   <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 flex flex-wrap gap-x-2">
-                    <span>{c.subject ? `"${c.subject}"` : 'No subject'}</span>
-                    {c.toListName && <span>· To: {c.toListName}</span>}
+                    {c.toListName && <span>To: {c.toListName}</span>}
                     <span>· {(c.blocks?.length || 0)} block{(c.blocks?.length || 0) !== 1 ? 's' : ''}</span>
                     {c.status === 'sent' && c.sentAt && (
                       <span className="text-emerald-600 dark:text-emerald-400">
