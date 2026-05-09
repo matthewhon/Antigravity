@@ -496,7 +496,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                                                     <div className="min-w-0">
                                                                         <p className="text-[10px] font-bold text-slate-700 dark:text-slate-300 truncate">{m.name}</p>
                                                                         <p className="text-[8px] text-slate-400 truncate">
-                                                                            {m.teamName}{m.teamPositionName && m.teamPositionName !== m.teamName ? ` • ${m.teamPositionName}` : ''}
+                                                                            {[m.teamName, m.teamPositionName].filter(Boolean).filter((val, i, arr) => arr.indexOf(val) === i).join(' • ')}
                                                                         </p>
                                                                     </div>
                                                                 </div>
@@ -706,7 +706,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                                                         <div className="min-w-0 mr-2">
                                                                             <p className="text-slate-600 dark:text-slate-300 truncate font-medium">{m.name}</p>
                                                                             <p className="text-[8px] text-slate-400 truncate">
-                                                                                {m.teamName}{m.teamPositionName && m.teamPositionName !== m.teamName ? ` • ${m.teamPositionName}` : ''}
+                                                                                {[m.teamName, m.teamPositionName].filter(Boolean).filter((val, i, arr) => arr.indexOf(val) === i).join(' • ')}
                                                                             </p>
                                                                         </div>
                                                                         <span className={`font-bold shrink-0 ${statusColor}`}>{displayStatus}</span>
