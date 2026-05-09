@@ -2477,6 +2477,8 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         </p>
                                     </div>
                                     <button
+                                        title="Enable SMS Messaging"
+                                        aria-label="Enable SMS Messaging"
                                         onClick={() => handleSmsChange('smsEnabled', !smsForm.smsEnabled)}
                                         className={`relative w-12 h-6 rounded-full transition-all duration-300 focus:outline-none ${
                                             smsForm.smsEnabled ? 'bg-indigo-500' : 'bg-slate-300 dark:bg-slate-600'
@@ -2645,7 +2647,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         </div>
                                         <div>
                                             <label className={labelCn}>Entity Type</label>
-                                            <select className={inputCn} value={brandForm.legalEntityType} onChange={e => setBrandForm({...brandForm, legalEntityType: e.target.value})}>
+                                            <select title="Entity Type" aria-label="Entity Type" className={inputCn} value={brandForm.legalEntityType} onChange={e => setBrandForm({...brandForm, legalEntityType: e.target.value})}>
                                                 <option value="NON_PROFIT">Non-Profit (501c3)</option>
                                                 <option value="PRIVATE_PROFIT">Private Company</option>
                                                 <option value="PUBLIC_PROFIT">Public Company</option>
@@ -2674,7 +2676,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         <div className="grid grid-cols-3 gap-2">
                                             <div className="col-span-1">
                                                 <label className={labelCn}>City</label>
-                                                <input className={inputCn} value={brandForm.city} onChange={e => setBrandForm({...brandForm, city: e.target.value})} />
+                                                <input title="City" placeholder="City" className={inputCn} value={brandForm.city} onChange={e => setBrandForm({...brandForm, city: e.target.value})} />
                                             </div>
                                             <div className="col-span-1">
                                                 <label className={labelCn}>State</label>
@@ -2682,7 +2684,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             </div>
                                             <div className="col-span-1">
                                                 <label className={labelCn}>Zip</label>
-                                                <input className={inputCn} value={brandForm.zip} onChange={e => setBrandForm({...brandForm, zip: e.target.value})} />
+                                                <input title="Zip Code" placeholder="Zip Code" className={inputCn} value={brandForm.zip} onChange={e => setBrandForm({...brandForm, zip: e.target.value})} />
                                             </div>
                                         </div>
                                         
@@ -2734,11 +2736,11 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         
                                         <div>
                                             <label className={labelCn}>Campaign Name</label>
-                                            <input className={inputCn} value={campaignForm.name} onChange={e => setCampaignForm({...campaignForm, name: e.target.value})} />
+                                            <input title="Campaign Name" placeholder="Campaign Name" className={inputCn} value={campaignForm.name} onChange={e => setCampaignForm({...campaignForm, name: e.target.value})} />
                                         </div>
                                         <div>
                                             <label className={labelCn}>Use Case</label>
-                                            <select className={inputCn} value={campaignForm.usecase} onChange={e => setCampaignForm({...campaignForm, usecase: e.target.value, subUsecases: []})}>
+                                            <select title="Use Case" aria-label="Use Case" className={inputCn} value={campaignForm.usecase} onChange={e => setCampaignForm({...campaignForm, usecase: e.target.value, subUsecases: []})}>
                                                 <option value="MIXED">Mixed / General (Recommended)</option>
                                                 <option value="LOW_VOLUME">Low Volume</option>
                                                 <option value="2FA">Two-Factor Authentication</option>
@@ -2833,6 +2835,8 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                         <label className={labelCn + ' mb-0'}>Opt-Out Confirmation Message</label>
                                                     </div>
                                                     <textarea
+                                                        title="Opt-Out Confirmation Message"
+                                                        placeholder="Opt-Out Confirmation Message"
                                                         value={campaignForm.optOutMessage}
                                                         onChange={e => setCampaignForm({...campaignForm, optOutMessage: e.target.value})}
                                                         rows={2}
@@ -2845,6 +2849,8 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                         <label className={labelCn + ' mb-0'}>Opt-In Confirmation Message</label>
                                                     </div>
                                                     <textarea
+                                                        title="Opt-In Confirmation Message"
+                                                        placeholder="Opt-In Confirmation Message"
                                                         value={campaignForm.optInMessage}
                                                         onChange={e => setCampaignForm({...campaignForm, optInMessage: e.target.value})}
                                                         rows={2}
@@ -2857,6 +2863,8 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                         <label className={labelCn + ' mb-0'}>Help Response Message</label>
                                                     </div>
                                                     <textarea
+                                                        title="Help Response Message"
+                                                        placeholder="Help Response Message"
                                                         value={campaignForm.helpMessage}
                                                         onChange={e => setCampaignForm({...campaignForm, helpMessage: e.target.value})}
                                                         rows={2}
@@ -2887,6 +2895,8 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                     <div className="relative group">
                                                         <input 
                                                             type="file" 
+                                                            title="Upload Consent Form"
+                                                            aria-label="Upload Consent Form"
                                                             accept="image/*,.pdf"
                                                             disabled={isUploadingConsent}
                                                             onChange={async (e) => {
@@ -2970,8 +2980,9 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         </div>
                                         <button
                                             role="switch"
-                                            aria-checked={!!smsForm.prefixMessagesWithName}
+                                            aria-checked={smsForm.prefixMessagesWithName ? 'true' : 'false'}
                                             aria-label="Prefix Messages with Church Name"
+                                            title="Prefix Messages with Church Name"
                                             onClick={() => handleSmsChange('prefixMessagesWithName', !smsForm.prefixMessagesWithName)}
                                             className={`ml-4 shrink-0 w-12 h-6 rounded-full p-1 transition-colors ${smsForm.prefixMessagesWithName ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'}`}
                                         >
@@ -3614,7 +3625,9 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                     </div>
                                     <button
                                         role="switch"
-                                        aria-checked={!!(church.growSettings as any)?.[key]}
+                                        aria-checked={(church.growSettings as any)?.[key] ? 'true' : 'false'}
+                                        aria-label={label}
+                                        title={label}
                                         onClick={() => onUpdateChurch && onUpdateChurch({ growSettings: { ...church.growSettings, [key]: !(church.growSettings as any)?.[key] } })}
                                         className={`ml-4 shrink-0 w-12 h-6 rounded-full p-1 transition-colors ${(church.growSettings as any)?.[key] ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'}`}
                                     >
