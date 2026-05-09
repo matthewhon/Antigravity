@@ -1181,6 +1181,7 @@ export async function executeSend(
             status: 'sent',
             sentAt: Date.now(),
             updatedAt: Date.now(),
+            recipientCount: recipients.length,
             retryCount: 0,
             lastError: null,
         });
@@ -1234,6 +1235,63 @@ export const sendEmail = async (req: any, res: any) => {
     }
 };
 
+// Helper: aggregate an array of day-stat objects returned by SendGrid /v3/categories/stats
+function aggregateCategoryStats(data: any[], campaignId: string) {
+    const aggregated = {
+        requests: 0, delivered: 0, opens: 0, unique_opens: 0,
+        clicks: 0, unique_clicks: 0, bounces: 0, spam_reports: 0,
+        unsubscribes: 0, drops: 0
+    };
+    if (!Array.isArray(data)) return aggregated;
+    data.forEach((dayData: any) => {
+        if (Array.isArray(dayData.stats)) {
+            const catStat = dayData.stats.find((s: any) => s.name === campaignId);
+            const metrics = catStat ? catStat.metrics : dayData.stats[0]?.metrics;
+            if (metrics) {
+                aggregated.requests += Number(metrics.requests) || 0;
+                aggregated.delivered += Number(metrics.delivered) || 0;
+                aggregated.opens += Number(metrics.opens) || 0;
+                aggregated.unique_opens += Number(metrics.unique_opens) || 0;
+                aggregated.clicks += Number(metrics.clicks) || 0;
+                aggregated.unique_clicks += Number(metrics.unique_clicks) || 0;
+                aggregated.bounces += Number(metrics.bounces) || 0;
+                aggregated.spam_reports += Number(metrics.spam_reports) || 0;
+                aggregated.unsubscribes += Number(metrics.unsubscribes) || 0;
+                aggregated.drops += Number(metrics.drops) || 0;
+            }
+        }
+    });
+    return aggregated;
+}
+
+// Helper: fetch category stats from SendGrid, optionally on-behalf-of a subuser
+async function fetchCategoryStats(
+    apiKey: string, campaignId: string, startDate: string, subuserId?: string
+): Promise<{ ok: boolean; data: any[]; status: number; error?: string }> {
+    const url = new URL('https://api.sendgrid.com/v3/categories/stats');
+    url.searchParams.set('categories', campaignId);
+    url.searchParams.set('start_date', startDate);
+    url.searchParams.set('aggregated_by', 'day');
+
+    const headers: Record<string, string> = {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+    };
+    if (subuserId) {
+        headers['on-behalf-of'] = subuserId;
+    }
+
+    const sgRes = await fetch(url.toString(), { method: 'GET', headers });
+
+    if (!sgRes.ok) {
+        const body = await sgRes.text();
+        return { ok: false, data: [], status: sgRes.status, error: body };
+    }
+
+    const data = await sgRes.json();
+    return { ok: true, data: Array.isArray(data) ? data : [], status: sgRes.status };
+}
+
 export const getEmailStats = async (req: any, res: any) => {
     const db = getDb();
     
@@ -1254,24 +1312,29 @@ export const getEmailStats = async (req: any, res: any) => {
     try {
         const log = createServerLogger(db);
 
-        // 1. Get Campaign to identify Start Date
+        // 1. Get Campaign to identify Start Date + Firestore-level send info
         const campaignSnap = await db.collection('email_campaigns').doc(campaignId).get();
         if (!campaignSnap.exists) {
             return res.status(404).json({ error: 'Campaign not found' });
         }
         const campaign = campaignSnap.data();
         
-        // SendGrid requires start_date in YYYY-MM-DD and only allows up to 30 days of retention
+        // SendGrid category stats are available for the previous 13 months
         const timeToUse = campaign.sentAt || campaign.createdAt || Date.now();
         let startDateObj = new Date(timeToUse);
         
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        if (startDateObj < thirtyDaysAgo) {
-            startDateObj = thirtyDaysAgo;
+        // Clamp to 13 months ago (SendGrid's max retention for category stats)
+        const thirteenMonthsAgo = new Date();
+        thirteenMonthsAgo.setMonth(thirteenMonthsAgo.getMonth() - 13);
+        if (startDateObj < thirteenMonthsAgo) {
+            startDateObj = thirteenMonthsAgo;
         }
         
         const startDate = startDateObj.toISOString().split('T')[0];
+
+        // Firestore-level campaign data for fallback info
+        const recipientCount = campaign.recipientCount || campaign.deliveredCount || 0;
+        const sentAt = campaign.sentAt || null;
 
         // 2. Load system settings (global API key)
         const settingsSnap = await db.doc('system/settings').get();
@@ -1288,76 +1351,81 @@ export const getEmailStats = async (req: any, res: any) => {
         const tenantEmail = churchData.emailSettings || {};
         const subuserId: string | undefined = tenantEmail.sendGridSubuserId || undefined;
 
-        // 4. Fetch Stats from SendGrid API
-        const url = new URL(`https://api.sendgrid.com/v3/categories/stats`);
-        url.searchParams.set('categories', campaignId);
-        url.searchParams.set('start_date', startDate);
-        url.searchParams.set('aggregated_by', 'day');
-
-        const headers: Record<string, string> = {
-            Authorization: `Bearer ${globalApiKey}`,
-            'Content-Type': 'application/json',
+        // 4. Fetch Stats from SendGrid — try BOTH subuser and parent account
+        //    Emails are sent with on-behalf-of (subuser), so category stats should live
+        //    on the subuser. However, some API key configurations only allow parent-level
+        //    access to category stats. We try the subuser first, then fall back to parent.
+        let statsSource = 'none';
+        let aggregated = {
+            requests: 0, delivered: 0, opens: 0, unique_opens: 0,
+            clicks: 0, unique_clicks: 0, bounces: 0, spam_reports: 0,
+            unsubscribes: 0, drops: 0
         };
+
+        // Attempt 1: Query as subuser (where categories should be registered)
         if (subuserId) {
-            headers['on-behalf-of'] = subuserId;
-        }
+            const subuserResult = await fetchCategoryStats(globalApiKey, campaignId, startDate, subuserId);
+            log.info(
+                `[SendGrid Stats] Subuser query (${subuserId}) for ${campaignId}: status=${subuserResult.status}, ` +
+                `records=${subuserResult.data.length}, raw=${JSON.stringify(subuserResult.data).substring(0, 500)}`,
+                'system', { campaignId, subuserId }, churchId
+            );
 
-        const sgRes = await fetch(url.toString(), { method: 'GET', headers });
-
-        if (!sgRes.ok) {
-            const body = await sgRes.text();
-            if (sgRes.status === 404 && body.includes('category does not exist')) {
-                return res.json({
-                    success: true,
-                    stats: {
-                        requests: 0, delivered: 0, opens: 0, unique_opens: 0,
-                        clicks: 0, unique_clicks: 0, bounces: 0, spam_reports: 0,
-                        unsubscribes: 0, drops: 0
-                    }
-                });
-            }
-            throw new Error(`SendGrid API error: ${sgRes.status} - ${body}`);
-        }
-
-        const data = await sgRes.json();
-        log.info(`[SendGrid Stats] Response for ${campaignId}: ${JSON.stringify(data)}`, 'system', { campaignId }, churchId);
-        
-        // Aggregate daily data over the returned period
-        const aggregated = {
-            requests: 0,
-            delivered: 0,
-            opens: 0,
-            unique_opens: 0,
-            clicks: 0,
-            unique_clicks: 0,
-            bounces: 0,
-            spam_reports: 0,
-            unsubscribes: 0,
-            drops: 0
-        };
-
-        if (Array.isArray(data)) {
-            data.forEach((dayData: any) => {
-                if (Array.isArray(dayData.stats)) {
-                    const catStat = dayData.stats.find((s: any) => s.name === campaignId);
-                    const metrics = catStat ? catStat.metrics : dayData.stats[0]?.metrics;
-                    if (metrics) {
-                        aggregated.requests += Number(metrics.requests) || 0;
-                        aggregated.delivered += Number(metrics.delivered) || 0;
-                        aggregated.opens += Number(metrics.opens) || 0;
-                        aggregated.unique_opens += Number(metrics.unique_opens) || 0;
-                        aggregated.clicks += Number(metrics.clicks) || 0;
-                        aggregated.unique_clicks += Number(metrics.unique_clicks) || 0;
-                        aggregated.bounces += Number(metrics.bounces) || 0;
-                        aggregated.spam_reports += Number(metrics.spam_reports) || 0;
-                        aggregated.unsubscribes += Number(metrics.unsubscribes) || 0;
-                        aggregated.drops += Number(metrics.drops) || 0;
-                    }
+            if (subuserResult.ok && subuserResult.data.length > 0) {
+                aggregated = aggregateCategoryStats(subuserResult.data, campaignId);
+                const hasData = aggregated.requests > 0 || aggregated.delivered > 0;
+                if (hasData) {
+                    statsSource = 'subuser';
                 }
-            });
+            }
         }
 
-        res.json({ success: true, stats: aggregated });
+        // Attempt 2: Query as parent account (fallback if subuser had no data)
+        if (statsSource === 'none') {
+            const parentResult = await fetchCategoryStats(globalApiKey, campaignId, startDate);
+            log.info(
+                `[SendGrid Stats] Parent query for ${campaignId}: status=${parentResult.status}, ` +
+                `records=${parentResult.data.length}, raw=${JSON.stringify(parentResult.data).substring(0, 500)}`,
+                'system', { campaignId }, churchId
+            );
+
+            if (parentResult.ok && parentResult.data.length > 0) {
+                aggregated = aggregateCategoryStats(parentResult.data, campaignId);
+                const hasData = aggregated.requests > 0 || aggregated.delivered > 0;
+                if (hasData) {
+                    statsSource = 'parent';
+                }
+            }
+
+            // If parent also returned an error, log it
+            if (!parentResult.ok) {
+                log.warn(
+                    `[SendGrid Stats] Both subuser and parent queries failed for ${campaignId}. ` +
+                    `Parent error: ${parentResult.status} - ${parentResult.error?.substring(0, 300)}`,
+                    'system', { campaignId }, churchId
+                );
+            }
+        }
+
+        log.info(
+            `[SendGrid Stats] Final result for ${campaignId}: source=${statsSource}, ` +
+            `delivered=${aggregated.delivered}, opens=${aggregated.opens}, clicks=${aggregated.clicks}`,
+            'system', { campaignId, statsSource }, churchId
+        );
+
+        // 5. Return stats + diagnostic info
+        //    If SendGrid has no category data yet (empty array = processing delay),
+        //    include Firestore-level campaign info so the UI can show something useful.
+        res.json({
+            success: true,
+            stats: aggregated,
+            source: statsSource,
+            campaign: {
+                recipientCount,
+                sentAt,
+                sentAgo: sentAt ? `${Math.round((Date.now() - sentAt) / (1000 * 60 * 60))}h ago` : null,
+            }
+        });
     } catch (e: any) {
         res.status(500).json({ error: e.message || 'Failed to fetch email statistics' });
     }

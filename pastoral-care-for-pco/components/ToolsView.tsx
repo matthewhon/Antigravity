@@ -549,6 +549,7 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
   const [lastSaved, setLastSaved] = useState<number | null>(null);
 
   const [emailStats, setEmailStats] = useState<any>(null);
+  const [statsMetadata, setStatsMetadata] = useState<any>(null);
   const [loadingStats, setLoadingStats] = useState(false);
   const [statsError, setStatsError] = useState<string | null>(null);
 
@@ -568,6 +569,7 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
           .then(res => res.json().then(data => {
               if (!res.ok) throw new Error(data.error);
               setEmailStats(data.stats);
+              setStatsMetadata({ source: data.source, campaign: data.campaign });
           }))
           .catch(err => setStatsError(err.message))
           .finally(() => setLoadingStats(false));
@@ -1138,8 +1140,28 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
               ) : (
                 <div className="bg-white dark:bg-slate-800 rounded-xl p-8 text-center text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 shadow-sm">
                   <BarChart2 size={32} className="mx-auto mb-3 opacity-30" />
-                  <p className="font-medium text-slate-700 dark:text-slate-300">No data available</p>
-                  <p className="text-sm mt-1 max-w-sm mx-auto">Either this campaign was sent before stats tracking was enabled, or SendGrid has not processed the data yet.</p>
+                  <p className="font-medium text-slate-700 dark:text-slate-300">Engagement data not yet available</p>
+                  {statsMetadata?.campaign?.recipientCount > 0 ? (
+                    <div className="mt-3 space-y-2">
+                      <p className="text-sm">
+                        This campaign was sent to <span className="font-semibold text-slate-700 dark:text-slate-300">{statsMetadata.campaign.recipientCount.toLocaleString()}</span> recipients
+                        {statsMetadata.campaign.sentAgo ? ` (${statsMetadata.campaign.sentAgo})` : ''}.
+                      </p>
+                      <p className="text-xs text-slate-400 max-w-md mx-auto">
+                        SendGrid category statistics can take up to 48 hours to process. Open & click tracking data will appear here once SendGrid has finished processing.
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-sm mt-1 max-w-sm mx-auto">
+                      SendGrid category statistics can take up to 48 hours to process after an email is sent. Check back later.
+                    </p>
+                  )}
+                  <button
+                    onClick={() => { setEmailStats(null); setStatsMetadata(null); setStatsError(null); }}
+                    className="mt-4 px-4 py-2 text-xs font-medium bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition"
+                  >
+                    ↻ Refresh Stats
+                  </button>
                 </div>
               )}
             </div>
