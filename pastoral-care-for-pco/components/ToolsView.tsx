@@ -543,7 +543,7 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
   const [openSection, setOpenSection] = useState<string | null>('to');
   const [pcoLists, setPcoLists] = useState<PcoList[]>([]);
   const [pcoGroups, setPcoGroups] = useState<{ id: string; name: string; memberCount: number }[]>([]);
-  const [toTab, setToTab] = useState<'lists' | 'groups'>('lists');
+  const [toTab, setToTab] = useState<'lists' | 'groups'>(initialCampaign.toGroupId ? 'groups' : 'lists');
   const [loadingLists, setLoadingLists] = useState(false);
   const [loadingGroups, setLoadingGroups] = useState(false);
   const [lastSaved, setLastSaved] = useState<number | null>(null);
@@ -630,7 +630,7 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
   const isToComplete = !!(localCampaign.toListId || localCampaign.toGroupId);
   const toRecipientLabel = localCampaign.toGroupName
     ? `Group: ${localCampaign.toGroupName}`
-    : localCampaign.toListName || localCampaign.toListId || '';
+    : localCampaign.toListName ? `List: ${localCampaign.toListName}` : localCampaign.toListId || '';
   const isFromComplete = !!(localCampaign.fromName && localCampaign.fromEmail);
   const isSubjectComplete = !!(localCampaign.subject?.trim());
   const isSendTimeComplete = !!(localCampaign.sendAt !== undefined);
