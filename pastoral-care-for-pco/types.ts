@@ -878,6 +878,17 @@ export interface ServicesReminderSchedule {
     messageTemplate: string;
 }
 
+export interface EscalationContact {
+    name: string;
+    phone: string; // E.164 or raw digits
+}
+
+export interface EscalationRule {
+    daysBefore: number;
+    messageTemplate: string;
+    contacts: EscalationContact[];
+}
+
 export interface SmsServicesReminders {
     enabled: boolean;
     remindOnlyUnconfirmed: boolean;
@@ -891,6 +902,15 @@ export interface SmsServicesReminders {
     leaderReminders?: ServicesReminderSchedule[];
     memberReminders?: ServicesReminderSchedule[];
     
+    // Scheduling Reminder for Leaders (remind leader to schedule the team in advance)
+    leaderSchedulingReminderEnabled?: boolean;
+    leaderSchedulingReminders?: ServicesReminderSchedule[];
+    leaderSchedulingReminderTemplate?: string; // legacy single template fallback
+
+    // Escalation Contacts for Understaffed Teams
+    escalationEnabled?: boolean;
+    escalationRules?: EscalationRule[];
+
     // Warnings for Leaders
     leaderWarningUnderstaffedEnabled?: boolean;
     leaderWarningUnderstaffedTemplate?: string;

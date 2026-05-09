@@ -170,7 +170,44 @@ export async function runServicesReminderScanner(db: any): Promise<void> {
                     }
                     const isLeaderDay = leaderDays.has(daysDiff);
 
-                    // 1. Understaffed Warning (sent to leaders)
+                    // ── 0. Scheduling Reminder (remind leader to build schedule) ──
+                    if (reminders.leaderSchedulingReminderEnabled) {
+                        const schedulingList = (reminders.leaderSchedulingReminders && reminders.leaderSchedulingReminders.length > 0)
+                            ? reminders.leaderSchedulingReminders
+                            : (reminders.leaderSchedulingReminderTemplate 
+                                ? [{ daysBefore: 14, messageTemplate: reminders.leaderSchedulingReminderTemplate }]
+                                : []);
+                        
+                        for (const sched of schedulingList) {
+                            if (daysDiff !== sched.daysBefore || !sched.messageTemplate) continue;
+                            
+                            // Send to all team leaders for every team on this plan
+                            const teamsOnPlan = new Set<string>();
+                            if (plan.teamMembers) {
+                                plan.teamMembers.forEach(m => teamsOnPlan.add(m.teamName));
+                            }
+                            // Also include teams from neededPositions (teams that may have no members yet)
+                            if (plan.neededPositions) {
+                                plan.neededPositions.forEach(n => teamsOnPlan.add(n.teamName));
+                            }
+                            
+                            for (const teamName of teamsOnPlan) {
+                                const leadersSet = teamLeadersMap.get(teamName);
+                                if (!leadersSet) continue;
+                                
+                                for (const leaderId of leadersSet) {
+                                    const role = `scheduling_${sched.daysBefore}_${teamName.replace(/[^a-zA-Z0-9]/g, '_')}`;
+                                    const historyId = `${churchId}_${planId}_${leaderId}_${role}`;
+                                    const body = resolveTemplate(sched.messageTemplate, '', serviceName, teamName, dateFormatted);
+                                    
+                                    const didSend = await sendReminder(db, churchId, planId, leaderId, role, body, historyId, log);
+                                    if (didSend === 1) sentCount++; else if (didSend === 2) deduplicatedCount++;
+                                }
+                            }
+                        }
+                    }
+
+                    // ── 1. Understaffed Warning (sent to leaders) ──
                     if (reminders.leaderWarningUnderstaffedEnabled && isLeaderDay && plan.neededPositions) {
                         for (const needed of plan.neededPositions) {
                             if (needed.quantity > 0) {
@@ -189,6 +226,70 @@ export async function runServicesReminderScanner(db: any): Promise<void> {
                                             
                                         const didSend = await sendReminder(db, churchId, planId, leaderId, role, body, historyId, log);
                                         if (didSend === 1) sentCount++; else if (didSend === 2) deduplicatedCount++;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // ── 1b. Escalation Contacts (understaffed teams → designated staff) ──
+                    if (reminders.escalationEnabled && reminders.escalationRules && plan.neededPositions) {
+                        for (const rule of reminders.escalationRules) {
+                            if (daysDiff !== rule.daysBefore) continue;
+                            if (!rule.contacts || rule.contacts.length === 0) continue;
+                            
+                            for (const needed of plan.neededPositions) {
+                                if (needed.quantity <= 0) continue;
+                                
+                                const body = (rule.messageTemplate || '')
+                                    .replace(/\{team_name\}/gi, needed.teamName)
+                                    .replace(/\{service_name\}/gi, serviceName)
+                                    .replace(/\{date\}/gi, dateFormatted)
+                                    .replace(/\{needed_count\}/gi, needed.quantity.toString());
+                                
+                                if (!body) continue;
+                                
+                                for (const contact of rule.contacts) {
+                                    const rawPhone = (contact.phone || '').replace(/\D/g, '');
+                                    const e164 = rawPhone.length === 10 ? `+1${rawPhone}` : rawPhone.length === 11 ? `+${rawPhone}` : '';
+                                    if (!e164) continue;
+                                    
+                                    const role = `escalation_${rule.daysBefore}_${needed.teamName.replace(/[^a-zA-Z0-9]/g, '_')}`;
+                                    const historyId = `${churchId}_${planId}_${e164}_${role}`;
+                                    
+                                    // Check dedup
+                                    const historyDoc = await db.collection('smsServicesSentHistory').doc(historyId).get();
+                                    if (historyDoc.exists) {
+                                        deduplicatedCount++;
+                                        continue;
+                                    }
+                                    
+                                    const personInfo = { personName: contact.name || 'Staff', email: '', phone: e164 };
+                                    
+                                    try {
+                                        const { sendBulkInternal } = await import('./smsSend.js');
+                                        const sendResult = await sendBulkInternal({
+                                            db,
+                                            churchId,
+                                            campaignId: `services_escalation_${planId}`,
+                                            phones: [e164],
+                                            body,
+                                            personMap: { [e164]: personInfo }
+                                        });
+                                        
+                                        if (sendResult.sent > 0 || sendResult.optedOut > 0) {
+                                            await db.collection('smsServicesSentHistory').doc(historyId).set({
+                                                id: historyId,
+                                                churchId,
+                                                planId,
+                                                personId: `escalation_${contact.name}`,
+                                                role,
+                                                sentAt: Date.now()
+                                            });
+                                            sentCount++;
+                                        }
+                                    } catch (err: any) {
+                                        log.warn(`[ServicesReminder] Escalation send failed to ${e164}: ${err.message}`, 'system', { churchId, planId }, churchId);
                                     }
                                 }
                             }

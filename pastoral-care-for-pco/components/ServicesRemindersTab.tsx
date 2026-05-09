@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Church, SmsServicesReminders } from '../types';
+import { Church, SmsServicesReminders, EscalationRule } from '../types';
 
 interface Props {
   church?: Church;
@@ -20,6 +20,14 @@ const defaultReminders: SmsServicesReminders = {
   ],
   memberReminders: [
     { daysBefore: 3, messageTemplate: "Hi {name}, you are scheduled for {team_name} for {service_name} on {date}. Please confirm your status in PCO!" }
+  ],
+  leaderSchedulingReminderEnabled: false,
+  leaderSchedulingReminders: [
+    { daysBefore: 14, messageTemplate: "Hi {name}, {service_name} is coming up on {date}. Please make sure you have scheduled your {team_name} team in PCO!" }
+  ],
+  escalationEnabled: false,
+  escalationRules: [
+    { daysBefore: 3, messageTemplate: "URGENT: {team_name} for {service_name} on {date} still needs {needed_count} more people. Please help coordinate coverage.", contacts: [] }
   ],
   leaderWarningUnderstaffedEnabled: false,
   leaderWarningUnderstaffedTemplate: "Warning: {team_name} for {service_name} on {date} still needs {needed_count} more people. Please check PCO.",
@@ -71,28 +79,36 @@ const ServicesRemindersTab: React.FC<Props> = ({ church, onUpdateChurch }) => {
     return [{ daysBefore: settings.memberDaysBefore || 3, messageTemplate: settings.memberMessageTemplate || "" }];
   };
 
-  const updateReminder = (role: 'leader' | 'member', index: number, field: 'daysBefore' | 'messageTemplate', value: any) => {
-    const list = role === 'leader' ? getLeaderReminders() : getMemberReminders();
+  const getSchedulingReminders = () => {
+    if (settings.leaderSchedulingReminders && settings.leaderSchedulingReminders.length > 0) return settings.leaderSchedulingReminders;
+    return [{ daysBefore: 14, messageTemplate: settings.leaderSchedulingReminderTemplate || "Hi {name}, {service_name} is coming up on {date}. Please make sure you have scheduled your {team_name} team in PCO!" }];
+  };
+
+  const updateReminder = (role: 'leader' | 'member' | 'scheduling', index: number, field: 'daysBefore' | 'messageTemplate', value: any) => {
+    const list = role === 'leader' ? getLeaderReminders() : role === 'member' ? getMemberReminders() : getSchedulingReminders();
     const updated = [...list];
     updated[index] = { ...updated[index], [field]: value };
-    updateSetting(role === 'leader' ? 'leaderReminders' : 'memberReminders', updated);
+    const key = role === 'leader' ? 'leaderReminders' : role === 'member' ? 'memberReminders' : 'leaderSchedulingReminders';
+    updateSetting(key, updated);
   };
 
-  const addReminder = (role: 'leader' | 'member') => {
-    const list = role === 'leader' ? getLeaderReminders() : getMemberReminders();
-    const updated = [...list, { daysBefore: 1, messageTemplate: "" }];
-    updateSetting(role === 'leader' ? 'leaderReminders' : 'memberReminders', updated);
+  const addReminder = (role: 'leader' | 'member' | 'scheduling') => {
+    const list = role === 'leader' ? getLeaderReminders() : role === 'member' ? getMemberReminders() : getSchedulingReminders();
+    const updated = [...list, { daysBefore: role === 'scheduling' ? 14 : 1, messageTemplate: "" }];
+    const key = role === 'leader' ? 'leaderReminders' : role === 'member' ? 'memberReminders' : 'leaderSchedulingReminders';
+    updateSetting(key, updated);
   };
 
-  const removeReminder = (role: 'leader' | 'member', index: number) => {
-    const list = role === 'leader' ? getLeaderReminders() : getMemberReminders();
+  const removeReminder = (role: 'leader' | 'member' | 'scheduling', index: number) => {
+    const list = role === 'leader' ? getLeaderReminders() : role === 'member' ? getMemberReminders() : getSchedulingReminders();
     const updated = list.filter((_, i) => i !== index);
-    updateSetting(role === 'leader' ? 'leaderReminders' : 'memberReminders', updated);
+    const key = role === 'leader' ? 'leaderReminders' : role === 'member' ? 'memberReminders' : 'leaderSchedulingReminders';
+    updateSetting(key, updated);
   };
 
-  const renderReminderBlock = (role: 'leader' | 'member') => {
-    const list = role === 'leader' ? getLeaderReminders() : getMemberReminders();
-    const color = role === 'leader' ? 'indigo' : 'violet';
+  const renderReminderBlock = (role: 'leader' | 'member' | 'scheduling') => {
+    const list = role === 'leader' ? getLeaderReminders() : role === 'member' ? getMemberReminders() : getSchedulingReminders();
+    const color = role === 'leader' ? 'indigo' : role === 'member' ? 'violet' : 'teal';
     
     return (
         <div className="space-y-6">
@@ -235,7 +251,37 @@ const ServicesRemindersTab: React.FC<Props> = ({ church, onUpdateChurch }) => {
 
                     <div className={`space-y-6 ${!settings.leaderReminderEnabled ? 'opacity-40 pointer-events-none' : ''}`}>
                         {renderReminderBlock('leader')}
+                    </div>
 
+                    {/* Scheduling Reminder */}
+                    <div className="mt-8 pt-6 border-t border-slate-200 dark:border-slate-700">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-teal-100 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400 flex items-center justify-center text-base">📋</div>
+                                <div>
+                                    <h6 className="text-sm font-bold text-slate-900 dark:text-white">Scheduling Reminder</h6>
+                                    <p className="text-[10px] text-slate-500 dark:text-slate-400">Remind leaders to schedule their team for upcoming services</p>
+                                </div>
+                            </div>
+                            <label className="relative inline-flex items-center cursor-pointer">
+                                <input 
+                                    type="checkbox" 
+                                    className="sr-only peer" 
+                                    checked={settings.leaderSchedulingReminderEnabled || false}
+                                    onChange={(e) => updateSetting('leaderSchedulingReminderEnabled', e.target.checked)}
+                                />
+                                <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-teal-500"></div>
+                            </label>
+                        </div>
+                        <div className={`${!settings.leaderSchedulingReminderEnabled ? 'opacity-40 pointer-events-none hidden' : ''}`}>
+                            <div className="bg-teal-50 dark:bg-teal-900/10 border border-teal-200 dark:border-teal-800/30 p-4 rounded-xl mb-4">
+                                <p className="text-xs text-teal-800 dark:text-teal-400">💡 This sends a reminder to team leaders ahead of time so they can schedule people to serve. For example, set it to 14 days before so leaders have enough time to fill their roster.</p>
+                            </div>
+                            {renderReminderBlock('scheduling')}
+                        </div>
+                    </div>
+
+                    <div className={`${!settings.leaderReminderEnabled ? 'opacity-40 pointer-events-none' : ''}`}>
                         {/* Leader Warnings */}
                         <div className="mt-8 pt-6 border-t border-slate-200 dark:border-slate-700 space-y-8">
                             <h6 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -332,6 +378,167 @@ const ServicesRemindersTab: React.FC<Props> = ({ church, onUpdateChurch }) => {
                     </div>
                 </div>
 
+            </div>
+
+            {/* Escalation Contacts Section */}
+            <div className="border border-rose-200 dark:border-rose-800/40 bg-rose-50/50 dark:bg-rose-900/10 rounded-3xl p-6">
+                <div className="flex items-center justify-between mb-6 pb-6 border-b border-rose-200 dark:border-rose-700">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 flex items-center justify-center text-lg">🚨</div>
+                        <div>
+                            <h5 className="font-bold text-slate-900 dark:text-white">Escalation Contacts</h5>
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400 max-w-md">Notify designated contacts when teams are still understaffed close to the service date</p>
+                        </div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                        <input 
+                            type="checkbox" 
+                            className="sr-only peer" 
+                            checked={settings.escalationEnabled || false}
+                            onChange={(e) => updateSetting('escalationEnabled', e.target.checked)}
+                        />
+                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-rose-500"></div>
+                    </label>
+                </div>
+
+                <div className={`space-y-6 ${!settings.escalationEnabled ? 'opacity-40 pointer-events-none' : ''}`}>
+                    <div className="bg-rose-100/50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800/30 p-4 rounded-xl">
+                        <p className="text-xs text-rose-800 dark:text-rose-400">💡 When a team still has unfilled positions at the configured time, these contacts will receive an SMS. Use this for pastors, ministry directors, or staff who can help find last-minute volunteers.</p>
+                    </div>
+
+                    {(settings.escalationRules || defaultReminders.escalationRules || []).map((rule: EscalationRule, ruleIdx: number) => (
+                        <div key={ruleIdx} className="relative p-5 border border-rose-200 dark:border-rose-700 bg-white dark:bg-slate-900 rounded-2xl shadow-sm">
+                            {(settings.escalationRules || []).length > 1 && (
+                                <button 
+                                    onClick={() => {
+                                        const rules = [...(settings.escalationRules || [])];
+                                        rules.splice(ruleIdx, 1);
+                                        updateSetting('escalationRules', rules);
+                                    }}
+                                    className="absolute top-4 right-4 w-6 h-6 rounded-full bg-slate-100 hover:bg-red-100 dark:bg-slate-800 dark:hover:bg-red-900/30 text-slate-400 hover:text-red-600 flex items-center justify-center transition-colors"
+                                >
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            )}
+
+                            <div className="mb-4">
+                                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-1.5">Trigger Timing</label>
+                                <div className="flex items-center gap-3">
+                                    <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Escalate if still understaffed</span>
+                                    <input 
+                                        type="number" 
+                                        min="1" max="30"
+                                        className="w-16 px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-sm font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-rose-500"
+                                        value={rule.daysBefore}
+                                        onChange={(e) => {
+                                            const rules = [...(settings.escalationRules || [])];
+                                            rules[ruleIdx] = { ...rules[ruleIdx], daysBefore: parseInt(e.target.value) || 1 };
+                                            updateSetting('escalationRules', rules);
+                                        }}
+                                    />
+                                    <span className="text-sm font-medium text-slate-600 dark:text-slate-400">days before service</span>
+                                </div>
+                            </div>
+
+                            <div className="mb-4">
+                                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-1.5">Escalation Message</label>
+                                <textarea 
+                                    className="w-full h-20 px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-rose-500 resize-none leading-relaxed"
+                                    value={rule.messageTemplate}
+                                    onChange={(e) => {
+                                        const rules = [...(settings.escalationRules || [])];
+                                        rules[ruleIdx] = { ...rules[ruleIdx], messageTemplate: e.target.value };
+                                        updateSetting('escalationRules', rules);
+                                    }}
+                                />
+                                <p className="text-[10px] font-bold text-slate-400 mt-1">
+                                    Tags: 
+                                    <span className="text-rose-500 bg-rose-50 dark:bg-rose-900/30 px-1 py-0.5 rounded mx-0.5">{'{team_name}'}</span>
+                                    <span className="text-rose-500 bg-rose-50 dark:bg-rose-900/30 px-1 py-0.5 rounded mx-0.5">{'{service_name}'}</span>
+                                    <span className="text-rose-500 bg-rose-50 dark:bg-rose-900/30 px-1 py-0.5 rounded mx-0.5">{'{date}'}</span>
+                                    <span className="text-rose-500 bg-rose-50 dark:bg-rose-900/30 px-1 py-0.5 rounded mx-0.5">{'{needed_count}'}</span>
+                                </p>
+                            </div>
+
+                            <div>
+                                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-2">Contacts to Notify</label>
+                                <div className="space-y-2">
+                                    {(rule.contacts || []).map((contact, cIdx) => (
+                                        <div key={cIdx} className="flex items-center gap-2">
+                                            <input 
+                                                type="text" 
+                                                placeholder="Name"
+                                                className="flex-1 px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-rose-500"
+                                                value={contact.name}
+                                                onChange={(e) => {
+                                                    const rules = [...(settings.escalationRules || [])];
+                                                    const contacts = [...(rules[ruleIdx].contacts || [])];
+                                                    contacts[cIdx] = { ...contacts[cIdx], name: e.target.value };
+                                                    rules[ruleIdx] = { ...rules[ruleIdx], contacts };
+                                                    updateSetting('escalationRules', rules);
+                                                }}
+                                            />
+                                            <input 
+                                                type="tel" 
+                                                placeholder="Phone (e.g. 555-123-4567)"
+                                                className="flex-1 px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-rose-500"
+                                                value={contact.phone}
+                                                onChange={(e) => {
+                                                    const rules = [...(settings.escalationRules || [])];
+                                                    const contacts = [...(rules[ruleIdx].contacts || [])];
+                                                    contacts[cIdx] = { ...contacts[cIdx], phone: e.target.value };
+                                                    rules[ruleIdx] = { ...rules[ruleIdx], contacts };
+                                                    updateSetting('escalationRules', rules);
+                                                }}
+                                            />
+                                            <button 
+                                                onClick={() => {
+                                                    const rules = [...(settings.escalationRules || [])];
+                                                    const contacts = [...(rules[ruleIdx].contacts || [])];
+                                                    contacts.splice(cIdx, 1);
+                                                    rules[ruleIdx] = { ...rules[ruleIdx], contacts };
+                                                    updateSetting('escalationRules', rules);
+                                                }}
+                                                className="w-6 h-6 rounded-full bg-slate-100 hover:bg-red-100 dark:bg-slate-800 dark:hover:bg-red-900/30 text-slate-400 hover:text-red-600 flex items-center justify-center transition-colors flex-shrink-0"
+                                            >
+                                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    ))}
+                                    <button 
+                                        onClick={() => {
+                                            const rules = [...(settings.escalationRules || [])];
+                                            const contacts = [...(rules[ruleIdx].contacts || []), { name: '', phone: '' }];
+                                            rules[ruleIdx] = { ...rules[ruleIdx], contacts };
+                                            updateSetting('escalationRules', rules);
+                                        }}
+                                        className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-rose-600 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300 transition-colors pt-1"
+                                    >
+                                        <span className="w-5 h-5 rounded-full bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center text-sm leading-none">+</span>
+                                        Add Contact
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+
+                    {(settings.escalationRules || []).length < 3 && (
+                        <button 
+                            onClick={() => {
+                                const rules = [...(settings.escalationRules || []), { daysBefore: 1, messageTemplate: 'URGENT: {team_name} for {service_name} on {date} still needs {needed_count} more people.', contacts: [] }];
+                                updateSetting('escalationRules', rules);
+                            }}
+                            className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-rose-600 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300 transition-colors"
+                        >
+                            <span className="w-6 h-6 rounded-full bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center text-lg leading-none">+</span>
+                            Add another escalation rule
+                        </button>
+                    )}
+                </div>
             </div>
         </div>
       </div>
