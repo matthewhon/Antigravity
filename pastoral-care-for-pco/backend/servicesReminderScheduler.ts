@@ -161,8 +161,17 @@ export async function runServicesReminderScanner(db: any): Promise<void> {
                     const serviceName = plan.serviceTypeName || plan.seriesTitle || 'Service';
                     const dateFormatted = fmtDate(plan.sortDate);
 
+                    // Determine if today is a scheduled day for leaders
+                    const leaderDays = new Set<number>();
+                    if (reminders.leaderReminders && reminders.leaderReminders.length > 0) {
+                        reminders.leaderReminders.forEach(r => leaderDays.add(r.daysBefore));
+                    } else if (reminders.leaderDaysBefore) {
+                        leaderDays.add(reminders.leaderDaysBefore);
+                    }
+                    const isLeaderDay = leaderDays.has(daysDiff);
+
                     // 1. Understaffed Warning (sent to leaders)
-                    if (reminders.leaderWarningUnderstaffedEnabled && daysDiff === reminders.leaderDaysBefore && plan.neededPositions) {
+                    if (reminders.leaderWarningUnderstaffedEnabled && isLeaderDay && plan.neededPositions) {
                         for (const needed of plan.neededPositions) {
                             if (needed.quantity > 0) {
                                 const leadersSet = teamLeadersMap.get(needed.teamName);
@@ -196,7 +205,7 @@ export async function runServicesReminderScanner(db: any): Promise<void> {
                         const isLeader = leadersSet && leadersSet.has(personId);
                         
                         // 2. Over-scheduled Warning
-                        if (reminders.leaderWarningOverScheduledEnabled && daysDiff === reminders.leaderDaysBefore) {
+                        if (reminders.leaderWarningOverScheduledEnabled && isLeaderDay) {
                             const count = scheduleCounts30Days.get(personId) || 0;
                             const threshold = reminders.leaderWarningOverScheduledThreshold || 3;
                             if (count >= threshold && leadersSet) {
@@ -223,27 +232,39 @@ export async function runServicesReminderScanner(db: any): Promise<void> {
                             continue;
                         }
 
-                        let shouldRemind = false;
-                        let template = '';
-                        let role = '';
+                        const applicableReminders: { template: string, roleKey: string }[] = [];
                         
-                        if (isLeader && reminders.leaderReminderEnabled && daysDiff === reminders.leaderDaysBefore) {
-                            shouldRemind = true;
-                            template = reminders.leaderMessageTemplate;
-                            role = 'leader';
-                        } else if (!isLeader && reminders.memberReminderEnabled && daysDiff === reminders.memberDaysBefore) {
-                            shouldRemind = true;
-                            template = reminders.memberMessageTemplate;
-                            role = 'member';
+                        if (isLeader && reminders.leaderReminderEnabled) {
+                            const leaderList = (reminders.leaderReminders && reminders.leaderReminders.length > 0) 
+                                ? reminders.leaderReminders 
+                                : [{ daysBefore: reminders.leaderDaysBefore || 5, messageTemplate: reminders.leaderMessageTemplate || '' }];
+                            
+                            for (const r of leaderList) {
+                                if (daysDiff === r.daysBefore && r.messageTemplate) {
+                                    applicableReminders.push({ template: r.messageTemplate, roleKey: `leader_${r.daysBefore}` });
+                                }
+                            }
+                        } else if (!isLeader && reminders.memberReminderEnabled) {
+                            const memberList = (reminders.memberReminders && reminders.memberReminders.length > 0)
+                                ? reminders.memberReminders
+                                : [{ daysBefore: reminders.memberDaysBefore || 3, messageTemplate: reminders.memberMessageTemplate || '' }];
+                                
+                            for (const r of memberList) {
+                                if (daysDiff === r.daysBefore && r.messageTemplate) {
+                                    applicableReminders.push({ template: r.messageTemplate, roleKey: `member_${r.daysBefore}` });
+                                }
+                            }
                         }
                         
-                        if (!shouldRemind) continue;
+                        if (applicableReminders.length === 0) continue;
                         
-                        const historyId = `${churchId}_${planId}_${personId}_${role}`;
-                        const body = resolveTemplate(template, member.name || 'Team Member', serviceName, member.teamName, dateFormatted);
-                        
-                        const didSend = await sendReminder(db, churchId, planId, personId, role, body, historyId, log);
-                        if (didSend === 1) sentCount++; else if (didSend === 2) deduplicatedCount++;
+                        for (const rem of applicableReminders) {
+                            const historyId = `${churchId}_${planId}_${personId}_${rem.roleKey}`;
+                            const body = resolveTemplate(rem.template, member.name || 'Team Member', serviceName, member.teamName, dateFormatted);
+                            
+                            const didSend = await sendReminder(db, churchId, planId, personId, rem.roleKey, body, historyId, log);
+                            if (didSend === 1) sentCount++; else if (didSend === 2) deduplicatedCount++;
+                        }
                     }
                 }
                 

@@ -873,6 +873,11 @@ export interface ChurchNote {
 
 // --- SMS / Messaging Module ---------------------------------------------------
 
+export interface ServicesReminderSchedule {
+    daysBefore: number;
+    messageTemplate: string;
+}
+
 export interface SmsServicesReminders {
     enabled: boolean;
     remindOnlyUnconfirmed: boolean;
@@ -882,6 +887,9 @@ export interface SmsServicesReminders {
     memberReminderEnabled: boolean;
     memberDaysBefore: number;
     memberMessageTemplate: string;
+    
+    leaderReminders?: ServicesReminderSchedule[];
+    memberReminders?: ServicesReminderSchedule[];
     
     // Warnings for Leaders
     leaderWarningUnderstaffedEnabled?: boolean;
