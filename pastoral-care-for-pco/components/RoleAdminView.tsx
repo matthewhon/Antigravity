@@ -543,7 +543,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
 
   const ALL_ROLES: UserRole[] = [
     'Church Admin', 'Pastor', 'Pastor AI', 'People', 'Services',
-    'Groups', 'Giving', 'Finance', 'Pastoral Care', 'Metrics', 'Messaging', 'System Administration',
+    'Groups', 'Giving', 'Finance', 'Pastoral Care', 'Metrics', 'Messaging',
     'Email', 'Polls', 'Workflows', 'Notes'
   ];
 

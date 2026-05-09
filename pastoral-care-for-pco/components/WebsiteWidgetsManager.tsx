@@ -31,6 +31,10 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
   const [forms, setForms] = useState<any[]>([]);
   const [singleFormId, setSingleFormId] = useState<string>('');
 
+  // Popup specifics
+  const [popupUrl, setPopupUrl] = useState('');
+  const [popupText, setPopupText] = useState('Open Form');
+
   React.useEffect(() => {
     if (type === 'forms' && forms.length === 0) {
       const apiBaseUrl = process.env.NODE_ENV === 'production' 
@@ -102,6 +106,14 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
   const iframeEmbedCode = `<iframe src="${iframeUrl}" width="100%" height="800" style="border:none; border-radius:12px; overflow:hidden;" allow="clipboard-write"></iframe>`;
   const scriptEmbedCode = `<script src="${scriptUrl}" async></script>`;
 
+  const colorMap: Record<string, string> = {
+      'indigo': '#4F46E5', 'blue': '#2563EB', 'emerald': '#10B981', 'amber': '#F59E0B',
+      'red': '#EF4444', 'violet': '#8B5CF6', 'fuchsia': '#D946EF', 'rose': '#F43F5E'
+  };
+  const btnColor = colorMap[color] || '#4F46E5';
+  
+  const popupHtml = popupUrl ? `<a href="${popupUrl}" data-open-in-church-center-modal="true" style="display:inline-block; padding:12px 24px; background-color:${btnColor}; color:#ffffff; font-family:sans-serif; font-weight:bold; border-radius:8px; text-decoration:none; cursor:pointer;">${popupText || 'Open Form'}</a>\n<script src="https://js.churchcenter.com/modal/v1"></script>` : 'Please enter a Church Center URL first.';
+
   const copyToClipboard = (text: string, isScript: boolean) => {
     navigator.clipboard.writeText(text);
     if (isScript) {
@@ -149,7 +161,8 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
                 { id: 'groups', label: 'Small Groups' },
                 { id: 'registrations', label: 'Registrations' },
                 { id: 'events', label: 'Calendar/Events' },
-                { id: 'forms', label: 'Forms' }
+                { id: 'forms', label: 'Forms' },
+                { id: 'popup', label: 'Popup Modal Link' }
               ].map(opt => (
                 <button 
                   key={opt.id}
@@ -166,90 +179,98 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
             </div>
           </div>
 
-          <div>
-             <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Theme Mode</label>
-             <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-xl">
-               <button onClick={() => setTheme('light')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition ${theme==='light'?'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white':'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>Light</button>
-               <button onClick={() => setTheme('dark')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition ${theme==='dark'?'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white':'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>Dark</button>
-             </div>
-          </div>
+          {type !== 'popup' && (
+            <div>
+               <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Theme Mode</label>
+               <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-xl">
+                 <button onClick={() => setTheme('light')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition ${theme==='light'?'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white':'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>Light</button>
+                 <button onClick={() => setTheme('dark')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition ${theme==='dark'?'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white':'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>Dark</button>
+               </div>
+            </div>
+          )}
 
-          <div>
-             <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Layout</label>
-             <div className="flex gap-2">
-               {type === 'events' && (
-                 <button onClick={() => setLayout('month')} className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border transition ${layout==='month'?'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-400':'border-slate-200 text-slate-500 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
+          {type !== 'popup' && (
+            <div>
+               <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Layout</label>
+               <div className="flex gap-2">
+                 {type === 'events' && (
+                   <button onClick={() => setLayout('month')} className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border transition ${layout==='month'?'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-400':'border-slate-200 text-slate-500 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
+                     <LayoutGrid size={20} />
+                     <span className="text-[10px] uppercase font-bold tracking-widest">Month</span>
+                   </button>
+                 )}
+                 <button onClick={() => setLayout('grid')} className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border transition ${layout==='grid'?'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-400':'border-slate-200 text-slate-500 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
                    <LayoutGrid size={20} />
-                   <span className="text-[10px] uppercase font-bold tracking-widest">Month</span>
+                   <span className="text-[10px] uppercase font-bold tracking-widest">{(type === 'registrations' || type === 'events' || type === 'forms') ? 'Tiles' : 'Grid'}</span>
                  </button>
-               )}
-               <button onClick={() => setLayout('grid')} className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border transition ${layout==='grid'?'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-400':'border-slate-200 text-slate-500 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
-                 <LayoutGrid size={20} />
-                 <span className="text-[10px] uppercase font-bold tracking-widest">{(type === 'registrations' || type === 'events' || type === 'forms') ? 'Tiles' : 'Grid'}</span>
-               </button>
-               <button onClick={() => setLayout('list')} className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border transition ${layout==='list'?'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-400':'border-slate-200 text-slate-500 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
-                 <MonitorPlay size={20} />
-                 <span className="text-[10px] uppercase font-bold tracking-widest">{(type === 'registrations' || type === 'events' || type === 'forms') ? 'Detailed' : 'List'}</span>
-               </button>
-               {type === 'registrations' && (
-                 <button onClick={() => setLayout('simplified_list')} className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border transition ${layout==='simplified_list'?'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-400':'border-slate-200 text-slate-500 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
+                 <button onClick={() => setLayout('list')} className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border transition ${layout==='list'?'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-400':'border-slate-200 text-slate-500 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
                    <MonitorPlay size={20} />
-                   <span className="text-[10px] uppercase font-bold tracking-widest">Simple</span>
+                   <span className="text-[10px] uppercase font-bold tracking-widest">{(type === 'registrations' || type === 'events' || type === 'forms') ? 'Detailed' : 'List'}</span>
                  </button>
-               )}
-             </div>
-          </div>
+                 {type === 'registrations' && (
+                   <button onClick={() => setLayout('simplified_list')} className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border transition ${layout==='simplified_list'?'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-400':'border-slate-200 text-slate-500 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
+                     <MonitorPlay size={20} />
+                     <span className="text-[10px] uppercase font-bold tracking-widest">Simple</span>
+                   </button>
+                 )}
+               </div>
+            </div>
+          )}
 
-          <div>
-             <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Display Mode</label>
-             <label className="flex items-center gap-3 cursor-pointer">
-               <input 
-                 type="checkbox" 
-                 checked={autoHeight} 
-                 onChange={e => setAutoHeight(e.target.checked)}
-                 className="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 bg-white dark:bg-slate-900"
-               />
-               <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Auto Height (No Scrollbar)</span>
-             </label>
-             <p className="text-[10px] text-slate-500 mt-2 leading-relaxed">Checking this will make the widget grow to fit all its content without showing an internal scrollbar. (Recommended to use the Script Embed for this feature)</p>
-           </div>
+          {type !== 'popup' && (
+            <>
+              <div>
+                 <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Display Mode</label>
+                 <label className="flex items-center gap-3 cursor-pointer">
+                   <input 
+                     type="checkbox" 
+                     checked={autoHeight} 
+                     onChange={e => setAutoHeight(e.target.checked)}
+                     className="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 bg-white dark:bg-slate-900"
+                   />
+                   <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Auto Height (No Scrollbar)</span>
+                 </label>
+                 <p className="text-[10px] text-slate-500 mt-2 leading-relaxed">Checking this will make the widget grow to fit all its content without showing an internal scrollbar. (Recommended to use the Script Embed for this feature)</p>
+               </div>
 
-          {/* Widget Sizing Scale Slider */}
-          <div>
-             <label className="flex items-center justify-between text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">
-                Widget Size <span className="text-indigo-600 dark:text-indigo-400">{Math.round(scale * 100)}%</span>
-             </label>
-             <input 
-                type="range" 
-                min="0.75" 
-                max="1.25" 
-                step="0.05" 
-                value={scale} 
-                onChange={e => setScale(parseFloat(e.target.value))}
-                className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer dark:bg-slate-700 accent-indigo-600"
-             />
-             <div className="flex justify-between text-[10px] text-slate-400 mt-1 font-bold">
-                <span>Smaller</span>
-                <span>Default</span>
-                <span>Larger</span>
-             </div>
-          </div>
+              {/* Widget Sizing Scale Slider */}
+              <div>
+                 <label className="flex items-center justify-between text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">
+                    Widget Size <span className="text-indigo-600 dark:text-indigo-400">{Math.round(scale * 100)}%</span>
+                 </label>
+                 <input 
+                    type="range" 
+                    min="0.75" 
+                    max="1.25" 
+                    step="0.05" 
+                    value={scale} 
+                    onChange={e => setScale(parseFloat(e.target.value))}
+                    className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer dark:bg-slate-700 accent-indigo-600"
+                 />
+                 <div className="flex justify-between text-[10px] text-slate-400 mt-1 font-bold">
+                    <span>Smaller</span>
+                    <span>Default</span>
+                    <span>Larger</span>
+                 </div>
+              </div>
 
-          {/* Max Items Limit */}
-          <div>
-            <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Max Items to Display</label>
-            <input 
-              type="number" 
-              min="0"
-              placeholder="0 for unlimited" 
-              value={maxItems} 
-              onChange={e => setMaxItems(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
-            />
-            <p className="text-[10px] text-slate-500 mt-1">Leave as 0 to show all items.</p>
-          </div>
+              {/* Max Items Limit */}
+              <div>
+                <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Max Items to Display</label>
+                <input 
+                  type="number" 
+                  min="0"
+                  placeholder="0 for unlimited" 
+                  value={maxItems} 
+                  onChange={e => setMaxItems(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                />
+                <p className="text-[10px] text-slate-500 mt-1">Leave as 0 to show all items.</p>
+              </div>
+            </>
+          )}
 
-          {layout === 'grid' && (
+          {type !== 'popup' && layout === 'grid' && (
             <div>
                <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Grid Columns</label>
                <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-xl">
@@ -260,7 +281,7 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
             </div>
           )}
 
-          {(layout === 'grid' || layout === 'list') && (
+          {type !== 'popup' && (layout === 'grid' || layout === 'list') && (
             <div>
                <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Image Ratio</label>
                <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-xl">
@@ -350,6 +371,32 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
             </div>
           )}
 
+          {type === 'popup' && (
+            <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+              <div>
+                 <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Church Center URL</label>
+                 <input 
+                    type="url"
+                    placeholder="https://yourchurch.churchcenter.com/people/forms/123" 
+                    value={popupUrl}
+                    onChange={e => setPopupUrl(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                 />
+                 <p className="text-[10px] text-slate-400 mt-1">Paste any Church Center link here to make it open as a popup.</p>
+              </div>
+              <div>
+                 <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Button Text</label>
+                 <input 
+                    type="text"
+                    placeholder="Open Form" 
+                    value={popupText}
+                    onChange={e => setPopupText(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                 />
+              </div>
+            </div>
+          )}
+
           <div>
              <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Accent Color</label>
              <div className="flex flex-wrap gap-2">
@@ -376,19 +423,47 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
                  <div className="flex items-center justify-between mb-3 text-slate-500 dark:text-slate-400">
                     <span className="text-xs font-bold tracking-widest uppercase">Live Preview</span>
                  </div>
-                 <div className={`flex-1 rounded-2xl border-4 border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xl bg-white dark:bg-slate-900 ${layout === 'list' ? 'max-w-3xl mx-auto w-full' : 'w-full'}`}>
-                    <iframe 
-                      id="widget-preview"
-                      src={iframeUrl}
-                      title="Widget Preview"
-                      className="w-full h-full border-none"
-                    />
+                 <div className={`flex-1 rounded-2xl border-4 border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xl bg-white dark:bg-slate-900 flex items-center justify-center ${layout === 'list' && type !== 'popup' ? 'max-w-3xl mx-auto w-full' : 'w-full'}`}>
+                    {type === 'popup' ? (
+                        <div className="text-center p-8">
+                            <a href={popupUrl || '#'} target="_blank" rel="noreferrer" style={{ display: 'inline-block', padding: '12px 24px', backgroundColor: btnColor, color: '#ffffff', fontFamily: 'sans-serif', fontWeight: 'bold', borderRadius: '8px', textDecoration: 'none', cursor: 'pointer' }}>
+                                {popupText || 'Open Form'}
+                            </a>
+                            <p className="mt-6 max-w-sm mx-auto text-xs text-slate-400">Note: The popup won't trigger in this dashboard. When added to your real website, clicking this will dim the background and securely open the form inside a Church Center modal.</p>
+                        </div>
+                    ) : (
+                        <iframe 
+                          id="widget-preview"
+                          src={iframeUrl}
+                          title="Widget Preview"
+                          className="w-full h-full border-none"
+                        />
+                    )}
                  </div>
              </div>
 
              {/* Code Snippets */}
              <div className="shrink-0 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 p-6 space-y-4">
                 
+              {type === 'popup' ? (
+                <div className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-4 rounded-xl relative group">
+                    <span className="absolute top-0 right-0 -translate-y-1/2 translate-x-2 bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-400 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest">HTML Embed</span>
+                    <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2 mb-2">
+                        <Code size={16} className="text-slate-400" />
+                        Popup Link Snippet
+                    </h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Copy and paste this HTML anywhere on your website. It includes the button and the required Church Center modal script.</p>
+                    <div className="bg-slate-900 p-3 rounded-lg break-all text-[11px] text-slate-300 font-mono">
+                        {popupHtml}
+                    </div>
+                    <button 
+                        onClick={() => copyToClipboard(popupHtml, true)}
+                        className="absolute bottom-4 right-4 p-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition"
+                    >
+                        {copiedScript ? <CheckCircle size={16} className="text-emerald-400" /> : <Copy size={16} />}
+                    </button>
+                </div>
+              ) : (
                 <div className="flex items-start gap-4">
                     <div className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-4 rounded-xl relative group">
                         <span className="absolute top-0 right-0 -translate-y-1/2 translate-x-2 bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-400 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest">Recommended</span>
@@ -425,6 +500,7 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
                         </button>
                     </div>
                 </div>
+              )}
 
              </div>
         </div>
