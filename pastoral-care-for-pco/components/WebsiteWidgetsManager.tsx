@@ -36,7 +36,7 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
   const [popupText, setPopupText] = useState('Open Form');
 
   React.useEffect(() => {
-    if (type === 'forms' && forms.length === 0) {
+    if ((type === 'forms' || type === 'popup') && forms.length === 0) {
       const apiBaseUrl = process.env.NODE_ENV === 'production' 
         ? 'https://pastoralcare.barnabassoftware.com' 
         : 'http://localhost:8080';
@@ -162,7 +162,7 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
                 { id: 'registrations', label: 'Registrations' },
                 { id: 'events', label: 'Calendar/Events' },
                 { id: 'forms', label: 'Forms' },
-                { id: 'popup', label: 'Popup Modal Link' }
+                { id: 'popup', label: 'Pop Up Form' }
               ].map(opt => (
                 <button 
                   key={opt.id}
@@ -374,7 +374,28 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
           {type === 'popup' && (
             <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-slate-700">
               <div>
-                 <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Church Center URL</label>
+                 <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Select a Form</label>
+                 <select 
+                    value={forms.find(f => f.publicUrl === popupUrl)?.id || ''}
+                    onChange={e => {
+                        const selected = forms.find(f => f.id === e.target.value);
+                        if (selected && selected.publicUrl) {
+                            setPopupUrl(selected.publicUrl);
+                            if (popupText === 'Open Form') setPopupText(`Open ${selected.name}`);
+                        } else if (!e.target.value) {
+                            setPopupUrl('');
+                            if (popupText.startsWith('Open ')) setPopupText('Open Form');
+                        }
+                    }}
+                    className="w-full px-3 py-2 mb-4 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                 >
+                    <option value="">-- Choose from Planning Center --</option>
+                    {forms.map(f => (
+                      <option key={f.id} value={f.id}>{f.name}</option>
+                    ))}
+                 </select>
+
+                 <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Or paste a custom Church Center URL</label>
                  <input 
                     type="url"
                     placeholder="https://yourchurch.churchcenter.com/people/forms/123" 
@@ -382,7 +403,7 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
                     onChange={e => setPopupUrl(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                  />
-                 <p className="text-[10px] text-slate-400 mt-1">Paste any Church Center link here to make it open as a popup.</p>
+                 <p className="text-[10px] text-slate-400 mt-1">Select a form above or paste any Church Center link here.</p>
               </div>
               <div>
                  <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Button Text</label>
@@ -450,7 +471,7 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
                     <span className="absolute top-0 right-0 -translate-y-1/2 translate-x-2 bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-400 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest">HTML Embed</span>
                     <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2 mb-2">
                         <Code size={16} className="text-slate-400" />
-                        Popup Link Snippet
+                        Pop Up Link Snippet
                     </h4>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Copy and paste this HTML anywhere on your website. It includes the button and the required Church Center modal script.</p>
                     <div className="bg-slate-900 p-3 rounded-lg break-all text-[11px] text-slate-300 font-mono">
