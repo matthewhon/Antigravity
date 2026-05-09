@@ -495,7 +495,9 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                                                     </div>
                                                                     <div className="min-w-0">
                                                                         <p className="text-[10px] font-bold text-slate-700 dark:text-slate-300 truncate">{m.name}</p>
-                                                                        <p className="text-[8px] text-slate-400 truncate">{m.teamPositionName || m.teamName}</p>
+                                                                        <p className="text-[8px] text-slate-400 truncate">
+                                                                            {m.teamName}{m.teamPositionName && m.teamPositionName !== m.teamName ? ` • ${m.teamPositionName}` : ''}
+                                                                        </p>
                                                                     </div>
                                                                 </div>
                                                             ))}
@@ -510,7 +512,11 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                                     <p className="text-[9px] font-bold text-rose-500 uppercase tracking-widest mb-2">Open Positions</p>
                                                     {openPositions.length > 0 ? (
                                                         <div className="space-y-1.5">
-                                                            {openPositions.map((op, idx) => {
+                                                            {Object.values(openPositions.reduce((acc, op) => {
+                                                                if (!acc[op.teamName]) acc[op.teamName] = { teamName: op.teamName, quantity: 0 };
+                                                                acc[op.teamName].quantity += op.quantity;
+                                                                return acc;
+                                                            }, {} as Record<string, { teamName: string, quantity: number }>)).map((op, idx) => {
                                                                 const filledCount = plan.teamMembers?.filter(m => m.teamName === op.teamName && (m.status === 'Confirmed' || m.status === 'C')).length || 0;
                                                                 return (
                                                                 <div key={idx} className="flex justify-between items-center bg-white dark:bg-slate-800 px-2 py-1 rounded border border-slate-100 dark:border-slate-700">
@@ -669,7 +675,11 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                                         <div className="mb-4">
                                                             <p className="text-[9px] font-black uppercase text-rose-500 tracking-widest mb-2">Needs Attention</p>
                                                             <div className="flex flex-wrap gap-2">
-                                                                {plan.neededPositions.map((np, i) => {
+                                                                {Object.values(plan.neededPositions.reduce((acc, np) => {
+                                                                    if (!acc[np.teamName]) acc[np.teamName] = { teamName: np.teamName, quantity: 0 };
+                                                                    acc[np.teamName].quantity += np.quantity;
+                                                                    return acc;
+                                                                }, {} as Record<string, { teamName: string, quantity: number }>)).map((np, i) => {
                                                                     const filledCount = plan.teamMembers?.filter(m => m.teamName === np.teamName && (m.status === 'Confirmed' || m.status === 'C')).length || 0;
                                                                     return (
                                                                     <div key={i} className="flex items-center gap-1.5 bg-rose-50 dark:bg-rose-900/20 border border-rose-100 dark:border-rose-800 px-2 py-1 rounded text-[10px]">
@@ -687,19 +697,22 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                                         <div>
                                                             <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-2">Team Status</p>
                                                             <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                                                                {membersList.map((m, i) => (
+                                                                {membersList.map((m, i) => {
+                                                                    const displayStatus = m.status === 'C' ? 'Confirmed' : m.status === 'U' ? 'Unconfirmed' : m.status === 'D' ? 'Declined' : m.status;
+                                                                    const statusColor = (displayStatus === 'Confirmed') ? 'text-emerald-500' : (displayStatus === 'Pending' || displayStatus === 'Unconfirmed') ? 'text-amber-500' : 'text-rose-500';
+                                                                    
+                                                                    return (
                                                                     <div key={i} className="flex items-center justify-between text-[10px]">
                                                                         <div className="min-w-0 mr-2">
                                                                             <p className="text-slate-600 dark:text-slate-300 truncate font-medium">{m.name}</p>
-                                                                            <p className="text-[8px] text-slate-400 truncate">{m.teamPositionName || m.teamName}</p>
+                                                                            <p className="text-[8px] text-slate-400 truncate">
+                                                                                {m.teamName}{m.teamPositionName && m.teamPositionName !== m.teamName ? ` • ${m.teamPositionName}` : ''}
+                                                                            </p>
                                                                         </div>
-                                                                        <span className={`font-bold shrink-0 ${
-                                                                            m.status === 'Confirmed' ? 'text-emerald-500' : 
-                                                                            m.status === 'Pending' ? 'text-amber-500' : 
-                                                                            'text-rose-500'
-                                                                        }`}>{m.status}</span>
+                                                                        <span className={`font-bold shrink-0 ${statusColor}`}>{displayStatus}</span>
                                                                     </div>
-                                                                ))}
+                                                                    );
+                                                                })}
                                                             </div>
                                                         </div>
                                                     ) : (
