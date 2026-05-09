@@ -1,6 +1,7 @@
 import { executeSend } from './sendEmail';
 import { createServerLogger } from '../services/logService';
 import { calculateGivingAnalytics, DEFAULT_LIFECYCLE_SETTINGS } from '../services/analyticsService';
+import { syncAllData } from '../services/pcoSyncService';
 
 // ─── Analytics data refresher (server-side) ─────────────────────────────────
 
@@ -787,6 +788,15 @@ export function startEmailScheduler(db: any): void {
 
                     let finalBlocks = blocks;
                     if (hasRefreshable) {
+                        log.info(`[Scheduler] Syncing PCO data before refreshing dynamic blocks for campaign ${campaignId}`, 'system', { campaignId }, churchId);
+                        
+                        try {
+                            await syncAllData(churchId);
+                            log.info(`[Scheduler] Successfully synced PCO data for campaign ${campaignId}`, 'system', { campaignId }, churchId);
+                        } catch (syncErr: any) {
+                            log.warn(`[Scheduler] PCO sync failed before refreshing blocks for campaign ${campaignId}: ${syncErr.message}`, 'system', { campaignId }, churchId);
+                        }
+
                         log.info(`[Scheduler] Refreshing dynamic blocks for campaign ${campaignId}`, 'system', { campaignId }, churchId);
                         const { blocks: refreshed, refreshed: count } = await refreshCampaignBlocks(db, churchId, blocks);
                         finalBlocks = refreshed;
