@@ -478,3 +478,14 @@ export async function assignNumbersToCampaign(
 
     return { orderId, status };
 }
+
+/**
+ * Check the status of a specific campaign number assignment order.
+ * GET /api/relay/rest/registry/beta/campaigns/:campaignId/orders/:orderId
+ */
+export async function checkAssignmentOrder(campaignId: string, orderId: string): Promise<{ status: string; raw: any }> {
+    const result = await callRegistryApi(`/campaigns/${campaignId}/orders/${orderId}`, 'GET');
+    const status = (result.state || result.status || 'pending').toLowerCase();
+    return { status, raw: result };
+}
+

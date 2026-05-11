@@ -743,6 +743,30 @@ export const getSmsRegistrationStatus = async (req: any, res: any) => {
                                 }
                             }
                         }
+
+                        // --- POLL PENDING NUMBER ASSIGNMENTS ---
+                        const pendingDocs = numsSnap.docs.filter(d => d.data().campaignAssignmentStatus === 'pending' && d.data().campaignAssignmentOrderId);
+                        if (pendingDocs.length > 0) {
+                            const { checkAssignmentOrder } = await import('./signalwireClient');
+                            for (const d of pendingDocs) {
+                                const numData = d.data();
+                                try {
+                                    const { status } = await checkAssignmentOrder(sms.campaignId, numData.campaignAssignmentOrderId);
+                                    if (status && status !== 'pending' && status !== numData.campaignAssignmentStatus) {
+                                        const updates: any = { campaignAssignmentStatus: status };
+                                        if (status === 'active' || status === 'successful') {
+                                            updates.campaignAssigned = true;
+                                        } else if (status === 'failed' || status === 'error') {
+                                            updates.campaignAssigned = false;
+                                        }
+                                        await d.ref.update(updates);
+                                        log.info(`[getSmsRegistrationStatus] Polled assignment order ${numData.campaignAssignmentOrderId} for ${numData.phoneNumber}: updated status to ${status}`, 'system', { churchId, orderId: numData.campaignAssignmentOrderId, status }, churchId);
+                                    }
+                                } catch (pollErr: any) {
+                                    log.warn(`[getSmsRegistrationStatus] Failed to poll assignment order ${numData.campaignAssignmentOrderId}: ${pollErr.message}`, 'system', { churchId }, churchId);
+                                }
+                            }
+                        }
                     }
                 }
                 // -------------------------------------------------

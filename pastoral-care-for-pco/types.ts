@@ -468,6 +468,8 @@ export interface SystemSettings {
     enabledModules?: { pastoral: boolean, people: boolean, groups: boolean, services: boolean, giving: boolean, metrics: boolean, communication: boolean };
     allowSignups?: boolean;
     scheduledSyncTime?: string;
+    // AI Features
+    openAiApiKey?: string;
     // SendGrid Email Delivery
     sendGridApiKey?: string;
     sendGridFromEmail?: string; // Must be a verified sender in SendGrid (e.g. hello@mychurch.org)
