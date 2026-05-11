@@ -38,7 +38,7 @@ function toMmDd(dateStr?: string | null): string {
 }
 
 /** Resolve phone numbers from a PCO List or Group via the stored PCO access token. */
-async function resolvePcoRecipients(
+export async function resolvePcoRecipients(
     db: any,
     churchId: string,
     listId?: string,

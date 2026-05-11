@@ -359,14 +359,26 @@ export async function sendBulkInternal(params: {
 export const sendBulk = async (req: any, res: any) => {
     res.set('Access-Control-Allow-Origin', '*');
 
-    const { churchId, campaignId, phones, body, mediaUrls = [], sentBy, sentByName, personMap = {} } = req.body || {};
-
-    if (!churchId || !body || !Array.isArray(phones) || phones.length === 0) {
-        return res.status(400).json({ error: 'Missing churchId, body, or phones array' });
-    }
+    let { churchId, campaignId, phones = [], body, mediaUrls = [], sentBy, sentByName, personMap = {}, resolveFromList, resolveFromGroup } = req.body || {};
 
     const db = getDb();
+
+    if (!churchId || !body) {
+        return res.status(400).json({ error: 'Missing churchId or body' });
+    }
+
     try {
+        if (phones.length === 0 && (resolveFromList || resolveFromGroup)) {
+            const { resolvePcoRecipients } = await import('./smsCampaignScheduler.js');
+            const resolved = await resolvePcoRecipients(db, churchId, resolveFromList, resolveFromGroup, 'sms');
+            phones = resolved.destinations;
+            personMap = resolved.personMap;
+        }
+
+        if (!Array.isArray(phones) || phones.length === 0) {
+            return res.status(400).json({ error: 'No phone numbers provided or resolved for this campaign.' });
+        }
+
         const result = await sendBulkInternal({ db, churchId, campaignId, phones, body, mediaUrls, sentBy, sentByName, personMap });
         return res.json({ success: true, ...result });
     } catch (e: any) {
