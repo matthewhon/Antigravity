@@ -1,14 +1,4 @@
-const admin = require('firebase-admin');
-const { getFirestore } = require('firebase-admin/firestore');
-
-function getDb() {
-    if (!admin.apps.length) {
-        admin.initializeApp({
-            projectId: 'pastoral-care-for-pco',
-        });
-    }
-    return getFirestore(admin.app(), 'pcforpco');
-}
+import { getDb } from './backend/firebase';
 
 async function check() {
   const db = getDb();
