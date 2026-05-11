@@ -2079,6 +2079,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                         <button 
                             onClick={() => setActiveConv(null)} 
                             className="md:hidden p-1.5 -ml-2 rounded-full text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition shrink-0"
+                            title="Back"
                         >
                             <ArrowLeft size={20} />
                         </button>
@@ -2294,6 +2295,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                     type="file"
                                     accept="image/jpeg,image/png,image/gif,image/webp"
                                     className="hidden"
+                                    title="Attach image"
                                     onChange={handleReplyFileChange}
                                 />
                                 <div className="flex items-end gap-2">
@@ -2461,6 +2463,7 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingL
                     <select
                         value={actionType}
                         onChange={e => setActionType(e.target.value as SmsKeywordAction)}
+                        title="Action Type"
                         className="w-full text-sm font-semibold border-2 border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500"
                     >
                         <option value="static">Static Reply Message</option>
@@ -2563,6 +2566,7 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingL
                         <select
                             value={linkedPollId}
                             onChange={e => setLinkedPollId(e.target.value)}
+                            title="Linked Poll"
                             className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
                         >
                             <option value="">— Don't link a poll —</option>
@@ -4471,6 +4475,7 @@ const WorkflowMmsUploader: React.FC<{
                     type="file"
                     accept="image/jpeg,image/png,image/gif,image/webp"
                     className="hidden"
+                    title="Upload image"
                     onChange={handleFileChange}
                 />
                 <button
@@ -4567,6 +4572,7 @@ const WorkflowSmsImageAttachment: React.FC<{
                 type="file"
                 accept="image/jpeg,image/png,image/gif,image/webp"
                 className="hidden"
+                title="Upload image"
                 onChange={handleFileChange}
             />
             {mmsUrl ? (
