@@ -469,7 +469,7 @@ export interface SystemSettings {
     allowSignups?: boolean;
     scheduledSyncTime?: string;
     // AI Features
-    openAiApiKey?: string;
+    geminiApiKey?: string;
     // SendGrid Email Delivery
     sendGridApiKey?: string;
     sendGridFromEmail?: string; // Must be a verified sender in SendGrid (e.g. hello@mychurch.org)

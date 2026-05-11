@@ -3164,22 +3164,32 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             <h4 className="text-sm font-black text-slate-900 dark:text-white">Provisioned Phone Numbers</h4>
                                             <p className="text-[10px] text-slate-400 mt-0.5">SignalWire numbers assigned to this church. The default number is used for outbound replies when no inbox is specified.</p>
                                         </div>
-                                        <button
-                                            onClick={() => {
-                                                if (!profileApproved) return;
-                                                setShowAddNumber(true); setAddNumStep('search'); setAddNumResults([]); setNumError('');
-                                            }}
-                                            disabled={!profileApproved}
-                                            title={!profileApproved ? 'A Twilio-approved Customer Profile is required before requesting a phone number.' : 'Request a new phone number'}
-                                            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${
-                                                profileApproved
-                                                    ? 'bg-violet-600 hover:bg-violet-700 text-white shadow-lg shadow-violet-200 dark:shadow-violet-900/30'
-                                                    : 'bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed'
-                                            }`}
-                                        >
-                                            <span className="text-sm leading-none">{profileApproved ? '+' : '🔒'}</span>
-                                            {profileApproved ? 'Request a Number' : 'Profile Required'}
-                                        </button>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={handleCheckRegistrationStatus}
+                                                disabled={isCheckingStatus}
+                                                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
+                                                title="Check and refresh assignment status"
+                                            >
+                                                {isCheckingStatus ? '↻ Syncing...' : '↻ Refresh Status'}
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    if (!profileApproved) return;
+                                                    setShowAddNumber(true); setAddNumStep('search'); setAddNumResults([]); setNumError('');
+                                                }}
+                                                disabled={!profileApproved}
+                                                title={!profileApproved ? 'A Twilio-approved Customer Profile is required before requesting a phone number.' : 'Request a new phone number'}
+                                                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${
+                                                    profileApproved
+                                                        ? 'bg-violet-600 hover:bg-violet-700 text-white shadow-lg shadow-violet-200 dark:shadow-violet-900/30'
+                                                        : 'bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed'
+                                                }`}
+                                            >
+                                                <span className="text-sm leading-none">{profileApproved ? '+' : '🔒'}</span>
+                                                {profileApproved ? 'Request a Number' : 'Profile Required'}
+                                            </button>
+                                        </div>
                                     </div>
 
                                     {/* No approval gate needed with SignalWire flat-project model */}
@@ -3246,7 +3256,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                             if (status === 'pending') return (
                                                                 <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1 flex items-center gap-1">
                                                                     <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
-                                                                    Campaign registration pending carrier approval — SMS enabled within 24h
+                                                                    Number assignment to campaign pending carrier approval — SMS enabled within 24h
                                                                 </p>
                                                             );
                                                             if (status === 'active' || num.campaignAssigned) return (
