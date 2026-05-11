@@ -32,6 +32,7 @@ function validateRequest(signingKey: string, signature: string, webhookUrl: stri
 import { getDb } from './firebase';
 import { createServerLogger } from '../services/logService';
 import { getSignalWireSigningKey, getSmsWebhookBaseUrl } from './signalwireClient';
+import { processExecutiveAiQuery } from './executiveAiAgent';
 
 // â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -466,7 +467,16 @@ export const handleInboundSms = async (req: any, res: any) => {
                 createdAt:      now,
             });
 
-        // 4-A. SMS AI Agent â€” fire-and-forget suggestion generation
+        // 4-A. Executive AI Auto-Responder
+        if (smsSettings?.executiveAiAgentEnabled && smsSettings?.executiveAiAgentListId && personMatch?.personId) {
+            // Non-blocking
+            processExecutiveAiQuery(
+                db, log, churchId, personMatch.personId, from, body, 
+                smsSettings.executiveAiAgentListId, smsNumberId
+            ).catch(() => {});
+        }
+
+        // 4-B. SMS AI Agent â€” fire-and-forget suggestion generation
         //      Runs only when smsAgentEnabled is true and the body is not a carrier keyword.
         if (smsSettings?.smsAgentEnabled === true) {
             const churchSnap = await db.collection('churches').doc(churchId).get();

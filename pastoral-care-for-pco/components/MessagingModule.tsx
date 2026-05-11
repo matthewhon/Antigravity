@@ -7136,6 +7136,11 @@ const SmsAgentTab: React.FC<{
 }> = ({ churchId, church, currentUser, onUpdateChurch }) => {
     const isAdmin = currentUser.roles.includes('Church Admin') || currentUser.roles.includes('System Administration');
     const agentEnabled = !!(church.smsSettings?.smsAgentEnabled);
+    const execAgentEnabled = !!(church.smsSettings?.executiveAiAgentEnabled);
+    const execListId = church.smsSettings?.executiveAiAgentListId || '';
+
+    const [pcoLists, setPcoLists] = useState<{ id: string; attributes: { name: string; total_people: number } }[]>([]);
+    const [loadingLists, setLoadingLists] = useState(false);
 
     const [kb, setKb]               = useState<Partial<SmsAgentKnowledge>>({});
     const [kbLoading, setKbLoading] = useState(true);
@@ -7196,6 +7201,46 @@ const SmsAgentTab: React.FC<{
             setKbLoading(false);
         }).catch(() => setKbLoading(false));
     }, [churchId]);
+
+    useEffect(() => {
+        if (isAdmin && church.pcoConnected) {
+            setLoadingLists(true);
+            pcoService.getPeopleLists(churchId)
+                .then(raw => setPcoLists(raw))
+                .catch(e => console.error(e))
+                .finally(() => setLoadingLists(false));
+        }
+    }, [isAdmin, church.pcoConnected, churchId]);
+
+    const handleToggleExecAgent = async () => {
+        const next = !execAgentEnabled;
+        try {
+            const churchRef = doc(firebaseDb, 'churches', churchId);
+            await updateDoc(churchRef, { 'smsSettings.executiveAiAgentEnabled': next });
+            if (onUpdateChurch) onUpdateChurch({ smsSettings: { ...church.smsSettings, executiveAiAgentEnabled: next } });
+            showToast(next ? '✓ Executive AI enabled' : 'Executive AI disabled');
+        } catch {
+            showToast('Failed to update setting', 'error');
+        }
+    };
+
+    const handleExecListSelect = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const listId = e.target.value;
+        const listName = pcoLists.find(l => l.id === listId)?.attributes.name || '';
+        try {
+            const churchRef = doc(firebaseDb, 'churches', churchId);
+            await updateDoc(churchRef, { 
+                'smsSettings.executiveAiAgentListId': listId,
+                'smsSettings.executiveAiAgentListName': listName 
+            });
+            if (onUpdateChurch) onUpdateChurch({ 
+                smsSettings: { ...church.smsSettings, executiveAiAgentListId: listId, executiveAiAgentListName: listName } 
+            });
+            showToast('✓ Authorized list saved');
+        } catch {
+            showToast('Failed to save authorized list', 'error');
+        }
+    };
 
     const handleToggleAgent = async () => {
         const next = !agentEnabled;
@@ -7345,6 +7390,69 @@ Write the reply:`;
                     <div className="mt-3 flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl px-3 py-2">
                         <AlertTriangle size={13} className="shrink-0 mt-0.5" />
                         The agent is active but your knowledge base is empty. Fill in the fields below so it can give helpful, accurate replies.
+                    </div>
+                )}
+            </div>
+
+            {/* Executive Agent Toggle Card */}
+            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <p className="font-bold text-slate-900 dark:text-white text-sm">Executive AI Auto-Responder</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                            Allows authorized people to text questions about church data (giving, headcount) and get instant answers.
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                            execAgentEnabled ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400'
+                                         : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
+                        }`}>{execAgentEnabled ? 'Active' : 'Off'}</span>
+                        {isAdmin && (
+                            <button
+                                onClick={handleToggleExecAgent}
+                                title={execAgentEnabled ? 'Disable Executive AI' : 'Enable Executive AI'}
+                                className={`relative w-14 h-7 rounded-full transition-colors ${
+                                    execAgentEnabled ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'
+                                }`}
+                            >
+                                <span className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow transition-transform ${
+                                    execAgentEnabled ? 'translate-x-7' : 'translate-x-0'
+                                }`} />
+                            </button>
+                        )}
+                    </div>
+                </div>
+
+                {execAgentEnabled && (
+                    <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
+                        <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">
+                            Authorized PCO List
+                        </label>
+                        {loadingLists ? (
+                            <div className="text-xs text-slate-400 flex items-center gap-2"><Loader2 size={12} className="animate-spin" /> Loading lists from PCO...</div>
+                        ) : pcoLists.length === 0 ? (
+                            <div className="text-xs text-amber-600">No lists found in Planning Center or PCO is not connected.</div>
+                        ) : (
+                            <div className="flex items-center gap-3">
+                                <select 
+                                    value={execListId}
+                                    onChange={handleExecListSelect}
+                                    disabled={!isAdmin}
+                                    className="flex-1 max-w-sm text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                >
+                                    <option value="">-- Select a PCO List --</option>
+                                    {pcoLists.map(list => (
+                                        <option key={list.id} value={list.id}>
+                                            {list.attributes.name} ({list.attributes.total_people} people)
+                                        </option>
+                                    ))}
+                                </select>
+                                {!execListId && (
+                                    <span className="text-xs text-rose-500 font-medium">Please select a list to authorize access.</span>
+                                )}
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
