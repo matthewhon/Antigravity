@@ -419,24 +419,33 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
       if (smsSubTab !== 'numbers') return;
       setNumLoading(true);
       setNumError('');
-      import('firebase/firestore').then(({ collection, query, where, orderBy, getDocs }) => {
+      
+      let unsubscribe: () => void;
+      
+      import('firebase/firestore').then(({ collection, query, where, orderBy, onSnapshot }) => {
           const q = query(
               collection(firebaseDb, 'smsNumbers'),
               where('churchId', '==', churchId),
               orderBy('createdAt', 'asc')
           );
-          getDocs(q)
-              .then(snap => {
-                  setSmsNumbers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-              })
-              .catch(e => setNumError(e.message || 'Failed to load numbers'))
-              .finally(() => setNumLoading(false));
+          
+          unsubscribe = onSnapshot(q, (snap) => {
+              setSmsNumbers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+              setNumLoading(false);
+          }, (e) => {
+              setNumError(e.message || 'Failed to load numbers');
+              setNumLoading(false);
+          });
       });
+      
+      return () => {
+          if (unsubscribe) unsubscribe();
+      };
   }, [smsSubTab, churchId]);
 
-  // Check A2P 10DLC Compliance status automatically when entering the compliance tab
+  // Check A2P 10DLC Compliance status automatically when entering the SMS tab
   useEffect(() => {
-      if (smsSubTab !== 'compliance') return;
+      if (activeTab !== 'SMS') return;
       if (regStatus !== null) return; // Only fetch if we haven't yet
 
       const checkStatus = async () => {
@@ -458,7 +467,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
       };
       
       checkStatus();
-  }, [smsSubTab, churchId, regStatus]);
+  }, [activeTab, churchId, regStatus]);
 
 
   // Sync mail state when church prop changes
