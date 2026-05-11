@@ -709,6 +709,43 @@ export const getSmsRegistrationStatus = async (req: any, res: any) => {
                 const result = await checkCampaignStatus(churchId, sms.campaignId);
                 campaignStatus = result.status;
                 campaignRaw    = result.raw;
+
+                // --- AUTO-ASSIGN NUMBERS IF CAMPAIGN IS ACTIVE ---
+                if (campaignStatus === 'active' || campaignStatus === 'approved') {
+                    const numsSnap = await db.collection('smsNumbers').where('churchId', '==', churchId).get();
+                    if (!numsSnap.empty) {
+                        const unassignedDocs = numsSnap.docs.filter(d => {
+                            const s = d.data().campaignAssignmentStatus;
+                            return !s || s === 'not_configured' || s === 'error';
+                        });
+                        
+                        if (unassignedDocs.length > 0) {
+                            const phones = unassignedDocs.map(d => d.data().phoneNumber).filter(Boolean);
+                            if (phones.length > 0) {
+                                try {
+                                    const { assignNumbersToCampaign } = await import('./signalwireClient');
+                                    const { orderId } = await assignNumbersToCampaign(sms.campaignId, phones);
+                                    
+                                    const batch = db.batch();
+                                    unassignedDocs.forEach(d => {
+                                        batch.update(d.ref, {
+                                            campaignId: sms.campaignId,
+                                            campaignAssigned: false,
+                                            campaignAssignmentStatus: 'pending',
+                                            campaignAssignmentOrderId: orderId,
+                                            campaignAssignedAt: Date.now(),
+                                        });
+                                    });
+                                    await batch.commit();
+                                    log.info(`[getSmsRegistrationStatus] Auto-assigned ${phones.length} unassigned numbers to active campaign ${sms.campaignId}`, 'system', { churchId, campaignId: sms.campaignId, orderId }, churchId);
+                                } catch (assignErr: any) {
+                                    log.warn(`[getSmsRegistrationStatus] Auto-assign retry failed (non-fatal): ${assignErr.message}`, 'system', { churchId, campaignId: sms.campaignId }, churchId);
+                                }
+                            }
+                        }
+                    }
+                }
+                // -------------------------------------------------
             } catch (e: any) {
                 log.warn(`[getSmsRegistrationStatus] Campaign status check failed: ${e.message}`, 'system', { churchId }, churchId);
             }
