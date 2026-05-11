@@ -80,7 +80,7 @@ function extractYouTubeId(url: string): string | null {
  * Minimal HTML renderer for email blocks.
  * Converts the campaign's block array into a sendable HTML string.
  */
-export function renderBlocksToHtml(blocks: any[], templateSettings: any, unsubscribeHtml = ''): string {
+export function renderBlocksToHtml(blocks: any[], templateSettings: any, unsubscribeHtml = '', contentType?: 'blocks' | 'html' | 'text', content?: string): string {
     const bg = templateSettings?.backgroundColor || '#ffffff';
     const textColor = templateSettings?.textColor || '#1f2937';
     const primaryColor = templateSettings?.primaryColor || '#4f46e5';
@@ -95,8 +95,14 @@ export function renderBlocksToHtml(blocks: any[], templateSettings: any, unsubsc
            </div>`
         : '';
 
-    const bodyContent = (blocks || []).map((block: any) => {
-        switch (block.type) {
+    let bodyContent = '';
+    if (contentType === 'html') {
+        bodyContent = `<div style="font-family:${fontFamily};color:${textColor};font-size:15px;line-height:1.65;margin:0 0 16px;">${content || ''}</div>`;
+    } else if (contentType === 'text') {
+        bodyContent = `<div style="font-family:${fontFamily};color:${textColor};font-size:15px;line-height:1.65;margin:0 0 16px;white-space:pre-wrap;">${content || ''}</div>`;
+    } else {
+        bodyContent = (blocks || []).map((block: any) => {
+            switch (block.type) {
             case 'header': {
                 // Tiptap content is already HTML (may contain <h1>–<h3>, <p>, etc.)
                 // Wrap in a styled div so inline styles apply to child elements.
@@ -276,6 +282,7 @@ export function renderBlocksToHtml(blocks: any[], templateSettings: any, unsubsc
                 return '';
         }
     }).join('\n');
+    }
 
     return `<!DOCTYPE html>
 <html>
@@ -1164,7 +1171,9 @@ export async function executeSend(
             const personalizedHtml = renderBlocksToHtml(
                 campaign.blocks || [],
                 campaign.templateSettings || {},
-                unsubHtml
+                unsubHtml,
+                campaign.contentType,
+                campaign.content
             );
             await sgSend(
                 [{ to: recipientEmail, from: { email: fromEmail, name: fromName }, replyTo: campaign.replyTo || undefined, subject, html: personalizedHtml }],

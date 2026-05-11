@@ -134,7 +134,7 @@ const CampaignPreviewModal: React.FC<{ campaign: EmailCampaign; onClose: () => v
             </div>
           ) : (
             <div className="rounded-xl overflow-hidden shadow-lg">
-              <EmailPreview blocks={blocks} settings={settings} churchLogoUrl={churchLogoUrl} />
+              <EmailPreview blocks={blocks} settings={settings} churchLogoUrl={churchLogoUrl} contentType={campaign.contentType} content={campaign.content} />
             </div>
           )}
         </div>
@@ -636,7 +636,7 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
   const isFromComplete = !!(localCampaign.fromName && localCampaign.fromEmail);
   const isSubjectComplete = !!(localCampaign.subject?.trim());
   const isSendTimeComplete = !!(localCampaign.sendAt !== undefined);
-  const isContentComplete = (localCampaign.blocks?.length || 0) > 0;
+  const isContentComplete = (localCampaign.contentType === 'html' || localCampaign.contentType === 'text') ? !!localCampaign.content?.trim() : (localCampaign.blocks?.length || 0) > 0;
   const canSend = isFromComplete && isSubjectComplete;
 
   const scheduleMode = localCampaign.sendAt === null ? 'now' : 'schedule';
@@ -980,18 +980,45 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
               {/* Content */}
               <AccordionSection
                 id="content" title="Content" icon={<Pencil size={16} />}
-                subtitle={`${blocks.length} block${blocks.length !== 1 ? 's' : ''}`}
+                subtitle={(localCampaign.contentType === 'html' || localCampaign.contentType === 'text') ? 'Simple content' : `${blocks.length} block${blocks.length !== 1 ? 's' : ''}`}
                 isComplete={isContentComplete} isOpen={openSection === 'content'} onToggle={() => toggleSection('content')}
               >
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-600 dark:text-slate-400">{blocks.length} content block{blocks.length !== 1 ? 's' : ''}</span>
-                  <button
-                    onClick={() => setPanel('builder')}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg transition"
-                  >
-                    <Pencil size={12} /> Edit Content
-                  </button>
+                <div className="flex rounded-lg overflow-hidden border border-slate-200 dark:border-slate-600 mb-3">
+                  {(['blocks', 'html', 'text'] as const).map(type => (
+                    <button
+                      key={type}
+                      onClick={() => update({ contentType: type })}
+                      className={`flex-1 py-1.5 text-xs font-semibold capitalize transition ${
+                        (localCampaign.contentType || 'blocks') === type
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-600'
+                      }`}
+                    >
+                      {type === 'blocks' ? 'Builder' : type === 'html' ? 'HTML' : 'Text'}
+                    </button>
+                  ))}
                 </div>
+
+                {(localCampaign.contentType || 'blocks') === 'blocks' ? (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-slate-600 dark:text-slate-400">{blocks.length} content block{blocks.length !== 1 ? 's' : ''}</span>
+                    <button
+                      onClick={() => setPanel('builder')}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg transition"
+                    >
+                      <Pencil size={12} /> Edit Content
+                    </button>
+                  </div>
+                ) : (
+                  <div className="mt-2">
+                    <textarea
+                      className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 min-h-[200px]"
+                      placeholder={localCampaign.contentType === 'html' ? '<p>Write your HTML email here...</p>' : 'Write your plain text email here...'}
+                      value={localCampaign.content || ''}
+                      onChange={e => update({ content: e.target.value })}
+                    />
+                  </div>
+                )}
               </AccordionSection>
             </div>
 
@@ -1004,7 +1031,7 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
                 </button>
               </div>
               <div className="max-w-xl mx-auto">
-                <EmailPreview blocks={blocks} settings={settings} />
+                <EmailPreview blocks={blocks} settings={settings} contentType={localCampaign.contentType} content={localCampaign.content} />
               </div>
             </div>
           </div>
@@ -1059,7 +1086,7 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
               </button>
             </div>
             <div className="max-w-2xl mx-auto shadow-xl rounded-2xl overflow-hidden">
-              <EmailPreview blocks={blocks} settings={settings} churchLogoUrl={church?.logoUrl} />
+              <EmailPreview blocks={blocks} settings={settings} churchLogoUrl={church?.logoUrl} contentType={localCampaign.contentType} content={localCampaign.content} />
             </div>
           </div>
         )}

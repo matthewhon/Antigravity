@@ -92,6 +92,8 @@ interface Props {
   settings: TemplateSettings;
   /** Church-wide logo URL fallback (from Firestore Church doc). Used when settings.logoUrl is not set. */
   churchLogoUrl?: string;
+  contentType?: 'blocks' | 'text' | 'html';
+  content?: string;
 }
 
 const resolveMergeTags = (html: string) =>
@@ -205,7 +207,7 @@ const SOCIAL_LINKS: { key: keyof TemplateSettings; label: string; color: string;
 
 // ─── Main Preview Component ───────────────────────────────────────────────────
 
-export const EmailPreview: React.FC<Props> = ({ blocks, settings, churchLogoUrl }) => {
+export const EmailPreview: React.FC<Props> = ({ blocks, settings, churchLogoUrl, contentType = 'blocks', content }) => {
   useEffect(() => {
     ensureProseStyles();
     if (blocks.some(b => b.type === 'pco_groups_widget' || b.type === 'pco_registrations_widget')) {
@@ -245,8 +247,13 @@ export const EmailPreview: React.FC<Props> = ({ blocks, settings, churchLogoUrl 
       )}
 
       <div className="space-y-4">
-        {blocks.map((block) => (
-          <div key={block.id}>
+        {contentType === 'html' ? (
+          <div className="ep-prose" dangerouslySetInnerHTML={{ __html: resolveMergeTags(content || '') }} />
+        ) : contentType === 'text' ? (
+          <div style={{ whiteSpace: 'pre-wrap', fontSize: 15, lineHeight: 1.65 }}>{resolveMergeTags(content || '')}</div>
+        ) : (
+          blocks.map((block) => (
+            <div key={block.id}>
             {block.type === 'text' && (
               <div
                 className="ep-prose"
@@ -374,7 +381,7 @@ export const EmailPreview: React.FC<Props> = ({ blocks, settings, churchLogoUrl 
               />
             )}
           </div>
-        ))}
+        )))}
       </div>
 
       {/* ── Footer ─────────────────────────────────────────────────── */}

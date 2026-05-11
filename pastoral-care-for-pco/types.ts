@@ -561,6 +561,8 @@ export interface EmailCampaign {
     // Content
     subject?: string;
     blocks?: any[];
+    contentType?: 'blocks' | 'text' | 'html';
+    content?: string;
     templateSettings?: TemplateSettings;
     // Scheduling
     sendAt?: string | null;         // ISO string display value set by UI
