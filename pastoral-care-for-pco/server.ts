@@ -273,9 +273,20 @@ async function startServer() {
 
         // 3. Use Gemini to extract structured church info
         const { GoogleGenAI } = await import('@google/genai');
-        const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+        let apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+        try {
+          const db = getDb();
+          const snap = await db.doc('system/settings').get();
+          const data = snap.data() || {};
+          if (data.geminiApiKey) {
+            apiKey = data.geminiApiKey.trim();
+          }
+        } catch (dbErr) {
+          console.error('[ScanWebsite] Failed to fetch system settings:', dbErr);
+        }
+
         if (!apiKey) {
-          return res.status(500).json({ error: 'AI service not configured on server.' });
+          return res.status(500).json({ error: 'AI service not configured on server or in System Settings.' });
         }
         const ai = new GoogleGenAI({ apiKey });
 

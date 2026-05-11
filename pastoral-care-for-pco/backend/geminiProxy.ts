@@ -1,5 +1,6 @@
 
 import { GoogleGenAI } from '@google/genai';
+import { getDb } from './firebase';
 
 /**
  * POST /ai/generate
@@ -31,9 +32,19 @@ export const handleGeminiProxy = async (req: any, res: any) => {
         return res.status(400).json({ error: 'prompt is required' });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+    let apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+    try {
+        const snap = await getDb().doc('system/settings').get();
+        const data = snap.data() || {};
+        if (data.geminiApiKey) {
+            apiKey = data.geminiApiKey.trim();
+        }
+    } catch (dbErr) {
+        console.error('[GeminiProxy] Failed to fetch system settings:', dbErr);
+    }
+
     if (!apiKey) {
-        console.error('[GeminiProxy] GEMINI_API_KEY is not set on the server.');
+        console.error('[GeminiProxy] GEMINI_API_KEY is not set on the server or in System Settings.');
         return res.status(500).json({ error: 'AI service is not configured. Contact your administrator.' });
     }
 

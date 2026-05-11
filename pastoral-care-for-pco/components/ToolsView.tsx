@@ -239,8 +239,8 @@ interface CampaignListViewProps {
   onCreate: () => void;
 }
 
-const CampaignListView: React.FC<CampaignListViewProps> = ({
-  churchId, church, campaigns, isLoading, onOpen, onPreview, onDelete, onDuplicate, onCreate
+const CampaignListView: React.FC<CampaignListViewProps & { setIsQuickSendOpen: (v: boolean) => void }> = ({
+  churchId, church, campaigns, isLoading, onOpen, onPreview, onDelete, onDuplicate, onCreate, setIsQuickSendOpen
 }) => {
   const [tab, setTab] = React.useState<'all' | 'draft' | 'sent'>('all');
   const filtered = tab === 'all' ? campaigns : campaigns.filter(c => c.status === tab);
@@ -270,12 +270,20 @@ const CampaignListView: React.FC<CampaignListViewProps> = ({
             Create and send emails to your Planning Center audience
           </p>
         </div>
-        <button
-          onClick={onCreate}
-          className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition shadow-sm"
-        >
-          <Plus size={16} /> Create New
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setIsQuickSendOpen(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl transition shadow-sm"
+          >
+            <Send size={16} /> Quick Send to Group
+          </button>
+          <button
+            onClick={onCreate}
+            className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition shadow-sm"
+          >
+            <Plus size={16} /> Create Campaign
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-col lg:flex-row gap-8 items-start">
@@ -1329,6 +1337,120 @@ const SendTestModal: React.FC<SendTestModalProps> = ({ onConfirm, onCancel, isSe
   );
 };
 
+const QuickSendModal: React.FC<{
+  churchId: string;
+  church?: Church;
+  onClose: () => void;
+  onSendQuickEmail: (campaign: EmailCampaign) => Promise<void>;
+}> = ({ churchId, church, onClose, onSendQuickEmail }) => {
+  const [groupId, setGroupId] = useState('');
+  const [subject, setSubject] = useState('');
+  const [content, setContent] = useState('');
+  const [pcoGroups, setPcoGroups] = useState<{ id: string; name: string; memberCount: number }[]>([]);
+  const [loadingGroups, setLoadingGroups] = useState(true);
+  const [isSending, setIsSending] = useState(false);
+
+  useEffect(() => {
+    pcoService.getPeopleGroups()
+      .then(setPcoGroups)
+      .catch(e => console.error('Failed to load PCO groups', e))
+      .finally(() => setLoadingGroups(false));
+  }, []);
+
+  const handleSend = async () => {
+    if (!groupId || !subject.trim() || !content.trim()) return alert('Please fill all fields');
+    if (!church?.emailSettings?.fromEmail) {
+      return alert('You must configure a From Address in Mail Settings first.');
+    }
+    
+    setIsSending(true);
+    try {
+      const groupName = pcoGroups.find(g => g.id === groupId)?.name;
+      const c = newCampaign(churchId, `Quick Email: ${subject}`);
+      c.toGroupId = groupId;
+      c.toGroupName = groupName;
+      c.subject = subject;
+      c.contentType = 'html';
+      // Convert basic newlines to <br> for HTML mode to ensure it displays nicely
+      c.content = content.replace(/\n/g, '<br/>');
+      c.fromEmail = church.emailSettings.fromEmail;
+      c.fromName = church.emailSettings.fromName || church.name || '';
+      
+      await onSendQuickEmail(c);
+      onClose();
+    } catch (e: any) {
+      alert(e.message || 'Failed to send quick email.');
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-6 w-full max-w-lg mx-4 flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+        <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2 mb-1">
+          <Send size={20} className="text-emerald-500" /> Quick Email to Group
+        </h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">Send a simple email message directly to a Planning Center group.</p>
+        
+        <div className="space-y-4 overflow-y-auto flex-1 pr-2">
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Select PCO Group <span className="text-red-500">*</span></label>
+            {loadingGroups ? (
+              <div className="flex items-center gap-2 text-sm text-slate-400 py-2"><Loader2 size={14} className="animate-spin" /> Loading groups...</div>
+            ) : (
+              <select
+                className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                value={groupId}
+                onChange={e => setGroupId(e.target.value)}
+              >
+                <option value="">— Select a Planning Center Group —</option>
+                {pcoGroups.map(g => (
+                  <option key={g.id} value={g.id}>{g.name} ({g.memberCount} members)</option>
+                ))}
+              </select>
+            )}
+          </div>
+          
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Subject <span className="text-red-500">*</span></label>
+            <input
+              type="text"
+              className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              placeholder="Email subject..."
+              value={subject}
+              onChange={e => setSubject(e.target.value)}
+            />
+          </div>
+          
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Message Content <span className="text-red-500">*</span></label>
+            <textarea
+              className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-3 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 min-h-[200px]"
+              placeholder="Write your message here..."
+              value={content}
+              onChange={e => setContent(e.target.value)}
+            />
+          </div>
+        </div>
+        
+        <div className="flex gap-3 pt-5 mt-2 border-t border-slate-100 dark:border-slate-700">
+          <button onClick={onClose} className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-xl transition font-medium">
+            Cancel
+          </button>
+          <button
+            onClick={handleSend}
+            disabled={isSending || !groupId || !subject.trim() || !content.trim()}
+            className="flex-1 px-4 py-2.5 text-sm text-white bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-400 rounded-xl transition font-semibold flex items-center justify-center gap-2"
+          >
+            {isSending ? <><Loader2 size={16} className="animate-spin" /> Sending to Group…</> : <><Send size={16} /> Send Email Now</>}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const ToolsView: React.FC<{ churchId: string; church?: Church;
 currentUserId?: string; currentUser?: User; onUpdateChurch?: (updates: Partial<Church>) => void;
 /** When provided by a parent route, controls which tab is shown and hides the internal tab bar */
@@ -1344,6 +1466,7 @@ currentUser, onUpdateChurch, activePage, smsTab }) => {
   const [previewCampaign, setPreviewCampaign] = useState<EmailCampaign | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showNewModal, setShowNewModal] = useState(false);
+  const [showQuickSendModal, setShowQuickSendModal] = useState(false);
   const [duplicateCampaignState, setDuplicateCampaignState] = useState<EmailCampaign | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [showTestModal, setShowTestModal] = useState(false);
@@ -1507,6 +1630,20 @@ currentUser, onUpdateChurch, activePage, smsTab }) => {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
     return data;
+  };
+
+  const handleSendQuickEmail = async (campaign: EmailCampaign) => {
+    // 1. Save campaign to firestore
+    await firestore.saveEmailCampaign(campaign);
+    setCampaigns(prev => [campaign, ...prev]);
+    
+    // 2. Trigger send
+    const result = await callSendApi(campaign.id);
+    
+    // 3. Update local state
+    const merged = { ...campaign, status: 'sent' as const, sentAt: Date.now() };
+    setCampaigns(prev => prev.map(c => c.id === merged.id ? merged : c));
+    showToast(result.message || 'Quick email sent successfully!');
   };
 
   const handleSend = async () => {
@@ -1939,6 +2076,16 @@ currentUser, onUpdateChurch, activePage, smsTab }) => {
         <NewCampaignModal onConfirm={handleCreate} onCancel={() => setShowNewModal(false)} />
       )}
 
+      {/* Quick Send Modal */}
+      {showQuickSendModal && (
+        <QuickSendModal
+          churchId={churchId}
+          church={church}
+          onClose={() => setShowQuickSendModal(false)}
+          onSendQuickEmail={handleSendQuickEmail}
+        />
+      )}
+
       {/* Duplicate campaign modal */}
       {duplicateCampaignState && (
         <NewCampaignModal
@@ -1978,6 +2125,7 @@ currentUser, onUpdateChurch, activePage, smsTab }) => {
           onDelete={handleDelete}
           onDuplicate={handleDuplicate}
           onCreate={() => setShowNewModal(true)}
+          setIsQuickSendOpen={setShowQuickSendModal}
         />
       )}
         </>
