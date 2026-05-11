@@ -261,6 +261,9 @@ export const syncPeopleData = async (churchId: string) => {
                 personPhoneNumbers[0] ||
                 null;
 
+            const rawPhone = primaryPhone ? primaryPhone.number.replace(/\D/g, '') : '';
+            const e164Phone = rawPhone.length === 10 ? `+1${rawPhone}` : rawPhone.length === 11 ? `+${rawPhone}` : null;
+
             return {
                 id: p.id,
                 churchId,
@@ -284,6 +287,7 @@ export const syncPeopleData = async (churchId: string) => {
                 // ── Phone ───────────────────────────────────────────────────────
                 /** Canonical phone number for SMS (E.164 or formatted). Null if none on file. */
                 phone: primaryPhone ? primaryPhone.number : null,
+                e164Phone,
                 phoneNumbers: personPhoneNumbers,
                 // ── Addresses ──────────────────────────────────────────────────
                 addresses: (included || [])

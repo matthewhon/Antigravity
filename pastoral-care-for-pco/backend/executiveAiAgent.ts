@@ -20,17 +20,17 @@ export async function processExecutiveAiQuery(
         if (!churchSnap.exists) return;
         const churchData = churchSnap.data()!;
         
-        const token = churchData.pcoAccessToken;
-        if (!token) {
-            log.warn(`[Executive AI] Cannot verify PCO list: No PCO token for church ${churchId}`, 'system', { churchId }, churchId);
-            return;
-        }
-
-        // We check if the person is in the list
-        const pcoListRes = await fetch(`https://api.planningcenteronline.com/people/v2/lists/${listId}/people?where[id]=${personId}`, {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
+        const port = process.env.PORT || 8080;
+        const proxyUrl = `http://localhost:${port}/pco/proxy`;
+        
+        const pcoListRes = await fetch(proxyUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                churchId,
+                url: `https://api.planningcenteronline.com/people/v2/lists/${listId}/people?where[id]=${personId}`,
+                method: 'GET'
+            })
         });
 
         if (!pcoListRes.ok) {

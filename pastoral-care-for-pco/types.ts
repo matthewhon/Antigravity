@@ -179,6 +179,7 @@ export interface PcoPerson {
     name: string;
     email?: string;
     phone?: string;
+    e164Phone?: string | null;
     avatar?: string | null;
     membership?: string | null;
     status?: string | null;

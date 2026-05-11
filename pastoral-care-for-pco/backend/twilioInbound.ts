@@ -18,7 +18,7 @@ async function matchPersonByPhone(db: any, churchId: string, phone: string): Pro
     try {
         const snap = await db.collection('people')
             .where('churchId', '==', churchId)
-            .where('phone', '==', phone)
+            .where('e164Phone', '==', phone)
             .limit(1)
             .get();
         if (snap.empty) return null;

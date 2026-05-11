@@ -232,6 +232,56 @@ async function startServer() {
       }
     });
 
+    // Admin endpoint to backfill SMS conversation names and avatars
+    app.get('/api/admin/backfill-sms', async (req: any, res: any) => {
+        try {
+            const db = getDb();
+            const peopleSnap = await db.collection('people').get();
+            const peopleMap = new Map(); // e164 -> person data
+            
+            // Backfill people with e164Phone and build map
+            let peopleUpdates = 0;
+            
+            for (const doc of peopleSnap.docs) {
+                const p = doc.data();
+                const rawPhone = (p.phone || '').replace(/\D/g, '');
+                const e164 = rawPhone.length === 10 ? `+1${rawPhone}` : rawPhone.length === 11 ? `+${rawPhone}` : null;
+                
+                if (e164) {
+                    peopleMap.set(`${p.churchId}_${e164}`, { id: doc.id, name: p.name, avatar: p.avatar });
+                    if (!p.e164Phone) {
+                        await doc.ref.update({ e164Phone: e164 });
+                        peopleUpdates++;
+                    }
+                }
+            }
+
+            const convsSnap = await db.collection('smsConversations').get();
+            let convUpdates = 0;
+            
+            for (const convDoc of convsSnap.docs) {
+                const conv = convDoc.data();
+                if (conv.personName) continue; // Already mapped
+                
+                const phone = conv.phoneNumber;
+                if (!phone) continue;
+                
+                const match = peopleMap.get(`${conv.churchId}_${phone}`);
+                if (match) {
+                    await convDoc.ref.update({
+                        personId: match.id,
+                        personName: match.name || null,
+                        personAvatar: match.avatar || null
+                    });
+                    convUpdates++;
+                }
+            }
+            res.send(`Updated ${peopleUpdates} people with e164Phone. Backfilled ${convUpdates} SMS conversations.`);
+        } catch(e: any) {
+            res.status(500).send(`Error: ${e.message}`);
+        }
+    });
+
     // ─── SMS Agent: Website Scanner ─────────────────────────────────────────────
     // Fetches a church website URL server-side, extracts visible text, and uses
     // Gemini to pull out structured church information for the knowledge base.

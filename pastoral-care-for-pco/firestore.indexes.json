@@ -33,6 +33,14 @@
       ]
     },
     {
+      "collectionGroup": "people",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "churchId",  "order": "ASCENDING" },
+        { "fieldPath": "e164Phone", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "smsKeywords",
       "queryScope": "COLLECTION",
       "fields": [
