@@ -2098,7 +2098,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                         </div>
                         <div className="flex-1 min-w-0">
                             <p className="font-bold text-slate-900 dark:text-white text-sm">{activeConv.personName || formatPhone(activeConv.phoneNumber)}</p>
-                            <p className="text-xs text-slate-400">{formatPhone(activeConv.phoneNumber)}</p>
+                            {activeConv.personName && <p className="text-xs text-slate-400">{formatPhone(activeConv.phoneNumber)}</p>}
                         </div>
                         {activeConv.isOptedOut && (
                             <span className="text-xs font-bold text-red-500 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-full px-2 py-0.5">OPTED OUT</span>

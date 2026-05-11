@@ -1351,11 +1351,17 @@ const QuickSendModal: React.FC<{
   const [isSending, setIsSending] = useState(false);
 
   useEffect(() => {
-    pcoService.getPeopleGroups()
-      .then(setPcoGroups)
+    pcoService.getGroups(churchId)
+      .then((raw: any[]) => {
+        setPcoGroups(raw.map(r => ({
+          id: r.id,
+          name: r.attributes?.name || 'Unnamed',
+          memberCount: r.attributes?.memberships_count ?? r.attributes?.member_count ?? 0,
+        })));
+      })
       .catch(e => console.error('Failed to load PCO groups', e))
       .finally(() => setLoadingGroups(false));
-  }, []);
+  }, [churchId]);
 
   const handleSend = async () => {
     if (!groupId || !subject.trim() || !content.trim()) return alert('Please fill all fields');
