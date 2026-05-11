@@ -486,7 +486,51 @@ export const handleInboundSms = async (req: any, res: any) => {
                 .catch(() => { /* already logged inside */ });
         }
 
-        // 5. Check for keyword matches
+        // 5. Check for "Who Is This" contact card request
+        const isWhoIsThis = /^WHO IS THIS\??$/i.test(body.trim());
+        let whoIsThisReplyMessage: string | null = null;
+        let whoIsThisMediaUrl: string | null = null;
+
+        if (isWhoIsThis) {
+            try {
+                const churchSnap = await db.collection('churches').doc(churchId).get();
+                const churchName = churchSnap.data()?.name || 'Church';
+                let lineName = 'Main Line';
+                
+                if (smsNumberId) {
+                    const numSnap = await db.collection('smsNumbers').doc(smsNumberId).get();
+                    if (numSnap.exists) lineName = numSnap.data()?.friendlyLabel || 'Main Line';
+                }
+
+                whoIsThisReplyMessage = `This is the ${lineName} line for ${churchName}. Save our contact card!`;
+                const baseUrl = await getSmsWebhookBaseUrl();
+                if (smsNumberId) {
+                    whoIsThisMediaUrl = `${baseUrl}/api/messaging/vcard/${smsNumberId}`;
+                }
+
+                // Save outbound message to Firestore
+                const replyId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+                await db.collection('smsConversations').doc(convId)
+                    .collection('messages').doc(replyId).set({
+                        id:             replyId,
+                        conversationId: convId,
+                        churchId,
+                        direction:      'outbound',
+                        body:           whoIsThisReplyMessage,
+                        mediaUrls:      whoIsThisMediaUrl ? [whoIsThisMediaUrl] : [],
+                        status:         'sent',
+                        sentBy:         null,
+                        sentByName:     'Auto-Reply (Contact Card)',
+                        createdAt:      Date.now(),
+                    });
+
+                log.info(`[Inbound SMS] "Who Is This" matched from ${from} for church ${churchId}`, 'system', { churchId }, churchId);
+            } catch (e: any) {
+                log.warn(`[Inbound SMS] Failed to process "Who Is This": ${e.message}`, 'system', { churchId, convId }, churchId);
+            }
+        }
+
+        // 6. Check for keyword matches
         const kw = await matchKeyword(db, churchId, body);
         let keywordReplyMessage: string | null = null;
 
@@ -598,7 +642,7 @@ export const handleInboundSms = async (req: any, res: any) => {
         try {
             const prayerDetectionEnabled = !!(smsSettings as any)?.prayerDetectionEnabled;
 
-            if (prayerDetectionEnabled && !kw) {
+            if (prayerDetectionEnabled && !kw && !isWhoIsThis) {
                 const convData = convSnap.exists ? convSnap.data() : null;
                 const prayerFollowUpState = convData?.prayerFollowUpState ?? null;
 
@@ -708,7 +752,7 @@ export const handleInboundSms = async (req: any, res: any) => {
             const trimmedBody = body.trim();
             const voteNumber = /^[1-9]$/.test(trimmedBody) ? parseInt(trimmedBody, 10) : null;
 
-            if (!kw && !prayerClarifyingReplyMessage && voteNumber !== null) {
+            if (!isWhoIsThis && !kw && !prayerClarifyingReplyMessage && voteNumber !== null) {
                 // Find any active poll for this church with smsVotingEnabled
                 const pollSnap = await db.collection('polls')
                     .where('churchId', '==', churchId)
@@ -765,21 +809,24 @@ export const handleInboundSms = async (req: any, res: any) => {
             log.warn(`[SMS Poll] Error during poll vote processing: ${pollVoteErr.message}`, 'system', { churchId }, churchId);
         }
 
-        // Build TwiML â€” keyword reply first, then tag auto-replies, then prayer clarifying reply, then poll vote reply
+        // Build TwiML — keyword reply first, then tag auto-replies, then prayer clarifying reply, then poll vote reply
         // (prayer clarifying reply is mutually exclusive with keyword pipeline)
 
-        // (prayer clarifying reply is mutually exclusive with keyword pipeline)
-        const allReplies: string[] = [];
-        if (keywordReplyMessage) allReplies.push(keywordReplyMessage);
-        for (const r of tagAutoReplies) allReplies.push(r);
-        if (prayerClarifyingReplyMessage) allReplies.push(prayerClarifyingReplyMessage);
-        if (pollVoteReplyMessage) allReplies.push(pollVoteReplyMessage);
-
+        const allReplies: { body: string, mediaUrl?: string }[] = [];
+        if (whoIsThisReplyMessage) allReplies.push({ body: whoIsThisReplyMessage, mediaUrl: whoIsThisMediaUrl || undefined });
+        if (keywordReplyMessage) allReplies.push({ body: keywordReplyMessage });
+        for (const r of tagAutoReplies) allReplies.push({ body: r });
+        if (prayerClarifyingReplyMessage) allReplies.push({ body: prayerClarifyingReplyMessage });
+        if (pollVoteReplyMessage) allReplies.push({ body: pollVoteReplyMessage });
 
         let twiml = '<Response></Response>';
         if (allReplies.length > 0) {
             const msgXml = allReplies
-                .map(r => `<Message>${r.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</Message>`)
+                .map(r => {
+                    const safeBody = r.body.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                    const mediaTag = r.mediaUrl ? `<Media>${r.mediaUrl.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</Media>` : '';
+                    return `<Message><Body>${safeBody}</Body>${mediaTag}</Message>`;
+                })
                 .join('');
             twiml = `<Response>${msgXml}</Response>`;
         }

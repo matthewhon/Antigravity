@@ -205,6 +205,33 @@ async function startServer() {
     app.post('/api/messaging/campaign-status',      express.json(), handleCampaignStatusWebhook);
     app.post('/api/messaging/assignment-status',    express.json(), handleAssignmentStatusWebhook);
 
+    // Dynamic vCard endpoint for "Who Is This" contact card feature
+    app.get('/api/messaging/vcard/:numberId', async (req: any, res: any) => {
+      const { numberId } = req.params;
+      try {
+        const db = getDb();
+        let numSnap = await db.collection('smsNumbers').doc(numberId).get();
+        if (!numSnap.exists) {
+          numSnap = await db.collection('twilioNumbers').doc(numberId).get();
+        }
+        if (!numSnap.exists) return res.status(404).send('Number not found');
+        
+        const numData = numSnap.data()!;
+        const churchSnap = await db.collection('churches').doc(numData.churchId).get();
+        const churchName = churchSnap.data()?.name || 'Church';
+        const lineName = numData.friendlyLabel || 'Main Line';
+        const phone = numData.phoneNumber || '';
+        
+        const vcard = `BEGIN:VCARD\r\nVERSION:3.0\r\nN:${churchName};${lineName};;;\r\nFN:${churchName} (${lineName})\r\nORG:${churchName}\r\nTEL;TYPE=WORK,VOICE:${phone}\r\nEND:VCARD\r\n`;
+        
+        res.set('Content-Type', 'text/vcard');
+        res.set('Content-Disposition', 'attachment; filename="contact.vcf"');
+        return res.send(vcard);
+      } catch (e: any) {
+        return res.status(500).send('Error generating vCard');
+      }
+    });
+
     // ─── SMS Agent: Website Scanner ─────────────────────────────────────────────
     // Fetches a church website URL server-side, extracts visible text, and uses
     // Gemini to pull out structured church information for the knowledge base.
