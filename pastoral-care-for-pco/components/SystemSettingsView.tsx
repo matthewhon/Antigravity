@@ -358,10 +358,10 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                         </div>
                     </div>
 
-                    {/* Maps & Census */}
+                    {/* External APIs */}
                     <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
-                        <h3 className="text-sm font-black text-slate-900 dark:text-white mb-1">Maps &amp; Census APIs</h3>
-                        <p className="text-[10px] text-slate-400 mb-5 leading-relaxed">Geographic mapping and demographic data integrations.</p>
+                        <h3 className="text-sm font-black text-slate-900 dark:text-white mb-1">External APIs</h3>
+                        <p className="text-[10px] text-slate-400 mb-5 leading-relaxed">Geographic, demographic, and AI integrations.</p>
                         <div className="space-y-4">
                             <div>
                                 <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Google Maps API Key</label>
@@ -370,6 +370,10 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                             <div>
                                 <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Census.gov API Key</label>
                                 <input type="text" aria-label="Census.gov API Key" placeholder="Enter Census.gov API key" value={settings.censusApiKey || ''} onChange={e => handleChange('censusApiKey', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" />
+                            </div>
+                            <div className="pt-2 mt-2 border-t border-slate-100 dark:border-slate-800">
+                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">OpenAI API Key (AI Features)</label>
+                                <input type="password" aria-label="OpenAI API Key" placeholder="sk-proj-..." value={settings.openAiApiKey || ''} onChange={e => handleChange('openAiApiKey', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" />
                             </div>
                         </div>
                     </div>
