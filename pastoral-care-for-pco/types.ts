@@ -952,6 +952,14 @@ export interface SmsSettings {
     messageFooter?: string;
     /** Whether the SMS AI Agent is enabled for this tenant */
     smsAgentEnabled?: boolean;
+    
+    // -- Executive AI Auto-Responder -------------------------------------------
+    /** Whether the Executive AI Auto-Responder is enabled */
+    executiveAiAgentEnabled?: boolean;
+    /** PCO List ID for the Executive AI Auto-Responder. Only members of this list can use it. */
+    executiveAiAgentListId?: string;
+    /** Display name of the selected PCO list */
+    executiveAiAgentListName?: string;
 
     // -- Prayer Request Detection (NLP) ----------------------------------------
     /**
