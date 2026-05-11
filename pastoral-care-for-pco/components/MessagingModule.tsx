@@ -6865,13 +6865,18 @@ function useTwilioNumbers(churchId: string) {
     const [loading, setLoading] = useState(true);
     useEffect(() => {
         const q = query(
-            collection(firebaseDb, 'twilioNumbers'),
+            collection(firebaseDb, 'smsNumbers'),
             where('churchId', '==', churchId),
-            orderBy('isDefault', 'desc'),
             orderBy('createdAt', 'asc')
         );
         const unsub = onSnapshot(q, snap => {
-            setNumbers(snap.docs.map(d => ({ id: d.id, ...d.data() } as TwilioPhoneNumber)));
+            const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as TwilioPhoneNumber));
+            list.sort((a, b) => {
+                if (a.isDefault && !b.isDefault) return -1;
+                if (!a.isDefault && b.isDefault) return 1;
+                return 0;
+            });
+            setNumbers(list);
             setLoading(false);
         });
         return unsub;
