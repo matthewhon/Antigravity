@@ -275,7 +275,7 @@ const CampaignListView: React.FC<CampaignListViewProps & { setIsQuickSendOpen: (
             onClick={() => setIsQuickSendOpen(true)}
             className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl transition shadow-sm"
           >
-            <Send size={16} /> Quick Send to Group
+            <Send size={16} /> Quick Send Email
           </button>
           <button
             onClick={onCreate}
@@ -1343,11 +1343,17 @@ const QuickSendModal: React.FC<{
   onClose: () => void;
   onSendQuickEmail: (campaign: EmailCampaign) => Promise<void>;
 }> = ({ churchId, church, onClose, onSendQuickEmail }) => {
-  const [groupId, setGroupId] = useState('');
+  const [targetType, setTargetType] = useState<'group' | 'list'>('group');
+  const [targetId, setTargetId] = useState('');
   const [subject, setSubject] = useState('');
   const [content, setContent] = useState('');
+  
   const [pcoGroups, setPcoGroups] = useState<{ id: string; name: string; memberCount: number }[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(true);
+
+  const [pcoLists, setPcoLists] = useState<{ id: string; name: string; memberCount: number }[]>([]);
+  const [loadingLists, setLoadingLists] = useState(true);
+
   const [isSending, setIsSending] = useState(false);
 
   useEffect(() => {
@@ -1361,20 +1367,46 @@ const QuickSendModal: React.FC<{
       })
       .catch(e => console.error('Failed to load PCO groups', e))
       .finally(() => setLoadingGroups(false));
+
+    pcoService.getPeopleLists(churchId)
+      .then((raw: any[]) => {
+        setPcoLists(raw.map(r => ({
+          id: r.id,
+          name: r.attributes?.name || 'Unnamed',
+          memberCount: r.attributes?.total_people ?? 0,
+        })));
+      })
+      .catch(e => console.error('Failed to load PCO lists', e))
+      .finally(() => setLoadingLists(false));
   }, [churchId]);
 
+  // Reset target ID when switching types
+  useEffect(() => {
+    setTargetId('');
+  }, [targetType]);
+
   const handleSend = async () => {
-    if (!groupId || !subject.trim() || !content.trim()) return alert('Please fill all fields');
+    if (!targetId || !subject.trim() || !content.trim()) return alert('Please fill all fields');
     if (!church?.emailSettings?.fromEmail) {
       return alert('You must configure a From Address in Mail Settings first.');
     }
     
     setIsSending(true);
     try {
-      const groupName = pcoGroups.find(g => g.id === groupId)?.name;
+      const targetName = targetType === 'group'
+        ? pcoGroups.find(g => g.id === targetId)?.name
+        : pcoLists.find(l => l.id === targetId)?.name;
+
       const c = newCampaign(churchId, `Quick Email: ${subject}`);
-      c.toGroupId = groupId;
-      c.toGroupName = groupName;
+      
+      if (targetType === 'group') {
+        c.toGroupId = targetId;
+        c.toGroupName = targetName;
+      } else {
+        c.toListId = targetId;
+        c.toListName = targetName;
+      }
+      
       c.subject = subject;
       c.contentType = 'html';
       // Convert basic newlines to <br> for HTML mode to ensure it displays nicely
@@ -1395,25 +1427,60 @@ const QuickSendModal: React.FC<{
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
       <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-6 w-full max-w-lg mx-4 flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
         <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2 mb-1">
-          <Send size={20} className="text-emerald-500" /> Quick Email to Group
+          <Send size={20} className="text-emerald-500" /> Quick Email
         </h2>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">Send a simple email message directly to a Planning Center group.</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">Send a simple email message directly to a Planning Center group or list.</p>
         
         <div className="space-y-4 overflow-y-auto flex-1 pr-2">
+          
+          <div className="flex gap-5">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input 
+                type="radio" 
+                name="targetType" 
+                value="group" 
+                checked={targetType === 'group'} 
+                onChange={() => setTargetType('group')} 
+                className="text-emerald-500 focus:ring-emerald-500" 
+              />
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">PCO Group</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input 
+                type="radio" 
+                name="targetType" 
+                value="list" 
+                checked={targetType === 'list'} 
+                onChange={() => setTargetType('list')} 
+                className="text-emerald-500 focus:ring-emerald-500" 
+              />
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">PCO List</span>
+            </label>
+          </div>
+
           <div>
-            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Select PCO Group <span className="text-red-500">*</span></label>
-            {loadingGroups ? (
+            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
+              Select {targetType === 'group' ? 'Group' : 'List'} <span className="text-red-500">*</span>
+            </label>
+            {targetType === 'group' && loadingGroups ? (
               <div className="flex items-center gap-2 text-sm text-slate-400 py-2"><Loader2 size={14} className="animate-spin" /> Loading groups...</div>
+            ) : targetType === 'list' && loadingLists ? (
+              <div className="flex items-center gap-2 text-sm text-slate-400 py-2"><Loader2 size={14} className="animate-spin" /> Loading lists...</div>
             ) : (
               <select
                 className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                value={groupId}
-                onChange={e => setGroupId(e.target.value)}
+                value={targetId}
+                onChange={e => setTargetId(e.target.value)}
               >
-                <option value="">— Select a Planning Center Group —</option>
-                {pcoGroups.map(g => (
-                  <option key={g.id} value={g.id}>{g.name} ({g.memberCount} members)</option>
-                ))}
+                <option value="">— Select a Planning Center {targetType === 'group' ? 'Group' : 'List'} —</option>
+                {targetType === 'group' 
+                  ? pcoGroups.map(g => (
+                      <option key={g.id} value={g.id}>{g.name} ({g.memberCount} members)</option>
+                    ))
+                  : pcoLists.map(l => (
+                      <option key={l.id} value={l.id}>{l.name} ({l.memberCount} people)</option>
+                    ))
+                }
               </select>
             )}
           </div>
@@ -1446,10 +1513,10 @@ const QuickSendModal: React.FC<{
           </button>
           <button
             onClick={handleSend}
-            disabled={isSending || !groupId || !subject.trim() || !content.trim()}
+            disabled={isSending || !targetId || !subject.trim() || !content.trim()}
             className="flex-1 px-4 py-2.5 text-sm text-white bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-400 rounded-xl transition font-semibold flex items-center justify-center gap-2"
           >
-            {isSending ? <><Loader2 size={16} className="animate-spin" /> Sending to Group…</> : <><Send size={16} /> Send Email Now</>}
+            {isSending ? <><Loader2 size={16} className="animate-spin" /> Sending to {targetType === 'group' ? 'Group' : 'List'}…</> : <><Send size={16} /> Send Email Now</>}
           </button>
         </div>
       </div>
