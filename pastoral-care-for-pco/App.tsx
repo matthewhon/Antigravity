@@ -26,6 +26,7 @@ import { PublicNoteView } from './components/PublicNoteView';
 import { ToolsView } from './components/ToolsView';
 import { SmsWorkflowsManager } from './components/MessagingModule';
 import MobileSmsLayout from './components/MobileSmsLayout';
+import { PersonProfileDrawer } from './components/PersonProfileDrawer';
 import { 
   User, Church, PeopleDashboardData, GivingAnalytics, GroupsDashboardData, 
   ServicesDashboardData, AttendanceData, CensusStats, BudgetRecord, PcoFund, 
@@ -84,6 +85,9 @@ const App: React.FC = () => {
   const [isGeneratingLayout, setIsGeneratingLayout] = useState(false);
 
   const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
+  
+  // Global drawer state
+  const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
 
   // Refs
   const processedCodeRef = useRef<string | null>(null);
@@ -167,6 +171,14 @@ const App: React.FC = () => {
     });
   }, [user]);
 
+  // Listen for global open profile events
+  useEffect(() => {
+    const handleOpenProfile = (e: any) => {
+      setSelectedPersonId(e.detail);
+    };
+    window.addEventListener('openPersonProfile', handleOpenProfile);
+    return () => window.removeEventListener('openPersonProfile', handleOpenProfile);
+  }, []);
 
   // Handle Planning Center OAuth Callback
   useEffect(() => {
@@ -1260,6 +1272,15 @@ const App: React.FC = () => {
         {view === 'tools-sms-agent'    && <ToolsView churchId={church.id} church={church} currentUserId={user.id} currentUser={user} onUpdateChurch={(updates) => { firestore.updateChurch(church.id, updates); setChurch({ ...church, ...updates }); }} activePage="messaging" smsTab="agent" />}
 
     </Layout>
+
+    {/* Global Profile Drawer Overlay */}
+    {selectedPersonId && church && (
+        <PersonProfileDrawer 
+            personId={selectedPersonId}
+            churchId={church.id}
+            onClose={() => setSelectedPersonId(null)}
+        />
+    )}
     </>
   );
 };

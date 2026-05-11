@@ -451,7 +451,9 @@ export const syncRiskChanges = async (churchId: string) => {
 
         for (const person of evaluatedPeople) {
             const currentCat = person.riskProfile?.category || 'Disconnected';
+            const currentScore = person.riskProfile?.score ?? 0;
             const oldCat = person.historicRiskCategory || currentCat;
+            const oldScore = person.historicRiskScore;
             
             // If the category has objectively changed, log it and update the person record
             if (currentCat !== oldCat) {
@@ -463,6 +465,8 @@ export const syncRiskChanges = async (churchId: string) => {
                     date: nowIso,
                     oldCategory: oldCat,
                     newCategory: currentCat,
+                    oldScore: oldScore,
+                    newScore: currentScore,
                     reasons: person.riskProfile?.factors || [],
                     timestamp: nowMs
                 });
@@ -470,14 +474,16 @@ export const syncRiskChanges = async (churchId: string) => {
                 peopleToUpdate.push({
                     id: person.id,
                     churchId,
-                    historicRiskCategory: currentCat
+                    historicRiskCategory: currentCat,
+                    historicRiskScore: currentScore
                 });
-            } else if (!person.historicRiskCategory) {
-                // Initial set without creating a fake status change log
+            } else if (!person.historicRiskCategory || person.historicRiskScore !== currentScore) {
+                // Initial set or score update without creating a status change log
                 peopleToUpdate.push({
                     id: person.id,
                     churchId,
-                    historicRiskCategory: currentCat
+                    historicRiskCategory: currentCat,
+                    historicRiskScore: currentScore
                 });
             }
         }

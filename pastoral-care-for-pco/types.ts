@@ -196,6 +196,7 @@ export interface PcoPerson {
     lastUpdated?: number;
     riskProfile?: RiskProfile;
     historicRiskCategory?: string;
+    historicRiskScore?: number;
     isDonor?: boolean;
     engagementStatus?: string;
     spiritualMilestones?: {
@@ -838,6 +839,8 @@ export interface RiskChangeRecord {
     date: string;           // ISO date string
     oldCategory: string;    // 'Healthy' | 'At Risk' | 'Disconnected'
     newCategory: string;
+    oldScore?: number;
+    newScore?: number;
     reasons?: string[];
     timestamp: number;
 }

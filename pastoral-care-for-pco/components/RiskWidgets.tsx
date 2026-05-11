@@ -147,7 +147,11 @@ export const AtRiskListWidget: React.FC<RiskProps> = ({ people }) => {
         <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-3">
             {atRiskPeople.length > 0 ? (
                 atRiskPeople.map(p => (
-                    <div key={p.id} className="p-3 rounded-2xl bg-amber-50/50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-900/30 flex items-center gap-3 group hover:bg-amber-50 dark:hover:bg-amber-900/30 transition-colors cursor-pointer">
+                    <div 
+                        key={p.id} 
+                        onClick={() => window.dispatchEvent(new CustomEvent('openPersonProfile', { detail: p.id }))}
+                        className="p-3 rounded-2xl bg-amber-50/50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-900/30 flex items-center gap-3 group hover:bg-amber-50 dark:hover:bg-amber-900/30 transition-colors cursor-pointer text-left"
+                    >
                         <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-800 flex items-center justify-center text-amber-500 font-black text-sm shadow-sm">
                             {p.riskProfile?.score}
                         </div>
@@ -202,6 +206,7 @@ export const StatusChangesWidget: React.FC<RiskProps> = ({ recentRiskChanges = [
             else if (c.oldCategory === 'Disconnected' && c.newCategory === 'At Risk') type = 'improved';
             return {
                 id: c.id,
+                personId: c.personId,
                 name: c.personName,
                 changeType: type,
                 oldCategory: c.oldCategory,
@@ -238,7 +243,11 @@ export const StatusChangesWidget: React.FC<RiskProps> = ({ recentRiskChanges = [
                         <p className="text-[10px] text-slate-400 font-medium">No recent status changes</p>
                     </div>
                 ) : recentMovements.map(m => (
-                    <div key={m.id} className="flex flex-col p-2 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors">
+                    <button 
+                        key={m.id} 
+                        onClick={() => window.dispatchEvent(new CustomEvent('openPersonProfile', { detail: m.personId }))}
+                        className="flex flex-col p-2 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors w-full text-left"
+                    >
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
                                 <div className={`w-2 h-2 rounded-full ${
@@ -266,7 +275,7 @@ export const StatusChangesWidget: React.FC<RiskProps> = ({ recentRiskChanges = [
                                 ))}
                             </div>
                         )}
-                    </div>
+                    </button>
                 ))}
             </div>
         </div>
@@ -472,14 +481,12 @@ export const PeopleDirectoryWidget: React.FC<RiskProps> = ({ people }) => {
                                     </span>
                                 </td>
                                 <td className="p-3 text-right">
-                                    <a 
-                                        href={`https://people.planningcenteronline.com/people/${p.id}`}
-                                        target="_blank" 
-                                        rel="noopener noreferrer"
+                                    <button 
+                                        onClick={() => window.dispatchEvent(new CustomEvent('openPersonProfile', { detail: p.id }))}
                                         className="text-[9px] font-black uppercase text-indigo-500 hover:text-indigo-600 tracking-widest"
                                     >
-                                        View
-                                    </a>
+                                        Profile
+                                    </button>
                                 </td>
                             </tr>
                         ))}

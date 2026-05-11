@@ -435,6 +435,22 @@ class FirestoreService {
       }
   }
 
+  async getPersonRiskTimeline(churchId: string, personId: string): Promise<RiskChangeRecord[]> {
+      try {
+          const q = query(
+              collection(db, 'risk_changes'),
+              where('churchId', '==', churchId),
+              where('personId', '==', personId),
+              orderBy('timestamp', 'desc')
+          );
+          const snapshot = await getDocs(q);
+          return snapshot.docs.map(d => d.data() as RiskChangeRecord);
+      } catch (e) {
+          console.warn('[Firestore] getPersonRiskTimeline failed:', e);
+          return [];
+      }
+  }
+
   async getRecentRiskChanges(churchId: string, daysBack: number = 30): Promise<RiskChangeRecord[]> {
       try {
           const since = new Date();

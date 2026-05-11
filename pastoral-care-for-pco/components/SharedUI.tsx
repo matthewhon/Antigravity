@@ -170,26 +170,22 @@ export const PersonList: React.FC<{ people: PcoPerson[]; type: string }> = ({ pe
     {people.map(p => (
       <div key={p.id} className="flex items-center justify-between p-4 print:p-2 bg-slate-50 dark:bg-slate-900 print:bg-white rounded-2xl print:rounded-lg border border-slate-100 dark:border-slate-800 print:border-slate-200 group/item hover:bg-white dark:hover:bg-slate-800 transition-all">
         <div className="flex items-center gap-4 print:gap-2">
-          <a 
-            href={`https://people.planningcenteronline.com/people/${p.id}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-10 h-10 print:w-8 print:h-8 rounded-xl overflow-hidden bg-slate-200 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex-shrink-0 relative block hover:ring-2 hover:ring-indigo-500 transition-all"
+          <button 
+            onClick={() => window.dispatchEvent(new CustomEvent('openPersonProfile', { detail: p.id }))}
+            className="w-10 h-10 print:w-8 print:h-8 rounded-xl overflow-hidden bg-slate-200 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex-shrink-0 relative block hover:ring-2 hover:ring-indigo-500 transition-all text-left"
           >
             {p.avatar ? <img src={p.avatar} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-black text-slate-400 dark:text-slate-500 text-xs">{p.name.charAt(0)}</div>}
             {p.engagementStatus === 'Core' && (
                 <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full" title="Core Attendee"></div>
             )}
-          </a>
+          </button>
           <div className="overflow-hidden">
-            <a 
-                href={`https://people.planningcenteronline.com/people/${p.id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-black text-slate-900 dark:text-slate-100 text-sm truncate hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors block"
+            <button 
+                onClick={() => window.dispatchEvent(new CustomEvent('openPersonProfile', { detail: p.id }))}
+                className="font-black text-slate-900 dark:text-slate-100 text-sm truncate hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors block text-left w-full"
             >
                 {p.name}
-            </a>
+            </button>
             <div className="flex flex-wrap gap-2 items-center mt-0.5">
                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest truncate">{p.membership || 'Guest'}</p>
                 
