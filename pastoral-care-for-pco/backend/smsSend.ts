@@ -138,15 +138,96 @@ async function recordUsage(db: any, params: {
 
 // ─── POST /api/messaging/send-individual ─────────────────────────────────────
 
+export async function sendIndividualInternal(params: {
+    db: any;
+    log: any;
+    churchId: string;
+    toPhone: string;
+    body: string;
+    mediaUrls?: string[];
+    sentBy?: string;
+    sentByName?: string;
+    smsNumberId?: string;
+    twilioNumberId?: string;
+    conversationId?: string;
+}) {
+    const { db, log, churchId, toPhone, body, mediaUrls = [], sentBy, sentByName, smsNumberId, twilioNumberId, conversationId: existingConvId } = params;
+
+    const to = normaliseE164(toPhone);
+
+    if (await isOptedOut(db, churchId, to)) {
+        throw { status: 403, message: `${to} has opted out of messages from this church.` };
+    }
+
+    // Resolve number ID (accept both new and legacy field names)
+    let resolvedNumberId = smsNumberId || twilioNumberId || null;
+    if (!resolvedNumberId && existingConvId) {
+        const convSnap = await db.collection('smsConversations').doc(existingConvId).get();
+        if (convSnap.exists) {
+            resolvedNumberId = convSnap.data()?.smsNumberId || convSnap.data()?.twilioNumberId || null;
+        }
+    }
+
+    const { client, fromNumber } = await getSmsClient(db, churchId, resolvedNumberId);
+
+    const isMms    = (mediaUrls as string[]).length > 0;
+    const segments = isMms ? 1 : countSegments(body);
+
+    const baseUrl = await getSmsWebhookBaseUrl();
+    const statusCallbackUrl = baseUrl ? `${baseUrl}/api/messaging/status` : null;
+
+    const msgParams: any = { from: fromNumber, to, body };
+    if (isMms) msgParams.mediaUrl = mediaUrls;
+    if (statusCallbackUrl) {
+        msgParams.statusCallback       = statusCallbackUrl;
+        msgParams.statusCallbackMethod = 'POST';
+    }
+
+    const msg = await client.messages.create(msgParams);
+
+    await recordUsage(db, { churchId, toPhone: to, segments, isMms, messageSid: msg.sid });
+
+    const convId  = existingConvId || `${churchId}_${to.replace(/\+/g, '')}`;
+    const convRef = db.collection('smsConversations').doc(convId);
+    const now     = Date.now();
+
+    const convPatch: any = {
+        id: convId, churchId, phoneNumber: to,
+        lastMessageAt: now, lastMessageBody: body,
+        lastMessageDirection: 'outbound',
+        isOptedOut: false, unreadCount: 0,
+    };
+    if (resolvedNumberId) {
+        convPatch.smsNumberId   = resolvedNumberId;
+        convPatch.inboxId       = resolvedNumberId;
+        convPatch.toPhoneNumber = fromNumber;
+    }
+    await convRef.set(convPatch, { merge: true });
+
+    const messageId = `msg_${now}_${Math.random().toString(36).slice(2, 8)}`;
+    await convRef.collection('messages').doc(messageId).set({
+        id: messageId, conversationId: convId, churchId,
+        direction: 'outbound', body,
+        mediaUrls: mediaUrls || [], status: msg.status || 'queued',
+        messageSid: msg.sid,        // renamed from twilioSid
+        sentBy: sentBy || null, sentByName: sentByName || null,
+        createdAt: now,
+    });
+
+    log.info(`[Send] 1:1 message to ${to} from church ${churchId} (SID: ${msg.sid})`, 'system', { churchId, to }, churchId);
+
+    return { messageSid: msg.sid, segments };
+}
+
 export const sendIndividual = async (req: any, res: any) => {
     res.set('Access-Control-Allow-Origin', '*');
 
     const {
         churchId, toPhone, body, mediaUrls = [],
         sentBy, sentByName,
-        smsNumberId,          // renamed from twilioNumberId
-        twilioNumberId,       // legacy alias — still accepted
-        conversationId: existingConvId,
+        smsNumberId,
+        twilioNumberId,
+        conversationId,
     } = req.body || {};
 
     if (!churchId || !toPhone || !body) {
@@ -157,74 +238,12 @@ export const sendIndividual = async (req: any, res: any) => {
     const log = createServerLogger(db);
 
     try {
-        const to = normaliseE164(toPhone);
-
-        if (await isOptedOut(db, churchId, to)) {
-            return res.status(403).json({ error: `${to} has opted out of messages from this church.` });
-        }
-
-        // Resolve number ID (accept both new and legacy field names)
-        let resolvedNumberId = smsNumberId || twilioNumberId || null;
-        if (!resolvedNumberId && existingConvId) {
-            const convSnap = await db.collection('smsConversations').doc(existingConvId).get();
-            if (convSnap.exists) {
-                resolvedNumberId = convSnap.data()?.smsNumberId || convSnap.data()?.twilioNumberId || null;
-            }
-        }
-
-        const { client, fromNumber } = await getSmsClient(db, churchId, resolvedNumberId);
-
-        const isMms    = (mediaUrls as string[]).length > 0;
-        const segments = isMms ? 1 : countSegments(body);
-
-        const baseUrl = await getSmsWebhookBaseUrl();
-        const statusCallbackUrl = baseUrl ? `${baseUrl}/api/messaging/status` : null;
-
-        const msgParams: any = { from: fromNumber, to, body };
-        if (isMms) msgParams.mediaUrl = mediaUrls;
-        if (statusCallbackUrl) {
-            msgParams.statusCallback       = statusCallbackUrl;
-            msgParams.statusCallbackMethod = 'POST';
-        }
-
-        const msg = await client.messages.create(msgParams);
-
-        await recordUsage(db, { churchId, toPhone: to, segments, isMms, messageSid: msg.sid });
-
-        const convId  = existingConvId || `${churchId}_${to.replace(/\+/g, '')}`;
-        const convRef = db.collection('smsConversations').doc(convId);
-        const now     = Date.now();
-
-        const convPatch: any = {
-            id: convId, churchId, phoneNumber: to,
-            lastMessageAt: now, lastMessageBody: body,
-            lastMessageDirection: 'outbound',
-            isOptedOut: false, unreadCount: 0,
-        };
-        if (resolvedNumberId) {
-            convPatch.smsNumberId   = resolvedNumberId;
-            convPatch.inboxId       = resolvedNumberId;
-            convPatch.toPhoneNumber = fromNumber;
-        }
-        await convRef.set(convPatch, { merge: true });
-
-        const messageId = `msg_${now}_${Math.random().toString(36).slice(2, 8)}`;
-        await convRef.collection('messages').doc(messageId).set({
-            id: messageId, conversationId: convId, churchId,
-            direction: 'outbound', body,
-            mediaUrls: mediaUrls || [], status: msg.status || 'queued',
-            messageSid: msg.sid,        // renamed from twilioSid
-            sentBy: sentBy || null, sentByName: sentByName || null,
-            createdAt: now,
+        const result = await sendIndividualInternal({
+            db, log, churchId, toPhone, body, mediaUrls,
+            sentBy, sentByName, smsNumberId, twilioNumberId, conversationId
         });
-
-        log.info(`[Send] 1:1 message to ${to} from church ${churchId} (SID: ${msg.sid})`, 'system', { churchId, to }, churchId);
-
-        return res.json({ success: true, messageSid: msg.sid, segments });
+        return res.json({ success: true, ...result });
     } catch (e: any) {
-        // Extract structured error info from SignalWire SDK errors
-        // (per Core API Error Codes spec: e.code contains identifiers like
-        // 'inactive_campaign', 'rate_limit_exceeded', 'invalid_from_number', etc.)
         const errorCode   = e.code || e.errorCode || null;
         const errorStatus = e.status || null;
 

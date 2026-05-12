@@ -2,7 +2,7 @@ import { Firestore } from '@google-cloud/firestore';
 import { Logger } from '../services/logService';
 import { askPastorAI } from '../services/geminiService';
 import fetch from 'node-fetch';
-import { sendIndividual } from './smsSend';
+import { sendIndividualInternal } from './smsSend';
 
 export async function processExecutiveAiQuery(
     db: Firestore,
@@ -80,11 +80,12 @@ export async function processExecutiveAiQuery(
         }
 
         // 4. Send SMS
-        await sendIndividual(db, log, churchId, {
-            to: phoneNumber,
+        await sendIndividualInternal({
+            db, log, churchId,
+            toPhone: phoneNumber,
             body: aiResponse,
             sentByName: 'Executive AI',
-            twilioNumberId: smsNumberId || undefined
+            smsNumberId: smsNumberId || undefined
         });
 
         log.info(`[Executive AI] Sent response to ${phoneNumber}`, 'system', { churchId }, churchId);
