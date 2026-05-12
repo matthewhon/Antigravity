@@ -3568,7 +3568,7 @@ const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[]; twili
     return (
         <div className="p-6 max-w-5xl mx-auto space-y-6">
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-3">
                         <BarChart3 size={26} className="text-violet-500" /> Analytics
@@ -6166,7 +6166,7 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
     return (
         <div className="p-6 max-w-4xl mx-auto">
             {/* Header */}
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
                 <div>
                     <h1 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-3">
                         <Zap size={26} className="text-violet-500" /> Workflows
@@ -7929,9 +7929,9 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
 
             {/* Top section: tabs + phone number badge */}
             {!activeCampaign && (
-                <div className={`flex items-center justify-between px-6 pt-3 pb-3 shrink-0 ${controlledTab ? 'border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/20' : ''}`}>
+                <div className={`flex flex-col md:flex-row md:items-center justify-between gap-4 px-4 md:px-6 pt-3 pb-3 shrink-0 ${controlledTab ? 'border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/20' : ''}`}>
                     {!controlledTab ? (
-                        <div className="flex gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
+                        <div className="flex gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl overflow-x-auto no-scrollbar w-full md:w-auto">
                             {([
                                 { key: 'campaigns', label: 'Broadcast', icon: <MessageSquare size={13} /> },
                                 { key: 'workflows', label: 'Workflows', icon: <Zap size={13} /> },
