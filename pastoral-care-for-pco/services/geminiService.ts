@@ -27,7 +27,7 @@ const callGemini = async (payload: GeminiProxyPayload): Promise<GeminiProxyRespo
     let url = '/ai/generate';
     if (typeof window === 'undefined') {
         const port = process.env.PORT || 8080;
-        url = `http://localhost:${port}/ai/generate`;
+        url = `http://127.0.0.1:${port}/ai/generate`;
     }
     
     const res = await fetch(url, {

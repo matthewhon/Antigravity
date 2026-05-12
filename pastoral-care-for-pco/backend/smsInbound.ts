@@ -468,10 +468,17 @@ export const handleInboundSms = async (req: any, res: any) => {
             });
 
         // 4-A. Executive AI Auto-Responder
-        if (smsSettings?.executiveAiAgentEnabled && smsSettings?.executiveAiAgentListId && personMatch?.personId) {
+        const bodyTrimmed = body.trim();
+        const aiAgentPrefix = 'ai agent';
+        const isAiAgentTrigger = bodyTrimmed.toLowerCase().startsWith(aiAgentPrefix);
+
+        if (smsSettings?.executiveAiAgentEnabled && smsSettings?.executiveAiAgentListId && personMatch?.personId && isAiAgentTrigger) {
+            // Strip the trigger prefix
+            const queryBody = bodyTrimmed.substring(aiAgentPrefix.length).trim();
+            
             // Non-blocking
             processExecutiveAiQuery(
-                db, log, churchId, personMatch.personId, from, body, 
+                db, log, churchId, personMatch.personId, from, queryBody, 
                 smsSettings.executiveAiAgentListId, smsNumberId
             ).catch(() => {});
         }

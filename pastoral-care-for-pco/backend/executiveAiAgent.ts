@@ -21,7 +21,7 @@ export async function processExecutiveAiQuery(
         const churchData = churchSnap.data()!;
         
         const port = process.env.PORT || 8080;
-        const proxyUrl = `http://localhost:${port}/pco/proxy`;
+        const proxyUrl = `http://127.0.0.1:${port}/pco/proxy`;
         
         const pcoListRes = await fetch(proxyUrl, {
             method: 'POST',
