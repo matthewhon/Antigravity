@@ -2035,9 +2035,14 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                             {(conv.personName || conv.phoneNumber).charAt(0).toUpperCase()}
                                         </div>
                                         <div className="min-w-0">
-                                            <p className={`text-sm truncate ${
-                                                isUnread ? 'font-black text-slate-900 dark:text-white' : 'font-semibold text-slate-700 dark:text-slate-200'
-                                            }`}>{conv.personName || formatPhone(conv.phoneNumber)}</p>
+                                            <div className="flex items-center gap-1.5">
+                                                <p className={`text-sm truncate ${
+                                                    isUnread ? 'font-black text-slate-900 dark:text-white' : 'font-semibold text-slate-700 dark:text-slate-200'
+                                                }`}>{conv.personName || formatPhone(conv.phoneNumber)}</p>
+                                                {convTags.some(t => t.name === 'Needs Prayer') && conv.lastMessageDirection === 'inbound' && (
+                                                    <span title="Needs Prayer (waiting for reply)" className="shrink-0 text-[13px] leading-none">🙏</span>
+                                                )}
+                                            </div>
                                             {conv.personName && <p className={`text-[10px] ${ isUnread ? 'text-slate-500' : 'text-slate-400' }`}>{formatPhone(conv.phoneNumber)}</p>}
                                             <p className={`text-xs truncate mt-0.5 ${
                                                 isUnread ? 'text-slate-600 dark:text-slate-300 font-medium' : 'text-slate-400 dark:text-slate-500'
