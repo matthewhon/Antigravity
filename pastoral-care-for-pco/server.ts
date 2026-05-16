@@ -15,6 +15,7 @@ import { handlePcoWebhook } from './backend/pcoWebhookHandler';
 import { sendEmail, getEmailStats } from './backend/sendEmail';
 import { startEmailScheduler } from './backend/emailScheduler';
 import { startSyncScheduler } from './backend/syncScheduler';
+import { startBillingScheduler } from './backend/billingScheduler';
 import { getDb } from './backend/firebase';
 import { handleGeminiProxy } from './backend/geminiProxy';
 import { provisionSubuser, authenticateDomain, verifyDomain, diagnoseDomain } from './backend/emailProvisioning';
@@ -28,6 +29,7 @@ import { startServicesReminderScheduler } from './backend/servicesReminderSchedu
 import { workflowEnrollList, workflowEnrollPreview } from './backend/workflowEnrollEndpoint';
 import { handleGrowDailyEmail, setupGrowIntegration, requestGrowAccess, getGrowStatus } from './backend/growIntegration';
 import { getVapidPublicKey, savePushSubscription, removePushSubscription } from './backend/webPushService';
+import { handleFileProxy } from './backend/fileProxy';
 
 // Fix for bundled CJS environment
 const __dirname = process.cwd();
@@ -185,6 +187,9 @@ async function startServer() {
     app.get('/api/public/events/:churchId', getPublicEvents);
     app.get('/api/public/forms/:churchId', getPublicForms);
     app.get('/widget.js', serveWidgetScript);
+
+    // ─── File Proxy & Egress Tracking ───────────────────────────────
+    app.get('/f/:fileId', handleFileProxy);
 
     // ─── SMS / Messaging Endpoints ────────────────────────────────────────────
     // SignalWire webhooks — support both form-encoded (compatibility SDK) and
@@ -997,6 +1002,7 @@ Return ONLY the JSON object, no markdown, no explanation:`;
       }
       try {
         const db = getDb();
+        startBillingScheduler(db as any);
         startSmsCampaignScheduler(db as any);
         startServicesReminderScheduler(db as any);
       } catch (e) {

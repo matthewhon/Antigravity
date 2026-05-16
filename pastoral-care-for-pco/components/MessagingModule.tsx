@@ -19,7 +19,7 @@ import {
     Inbox, BarChart3, Copy, Zap, MessageCircle, TrendingUp, TrendingDown,
     Activity, DollarSign, UserX, Edit3, UserCheck, List, Layers,
     Smile, Image as ImageIcon, Link, Sparkles, ChevronRight, RotateCcw,
-    Mail, Tag, Filter, Hash, Upload, ExternalLink, GitBranch, Info, ShieldCheck, Globe2, PlusCircle, Lock, Unlock, ListPlus, Tv2
+    Mail, Tag, Filter, Hash, Upload, ExternalLink, GitBranch, Info, ShieldCheck, Globe2, PlusCircle, Lock, Unlock, ListPlus, Tv2, FileText
 } from 'lucide-react';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -273,6 +273,63 @@ const ScheduleModal: React.FC<{
     );
 };
 
+// ─── File Picker Modal ──────────────────────────────────────────────────────
+
+const FilePickerDialog: React.FC<{
+    churchId: string;
+    onSelect: (url: string) => void;
+    onClose: () => void;
+}> = ({ churchId, onSelect, onClose }) => {
+    const [files, setFiles] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        firestore.getTenantFiles(churchId).then(f => {
+            setFiles(f);
+            setLoading(false);
+        }).catch(() => setLoading(false));
+    }, [churchId]);
+
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
+            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl p-6 w-full max-w-lg mx-4 flex flex-col max-h-[80vh]" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <FileText size={16} className="text-violet-500" /> Select a File to Attach
+                    </h3>
+                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={16}/></button>
+                </div>
+                {loading ? (
+                    <div className="flex-1 flex items-center justify-center py-10"><Loader2 size={24} className="animate-spin text-slate-400" /></div>
+                ) : files.length === 0 ? (
+                    <div className="flex-1 flex flex-col items-center justify-center py-10 text-center">
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">No files found.</p>
+                        <p className="text-xs text-slate-400">Upload files in the "Files" tool first.</p>
+                    </div>
+                ) : (
+                    <div className="flex-1 overflow-y-auto space-y-2 pr-2">
+                        {files.map(f => (
+                            <button
+                                key={f.id}
+                                onClick={() => onSelect(`${window.location.origin}/f/${f.id}`)}
+                                className="w-full flex items-center gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-violet-300 dark:hover:border-violet-600 hover:bg-slate-50 dark:hover:bg-slate-800 transition text-left"
+                            >
+                                <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0">
+                                    <FileText size={18} className="text-slate-500" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <div className="text-sm font-bold text-slate-900 dark:text-white truncate">{f.originalName}</div>
+                                    <div className="text-[10px] text-slate-500">{f.mimeType} · {new Date(f.createdAt).toLocaleDateString()}</div>
+                                </div>
+                            </button>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
 // ─── Campaign Composer ────────────────────────────────────────────────────────
 
 interface ComposerProps {
@@ -304,6 +361,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
     // Composer extras
     const [showEmojis, setShowEmojis]   = useState(false);
     const [showLinkDlg, setShowLinkDlg] = useState(false);
+    const [showFilePicker, setShowFilePicker] = useState(false);
     const [linkUrl, setLinkUrl]         = useState('');
     const [imageUrl, setImageUrl]       = useState((local.mediaUrls && local.mediaUrls[0]) || '');
     const [aiSuggestion, setAiSuggestion]   = useState('');
@@ -620,7 +678,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                             <button
                                                 type="button"
                                                 title="Insert link"
-                                                onClick={() => { setShowLinkDlg(v => !v); setShowEmojis(false); }}
+                                                onClick={() => { setShowLinkDlg(v => !v); setShowEmojis(false); setShowFilePicker(false); }}
                                                 className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition"
                                             >
                                                 <Link size={13} /> Link
@@ -644,6 +702,15 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                                 </div>
                                             )}
                                         </div>
+                                        {/* File inserter */}
+                                        <button
+                                            type="button"
+                                            title="Attach a file link"
+                                            onClick={() => { setShowFilePicker(v => !v); setShowEmojis(false); setShowLinkDlg(false); }}
+                                            className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition"
+                                        >
+                                            <FileText size={13} /> File
+                                        </button>
                                         {/* Image URL */}
                                         <button
                                             type="button"
@@ -784,6 +851,15 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                     onConfirm={(ts, freq) => { setShowSchedule(false); onSchedule(ts, freq); }}
                     onCancel={() => setShowSchedule(false)}
                     isBusy={isSending}
+                />
+            )}
+            
+            {/* File Picker */}
+            {showFilePicker && (
+                <FilePickerDialog
+                    churchId={churchId}
+                    onSelect={(url) => { insertAtCursor(' ' + url); setShowFilePicker(false); }}
+                    onClose={() => setShowFilePicker(false)}
                 />
             )}
         </div>
@@ -941,6 +1017,7 @@ const NewMessageComposer: React.FC<{
     // Composer extras
     const [showEmojisNM, setShowEmojisNM]     = useState(false);
     const [showLinkDlgNM, setShowLinkDlgNM]   = useState(false);
+    const [showFilePickerNM, setShowFilePickerNM] = useState(false);
     const [linkUrlNM, setLinkUrlNM]           = useState('');
     const [imageUrlNM, setImageUrlNM]         = useState(''); // final publicly-accessible URL (MMS)
     const [aiSuggestionNM, setAiSuggestionNM] = useState('');
@@ -1500,7 +1577,7 @@ const NewMessageComposer: React.FC<{
                             {/* Link */}
                             <div className="relative">
                                 <button type="button" title="Insert link"
-                                    onClick={() => { setShowLinkDlgNM(v => !v); setShowEmojisNM(false); }}
+                                    onClick={() => { setShowLinkDlgNM(v => !v); setShowEmojisNM(false); setShowFilePickerNM(false); }}
                                     className="flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition"
                                 ><Link size={12} /> Link</button>
                                 {showLinkDlgNM && (
@@ -1517,9 +1594,14 @@ const NewMessageComposer: React.FC<{
                                     </div>
                                 )}
                             </div>
+                            {/* File */}
+                            <button type="button" title="Attach file link"
+                                onClick={() => { setShowFilePickerNM(v => !v); setShowEmojisNM(false); setShowLinkDlgNM(false); setShowImagePanelNM(false); }}
+                                className="flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition"
+                            ><FileText size={12} /> File</button>
                             {/* Image / MMS */}
                             <button type="button" title="Attach image (MMS)"
-                                onClick={() => { setShowImagePanelNM(v => !v); setShowEmojisNM(false); setShowLinkDlgNM(false); }}
+                                onClick={() => { setShowImagePanelNM(v => !v); setShowEmojisNM(false); setShowLinkDlgNM(false); setShowFilePickerNM(false); }}
                                 className={`flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-lg border transition ${imageUrlNM ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700' : showImagePanelNM ? 'bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 border-violet-300 dark:border-violet-700' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700'}`}
                             ><ImageIcon size={12} /> {imageUrlNM ? 'Image \u2713' : 'Image (MMS)'}</button>
                             {imageUrlNM && (

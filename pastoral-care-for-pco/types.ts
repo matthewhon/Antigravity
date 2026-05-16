@@ -1597,3 +1597,25 @@ export interface TwilioPhoneNumber {
     createdAt: number;
     updatedAt: number;
 }
+
+// --- Tenant File Storage (GCS) ---
+
+export interface TenantFile {
+    id: string;             // Firestore doc ID
+    churchId: string;       // Tenant ID
+    uploaderUid: string;
+    originalName: string;
+    mimeType: string;
+    sizeBytes: number;
+    publicUrl?: string;     // If publicly accessible
+    gcsPath: string;        // e.g. tenants/{churchId}/uploads/{id}
+    createdAt: number;
+}
+
+export interface BillingUsage {
+    id: string;             // e.g. {churchId}_{YYYY_MM_DD}
+    churchId: string;
+    date: string;           // YYYY-MM-DD
+    storageBytes: number;   // Daily snapshot of storage used
+    egressBytes: number;    // Accumulated egress for this day
+}

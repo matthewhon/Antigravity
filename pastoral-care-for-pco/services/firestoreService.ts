@@ -1168,6 +1168,37 @@ class FirestoreService {
       this.handleFirestoreError(e);
     }
   }
+
+  // --- Tenant Files ---
+
+  async getTenantFiles(churchId: string): Promise<any[]> {
+    try {
+      const q = query(collection(db, 'tenantFiles'), where('churchId', '==', churchId));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(d => d.data()).sort((a: any, b: any) => b.createdAt - a.createdAt);
+    } catch (e) {
+      this.handleFirestoreError(e);
+      return [];
+    }
+  }
+
+  async saveTenantFile(file: any): Promise<void> {
+    try {
+      await setDoc(doc(db, 'tenantFiles', file.id), file, { merge: true });
+    } catch (e) {
+      this.handleFirestoreError(e);
+      throw e;
+    }
+  }
+
+  async deleteTenantFile(fileId: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, 'tenantFiles', fileId));
+    } catch (e) {
+      this.handleFirestoreError(e);
+      throw e;
+    }
+  }
 }
 
 export interface SermonVerseRecord {

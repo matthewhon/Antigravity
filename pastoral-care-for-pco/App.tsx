@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { auth } from './services/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -92,6 +92,7 @@ const App: React.FC = () => {
      if (path.startsWith('/tools/qrcodes')) return 'tools-qrcodes';
      if (path.startsWith('/tools/notes')) return 'tools-notes';
      if (path.startsWith('/tools/workflows')) return 'tools-workflows';
+     if (path.startsWith('/tools/files')) return 'tools-files';
      if (path.startsWith('/tools/sms/inbox')) return 'tools-sms-inbox';
      if (path.startsWith('/tools/sms/campaigns')) return 'tools-sms-campaigns';
      if (path.startsWith('/tools/sms/keywords')) return 'tools-sms-keywords';
@@ -460,6 +461,7 @@ const App: React.FC = () => {
           'tools-polls': 'Polls',
           'tools-workflows': 'Workflows',
           'tools-notes': 'Notes',
+          'tools-files': 'Files',
       };
       
       if (v === 'tools') return true; 
@@ -473,7 +475,7 @@ const App: React.FC = () => {
       let resolvedView = newView;
       
       if (newView === 'tools') {
-          const toolViews = ['tools-emails', 'tools-sms-inbox', 'tools-workflows', 'tools-polls', 'tools-notes', 'tools-website', 'tools-qrcodes', 'tools-unsubscribers'];
+          const toolViews = ['tools-emails', 'tools-sms-inbox', 'tools-workflows', 'tools-polls', 'tools-notes', 'tools-files', 'tools-website', 'tools-qrcodes', 'tools-unsubscribers'];
           const availableTool = toolViews.find(tv => hasPermission(tv));
           resolvedView = availableTool || 'dashboard';
       }
@@ -517,6 +519,7 @@ const App: React.FC = () => {
               'tools-workflows': '/tools/workflows',
               'tools-polls': '/tools/polls',
               'tools-notes': '/tools/notes',
+              'tools-files': '/tools/files',
               'tools-website': '/tools/website',
               'tools-qrcodes': '/tools/qrcodes',
               'tools-unsubscribers': '/tools/unsubscribers'

@@ -1,5 +1,6 @@
 import admin from 'firebase-admin';
 import { getFirestore } from 'firebase-admin/firestore';
+import { getStorage as getAdminStorage } from 'firebase-admin/storage';
 
 /**
  * CRITICAL: The Firestore database for this project is the NAMED database "pcforpco".
@@ -24,4 +25,22 @@ export const getDb = () => {
     dbInstance = getFirestore(admin.app(), 'pcforpco');
   }
   return dbInstance;
+};
+
+let storageInstance: any = null;
+
+export const getStorage = () => {
+  if (!storageInstance) {
+    if (!admin.apps.length) {
+      try {
+        admin.initializeApp({
+          projectId: 'pastoral-care-for-pco',
+        });
+      } catch (e) {
+        console.error('Firebase Admin init failed:', e);
+      }
+    }
+    storageInstance = getAdminStorage(admin.app());
+  }
+  return storageInstance;
 };
