@@ -214,11 +214,15 @@ export const sendIndividual = async (req: any, res: any) => {
             return res.status(403).json({ error: `${to} has opted out of messages from this church.` });
         }
 
-        // If caller provides a conversationId, read the twilioNumberId from there
+        // If caller provides a conversationId, read the number ID from there.
+        // The backend may write it under twilioNumberId, smsNumberId, or inboxId.
         let resolvedNumberId = twilioNumberId || null;
         if (!resolvedNumberId && existingConvId) {
             const convSnap = await db.collection('smsConversations').doc(existingConvId).get();
-            if (convSnap.exists) resolvedNumberId = convSnap.data()?.twilioNumberId || null;
+            if (convSnap.exists) {
+                const cd = convSnap.data();
+                resolvedNumberId = cd?.twilioNumberId || cd?.smsNumberId || cd?.inboxId || null;
+            }
         }
 
         const { client, fromNumber, messagingServiceSid } = await getSubClient(db, churchId, resolvedNumberId);

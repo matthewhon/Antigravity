@@ -211,6 +211,25 @@ async function startServer() {
     app.get('/api/messaging/registration-status',   getSmsRegistrationStatus);
     app.post('/api/messaging/campaign-status',      express.json(), handleCampaignStatusWebhook);
     app.post('/api/messaging/assignment-status',    express.json(), handleAssignmentStatusWebhook);
+    // Admin override: force-mark a number as campaign-active (clears stale 'pending' status)
+    app.post('/api/messaging/mark-number-active', express.json(), async (req: any, res: any) => {
+      const { churchId, smsNumberId } = req.body || {};
+      if (!churchId || !smsNumberId) return res.status(400).json({ error: 'Missing churchId or smsNumberId' });
+      try {
+        const db = getDb();
+        const numSnap = await db.collection('smsNumbers').doc(smsNumberId).get();
+        if (!numSnap.exists) return res.status(404).json({ error: 'Number not found' });
+        if (numSnap.data()?.churchId !== churchId) return res.status(403).json({ error: 'Forbidden' });
+        await db.collection('smsNumbers').doc(smsNumberId).update({
+          campaignAssignmentStatus: 'active',
+          campaignAssigned: true,
+          updatedAt: Date.now(),
+        });
+        return res.json({ success: true });
+      } catch (e: any) {
+        return res.status(500).json({ error: e.message });
+      }
+    });
 
     // ─── Web Push Notifications ─────────────────────────────────────────────────
     app.get('/push/vapid-public-key',  getVapidPublicKey);

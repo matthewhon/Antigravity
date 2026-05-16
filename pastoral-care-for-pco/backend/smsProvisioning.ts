@@ -710,8 +710,8 @@ export const getSmsRegistrationStatus = async (req: any, res: any) => {
                 campaignStatus = result.status;
                 campaignRaw    = result.raw;
 
-                // --- AUTO-ASSIGN NUMBERS IF CAMPAIGN IS ACTIVE ---
-                if (campaignStatus === 'active' || campaignStatus === 'approved') {
+                // --- AUTO-ASSIGN NUMBERS IF CAMPAIGN IS ACTIVE/COMPLETED ---
+                if (campaignStatus === 'active' || campaignStatus === 'approved' || campaignStatus === 'completed') {
                     const numsSnap = await db.collection('smsNumbers').where('churchId', '==', churchId).get();
                     if (!numsSnap.empty) {
                         const unassignedDocs = numsSnap.docs.filter(d => {

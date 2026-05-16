@@ -437,7 +437,8 @@ export const handleInboundSms = async (req: any, res: any) => {
                 unreadCount:         1,
                 isOptedOut:          false,
                 smsNumberId:         smsNumberId,
-                inboxId:             smsNumberId,   // keep legacy field in sync
+                twilioNumberId:      smsNumberId,   // alias used by twilioSend.ts for reply routing
+                inboxId:             smsNumberId,   // legacy alias — keep in sync
                 toPhoneNumber:       to,
             };
             if (personMatch) {
@@ -453,9 +454,10 @@ export const handleInboundSms = async (req: any, res: any) => {
                 lastMessageDirection:'inbound',
                 unreadCount:         (convSnap.data()?.unreadCount || 0) + 1,
             };
-            // Backfill twilioNumberId if not set (migration)
+            // Backfill number fields if not set (migration / first inbound on existing conv)
             if (!convSnap.data()?.smsNumberId && smsNumberId) {
                 updateData.smsNumberId    = smsNumberId;
+                updateData.twilioNumberId = smsNumberId;   // alias for twilioSend.ts
                 updateData.inboxId        = smsNumberId;
                 updateData.toPhoneNumber  = to;
             }

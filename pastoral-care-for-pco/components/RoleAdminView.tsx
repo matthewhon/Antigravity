@@ -3399,9 +3399,34 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                                         </p>
                                                                     );
                                                                     if (status === 'pending') return (
-                                                                        <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1 flex items-center gap-1">
-                                                                            <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
-                                                                            Number assignment to campaign pending carrier approval — SMS enabled within 24h
+                                                                        <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1 flex items-center gap-2 flex-wrap">
+                                                                            <span className="flex items-center gap-1">
+                                                                                <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+                                                                                Number assignment to campaign pending carrier approval — SMS enabled within 24h
+                                                                            </span>
+                                                                            <button
+                                                                                onClick={async () => {
+                                                                                    if (!window.confirm('SignalWire shows this assignment is complete? Click OK to mark this number as active now.')) return;
+                                                                                    try {
+                                                                                        const r = await fetch('/api/messaging/mark-number-active', {
+                                                                                            method: 'POST',
+                                                                                            headers: { 'Content-Type': 'application/json' },
+                                                                                            body: JSON.stringify({ churchId, smsNumberId: num.id }),
+                                                                                        });
+                                                                                        const d = await r.json();
+                                                                                        if (d.success) {
+                                                                                            setSmsNumbers((prev: any[]) => prev.map(n => n.id === num.id ? { ...n, campaignAssignmentStatus: 'active', campaignAssigned: true } : n));
+                                                                                            setNumToast('✓ Number marked as active.');
+                                                                                            setTimeout(() => setNumToast(''), 4000);
+                                                                                        } else {
+                                                                                            setNumError(d.error || 'Failed');
+                                                                                        }
+                                                                                    } catch { setNumError('Request failed'); }
+                                                                                }}
+                                                                                className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border border-amber-400 dark:border-amber-600 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition"
+                                                                            >
+                                                                                Mark Active ✓
+                                                                            </button>
                                                                         </p>
                                                                     );
                                                                     if (status === 'active' || status === 'completed' || status === 'successful' || num.campaignAssigned) return (

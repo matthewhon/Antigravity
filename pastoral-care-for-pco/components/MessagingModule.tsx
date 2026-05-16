@@ -1690,8 +1690,10 @@ const SmsInbox: React.FC<{
         });
     }, [churchId]);
 
-    // Load conversations — filtered by twilioNumberId when provided.
-    // Conversations without twilioNumberId (legacy) show up in every inbox.
+    // Load conversations — filtered by the active number's ID when provided.
+    // The backend may store the number reference under any of three field names
+    // (smsNumberId, inboxId, or the older twilioNumberId alias) so we check all.
+    // Conversations with no number field at all (legacy) appear in every inbox.
     useEffect(() => {
         const baseQ = query(
             collection(firebaseDb, 'smsConversations'),
@@ -1701,10 +1703,21 @@ const SmsInbox: React.FC<{
         );
         const unsub = onSnapshot(baseQ, snap => {
             const all = snap.docs.map(d => ({ id: d.id, ...d.data() } as SmsConversation));
-            // Client-side filter: strict match on twilioNumberId, but if this is the default number, also include legacy convos
-            const filtered = twilioNumberId
-                ? all.filter(c => c.twilioNumberId === twilioNumberId || (!c.twilioNumberId && isDefaultNumber))
-                : all;
+
+            if (!twilioNumberId) {
+                setConversations(all);
+                return;
+            }
+
+            const filtered = all.filter(c => {
+                // Resolve whichever field the backend wrote the number ID into
+                const convNumberId = (c as any).smsNumberId || (c as any).inboxId || c.twilioNumberId || null;
+                if (!convNumberId) {
+                    // Legacy conversation with no number field — only show in default inbox
+                    return !!isDefaultNumber;
+                }
+                return convNumberId === twilioNumberId;
+            });
             setConversations(filtered);
         });
         return unsub;
