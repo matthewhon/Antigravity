@@ -2663,6 +2663,9 @@ const SmsKeywordsManager: React.FC<{
     const [tagEmoji, setTagEmoji]               = useState('');
     const [tagColor, setTagColor]               = useState<SmsTag['color']>('violet');
     const [tagAutoReply, setTagAutoReply]        = useState('');
+    const [tagDetectionEnabled, setTagDetectionEnabled] = useState(false);
+    const [tagDetectionPhrases, setTagDetectionPhrases] = useState('');
+    const [tagClarifyingReply, setTagClarifyingReply]   = useState('');
     const [tagBusy, setTagBusy]                 = useState(false);
     const [activeSection, setActiveSection]     = useState<'keywords' | 'tags'>('keywords');
 
@@ -2796,8 +2799,12 @@ const SmsKeywordsManager: React.FC<{
     const openEdit = (kw: SmsKeyword) => { setSaveError(null); setEditKw(kw); setModalOpen(true); };
 
     // Tag CRUD
-    const openNewTag = () => { setEditTag(null); setTagName(''); setTagEmoji(''); setTagColor('violet'); setTagAutoReply(''); setTagModalOpen(true); };
-    const openEditTag = (t: SmsTag) => { setEditTag(t); setTagName(t.name); setTagEmoji(t.emoji || ''); setTagColor(t.color); setTagAutoReply(t.autoReplyMessage || ''); setTagModalOpen(true); };
+    const openNewTag = () =>
+        { setEditTag(null); setTagName(''); setTagEmoji(''); setTagColor('violet'); setTagAutoReply('');
+          setTagDetectionEnabled(false); setTagDetectionPhrases(''); setTagClarifyingReply(''); setTagModalOpen(true); };
+    const openEditTag = (t: SmsTag) =>
+        { setEditTag(t); setTagName(t.name); setTagEmoji(t.emoji || ''); setTagColor(t.color); setTagAutoReply(t.autoReplyMessage || '');
+          setTagDetectionEnabled(t.detectionEnabled ?? false); setTagDetectionPhrases(t.detectionPhrases || ''); setTagClarifyingReply(t.clarifyingReply || ''); setTagModalOpen(true); };
     const handleSaveTag = async () => {
         if (!tagName.trim()) return;
         setTagBusy(true);
@@ -2805,9 +2812,13 @@ const SmsKeywordsManager: React.FC<{
             if (editTag) {
                 const updatePayload: any = { name: tagName.trim(), color: tagColor };
                 if (tagEmoji.trim()) updatePayload.emoji = tagEmoji.trim();
-                else updatePayload.emoji = null; // clear it if user removed the emoji
+                else updatePayload.emoji = null;
                 if (tagAutoReply.trim()) updatePayload.autoReplyMessage = tagAutoReply.trim();
-                else updatePayload.autoReplyMessage = null; // clear if removed
+                else updatePayload.autoReplyMessage = null;
+                // Detection fields
+                updatePayload.detectionEnabled  = tagDetectionEnabled;
+                updatePayload.detectionPhrases  = tagDetectionEnabled ? tagDetectionPhrases.trim() : null;
+                updatePayload.clarifyingReply   = tagDetectionEnabled && tagClarifyingReply.trim() ? tagClarifyingReply.trim() : null;
                 await updateDoc(doc(firebaseDb, 'smsTags', editTag.id), updatePayload);
             } else {
                 const newTag: any = {
@@ -2818,13 +2829,16 @@ const SmsKeywordsManager: React.FC<{
                 };
                 if (tagEmoji.trim()) newTag.emoji = tagEmoji.trim();
                 if (tagAutoReply.trim()) newTag.autoReplyMessage = tagAutoReply.trim();
+                if (tagDetectionEnabled) {
+                    newTag.detectionEnabled = true;
+                    newTag.detectionPhrases = tagDetectionPhrases.trim() || null;
+                    newTag.clarifyingReply  = tagClarifyingReply.trim() || null;
+                }
                 await addDoc(collection(firebaseDb, 'smsTags'), newTag);
             }
             setTagModalOpen(false);
-            setTagName('');
-            setTagEmoji('');
-            setTagColor('violet');
-            setTagAutoReply('');
+            setTagName(''); setTagEmoji(''); setTagColor('violet'); setTagAutoReply('');
+            setTagDetectionEnabled(false); setTagDetectionPhrases(''); setTagClarifyingReply('');
             setEditTag(null);
         } catch (e: any) {
             const msg = e?.code === 'permission-denied'
@@ -3026,6 +3040,11 @@ const SmsKeywordsManager: React.FC<{
                                         {t.autoReplyMessage && (
                                             <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-700">
                                                 <MessageSquare size={9} /> Auto-Reply
+                                            </span>
+                                        )}
+                                        {t.detectionEnabled && (
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-700">
+                                                <Sparkles size={9} /> Auto-Detect
                                             </span>
                                         )}
                                     </div>
@@ -3382,6 +3401,96 @@ const SmsKeywordsManager: React.FC<{
                                 <div className="mt-2 bg-slate-100 dark:bg-slate-800/60 rounded-2xl p-3 flex justify-end">
                                     <div className="bg-violet-600 text-white text-xs px-3 py-2 rounded-2xl rounded-br-sm max-w-[85%] leading-relaxed whitespace-pre-wrap break-words">
                                         {tagAutoReply}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* ── Auto-Detection section ───────────────────────────────────────── */}
+                        <div className="mb-6 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
+                            {/* Header toggle */}
+                            <button
+                                type="button"
+                                onClick={() => setTagDetectionEnabled(v => !v)}
+                                className="w-full flex items-center justify-between gap-3 px-4 py-3 bg-slate-50 dark:bg-slate-800 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition"
+                            >
+                                <div className="flex items-center gap-2.5 text-left">
+                                    <Sparkles size={14} className={tagDetectionEnabled ? 'text-violet-500' : 'text-slate-400'} />
+                                    <div>
+                                        <p className={`text-xs font-black ${tagDetectionEnabled ? 'text-violet-700 dark:text-violet-300' : 'text-slate-600 dark:text-slate-300'}`}>
+                                            Auto-Detection
+                                        </p>
+                                        <p className="text-[10px] text-slate-400 leading-tight">
+                                            Scan inbound messages for trigger phrases
+                                        </p>
+                                    </div>
+                                </div>
+                                <span className={`relative shrink-0 w-10 h-5 rounded-full transition-colors ${
+                                    tagDetectionEnabled ? 'bg-violet-600' : 'bg-slate-300 dark:bg-slate-600'
+                                }`}>
+                                    <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                                        tagDetectionEnabled ? 'translate-x-5' : 'translate-x-0'
+                                    }`} />
+                                </span>
+                            </button>
+
+                            {tagDetectionEnabled && (
+                                <div className="px-4 pt-3 pb-4 space-y-4 bg-white dark:bg-slate-900">
+                                    {/* Trigger phrases */}
+                                    <div>
+                                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">
+                                            Trigger Phrases
+                                        </label>
+                                        <p className="text-[10px] text-slate-400 mb-2">
+                                            Comma-separated. Any inbound message containing one of these (case-insensitive) will auto-apply this tag.
+                                        </p>
+                                        <input
+                                            type="text"
+                                            value={tagDetectionPhrases}
+                                            onChange={e => setTagDetectionPhrases(e.target.value)}
+                                            placeholder="counseling, struggling, anxiety, mental health"
+                                            className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                        />
+                                        {/* Live phrase chips preview */}
+                                        {tagDetectionPhrases.trim() && (
+                                            <div className="flex flex-wrap gap-1.5 mt-2">
+                                                {tagDetectionPhrases.split(',').map(p => p.trim()).filter(Boolean).map((phrase, i) => (
+                                                    <span key={i} className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-700">
+                                                        {phrase}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Clarifying reply */}
+                                    <div>
+                                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">
+                                            Clarifying Reply <span className="text-slate-300 dark:text-slate-600 normal-case font-normal tracking-normal">(optional)</span>
+                                        </label>
+                                        <p className="text-[10px] text-slate-400 mb-2">
+                                            If set, sends this reply and waits for the next message before applying the tag — like a two-step flow. Leave blank to tag immediately.
+                                        </p>
+                                        <textarea
+                                            rows={2}
+                                            value={tagClarifyingReply}
+                                            onChange={e => setTagClarifyingReply(e.target.value)}
+                                            placeholder="Can you tell us more about what you're going through?"
+                                            maxLength={160}
+                                            className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
+                                        />
+                                        {tagClarifyingReply.trim() && (
+                                            <div className="mt-2 bg-slate-50 dark:bg-slate-900/60 rounded-2xl p-3 flex justify-end">
+                                                <div className="bg-violet-600 text-white text-xs px-3 py-2 rounded-2xl rounded-br-sm max-w-[85%] leading-relaxed">
+                                                    {tagClarifyingReply}
+                                                </div>
+                                            </div>
+                                        )}
+                                        {!tagClarifyingReply.trim() && (
+                                            <div className="mt-2 flex items-center gap-1.5 text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                                                <CheckCircle size={11} /> Tag applied immediately on match
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             )}

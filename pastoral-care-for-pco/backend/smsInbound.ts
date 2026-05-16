@@ -34,7 +34,7 @@ import { createServerLogger } from '../services/logService';
 import { getSignalWireSigningKey, getSmsWebhookBaseUrl } from './signalwireClient';
 import { processExecutiveAiQuery } from './executiveAiAgent';
 
-// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Helpers Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 /** Normalise an E.164 phone number to a consistent key (strip all non-digits, prefix +1 for US). */
 function normaliseE164(phone: string): string {
@@ -80,7 +80,7 @@ async function matchKeyword(db: any, churchId: string, body: string): Promise<an
 /**
  * Fire-and-forget: generate an AI-suggested reply for an inbound message
  * using the church's knowledge base, then store it in Firestore.
- * Never throws â€” any error is logged and silently swallowed so the
+ * Never throws Ã¢â‚¬â€ any error is logged and silently swallowed so the
  * Twilio webhook response is never blocked or delayed.
  */
 async function generateAiSuggestion(
@@ -100,7 +100,7 @@ async function generateAiSuggestion(
         const systemPrompt = `You are a friendly, warm church receptionist for ${churchName}.
 Your job is to compose a helpful, natural reply to an incoming SMS from a visitor or member.
 Only answer based on the church facts below. If the answer is not in the facts, reply with something like "Let me check on that and get back to you!"
-Keep replies under 160 characters when possible (1 SMS segment). Do NOT include any explanation, preamble, or quotes â€” return ONLY the reply text.
+Keep replies under 160 characters when possible (1 SMS segment). Do NOT include any explanation, preamble, or quotes Ã¢â‚¬â€ return ONLY the reply text.
 
 CHURCH FACTS:
 ${kb.address       ? `Address: ${kb.address}`             : ''}
@@ -175,24 +175,24 @@ Write the reply:`;
     }
 }
 
-// â”€â”€â”€ Prayer Request Detection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Prayer Request Detection Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 /**
  * Classify an inbound SMS body as a prayer request.
  *
  * Returns:
- *   'generic'  â€” the sender is asking for prayer for themselves with no detail
+ *   'generic'  Ã¢â‚¬â€ the sender is asking for prayer for themselves with no detail
  *                (triggers the clarifying reply flow)
- *   'specific' â€” the sender has included a specific request or person
+ *   'specific' Ã¢â‚¬â€ the sender has included a specific request or person
  *                (tag immediately, no clarifying reply needed)
- *   null       â€” not a prayer request
+ *   null       Ã¢â‚¬â€ not a prayer request
  *
  * Detection is regex-based (no external API), keeping cost at $0.
  */
 export function detectPrayerRequest(body: string): 'generic' | 'specific' | null {
     const text = body.trim().toLowerCase();
 
-    // â”€â”€ Generic patterns â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // Ã¢â€â‚¬Ã¢â€â‚¬ Generic patterns Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     // These match requests that ask for prayer for the sender themselves,
     // with no additional detail provided in the message.
     const genericPatterns: RegExp[] = [
@@ -207,9 +207,9 @@ export function detectPrayerRequest(body: string): 'generic' | 'specific' | null
         /^i need (some )?prayer support\.?$/i,
     ];
 
-    // â”€â”€ Specific patterns â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // Ã¢â€â‚¬Ã¢â€â‚¬ Specific patterns Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     // These match requests that name a person, situation, or topic after the
-    // prayer phrase â€” enough detail that no clarifying reply is needed.
+    // prayer phrase Ã¢â‚¬â€ enough detail that no clarifying reply is needed.
     const specificPatterns: RegExp[] = [
         /\bpray for (my|our|his|her|their|a |the )\w/i,
         /\bpray for [a-z].{3,}/i,           // "pray for [name/situation]"
@@ -258,7 +258,7 @@ async function getOrCreatePrayerTag(db: any, churchId: string, log: any): Promis
     const newTag = {
         churchId,
         name:      'Needs Prayer',
-        emoji:     'ðŸ™',
+        emoji:     'Ã°Å¸â„¢Â',
         color:     'violet',
         createdAt: Date.now(),
     };
@@ -269,7 +269,7 @@ async function getOrCreatePrayerTag(db: any, churchId: string, log: any): Promis
 
 
 
-// â”€â”€â”€ POST /api/messaging/inbound â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ POST /api/messaging/inbound Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 // SignalWire sends an HTTP POST to this endpoint on every inbound SMS/MMS.
 // Responds with TwiML (200 + empty response body, or keyword auto-reply).
 
@@ -277,7 +277,7 @@ export const handleInboundSms = async (req: any, res: any) => {
     const db  = getDb();
     const log = createServerLogger(db);
 
-    // ── Webhook signature validation (required for production per SignalWire docs) ──
+    // â”€â”€ Webhook signature validation (required for production per SignalWire docs) â”€â”€
     try {
         const signingKey = await getSignalWireSigningKey();
         if (signingKey) {
@@ -286,15 +286,15 @@ export const handleInboundSms = async (req: any, res: any) => {
             const signature  = (req.headers['x-signalwire-signature'] || '') as string;
             const isValid    = validateRequest(signingKey, signature, webhookUrl, req.body as Record<string, string> || {});
             if (!isValid) {
-                log.warn('[Inbound SMS] Invalid webhook signature — request rejected', 'system', { signature }, '');
+                log.warn('[Inbound SMS] Invalid webhook signature â€” request rejected', 'system', { signature }, '');
                 return res.status(401).send('Invalid signature');
             }
         } else {
             // Soft-fail: log warning but process the request until the key is added to System Settings
-            log.warn('[Inbound SMS] signalwireSigningKey not configured — signature validation skipped. Add it in System Settings.', 'system', {}, '');
+            log.warn('[Inbound SMS] signalwireSigningKey not configured â€” signature validation skipped. Add it in System Settings.', 'system', {}, '');
         }
     } catch (sigErr: any) {
-        // Non-blocking — log but allow through in case of transient Firestore issue
+        // Non-blocking â€” log but allow through in case of transient Firestore issue
         log.warn(`[Inbound SMS] Signature validation error: ${sigErr.message}`, 'system', {}, '');
     }
 
@@ -306,7 +306,7 @@ export const handleInboundSms = async (req: any, res: any) => {
         SmsSid: smsSid, MessageSid: messageSidField,
     } = req.body || {};
 
-    // Collect MMS media URLs (Twilio sends MediaUrl0, MediaUrl1, â€¦)
+    // Collect MMS media URLs (Twilio sends MediaUrl0, MediaUrl1, Ã¢â‚¬Â¦)
     const mediaUrls: string[] = [];
     const mediaCount = parseInt(numMedia, 10) || 0;
     for (let i = 0; i < mediaCount; i++) {
@@ -382,11 +382,11 @@ export const handleInboundSms = async (req: any, res: any) => {
         }
 
         if (upperBody === 'START' || upperBody === 'UNSTOP' || upperBody === 'YES') {
-            // Contact re-opted-in — clear our Firestore opt-out record so sends resume
+            // Contact re-opted-in â€” clear our Firestore opt-out record so sends resume
             const optOutId = convIdKeyword;
             await db.collection('smsOptOuts').doc(optOutId).delete().catch(() => {});
             await db.collection('smsConversations').doc(convIdKeyword).set({ isOptedOut: false }, { merge: true });
-            log.info(`[Inbound SMS] START/UNSTOP received from ${from} for church ${churchId} — opt-out cleared`, 'system', { churchId, from }, churchId);
+            log.info(`[Inbound SMS] START/UNSTOP received from ${from} for church ${churchId} â€” opt-out cleared`, 'system', { churchId, from }, churchId);
             // Carrier sends the mandated opt-in confirmation; we return empty TwiML
             res.set('Content-Type', 'text/xml');
             return res.status(200).send('<Response></Response>');
@@ -485,7 +485,7 @@ export const handleInboundSms = async (req: any, res: any) => {
             ).catch(() => {});
         }
 
-        // 4-B. SMS AI Agent â€” fire-and-forget suggestion generation
+        // 4-B. SMS AI Agent Ã¢â‚¬â€ fire-and-forget suggestion generation
         //      Runs only when smsAgentEnabled is true and the body is not a carrier keyword.
         if (smsSettings?.smsAgentEnabled === true) {
             const churchSnap = await db.collection('churches').doc(churchId).get();
@@ -589,7 +589,7 @@ export const handleInboundSms = async (req: any, res: any) => {
                     const sysSnap = await db.collection('system').doc('settings').get();
                     const sysData = sysSnap.data() || {};
                     pollBase = sysData.appBaseUrl || sysData.apiBaseUrl || '';
-                    // Strip /api or trailing paths â€” we want the frontend origin
+                    // Strip /api or trailing paths Ã¢â‚¬â€ we want the frontend origin
                     pollBase = pollBase.replace(/\/api.*$/, '').replace(/\/$/, '');
                 } catch { /* ignore */ }
                 if (!pollBase) pollBase = 'https://pastoralcare.barnabassoftware.com';
@@ -618,7 +618,7 @@ export const handleInboundSms = async (req: any, res: any) => {
 
             // Optionally add person to a PCO list
             if (kw.addToListId && personMatch?.personId) {
-                log.info(`[Inbound SMS] Keyword "${kw.keyword}" matched â€” would add ${personMatch.personId} to list ${kw.addToListId}`, 'system', { churchId, keyword: kw.keyword }, churchId);
+                log.info(`[Inbound SMS] Keyword "${kw.keyword}" matched Ã¢â‚¬â€ would add ${personMatch.personId} to list ${kw.addToListId}`, 'system', { churchId, keyword: kw.keyword }, churchId);
                 // The PCO list add is handled asynchronously; full implementation in Phase 3.
             }
 
@@ -656,7 +656,7 @@ export const handleInboundSms = async (req: any, res: any) => {
                 const prayerFollowUpState = convData?.prayerFollowUpState ?? null;
 
                 if (prayerFollowUpState === 'awaiting_prayer_detail') {
-                    // â”€â”€ Two-step flow: contact just sent their prayer detail â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                    // Ã¢â€â‚¬Ã¢â€â‚¬ Two-step flow: contact just sent their prayer detail Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
                     // Tag "Needs Prayer" immediately and clear the follow-up state.
                     const { FieldValue } = require('firebase-admin/firestore');
                     const prayerTagId = await getOrCreatePrayerTag(db, churchId, log);
@@ -666,7 +666,7 @@ export const handleInboundSms = async (req: any, res: any) => {
                     });
                     log.info(`[Prayer Detection] Tagged conversation ${convId} "Needs Prayer" (follow-up detail received)`, 'system', { churchId, convId }, churchId);
                 } else {
-                    // â”€â”€ Fresh message â€” run NLP scanner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                    // Ã¢â€â‚¬Ã¢â€â‚¬ Fresh message Ã¢â‚¬â€ run NLP scanner Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
                     const prayerType = detectPrayerRequest(body);
 
                     if (prayerType === 'generic') {
@@ -695,23 +695,93 @@ export const handleInboundSms = async (req: any, res: any) => {
                         // Mark conversation as awaiting prayer detail
                         await convRef.update({ prayerFollowUpState: 'awaiting_prayer_detail' });
 
-                        log.info(`[Prayer Detection] Generic prayer ask from ${from} â€” sent clarifying reply for church ${churchId}`, 'system', { churchId, convId }, churchId);
+                        log.info(`[Prayer Detection] Generic prayer ask from ${from} Ã¢â‚¬â€ sent clarifying reply for church ${churchId}`, 'system', { churchId, convId }, churchId);
 
                     } else if (prayerType === 'specific') {
-                        // Specific request â€” tag immediately, no clarifying reply needed
+                        // Specific request Ã¢â‚¬â€ tag immediately, no clarifying reply needed
                         const { FieldValue } = require('firebase-admin/firestore');
                         const prayerTagId = await getOrCreatePrayerTag(db, churchId, log);
                         await convRef.update({
                             tags: FieldValue.arrayUnion(prayerTagId),
                         });
-                        log.info(`[Prayer Detection] Specific prayer request from ${from} â€” tagged "Needs Prayer" for church ${churchId}`, 'system', { churchId, convId }, churchId);
+                        log.info(`[Prayer Detection] Specific prayer request from ${from} Ã¢â‚¬â€ tagged "Needs Prayer" for church ${churchId}`, 'system', { churchId, convId }, churchId);
                     }
                 }
             }
         } catch (prayerErr: any) {
-            // Non-fatal â€” log and continue so the inbound message is always saved
+            // Non-fatal Ã¢â‚¬â€ log and continue so the inbound message is always saved
             log.warn(`[Prayer Detection] Error during prayer detection: ${prayerErr.message}`, 'system', { churchId, convId }, churchId);
         }
+        // 5c. Custom Tag Auto-Detection (NLP phrase matching)
+        //     Each SmsTag may have detectionEnabled=true and detectionPhrases.
+        //     Runs only when no keyword matched. Supports immediate tagging or a
+        //     two-step clarifying-reply flow via tagFollowUpState on the conversation.
+        const customTagReplies: string[] = [];
+        if (!kw && !isWhoIsThis) {
+            try {
+                const { FieldValue } = require('firebase-admin/firestore');
+                const freshConvData = convSnap.exists ? convSnap.data() : {} as any;
+                const existingTags: string[] = freshConvData?.tags || [];
+                const tagFollowUpState: string | null = freshConvData?.tagFollowUpState ?? null;
+
+                const detectionTagsSnap = await db.collection('smsTags')
+                    .where('churchId', '==', churchId)
+                    .where('detectionEnabled', '==', true)
+                    .get();
+
+                if (!detectionTagsSnap.empty) {
+                    const lowerBody = body.toLowerCase();
+
+                    for (const tagDoc of detectionTagsSnap.docs) {
+                        const tag = tagDoc.data();
+                        const tagId = tagDoc.id;
+
+                        // Two-step follow-up: this tag is waiting for the next reply
+                        if (tagFollowUpState === `awaiting_tag_${tagId}`) {
+                            await convRef.update({
+                                tags:             FieldValue.arrayUnion(tagId),
+                                tagFollowUpState: null,
+                            });
+                            log.info(`[Tag Detection] Follow-up tag "${tag.name}" applied to conv ${convId}`, 'system', { churchId, convId, tagId }, churchId);
+                            if (tag.autoReplyMessage?.trim()) customTagReplies.push(tag.autoReplyMessage.trim());
+                            break;
+                        }
+
+                        if (existingTags.includes(tagId)) continue;
+
+                        const phrases: string[] = (tag.detectionPhrases || '')
+                            .split(',').map((p: string) => p.trim().toLowerCase()).filter(Boolean);
+                        if (phrases.length === 0) continue;
+
+                        const matched = phrases.some((phrase: string) => lowerBody.includes(phrase));
+                        if (!matched) continue;
+
+                        if (tag.clarifyingReply?.trim()) {
+                            // Send clarifying reply, defer tag to next message
+                            const clarifyId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+                            await db.collection('smsConversations').doc(convId)
+                                .collection('messages').doc(clarifyId).set({
+                                    id: clarifyId, conversationId: convId, churchId,
+                                    direction: 'outbound', body: tag.clarifyingReply.trim(),
+                                    mediaUrls: [], status: 'sent', sentBy: null,
+                                    sentByName: `Auto-Reply (${tag.name})`, createdAt: Date.now(),
+                                });
+                            await convRef.update({ tagFollowUpState: `awaiting_tag_${tagId}` });
+                            customTagReplies.push(tag.clarifyingReply.trim());
+                            log.info(`[Tag Detection] Phrase matched "${tag.name}" — clarifying reply sent for conv ${convId}`, 'system', { churchId, convId, tagId }, churchId);
+                        } else {
+                            await convRef.update({ tags: FieldValue.arrayUnion(tagId) });
+                            log.info(`[Tag Detection] Phrase matched — tagged conv ${convId} with "${tag.name}"`, 'system', { churchId, convId, tagId }, churchId);
+                            if (tag.autoReplyMessage?.trim()) customTagReplies.push(tag.autoReplyMessage.trim());
+                        }
+                        break; // only one tag detection match per message
+                    }
+                }
+            } catch (tagDetectErr: any) {
+                log.warn(`[Tag Detection] Error: ${tagDetectErr.message}`, 'system', { churchId, convId }, churchId);
+            }
+        }
+
 
         // 6. Check tag auto-replies: look up any tags that were applied (via keyword auto-tag or
         //    already on the conversation) and fire their autoReplyMessage if set.
@@ -752,8 +822,8 @@ export const handleInboundSms = async (req: any, res: any) => {
                 });
         }
 
-        // â”€â”€â”€ 5c. SMS Poll Text-to-Vote â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-        // If no keyword matched and body is a single digit 1â€“9, check if this
+        // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ 5c. SMS Poll Text-to-Vote Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+        // If no keyword matched and body is a single digit 1Ã¢â‚¬â€œ9, check if this
         // church has an active poll with smsVotingEnabled. If so, record the vote.
         let pollVoteReplyMessage: string | null = null;
 
@@ -805,7 +875,7 @@ export const handleInboundSms = async (req: any, res: any) => {
                                 totalResponses: (poll.totalResponses || 0) + 1,
                                 updatedAt: Date.now(),
                             });
-                            pollVoteReplyMessage = `âœ“ Your vote for "${chosenOption}" has been recorded! Thank you.`;
+                            pollVoteReplyMessage = `Ã¢Å“â€œ Your vote for "${chosenOption}" has been recorded! Thank you.`;
                             log.info(`[SMS Poll] Vote recorded: poll=${pollDoc.id} option=${chosenOption} from=${from}`, 'system', { churchId, pollId: pollDoc.id }, churchId);
                         } else {
                             // Out of range
@@ -818,13 +888,14 @@ export const handleInboundSms = async (req: any, res: any) => {
             log.warn(`[SMS Poll] Error during poll vote processing: ${pollVoteErr.message}`, 'system', { churchId }, churchId);
         }
 
-        // Build TwiML — keyword reply first, then tag auto-replies, then prayer clarifying reply, then poll vote reply
+        // Build TwiML â€” keyword reply first, then tag auto-replies, then prayer clarifying reply, then poll vote reply
         // (prayer clarifying reply is mutually exclusive with keyword pipeline)
 
         const allReplies: { body: string, mediaUrl?: string }[] = [];
         if (whoIsThisReplyMessage) allReplies.push({ body: whoIsThisReplyMessage, mediaUrl: whoIsThisMediaUrl || undefined });
         if (keywordReplyMessage) allReplies.push({ body: keywordReplyMessage });
         for (const r of tagAutoReplies) allReplies.push({ body: r });
+        for (const r of customTagReplies) allReplies.push({ body: r });
         if (prayerClarifyingReplyMessage) allReplies.push({ body: prayerClarifyingReplyMessage });
         if (pollVoteReplyMessage) allReplies.push({ body: pollVoteReplyMessage });
 

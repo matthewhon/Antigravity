@@ -1141,7 +1141,7 @@ export interface SmsTag {
     churchId: string;
     /** Display name, e.g. "Prayer Request" */
     name: string;
-    /** Optional emoji prefix, e.g. "??" */
+    /** Optional emoji prefix, e.g. "🙏" */
     emoji?: string;
     /** Color theme for tag chip UI */
     color: 'violet' | 'blue' | 'emerald' | 'amber' | 'red' | 'pink';
@@ -1151,6 +1151,24 @@ export interface SmsTag {
      * includes this tag's ID. Only fires once per conversation per tag application.
      */
     autoReplyMessage?: string;
+    /**
+     * When true, incoming SMS messages are scanned for detectionPhrases.
+     * If matched, this tag is auto-applied — similar to Prayer Request Detection.
+     */
+    detectionEnabled?: boolean;
+    /**
+     * Comma-separated phrases or words to scan for in inbound message bodies.
+     * Case-insensitive substring match. e.g. "counseling,mental health,struggling"
+     */
+    detectionPhrases?: string;
+    /**
+     * Optional clarifying reply sent when the message matches detectionPhrases
+     * but the tag needs follow-up context (like "generic" prayer requests).
+     * If set, the conversation enters a follow-up state and the tag is applied
+     * on the next inbound reply.
+     * Leave blank to apply the tag immediately without sending a reply.
+     */
+    clarifyingReply?: string;
     createdAt: number;
 }
 

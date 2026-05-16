@@ -2536,13 +2536,21 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                             </div>
 
                             {/* Save button */}
+                            {smsMessage && (
+                                <div className={`p-4 rounded-xl text-xs font-bold flex items-center gap-2 ${
+                                    smsMessage.type === 'success' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' : 'bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400'
+                                }`}>
+                                    <span>{smsMessage.type === 'success' ? '✓' : '⚠️'}</span>
+                                    {smsMessage.text}
+                                </div>
+                            )}
                             <div className="flex justify-end">
                                 <button
                                     onClick={handleSmsSave}
                                     disabled={isSmsSaving}
-                                    className="bg-indigo-600 text-white px-8 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-700 transition-all disabled:opacity-50 shadow-sm"
+                                    className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-8 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30"
                                 >
-                                    {isSmsSaving ? 'Saving…' : 'Save Settings'}
+                                    {isSmsSaving ? 'Saving…' : 'Save SMS Settings'}
                                 </button>
                             </div>
 
@@ -3459,24 +3467,6 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                         );
                     })()}
 
-                    {smsMessage && (
-                        <div className={`p-4 rounded-xl text-xs font-bold flex items-center gap-2 ${
-                            smsMessage.type === 'success' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' : 'bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400'
-                        }`}>
-                            <span>{smsMessage.type === 'success' ? '✓' : '⚠️'}</span>
-                            {smsMessage.text}
-                        </div>
-                    )}
-
-                    <div className="flex justify-end">
-                        <button
-                            onClick={handleSmsSave}
-                            disabled={isSmsSaving}
-                            className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-8 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30"
-                        >
-                            {isSmsSaving ? 'Saving…' : 'Save SMS Settings'}
-                        </button>
-                    </div>
                 </div>
             );
         })()}
