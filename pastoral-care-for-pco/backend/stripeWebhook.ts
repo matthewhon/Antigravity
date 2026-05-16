@@ -39,13 +39,22 @@ export const handleStripeWebhook = async (req: any, res: any) => {
 
     let event: Stripe.Event;
 
+    // express.raw() puts the raw Buffer into req.body — NOT req.rawBody
+    const rawBody = req.body;
+    if (!rawBody || !sig) {
+        console.error('[StripeWebhook] Missing raw body or stripe-signature header');
+        res.status(400).send('Webhook Error: No webhook payload was provided.');
+        return;
+    }
+
     try {
-        event = stripe.webhooks.constructEvent(req.rawBody, sig, endpointSecret);
+        event = stripe.webhooks.constructEvent(rawBody, sig, endpointSecret);
     } catch (err: any) {
         console.error(`Webhook Error: ${err.message}`);
         res.status(400).send(`Webhook Error: ${err.message}`);
         return;
     }
+
 
     // Handle the event
     switch (event.type) {

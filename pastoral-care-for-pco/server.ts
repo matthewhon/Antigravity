@@ -666,8 +666,33 @@ Return ONLY the JSON object, no markdown, no explanation:`;
       }
     });
 
+    // ─── Admin: Manual Subscription Patch ─────────────────────────────────────
+    // Used when Stripe webhooks fail and a subscription needs to be manually synced.
+    // POST /admin/patch-subscription { churchId, subscription: { status, planId, customerId, subscriptionId, currentPeriodEnd } }
+    app.post('/admin/patch-subscription', express.json(), async (req: any, res: any) => {
+      const { churchId, subscription } = req.body || {};
+      if (!churchId || !subscription) {
+        return res.status(400).json({ error: 'Missing churchId or subscription fields' });
+      }
+      if (!['active', 'past_due', 'canceled', 'trialing'].includes(subscription.status)) {
+        return res.status(400).json({ error: 'Invalid status value' });
+      }
+      try {
+        const db = getDb();
+        const ref = db.collection('churches').doc(churchId);
+        const snap = await ref.get();
+        if (!snap.exists) return res.status(404).json({ error: `Church ${churchId} not found` });
+        await ref.update({ subscription });
+        console.log(`[AdminPatch] Updated subscription for ${churchId}:`, subscription);
+        res.json({ success: true, churchId, subscription });
+      } catch (e: any) {
+        res.status(500).json({ error: e.message });
+      }
+    });
+
     // ─── Tenant Deletion ─────────────────────────────────────────────────────
     // Permanently deletes all Firebase Auth users + all Firestore data for a tenant.
+
     // Requires Admin SDK — must remain server-side.
     app.post('/tenant/delete', express.json(), async (req: any, res: any) => {
       const { churchId, confirmationText } = req.body || {};
