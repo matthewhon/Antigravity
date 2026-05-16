@@ -1,12 +1,12 @@
 import { Firestore } from '@google-cloud/firestore';
-import { Logger } from '../services/logService';
+import { createServerLogger } from '../services/logService';
 import { askPastorAI } from '../services/geminiService';
 import fetch from 'node-fetch';
 import { sendIndividualInternal } from './smsSend';
 
 export async function processExecutiveAiQuery(
     db: Firestore,
-    log: Logger,
+    log: ReturnType<typeof createServerLogger>,
     churchId: string,
     personId: string,
     phoneNumber: string,

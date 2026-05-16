@@ -3501,7 +3501,11 @@ const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[]; twili
                 const convSnap = await getDocs(
                     query(collection(firebaseDb, 'smsConversations'), where('churchId', '==', churchId))
                 );
-                const totalReplies = convSnap.size;
+                let convs = convSnap.docs.map(d => d.data());
+                if (twilioNumberId) {
+                    convs = convs.filter(c => c.twilioNumberId === twilioNumberId || c.smsNumberId === twilioNumberId || c.inboxId === twilioNumberId);
+                }
+                const totalReplies = convs.length;
 
                 // Build monthly bars (last 6 months from campaigns)
                 const monthMap: Record<string, { sent: number; delivered: number }> = {};

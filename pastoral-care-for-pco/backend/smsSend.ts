@@ -116,6 +116,7 @@ async function recordUsage(db: any, params: {
     segments:       number;
     isMms:          boolean;
     messageSid:     string;
+    numberId?:      string | null;
 }) {
     const costUsd = params.isMms
         ? MMS_COST_PER_MESSAGE
@@ -132,6 +133,7 @@ async function recordUsage(db: any, params: {
         isMms:           params.isMms,
         costUsd,
         messageSid:      params.messageSid,   // renamed from twilioSid
+        numberId:        params.numberId || null,
         createdAt:       Date.now(),
     });
 }
@@ -185,7 +187,7 @@ export async function sendIndividualInternal(params: {
 
     const msg = await client.messages.create(msgParams);
 
-    await recordUsage(db, { churchId, toPhone: to, segments, isMms, messageSid: msg.sid });
+    await recordUsage(db, { churchId, toPhone: to, segments, isMms, messageSid: msg.sid, numberId: resolvedNumberId });
 
     const convId  = existingConvId || `${churchId}_${to.replace(/\+/g, '')}`;
     const convRef = db.collection('smsConversations').doc(convId);
@@ -318,7 +320,7 @@ export async function sendBulkInternal(params: {
 
                 const msg = await client.messages.create(msgParams);
 
-                await recordUsage(db, { churchId, campaignId, toPhone: to, segments, isMms, messageSid: msg.sid });
+                await recordUsage(db, { churchId, campaignId, toPhone: to, segments, isMms, messageSid: msg.sid, numberId });
 
                 const convId  = `${churchId}_${to.replace(/\+/g, '')}`;
                 const convRef = db.collection('smsConversations').doc(convId);
