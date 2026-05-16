@@ -6868,6 +6868,8 @@ const SmsSetupWizard: React.FC<{
 
 // ─── useTwilioNumbers ─────────────────────────────────────────────────────────
 // Real-time listener for all phone numbers owned by this church.
+// NOTE: An identical copy lives in hooks/useTwilioNumbers.ts for use by
+// MobileSmsLayout.  Keep both in sync if the query changes.
 
 function useTwilioNumbers(churchId: string) {
     const [numbers, setNumbers] = useState<TwilioPhoneNumber[]>([]);
@@ -7637,9 +7639,13 @@ interface MessagingModuleProps {
     onUpdateChurch?: (updates: Partial<Church>) => void;
     /** When provided by a parent route, drives the active tab and hides the internal pill nav */
     controlledTab?: 'campaigns' | 'inbox' | 'keywords' | 'analytics' | 'workflows' | 'agent';
+    /** Pre-selected phone number ID supplied by a parent (e.g. MobileSmsLayout). */
+    initialNumberId?: string | null;
+    /** When true the built-in number dropdown is hidden (parent owns the selector UI). */
+    hideNumberSelector?: boolean;
 }
 
-const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, currentUser, onUpdateChurch, controlledTab }) => {
+const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, currentUser, onUpdateChurch, controlledTab, initialNumberId, hideNumberSelector }) => {
     const smsEnabled = church.smsSettings?.smsEnabled;
 
     type Tab = 'campaigns' | 'inbox' | 'keywords' | 'analytics' | 'workflows' | 'agent';
@@ -7655,7 +7661,8 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
     // ── Multi-number support ───────────────────────────────────────────────────
     const { numbers: twilioNumbers, loading: numbersLoading } = useTwilioNumbers(churchId);
     const visibleNumbers = twilioNumbers.filter(n => canUserSeeNumber(n, currentUser));
-    const [activeNumberId, setActiveNumberId] = useState<string | null>(null);
+    // Initialise from prop (mobile parent) or null; auto-select happens in the effect below
+    const [activeNumberId, setActiveNumberId] = useState<string | null>(initialNumberId ?? null);
     const [showNumberManager, setShowNumberManager] = useState(false);
     const [showAddNumber, setShowAddNumber] = useState(false);
     // All users in the church — needed for the user restriction picker
@@ -7665,14 +7672,19 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
         getDocs(q).then(snap => setAllUsers(snap.docs.map(d => ({ id: d.id, ...d.data() } as User))));
     }, [churchId]);
 
-    // Auto-select first visible number when list loads
+    // Sync when parent changes the initialNumberId (e.g. mobile number switcher)
+    useEffect(() => {
+        if (initialNumberId) setActiveNumberId(initialNumberId);
+    }, [initialNumberId]);
+
+    // Auto-select first visible number when list loads (only if nothing selected yet)
     useEffect(() => {
         if (!activeNumberId && visibleNumbers.length > 0) {
             // Prefer the default number, otherwise first visible
             const defaultNum = visibleNumbers.find(n => n.isDefault) ?? visibleNumbers[0];
             setActiveNumberId(defaultNum.id);
         }
-    }, [visibleNumbers.length]);
+    }, [visibleNumbers.length, activeNumberId]);
 
     // Auto-migrate: if church has smsSettings.twilioPhoneNumber (and a real sub-account) but no twilioNumbers docs yet
     useEffect(() => {
@@ -7958,8 +7970,8 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                             Active Line
                         </div>
                     )}
-                    {/* Number selector dropdown */}
-                    {smsEnabled && visibleNumbers.length > 0 ? (
+                    {/* Number selector dropdown — hidden when parent (MobileSmsLayout) owns this UI */}
+                    {!hideNumberSelector && smsEnabled && visibleNumbers.length > 0 ? (
                         <div className="flex items-center gap-2 shrink-0">
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400">
