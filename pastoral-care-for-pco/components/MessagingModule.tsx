@@ -2602,8 +2602,6 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingL
                             </p>
                         )}
                     </div>
-                        )}
-                    </div>
                 )}
 
                 {/* Phone number scope */}

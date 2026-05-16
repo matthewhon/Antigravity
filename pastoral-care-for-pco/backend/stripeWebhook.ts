@@ -214,7 +214,7 @@ export const handleStripeWebhook = async (req: any, res: any) => {
             const invoice = event.data.object as Stripe.Invoice;
 
             // Only send for subscription invoices (not one-off)
-            if (!invoice.subscription) break;
+            if (!(invoice as any).subscription) break;
 
             try {
                 const customerId = typeof invoice.customer === 'string'

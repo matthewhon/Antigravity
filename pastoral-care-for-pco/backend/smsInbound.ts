@@ -484,7 +484,7 @@ export const handleInboundSms = async (req: any, res: any) => {
             });
 
         // 4-A. Push notification — fire-and-forget, must not block the TwiML response
-        const senderName = personMatch?.name || convSnap.data()?.personName || from;
+        const senderName = personMatch?.personName || convSnap.data()?.personName || from;
         const preview    = body.length > 80 ? body.slice(0, 77) + '...' : body;
         sendPushToChurch({
             churchId,
