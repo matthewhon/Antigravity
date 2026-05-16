@@ -749,6 +749,10 @@ export const handleInboundSms = async (req: any, res: any) => {
 
                         if (existingTags.includes(tagId)) continue;
 
+                        // Scope check: if detectionNumberIds is non-empty, only fire on those lines
+                        const scopedNumbers: string[] = tag.detectionNumberIds || [];
+                        if (scopedNumbers.length > 0 && smsNumberId && !scopedNumbers.includes(smsNumberId)) continue;
+
                         const phrases: string[] = (tag.detectionPhrases || '')
                             .split(',').map((p: string) => p.trim().toLowerCase()).filter(Boolean);
                         if (phrases.length === 0) continue;

@@ -2666,8 +2666,12 @@ const SmsKeywordsManager: React.FC<{
     const [tagDetectionEnabled, setTagDetectionEnabled] = useState(false);
     const [tagDetectionPhrases, setTagDetectionPhrases] = useState('');
     const [tagClarifyingReply, setTagClarifyingReply]   = useState('');
+    const [tagDetectionNumberIds, setTagDetectionNumberIds] = useState<string[]>([]); // empty = all numbers
     const [tagBusy, setTagBusy]                 = useState(false);
     const [activeSection, setActiveSection]     = useState<'keywords' | 'tags'>('keywords');
+
+    // Phone numbers — used to restrict auto-detection per line
+    const { numbers: allSmsNumbers } = useTwilioNumbers(churchId);
 
     // Polls — for the "Link to Poll" picker inside the keyword modal
     const [polls, setPolls] = useState<{ id: string; title: string }[]>([]);
@@ -2801,10 +2805,12 @@ const SmsKeywordsManager: React.FC<{
     // Tag CRUD
     const openNewTag = () =>
         { setEditTag(null); setTagName(''); setTagEmoji(''); setTagColor('violet'); setTagAutoReply('');
-          setTagDetectionEnabled(false); setTagDetectionPhrases(''); setTagClarifyingReply(''); setTagModalOpen(true); };
+          setTagDetectionEnabled(false); setTagDetectionPhrases(''); setTagClarifyingReply('');
+          setTagDetectionNumberIds([]); setTagModalOpen(true); };
     const openEditTag = (t: SmsTag) =>
         { setEditTag(t); setTagName(t.name); setTagEmoji(t.emoji || ''); setTagColor(t.color); setTagAutoReply(t.autoReplyMessage || '');
-          setTagDetectionEnabled(t.detectionEnabled ?? false); setTagDetectionPhrases(t.detectionPhrases || ''); setTagClarifyingReply(t.clarifyingReply || ''); setTagModalOpen(true); };
+          setTagDetectionEnabled(t.detectionEnabled ?? false); setTagDetectionPhrases(t.detectionPhrases || ''); setTagClarifyingReply(t.clarifyingReply || '');
+          setTagDetectionNumberIds(t.detectionNumberIds || []); setTagModalOpen(true); };
     const handleSaveTag = async () => {
         if (!tagName.trim()) return;
         setTagBusy(true);
@@ -2819,6 +2825,7 @@ const SmsKeywordsManager: React.FC<{
                 updatePayload.detectionEnabled  = tagDetectionEnabled;
                 updatePayload.detectionPhrases  = tagDetectionEnabled ? tagDetectionPhrases.trim() : null;
                 updatePayload.clarifyingReply   = tagDetectionEnabled && tagClarifyingReply.trim() ? tagClarifyingReply.trim() : null;
+                updatePayload.detectionNumberIds = tagDetectionEnabled ? tagDetectionNumberIds : [];
                 await updateDoc(doc(firebaseDb, 'smsTags', editTag.id), updatePayload);
             } else {
                 const newTag: any = {
@@ -2830,15 +2837,17 @@ const SmsKeywordsManager: React.FC<{
                 if (tagEmoji.trim()) newTag.emoji = tagEmoji.trim();
                 if (tagAutoReply.trim()) newTag.autoReplyMessage = tagAutoReply.trim();
                 if (tagDetectionEnabled) {
-                    newTag.detectionEnabled = true;
-                    newTag.detectionPhrases = tagDetectionPhrases.trim() || null;
-                    newTag.clarifyingReply  = tagClarifyingReply.trim() || null;
+                    newTag.detectionEnabled    = true;
+                    newTag.detectionPhrases    = tagDetectionPhrases.trim() || null;
+                    newTag.clarifyingReply     = tagClarifyingReply.trim() || null;
+                    newTag.detectionNumberIds  = tagDetectionNumberIds;
                 }
                 await addDoc(collection(firebaseDb, 'smsTags'), newTag);
             }
             setTagModalOpen(false);
             setTagName(''); setTagEmoji(''); setTagColor('violet'); setTagAutoReply('');
             setTagDetectionEnabled(false); setTagDetectionPhrases(''); setTagClarifyingReply('');
+            setTagDetectionNumberIds([]);
             setEditTag(null);
         } catch (e: any) {
             const msg = e?.code === 'permission-denied'
@@ -3462,6 +3471,57 @@ const SmsKeywordsManager: React.FC<{
                                             </div>
                                         )}
                                     </div>
+
+                                    {/* Phone number scope */}
+                                    {allSmsNumbers.length > 1 && (
+                                        <div>
+                                            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">
+                                                Active Phone Lines
+                                            </label>
+                                            <p className="text-[10px] text-slate-400 mb-2">
+                                                Choose which phone lines trigger this detection. Leave all unchecked to apply to every line.
+                                            </p>
+                                            <div className="space-y-1.5">
+                                                {allSmsNumbers.map(num => {
+                                                    const isChecked = tagDetectionNumberIds.includes(num.id);
+                                                    return (
+                                                        <button
+                                                            key={num.id}
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setTagDetectionNumberIds(prev =>
+                                                                    prev.includes(num.id)
+                                                                        ? prev.filter(id => id !== num.id)
+                                                                        : [...prev, num.id]
+                                                                );
+                                                            }}
+                                                            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-semibold border transition ${
+                                                                isChecked
+                                                                    ? 'bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-200 border-violet-300 dark:border-violet-700'
+                                                                    : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-violet-300'
+                                                            }`}
+                                                        >
+                                                            <span className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition ${
+                                                                isChecked ? 'bg-violet-600 border-violet-600' : 'border-slate-300 dark:border-slate-600'
+                                                            }`}>
+                                                                {isChecked && <CheckCircle size={10} className="text-white" />}
+                                                            </span>
+                                                            <Phone size={12} className="text-slate-400 shrink-0" />
+                                                            <span className="flex-1 text-left truncate">{num.friendlyLabel}</span>
+                                                            {num.isDefault && (
+                                                                <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Default</span>
+                                                            )}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                            {tagDetectionNumberIds.length === 0 && (
+                                                <p className="mt-1.5 text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                                                    <CheckCircle size={10} /> Applies to all {allSmsNumbers.length} phone lines
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
 
                                     {/* Clarifying reply */}
                                     <div>

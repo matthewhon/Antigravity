@@ -371,6 +371,10 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   const [addNumLabel, setAddNumLabel] = useState('');
   const [addNumSender, setAddNumSender] = useState(church.name || '');
   const [addNumBusy, setAddNumBusy] = useState(false);
+  // Per-number access management panel
+  const [expandedNumId, setExpandedNumId] = useState<string | null>(null);
+  const [numPermSaving, setNumPermSaving] = useState(false);
+  const [numPermToast, setNumPermToast] = useState<{id: string; text: string} | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
   const [editingUserId, setEditingUserId] = useState<string | null>(null);

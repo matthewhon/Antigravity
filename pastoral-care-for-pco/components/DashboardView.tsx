@@ -1,5 +1,5 @@
 
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { 
     User, PeopleDashboardData, GivingAnalytics, GroupsDashboardData, 
     ServicesDashboardData, AttendanceData, CensusStats, BudgetRecord, 
@@ -75,7 +75,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   churchName,
 }) => {
 
-  const [showAI, setShowAI] = useState(true);
+  const [showAI, setShowAI] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('dashboard_showAI');
+      return saved === null ? true : saved === 'true';
+    } catch {
+      return true;
+    }
+  });
+
+  const toggleShowAI = useCallback(() => {
+    setShowAI(v => {
+      const next = !v;
+      try { localStorage.setItem('dashboard_showAI', String(next)); } catch {}
+      return next;
+    });
+  }, []);
 
   const availableWidgets = useMemo(() => {
     if (!allowedWidgetIds) return DASHBOARD_WIDGETS;
@@ -600,7 +615,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   </button>
               )}
               <button
-                  onClick={() => setShowAI(v => !v)}
+                  onClick={toggleShowAI}
                   title={showAI ? 'Hide AI Assistant' : 'Show AI Assistant'}
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border shadow-sm ${
                       showAI

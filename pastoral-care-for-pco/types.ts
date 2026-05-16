@@ -1267,6 +1267,32 @@ export interface SmsPhoneNumber {
     campaignAssignmentError?: string;
     createdAt: number;
     updatedAt: number;
+
+    // ── Per-number feature permissions ────────────────────────────────────────
+    /**
+     * Granular access controls for this number's features.
+     * Absent = all Messaging users have access (backwards-compatible default).
+     * Church Admins always bypass these restrictions.
+     */
+    permissions?: SmsNumberPermissions;
+}
+
+/**
+ * Per-number feature-level access control.
+ * Each field restricts which user IDs can use that feature on this number.
+ * An empty array or absent field means "all users with Messaging role can access".
+ */
+export interface SmsNumberPermissions {
+    /** User IDs who can read and reply to inbox conversations on this number */
+    inboxUserIds?: string[];
+    /** User IDs who can send broadcast campaigns from this number */
+    broadcastUserIds?: string[];
+    /** User IDs who can view analytics for this number */
+    analyticsUserIds?: string[];
+    /** User IDs who can manage keywords tied to this number */
+    keywordsUserIds?: string[];
+    /** User IDs who can use the AI Agent on this number */
+    aiAgentUserIds?: string[];
 }
 
 export interface SmsUsageRecord {
