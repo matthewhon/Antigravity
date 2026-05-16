@@ -34,6 +34,7 @@ export const CarePage: React.FC<CarePageProps> = ({
     const activePage = 
         subpath === 'membership' ? 'Membership' :
         subpath === 'community'  ? 'Community'  :
+        subpath === 'care'       ? 'Care'       :
         subpath === 'calendar'   ? 'Calendar'   :
         'Church';
 

@@ -76,6 +76,7 @@ const App: React.FC = () => {
      if (path.startsWith('/care/membership')) return 'pastoral-membership';
      if (path.startsWith('/care/community')) return 'pastoral-community';
      if (path.startsWith('/care/calendar')) return 'pastoral-calendar';
+     if (path.startsWith('/care/care')) return 'pastoral-care';
      if (path.startsWith('/care')) return 'pastoral';
      if (path.startsWith('/metrics/input')) return 'metrics-input';
      if (path.startsWith('/metrics/settings')) return 'metrics-settings';
@@ -470,7 +471,6 @@ const App: React.FC = () => {
 
   const handleNavigate = (newView: string) => {
       let resolvedView = newView;
-      let path = '/';
       
       if (newView === 'tools') {
           const toolViews = ['tools-emails', 'tools-sms-inbox', 'tools-workflows', 'tools-polls', 'tools-notes', 'tools-website', 'tools-qrcodes', 'tools-unsubscribers'];
@@ -479,26 +479,51 @@ const App: React.FC = () => {
       }
 
       if (hasPermission(resolvedView)) {
-          if (resolvedView === 'dashboard') path = '/';
-          else if (resolvedView === 'people') path = '/people';
-          else if (resolvedView === 'groups') path = '/groups';
-          else if (resolvedView === 'services') path = '/services';
-          else if (resolvedView === 'giving') path = '/giving';
-          else if (resolvedView === 'pastoral') path = '/care';
-          else if (resolvedView === 'metrics') path = '/metrics';
-          else if (resolvedView === 'settings') path = '/settings';
-          else if (resolvedView === 'global-admin') path = '/global-admin';
-          else if (resolvedView === 'ai-assistant') path = '/ai-assistant';
-          else if (resolvedView === 'tools-emails') path = '/tools/emails';
-          else if (resolvedView === 'tools-sms-inbox') path = '/tools/sms/inbox';
-          else if (resolvedView === 'tools-workflows') path = '/tools/workflows';
-          else if (resolvedView === 'tools-polls') path = '/tools/polls';
-          else if (resolvedView === 'tools-notes') path = '/tools/notes';
-          else if (resolvedView === 'tools-website') path = '/tools/website';
-          else if (resolvedView === 'tools-qrcodes') path = '/tools/qrcodes';
-          else if (resolvedView === 'tools-unsubscribers') path = '/tools/unsubscribers';
+          const viewToPath: Record<string, string> = {
+              'dashboard': '/',
+              'people': '/people',
+              'people-households': '/people/households',
+              'people-risk': '/people/risk',
+              'people-reports': '/people/reports',
+              'groups': '/groups',
+              'services': '/services',
+              'services-attendance': '/services/attendance',
+              'services-teams': '/services/teams',
+              'services-reminders': '/services/reminders',
+              'giving': '/giving',
+              'giving-donor': '/giving/donor',
+              'giving-budgets': '/giving/budgets',
+              'giving-donations': '/giving/donations',
+              'giving-reports': '/giving/reports',
+              'pastoral': '/care',
+              'pastoral-membership': '/care/membership',
+              'pastoral-community': '/care/community',
+              'pastoral-care': '/care/care',
+              'pastoral-calendar': '/care/calendar',
+              'metrics': '/metrics',
+              'metrics-input': '/metrics/input',
+              'metrics-settings': '/metrics/settings',
+              'settings': '/settings',
+              'app-settings': '/app-settings',
+              'global-admin': '/global-admin',
+              'library': '/library',
+              'tools-emails': '/tools/emails',
+              'tools-sms-inbox': '/tools/sms/inbox',
+              'tools-sms-campaigns': '/tools/sms/campaigns',
+              'tools-sms-workflows': '/tools/sms/workflows',
+              'tools-sms-keywords': '/tools/sms/keywords',
+              'tools-sms-analytics': '/tools/sms/analytics',
+              'tools-sms-agent': '/tools/sms/agent',
+              'tools-workflows': '/tools/workflows',
+              'tools-polls': '/tools/polls',
+              'tools-notes': '/tools/notes',
+              'tools-website': '/tools/website',
+              'tools-qrcodes': '/tools/qrcodes',
+              'tools-unsubscribers': '/tools/unsubscribers'
+          };
           
-          navigate(path);
+          const navPath = viewToPath[resolvedView] || '/';
+          navigate(navPath);
           loadWidgets(user!, resolvedView);
       }
   };
