@@ -3404,7 +3404,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                                             Number assignment to campaign pending carrier approval — SMS enabled within 24h
                                                                         </p>
                                                                     );
-                                                                    if (status === 'active' || num.campaignAssigned) return (
+                                                                    if (status === 'active' || status === 'completed' || status === 'successful' || num.campaignAssigned) return (
                                                                         <p className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
                                                                             <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                                                                             Campaign approved — outbound SMS active

@@ -754,7 +754,7 @@ export const getSmsRegistrationStatus = async (req: any, res: any) => {
                                     const { status } = await checkAssignmentOrder(sms.campaignId, numData.campaignAssignmentOrderId);
                                     if (status && status !== 'pending' && status !== numData.campaignAssignmentStatus) {
                                         const updates: any = { campaignAssignmentStatus: status };
-                                        if (status === 'active' || status === 'successful') {
+                                        if (status === 'active' || status === 'successful' || status === 'completed') {
                                             updates.campaignAssigned = true;
                                         } else if (status === 'failed' || status === 'error') {
                                             updates.campaignAssigned = false;
@@ -901,7 +901,7 @@ export const handleAssignmentStatusWebhook = async (req: any, res: any) => {
                 updates.campaignAssignmentStatus = newStatus;
             }
 
-            if (newStatus === 'successful' || newStatus === 'active') {
+            if (newStatus === 'successful' || newStatus === 'active' || newStatus === 'completed') {
                 updates.campaignAssigned = true;
             } else if (newStatus === 'failed') {
                 updates.campaignAssigned = false;
