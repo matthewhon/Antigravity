@@ -80,7 +80,7 @@ async function matchKeyword(db: any, churchId: string, body: string): Promise<an
 /**
  * Fire-and-forget: generate an AI-suggested reply for an inbound message
  * using the church's knowledge base, then store it in Firestore.
- * Never throws Ã¢â‚¬â€ any error is logged and silently swallowed so the
+ * Never throws —â€ any error is logged and silently swallowed so the
  * Twilio webhook response is never blocked or delayed.
  */
 async function generateAiSuggestion(
@@ -100,7 +100,7 @@ async function generateAiSuggestion(
         const systemPrompt = `You are a friendly, warm church receptionist for ${churchName}.
 Your job is to compose a helpful, natural reply to an incoming SMS from a visitor or member.
 Only answer based on the church facts below. If the answer is not in the facts, reply with something like "Let me check on that and get back to you!"
-Keep replies under 160 characters when possible (1 SMS segment). Do NOT include any explanation, preamble, or quotes Ã¢â‚¬â€ return ONLY the reply text.
+Keep replies under 160 characters when possible (1 SMS segment). Do NOT include any explanation, preamble, or quotes —â€ return ONLY the reply text.
 
 CHURCH FACTS:
 ${kb.address       ? `Address: ${kb.address}`             : ''}
@@ -181,11 +181,11 @@ Write the reply:`;
  * Classify an inbound SMS body as a prayer request.
  *
  * Returns:
- *   'generic'  Ã¢â‚¬â€ the sender is asking for prayer for themselves with no detail
+ *   'generic'  —â€ the sender is asking for prayer for themselves with no detail
  *                (triggers the clarifying reply flow)
- *   'specific' Ã¢â‚¬â€ the sender has included a specific request or person
+ *   'specific' —â€ the sender has included a specific request or person
  *                (tag immediately, no clarifying reply needed)
- *   null       Ã¢â‚¬â€ not a prayer request
+ *   null       —â€ not a prayer request
  *
  * Detection is regex-based (no external API), keeping cost at $0.
  */
@@ -209,7 +209,7 @@ export function detectPrayerRequest(body: string): 'generic' | 'specific' | null
 
     // Ã¢â€â‚¬Ã¢â€â‚¬ Specific patterns Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     // These match requests that name a person, situation, or topic after the
-    // prayer phrase Ã¢â‚¬â€ enough detail that no clarifying reply is needed.
+    // prayer phrase —â€ enough detail that no clarifying reply is needed.
     const specificPatterns: RegExp[] = [
         /\bpray for (my|our|his|her|their|a |the )\w/i,
         /\bpray for [a-z].{3,}/i,           // "pray for [name/situation]"
@@ -306,7 +306,7 @@ export const handleInboundSms = async (req: any, res: any) => {
         SmsSid: smsSid, MessageSid: messageSidField,
     } = req.body || {};
 
-    // Collect MMS media URLs (Twilio sends MediaUrl0, MediaUrl1, Ã¢â‚¬Â¦)
+    // Collect MMS media URLs (Twilio sends MediaUrl0, MediaUrl1, …)
     const mediaUrls: string[] = [];
     const mediaCount = parseInt(numMedia, 10) || 0;
     for (let i = 0; i < mediaCount; i++) {
@@ -485,7 +485,7 @@ export const handleInboundSms = async (req: any, res: any) => {
             ).catch(() => {});
         }
 
-        // 4-B. SMS AI Agent Ã¢â‚¬â€ fire-and-forget suggestion generation
+        // 4-B. SMS AI Agent —â€ fire-and-forget suggestion generation
         //      Runs only when smsAgentEnabled is true and the body is not a carrier keyword.
         if (smsSettings?.smsAgentEnabled === true) {
             const churchSnap = await db.collection('churches').doc(churchId).get();
@@ -589,7 +589,7 @@ export const handleInboundSms = async (req: any, res: any) => {
                     const sysSnap = await db.collection('system').doc('settings').get();
                     const sysData = sysSnap.data() || {};
                     pollBase = sysData.appBaseUrl || sysData.apiBaseUrl || '';
-                    // Strip /api or trailing paths Ã¢â‚¬â€ we want the frontend origin
+                    // Strip /api or trailing paths —â€ we want the frontend origin
                     pollBase = pollBase.replace(/\/api.*$/, '').replace(/\/$/, '');
                 } catch { /* ignore */ }
                 if (!pollBase) pollBase = 'https://pastoralcare.barnabassoftware.com';
@@ -618,7 +618,7 @@ export const handleInboundSms = async (req: any, res: any) => {
 
             // Optionally add person to a PCO list
             if (kw.addToListId && personMatch?.personId) {
-                log.info(`[Inbound SMS] Keyword "${kw.keyword}" matched Ã¢â‚¬â€ would add ${personMatch.personId} to list ${kw.addToListId}`, 'system', { churchId, keyword: kw.keyword }, churchId);
+                log.info(`[Inbound SMS] Keyword "${kw.keyword}" matched —â€ would add ${personMatch.personId} to list ${kw.addToListId}`, 'system', { churchId, keyword: kw.keyword }, churchId);
                 // The PCO list add is handled asynchronously; full implementation in Phase 3.
             }
 
@@ -666,7 +666,7 @@ export const handleInboundSms = async (req: any, res: any) => {
                     });
                     log.info(`[Prayer Detection] Tagged conversation ${convId} "Needs Prayer" (follow-up detail received)`, 'system', { churchId, convId }, churchId);
                 } else {
-                    // Ã¢â€â‚¬Ã¢â€â‚¬ Fresh message Ã¢â‚¬â€ run NLP scanner Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+                    // Ã¢â€â‚¬Ã¢â€â‚¬ Fresh message —â€ run NLP scanner Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
                     const prayerType = detectPrayerRequest(body);
 
                     if (prayerType === 'generic') {
@@ -695,21 +695,21 @@ export const handleInboundSms = async (req: any, res: any) => {
                         // Mark conversation as awaiting prayer detail
                         await convRef.update({ prayerFollowUpState: 'awaiting_prayer_detail' });
 
-                        log.info(`[Prayer Detection] Generic prayer ask from ${from} Ã¢â‚¬â€ sent clarifying reply for church ${churchId}`, 'system', { churchId, convId }, churchId);
+                        log.info(`[Prayer Detection] Generic prayer ask from ${from} —â€ sent clarifying reply for church ${churchId}`, 'system', { churchId, convId }, churchId);
 
                     } else if (prayerType === 'specific') {
-                        // Specific request Ã¢â‚¬â€ tag immediately, no clarifying reply needed
+                        // Specific request —â€ tag immediately, no clarifying reply needed
                         const { FieldValue } = require('firebase-admin/firestore');
                         const prayerTagId = await getOrCreatePrayerTag(db, churchId, log);
                         await convRef.update({
                             tags: FieldValue.arrayUnion(prayerTagId),
                         });
-                        log.info(`[Prayer Detection] Specific prayer request from ${from} Ã¢â‚¬â€ tagged "Needs Prayer" for church ${churchId}`, 'system', { churchId, convId }, churchId);
+                        log.info(`[Prayer Detection] Specific prayer request from ${from} —â€ tagged "Needs Prayer" for church ${churchId}`, 'system', { churchId, convId }, churchId);
                     }
                 }
             }
         } catch (prayerErr: any) {
-            // Non-fatal Ã¢â‚¬â€ log and continue so the inbound message is always saved
+            // Non-fatal —â€ log and continue so the inbound message is always saved
             log.warn(`[Prayer Detection] Error during prayer detection: ${prayerErr.message}`, 'system', { churchId, convId }, churchId);
         }
         // 5c. Custom Tag Auto-Detection (NLP phrase matching)
@@ -827,7 +827,7 @@ export const handleInboundSms = async (req: any, res: any) => {
         }
 
         // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ 5c. SMS Poll Text-to-Vote Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
-        // If no keyword matched and body is a single digit 1Ã¢â‚¬â€œ9, check if this
+        // If no keyword matched and body is a single digit 1—â€œ9, check if this
         // church has an active poll with smsVotingEnabled. If so, record the vote.
         let pollVoteReplyMessage: string | null = null;
 
@@ -879,7 +879,7 @@ export const handleInboundSms = async (req: any, res: any) => {
                                 totalResponses: (poll.totalResponses || 0) + 1,
                                 updatedAt: Date.now(),
                             });
-                            pollVoteReplyMessage = `Ã¢Å“â€œ Your vote for "${chosenOption}" has been recorded! Thank you.`;
+                            pollVoteReplyMessage = `✅ Your vote for "${chosenOption}" has been recorded! Thank you.`;
                             log.info(`[SMS Poll] Vote recorded: poll=${pollDoc.id} option=${chosenOption} from=${from}`, 'system', { churchId, pollId: pollDoc.id }, churchId);
                         } else {
                             // Out of range

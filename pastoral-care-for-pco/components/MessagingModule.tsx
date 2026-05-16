@@ -4503,7 +4503,7 @@ const BranchNodeCard: React.FC<{
                 <div className="flex items-center gap-2 min-w-0">
                     <GitBranch size={14} className="text-blue-500 shrink-0" />
                     <span className="text-xs font-black uppercase tracking-widest text-blue-600 dark:text-blue-400 shrink-0">Branch</span>
-                    <span className="text-xs text-slate-400 shrink-0">�</span>
+                    <span className="text-xs text-slate-400 shrink-0">·</span>
                     <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 truncate">IF: {conditionSummary()}</span>
                 </div>
                 <div className="flex items-center gap-1 shrink-0 ml-2">
@@ -4526,10 +4526,10 @@ const BranchNodeCard: React.FC<{
                         {/* Condition type picker */}
                         <div className="flex rounded-xl overflow-hidden border border-slate-200 dark:border-slate-600">
                             {([
-                                { id: 'replied',      label: '?? Replied'     },
-                                { id: 'email_opened', label: '?? Email Opened'},
-                                { id: 'tag_applied',  label: '?? Tag Applied' },
-                                { id: 'custom',       label: '?? Custom'       },
+                                { id: 'replied',      label: '↩ Replied'     },
+                                { id: 'email_opened', label: '✉ Email Opened'},
+                                { id: 'tag_applied',  label: '🏷 Tag Applied' },
+                                { id: 'custom',       label: '⚙ Custom'       },
                             ] as const).map(({ id, label }) => (
                                 <button key={id} type="button" onClick={() => onChange({ conditionType: id })}
                                     className={`flex-1 py-1.5 text-[10px] font-bold transition border-r last:border-r-0 border-slate-200 dark:border-slate-600 ${
@@ -4547,7 +4547,7 @@ const BranchNodeCard: React.FC<{
                                 }}
                                 className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                             >
-                                <option value="">� Select a tag �</option>
+                                <option value="">— Select a tag —</option>
                                 {smsTags.map(t => <option key={t.id} value={t.id}>{t.emoji} {t.name}</option>)}
                             </select>
                         )}
@@ -4858,7 +4858,7 @@ const ActionNodeCard: React.FC<{
                 </div>
             </div>
 
-            {/* Channel picker � full layout for normal steps, compact for sub-steps inside branches */}
+            {/* Channel picker — full layout for normal steps, compact for sub-steps inside branches */}
             {!isSubStep ? (
                 <div>
                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Channel</p>
@@ -4989,7 +4989,7 @@ const ActionNodeCard: React.FC<{
                     </div>
                     <div>
                         <div className="flex items-center justify-between mb-1.5">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Email Body</label>
+                            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Email Body</label>
                             <span className="text-[10px] text-slate-400">{(step.emailBody || '').length} chars</span>
                         </div>
                         <textarea
@@ -5250,7 +5250,7 @@ const WorkflowEditor: React.FC<{
     isBusy: boolean;
 }> = ({ initial, churchId, keywords, pcoLists, pcoGroups, smsTags, pcoRegistrationEvents, onSave, onBack, isBusy }) => {
 
-    /** Convert legacy flat SmsWorkflowStep[] ? WorkflowNode[]. */
+    /** Convert legacy flat SmsWorkflowStep[] to WorkflowNode[]. */
     const stepsToNodes = (steps: SmsWorkflowStep[]): WorkflowNode[] => {
         const nodes: WorkflowNode[] = [];
         steps.forEach((s, i) => {
