@@ -1,7 +1,16 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { auth } from './services/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { firestore } from './services/firestoreService';
+import { DashboardPage } from './components/pages/DashboardPage';
+import { PeoplePage } from './components/pages/PeoplePage';
+import { GroupsPage } from './components/pages/GroupsPage';
+import { ServicesPage } from './components/pages/ServicesPage';
+import { GivingPage } from './components/pages/GivingPage';
+import { CarePage } from './components/pages/CarePage';
+import { TenantDataProvider } from './contexts/TenantDataContext';
+import { useRiskEnrichedPeople, usePeopleDashboardData, useGivingAnalyticsData, useGroupsDashboardData, useAttendanceChartData } from './hooks/useDashboardData';
 import { syncAllData, syncGroupsData, syncServicesData, syncRecentGiving } from './services/pcoSyncService';
 import { initializeWebhooks } from './services/pcoWebhookService';
 import { LoginView } from './components/LoginView';
@@ -45,7 +54,52 @@ const App: React.FC = () => {
   const [church, setChurch] = useState<Church | null>(null);
   const [allChurches, setAllChurches] = useState<Church[]>([]);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState('dashboard');
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const view = useMemo(() => {
+     const path = location.pathname;
+     if (path.startsWith('/people/households')) return 'people-households';
+     if (path.startsWith('/people/risk')) return 'people-risk';
+     if (path.startsWith('/people/reports')) return 'people-reports';
+     if (path.startsWith('/people')) return 'people';
+     if (path.startsWith('/groups')) return 'groups';
+     if (path.startsWith('/services/attendance')) return 'services-attendance';
+     if (path.startsWith('/services/teams')) return 'services-teams';
+     if (path.startsWith('/services/reminders')) return 'services-reminders';
+     if (path.startsWith('/services')) return 'services';
+     if (path.startsWith('/giving/donor')) return 'giving-donor';
+     if (path.startsWith('/giving/budgets')) return 'giving-budgets';
+     if (path.startsWith('/giving/donations')) return 'giving-donations';
+     if (path.startsWith('/giving/reports')) return 'giving-reports';
+     if (path.startsWith('/giving')) return 'giving';
+     if (path.startsWith('/care/membership')) return 'pastoral-membership';
+     if (path.startsWith('/care/community')) return 'pastoral-community';
+     if (path.startsWith('/care/calendar')) return 'pastoral-calendar';
+     if (path.startsWith('/care')) return 'pastoral';
+     if (path.startsWith('/metrics/input')) return 'metrics-input';
+     if (path.startsWith('/metrics/settings')) return 'metrics-settings';
+     if (path.startsWith('/metrics')) return 'metrics';
+     if (path.startsWith('/settings')) return 'settings';
+     if (path.startsWith('/app-settings')) return 'app-settings';
+     if (path.startsWith('/global-admin')) return 'global-admin';
+     if (path.startsWith('/library')) return 'library';
+     if (path.startsWith('/tools/emails')) return 'tools-emails';
+     if (path.startsWith('/tools/polls')) return 'tools-polls';
+     if (path.startsWith('/tools/website')) return 'tools-website';
+     if (path.startsWith('/tools/unsubscribers')) return 'tools-unsubscribers';
+     if (path.startsWith('/tools/qrcodes')) return 'tools-qrcodes';
+     if (path.startsWith('/tools/notes')) return 'tools-notes';
+     if (path.startsWith('/tools/workflows')) return 'tools-workflows';
+     if (path.startsWith('/tools/sms/inbox')) return 'tools-sms-inbox';
+     if (path.startsWith('/tools/sms/campaigns')) return 'tools-sms-campaigns';
+     if (path.startsWith('/tools/sms/keywords')) return 'tools-sms-keywords';
+     if (path.startsWith('/tools/sms/analytics')) return 'tools-sms-analytics';
+     if (path.startsWith('/tools/sms/agent')) return 'tools-sms-agent';
+     if (path.startsWith('/tools/sms')) return 'tools-sms-inbox';
+     if (path.startsWith('/tools')) return 'tools';
+     return 'dashboard';
+  }, [location.pathname]);
   const [isRegistering, setIsRegistering] = useState(window.location.pathname === '/register');
   const [settingsTab, setSettingsTab] = useState<string>('Team'); // Controls initial tab in Settings
 
@@ -260,7 +314,7 @@ const App: React.FC = () => {
                   
                   // Ensure we are on the settings page to see the result
                   setSettingsTab('Planning Center');
-                  setView('settings');
+                  handleNavigate('settings');
 
               } catch (e: any) {
                   console.error("PCO Auth Error:", e);
@@ -415,16 +469,36 @@ const App: React.FC = () => {
   };
 
   const handleNavigate = (newView: string) => {
-      // Upgrade legacy bare 'tools' route to first available sub-page
       let resolvedView = newView;
+      let path = '/';
+      
       if (newView === 'tools') {
           const toolViews = ['tools-emails', 'tools-sms-inbox', 'tools-workflows', 'tools-polls', 'tools-notes', 'tools-website', 'tools-qrcodes', 'tools-unsubscribers'];
           const availableTool = toolViews.find(tv => hasPermission(tv));
           resolvedView = availableTool || 'dashboard';
       }
-      
+
       if (hasPermission(resolvedView)) {
-          setView(resolvedView);
+          if (resolvedView === 'dashboard') path = '/';
+          else if (resolvedView === 'people') path = '/people';
+          else if (resolvedView === 'groups') path = '/groups';
+          else if (resolvedView === 'services') path = '/services';
+          else if (resolvedView === 'giving') path = '/giving';
+          else if (resolvedView === 'pastoral') path = '/care';
+          else if (resolvedView === 'metrics') path = '/metrics';
+          else if (resolvedView === 'settings') path = '/settings';
+          else if (resolvedView === 'global-admin') path = '/global-admin';
+          else if (resolvedView === 'ai-assistant') path = '/ai-assistant';
+          else if (resolvedView === 'tools-emails') path = '/tools/emails';
+          else if (resolvedView === 'tools-sms-inbox') path = '/tools/sms/inbox';
+          else if (resolvedView === 'tools-workflows') path = '/tools/workflows';
+          else if (resolvedView === 'tools-polls') path = '/tools/polls';
+          else if (resolvedView === 'tools-notes') path = '/tools/notes';
+          else if (resolvedView === 'tools-website') path = '/tools/website';
+          else if (resolvedView === 'tools-qrcodes') path = '/tools/qrcodes';
+          else if (resolvedView === 'tools-unsubscribers') path = '/tools/unsubscribers';
+          
+          navigate(path);
           loadWidgets(user!, resolvedView);
       }
   };
@@ -548,296 +622,11 @@ const App: React.FC = () => {
 
   // --- Derived Data Calculations ---
 
-  // Risk Calculation (Enrich People with Risk Profiles)
-  const riskEnrichedPeople = useMemo(() => {
-      // Create a set of people in ANY group for easy risk calc lookup
-      const groupMemberMap = new Set<string>();
-      if (groups) {
-          groups.forEach(g => {
-              if (g.memberIds) {
-                  g.memberIds.forEach(mid => groupMemberMap.add(mid));
-              }
-          });
-      }
-
-      const peopleWithGroups = people.map(p => ({
-          ...p,
-          groupIds: groupMemberMap.has(p.id) ? ['exists'] : [] // Simple check for now
-      }));
-
-      if (!peopleWithGroups || peopleWithGroups.length === 0) return [];
-      return calculateBulkRisk(
-          peopleWithGroups, 
-          donations, 
-          groups, 
-          servicesData?.recentPlans || [], 
-          teams, 
-          church?.riskSettings || DEFAULT_RISK_SETTINGS
-      );
-  }, [people, donations, groups, servicesData, teams, church?.riskSettings]);
-
-  const attendanceData = useMemo<AttendanceData[]>(() => {
-      return attendance.map(a => ({
-          date: a.date,
-          attendance: a.count,
-          newComers: a.guests
-      }));
-  }, [attendance]);
-
-  // People Dashboard Data
-  const peopleDashboardData = useMemo<PeopleDashboardData>(() => {
-      const total = people.length;
-      const members = people.filter(p => p.membership === 'Member').length;
-      const newThisMonth = people.filter(p => {
-          const d = new Date(p.createdAt);
-          const now = new Date();
-          return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-      }).length;
-      
-      const genderData = [
-          { name: 'Male', value: people.filter(p => p.gender === 'M' || p.gender === 'Male').length },
-          { name: 'Female', value: people.filter(p => p.gender === 'F' || p.gender === 'Female').length },
-      ].filter(d => d.value > 0);
-
-      const membershipCounts: Record<string, number> = {};
-      people.forEach(p => {
-          const m = p.membership || 'No Status';
-          membershipCounts[m] = (membershipCounts[m] || 0) + 1;
-      });
-      const membershipData = Object.entries(membershipCounts)
-          .map(([name, value]) => ({ name, value }))
-          .sort((a, b) => b.value - a.value);
-
-      const cityMap = new Map<string, number>();
-      const zipMap = new Map<string, number>();
-      people.forEach(p => {
-          if (p.addresses && p.addresses.length > 0) {
-              const addr = p.addresses[0];
-              if (addr.city) cityMap.set(addr.city, (cityMap.get(addr.city) || 0) + 1);
-              if (addr.zip) zipMap.set(addr.zip, (zipMap.get(addr.zip) || 0) + 1);
-          }
-      });
-
-      const ageBuckets: Record<string, number> = { '0-18': 0, '19-30': 0, '31-50': 0, '51-70': 0, '70+': 0 };
-      const currentYear = new Date().getFullYear();
-      people.forEach(p => {
-          if (p.birthdate) {
-              const birthYear = parseInt(p.birthdate.split('-')[0]);
-              const age = currentYear - birthYear;
-              if (age <= 18) ageBuckets['0-18']++;
-              else if (age <= 30) ageBuckets['19-30']++;
-              else if (age <= 50) ageBuckets['31-50']++;
-              else if (age <= 70) ageBuckets['51-70']++;
-              else ageBuckets['70+']++;
-          }
-      });
-      const ageData = Object.entries(ageBuckets).map(([range, count]) => ({ range, count }));
-
-      const householdMap = new Map<string, PcoPerson[]>();
-      people.forEach(p => {
-          if (p.householdId) {
-              if (!householdMap.has(p.householdId)) householdMap.set(p.householdId, []);
-              householdMap.get(p.householdId)?.push(p);
-          }
-      });
-      const pcoHouseholds = householdMap.size;
-      const looseCount = people.filter(p => !p.householdId).length;
-      const totalHouseholds = pcoHouseholds + looseCount;
-      const avgSize = totalHouseholds > 0 ? total / totalHouseholds : 0;
-
-      let familyCount = 0;
-      householdMap.forEach(members => { if (members.length > 1) familyCount++; });
-      const composition = [{ type: 'Family', count: familyCount }, { type: 'Individual', count: looseCount + (pcoHouseholds - familyCount) }];
-
-      const sizeDist: Record<string, number> = {};
-      householdMap.forEach(m => {
-          const s = m.length;
-          sizeDist[s] = (sizeDist[s] || 0) + 1;
-      });
-      if (looseCount > 0) sizeDist['1'] = (sizeDist['1'] || 0) + looseCount;
-      const sizeDistribution = Object.entries(sizeDist).map(([size, count]) => ({ size: `${size} Person`, count })).sort((a,b) => parseInt(a.size) - parseInt(b.size));
-
-      const householdList = Array.from(householdMap.entries()).map(([id, members]) => {
-          let name = members[0].householdName || '';
-          if (!name) {
-              const lastName = members[0].name.split(' ').pop() || 'Unknown';
-              name = `${lastName} Household`;
-          }
-          return { id, name, memberCount: members.length, members };
-      }).sort((a,b) => b.memberCount - a.memberCount);
-
-      // Stable calculation of 'Today' for consistent sorting
-      const today = new Date();
-      today.setHours(0,0,0,0);
-
-      // Helper to calculate next occurrence of a date (birthday/anniversary)
-      const getNextDate = (dateStr: string) => {
-          const [y, m, d] = dateStr.split('-').map(Number);
-          const currentYear = today.getFullYear();
-          const target = new Date(currentYear, m - 1, d);
-          
-          if (target < today) {
-              target.setFullYear(currentYear + 1);
-          }
-          return target;
-      };
-
-      return {
-          stats: {
-              total,
-              members,
-              nonMembers: total - members,
-              newThisMonth,
-              households: totalHouseholds
-          },
-          genderData,
-          membershipData,
-          ageData,
-          engagementData: [
-              { name: 'Core', value: people.filter(p => p.checkInCount && p.checkInCount > 8).length },
-              { name: 'Regular', value: people.filter(p => p.checkInCount && p.checkInCount >= 4 && p.checkInCount <= 8).length },
-              { name: 'Sporadic', value: people.filter(p => p.checkInCount && p.checkInCount > 0 && p.checkInCount < 4).length },
-              { name: 'Inactive', value: people.filter(p => !p.checkInCount || p.checkInCount === 0).length }
-          ],
-          upcomingBirthdays: riskEnrichedPeople
-              .filter(p => p.birthdate && p.status !== 'inactive') // Filter inactive
-              .sort((a, b) => getNextDate(a.birthdate!).getTime() - getNextDate(b.birthdate!).getTime())
-              .slice(0, 8),
-          upcomingAnniversaries: riskEnrichedPeople
-              .filter(p => p.anniversary && p.status !== 'inactive') // Filter inactive
-              .sort((a, b) => getNextDate(a.anniversary!).getTime() - getNextDate(b.anniversary!).getTime())
-              .slice(0, 8),
-          recentPeople: [...riskEnrichedPeople]
-              .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-              .slice(0, 10),
-          geoData: {
-              byCity: Array.from(cityMap.entries()).map(([name, value]) => ({ name, value })).sort((a,b) => b.value - a.value).slice(0, 20),
-              byZip: Array.from(zipMap.entries()).map(([name, value]) => ({ name, value })).sort((a,b) => b.value - a.value).slice(0, 10)
-          },
-          allPeople: riskEnrichedPeople,
-          householdStats: {
-              totalHouseholds,
-              pcoHouseholds,
-              avgSize,
-              sizeDistribution,
-              composition,
-              householdList
-          },
-          recentRiskChanges,
-          recentStatusChanges
-      };
-  }, [people, riskEnrichedPeople, recentRiskChanges, recentStatusChanges]);
-
-  const givingAnalyticsData = useMemo(() => {
-      return calculateGivingAnalytics(
-          donations, 
-          givingFilter, 
-          givingDateRange.start && givingDateRange.end ? givingDateRange : undefined, 
-          people,
-          church?.donorLifecycleSettings || DEFAULT_LIFECYCLE_SETTINGS
-      );
-  }, [donations, givingFilter, givingDateRange, people, church?.donorLifecycleSettings]);
-
-  const groupsDashboardData = useMemo<GroupsDashboardData>(() => {
-      const totalEnrollment = groups.reduce((sum, g) => sum + g.membersCount, 0);
-      const groupTypeMap = new Map<string, number>();
-      let totalAverageAttendance = 0;
-
-      groups.forEach(g => {
-          groupTypeMap.set(g.groupTypeName || 'Unknown', (groupTypeMap.get(g.groupTypeName || 'Unknown') || 0) + 1);
-          
-          if (g.attendanceHistory && g.attendanceHistory.length > 0) {
-              const events = [...g.attendanceHistory].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-              const recentEvents = events.slice(0, 4);
-              const sum = recentEvents.reduce((acc, ev) => acc + (ev.count || 0), 0);
-              if (recentEvents.length > 0) {
-                  totalAverageAttendance += sum / recentEvents.length;
-              }
-          }
-      });
-
-      totalAverageAttendance = Math.round(totalAverageAttendance);
-
-      // Calculate Gender Distribution based on Group Members
-      let male = 0;
-      let female = 0;
-      
-      // Create a set of unique person IDs who are in any group
-      const allGroupMemberIds = new Set<string>();
-      groups.forEach(g => {
-          if (g.memberIds) {
-              g.memberIds.forEach(mid => allGroupMemberIds.add(mid));
-          }
-      });
-
-      // Cross-reference with People list
-      if (people) {
-          people.forEach(p => {
-              if (allGroupMemberIds.has(p.id)) {
-                  const g = p.gender?.toLowerCase();
-                  if (g === 'm' || g === 'male') male++;
-                  else if (g === 'f' || g === 'female') female++;
-              }
-          });
-      }
-
-      const genderDistribution = [
-          { name: 'Male', value: male },
-          { name: 'Female', value: female }
-      ].filter(d => d.value > 0);
-
-      // Calculate Church Progress Stats specifically
-      const now = new Date();
-      const thirtyDaysAgoIso = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      const sixtyDaysAgoIso = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      const todayIso = now.toISOString().split('T')[0];
-
-      const attendedThisMonth = new Set<string>();
-      const attendedLastMonth = new Set<string>();
-
-      groups.forEach(g => {
-          if (g.attendanceHistory) {
-              g.attendanceHistory.forEach(h => {
-                  const eventDate = h.date.split('T')[0];
-                  if (eventDate > todayIso || eventDate < sixtyDaysAgoIso) return;
-                  
-                  if (h.attendeeIds) {
-                      h.attendeeIds.forEach(id => {
-                          if (eventDate >= thirtyDaysAgoIso) {
-                              attendedThisMonth.add(id);
-                          } else if (eventDate >= sixtyDaysAgoIso && eventDate < thirtyDaysAgoIso) {
-                              attendedLastMonth.add(id);
-                          }
-                      });
-                  }
-              });
-          }
-      });
-
-      return {
-          stats: {
-              totalGroups: groups.length,
-              totalEnrollment,
-              averageGroupSize: groups.length > 0 ? Math.round(totalEnrollment / groups.length) : 0,
-              publicGroups: groups.filter(g => g.isPublic).length,
-              averageAttendance: totalAverageAttendance
-          },
-          groupsByType: Array.from(groupTypeMap.entries()).map(([name, value]) => ({ name, value })),
-          groupsByDay: [],
-          allGroups: groups,
-          recentGroups: groups.slice(0, 5),
-          genderDistribution,
-          progressStats: { thisMonth: attendedThisMonth.size, lastMonth: attendedLastMonth.size }
-      };
-  }, [groups, people]);
-
-  const attendanceChartData = useMemo(() => {
-      return attendance.map(a => ({
-          date: a.date,
-          attendance: a.count,
-          newComers: a.guests
-      }));
-  }, [attendance]);
+  const riskEnrichedPeople = useRiskEnrichedPeople(people, groups, donations, servicesData, teams, church?.riskSettings);
+  const peopleDashboardData = usePeopleDashboardData(people, riskEnrichedPeople, recentRiskChanges, recentStatusChanges);
+  const givingAnalyticsData = useGivingAnalyticsData(donations, givingFilter, givingDateRange, people, church?.donorLifecycleSettings);
+  const groupsDashboardData = useGroupsDashboardData(groups, people);
+  const attendanceChartData = useAttendanceChartData(attendance);
 
   const handleGenerateAIInsights = async () => {
       if (!church) return;
@@ -943,335 +732,180 @@ const App: React.FC = () => {
             onCustomize={handleCustomizeLayout}
         />
     )}
-    <Layout 
-        user={user} 
-        church={church} 
-        allChurches={allChurches}
-        onSwitchChurch={handleSwitchChurch}
-        onLogout={() => auth.signOut()} 
-        currentView={view} 
-        onNavigate={handleNavigate}
-        hasPermission={hasPermission}
-        onRefreshUser={() => firestore.getUserProfile(user.id).then(u => u && setUser(u))}
-        isSyncing={isSyncing}
-        enableLibrary={systemSettings?.enableLibrary}
-        noPadding={view.startsWith('tools')}
-        subNavItems={view.startsWith('tools-sms') ? [
-            { label: 'Inbox',     view: 'tools-sms-inbox',     icon: <span className="text-sm">📥</span> },
-            { label: 'Broadcast', view: 'tools-sms-campaigns', icon: <span className="text-sm">📨</span> },
-            { label: 'Keywords',  view: 'tools-sms-keywords',  icon: <span className="text-sm">🔑</span> },
-            { label: 'Analytics', view: 'tools-sms-analytics', icon: <span className="text-sm">📊</span> },
-            { label: 'AI Agent',  view: 'tools-sms-agent',     icon: <span className="text-sm">✨</span> },
-        ] : undefined}
-    >
-        {view === 'dashboard' && (
-            <DashboardView 
-                user={user}
-                peopleData={peopleDashboardData}
-                givingAnalytics={givingAnalyticsData}
-                groupsData={groupsDashboardData}
-                servicesData={servicesData}
-                attendanceData={attendanceChartData}
-                censusData={censusData}
-                visibleWidgets={widgets}
-                onUpdateWidgets={handleUpdateWidgets}
-                budgets={budgets}
-                funds={funds}
-                donations={donations}
-                pcoConnected={church.pcoConnected}
-                onConnectPco={() => {
-                    setSettingsTab('Planning Center');
-                    setView('settings');
-                }}
-                allowedWidgetIds={safeEnabledWidgets}
-                globalInsights={globalInsights}
-                isGeneratingInsights={isGeneratingInsights}
-                onUpdateTheme={handleUpdateUserTheme}
-                churchRiskSettings={church.churchRiskSettings}
-                onGenerateInsights={handleGenerateAIInsights}
-                churchName={church.name}
-            />
-        )}
-        {(view === 'people' || view === 'people-households' || view === 'people-risk' || view === 'people-reports') && (
-            <PeopleView 
-                data={peopleDashboardData}
-                activePage={
-                    view === 'people-households' ? 'households' :
-                    view === 'people-risk'       ? 'risk'       :
-                    view === 'people-reports'    ? 'reports'    :
-                    'overview'
-                }
-                overviewWidgets={widgets}
-                householdWidgets={user.widgetPreferences?.['people_households'] || getDefaultWidgets('people_households')}
-                riskWidgets={user.widgetPreferences?.['people_risk'] || getDefaultWidgets('people_risk')}
-                onUpdateOverviewWidgets={handleUpdateWidgets}
-                onUpdateHouseholdWidgets={(w) => {
-                    const newPrefs = { ...user.widgetPreferences, 'people_households': w };
-                    firestore.updateUserPreferences(user.id, newPrefs);
-                    setUser({ ...user, widgetPreferences: newPrefs });
-                }}
-                onUpdateRiskWidgets={(w) => {
-                    const newPrefs = { ...user.widgetPreferences, 'people_risk': w };
-                    firestore.updateUserPreferences(user.id, newPrefs);
-                    setUser({ ...user, widgetPreferences: newPrefs });
-                }}
-                geoInsights={geoInsights}
-                isGeneratingGeo={isGeneratingGeo}
-                onGenerateGeoInsights={handleGenerateGeoInsights}
-                censusData={censusData}
-                allowedWidgetIds={safeEnabledWidgets}
-                onSync={handleSync}
+    
+        <TenantDataProvider value={{
+            user, church, allChurches, systemSettings, widgets,
+            people, groups, attendance, donations, funds, budgets, teams,
+            recentRiskChanges, recentStatusChanges, servicesData,
+            setPeople, setGroups, setAttendance, setDonations, setFunds, setBudgets,
+            setTeams, setRecentRiskChanges, setRecentStatusChanges, setServicesData
+        }}>
+            <Layout 
+                user={user} 
+                church={church} 
+                allChurches={allChurches}
+                onSwitchChurch={handleSwitchChurch}
+                onLogout={() => auth.signOut()} 
+                currentView={view} 
+                onNavigate={handleNavigate}
+                hasPermission={hasPermission}
+                onRefreshUser={() => firestore.getUserProfile(user.id).then(u => u && setUser(u))}
                 isSyncing={isSyncing}
-                pcoConnected={church.pcoConnected}
-                churchId={church.id}
-                apiBaseUrl={systemSettings?.apiBaseUrl || 'https://pastoralcare.barnabassoftware.com'}
-                onUpdateTheme={handleUpdateUserTheme}
-                currentTheme={user.theme}
-            />
-        )}
-        {view === 'groups' && (
-            <GroupsView 
-                data={groupsDashboardData}
-                pcoConnected={church.pcoConnected}
-                visibleWidgets={widgets}
-                onUpdateWidgets={handleUpdateWidgets}
-                allowedWidgetIds={safeEnabledWidgets}
-                onSync={handleSync}
-                onSyncGroups={handleSyncGroups}
-                isSyncing={isSyncing}
-                peopleData={peopleDashboardData}
-                onUpdateTheme={handleUpdateUserTheme}
-                currentTheme={user.theme}
-                groupRiskSettings={church.groupRiskSettings}
-            />
-        )}
-        {(view === 'services' || view === 'services-attendance' || view === 'services-teams' || view === 'services-reminders') && (
-            <ServicesView 
-                church={church}
-                onUpdateChurch={(updates) => { firestore.updateChurch(church.id, updates); setChurch({ ...church, ...updates }); }}
-                data={servicesData}
-                isLoading={!servicesData}
-                filter={servicesFilter}
-                onFilterChange={setServicesFilter}
-                pcoConnected={church.pcoConnected}
-                activePage={
-                    view === 'services-attendance' ? 'Attendance' :
-                    view === 'services-teams'      ? 'Teams'      :
-                    view === 'services-reminders'  ? 'Reminders'  :
-                    'Overview'
-                }
-                overviewWidgets={user.widgetPreferences?.['services_overview'] || getDefaultWidgets('services_overview')}
-                attendanceWidgets={user.widgetPreferences?.['services_attendance'] || getDefaultWidgets('services_attendance')}
-                teamsWidgets={user.widgetPreferences?.['services_teams'] || getDefaultWidgets('services_teams')}
-                onUpdateOverviewWidgets={(w) => {
-                    const newPrefs = { ...user.widgetPreferences, 'services_overview': w };
-                    firestore.updateUserPreferences(user.id, newPrefs);
-                    setUser({ ...user, widgetPreferences: newPrefs });
-                }}
-                onUpdateAttendanceWidgets={(w) => {
-                    const newPrefs = { ...user.widgetPreferences, 'services_attendance': w };
-                    firestore.updateUserPreferences(user.id, newPrefs);
-                    setUser({ ...user, widgetPreferences: newPrefs });
-                }}
-                onUpdateTeamsWidgets={(w) => {
-                    const newPrefs = { ...user.widgetPreferences, 'services_teams': w };
-                    firestore.updateUserPreferences(user.id, newPrefs);
-                    setUser({ ...user, widgetPreferences: newPrefs });
-                }}
-                allowedWidgetIds={safeEnabledWidgets}
-                onSync={handleSync}
-                isSyncing={isSyncing}
-                people={peopleDashboardData.allPeople}
-                onUpdateTheme={handleUpdateUserTheme}
-                currentTheme={user.theme}
-                churchId={church.id}
-            />
-        )}
-        {(view === 'giving' || view === 'giving-donor' || view === 'giving-budgets' || view === 'giving-donations' || view === 'giving-reports') && (
-            <GivingView 
-                analytics={givingAnalyticsData}
-                filter={givingFilter}
-                onFilterChange={setGivingFilter}
-                dateRange={givingFilter === 'Custom' ? givingDateRange : undefined}
-                onDateRangeChange={setGivingDateRange}
-                pcoConnected={church.pcoConnected}
-                activePage={
-                    view === 'giving-donor'     ? 'donor'     :
-                    view === 'giving-budgets'   ? 'budgets'   :
-                    view === 'giving-donations' ? 'donations' :
-                    view === 'giving-reports'   ? 'reports'   :
-                    'overview'
-                }
-                overviewWidgets={user.widgetPreferences?.['giving_overview'] || getDefaultWidgets('giving_overview')}
-                donorWidgets={user.widgetPreferences?.['giving_donors'] || getDefaultWidgets('giving_donors')}
-                onUpdateOverviewWidgets={(w) => {
-                    const newPrefs = { ...user.widgetPreferences, 'giving_overview': w };
-                    firestore.updateUserPreferences(user.id, newPrefs);
-                    setUser({ ...user, widgetPreferences: newPrefs });
-                }}
-                onUpdateDonorWidgets={(w) => {
-                    const newPrefs = { ...user.widgetPreferences, 'giving_donors': w };
-                    firestore.updateUserPreferences(user.id, newPrefs);
-                    setUser({ ...user, widgetPreferences: newPrefs });
-                }}
-                allowedWidgetIds={safeEnabledWidgets}
-                onSyncRecent={handleSyncRecentGiving}
-                isSyncing={isSyncing}
-                budgets={budgets}
-                funds={funds}
-                donations={donations}
-                churchId={church.id}
-                church={church}
-                people={peopleDashboardData.allPeople}
-                totalPeople={peopleDashboardData.stats.total}
-                onUpdateTheme={handleUpdateUserTheme}
-                currentTheme={user.theme}
-                onSaveBudget={handleSaveBudget}
-            />
-        )}
-        {(view === 'pastoral' || view === 'pastoral-membership' || view === 'pastoral-community' || view === 'pastoral-care' || view === 'pastoral-calendar') && (
-            <PastoralView 
-                user={user}
-                church={church}
-                attendanceData={attendanceChartData}
-                peopleData={peopleDashboardData}
-                givingAnalytics={givingAnalyticsData}
-                groupsData={groupsDashboardData}
-                pcoConnected={church.pcoConnected}
-                censusData={censusData}
-                churchConfig={{ city: church.city, state: church.state }}
-                censusError={censusError}
-                activePage={
-                    view === 'pastoral-membership' ? 'Membership' :
-                    view === 'pastoral-community'  ? 'Community'  :
-                    view === 'pastoral-care'       ? 'Care'       :
-                    view === 'pastoral-calendar'   ? 'Calendar'   :
-                    'Church'
-                }
-                churchWidgets={user.widgetPreferences?.['pastoral_church'] || getDefaultWidgets('pastoral')}
-                membershipWidgets={user.widgetPreferences?.['pastoral_membership'] || getDefaultWidgets('pastoral_membership')}
-                communityWidgets={user.widgetPreferences?.['pastoral_community'] || getDefaultWidgets('pastoral_community')}
-                careWidgets={user.widgetPreferences?.['pastoral_care'] || getDefaultWidgets('pastoral_care')}
-                onUpdateChurchWidgets={(w) => {
-                    const newPrefs = { ...user.widgetPreferences, 'pastoral_church': w };
-                    firestore.updateUserPreferences(user.id, newPrefs);
-                    setUser({ ...user, widgetPreferences: newPrefs });
-                }}
-                onUpdateMembershipWidgets={(w) => {
-                    const newPrefs = { ...user.widgetPreferences, 'pastoral_membership': w };
-                    firestore.updateUserPreferences(user.id, newPrefs);
-                    setUser({ ...user, widgetPreferences: newPrefs });
-                }}
-                onUpdateCommunityWidgets={(w) => {
-                    const newPrefs = { ...user.widgetPreferences, 'pastoral_community': w };
-                    firestore.updateUserPreferences(user.id, newPrefs);
-                    setUser({ ...user, widgetPreferences: newPrefs });
-                }}
-                onUpdateCareWidgets={(w) => {
-                    const newPrefs = { ...user.widgetPreferences, 'pastoral_care': w };
-                    firestore.updateUserPreferences(user.id, newPrefs);
-                    setUser({ ...user, widgetPreferences: newPrefs });
-                }}
-                allowedWidgetIds={safeEnabledWidgets}
-                googleMapsApiKey={church.googleMapsApiKey}
-                onUpdateTheme={handleUpdateUserTheme}
-            />
-        )}
-
-        {view === 'metrics' && (
-            <MetricsView 
-                churchId={church.id}
-                currentUser={user}
-                censusData={censusData}
-                peopleData={peopleDashboardData}
-                church={church}
-                activePage="Dashboard"
-                onUpdateChurch={(updates) => {
-                    firestore.updateChurch(church.id, updates);
-                    setChurch({ ...church, ...updates });
-                }}
-            />
-        )}
-        {view === 'metrics-input' && (
-            <MetricsView 
-                churchId={church.id}
-                currentUser={user}
-                censusData={censusData}
-                peopleData={peopleDashboardData}
-                church={church}
-                activePage="Input"
-                onUpdateChurch={(updates) => {
-                    firestore.updateChurch(church.id, updates);
-                    setChurch({ ...church, ...updates });
-                }}
-            />
-        )}
-        {view === 'metrics-settings' && (
-            <MetricsView 
-                churchId={church.id}
-                currentUser={user}
-                censusData={censusData}
-                peopleData={peopleDashboardData}
-                church={church}
-                activePage="Settings"
-                onUpdateChurch={(updates) => {
-                    firestore.updateChurch(church.id, updates);
-                    setChurch({ ...church, ...updates });
-                }}
-            />
-        )}
-        {view === 'settings' && (
-            <RoleAdminView 
-                currentUser={user}
-                churchId={church.id}
-                church={church}
-                onUpdateChurch={(updates) => {
-                    firestore.updateChurch(church.id, updates);
-                    setChurch({ ...church, ...updates });
-                }}
-                initialTab={settingsTab}
-                onSync={handleSync}
-            />
-        )}
-        {view === 'app-settings' && (
-            <SystemSettingsView 
-                settings={systemSettings || {}}
-                onSave={async (s) => {
-                    await firestore.saveSystemSettings(s);
-                    setSystemSettings(s);
-                }}
-                onRecalculateBenchmarks={async () => {
-                    // Implementation for recalculating benchmarks
-                }}
-            />
-        )}
-        {view === 'global-admin' && (
-            <GlobalAdminManager />
-        )}
-        {view === 'library' && (user.email === 'matthewhon01@gmail.com' || systemSettings?.enableLibrary) && (
-            <div className="flex-1 min-h-0 overflow-y-auto p-6">
-                <LibraryView churchId={church.id} />
-            </div>
-        )}
-        {/* ─── Tools: all sub-routes ─────────────────────────────────────── */}
-        {view === 'tools-emails' && <ToolsView churchId={church.id} church={church} currentUserId={user.id} currentUser={user} onUpdateChurch={(updates) => { firestore.updateChurch(church.id, updates); setChurch({ ...church, ...updates }); }} activePage="emails" />}
-        {view === 'tools-polls' && <ToolsView churchId={church.id} church={church} currentUserId={user.id} currentUser={user} onUpdateChurch={(updates) => { firestore.updateChurch(church.id, updates); setChurch({ ...church, ...updates }); }} activePage="polls" />}
-        {view === 'tools-website' && <ToolsView churchId={church.id} church={church} currentUserId={user.id} currentUser={user} onUpdateChurch={(updates) => { firestore.updateChurch(church.id, updates); setChurch({ ...church, ...updates }); }} activePage="website" />}
-        {view === 'tools-unsubscribers' && <ToolsView churchId={church.id} church={church} currentUserId={user.id} currentUser={user} onUpdateChurch={(updates) => { firestore.updateChurch(church.id, updates); setChurch({ ...church, ...updates }); }} activePage="unsubscribers" />}
-        {view === 'tools-qrcodes' && <ToolsView churchId={church.id} church={church} currentUserId={user.id} currentUser={user} onUpdateChurch={(updates) => { firestore.updateChurch(church.id, updates); setChurch({ ...church, ...updates }); }} activePage="qrcodes" />}
-        {view === 'tools-notes'   && <ToolsView churchId={church.id} church={church} currentUserId={user.id} currentUser={user} onUpdateChurch={(updates) => { firestore.updateChurch(church.id, updates); setChurch({ ...church, ...updates }); }} activePage="notes" />}
-        {/* Workflows — standalone, no SMS sub-nav */}
-        {view === 'tools-workflows' && church && <SmsWorkflowsManager churchId={church.id} />}
-        {/* SMS sub-routes — controlledTab drives panel selection; pill-nav hidden automatically */}
-        {(view === 'tools-sms-inbox' || view === 'tools-sms') && <ToolsView churchId={church.id} church={church} currentUserId={user.id} currentUser={user} onUpdateChurch={(updates) => { firestore.updateChurch(church.id, updates); setChurch({ ...church, ...updates }); }} activePage="messaging" smsTab="inbox" />}
-        {view === 'tools-sms-campaigns' && <ToolsView churchId={church.id} church={church} currentUserId={user.id} currentUser={user} onUpdateChurch={(updates) => { firestore.updateChurch(church.id, updates); setChurch({ ...church, ...updates }); }} activePage="messaging" smsTab="campaigns" />}
-        {/* tools-sms-workflows kept as redirect alias for any bookmarks */}
-        {view === 'tools-sms-workflows' && <ToolsView churchId={church.id} church={church} currentUserId={user.id} currentUser={user} onUpdateChurch={(updates) => { firestore.updateChurch(church.id, updates); setChurch({ ...church, ...updates }); }} activePage="messaging" smsTab="workflows" />}
-        {view === 'tools-sms-keywords' && <ToolsView churchId={church.id} church={church} currentUserId={user.id} currentUser={user} onUpdateChurch={(updates) => { firestore.updateChurch(church.id, updates); setChurch({ ...church, ...updates }); }} activePage="messaging" smsTab="keywords" />}
-        {view === 'tools-sms-analytics' && <ToolsView churchId={church.id} church={church} currentUserId={user.id} currentUser={user} onUpdateChurch={(updates) => { firestore.updateChurch(church.id, updates); setChurch({ ...church, ...updates }); }} activePage="messaging" smsTab="analytics" />}
-        {view === 'tools-sms-agent'    && <ToolsView churchId={church.id} church={church} currentUserId={user.id} currentUser={user} onUpdateChurch={(updates) => { firestore.updateChurch(church.id, updates); setChurch({ ...church, ...updates }); }} activePage="messaging" smsTab="agent" />}
-
-    </Layout>
+                enableLibrary={systemSettings?.enableLibrary}
+                noPadding={view.startsWith('tools')}
+                subNavItems={view.startsWith('tools-sms') ? [
+                    { label: 'Inbox',     view: 'tools-sms-inbox',     icon: <span className="text-sm">📥</span> },
+                    { label: 'Broadcast', view: 'tools-sms-campaigns', icon: <span className="text-sm">📨</span> },
+                    { label: 'Keywords',  view: 'tools-sms-keywords',  icon: <span className="text-sm">🔑</span> },
+                    { label: 'Analytics', view: 'tools-sms-analytics', icon: <span className="text-sm">📊</span> },
+                    { label: 'AI Agent',  view: 'tools-sms-agent',     icon: <span className="text-sm">✨</span> },
+                ] : undefined}
+            >
+            <Routes>
+                <Route path="/" element={
+                    <DashboardPage 
+                        onUpdateWidgets={handleUpdateWidgets}
+                        onConnectPco={() => { setSettingsTab('Planning Center'); handleNavigate('settings'); }}
+                        allowedWidgetIds={safeEnabledWidgets}
+                        globalInsights={globalInsights}
+                        isGeneratingInsights={isGeneratingInsights}
+                        onUpdateTheme={handleUpdateUserTheme}
+                        onGenerateInsights={handleGenerateAIInsights}
+                        givingFilter={givingFilter}
+                        givingDateRange={givingDateRange}
+                    />
+                } />
+                <Route path="/people/*" element={
+                    <PeoplePage 
+                        geoInsights={geoInsights}
+                        isGeneratingGeo={isGeneratingGeo}
+                        onGenerateGeoInsights={handleGenerateGeoInsights}
+                        censusData={censusData}
+                        allowedWidgetIds={safeEnabledWidgets}
+                        onSync={handleSync}
+                        isSyncing={isSyncing}
+                        apiBaseUrl={systemSettings?.apiBaseUrl || 'https://pastoralcare.barnabassoftware.com'}
+                        onUpdateTheme={handleUpdateUserTheme}
+                        setUser={setUser}
+                        onUpdateWidgets={handleUpdateWidgets}
+                    />
+                } />
+                <Route path="/groups/*" element={
+                    <GroupsPage 
+                        allowedWidgetIds={safeEnabledWidgets}
+                        onSync={handleSync}
+                        onSyncGroups={handleSyncGroups}
+                        isSyncing={isSyncing}
+                        onUpdateTheme={handleUpdateUserTheme}
+                        onUpdateWidgets={handleUpdateWidgets}
+                    />
+                } />
+                <Route path="/services/*" element={
+                    <ServicesPage 
+                        onUpdateChurch={(updates) => { firestore.updateChurch(church!.id, updates); setChurch({ ...church!, ...updates }); }}
+                        servicesFilter={servicesFilter}
+                        onFilterChange={setServicesFilter}
+                        allowedWidgetIds={safeEnabledWidgets}
+                        onSync={handleSync}
+                        isSyncing={isSyncing}
+                        onUpdateTheme={handleUpdateUserTheme}
+                        setUser={setUser}
+                    />
+                } />
+                <Route path="/giving/*" element={
+                    <GivingPage 
+                        givingFilter={givingFilter}
+                        onFilterChange={setGivingFilter}
+                        givingDateRange={givingDateRange}
+                        onDateRangeChange={setGivingDateRange}
+                        allowedWidgetIds={safeEnabledWidgets}
+                        onSyncRecent={handleSyncRecentGiving}
+                        isSyncing={isSyncing}
+                        onUpdateTheme={handleUpdateUserTheme}
+                        setUser={setUser}
+                        onSaveBudget={handleSaveBudget}
+                    />
+                } />
+                <Route path="/care/*" element={
+                    <CarePage 
+                        censusData={censusData}
+                        censusError={censusError}
+                        allowedWidgetIds={safeEnabledWidgets}
+                        onUpdateTheme={handleUpdateUserTheme}
+                        setUser={setUser}
+                        givingFilter={givingFilter}
+                        givingDateRange={givingDateRange}
+                    />
+                } />
+                
+                {/* Legacy Views that still accept data directly until further refactored */}
+                <Route path="/metrics/*" element={
+                    <MetricsView 
+                        churchId={church!.id}
+                        currentUser={user!}
+                        censusData={censusData}
+                        peopleData={peopleDashboardData}
+                        church={church!}
+                        activePage={view === 'metrics-input' ? 'Input' : view === 'metrics-settings' ? 'Settings' : 'Dashboard'}
+                        onUpdateChurch={(updates) => { firestore.updateChurch(church!.id, updates); setChurch({ ...church!, ...updates }); }}
+                    />
+                } />
+                <Route path="/settings" element={
+                    <RoleAdminView 
+                        currentUser={user!}
+                        churchId={church!.id}
+                        church={church!}
+                        onUpdateChurch={(updates) => { firestore.updateChurch(church!.id, updates); setChurch({ ...church!, ...updates }); }}
+                        initialTab={settingsTab}
+                        onSync={handleSync}
+                    />
+                } />
+                <Route path="/app-settings" element={
+                    <SystemSettingsView 
+                        settings={systemSettings || {}}
+                        onSave={async (s) => { await firestore.saveSystemSettings(s); setSystemSettings(s); }}
+                        onRecalculateBenchmarks={async () => {}}
+                    />
+                } />
+                <Route path="/global-admin" element={<GlobalAdminManager />} />
+                <Route path="/library" element={
+                    (user?.email === 'matthewhon01@gmail.com' || systemSettings?.enableLibrary) ? (
+                        <div className="flex-1 min-h-0 overflow-y-auto p-6">
+                            <LibraryView churchId={church!.id} />
+                        </div>
+                    ) : <Navigate to="/" replace />
+                } />
+                
+                <Route path="/tools/emails" element={<ToolsView churchId={church!.id} church={church!} currentUserId={user!.id} currentUser={user!} onUpdateChurch={(updates) => { firestore.updateChurch(church!.id, updates); setChurch({ ...church!, ...updates }); }} activePage="emails" />} />
+                <Route path="/tools/polls" element={<ToolsView churchId={church!.id} church={church!} currentUserId={user!.id} currentUser={user!} onUpdateChurch={(updates) => { firestore.updateChurch(church!.id, updates); setChurch({ ...church!, ...updates }); }} activePage="polls" />} />
+                <Route path="/tools/website" element={<ToolsView churchId={church!.id} church={church!} currentUserId={user!.id} currentUser={user!} onUpdateChurch={(updates) => { firestore.updateChurch(church!.id, updates); setChurch({ ...church!, ...updates }); }} activePage="website" />} />
+                <Route path="/tools/unsubscribers" element={<ToolsView churchId={church!.id} church={church!} currentUserId={user!.id} currentUser={user!} onUpdateChurch={(updates) => { firestore.updateChurch(church!.id, updates); setChurch({ ...church!, ...updates }); }} activePage="unsubscribers" />} />
+                <Route path="/tools/qrcodes" element={<ToolsView churchId={church!.id} church={church!} currentUserId={user!.id} currentUser={user!} onUpdateChurch={(updates) => { firestore.updateChurch(church!.id, updates); setChurch({ ...church!, ...updates }); }} activePage="qrcodes" />} />
+                <Route path="/tools/notes" element={<ToolsView churchId={church!.id} church={church!} currentUserId={user!.id} currentUser={user!} onUpdateChurch={(updates) => { firestore.updateChurch(church!.id, updates); setChurch({ ...church!, ...updates }); }} activePage="notes" />} />
+                <Route path="/tools/workflows" element={<SmsWorkflowsManager churchId={church!.id} />} />
+                <Route path="/tools/sms/*" element={
+                    <ToolsView 
+                        churchId={church!.id} 
+                        church={church!} 
+                        currentUserId={user!.id} 
+                        currentUser={user!} 
+                        onUpdateChurch={(updates) => { firestore.updateChurch(church!.id, updates); setChurch({ ...church!, ...updates }); }} 
+                        activePage="messaging" 
+                        smsTab={
+                            view === 'tools-sms-campaigns' ? 'campaigns' :
+                            view === 'tools-sms-workflows' ? 'workflows' :
+                            view === 'tools-sms-keywords'  ? 'keywords'  :
+                            view === 'tools-sms-analytics' ? 'analytics' :
+                            view === 'tools-sms-agent'     ? 'agent'     : 'inbox'
+                        } 
+                    />
+                } />
+                
+                {/* Fallback route */}
+                <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+            </Layout>
+        </TenantDataProvider>
 
     {/* Global Profile Drawer Overlay */}
     {selectedPersonId && church && (

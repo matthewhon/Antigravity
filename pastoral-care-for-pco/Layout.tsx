@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { Church, User } from './types';
 
 interface LayoutProps {
@@ -45,13 +46,13 @@ const Layout: React.FC<LayoutProps> = ({ children, church, allChurches, onSwitch
       {/* Top Navigation Bar */}
       <header className="bg-slate-900 text-white px-6 py-3 flex items-center justify-between shadow-md z-20">
         {/* Left: Logo & Brand */}
-        <div className="flex items-center gap-4 cursor-pointer" onClick={() => onNavigate('dashboard')}>
+        <Link to="/" className="flex items-center gap-4 cursor-pointer">
           <AppLogo size={36} />
           <div className="leading-none">
             <h1 className="font-black text-sm tracking-tight text-white">Pastoral Care</h1>
             <p className="text-[9px] text-slate-400 uppercase font-black tracking-widest">for PCO</p>
           </div>
-        </div>
+        </Link>
 
         {/* Center: Navigation */}
         <nav className="hidden md:flex items-center gap-1">
@@ -59,8 +60,7 @@ const Layout: React.FC<LayoutProps> = ({ children, church, allChurches, onSwitch
               <NavItem 
                 icon="🌍" 
                 label="Global" 
-                active={currentView === 'global-admin'} 
-                onClick={() => onNavigate('global-admin')} 
+                path="/global-admin"
                 highlight="amber"
               />
             )}
@@ -69,70 +69,62 @@ const Layout: React.FC<LayoutProps> = ({ children, church, allChurches, onSwitch
               <NavItem 
                 icon="📊" 
                 label="Dashboard" 
-                active={currentView === 'dashboard'} 
-                onClick={() => onNavigate('dashboard')} 
+                path="/"
+                exact
               />
             )}
             {hasPermission('people') && (
               <NavItem 
                 icon="👥" 
                 label="People" 
-                active={currentView === 'people'} 
-                onClick={() => onNavigate('people')} 
+                path="/people"
               />
             )}
             {hasPermission('groups') && (
               <NavItem 
                 icon="📂" 
                 label="Groups" 
-                active={currentView === 'groups'} 
-                onClick={() => onNavigate('groups')} 
+                path="/groups"
               />
             )}
             {hasPermission('services') && (
               <NavItem 
                 icon="📅" 
                 label="Services" 
-                active={currentView === 'services'} 
-                onClick={() => onNavigate('services')} 
+                path="/services"
               />
             )}
             {hasPermission('giving') && (
               <NavItem 
                 icon="💰" 
                 label="Giving" 
-                active={currentView === 'giving'} 
-                onClick={() => onNavigate('giving')} 
+                path="/giving"
               />
             )}
             {hasPermission('pastoral') && (
               <NavItem 
                 icon="🕊️" 
                 label="Care" 
-                active={currentView === 'pastoral'} 
-                onClick={() => onNavigate('pastoral')} 
+                path="/care"
               />
             )}
              {hasPermission('metrics') && (
               <NavItem 
                 icon="📈" 
                 label="Metrics" 
-                active={currentView === 'metrics'} 
-                onClick={() => onNavigate('metrics')} 
+                path="/metrics"
               />
             )}
              <NavItem 
                 icon="🤖" 
                 label="AI Assistant" 
-                active={currentView === 'ai-assistant'} 
-                onClick={() => onNavigate('ai-assistant')} 
+                path="/ai-assistant"
               />
              {hasPermission('settings') && (
               <NavItem 
                 icon="⚙️" 
                 label="Settings" 
-                active={currentView === 'settings'} 
-                onClick={() => onNavigate('settings')} 
+                path="/settings"
               />
             )}
         </nav>
@@ -197,28 +189,31 @@ const Layout: React.FC<LayoutProps> = ({ children, church, allChurches, onSwitch
 interface NavItemProps {
   icon: string;
   label: string;
-  active?: boolean;
-  onClick: () => void;
+  path: string;
   highlight?: 'indigo' | 'amber';
+  exact?: boolean;
 }
 
-const NavItem: React.FC<NavItemProps> = ({ icon, label, active, onClick, highlight = 'indigo' }) => {
-  // Style matching the screenshot: Active items have a gradient/solid background, others are plain text
+const NavItem: React.FC<NavItemProps> = ({ icon, label, path, highlight = 'indigo', exact = false }) => {
+  const location = useLocation();
+  const active = exact ? location.pathname === path : location.pathname.startsWith(path);
+
   const activeClass = highlight === 'amber' 
     ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-lg shadow-amber-500/20' 
     : 'bg-gradient-to-r from-indigo-500 to-violet-600 text-white shadow-lg shadow-indigo-500/20';
 
   return (
-    <button 
-      onClick={onClick}
+    <Link 
+      to={path}
       className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 ${
         active ? activeClass : 'text-slate-400 hover:text-white hover:bg-slate-800'
       }`}
     >
       <span className="text-sm">{icon}</span>
       <span className="text-[10px] font-black uppercase tracking-widest">{label}</span>
-    </button>
+    </Link>
   );
 };
 
 export default Layout;
+

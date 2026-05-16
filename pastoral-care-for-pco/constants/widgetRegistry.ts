@@ -14,6 +14,7 @@ export const DASHBOARD_WIDGETS: WidgetDefinition[] = [
     { id: 'gender', label: 'Gender', icon: '🚻' },
     { id: 'age', label: 'Age', icon: '🎂' },
     { id: 'trends', label: 'Giving Trends', icon: '📈' },
+    { id: 'last_week_stats', label: 'Last Week Stats', icon: '📅' },
 ];
 
 export const PEOPLE_OVERVIEW_WIDGETS: WidgetDefinition[] = [
@@ -188,12 +189,12 @@ export const getRoleBasedDefaults = (roles: string[]): Record<string, string[]> 
     const isCare    = has('Pastoral Care') || isPastor;
 
     // Dashboard — everyone sees it; tailor by primary role
-    let dashboard = ['ai_insights', 'people_stats'];
-    if (isPastor)   dashboard = ['ai_insights', 'church_progress', 'people_stats', 'churchRisk', 'keyMetrics', 'groups_stats', 'services_stats'];
-    else if (isGiving)  dashboard = ['keyMetrics', 'people_stats', 'trends', 'groups_stats'];
-    else if (isServices) dashboard = ['services_stats', 'people_stats', 'ai_insights'];
-    else if (isPeople)  dashboard = ['people_stats', 'churchRisk', 'ai_insights'];
-    else if (isGroups)  dashboard = ['groups_stats', 'people_stats', 'ai_insights'];
+    let dashboard = ['ai_insights', 'people_stats', 'last_week_stats'];
+    if (isPastor)   dashboard = ['ai_insights', 'church_progress', 'last_week_stats', 'people_stats', 'churchRisk', 'keyMetrics', 'groups_stats', 'services_stats'];
+    else if (isGiving)  dashboard = ['keyMetrics', 'people_stats', 'trends', 'groups_stats', 'last_week_stats'];
+    else if (isServices) dashboard = ['services_stats', 'people_stats', 'ai_insights', 'last_week_stats'];
+    else if (isPeople)  dashboard = ['people_stats', 'churchRisk', 'ai_insights', 'last_week_stats'];
+    else if (isGroups)  dashboard = ['groups_stats', 'people_stats', 'ai_insights', 'last_week_stats'];
 
     return {
         dashboard,
@@ -240,7 +241,7 @@ export const getRoleBasedDefaults = (roles: string[]): Record<string, string[]> 
 
 export const getDefaultWidgets = (view: string): string[] => {
     switch (view) {
-        case 'dashboard': return ['ai_insights', 'church_progress', 'people_stats', 'keyMetrics', 'groups_stats', 'services_stats', 'churchRisk'];
+        case 'dashboard': return ['ai_insights', 'church_progress', 'last_week_stats', 'people_stats', 'keyMetrics', 'groups_stats', 'services_stats', 'churchRisk'];
         case 'people': return ['people_stats', 'people_engagement', 'gender', 'age', 'community_age_comparison', 'map'];
         case 'people_households': return ['householdSummary', 'householdComp', 'householdSize'];
         case 'people_risk': return ['riskDistribution', 'atRiskList'];

@@ -303,6 +303,116 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   </div>
               );
           
+          case 'last_week_stats': {
+              const now = new Date();
+              const todayIso = now.toISOString();
+              
+              const lastWeekDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+              const lastWeekIso = lastWeekDate.toISOString();
+              
+              const twoWeeksAgoDate = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+              const twoWeeksAgoIso = twoWeeksAgoDate.toISOString();
+
+              const getStats = () => {
+                  let profiles1 = 0, profiles2 = 0;
+                  if (peopleData?.allPeople) {
+                      peopleData.allPeople.forEach(p => {
+                          const date = p.createdAt;
+                          if (date >= lastWeekIso && date <= todayIso) profiles1++;
+                          else if (date >= twoWeeksAgoIso && date < lastWeekIso) profiles2++;
+                      });
+                  }
+
+                  let giving1 = 0, giving2 = 0;
+                  const donors1 = new Set<string>();
+                  const donors2 = new Set<string>();
+                  if (donations) {
+                      donations.forEach(d => {
+                          const date = new Date(d.date).toISOString();
+                          if (date >= lastWeekIso && date <= todayIso) {
+                              giving1 += d.amount;
+                              donors1.add(d.donorId);
+                          } else if (date >= twoWeeksAgoIso && date < lastWeekIso) {
+                              giving2 += d.amount;
+                              donors2.add(d.donorId);
+                          }
+                      });
+                  }
+
+                  let headcount1 = 0, headcount2 = 0;
+                  if (attendanceData) {
+                      attendanceData.forEach(a => {
+                          const isoStr = a.date.includes('T') ? a.date : new Date(a.date).toISOString();
+                          if (isoStr >= lastWeekIso && isoStr <= todayIso) headcount1 += (a as any).attendance || (a as any).count || 0;
+                          else if (isoStr >= twoWeeksAgoIso && isoStr < lastWeekIso) headcount2 += (a as any).attendance || (a as any).count || 0;
+                      });
+                  }
+
+                  let groupAtt1 = 0, groupAtt2 = 0;
+                  if (groupsData?.allGroups) {
+                      groupsData.allGroups.forEach(g => {
+                          g.attendanceHistory?.forEach(h => {
+                              const isoStr = h.date.includes('T') ? h.date : new Date(h.date).toISOString();
+                              if (isoStr >= lastWeekIso && isoStr <= todayIso) groupAtt1 += h.count;
+                              else if (isoStr >= twoWeeksAgoIso && isoStr < lastWeekIso) groupAtt2 += h.count;
+                          });
+                      });
+                  }
+
+                  return {
+                      profiles: { lw: profiles1, prev: profiles2 },
+                      giving: { lw: giving1, prev: giving2 },
+                      headcount: { lw: headcount1, prev: headcount2 },
+                      groupAtt: { lw: groupAtt1, prev: groupAtt2 },
+                      donors: { lw: donors1.size, prev: donors2.size }
+                  };
+              };
+
+              const stats = getStats();
+
+              const renderRow = (label: string, lw: number = 0, prev: number = 0, isCurrency = false) => {
+                  const diff = lw - prev;
+                  const absDiff = Math.abs(diff);
+                  const isUp = diff >= 0;
+                  const colorClass = isUp ? 'text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 dark:text-emerald-400' : 'text-rose-500 bg-rose-50 dark:bg-rose-900/20 dark:text-rose-400';
+                  
+                  const formatVal = (val: number) => isCurrency ? `$${Math.round(val).toLocaleString()}` : val.toLocaleString();
+
+                  return (
+                      <div className="flex items-center justify-between py-3 border-b border-slate-100 dark:border-slate-800 last:border-0 last:pb-0">
+                          <span className="text-sm font-bold text-slate-600 dark:text-slate-300">{label}</span>
+                          <div className="flex items-center gap-4">
+                              <span className="text-xl font-black text-slate-900 dark:text-white">{formatVal(lw)}</span>
+                              <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-black ${colorClass} w-20 justify-center`}>
+                                  <span>{isUp ? '▲' : '▼'}</span>
+                                  <span>{formatVal(absDiff)}</span>
+                              </div>
+                          </div>
+                      </div>
+                  );
+              };
+
+              return (
+                  <div className="bg-white dark:bg-slate-800 p-8 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm h-full flex flex-col">
+                      <div className="flex justify-between items-center mb-6">
+                          <div>
+                              <h4 className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">Last Week Stats</h4>
+                              <p className="text-[9px] font-bold text-indigo-400 uppercase tracking-widest mt-1">Vs Previous Week</p>
+                          </div>
+                          <button onClick={() => handleRemoveWidget(id)} className="text-slate-300 dark:text-slate-600 hover:text-rose-500 transition-colors">✕</button>
+                      </div>
+
+                      <div className="flex-1 flex flex-col justify-center">
+                          {renderRow('New Profiles', stats.profiles.lw, stats.profiles.prev)}
+                          {renderRow('Total Giving', stats.giving.lw, stats.giving.prev, true)}
+                          {renderRow('Headcount', stats.headcount.lw, stats.headcount.prev)}
+                          {renderRow('Group Attendance', stats.groupAtt.lw, stats.groupAtt.prev)}
+                          {renderRow('Number of Donors', stats.donors.lw, stats.donors.prev)}
+                      </div>
+                  </div>
+              );
+          }
+          
           case 'church_progress': {
               const groupsStats = groupsData?.progressStats;
               const givingStats = givingAnalytics?.progressStats;
