@@ -75,6 +75,10 @@ async function getSmsClient(
         const numSnap = await db.collection('smsNumbers').doc(smsNumberId).get();
         if (numSnap.exists && numSnap.data()?.churchId === churchId) {
             fromNumber = numSnap.data()!.phoneNumber;
+        } else {
+            // Doc not found or church mismatch — surface the error so sends don't silently
+            // go out from the wrong (default) number.
+            throw new Error(`SMS number ${smsNumberId} not found or does not belong to church ${churchId}.`);
         }
     } else if (!fromNumber) {
         // Fall back to default smsNumbers doc for this church
@@ -161,14 +165,22 @@ export async function sendIndividualInternal(params: {
         throw { status: 403, message: `${to} has opted out of messages from this church.` };
     }
 
-    // Resolve number ID (accept both new and legacy field names)
+    // Resolve number ID (accept both new and legacy field names).
+    // The frontend sends 'twilioNumberId' (which is actually the smsNumbers doc ID for
+    // SignalWire tenants); 'smsNumberId' is the canonical field name on this backend.
     let resolvedNumberId = smsNumberId || twilioNumberId || null;
     if (!resolvedNumberId && existingConvId) {
         const convSnap = await db.collection('smsConversations').doc(existingConvId).get();
         if (convSnap.exists) {
-            resolvedNumberId = convSnap.data()?.smsNumberId || convSnap.data()?.twilioNumberId || null;
+            const cd = convSnap.data();
+            resolvedNumberId = cd?.smsNumberId || cd?.inboxId || cd?.twilioNumberId || null;
         }
     }
+
+    log.info(
+        `[Send] Resolved numberId=${resolvedNumberId || 'default'} for church ${churchId} → to ${to}`,
+        'system', { churchId, resolvedNumberId, to }, churchId
+    );
 
     const { client, fromNumber } = await getSmsClient(db, churchId, resolvedNumberId);
 
@@ -201,6 +213,7 @@ export async function sendIndividualInternal(params: {
     };
     if (resolvedNumberId) {
         convPatch.smsNumberId   = resolvedNumberId;
+        convPatch.twilioNumberId = resolvedNumberId;  // alias for inbox filter
         convPatch.inboxId       = resolvedNumberId;
         convPatch.toPhoneNumber = fromNumber;
     }
