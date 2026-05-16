@@ -62,17 +62,32 @@ async function matchPersonByPhone(db: any, churchId: string, phone: string): Pro
 }
 
 /** Check if the church has a matching active keyword for the given body. */
-async function matchKeyword(db: any, churchId: string, body: string): Promise<any | null> {
+async function matchKeyword(db: any, churchId: string, body: string, smsNumberId?: string): Promise<any | null> {
     try {
         const keyword = body.trim().toUpperCase().split(/\s+/)[0];
         const snap = await db.collection('smsKeywords')
             .where('churchId', '==', churchId)
             .where('keyword', '==', keyword)
             .where('isActive', '==', true)
-            .limit(1)
             .get();
         if (snap.empty) return null;
-        return { id: snap.docs[0].id, ...snap.docs[0].data() };
+
+        const matches = snap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
+        
+        // Find the most appropriate keyword match for this phone line
+        const validMatch = matches.find((m: any) => {
+            if (!smsNumberId) return true;
+            
+            if (Array.isArray(m.numberIds) && m.numberIds.length > 0) {
+                return m.numberIds.includes(smsNumberId);
+            }
+            if (m.twilioNumberId) {
+                return m.twilioNumberId === smsNumberId;
+            }
+            return true;
+        });
+
+        return validMatch || null;
     } catch {
         return null;
     }
@@ -553,7 +568,7 @@ export const handleInboundSms = async (req: any, res: any) => {
         }
 
         // 6. Check for keyword matches
-        const kw = await matchKeyword(db, churchId, body);
+        const kw = await matchKeyword(db, churchId, body, smsNumberId);
         let keywordReplyMessage: string | null = null;
 
         if (kw) {

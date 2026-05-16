@@ -2412,13 +2412,14 @@ interface KeywordModalProps {
     loadingLists: boolean;
     tags: SmsTag[];
     polls: { id: string; title: string }[];
+    allSmsNumbers: any[];
     onSave: (kw: Omit<SmsKeyword, 'id' | 'matchCount' | 'createdAt'>) => Promise<void>;
     onClose: () => void;
     isBusy: boolean;
     saveError?: string;
 }
 
-const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingLists, tags, polls, onSave, onClose, isBusy, saveError }) => {
+const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingLists, tags, polls, allSmsNumbers, onSave, onClose, isBusy, saveError }) => {
     const [keyword, setKeyword]           = useState(initial?.keyword || '');
     const [actionType, setActionType]     = useState<SmsKeywordAction>(initial?.actionType || 'static');
     const [replyMessage, setReplyMessage] = useState(initial?.replyMessage || '');
@@ -2426,6 +2427,7 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingL
     const [isActive, setIsActive]         = useState(initial?.isActive ?? true);
     const [autoTagIds, setAutoTagIds]     = useState<string[]>(initial?.autoTagIds || []);
     const [linkedPollId, setLinkedPollId] = useState(initial?.linkedPollId || '');
+    const [numberIds, setNumberIds]       = useState<string[]>(initial?.numberIds || []);
     const [error, setError]               = useState('');
 
     const segs    = countSegments(replyMessage);
@@ -2449,6 +2451,7 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingL
             autoTagIds:    autoTagIds.length > 0 ? autoTagIds : [],
             linkedPollId:  linkedPollId || null,
             linkedPollTitle: selectedPoll?.title || null,
+            numberIds,
             isActive,
         });
     };
@@ -2598,6 +2601,51 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingL
                                 Poll link will be appended: {window.location.origin}/poll/{linkedPollId}
                             </p>
                         )}
+                    </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Phone number scope */}
+                {allSmsNumbers.length > 1 && (
+                    <div className="mb-5">
+                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">
+                            Active Phone Lines
+                        </label>
+                        <p className="text-[10px] text-slate-400 mb-2">
+                            Choose which phone lines trigger this keyword. Leave all unchecked to apply to every line.
+                        </p>
+                        <div className="space-y-1.5">
+                            {allSmsNumbers.map(num => {
+                                const isChecked = numberIds.includes(num.id);
+                                return (
+                                    <button
+                                        key={num.id}
+                                        type="button"
+                                        onClick={() => {
+                                            setNumberIds(prev =>
+                                                prev.includes(num.id)
+                                                    ? prev.filter(id => id !== num.id)
+                                                    : [...prev, num.id]
+                                            );
+                                        }}
+                                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-semibold border transition ${
+                                            isChecked
+                                                ? 'bg-violet-50 dark:bg-violet-900/40 border-violet-200 dark:border-violet-800 text-violet-700 dark:text-violet-300'
+                                                : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-violet-300'
+                                        }`}
+                                    >
+                                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
+                                            isChecked ? 'bg-violet-600 border-violet-600' : 'border-slate-300 dark:border-slate-600'
+                                        }`}>
+                                            {isChecked && <CheckCircle size={10} className="text-white" />}
+                                        </div>
+                                        {num.friendlyLabel}
+                                        <span className="text-[10px] text-slate-400 font-normal ml-auto">{num.phoneNumber}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
                     </div>
                 )}
 
@@ -2899,7 +2947,7 @@ const SmsKeywordsManager: React.FC<{
             <>
             {(() => {
                 const filteredKeywords = twilioNumberId 
-                    ? keywords.filter(k => !k.twilioNumberId || k.twilioNumberId === twilioNumberId)
+                    ? keywords.filter(k => !k.twilioNumberId || k.twilioNumberId === twilioNumberId || (k.numberIds && k.numberIds.includes(twilioNumberId)))
                     : keywords;
                 
                 return (
@@ -3325,6 +3373,7 @@ const SmsKeywordsManager: React.FC<{
                     loadingLists={loadingLists}
                     tags={tags}
                     polls={polls}
+                    allSmsNumbers={allSmsNumbers}
                     onSave={handleSave}
                     onClose={() => { setModalOpen(false); setEditKw(null); setSaveError(null); }}
                     isBusy={isBusy}
@@ -3335,7 +3384,7 @@ const SmsKeywordsManager: React.FC<{
             {/* Tag modal */}
             {tagModalOpen && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setTagModalOpen(false)}>
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl p-7 w-full max-w-sm mx-4" onClick={e => e.stopPropagation()}>
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl p-7 w-full max-w-sm mx-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
                         <h3 className="text-lg font-black text-slate-900 dark:text-white mb-5 flex items-center gap-2">
                             <Tag size={18} className="text-violet-500" /> {editTag ? 'Edit Tag' : 'New Tag'}
                         </h3>
