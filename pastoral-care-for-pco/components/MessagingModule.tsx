@@ -3669,18 +3669,16 @@ const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[]; smsNu
                 );
                 let usageRecords: any[] = usageSnap.docs.map(d => d.data());
                 
-                // Only pull analytics for SignalWire (must have messageSid, omit Twilio)
-                usageRecords = usageRecords.filter(r => !!r.messageSid);
-
                 if (smsNumberId) {
-                    usageRecords = usageRecords.filter(r => r.smsNumberId === smsNumberId || r.numberId === smsNumberId);
+                    usageRecords = usageRecords.filter(r => r.smsNumberId === smsNumberId || r.numberId === smsNumberId || r.twilioNumberId === smsNumberId);
                 }
 
                 // Derive summary from sent campaigns + usage records
                 let sentCampaigns = campaigns.filter(c => c.status === 'sent');
                 
-                // Exclude Twilio campaigns
-                sentCampaigns = sentCampaigns.filter(c => !c.twilioNumberId && c.smsNumberId);
+                if (smsNumberId) {
+                    sentCampaigns = sentCampaigns.filter(c => c.smsNumberId === smsNumberId || c.twilioNumberId === smsNumberId);
+                }
 
                 const totalSent       = sentCampaigns.reduce((s, c) => s + (c.recipientCount ?? 0), 0);
                 const totalDelivered  = sentCampaigns.reduce((s, c) => s + (c.deliveredCount ?? 0), 0);
@@ -3693,12 +3691,9 @@ const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[]; smsNu
                     query(collection(firebaseDb, 'smsConversations'), where('churchId', '==', churchId))
                 );
                 let convs = convSnap.docs.map(d => d.data());
-                
-                // Filter out Twilio conversations
-                convs = convs.filter(c => !c.twilioNumberId && c.smsNumberId);
 
                 if (smsNumberId) {
-                    convs = convs.filter(c => c.smsNumberId === smsNumberId || c.inboxId === smsNumberId);
+                    convs = convs.filter(c => c.smsNumberId === smsNumberId || c.inboxId === smsNumberId || c.twilioNumberId === smsNumberId);
                 }
                 const totalReplies = convs.length;
 

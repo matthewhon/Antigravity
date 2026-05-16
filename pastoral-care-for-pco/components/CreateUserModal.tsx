@@ -19,7 +19,12 @@ const AVAILABLE_ROLES: UserRole[] = [
   'Giving',
   'Finance',
   'Pastoral Care',
-  'Metrics'
+  'Metrics',
+  'Messaging',
+  'Email',
+  'Polls',
+  'Workflows',
+  'Notes'
 ];
 
 export const CreateUserModal: React.FC<CreateUserModalProps> = ({ churchId, onClose, onSuccess }) => {
