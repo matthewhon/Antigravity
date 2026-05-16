@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Loader2, RefreshCw, Copy, CheckCircle, Globe, Settings, Code, LayoutGrid, MonitorPlay } from 'lucide-react';
+import { Loader2, RefreshCw, Copy, CheckCircle, Globe, Code, LayoutGrid, MonitorPlay, Eye, EyeOff } from 'lucide-react';
 
 interface WebsiteWidgetsManagerProps {
   churchId: string;
@@ -29,25 +29,42 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
   
   // Forms specifics
   const [forms, setForms] = useState<any[]>([]);
-  const [singleFormId, setSingleFormId] = useState<string>('');
+  const [visibleFormIds, setVisibleFormIds] = useState<Set<string>>(new Set());
+  const [formsLoaded, setFormsLoaded] = useState(false);
 
   // Popup specifics
   const [popupUrl, setPopupUrl] = useState('');
   const [popupText, setPopupText] = useState('Open Form');
 
   React.useEffect(() => {
-    if ((type === 'forms' || type === 'popup') && forms.length === 0) {
+    if ((type === 'forms' || type === 'popup') && !formsLoaded) {
       const apiBaseUrl = process.env.NODE_ENV === 'production' 
         ? 'https://pastoralcare.barnabassoftware.com' 
         : 'http://localhost:8080';
       fetch(`${apiBaseUrl}/api/public/forms/${churchId}`)
         .then(r => r.json())
         .then(data => {
-          if (Array.isArray(data)) setForms(data);
+          if (Array.isArray(data)) {
+            setForms(data);
+            // Default: all forms visible
+            setVisibleFormIds(new Set(data.map((f: any) => f.id)));
+            setFormsLoaded(true);
+          }
         })
         .catch(console.error);
     }
-  }, [type, churchId, forms.length]);
+  }, [type, churchId, formsLoaded]);
+
+  const toggleFormVisibility = (id: string) => {
+    setVisibleFormIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const selectAllForms = () => setVisibleFormIds(new Set(forms.map(f => f.id)));
+  const selectNoForms = () => setVisibleFormIds(new Set());
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -89,12 +106,14 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
   const domain = process.env.NODE_ENV === 'production' 
     ? 'https://pastoralcare.barnabassoftware.com'
     : window.location.origin;
+  const visibleFormIdsArray = Array.from(visibleFormIds);
+  const allFormsVisible = forms.length > 0 && visibleFormIds.size === forms.length;
   const commonParams = `type=${type}&churchId=${churchId}&theme=${theme}&color=${color}&layout=${layout}` 
       + (layout === 'grid' ? `&gridCols=${gridCols}` : '')
       + (type === 'groups' && groupType ? `&groupType=${encodeURIComponent(groupType)}` : '')
       + (type === 'groups' ? `&showTags=${showTags}` : '')
       + (type === 'registrations' ? `&dateFilter=${dateFilter}&tagFilter=${encodeURIComponent(tagFilter)}&includeArchived=${includeArchived}` : '')
-      + (type === 'forms' && singleFormId ? `&singleFormId=${singleFormId}` : '')
+      + (type === 'forms' && !allFormsVisible && visibleFormIdsArray.length > 0 ? `&visibleFormIds=${encodeURIComponent(visibleFormIdsArray.join(','))}` : '')
       + `&imageRatio=${imageRatio}`
       + (autoHeight ? `&autoHeight=true` : '')
       + (scale !== 1 ? `&scale=${scale}` : '')
@@ -353,21 +372,50 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
           )}
 
           {type === 'forms' && (
-            <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-              <div>
-                 <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Select Form</label>
-                 <select 
-                    value={singleFormId}
-                    onChange={e => setSingleFormId(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
-                 >
-                    <option value="">All Forms</option>
-                    {forms.map(f => (
-                      <option key={f.id} value={f.id}>{f.name}</option>
-                    ))}
-                 </select>
-                 <p className="text-[10px] text-slate-400 mt-1">Leave as "All Forms" to display a list/grid of all active forms, or select a specific form to embed just that one.</p>
+            <div className="space-y-3 pt-4 border-t border-slate-200 dark:border-slate-700">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-500 tracking-wider uppercase">Show / Hide Forms</label>
+                <div className="flex gap-2">
+                  <button onClick={selectAllForms} className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline">All</button>
+                  <span className="text-slate-300 dark:text-slate-600">|</span>
+                  <button onClick={selectNoForms} className="text-[10px] font-bold text-slate-500 hover:underline">None</button>
+                </div>
               </div>
+              {!formsLoaded ? (
+                <div className="flex items-center gap-2 text-xs text-slate-400 py-2">
+                  <Loader2 size={12} className="animate-spin" /> Loading forms from Planning Center...
+                </div>
+              ) : forms.length === 0 ? (
+                <p className="text-xs text-slate-400 italic">No active forms found in Planning Center.</p>
+              ) : (
+                <div className="space-y-1 max-h-64 overflow-y-auto pr-1">
+                  {forms.map(f => {
+                    const isVisible = visibleFormIds.has(f.id);
+                    return (
+                      <div
+                        key={f.id}
+                        onClick={() => toggleFormVisibility(f.id)}
+                        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border cursor-pointer transition-all ${
+                          isVisible
+                            ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800'
+                            : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 opacity-60 hover:opacity-80'
+                        }`}
+                      >
+                        <span className={`shrink-0 transition-colors ${ isVisible ? 'text-indigo-500' : 'text-slate-400' }`}>
+                          {isVisible ? <Eye size={14} /> : <EyeOff size={14} />}
+                        </span>
+                        <span className={`text-sm font-semibold flex-1 truncate ${ isVisible ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 line-through' }`}>
+                          {f.name}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              <p className="text-[10px] text-slate-400 leading-relaxed">Toggle which forms appear in your embedded widget. Click a form to show or hide it.</p>
+              {visibleFormIds.size === 0 && forms.length > 0 && (
+                <p className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold">⚠ No forms selected — the widget will show nothing.</p>
+              )}
             </div>
           )}
 
