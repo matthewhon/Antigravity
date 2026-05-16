@@ -1169,6 +1169,12 @@ export interface SmsTag {
      * Leave blank to apply the tag immediately without sending a reply.
      */
     clarifyingReply?: string;
+    /**
+     * Restricts auto-detection to specific phone line IDs (TwilioPhoneNumber doc IDs).
+     * Empty array or undefined = detection runs on ALL phone numbers for this church.
+     * Populated = detection only fires when the inbound message arrives on one of these lines.
+     */
+    detectionNumberIds?: string[];
     createdAt: number;
 }
 
