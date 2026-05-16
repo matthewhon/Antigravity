@@ -1654,6 +1654,7 @@ const SmsInbox: React.FC<{
     const [replyUploading, setReplyUploading] = useState(false);
     const [replyUploadPct, setReplyUploadPct] = useState(0);
     const replyFileRef = useRef<HTMLInputElement>(null);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
     const [loadingMsgs, setLoadingMsgs]     = useState(false);
     const [isSending, setIsSending]         = useState(false);
     const [search, setSearch]               = useState('');
@@ -1737,6 +1738,13 @@ const SmsInbox: React.FC<{
 
         return () => { unsub(); unsubSug(); };
     }, [activeConv?.id]);
+
+    // Auto-scroll to the newest message whenever messages change or conversation switches
+    useEffect(() => {
+        if (messagesEndRef.current) {
+            messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
+    }, [messages, activeConv?.id]);
 
     // On-demand AI suggestion — called when staff click the ✨ button
     const handleAiSuggest = async () => {
@@ -1926,7 +1934,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
     };
 
     return (
-        <div className="flex h-full">
+        <div className="flex h-full min-h-0">
             {/* Inbox Toast */}
             {inboxToast && <Toast msg={inboxToast.msg} type={inboxToast.type} onClose={() => setInboxToast(null)} />}
             {/* New Message Composer modal */}
@@ -1940,7 +1948,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
             )}
 
             {/* Conversation list */}
-            <div className={`w-full md:w-[320px] shrink-0 border-r border-slate-200 dark:border-slate-700 flex flex-col bg-white dark:bg-slate-900 ${activeConv ? 'hidden md:flex' : 'flex'}`}>
+            <div className={`w-full md:w-[320px] shrink-0 border-r border-slate-200 dark:border-slate-700 flex flex-col min-h-0 bg-white dark:bg-slate-900 ${activeConv ? 'hidden md:flex' : 'flex'}`}>
                 <div className="p-4 border-b border-slate-200 dark:border-slate-700">
                     <div className="flex items-center justify-between mb-3">
                         <h2 className="font-black text-slate-900 dark:text-white text-sm flex items-center gap-2">
@@ -2078,7 +2086,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
 
             {/* Message thread */}
             {activeConv ? (
-                <div className={`flex-1 flex flex-col ${!activeConv ? 'hidden md:flex' : 'flex'}`}>
+                <div className={`flex-1 flex flex-col min-h-0 overflow-hidden ${!activeConv ? 'hidden md:flex' : 'flex'}`}>
                     {/* Thread header */}
                     <div className="px-5 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex items-center gap-3">
                         <button 
@@ -2169,7 +2177,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                     </div>
 
                     {/* Messages */}
-                    <div className="flex-1 overflow-y-auto p-5 space-y-3 bg-slate-50 dark:bg-slate-950">
+                    <div className="flex-1 overflow-y-auto overscroll-contain p-5 space-y-3 bg-slate-50 dark:bg-slate-950">
                         {loadingMsgs ? (
                             <div className="flex justify-center py-12 text-slate-400"><Loader2 size={20} className="animate-spin" /></div>
                         ) : messages.length === 0 ? (
@@ -2203,6 +2211,8 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                 </div>
                             ))
                         )}
+                        {/* Scroll anchor — always at bottom of message list */}
+                        <div ref={messagesEndRef} aria-hidden="true" />
                     </div>
 
                     {/* Reply box */}
@@ -2322,6 +2332,10 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                         onChange={e => setReplyBody(e.target.value)}
                                         placeholder={replyMediaUrl ? 'Add a caption (optional)…' : 'Type a reply…'}
                                         onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendReply(); }}}
+                                        onFocus={() => {
+                                            // On mobile, scroll to bottom when keyboard opens
+                                            setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 350);
+                                        }}
                                         className="flex-1 text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
                                     />
                                     {/* Attach image button */}
@@ -3456,7 +3470,7 @@ const MiniBar: React.FC<{ pct: number; color?: string; label?: string }> = ({ pc
     </div>
 );
 
-const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[]; twilioNumberId?: string | null }> = ({ churchId, campaigns, twilioNumberId }) => {
+const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[]; smsNumberId?: string | null }> = ({ churchId, campaigns, smsNumberId }) => {
     const [summary, setSummary]     = useState<UsageSummary | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [optOuts, setOptOuts]     = useState(0);
@@ -3485,12 +3499,20 @@ const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[]; twili
                     )
                 );
                 let usageRecords: any[] = usageSnap.docs.map(d => d.data());
-                if (twilioNumberId) {
-                    usageRecords = usageRecords.filter(r => r.twilioNumberId === twilioNumberId || r.numberId === twilioNumberId);
+                
+                // Only pull analytics for SignalWire (must have messageSid, omit Twilio)
+                usageRecords = usageRecords.filter(r => !!r.messageSid);
+
+                if (smsNumberId) {
+                    usageRecords = usageRecords.filter(r => r.smsNumberId === smsNumberId || r.numberId === smsNumberId);
                 }
 
                 // Derive summary from sent campaigns + usage records
-                const sentCampaigns = campaigns.filter(c => c.status === 'sent');
+                let sentCampaigns = campaigns.filter(c => c.status === 'sent');
+                
+                // Exclude Twilio campaigns
+                sentCampaigns = sentCampaigns.filter(c => !c.twilioNumberId && c.smsNumberId);
+
                 const totalSent       = sentCampaigns.reduce((s, c) => s + (c.recipientCount ?? 0), 0);
                 const totalDelivered  = sentCampaigns.reduce((s, c) => s + (c.deliveredCount ?? 0), 0);
                 const totalFailed     = sentCampaigns.reduce((s, c) => s + (c.failedCount ?? 0), 0);
@@ -3502,8 +3524,12 @@ const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[]; twili
                     query(collection(firebaseDb, 'smsConversations'), where('churchId', '==', churchId))
                 );
                 let convs = convSnap.docs.map(d => d.data());
-                if (twilioNumberId) {
-                    convs = convs.filter(c => c.twilioNumberId === twilioNumberId || c.smsNumberId === twilioNumberId || c.inboxId === twilioNumberId);
+                
+                // Filter out Twilio conversations
+                convs = convs.filter(c => !c.twilioNumberId && c.smsNumberId);
+
+                if (smsNumberId) {
+                    convs = convs.filter(c => c.smsNumberId === smsNumberId || c.inboxId === smsNumberId);
                 }
                 const totalReplies = convs.length;
 
@@ -8049,7 +8075,7 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
 
                 {/* Inbox tab */}
                 {effectiveTab === 'inbox' && (
-                    <div className="h-full">
+                    <div className="h-full flex flex-col min-h-0">
                         <SmsInbox
                             churchId={churchId}
                             currentUser={currentUser}
@@ -8082,7 +8108,7 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                 {/* Analytics tab */}
                 {effectiveTab === 'analytics' && (
                     <div className="h-full overflow-y-auto">
-                        <SmsAnalytics churchId={churchId} campaigns={filteredCampaigns} twilioNumberId={activeNumberId} />
+                        <SmsAnalytics churchId={churchId} campaigns={filteredCampaigns} smsNumberId={activeNumberId} />
                     </div>
                 )}
 
