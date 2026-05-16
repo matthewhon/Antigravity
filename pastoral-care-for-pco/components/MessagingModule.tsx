@@ -2088,7 +2088,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
             {activeConv ? (
                 <div className={`flex-1 flex flex-col min-h-0 overflow-hidden ${!activeConv ? 'hidden md:flex' : 'flex'}`}>
                     {/* Thread header */}
-                    <div className="px-5 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex items-center gap-3">
+                    <div className="shrink-0 px-5 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex items-center gap-3 flex-wrap">
                         <button 
                             onClick={() => setActiveConv(null)} 
                             className="md:hidden p-1.5 -ml-2 rounded-full text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition shrink-0"
@@ -2216,7 +2216,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                     </div>
 
                     {/* Reply box */}
-                    <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+                    <div className="shrink-0 p-4 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
                         {/* AI Suggested Replies panel */}
                         {smsAgentEnabled && !activeConv.isOptedOut && aiSuggestions.length > 0 && (
                             <div className="mb-3 space-y-2">
