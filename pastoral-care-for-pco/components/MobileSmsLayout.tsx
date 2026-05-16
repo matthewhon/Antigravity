@@ -1,13 +1,30 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Church, User, TwilioPhoneNumber } from '../types';
 import MessagingModule from './MessagingModule';
 import { useTwilioNumbers, canUserSeeNumber, canUserUseFeature } from '../hooks/useTwilioNumbers';
 import {
     Inbox, MessageSquare, Key, BarChart3, ArrowLeft, Phone, ChevronDown,
-    Loader2, Share2, Copy, CheckCircle2, X, Link2, Mail,
+    Loader2, Share2, Copy, CheckCircle2, X, Link2, Mail, Bell, BellOff,
 } from 'lucide-react';
 import { QuickSendModal } from './ToolsView';
 import { firestore } from '../services/firestoreService';
+
+// ─── Web Push helper ──────────────────────────────────────────────────────────
+
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+    const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+    const base64  = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const raw     = atob(base64);
+    return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+}
+
+async function getApiBase(): Promise<string> {
+    try {
+        const s = await firestore.getSystemSettings();
+        return (s.apiBaseUrl || 'https://pastoralcare.barnabassoftware.com').replace(/\/$/, '');
+    } catch { return 'https://pastoralcare.barnabassoftware.com'; }
+}
+
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -356,7 +373,78 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
 
     const [showShareSheet, setShowShareSheet] = useState(false);
     const [showEmailModal, setShowEmailModal] = useState(false);
-    
+
+    // ── Push notifications ────────────────────────────────────────────────────
+    const [pushEnabled,  setPushEnabled]  = useState(false);
+    const [pushLoading,  setPushLoading]  = useState(false);
+
+    // On mount: check if we already have a push subscription registered
+    useEffect(() => {
+        if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+        navigator.serviceWorker.register('/sw.js').then(reg => {
+            reg.pushManager.getSubscription().then(sub => {
+                setPushEnabled(!!sub);
+            });
+        }).catch(() => {});
+    }, []);
+
+    const togglePushNotifications = useCallback(async () => {
+        if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+            alert('Push notifications are not supported in this browser. Try adding the app to your home screen.');
+            return;
+        }
+        setPushLoading(true);
+        try {
+            const reg = await navigator.serviceWorker.register('/sw.js');
+            const existing = await reg.pushManager.getSubscription();
+
+            if (existing) {
+                // Unsubscribe
+                await existing.unsubscribe();
+                const base = await getApiBase();
+                await fetch(`${base}/push/subscribe`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ churchId, userId: currentUser.id }),
+                });
+                setPushEnabled(false);
+            } else {
+                // Request permission
+                const permission = await Notification.requestPermission();
+                if (permission !== 'granted') {
+                    alert('Please allow notifications in your browser settings to receive SMS alerts.');
+                    return;
+                }
+                // Get VAPID public key
+                const base = await getApiBase();
+                const keyRes = await fetch(`${base}/push/vapid-public-key`);
+                const { publicKey } = await keyRes.json();
+                // Subscribe
+                const sub = await reg.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: urlBase64ToUint8Array(publicKey),
+                });
+                // Save subscription
+                await fetch(`${base}/push/subscribe`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        churchId,
+                        userId:      currentUser.id,
+                        numberId:    activeNumberId || null,
+                        subscription: sub.toJSON(),
+                    }),
+                });
+                setPushEnabled(true);
+            }
+        } catch (err: any) {
+            console.error('[Push]', err);
+            alert('Could not enable notifications: ' + (err?.message || 'Unknown error'));
+        } finally {
+            setPushLoading(false);
+        }
+    }, [churchId, currentUser.id, activeNumberId]);
+
     const canSendEmail = currentUser.roles.includes('Email') || currentUser.roles.includes('Church Admin') || currentUser.roles.includes('System Administration');
 
     const handleSendQuickEmail = async (campaign: any) => {
@@ -403,8 +491,29 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
                         </div>
                     </div>
 
-                    {/* Right: share + number selector */}
+                    {/* Right: notifications + share + number selector */}
                     <div className="flex items-center gap-2 shrink-0">
+                        {/* Push notification bell */}
+                        {'Notification' in window && (
+                            <button
+                                onClick={togglePushNotifications}
+                                disabled={pushLoading}
+                                title={pushEnabled ? 'Disable notifications' : 'Enable notifications'}
+                                className="w-8 h-8 flex items-center justify-center rounded-full transition active:opacity-60"
+                                style={{
+                                    color: pushEnabled ? 'rgb(124 58 237)' : 'rgb(148 163 184)',
+                                    background: pushEnabled ? 'rgb(237 233 254)' : 'transparent',
+                                }}
+                            >
+                                {pushLoading
+                                    ? <Loader2 size={16} className="animate-spin" />
+                                    : pushEnabled
+                                        ? <Bell size={17} strokeWidth={2} />
+                                        : <BellOff size={17} strokeWidth={1.7} />
+                                }
+                            </button>
+                        )}
+
                         {/* Share button — iOS system style */}
                         <button
                             onClick={() => setShowShareSheet(true)}
@@ -413,6 +522,7 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
                         >
                             <Share2 size={18} strokeWidth={2} />
                         </button>
+
 
                         {numbersLoading ? (
                             <Loader2 size={16} className="animate-spin text-slate-400" />

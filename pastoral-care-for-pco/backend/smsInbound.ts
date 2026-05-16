@@ -1,5 +1,6 @@
 import http from 'http';
 import { createHmac } from 'crypto';
+import { sendPushToChurch } from './webPushService';
 
 /**
  * Verify a SignalWire (Twilio-compatible) webhook signature.
@@ -467,7 +468,19 @@ export const handleInboundSms = async (req: any, res: any) => {
                 createdAt:      now,
             });
 
-        // 4-A. Executive AI Auto-Responder
+        // 4-A. Push notification — fire-and-forget, must not block the TwiML response
+        const senderName = personMatch?.name || convSnap.data()?.personName || from;
+        const preview    = body.length > 80 ? body.slice(0, 77) + '...' : body;
+        sendPushToChurch({
+            churchId,
+            numberId: smsNumberId,
+            title:    `New SMS from ${senderName}`,
+            body:     preview,
+            url:      `/mobile/sms?tab=inbox`,
+            tag:      `sms-${convId}`,
+        }).catch(() => {});
+
+        // 4-B. Executive AI Auto-Responder
         const bodyTrimmed = body.trim();
         const aiAgentPrefix = 'ai agent';
         const isAiAgentTrigger = bodyTrimmed.toLowerCase().startsWith(aiAgentPrefix);

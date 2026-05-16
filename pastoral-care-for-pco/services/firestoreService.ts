@@ -298,21 +298,31 @@ class FirestoreService {
   }
 
   async createTenantUser(churchId: string, userData: any): Promise<void> {
-      // Note: This function typically requires Cloud Functions to create Auth users securely without logging out the admin.
-      // For client-side, we assume an invite flow or standard auth. 
-      // If used purely client-side, it might conflict with current auth session.
-      // Placeholder implementation for data record:
-      const uid = `user_${Date.now()}`; // In reality, this comes from Auth
-      const newUser: User = {
-          id: uid,
-          churchId,
-          name: userData.name,
-          email: userData.email,
-          roles: userData.roles,
-          theme: 'traditional'
-      };
-      await this.createUserProfile(newUser);
+      // Uses the server-side /user/create endpoint which calls Firebase Admin SDK.
+      // This creates the Auth account AND the Firestore profile atomically,
+      // without logging out the currently signed-in admin.
+      const res = await fetch('/user/create', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({
+              churchId,
+              name:     userData.name,
+              email:    userData.email,
+              password: userData.password,
+              roles:    userData.roles,
+          }),
+      });
+      const text = await res.text();
+      let json: any;
+      try { json = JSON.parse(text); } catch { throw new Error(`Server error: ${text}`); }
+      if (!res.ok) {
+          // Rethrow with the Firebase Auth error code so the UI can handle it
+          const err: any = new Error(json.error || `Failed to create user (${res.status})`);
+          err.code = json.code;
+          throw err;
+      }
   }
+
 
   async updateUserLastLogin(uid: string) {
       try {

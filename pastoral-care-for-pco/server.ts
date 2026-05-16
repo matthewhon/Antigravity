@@ -27,6 +27,7 @@ import { startSmsCampaignScheduler } from './backend/smsCampaignScheduler';
 import { startServicesReminderScheduler } from './backend/servicesReminderScheduler';
 import { workflowEnrollList, workflowEnrollPreview } from './backend/workflowEnrollEndpoint';
 import { handleGrowDailyEmail, setupGrowIntegration, requestGrowAccess, getGrowStatus } from './backend/growIntegration';
+import { getVapidPublicKey, savePushSubscription, removePushSubscription } from './backend/webPushService';
 
 // Fix for bundled CJS environment
 const __dirname = process.cwd();
@@ -210,6 +211,11 @@ async function startServer() {
     app.get('/api/messaging/registration-status',   getSmsRegistrationStatus);
     app.post('/api/messaging/campaign-status',      express.json(), handleCampaignStatusWebhook);
     app.post('/api/messaging/assignment-status',    express.json(), handleAssignmentStatusWebhook);
+
+    // ─── Web Push Notifications ─────────────────────────────────────────────────
+    app.get('/push/vapid-public-key',  getVapidPublicKey);
+    app.post('/push/subscribe',        express.json(), savePushSubscription);
+    app.delete('/push/subscribe',      express.json(), removePushSubscription);
 
     // Dynamic vCard endpoint for "Who Is This" contact card feature
     app.get('/api/messaging/vcard/:numberId', async (req: any, res: any) => {
@@ -691,10 +697,94 @@ Return ONLY the JSON object, no markdown, no explanation:`;
     });
 
     // ─── Tenant Deletion ─────────────────────────────────────────────────────
+    // ─── User Management (Admin SDK) ──────────────────────────────────────────
+    // Creates a Firebase Auth user + Firestore profile without signing out the admin.
+    // POST /user/create { churchId, name, email, password, roles[] }
+    app.post('/user/create', express.json(), async (req: any, res: any) => {
+      const { churchId, name, email, password, roles } = req.body || {};
+      if (!churchId || !name || !email || !password) {
+        return res.status(400).json({ error: 'Missing required fields: churchId, name, email, password' });
+      }
+      if (password.length < 6) {
+        return res.status(400).json({ error: 'Password must be at least 6 characters' });
+      }
+      try {
+        const admin = await import('firebase-admin');
+        const db = getDb();
+
+        // 1. Create the Firebase Auth user (Admin SDK — does NOT affect caller's session)
+        const authUser = await admin.default.auth().createUser({
+          email,
+          password,
+          displayName: name,
+        });
+
+        // 2. Write the Firestore user profile with the real UID
+        const userDoc = {
+          id: authUser.uid,
+          churchId,
+          name,
+          email: email.toLowerCase().trim(),
+          roles: roles || ['Pastoral Care'],
+          theme: 'traditional',
+          createdAt: Date.now(),
+        };
+        await db.collection('users').doc(authUser.uid).set(userDoc, { merge: true });
+
+        console.log(`[UserCreate] Created auth+profile for ${email} (uid=${authUser.uid}) in church ${churchId}`);
+        res.json({ success: true, uid: authUser.uid });
+      } catch (e: any) {
+        // Surface Firebase Auth error codes clearly
+        const code = e.code || 'unknown';
+        console.error(`[UserCreate] Failed for ${email}:`, e.message);
+        res.status(400).json({ error: e.message, code });
+      }
+    });
+
+    // Fixes an orphaned Firestore user profile that has no Auth account.
+    // POST /user/fix-orphan { firestoreUserId, email, password, name, churchId }
+    app.post('/user/fix-orphan', express.json(), async (req: any, res: any) => {
+      const { firestoreUserId, email, password, name, churchId } = req.body || {};
+      if (!firestoreUserId || !email || !password) {
+        return res.status(400).json({ error: 'Missing firestoreUserId, email, or password' });
+      }
+      try {
+        const admin = await import('firebase-admin');
+        const db = getDb();
+
+        // 1. Create Auth user
+        const authUser = await admin.default.auth().createUser({ email, password, displayName: name || email });
+
+        // 2. Rename Firestore doc from old fake ID → real UID
+        const oldRef = db.collection('users').doc(firestoreUserId);
+        const oldSnap = await oldRef.get();
+        const existingData = oldSnap.exists ? oldSnap.data() : {};
+
+        const newData = {
+          ...existingData,
+          id:        authUser.uid,
+          email:     email.toLowerCase().trim(),
+          churchId:  churchId || existingData?.churchId,
+          name:      name || existingData?.name,
+          createdAt: Date.now(),
+        };
+        await db.collection('users').doc(authUser.uid).set(newData, { merge: true });
+
+        // 3. Delete the orphaned old doc
+        if (oldSnap.exists) await oldRef.delete();
+
+        console.log(`[FixOrphan] Migrated ${firestoreUserId} → ${authUser.uid} for ${email}`);
+        res.json({ success: true, oldId: firestoreUserId, newUid: authUser.uid });
+      } catch (e: any) {
+        res.status(400).json({ error: e.message, code: e.code });
+      }
+    });
+
     // Permanently deletes all Firebase Auth users + all Firestore data for a tenant.
 
     // Requires Admin SDK — must remain server-side.
     app.post('/tenant/delete', express.json(), async (req: any, res: any) => {
+
       const { churchId, confirmationText } = req.body || {};
       if (!churchId) return res.status(400).json({ error: 'Missing churchId' });
       if (confirmationText !== 'DELETE') {
