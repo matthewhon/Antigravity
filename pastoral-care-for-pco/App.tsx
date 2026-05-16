@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+﻿import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { auth } from './services/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -211,7 +211,7 @@ const App: React.FC = () => {
   useEffect(() => {
     firestore.getSystemSettings().then(async (settings) => {
         const correctUrl = 'https://pastoralcare.barnabassoftware.com';
-        // Fix stale URL — covers: no URL, old api.* subdomain, old Cloud Run URL
+        // Fix stale URL â€” covers: no URL, old api.* subdomain, old Cloud Run URL
         const isStaleUrl = !settings.apiBaseUrl 
             || settings.apiBaseUrl.includes('api.pastoralcare.barnabassoftware.com')
             || settings.apiBaseUrl.includes('u3gnt7kb5a-uc.a.run.app')
@@ -645,13 +645,25 @@ const App: React.FC = () => {
       }
   };
 
+  // --- PCO Display Filters ---
+  const visiblePeople = useMemo(() => {
+    if (!church?.pcoSettings?.hideInactiveMembers) return people;
+    return people.filter(p => p.status?.toLowerCase() !== 'inactive');
+  }, [people, church?.pcoSettings?.hideInactiveMembers]);
+
+  const visibleGroups = useMemo(() => {
+    if (!church?.pcoSettings?.hideArchivedItems) return groups;
+    return groups.filter(g => !g.archivedAt);
+  }, [groups, church?.pcoSettings?.hideArchivedItems]);
+
   // --- Derived Data Calculations ---
 
-  const riskEnrichedPeople = useRiskEnrichedPeople(people, groups, donations, servicesData, teams, church?.riskSettings);
-  const peopleDashboardData = usePeopleDashboardData(people, riskEnrichedPeople, recentRiskChanges, recentStatusChanges);
-  const givingAnalyticsData = useGivingAnalyticsData(donations, givingFilter, givingDateRange, people, church?.donorLifecycleSettings);
-  const groupsDashboardData = useGroupsDashboardData(groups, people);
+  const riskEnrichedPeople = useRiskEnrichedPeople(visiblePeople, visibleGroups, donations, servicesData, teams, church?.riskSettings);
+  const peopleDashboardData = usePeopleDashboardData(visiblePeople, riskEnrichedPeople, recentRiskChanges, recentStatusChanges);
+  const givingAnalyticsData = useGivingAnalyticsData(donations, givingFilter, givingDateRange, visiblePeople, church?.donorLifecycleSettings);
+  const groupsDashboardData = useGroupsDashboardData(visibleGroups, visiblePeople);
   const attendanceChartData = useAttendanceChartData(attendance);
+
 
   const handleGenerateAIInsights = async () => {
       if (!church) return;
@@ -689,17 +701,17 @@ const App: React.FC = () => {
 
   // --- Render ---
 
-  // ── Public Poll Route (no auth required) ───────────────────────────────────
+  // â”€â”€ Public Poll Route (no auth required) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const pollMatch = window.location.pathname.match(/^\/poll\/([^/]+)/);
   if (pollMatch) {
-    // Sub-path: /poll/:id/live — Live Projector Display
+    // Sub-path: /poll/:id/live â€” Live Projector Display
     if (window.location.pathname.includes('/live')) {
       return <PollProjectorView pollId={pollMatch[1]} />;
     }
     return <PublicPollView pollId={pollMatch[1]} />;
   }
 
-  // ── Public Note Route (no auth required) ──────────────────────────────────
+  // â”€â”€ Public Note Route (no auth required) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const noteMatch = window.location.pathname.match(/^\/note\/([^/]+)/);
   if (noteMatch) {
     return <PublicNoteView noteId={noteMatch[1]} />;
@@ -725,7 +737,7 @@ const App: React.FC = () => {
       return <div className="flex h-screen items-center justify-center text-slate-400">No Church Organization Found. Contact Admin.</div>;
   }
 
-  // ── Mobile SMS App Route ──────────────────────────────────────────────────
+  // â”€â”€ Mobile SMS App Route â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (window.location.pathname.startsWith('/mobile/sms')) {
       return (
           <MobileSmsLayout
@@ -744,6 +756,22 @@ const App: React.FC = () => {
       );
   }
 
+
+  // -- Mobile device detection -----------------------------------------------
+  const isMobileDevice = /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+      || window.innerWidth < 768;
+
+  // Auto-redirect mobile browsers that land on the desktop SMS tools route
+  if (isMobileDevice && window.location.pathname.startsWith('/tools/sms')) {
+      const smsMobilePath = window.location.pathname;
+      let mobileTab = 'inbox';
+      if (smsMobilePath.includes('/campaigns')) mobileTab = 'campaigns';
+      else if (smsMobilePath.includes('/keywords'))  mobileTab = 'keywords';
+      else if (smsMobilePath.includes('/analytics')) mobileTab = 'analytics';
+      window.location.replace("/mobile/sms?tab=" + mobileTab);
+      return null;
+  }
+
   const safeEnabledWidgets = (church.enabledWidgets && church.enabledWidgets.length > 0) ? church.enabledWidgets : undefined;
 
   return (
@@ -760,7 +788,7 @@ const App: React.FC = () => {
     
         <TenantDataProvider value={{
             user, church, allChurches, systemSettings, widgets,
-            people, groups, attendance, donations, funds, budgets, teams,
+            people: visiblePeople, groups: visibleGroups, attendance, donations, funds, budgets, teams,
             recentRiskChanges, recentStatusChanges, servicesData,
             setPeople, setGroups, setAttendance, setDonations, setFunds, setBudgets,
             setTeams, setRecentRiskChanges, setRecentStatusChanges, setServicesData
@@ -779,11 +807,11 @@ const App: React.FC = () => {
                 enableLibrary={systemSettings?.enableLibrary}
                 noPadding={view.startsWith('tools')}
                 subNavItems={view.startsWith('tools-sms') ? [
-                    { label: 'Inbox',     view: 'tools-sms-inbox',     icon: <span className="text-sm">📥</span> },
-                    { label: 'Broadcast', view: 'tools-sms-campaigns', icon: <span className="text-sm">📨</span> },
-                    { label: 'Keywords',  view: 'tools-sms-keywords',  icon: <span className="text-sm">🔑</span> },
-                    { label: 'Analytics', view: 'tools-sms-analytics', icon: <span className="text-sm">📊</span> },
-                    { label: 'AI Agent',  view: 'tools-sms-agent',     icon: <span className="text-sm">✨</span> },
+                    { label: 'Inbox',     view: 'tools-sms-inbox',     icon: <span className="text-sm">ðŸ“¥</span> },
+                    { label: 'Broadcast', view: 'tools-sms-campaigns', icon: <span className="text-sm">ðŸ“¨</span> },
+                    { label: 'Keywords',  view: 'tools-sms-keywords',  icon: <span className="text-sm">ðŸ”‘</span> },
+                    { label: 'Analytics', view: 'tools-sms-analytics', icon: <span className="text-sm">ðŸ“Š</span> },
+                    { label: 'AI Agent',  view: 'tools-sms-agent',     icon: <span className="text-sm">âœ¨</span> },
                 ] : undefined}
             >
             <Routes>
@@ -922,8 +950,9 @@ const App: React.FC = () => {
                             view === 'tools-sms-keywords'  ? 'keywords'  :
                             view === 'tools-sms-analytics' ? 'analytics' :
                             view === 'tools-sms-agent'     ? 'agent'     : 'inbox'
-                        } 
-                    />
+                        }
+                        mobileSmsUrl={`${window.location.protocol}//${window.location.host}/mobile/sms`}
+                    /> 
                 } />
                 
                 {/* Fallback route */}

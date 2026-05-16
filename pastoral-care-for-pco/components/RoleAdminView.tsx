@@ -1736,6 +1736,56 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                         </div>
                     </div>
                 </div>
+
+                {/* PCO Display Preferences */}
+                <div className="mt-8 bg-slate-50 dark:bg-slate-800/50 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800 space-y-4">
+                    <div>
+                        <h4 className="font-bold text-slate-900 dark:text-white text-sm mb-1">Display Preferences</h4>
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-relaxed">
+                            Control how archived and inactive data from Planning Center is shown across the application. Changes save immediately.
+                        </p>
+                    </div>
+                    <div className="flex items-start justify-between gap-4 p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700">
+                        <div className="flex-1">
+                            <p className="text-xs font-bold text-slate-900 dark:text-white">Hide Archived Items</p>
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">
+                                When enabled, archived groups, registrations, and check-in events are hidden and excluded from all widget counts.
+                            </p>
+                        </div>
+                        <button
+                            title="Toggle archived items visibility"
+                            onClick={async () => {
+                                const next = !formData.pcoSettings?.hideArchivedItems;
+                                const updated = { ...formData.pcoSettings, hideArchivedItems: next };
+                                setFormData(prev => ({ ...prev, pcoSettings: updated }));
+                                if (onUpdateChurch) await onUpdateChurch({ pcoSettings: updated });
+                            }}
+                            className={`shrink-0 w-12 h-6 rounded-full p-1 transition-colors ${formData.pcoSettings?.hideArchivedItems ? 'bg-indigo-500' : 'bg-slate-300 dark:bg-slate-600'}`}
+                        >
+                            <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${formData.pcoSettings?.hideArchivedItems ? 'translate-x-6' : ''}`} />
+                        </button>
+                    </div>
+                    <div className="flex items-start justify-between gap-4 p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700">
+                        <div className="flex-1">
+                            <p className="text-xs font-bold text-slate-900 dark:text-white">Hide Inactive Members</p>
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">
+                                When enabled, people whose status in Planning Center is Inactive are hidden from people lists, dashboards, and pastoral views.
+                            </p>
+                        </div>
+                        <button
+                            title="Toggle inactive member visibility"
+                            onClick={async () => {
+                                const next = !formData.pcoSettings?.hideInactiveMembers;
+                                const updated = { ...formData.pcoSettings, hideInactiveMembers: next };
+                                setFormData(prev => ({ ...prev, pcoSettings: updated }));
+                                if (onUpdateChurch) await onUpdateChurch({ pcoSettings: updated });
+                            }}
+                            className={`shrink-0 w-12 h-6 rounded-full p-1 transition-colors ${formData.pcoSettings?.hideInactiveMembers ? 'bg-indigo-500' : 'bg-slate-300 dark:bg-slate-600'}`}
+                        >
+                            <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${formData.pcoSettings?.hideInactiveMembers ? 'translate-x-6' : ''}`} />
+                        </button>
+                    </div>
+                </div>
             </div>
         )}
 

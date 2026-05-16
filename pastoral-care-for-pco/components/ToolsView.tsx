@@ -19,8 +19,47 @@ import QrCodeGenerator from './QrCodeGenerator';
 import { EmailCampaign, TemplateSettings, PcoList, Church, User, EmailUnsubscribe, SmsOptOut } from '../types';
 import { 
   Trash2, Eye, Pencil, Loader2, X, List, UserMinus, Search, Copy, Globe, BarChart2, MessageSquare, Phone,
-  Mail, CheckCircle, Circle, ChevronUp, ChevronDown, Clock, Calendar, Plus, Send, ArrowLeft, AlignLeft, Users, AtSign, FileText
+  Mail, CheckCircle, Circle, ChevronUp, ChevronDown, Clock, Calendar, Plus, Send, ArrowLeft, AlignLeft, Users, AtSign, FileText, Smartphone, ExternalLink
 } from 'lucide-react';
+
+
+// ─── Mobile SMS Banner ─────────────────────────────────────────────────────
+
+const MobileSmsBanner: React.FC<{ url: string }> = ({ url }) => {
+    const [copied, setCopied] = React.useState(false);
+    const handleCopy = async () => {
+        try { await navigator.clipboard.writeText(url); }
+        catch { /* fallback */ const el = document.createElement('textarea'); el.value = url; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el); }
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2500);
+    };
+    return (
+        <div className="shrink-0 flex items-center gap-3 px-4 py-2 bg-violet-50 dark:bg-violet-900/20 border-b border-violet-200 dark:border-violet-800">
+            <Smartphone size={15} className="text-violet-500 shrink-0" />
+            <p className="text-xs text-violet-700 dark:text-violet-300 font-semibold flex-1">
+                📱 <strong>Mobile Staff App</strong> — Share this link for an optimized phone experience:
+                <span className="ml-1.5 font-mono text-violet-600 dark:text-violet-400">{url}</span>
+            </p>
+            <button
+                onClick={handleCopy}
+                className={`shrink-0 flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition ${
+                    copied ? 'bg-emerald-500 text-white' : 'bg-violet-200 dark:bg-violet-800 text-violet-700 dark:text-violet-200 hover:bg-violet-300 dark:hover:bg-violet-700'
+                }`}
+            >
+                {copied ? <CheckCircle size={12} /> : <Copy size={12} />}
+                {copied ? 'Copied!' : 'Copy'}
+            </button>
+            <a
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="shrink-0 flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-violet-600 hover:bg-violet-700 text-white transition"
+            >
+                <ExternalLink size={12} /> Open
+            </a>
+        </div>
+    );
+};
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -1530,8 +1569,10 @@ currentUserId?: string; currentUser?: User; onUpdateChurch?: (updates: Partial<C
 activePage?: 'website' | 'emails' | 'polls' | 'messaging' | 'unsubscribers' | 'qrcodes' | 'notes';
 /** When activePage='messaging', this controls the active SMS sub-tab */
 smsTab?: 'campaigns' | 'inbox' | 'keywords' | 'analytics' | 'workflows' | 'agent';
+/** When provided, shows an "Open Mobile App" banner in the SMS tab */
+mobileSmsUrl?: string;
 }> = ({ churchId, church, currentUserId,
-currentUser, onUpdateChurch, activePage, smsTab }) => {
+currentUser, onUpdateChurch, activePage, smsTab, mobileSmsUrl }) => {
   const [activeTab, setActiveTab] = useState<'website' | 'emails' | 'polls' | 'unsubscribers' | 'messaging' | 'qrcodes' | 'notes'>('emails');
   const effectiveTab = activePage ?? activeTab;
   const [campaigns, setCampaigns] = useState<EmailCampaign[]>([]);
@@ -2016,14 +2057,20 @@ currentUser, onUpdateChurch, activePage, smsTab }) => {
 
       {/* ─── Messaging (SMS) Tab ──────────────────────────────────────────── */}
       {effectiveTab === 'messaging' && church && currentUser && (
-        <div className="flex-1 min-h-0 overflow-hidden">
-          <MessagingModule
-            churchId={churchId}
-            church={church}
-            currentUser={currentUser}
-            onUpdateChurch={onUpdateChurch || (() => {})}
-            controlledTab={smsTab}
-          />
+        <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+          {/* Mobile App banner */}
+          {mobileSmsUrl && (
+            <MobileSmsBanner url={mobileSmsUrl} />
+          )}
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <MessagingModule
+              churchId={churchId}
+              church={church}
+              currentUser={currentUser}
+              onUpdateChurch={onUpdateChurch || (() => {})}
+              controlledTab={smsTab}
+            />
+          </div>
         </div>
       )}
       {effectiveTab === 'messaging' && (!church || !currentUser) && (

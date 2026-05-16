@@ -121,6 +121,13 @@ export interface Church {
         /** SendGrid API key scoped to this church's Subuser */
         sendGridSubuserApiKey?: string;
     };
+    /** PCO sync & display preferences */
+    pcoSettings?: {
+        /** If true, archived groups/registrations/check-ins are hidden and excluded from counts */
+        hideArchivedItems?: boolean;
+        /** If true, people whose PCO status is 'inactive' are hidden throughout the app */
+        hideInactiveMembers?: boolean;
+    };
     /** Grow integration settings */
     growSettings?: {
         growTracksEnabled?: boolean;
