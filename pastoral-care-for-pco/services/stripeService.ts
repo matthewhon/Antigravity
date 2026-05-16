@@ -95,12 +95,28 @@ class StripeService {
             }),
         });
 
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.message || `Payment server error: ${response.status}`);
+        // Read the raw text first — if the server returns an HTML error page
+        // (e.g. a missing route returning the SPA index.html), JSON.parse will
+        // produce a cryptic "unexpected character" error.  We surface it cleanly.
+        const rawText = await response.text();
+        let responseData: any = {};
+        try { responseData = JSON.parse(rawText); } catch {
+            throw new Error(
+                `Payment server returned an unexpected response (HTTP ${response.status}).\n` +
+                `This usually means the /createCheckoutSession endpoint is not reachable.\n` +
+                `Raw response (first 200 chars): ${rawText.slice(0, 200)}`
+            );
         }
 
-        const { sessionId } = await response.json();
+        if (!response.ok) {
+            throw new Error(responseData.message || `Payment server error: ${response.status}`);
+        }
+
+        const { sessionId } = responseData;
+        if (!sessionId) {
+            throw new Error('Payment server did not return a session ID. Check server logs.');
+        }
+
 
         // Redirect to Stripe Checkout
         const result = await (stripe as any).redirectToCheckout({

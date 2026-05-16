@@ -6,9 +6,9 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 // import * as admin from 'firebase-admin';
-// import { createCheckoutSession } from './backend/createCheckoutSession';
-// import { cancelSubscription } from './backend/cancelSubscription';
-// import { handleStripeWebhook } from './backend/stripeWebhook';
+import { createCheckoutSession } from './backend/createCheckoutSession';
+import { cancelSubscription } from './backend/cancelSubscription';
+import { handleStripeWebhook } from './backend/stripeWebhook';
 import { pcoTokenExchange } from './backend/pcoTokenExchange';
 import { pcoProxy } from './backend/pcoProxy';
 import { handlePcoWebhook } from './backend/pcoWebhookHandler';
@@ -55,6 +55,12 @@ async function startServer() {
     // 2. Immediate Health Check (For Cloud Run + App Config Test button)
     app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
     app.get('/health', (req, res) => res.json({ status: 'ok', service: 'pastoral-care-for-pco' }));
+
+    // ── Stripe Billing ──────────────────────────────────────────────────────
+    // Raw body required for Stripe webhook signature verification
+    app.post('/stripe/webhook', express.raw({ type: 'application/json' }), handleStripeWebhook);
+    app.post('/createCheckoutSession', express.json(), createCheckoutSession);
+    app.post('/cancelSubscription',    express.json(), cancelSubscription);
 
     // PCO Webhook Endpoint
     // We use express.raw to ensure we can verify the HMAC signature based on the raw body
