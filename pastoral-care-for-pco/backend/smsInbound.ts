@@ -471,14 +471,16 @@ export const handleInboundSms = async (req: any, res: any) => {
         const bodyTrimmed = body.trim();
         const aiAgentPrefix = 'ai agent';
         const isAiAgentTrigger = bodyTrimmed.toLowerCase().startsWith(aiAgentPrefix);
+        
+        const actualPersonId = personMatch?.personId || convSnap.data()?.personId;
 
-        if (smsSettings?.executiveAiAgentEnabled && smsSettings?.executiveAiAgentListId && personMatch?.personId && isAiAgentTrigger) {
+        if (smsSettings?.executiveAiAgentEnabled && smsSettings?.executiveAiAgentListId && actualPersonId && isAiAgentTrigger) {
             // Strip the trigger prefix
             const queryBody = bodyTrimmed.substring(aiAgentPrefix.length).trim();
             
             // Non-blocking
             processExecutiveAiQuery(
-                db, log, churchId, personMatch.personId, from, queryBody, 
+                db, log, churchId, actualPersonId, from, queryBody, 
                 smsSettings.executiveAiAgentListId, smsNumberId
             ).catch(() => {});
         }
