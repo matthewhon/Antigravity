@@ -984,9 +984,11 @@ type RecipientMode = 'individual' | 'list' | 'group';
 const NewMessageComposer: React.FC<{
     churchId: string;
     currentUser: User;
+    /** When set, all sends go from this specific phone number */
+    twilioNumberId?: string | null;
     onClose: () => void;
     onSent: () => void;
-}> = ({ churchId, currentUser, onClose, onSent }) => {
+}> = ({ churchId, currentUser, twilioNumberId, onClose, onSent }) => {
     const [mode, setMode]             = useState<RecipientMode>('individual');
     const [body, setBody]             = useState('');
     const [sending, setSending]       = useState(false);
@@ -1215,13 +1217,14 @@ const NewMessageComposer: React.FC<{
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         churchId,
-                        toPhone:    toPhone.replace(/[^\d+]/g, ''),
+                        toPhone:         toPhone.replace(/[^\d+]/g, ''),
                         body,
-                        mediaUrls:  imageUrlNM ? [imageUrlNM] : undefined,
-                        sentBy:     currentUser.id,
-                        sentByName: currentUser.name,
-                        personName: toName || undefined,
-                        personId:   selectedPerson?.id || undefined,
+                        mediaUrls:       imageUrlNM ? [imageUrlNM] : undefined,
+                        sentBy:          currentUser.id,
+                        sentByName:      currentUser.name,
+                        personName:      toName || undefined,
+                        personId:        selectedPerson?.id || undefined,
+                        twilioNumberId:  twilioNumberId ?? undefined,
                     }),
                 });
                 const data = await safeJson(res);
@@ -2005,14 +2008,25 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
         if ((!hasBody && !hasMedia) || !activeConv || isSending) return;
         setIsSending(true);
         try {
+            // Resolve the number to send from:
+            // 1. Prefer the explicit twilioNumberId prop (active line selected in the UI)
+            // 2. Fall back to the number stored on the conversation itself
+            const convNumberId = (activeConv as any).twilioNumberId
+                || (activeConv as any).smsNumberId
+                || (activeConv as any).inboxId
+                || null;
+            const resolvedNumberId = twilioNumberId || convNumberId;
+
             const payload: Record<string, any> = {
                 churchId,
-                toPhone: activeConv.phoneNumber,
-                body: replyBody,
-                sentBy: currentUser.id,
-                sentByName: currentUser.name,
+                toPhone:        activeConv.phoneNumber,
+                body:           replyBody,
+                sentBy:         currentUser.id,
+                sentByName:     currentUser.name,
+                conversationId: activeConv.id,
             };
-            if (hasMedia) payload.mediaUrls = [replyMediaUrl];
+            if (resolvedNumberId)  payload.twilioNumberId = resolvedNumberId;
+            if (hasMedia)          payload.mediaUrls      = [replyMediaUrl];
             const res = await fetch(`${API_BASE}/api/messaging/send-individual`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -2038,6 +2052,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                 <NewMessageComposer
                     churchId={churchId}
                     currentUser={currentUser}
+                    twilioNumberId={twilioNumberId}
                     onClose={() => setShowComposer(false)}
                     onSent={() => setShowComposer(false)}
                 />
