@@ -1645,7 +1645,8 @@ const SmsInbox: React.FC<{
     church: Church;
     /** If provided, only shows conversations for this TwilioPhoneNumber doc */
     twilioNumberId?: string | null;
-}> = ({ churchId, currentUser, church, twilioNumberId }) => {
+    isDefaultNumber?: boolean;
+}> = ({ churchId, currentUser, church, twilioNumberId, isDefaultNumber }) => {
     const [conversations, setConversations] = useState<SmsConversation[]>([]);
     const [activeConv, setActiveConv]       = useState<SmsConversation | null>(null);
     const [messages, setMessages]           = useState<SmsMessage[]>([]);
@@ -1700,9 +1701,9 @@ const SmsInbox: React.FC<{
         );
         const unsub = onSnapshot(baseQ, snap => {
             const all = snap.docs.map(d => ({ id: d.id, ...d.data() } as SmsConversation));
-            // Client-side filter: include legacy (no twilioNumberId) + matching ones
+            // Client-side filter: strict match on twilioNumberId, but if this is the default number, also include legacy convos
             const filtered = twilioNumberId
-                ? all.filter(c => !c.twilioNumberId || c.twilioNumberId === twilioNumberId)
+                ? all.filter(c => c.twilioNumberId === twilioNumberId || (!c.twilioNumberId && isDefaultNumber))
                 : all;
             setConversations(filtered);
         });
@@ -8270,6 +8271,7 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                             currentUser={currentUser}
                             church={church}
                             twilioNumberId={activeNumberId}
+                            isDefaultNumber={activeNumber?.isDefault ?? false}
                         />
                     </div>
                 )}
