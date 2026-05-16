@@ -4,8 +4,10 @@ import MessagingModule from './MessagingModule';
 import { useTwilioNumbers, canUserSeeNumber, canUserUseFeature } from '../hooks/useTwilioNumbers';
 import {
     Inbox, MessageSquare, Key, BarChart3, ArrowLeft, Phone, ChevronDown,
-    Loader2, Share2, Copy, CheckCircle2, X, Link2,
+    Loader2, Share2, Copy, CheckCircle2, X, Link2, Mail,
 } from 'lucide-react';
+import { QuickSendModal } from './ToolsView';
+import { firestore } from '../services/firestoreService';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -353,6 +355,25 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
     }, [activeNumber, activeTab, currentUser]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const [showShareSheet, setShowShareSheet] = useState(false);
+    const [showEmailModal, setShowEmailModal] = useState(false);
+    
+    const canSendEmail = currentUser.roles.includes('Email') || currentUser.roles.includes('Church Admin') || currentUser.roles.includes('System Administration');
+
+    const handleSendQuickEmail = async (campaign: any) => {
+        await firestore.saveEmailCampaign(campaign);
+        const sysSettings = await firestore.getSystemSettings();
+        const apiBaseUrl = sysSettings.apiBaseUrl || 'https://pastoralcare.barnabassoftware.com';
+        const res = await fetch(`${apiBaseUrl}/email/send`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ campaignId: campaign.id, churchId })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+        
+        await firestore.updateEmailCampaign(campaign.id, { status: 'sent', sentAt: Date.now() });
+        alert(data.message || 'Quick email sent successfully!');
+    };
 
     return (
         <div className="flex flex-col h-[100dvh] bg-slate-50 dark:bg-slate-950 overflow-hidden">
@@ -384,6 +405,16 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
 
                     {/* Right: share + number selector */}
                     <div className="flex items-center gap-2 shrink-0">
+                        {canSendEmail && (
+                            <button
+                                onClick={() => setShowEmailModal(true)}
+                                title="Quick Send Email"
+                                className="w-8 h-8 flex items-center justify-center rounded-full text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/30 active:opacity-60 transition"
+                            >
+                                <Mail size={18} strokeWidth={2} />
+                            </button>
+                        )}
+
                         {/* Share button — iOS system style */}
                         <button
                             onClick={() => setShowShareSheet(true)}
@@ -496,6 +527,16 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
                     visibleNumbers={visibleNumbers}
                     visibleTabs={visibleTabs}
                     onClose={() => setShowShareSheet(false)}
+                />
+            )}
+
+            {/* ── Quick Send Email Modal ────────────────────────────────────── */}
+            {showEmailModal && canSendEmail && (
+                <QuickSendModal
+                    churchId={churchId}
+                    church={church}
+                    onClose={() => setShowEmailModal(false)}
+                    onSendQuickEmail={handleSendQuickEmail}
                 />
             )}
         </div>

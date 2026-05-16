@@ -74,7 +74,7 @@ const DEFAULT_TEMPLATE: TemplateSettings = {
   showLogo: true,
 };
 
-const newCampaign = (churchId: string, name: string): EmailCampaign => ({
+export const newCampaign = (churchId: string, name: string): EmailCampaign => ({
   id: `email_${Date.now()}`,
   churchId,
   name,
@@ -1376,7 +1376,7 @@ const SendTestModal: React.FC<SendTestModalProps> = ({ onConfirm, onCancel, isSe
   );
 };
 
-const QuickSendModal: React.FC<{
+export const QuickSendModal: React.FC<{
   churchId: string;
   church?: Church;
   onClose: () => void;
