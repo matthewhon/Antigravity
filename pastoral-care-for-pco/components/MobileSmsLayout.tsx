@@ -405,16 +405,6 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
 
                     {/* Right: share + number selector */}
                     <div className="flex items-center gap-2 shrink-0">
-                        {canSendEmail && (
-                            <button
-                                onClick={() => setShowEmailModal(true)}
-                                title="Quick Send Email"
-                                className="w-8 h-8 flex items-center justify-center rounded-full text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/30 active:opacity-60 transition"
-                            >
-                                <Mail size={18} strokeWidth={2} />
-                            </button>
-                        )}
-
                         {/* Share button — iOS system style */}
                         <button
                             onClick={() => setShowShareSheet(true)}
@@ -471,49 +461,83 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
                         const isActive  = activeTab === tab.id;
                         const isPressed = pressedTab === tab.id;
                         return (
-                            <button
-                                key={tab.id}
-                                id={`mobile-sms-tab-${tab.id}`}
-                                onClick={() => handleTabChange(tab.id)}
-                                aria-label={tab.label}
-                                aria-current={isActive ? 'page' : undefined}
-                                className="flex-1 flex flex-col items-center justify-center gap-[3px] select-none"
-                                style={{
-                                    WebkitTapHighlightColor: 'transparent',
-                                }}
-                            >
-                                {/* Icon container with iOS pill highlight */}
-                                <span
-                                    className="flex items-center justify-center rounded-2xl transition-all duration-150"
+                            <React.Fragment key={tab.id}>
+                                <button
+                                    id={`mobile-sms-tab-${tab.id}`}
+                                    onClick={() => handleTabChange(tab.id)}
+                                    aria-label={tab.label}
+                                    aria-current={isActive ? 'page' : undefined}
+                                    className="flex-1 flex flex-col items-center justify-center gap-[3px] select-none"
                                     style={{
-                                        width: 44,
-                                        height: 28,
-                                        background: isActive
-                                            ? 'rgb(237 233 254)' // violet-100
-                                            : 'transparent',
-                                        transform: isPressed ? 'scale(0.88)' : 'scale(1)',
-                                        color: isActive
-                                            ? 'rgb(124 58 237)'  // violet-600
-                                            : 'rgb(148 163 184)', // slate-400
+                                        WebkitTapHighlightColor: 'transparent',
                                     }}
                                 >
-                                    {isActive ? tab.activeIcon : tab.icon}
-                                </span>
-                                {/* Label */}
-                                <span
-                                    className="leading-none"
-                                    style={{
-                                        fontSize: 10,
-                                        fontWeight: isActive ? 700 : 500,
-                                        color: isActive
-                                            ? 'rgb(124 58 237)'
-                                            : 'rgb(148 163 184)',
-                                        letterSpacing: 0.1,
-                                    }}
-                                >
-                                    {tab.label}
-                                </span>
-                            </button>
+                                    {/* Icon container with iOS pill highlight */}
+                                    <span
+                                        className="flex items-center justify-center rounded-2xl transition-all duration-150"
+                                        style={{
+                                            width: 44,
+                                            height: 28,
+                                            background: isActive
+                                                ? 'rgb(237 233 254)' // violet-100
+                                                : 'transparent',
+                                            transform: isPressed ? 'scale(0.88)' : 'scale(1)',
+                                            color: isActive
+                                                ? 'rgb(124 58 237)'  // violet-600
+                                                : 'rgb(148 163 184)', // slate-400
+                                        }}
+                                    >
+                                        {isActive ? tab.activeIcon : tab.icon}
+                                    </span>
+                                    {/* Label */}
+                                    <span
+                                        className="leading-none"
+                                        style={{
+                                            fontSize: 10,
+                                            fontWeight: isActive ? 700 : 500,
+                                            color: isActive
+                                                ? 'rgb(124 58 237)'
+                                                : 'rgb(148 163 184)',
+                                            letterSpacing: 0.1,
+                                        }}
+                                    >
+                                        {tab.label}
+                                    </span>
+                                </button>
+
+                                {/* Inject Email action button directly after Broadcast (campaigns) tab */}
+                                {tab.id === 'campaigns' && canSendEmail && (
+                                    <button
+                                        onClick={() => setShowEmailModal(true)}
+                                        className="flex-1 flex flex-col items-center justify-center gap-[3px] select-none"
+                                        style={{ WebkitTapHighlightColor: 'transparent' }}
+                                    >
+                                        <span
+                                            className="flex items-center justify-center rounded-2xl transition-all duration-150"
+                                            style={{
+                                                width: 44,
+                                                height: 28,
+                                                background: 'transparent',
+                                                transform: 'scale(1)',
+                                                color: 'rgb(148 163 184)',
+                                            }}
+                                        >
+                                            <Mail size={24} strokeWidth={1.6} />
+                                        </span>
+                                        <span
+                                            className="leading-none"
+                                            style={{
+                                                fontSize: 10,
+                                                fontWeight: 500,
+                                                color: 'rgb(148 163 184)',
+                                                letterSpacing: 0.1,
+                                            }}
+                                        >
+                                            Email
+                                        </span>
+                                    </button>
+                                )}
+                            </React.Fragment>
                         );
                     })}
                 </div>
