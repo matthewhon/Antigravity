@@ -807,11 +807,11 @@ const App: React.FC = () => {
                 enableLibrary={systemSettings?.enableLibrary}
                 noPadding={view.startsWith('tools')}
                 subNavItems={view.startsWith('tools-sms') ? [
-                    { label: 'Inbox',     view: 'tools-sms-inbox',     icon: <span className="text-sm">ðŸ“¥</span> },
-                    { label: 'Broadcast', view: 'tools-sms-campaigns', icon: <span className="text-sm">ðŸ“¨</span> },
-                    { label: 'Keywords',  view: 'tools-sms-keywords',  icon: <span className="text-sm">ðŸ”‘</span> },
-                    { label: 'Analytics', view: 'tools-sms-analytics', icon: <span className="text-sm">ðŸ“Š</span> },
-                    { label: 'AI Agent',  view: 'tools-sms-agent',     icon: <span className="text-sm">âœ¨</span> },
+                    { label: 'Inbox',     view: 'tools-sms-inbox',     icon: <span className="text-sm">📥</span> },
+                    { label: 'Broadcast', view: 'tools-sms-campaigns', icon: <span className="text-sm">📨</span> },
+                    { label: 'Keywords',  view: 'tools-sms-keywords',  icon: <span className="text-sm">🔑</span> },
+                    { label: 'Analytics', view: 'tools-sms-analytics', icon: <span className="text-sm">📊</span> },
+                    { label: 'AI Agent',  view: 'tools-sms-agent',     icon: <span className="text-sm">✨</span> },
                 ] : undefined}
             >
             <Routes>

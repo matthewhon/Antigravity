@@ -1,21 +1,147 @@
 
-import admin from 'firebase-admin';
 import Stripe from 'stripe';
 import { getDb } from './firebase';
+import { sgSend } from './sendEmail';
 
-// Note: In production, fetch these securely. 
-// For this setup, we fetch the secret key from Firestore similar to other endpoints, 
-// OR you must set them as Firebase Function Environment variables.
-// Here we assume environment variables for the webhook secret as it's static per deployment.
+// ─── Stripe Plan metadata ──────────────────────────────────────────────────────
+const PLAN_NAMES: Record<string, string> = {
+    starter: 'Starter',
+    growth:  'Growth',
+    kingdom: 'Kingdom',
+};
+const PLAN_PRICES: Record<string, string> = {
+    starter: '$49/mo',
+    growth:  '$99/mo',
+    kingdom: '$199/mo',
+};
+
+// ─── Branded receipt HTML ──────────────────────────────────────────────────────
+
+function buildReceiptHtml(opts: {
+    churchName: string;
+    planName: string;
+    planPrice: string;
+    amount: string;         // e.g. "$49.00"
+    invoiceNumber: string;
+    periodStart: string;    // formatted date string
+    periodEnd: string;      // formatted date string
+    invoiceUrl: string;     // Stripe-hosted PDF URL
+}): string {
+    const { churchName, planName, planPrice, amount, invoiceNumber, periodStart, periodEnd, invoiceUrl } = opts;
+    return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+</head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:40px 16px;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+
+        <!-- Header -->
+        <tr>
+          <td style="background:linear-gradient(135deg,#4f46e5,#7c3aed);padding:32px 40px;text-align:center;">
+            <div style="font-size:28px;margin-bottom:8px;">✅</div>
+            <div style="font-size:22px;font-weight:900;color:#ffffff;letter-spacing:-0.5px;">Payment Confirmed</div>
+            <div style="font-size:14px;color:#c4b5fd;margin-top:6px;">Pastoral Care for PCO – Subscription Receipt</div>
+          </td>
+        </tr>
+
+        <!-- Body -->
+        <tr>
+          <td style="padding:36px 40px;">
+
+            <p style="margin:0 0 24px;font-size:15px;color:#334155;line-height:1.6;">
+              Hi <strong>${churchName}</strong>, thank you for your subscription! Your payment was processed successfully.
+            </p>
+
+            <!-- Receipt box -->
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;margin-bottom:28px;">
+              <tr>
+                <td style="padding:20px 24px;border-bottom:1px solid #e2e8f0;">
+                  <table width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                      <td style="font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">Plan</td>
+                      <td align="right" style="font-size:15px;font-weight:800;color:#1e293b;">${planName} — ${planPrice}</td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:20px 24px;border-bottom:1px solid #e2e8f0;">
+                  <table width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                      <td style="font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">Billing Period</td>
+                      <td align="right" style="font-size:14px;color:#334155;">${periodStart} – ${periodEnd}</td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:20px 24px;border-bottom:1px solid #e2e8f0;">
+                  <table width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                      <td style="font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">Invoice #</td>
+                      <td align="right" style="font-size:14px;color:#334155;font-family:monospace;">${invoiceNumber}</td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:20px 24px;">
+                  <table width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                      <td style="font-size:16px;font-weight:900;color:#0f172a;">Total Charged</td>
+                      <td align="right" style="font-size:22px;font-weight:900;color:#4f46e5;">${amount}</td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+
+            <!-- Download button -->
+            <div style="text-align:center;margin-bottom:28px;">
+              <a href="${invoiceUrl}" target="_blank" style="display:inline-block;background:#4f46e5;color:#ffffff;font-size:14px;font-weight:700;padding:14px 32px;border-radius:10px;text-decoration:none;letter-spacing:0.2px;">
+                📄 View & Download Invoice
+              </a>
+            </div>
+
+            <p style="margin:0;font-size:13px;color:#94a3b8;text-align:center;line-height:1.6;">
+              Questions about your subscription? Reply to this email or visit<br>
+              <a href="https://pastoralcare.barnabassoftware.com" style="color:#6366f1;">pastoralcare.barnabassoftware.com</a>
+            </p>
+
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:20px 40px;text-align:center;">
+            <p style="margin:0;font-size:11px;color:#94a3b8;">
+              Barnabas Software LLC · Pastoral Care for PCO<br>
+              This is an automated payment receipt. Please keep it for your records.
+            </p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+// ─── Webhook Handler ───────────────────────────────────────────────────────────
 
 export const handleStripeWebhook = async (req: any, res: any) => {
     const db = getDb();
     const sig = req.headers['stripe-signature'];
-    
+
     // Fetch settings to get keys
     const settingsDoc = await db.doc('system/settings').get();
     const settings = settingsDoc.data() || {};
-    
+
     // TRIM KEY to prevent whitespace errors
     const secretKey = settings.stripeSecretKey ? settings.stripeSecretKey.trim() : '';
 
@@ -28,7 +154,7 @@ export const handleStripeWebhook = async (req: any, res: any) => {
     const stripe = new Stripe(secretKey, {
         apiVersion: '2023-10-16' as any,
     });
-    
+
     const endpointSecret = settings.stripeWebhookSecret ? settings.stripeWebhookSecret.trim() : '';
 
     if (!endpointSecret) {
@@ -55,41 +181,134 @@ export const handleStripeWebhook = async (req: any, res: any) => {
         return;
     }
 
-
     // Handle the event
     switch (event.type) {
+
+        // ── New subscription via Checkout ─────────────────────────────────────
         case 'checkout.session.completed': {
             const session = event.data.object as Stripe.Checkout.Session;
-            const churchId = session.client_reference_id; // Passed during creation
-            
-            if (churchId) {
-                console.log(`Processing checkout for church: ${churchId}`);
-                
-                // Retrieve subscription details
-                if (session.subscription) {
-                    const subscriptionId = session.subscription as string;
-                    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-                    
-                    // Identify the plan based on metadata or price
-                    const planId = session.metadata?.planId || 'growth'; 
-                    
-                    // Update Firestore
-                    await db.collection('churches').doc(churchId).update({
-                        subscription: {
-                            status: 'active',
-                            planId: planId,
-                            currentPeriodEnd: (subscription as any).current_period_end * 1000,
-                            customerId: session.customer as string
-                        }
-                    });
-                }
+            const churchId = session.client_reference_id;
+
+            if (churchId && session.subscription) {
+                console.log(`[StripeWebhook] checkout.session.completed for church: ${churchId}`);
+
+                const subscriptionId = session.subscription as string;
+                const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+                const planId = session.metadata?.planId || 'growth';
+
+                await db.collection('churches').doc(churchId).update({
+                    subscription: {
+                        status: 'active',
+                        planId,
+                        subscriptionId,
+                        currentPeriodEnd: (subscription as any).current_period_end * 1000,
+                        customerId: session.customer as string,
+                    }
+                });
             }
             break;
         }
 
+        // ── Monthly invoice paid → send receipt ───────────────────────────────
+        case 'invoice.paid': {
+            const invoice = event.data.object as Stripe.Invoice;
+
+            // Only send for subscription invoices (not one-off)
+            if (!invoice.subscription) break;
+
+            try {
+                const customerId = typeof invoice.customer === 'string'
+                    ? invoice.customer
+                    : (invoice.customer as any)?.id;
+
+                if (!customerId) break;
+
+                // Find the church by customerId
+                const churchSnap = await db.collection('churches')
+                    .where('subscription.customerId', '==', customerId)
+                    .limit(1)
+                    .get();
+
+                if (churchSnap.empty) {
+                    console.warn(`[StripeWebhook] invoice.paid: no church found for customer ${customerId}`);
+                    break;
+                }
+
+                const churchDoc = churchSnap.docs[0];
+                const church = churchDoc.data();
+                const churchName = church.name || 'Your Church';
+                const planId = church.subscription?.planId || 'growth';
+
+                // Get the billing admin's email — use the customer email on the invoice first
+                const customerEmail = invoice.customer_email ||
+                    (typeof invoice.customer === 'object' ? (invoice.customer as any)?.email : null);
+
+                // Fallback: find the church admin user
+                let toEmail = customerEmail;
+                if (!toEmail) {
+                    const adminSnap = await db.collection('users')
+                        .where('churchId', '==', churchDoc.id)
+                        .where('role', '==', 'Church Admin')
+                        .limit(1)
+                        .get();
+                    if (!adminSnap.empty) toEmail = adminSnap.docs[0].data().email;
+                }
+
+                if (!toEmail) {
+                    console.warn(`[StripeWebhook] invoice.paid: no email found for church ${churchDoc.id}`);
+                    break;
+                }
+
+                // Format amounts and dates
+                const amountPaid = `$${(invoice.amount_paid / 100).toFixed(2)}`;
+                const fmt = (ts: number) => new Date(ts * 1000).toLocaleDateString('en-US', {
+                    month: 'long', day: 'numeric', year: 'numeric'
+                });
+                const periodStart = fmt((invoice as any).period_start || invoice.created);
+                const periodEnd   = fmt((invoice as any).period_end   || invoice.created + 30 * 86400);
+                const invoiceUrl  = (invoice as any).hosted_invoice_url || 'https://billing.stripe.com';
+                const invoiceNum  = invoice.number || invoice.id;
+
+                const planName  = PLAN_NAMES[planId]  || 'Premium';
+                const planPrice = PLAN_PRICES[planId] || '';
+
+                // Get SendGrid config from system settings
+                const sgKey      = (settings.sendGridApiKey || '').trim();
+                const fromEmail  = (settings.sendGridFromEmail || 'noreply@barnabassoftware.com').trim();
+                const fromName   = (settings.sendGridFromName  || 'Pastoral Care for PCO').trim();
+
+                if (!sgKey) {
+                    console.warn('[StripeWebhook] invoice.paid: SendGrid not configured, skipping receipt email');
+                    break;
+                }
+
+                const html = buildReceiptHtml({
+                    churchName, planName, planPrice,
+                    amount: amountPaid,
+                    invoiceNumber: invoiceNum,
+                    periodStart, periodEnd,
+                    invoiceUrl,
+                });
+
+                await sgSend([{
+                    to:      toEmail,
+                    from:    { email: fromEmail, name: fromName },
+                    subject: `✅ Receipt: ${planName} Plan — ${amountPaid} – Pastoral Care for PCO`,
+                    html,
+                }], sgKey);
+
+                console.log(`[StripeWebhook] Receipt sent to ${toEmail} for church ${churchDoc.id} (${planName}, ${amountPaid})`);
+
+            } catch (receiptErr: any) {
+                // Don't fail the webhook — Stripe needs a 200 back regardless
+                console.error('[StripeWebhook] Failed to send receipt email:', receiptErr?.message || receiptErr);
+            }
+            break;
+        }
+
+        // ── Subscription renewed / plan changed ───────────────────────────────
         case 'customer.subscription.updated': {
             const subscription = event.data.object as Stripe.Subscription;
-            // Find church by customerId
             const churchesSnapshot = await db.collection('churches')
                 .where('subscription.customerId', '==', subscription.customer)
                 .limit(1)
@@ -98,13 +317,15 @@ export const handleStripeWebhook = async (req: any, res: any) => {
             if (!churchesSnapshot.empty) {
                 const churchDoc = churchesSnapshot.docs[0];
                 await churchDoc.ref.update({
-                    'subscription.status': subscription.status,
-                    'subscription.currentPeriodEnd': (subscription as any).current_period_end * 1000
+                    'subscription.status':          subscription.status,
+                    'subscription.currentPeriodEnd': (subscription as any).current_period_end * 1000,
                 });
+                console.log(`[StripeWebhook] Updated subscription status for ${churchDoc.id}: ${subscription.status}`);
             }
             break;
         }
 
+        // ── Subscription cancelled ────────────────────────────────────────────
         case 'customer.subscription.deleted': {
             const subscription = event.data.object as Stripe.Subscription;
             const churchesSnapshot = await db.collection('churches')
@@ -115,16 +336,17 @@ export const handleStripeWebhook = async (req: any, res: any) => {
             if (!churchesSnapshot.empty) {
                 const churchDoc = churchesSnapshot.docs[0];
                 await churchDoc.ref.update({
-                    'subscription.status': 'canceled',
-                    'subscription.currentPeriodEnd': Date.now()
+                    'subscription.status':          'canceled',
+                    'subscription.currentPeriodEnd': Date.now(),
                 });
+                console.log(`[StripeWebhook] Subscription canceled for church ${churchDoc.id}`);
             }
             break;
         }
 
         default:
-            console.log(`Unhandled event type ${event.type}`);
+            console.log(`[StripeWebhook] Unhandled event type: ${event.type}`);
     }
 
-    res.json({received: true});
+    res.json({ received: true });
 };
