@@ -24,8 +24,12 @@ export default function WidgetApp() {
   const maxItems = parseInt(params.get('maxItems') || '0', 10);
   const includeArchived = params.get('includeArchived') === 'true';
   const singleFormId = params.get('singleFormId') || '';  // legacy
-  const visibleFormIdsRaw = params.get('visibleFormIds') || '';
-  const visibleFormIds = visibleFormIdsRaw ? new Set(visibleFormIdsRaw.split(',').map(s => s.trim())) : null;
+  const visibleFormIdsRaw = params.get('visibleFormIds'); // null = param absent, '' = none selected
+  const visibleFormIds = visibleFormIdsRaw === null
+    ? null  // param not in URL → no filter, show all
+    : visibleFormIdsRaw === ''
+      ? new Set<string>()  // param present but empty → show nothing
+      : new Set(visibleFormIdsRaw.split(',').map(s => s.trim()).filter(Boolean));
 
   useEffect(() => {
     if (autoHeight && iframeId) {
