@@ -59,6 +59,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             isGeneratingInsights={isGeneratingInsights}
             onUpdateTheme={onUpdateTheme}
             churchRiskSettings={church.churchRiskSettings}
+            groupRiskSettings={church.groupRiskSettings}
             onGenerateInsights={onGenerateInsights}
             churchName={church.name}
         />

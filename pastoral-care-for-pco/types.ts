@@ -1584,8 +1584,9 @@ export interface TwilioPhoneNumber {
      * Empty array = visible to all users in the church.
      */
     allowedUserIds: string[];
-    /** Optional display name shown in outbound message headers */
     senderName?: string;
+    /** Granular feature-level permissions */
+    permissions?: SmsNumberPermissions;
     createdAt: number;
     updatedAt: number;
 }

@@ -397,3 +397,80 @@ export const calculateGroupHealth = (
         }
     };
 };
+
+export const calculateAggregateGroupHealth = (
+    groups: PcoGroup[],
+    people: PcoPerson[],
+    settings: GroupRiskSettings = DEFAULT_GROUP_RISK_SETTINGS
+) => {
+    if (!groups || groups.length === 0) {
+        return {
+            score: 0,
+            category: 'No Data',
+            color: 'slate',
+            factors: []
+        };
+    }
+
+    const peopleMap = new Map(people.map(p => [p.id, p]));
+    let totalScore = 0;
+    let totalAtt = 0;
+    let totalRet = 0;
+    let totalLead = 0;
+    let totalEng = 0;
+
+    let validGroups = 0;
+
+    groups.forEach(g => {
+        if (g.membersCount > 0) {
+            const health = calculateGroupHealth(g, settings, peopleMap);
+            totalScore += health.score;
+            totalAtt += health.breakdown.attendance;
+            totalRet += health.breakdown.retention;
+            totalLead += health.breakdown.leadership;
+            totalEng += health.breakdown.engagement;
+            validGroups++;
+        }
+    });
+
+    if (validGroups === 0) {
+         return {
+            score: 0,
+            category: 'No Active Groups',
+            color: 'slate',
+            factors: []
+        };
+    }
+
+    const avgScore = Math.round(totalScore / validGroups);
+    const avgAtt = totalAtt / validGroups;
+    const avgRet = totalRet / validGroups;
+    const avgLead = totalLead / validGroups;
+    const avgEng = totalEng / validGroups;
+
+    let category = 'Critical';
+    let color = 'rose';
+    if (avgScore >= settings.thresholds.thrivingMin) { category = 'Thriving'; color = 'emerald'; }
+    else if (avgScore >= settings.thresholds.warningMin) { category = 'Warning'; color = 'amber'; }
+
+    const makeFactor = (name: string, score: number, weight: number) => {
+        let status: 'good' | 'warning' | 'critical' = 'critical';
+        let label = 'Needs Help';
+        if (score >= 80) { status = 'good'; label = 'Healthy'; }
+        else if (score >= 60) { status = 'warning'; label = 'At Risk'; }
+
+        return { name, score, weight, status, label };
+    };
+
+    return {
+        score: avgScore,
+        category,
+        color,
+        factors: [
+            makeFactor('Attendance', avgAtt, settings.weights.attendanceConsistency),
+            makeFactor('Retention', avgRet, settings.weights.retention),
+            makeFactor('Leadership', avgLead, settings.weights.leadershipSpan),
+            makeFactor('Engagement', avgEng, settings.weights.engagement)
+        ]
+    };
+};

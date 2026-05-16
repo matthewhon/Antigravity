@@ -3,7 +3,7 @@ import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { 
     User, PeopleDashboardData, GivingAnalytics, GroupsDashboardData, 
     ServicesDashboardData, AttendanceData, CensusStats, BudgetRecord, 
-    PcoFund, DetailedDonation, ChurchRiskSettings 
+    PcoFund, DetailedDonation, ChurchRiskSettings, GroupRiskSettings
 } from '../types';
 import { 
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -13,7 +13,7 @@ import WidgetsController from './WidgetsController';
 import { DASHBOARD_WIDGETS } from '../constants/widgetRegistry';
 import { WidgetWrapper, StatCard } from './SharedUI';
 import { RiskDistributionWidget } from './RiskWidgets';
-import { calculateChurchRisk, DEFAULT_CHURCH_RISK_SETTINGS } from '../services/riskService';
+import { calculateChurchRisk, DEFAULT_CHURCH_RISK_SETTINGS, calculateAggregateGroupHealth } from '../services/riskService';
 import { PastorAIView } from './PastorAIView';
 import { ServicesTimelineWidget } from './ServicesTimelineWidget';
 
@@ -37,6 +37,7 @@ interface DashboardViewProps {
   isGeneratingInsights: boolean;
   onUpdateTheme: (theme: 'traditional' | 'dark') => void;
   churchRiskSettings?: ChurchRiskSettings;
+  groupRiskSettings?: GroupRiskSettings;
   onGenerateInsights: () => void;
   // AI Assistant props
   churchName: string;
@@ -71,6 +72,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   isGeneratingInsights,
   onUpdateTheme,
   churchRiskSettings,
+  groupRiskSettings,
   onGenerateInsights,
   churchName,
 }) => {
@@ -147,6 +149,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       );
   }, [churchRiskSettings, peopleData, givingAnalytics, groupsData, servicesData, attendanceData, budgets]);
 
+  const groupHealth = useMemo(() => {
+      return calculateAggregateGroupHealth(
+          groupsData?.allGroups || [],
+          peopleData?.allPeople || [],
+          groupRiskSettings
+      );
+  }, [groupRiskSettings, groupsData?.allGroups, peopleData?.allPeople]);
+
   const renderWidget = (id: string) => {
       const currentTheme = user.theme;
       const gridColor = currentTheme === 'dark' ? '#334155' : '#f1f5f9';
@@ -219,37 +229,44 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               ) : null;
           case 'groups_stats':
               return groupsData ? (
-                  <div className="bg-white dark:bg-slate-800 p-8 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm h-full flex flex-col justify-between">
-                        <div className="flex justify-between items-center mb-6">
-                            <h4 className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">Groups Health</h4>
-                            <button onClick={() => handleRemoveWidget(id)} className="text-slate-300 dark:text-slate-600 hover:text-rose-500 transition-colors">✕</button>
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-8 mb-8">
-                            <div>
-                                <p className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter">{groupsData.stats.totalGroups}</p>
-                                <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1">Active Groups</p>
-                            </div>
-                            <div className="text-right">
-                                <p className="text-4xl font-black text-indigo-600 dark:text-indigo-400 tracking-tighter">{groupsData.stats.totalEnrollment}</p>
-                                <p className="text-[10px] font-bold text-indigo-300 dark:text-indigo-700 uppercase tracking-widest mt-1">Enrolled</p>
-                            </div>
-                        </div>
+                  <div className="bg-white dark:bg-slate-800 p-8 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm h-full flex flex-col">
+                      <div className="flex justify-between items-center mb-6">
+                          <h4 className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">Groups Health</h4>
+                          <button onClick={() => handleRemoveWidget(id)} className="text-slate-300 dark:text-slate-600 hover:text-rose-500 transition-colors">✕</button>
+                      </div>
 
-                        <div>
-                            <div className="flex justify-between items-end mb-3">
-                                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Participation Rate</span>
-                                <span className="text-3xl font-black text-slate-900 dark:text-white">
-                                    {Math.round((groupsData.stats.averageAttendance / (groupsData.stats.totalEnrollment || 1)) * 100)}%
-                                </span>
-                            </div>
-                            <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-6 overflow-hidden border border-slate-200 dark:border-slate-600">
-                                <div 
-                                    className="bg-indigo-500 h-full rounded-full transition-all duration-1000 ease-out shadow-sm" 
-                                    style={{width: `${Math.min(100, (groupsData.stats.averageAttendance / (groupsData.stats.totalEnrollment || 1)) * 100)}%`}}
-                                ></div>
-                            </div>
-                        </div>
+                      <div className="flex flex-col items-center justify-center flex-1 mb-6">
+                          <div className={`w-32 h-32 rounded-full border-[8px] flex items-center justify-center mb-4 ${
+                              groupHealth.color === 'emerald' ? 'border-emerald-100 text-emerald-600 dark:border-emerald-900/30 dark:text-emerald-400' : 
+                              groupHealth.color === 'amber' ? 'border-amber-100 text-amber-500 dark:border-amber-900/30 dark:text-amber-400' : 
+                              groupHealth.color === 'slate' ? 'border-slate-100 text-slate-500 dark:border-slate-700 dark:text-slate-400' :
+                              'border-rose-100 text-rose-500 dark:border-rose-900/30 dark:text-rose-400'
+                          }`}>
+                              <span className="text-4xl font-black">{groupHealth.score}</span>
+                          </div>
+                          <p className={`text-sm font-black uppercase tracking-widest ${
+                              groupHealth.color === 'emerald' ? 'text-emerald-600 dark:text-emerald-400' : 
+                              groupHealth.color === 'amber' ? 'text-amber-500 dark:text-amber-400' : 
+                              groupHealth.color === 'slate' ? 'text-slate-500 dark:text-slate-400' :
+                              'text-rose-500 dark:text-rose-400'
+                          }`}>
+                              {groupHealth.category}
+                          </p>
+                      </div>
+
+                      <div className="space-y-2">
+                          {groupHealth.factors.map(f => (
+                              <div key={f.name} className="flex justify-between items-center text-[10px]">
+                                  <span className="font-bold text-slate-500 dark:text-slate-400">{f.name}</span>
+                                  <span className={`font-black uppercase ${
+                                      f.status === 'good' ? 'text-emerald-500 dark:text-emerald-400' : 
+                                      f.status === 'warning' ? 'text-amber-500 dark:text-amber-400' : 'text-rose-500 dark:text-rose-400'
+                                  }`}>
+                                      {f.label}
+                                  </span>
+                              </div>
+                          ))}
+                      </div>
                   </div>
               ) : null;
           case 'services_stats':

@@ -7093,7 +7093,15 @@ function useTwilioNumbers(churchId: string) {
 /** Returns true if the current user is allowed to see/use a given number. */
 function canUserSeeNumber(num: TwilioPhoneNumber, user: User): boolean {
     if (user.roles.includes('Church Admin') || user.roles.includes('System Administration')) return true;
-    return num.allowedUserIds.length === 0 || num.allowedUserIds.includes(user.id);
+    return !num.allowedUserIds || num.allowedUserIds.length === 0 || num.allowedUserIds.includes(user.id);
+}
+
+function canUserUseFeature(num: TwilioPhoneNumber | null | undefined, user: User, featureKey: keyof NonNullable<TwilioPhoneNumber['permissions']>): boolean {
+    if (!num) return false;
+    if (user.roles.includes('Church Admin') || user.roles.includes('System Administration')) return true;
+    if (num.allowedUserIds && num.allowedUserIds.length > 0 && !num.allowedUserIds.includes(user.id)) return false;
+    const featureIds = num.permissions?.[featureKey] || [];
+    return featureIds.length === 0 || featureIds.includes(user.id);
 }
 
 // ─── NumberManager ───────────────────────────────────────────────────────────
@@ -7905,6 +7913,21 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
 
     const activeNumber = visibleNumbers.find(n => n.id === activeNumberId) ?? visibleNumbers[0] ?? null;
 
+    useEffect(() => {
+        const allowedTabs = ([
+            { key: 'campaigns', perm: 'broadcastUserIds' },
+            { key: 'workflows', perm: 'broadcastUserIds' },
+            { key: 'inbox',     perm: 'inboxUserIds' },
+            { key: 'keywords',  perm: 'keywordsUserIds' },
+            { key: 'analytics', perm: 'analyticsUserIds' },
+            { key: 'agent',     perm: 'aiAgentUserIds' },
+        ] as const).filter(t => canUserUseFeature(activeNumber, currentUser, t.perm as any));
+
+        if (allowedTabs.length > 0 && !allowedTabs.some(t => t.key === activeTab) && !controlledTab) {
+            setActiveTab(allowedTabs[0].key as Tab);
+        }
+    }, [activeNumber, activeTab, currentUser, controlledTab]);
+
 
     const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
         setToast({ msg, type });
@@ -8144,16 +8167,18 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                     {!controlledTab ? (
                         <div className="flex gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl overflow-x-auto no-scrollbar w-full md:w-auto">
                             {([
-                                { key: 'campaigns', label: 'Broadcast', icon: <MessageSquare size={13} /> },
-                                { key: 'workflows', label: 'Workflows', icon: <Zap size={13} /> },
-                                { key: 'inbox',     label: 'Inbox',     icon: <Inbox size={13} /> },
-                                { key: 'keywords',  label: 'Keywords',  icon: <Key size={13} /> },
-                                { key: 'analytics', label: 'Analytics', icon: <BarChart3 size={13} /> },
-                                { key: 'agent',     label: 'AI Agent',  icon: <Sparkles size={13} /> },
-                            ] as const).map(t => (
+                                { key: 'campaigns', label: 'Broadcast', icon: <MessageSquare size={13} />, perm: 'broadcastUserIds' },
+                                { key: 'workflows', label: 'Workflows', icon: <Zap size={13} />, perm: 'broadcastUserIds' },
+                                { key: 'inbox',     label: 'Inbox',     icon: <Inbox size={13} />, perm: 'inboxUserIds' },
+                                { key: 'keywords',  label: 'Keywords',  icon: <Key size={13} />, perm: 'keywordsUserIds' },
+                                { key: 'analytics', label: 'Analytics', icon: <BarChart3 size={13} />, perm: 'analyticsUserIds' },
+                                { key: 'agent',     label: 'AI Agent',  icon: <Sparkles size={13} />, perm: 'aiAgentUserIds' },
+                            ] as const)
+                            .filter(t => canUserUseFeature(activeNumber, currentUser, t.perm as any))
+                            .map(t => (
                                 <button
                                     key={t.key}
-                                    onClick={() => setActiveTab(t.key)}
+                                    onClick={() => setActiveTab(t.key as any)}
                                     className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-semibold transition ${effectiveTab === t.key ? 'bg-white dark:bg-slate-700 text-violet-600 dark:text-violet-300 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}
                                 >
                                     {t.icon} {t.label}

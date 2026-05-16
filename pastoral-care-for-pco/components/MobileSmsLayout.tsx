@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Church, User, TwilioPhoneNumber } from '../types';
 import MessagingModule from './MessagingModule';
-import { useTwilioNumbers, canUserSeeNumber } from '../hooks/useTwilioNumbers';
+import { useTwilioNumbers, canUserSeeNumber, canUserUseFeature } from '../hooks/useTwilioNumbers';
 import {
     Inbox, MessageSquare, Key, BarChart3, ArrowLeft, Phone, ChevronDown, Loader2
 } from 'lucide-react';
@@ -36,11 +36,11 @@ const SESSION_TAB_KEY = 'mobileSms_activeTab';
 
 // ─── Tab definitions ──────────────────────────────────────────────────────────
 
-const TABS: { id: SmsTab; label: string; icon: React.ReactNode }[] = [
-    { id: 'inbox',     label: 'Inbox',     icon: <Inbox size={22} /> },
-    { id: 'campaigns', label: 'Broadcast', icon: <MessageSquare size={22} /> },
-    { id: 'keywords',  label: 'Keywords',  icon: <Key size={22} /> },
-    { id: 'analytics', label: 'Analytics', icon: <BarChart3 size={22} /> },
+const TABS: { id: SmsTab; label: string; icon: React.ReactNode; perm: string }[] = [
+    { id: 'inbox',     label: 'Inbox',     icon: <Inbox size={22} />, perm: 'inboxUserIds' },
+    { id: 'campaigns', label: 'Broadcast', icon: <MessageSquare size={22} />, perm: 'broadcastUserIds' },
+    { id: 'keywords',  label: 'Keywords',  icon: <Key size={22} />, perm: 'keywordsUserIds' },
+    { id: 'analytics', label: 'Analytics', icon: <BarChart3 size={22} />, perm: 'analyticsUserIds' },
 ];
 
 // ─── Number Selector ─────────────────────────────────────────────────────────
@@ -151,6 +151,13 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
 
     // ── Active number label for header ───────────────────────────────────────
     const activeNumber = visibleNumbers.find(n => n.id === activeNumberId) ?? null;
+    const visibleTabs = TABS.filter(t => canUserUseFeature(activeNumber, currentUser, t.perm as any));
+
+    useEffect(() => {
+        if (visibleTabs.length > 0 && !visibleTabs.some(t => t.id === activeTab)) {
+            setActiveTab(visibleTabs[0].id);
+        }
+    }, [activeNumber, activeTab, currentUser]);
 
     return (
         <div className="flex flex-col h-[100dvh] bg-white dark:bg-slate-950 overflow-hidden">
@@ -222,7 +229,7 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
                 style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
             >
                 <div className="flex items-stretch">
-                    {TABS.map(tab => {
+                    {visibleTabs.map(tab => {
                         const isActive = activeTab === tab.id;
                         return (
                             <button

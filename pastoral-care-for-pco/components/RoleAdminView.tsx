@@ -3238,86 +3238,337 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         </div>
                                     ) : (
                                         <div className="space-y-3">
-                                            {smsNumbers.map((num: any) => (
-                                                <div
-                                                    key={num.id}
-                                                    className={`flex items-center gap-4 p-4 rounded-2xl border transition-all ${
-                                                        num.isDefault
-                                                            ? 'bg-violet-50 dark:bg-violet-900/10 border-violet-200 dark:border-violet-800'
-                                                            : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700'
-                                                    }`}
-                                                >
-                                                    {/* Number info */}
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex items-center gap-2 flex-wrap">
-                                                            <span className="font-mono font-bold text-sm text-slate-900 dark:text-white">{num.phoneNumber}</span>
-                                                            {num.friendlyLabel && (
-                                                                <span className="text-[10px] font-bold bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400 px-2 py-0.5 rounded-full">
-                                                                    {num.friendlyLabel}
-                                                                </span>
-                                                            )}
-                                                            {num.isDefault && (
-                                                                <span className="text-[9px] font-black uppercase tracking-widest bg-violet-600 text-white px-2 py-0.5 rounded-full">
-                                                                    Default
-                                                                </span>
-                                                            )}
+                                            {smsNumbers.map((num: any) => {
+                                                const isExpanded = expandedNumId === num.id;
+                                                const perms = num.permissions || {};
+                                                const allUserIds = users.map((u: any) => u.id);
+
+                                                // Restricted access: if allowedUserIds is non-empty, only those users can see the number
+                                                const restrictedToIds: string[] = num.allowedUserIds || [];
+                                                const isRestricted = restrictedToIds.length > 0;
+
+                                                const FEATURES = [
+                                                    { key: 'inboxUserIds',     label: 'Inbox',     icon: '💬', desc: 'Can read and reply to conversations' },
+                                                    { key: 'broadcastUserIds', label: 'Broadcast',  icon: '📣', desc: 'Can send broadcast campaigns' },
+                                                    { key: 'analyticsUserIds', label: 'Analytics',  icon: '📊', desc: 'Can view SMS analytics' },
+                                                    { key: 'keywordsUserIds',  label: 'Keywords',   icon: '🔑', desc: 'Can manage keywords' },
+                                                    { key: 'aiAgentUserIds',   label: 'AI Agent',   icon: '🤖', desc: 'Can use the AI Agent' },
+                                                ] as const;
+
+                                                const handleSavePermissions = async (updatedNum: any) => {
+                                                    setNumPermSaving(true);
+                                                    try {
+                                                        const { doc, updateDoc } = await import('firebase/firestore');
+                                                        await updateDoc(doc(firebaseDb, 'smsNumbers', updatedNum.id), {
+                                                            allowedUserIds: updatedNum.allowedUserIds,
+                                                            permissions: updatedNum.permissions || {},
+                                                            updatedAt: Date.now(),
+                                                        });
+                                                        setNumPermToast({ id: updatedNum.id, text: '✓ Access settings saved.' });
+                                                        setTimeout(() => setNumPermToast(null), 3000);
+                                                    } catch (e: any) {
+                                                        setNumPermToast({ id: updatedNum.id, text: '⚠ Save failed: ' + e.message });
+                                                    } finally {
+                                                        setNumPermSaving(false);
+                                                    }
+                                                };
+
+                                                const toggleAllowedUser = (userId: string) => {
+                                                    const current: string[] = num.allowedUserIds || [];
+                                                    const next = current.includes(userId)
+                                                        ? current.filter((id: string) => id !== userId)
+                                                        : [...current, userId];
+                                                    setSmsNumbers((prev: any[]) => prev.map(n => n.id === num.id ? { ...n, allowedUserIds: next } : n));
+                                                };
+
+                                                const toggleFeatureUser = (featureKey: string, userId: string) => {
+                                                    const currentPerms = num.permissions || {};
+                                                    const current: string[] = currentPerms[featureKey] || [];
+                                                    const next = current.includes(userId)
+                                                        ? current.filter((id: string) => id !== userId)
+                                                        : [...current, userId];
+                                                    setSmsNumbers((prev: any[]) => prev.map(n => n.id === num.id
+                                                        ? { ...n, permissions: { ...n.permissions, [featureKey]: next } }
+                                                        : n
+                                                    ));
+                                                };
+
+                                                const setAllFeatureUsers = (featureKey: string, userIds: string[]) => {
+                                                    setSmsNumbers((prev: any[]) => prev.map(n => n.id === num.id
+                                                        ? { ...n, permissions: { ...n.permissions, [featureKey]: userIds } }
+                                                        : n
+                                                    ));
+                                                };
+
+                                                // Users eligible for feature permissions = those on the allowedUserIds list (or all if no restriction)
+                                                const eligibleUsers = users.filter((u: any) =>
+                                                    !isRestricted || restrictedToIds.includes(u.id)
+                                                );
+
+                                                return (
+                                                    <div
+                                                        key={num.id}
+                                                        className={`rounded-2xl border transition-all ${
+                                                            num.isDefault
+                                                                ? 'bg-violet-50 dark:bg-violet-900/10 border-violet-200 dark:border-violet-800'
+                                                                : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700'
+                                                        }`}
+                                                    >
+                                                        {/* Main row */}
+                                                        <div className="flex items-center gap-4 p-4">
+                                                            {/* Number info */}
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="flex items-center gap-2 flex-wrap">
+                                                                    <span className="font-mono font-bold text-sm text-slate-900 dark:text-white">{num.phoneNumber}</span>
+                                                                    {num.friendlyLabel && (
+                                                                        <span className="text-[10px] font-bold bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400 px-2 py-0.5 rounded-full">
+                                                                            {num.friendlyLabel}
+                                                                        </span>
+                                                                    )}
+                                                                    {num.isDefault && (
+                                                                        <span className="text-[9px] font-black uppercase tracking-widest bg-violet-600 text-white px-2 py-0.5 rounded-full">
+                                                                            Default
+                                                                        </span>
+                                                                    )}
+                                                                    {isRestricted && (
+                                                                        <span className="text-[9px] font-black uppercase tracking-widest bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800 px-2 py-0.5 rounded-full">
+                                                                            🔒 {restrictedToIds.length} user{restrictedToIds.length !== 1 ? 's' : ''}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                {num.senderName && (
+                                                                    <p className="text-[10px] text-slate-400 mt-0.5">Sender: {num.senderName}</p>
+                                                                )}
+                                                                {/* Campaign / TCR status */}
+                                                                {(() => {
+                                                                    const status = num.campaignAssignmentStatus as string | undefined;
+                                                                    if (!status || status === 'not_configured') return (
+                                                                        <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
+                                                                            <span className="inline-block w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                                                                            Campaign not configured — contact Barnabas Software support to enable outbound SMS
+                                                                        </p>
+                                                                    );
+                                                                    if (status === 'pending') return (
+                                                                        <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1 flex items-center gap-1">
+                                                                            <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+                                                                            Number assignment to campaign pending carrier approval — SMS enabled within 24h
+                                                                        </p>
+                                                                    );
+                                                                    if (status === 'active' || num.campaignAssigned) return (
+                                                                        <p className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
+                                                                            <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                                                            Campaign approved — outbound SMS active
+                                                                        </p>
+                                                                    );
+                                                                    if (status === 'error') return (
+                                                                        <p className="text-[10px] text-rose-500 mt-1 flex items-center gap-1" title={num.campaignAssignmentError}>
+                                                                            <span className="inline-block w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                                                                            Campaign assignment error — contact support
+                                                                        </p>
+                                                                    );
+                                                                    return null;
+                                                                })()}
+                                                            </div>
+                                                            {/* Actions */}
+                                                            <div className="flex items-center gap-2 shrink-0">
+                                                                <button
+                                                                    onClick={() => setExpandedNumId(isExpanded ? null : num.id)}
+                                                                    className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border transition-all ${
+                                                                        isExpanded
+                                                                            ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-300 dark:border-indigo-700 text-indigo-600 dark:text-indigo-400'
+                                                                            : 'border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:border-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-400'
+                                                                    }`}
+                                                                >
+                                                                    {isExpanded ? '▲ Access' : '▼ Manage Access'}
+                                                                </button>
+                                                                {!num.isDefault && (
+                                                                    <button
+                                                                        onClick={() => handleSetDefault(num.id)}
+                                                                        className="text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:border-violet-400 hover:text-violet-600 dark:hover:text-violet-400 transition-all"
+                                                                    >
+                                                                        Set Default
+                                                                    </button>
+                                                                )}
+                                                                <button
+                                                                    onClick={() => handleReleaseNumber(num)}
+                                                                    disabled={num.isDefault && smsNumbers.length > 1}
+                                                                    title={num.isDefault && smsNumbers.length > 1
+                                                                        ? 'Set another number as default before releasing this one'
+                                                                        : `Release ${num.phoneNumber}`}
+                                                                    className="text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border transition-all disabled:cursor-not-allowed disabled:opacity-40 border-rose-200 dark:border-rose-800 text-rose-500 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 hover:border-rose-400"
+                                                                >
+                                                                    {num.isDefault && smsNumbers.length > 1 ? '🔒 Release' : '🗑 Release'}
+                                                                </button>
+                                                            </div>
                                                         </div>
-                                                         {num.senderName && (
-                                                            <p className="text-[10px] text-slate-400 mt-0.5">Sender: {num.senderName}</p>
+
+                                                        {/* ── Access Management Panel ─────────────────────────── */}
+                                                        {isExpanded && (
+                                                            <div className="border-t border-slate-200 dark:border-slate-700 mx-4 mb-4 pt-5 space-y-6">
+
+                                                                {/* Section 1: Who can see this number */}
+                                                                <div>
+                                                                    <div className="flex items-center justify-between mb-3">
+                                                                        <div>
+                                                                            <h5 className="text-xs font-black text-slate-800 dark:text-white">Number Visibility</h5>
+                                                                            <p className="text-[10px] text-slate-400 mt-0.5">Restrict which users can see this phone number in the SMS module. Leave all unchecked for unrestricted access.</p>
+                                                                        </div>
+                                                                        <div className="flex gap-2 shrink-0">
+                                                                            <button
+                                                                                onClick={() => setSmsNumbers((prev: any[]) => prev.map(n => n.id === num.id ? { ...n, allowedUserIds: allUserIds } : n))}
+                                                                                className="text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-indigo-600 transition"
+                                                                            >Select All</button>
+                                                                            <button
+                                                                                onClick={() => setSmsNumbers((prev: any[]) => prev.map(n => n.id === num.id ? { ...n, allowedUserIds: [] } : n))}
+                                                                                className="text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-rose-600 transition"
+                                                                            >Clear</button>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                                        {users.filter((u: any) => !u.roles?.includes('Church Admin')).map((u: any) => {
+                                                                            const checked = !isRestricted || restrictedToIds.includes(u.id);
+                                                                            const isActuallyRestricted = (num.allowedUserIds || []).length > 0;
+                                                                            const isChecked = !isActuallyRestricted || (num.allowedUserIds || []).includes(u.id);
+                                                                            return (
+                                                                                <label key={u.id} className="flex items-center gap-2.5 p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-700 transition-all group">
+                                                                                    <div
+                                                                                        onClick={() => toggleAllowedUser(u.id)}
+                                                                                        className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-all cursor-pointer ${
+                                                                                            isChecked ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300 dark:border-slate-600 group-hover:border-indigo-400'
+                                                                                        }`}
+                                                                                    >
+                                                                                        {isChecked && <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
+                                                                                    </div>
+                                                                                    <div className="min-w-0 flex-1" onClick={() => toggleAllowedUser(u.id)}>
+                                                                                        <p className="text-xs font-bold text-slate-800 dark:text-white truncate">{u.name}</p>
+                                                                                        <p className="text-[9px] text-slate-400 truncate">{u.email}</p>
+                                                                                    </div>
+                                                                                </label>
+                                                                            );
+                                                                        })}
+                                                                        {users.filter((u: any) => !u.roles?.includes('Church Admin')).length === 0 && (
+                                                                            <p className="text-[10px] text-slate-400 col-span-2">No non-admin users found.</p>
+                                                                        )}
+                                                                    </div>
+                                                                    <p className="text-[9px] text-slate-400 mt-2">Church Admins always have full access regardless of this setting.</p>
+                                                                </div>
+
+                                                                {/* Section 2: Feature-level permissions */}
+                                                                <div>
+                                                                    <h5 className="text-xs font-black text-slate-800 dark:text-white mb-1">Feature Permissions</h5>
+                                                                    <p className="text-[10px] text-slate-400 mb-4">For each feature, control which users have access. Leave a feature's column fully unchecked to allow all visible users.</p>
+
+                                                                    {eligibleUsers.length === 0 ? (
+                                                                        <p className="text-[10px] text-slate-400">Add users to the visibility list above to configure feature permissions.</p>
+                                                                    ) : (
+                                                                        <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-700">
+                                                                            <table className="w-full text-xs">
+                                                                                <thead className="bg-slate-50 dark:bg-slate-800">
+                                                                                    <tr>
+                                                                                        <th className="px-4 py-3 text-left font-black text-slate-500 dark:text-slate-400 text-[10px] uppercase tracking-widest">User</th>
+                                                                                        {FEATURES.map(f => (
+                                                                                            <th key={f.key} className="px-3 py-3 text-center font-black text-slate-500 dark:text-slate-400 text-[10px] uppercase tracking-widest whitespace-nowrap" title={f.desc}>
+                                                                                                <span className="mr-1">{f.icon}</span>{f.label}
+                                                                                            </th>
+                                                                                        ))}
+                                                                                    </tr>
+                                                                                    <tr className="border-t border-slate-200 dark:border-slate-700 bg-slate-100/50 dark:bg-slate-800/80">
+                                                                                        <td className="px-4 py-1.5">
+                                                                                            <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Toggle All</span>
+                                                                                        </td>
+                                                                                        {FEATURES.map(f => {
+                                                                                            const featureIds: string[] = (num.permissions || {})[f.key] || [];
+                                                                                            const allSelected = eligibleUsers.every((u: any) => featureIds.includes(u.id));
+                                                                                            return (
+                                                                                                <td key={f.key} className="px-3 py-1.5 text-center">
+                                                                                                    <button
+                                                                                                        onClick={() => setAllFeatureUsers(f.key, allSelected ? [] : eligibleUsers.map((u: any) => u.id))}
+                                                                                                        className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border transition-all ${
+                                                                                                            allSelected
+                                                                                                                ? 'bg-indigo-100 dark:bg-indigo-900/30 border-indigo-300 dark:border-indigo-700 text-indigo-600 dark:text-indigo-400'
+                                                                                                                : 'border-slate-300 dark:border-slate-600 text-slate-400 hover:border-indigo-300 hover:text-indigo-500'
+                                                                                                        }`}
+                                                                                                    >
+                                                                                                        {allSelected ? 'All ✓' : 'All'}
+                                                                                                    </button>
+                                                                                                </td>
+                                                                                            );
+                                                                                        })}
+                                                                                    </tr>
+                                                                                </thead>
+                                                                                <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
+                                                                                    {eligibleUsers.map((u: any) => (
+                                                                                        <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                                                                            <td className="px-4 py-3">
+                                                                                                <p className="font-bold text-slate-800 dark:text-white text-xs">{u.name}</p>
+                                                                                                <p className="text-[9px] text-slate-400 truncate max-w-[160px]">{u.email}</p>
+                                                                                            </td>
+                                                                                            {FEATURES.map(f => {
+                                                                                                const featureIds: string[] = (num.permissions || {})[f.key] || [];
+                                                                                                const hasNoRestriction = featureIds.length === 0;
+                                                                                                const hasAccess = hasNoRestriction || featureIds.includes(u.id);
+                                                                                                return (
+                                                                                                    <td key={f.key} className="px-3 py-3 text-center">
+                                                                                                        <button
+                                                                                                            onClick={() => toggleFeatureUser(f.key, u.id)}
+                                                                                                            title={hasNoRestriction ? `All users have ${f.label} access. Click to restrict to specific users.` : (hasAccess ? `Remove ${f.label} access` : `Grant ${f.label} access`)}
+                                                                                                            className={`w-5 h-5 rounded border-2 flex items-center justify-center mx-auto transition-all ${
+                                                                                                                hasAccess
+                                                                                                                    ? hasNoRestriction
+                                                                                                                        ? 'bg-emerald-100 dark:bg-emerald-900/20 border-emerald-400 dark:border-emerald-600'
+                                                                                                                        : 'bg-indigo-600 border-indigo-600'
+                                                                                                                    : 'border-slate-300 dark:border-slate-600 hover:border-indigo-400'
+                                                                                                            }`}
+                                                                                                        >
+                                                                                                            {hasAccess && (
+                                                                                                                hasNoRestriction
+                                                                                                                    ? <svg className="w-2.5 h-2.5 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                                                                                                                    : <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                                                                                                            )}
+                                                                                                        </button>
+                                                                                                    </td>
+                                                                                                );
+                                                                                            })}
+                                                                                        </tr>
+                                                                                    ))}
+                                                                                </tbody>
+                                                                            </table>
+                                                                        </div>
+                                                                    )}
+                                                                    <p className="text-[9px] text-slate-400 mt-2">
+                                                                        <span className="inline-flex items-center gap-1 mr-3"><span className="w-3 h-3 rounded border-2 bg-emerald-100 border-emerald-400 inline-block align-middle"></span> Green = all users allowed (no restriction set)</span>
+                                                                        <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded border-2 bg-indigo-600 border-indigo-600 inline-block align-middle"></span> Indigo = explicitly granted</span>
+                                                                    </p>
+                                                                </div>
+
+                                                                {/* Save row */}
+                                                                <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
+                                                                    {numPermToast?.id === num.id && (
+                                                                        <span className={`text-xs font-bold ${numPermToast.text.startsWith('⚠') ? 'text-rose-600' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                                                            {numPermToast.text}
+                                                                        </span>
+                                                                    )}
+                                                                    <div className="ml-auto flex gap-2">
+                                                                        <button
+                                                                            onClick={() => setExpandedNumId(null)}
+                                                                            className="px-4 py-2 text-xs font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition"
+                                                                        >
+                                                                            Cancel
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => handleSavePermissions(num)}
+                                                                            disabled={numPermSaving}
+                                                                            className="px-5 py-2 text-xs font-black uppercase tracking-widest bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl transition-all shadow-sm"
+                                                                        >
+                                                                            {numPermSaving ? 'Saving…' : 'Save Access'}
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
                                                         )}
-                                                        {/* Campaign / TCR status */}
-                                                        {(() => {
-                                                            const status = num.campaignAssignmentStatus as string | undefined;
-                                                            if (!status || status === 'not_configured') return (
-                                                                <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
-                                                                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-slate-400"></span>
-                                                                    Campaign not configured — contact Barnabas Software support to enable outbound SMS
-                                                                </p>
-                                                            );
-                                                            if (status === 'pending') return (
-                                                                <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1 flex items-center gap-1">
-                                                                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
-                                                                    Number assignment to campaign pending carrier approval — SMS enabled within 24h
-                                                                </p>
-                                                            );
-                                                            if (status === 'active' || num.campaignAssigned) return (
-                                                                <p className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
-                                                                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                                                    Campaign approved — outbound SMS active
-                                                                </p>
-                                                            );
-                                                            if (status === 'error') return (
-                                                                <p className="text-[10px] text-rose-500 mt-1 flex items-center gap-1" title={num.campaignAssignmentError}>
-                                                                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-rose-500"></span>
-                                                                    Campaign assignment error — contact support
-                                                                </p>
-                                                            );
-                                                            return null;
-                                                        })()}
                                                     </div>
-                                                    {/* Actions */}
-                                                    <div className="flex items-center gap-2 shrink-0">
-                                                        {!num.isDefault && (
-                                                            <button
-                                                                onClick={() => handleSetDefault(num.id)}
-                                                                className="text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:border-violet-400 hover:text-violet-600 dark:hover:text-violet-400 transition-all"
-                                                            >
-                                                                Set Default
-                                                            </button>
-                                                        )}
-                                                        <button
-                                                            onClick={() => handleReleaseNumber(num)}
-                                                            disabled={num.isDefault && smsNumbers.length > 1}
-                                                            title={num.isDefault && smsNumbers.length > 1
-                                                                ? 'Set another number as default before releasing this one'
-                                                                : `Release ${num.phoneNumber}`}
-                                                            className="text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border transition-all disabled:cursor-not-allowed disabled:opacity-40 border-rose-200 dark:border-rose-800 text-rose-500 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 hover:border-rose-400"
-                                                        >
-                                                            {num.isDefault && smsNumbers.length > 1 ? '🔒 Release' : '🗑 Release'}
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            ))}
+                                                );
+                                            })}
                                         </div>
                                     )}
                                 </div>
