@@ -338,8 +338,8 @@ interface ComposerProps {
     apiBase: string;
     onBack: () => void;
     onSave: (updates: Partial<SmsCampaign>) => Promise<void>;
-    onSend: () => void;
-    onSchedule: (scheduledAt: number, freq?: 'daily' | 'weekly' | 'monthly') => void;
+    onSend: (campaign: SmsCampaign) => void;
+    onSchedule: (campaign: SmsCampaign, scheduledAt: number, freq?: 'daily' | 'weekly' | 'monthly') => void;
     onCancelSchedule?: () => void;
     isSending: boolean;
 }
@@ -477,7 +477,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                     )}
                     {local.status !== 'scheduled' && (
                         <button
-                            onClick={onSend}
+                            onClick={() => onSend(local)}
                             disabled={!canSend || isSending}
                             className={`flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-xl transition ${canSend && !isSending ? 'bg-violet-600 hover:bg-violet-700 text-white shadow-md shadow-violet-200 dark:shadow-violet-900/40' : 'bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed'}`}
                         >
@@ -7998,6 +7998,7 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
         }
     }, [visibleNumbers.length, activeNumberId]);
 
+
     // Auto-migrate: if church has smsSettings.twilioPhoneNumber (and a real sub-account) but no twilioNumbers docs yet
     useEffect(() => {
         const legacyPhone = church.smsSettings?.twilioPhoneNumber;
@@ -8094,17 +8095,17 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
         showToast('Campaign duplicated');
     };
 
-    const handleSendNow = async () => {
-        if (!activeCampaign) return;
+    const handleSendNow = async (campaignToSend = activeCampaign) => {
+        if (!campaignToSend) return;
         setIsSending(true);
         try {
-            if (activeCampaign.channelType === 'email') {
+            if (campaignToSend.channelType === 'email') {
                 const res = await fetch(`${API_BASE}/api/email/send`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         churchId,
-                        campaignId: activeCampaign.id,
+                        campaignId: campaignToSend.id,
                         collectionName: 'smsCampaigns' // Let backend know it's stored here
                     }),
                 });
@@ -8117,14 +8118,15 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         churchId,
-                        campaignId: activeCampaign.id,
+                        campaignId: campaignToSend.id,
                         phones: [],          // Scheduler / backend resolves from listId/groupId
-                        body: activeCampaign.body,
-                        mediaUrls: activeCampaign.mediaUrls || [],
+                        body: campaignToSend.body,
+                        mediaUrls: campaignToSend.mediaUrls || [],
                         sentBy: currentUser.id,
                         sentByName: currentUser.name,
-                        resolveFromList: activeCampaign.toListId || null,
-                        resolveFromGroup: activeCampaign.toGroupId || null,
+                        resolveFromList: campaignToSend.toListId || null,
+                        resolveFromGroup: campaignToSend.toGroupId || null,
+                        smsNumberId: campaignToSend.twilioNumberId || null,
                     }),
                 });
                 const data = await res.json();
@@ -8139,17 +8141,13 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
         }
     };
 
-    const handleSchedule = async (scheduledAt: number, recurringFrequency?: 'daily' | 'weekly' | 'monthly') => {
-        if (!activeCampaign) return;
-        await updateDoc(doc(firebaseDb, 'smsCampaigns', activeCampaign.id), {
-            status: 'scheduled',
-            scheduledAt,
-            sendAt: new Date(scheduledAt).toISOString(),
-            recurringFrequency: recurringFrequency ?? null,
-            updatedAt: Date.now(),
-        });
-        showToast('Campaign scheduled ✓');
+    const handleSchedule = async (campaignToSched: SmsCampaign, timeMs: number, freq?: 'daily' | 'weekly' | 'monthly') => {
+        if (!campaignToSched) return;
+        const patch = { ...campaignToSched, status: 'scheduled' as const, scheduledAt: timeMs, recurringFrequency: freq || null, sentHistory: [], updatedAt: Date.now() };
+        delete (patch as any).id;
+        await updateDoc(doc(firebaseDb, 'smsCampaigns', campaignToSched.id), patch);
         setActiveCampaign(null);
+        showToast('Campaign scheduled');
     };
 
     const handleCancelSchedule = async () => {
