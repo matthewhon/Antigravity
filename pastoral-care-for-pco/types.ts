@@ -1610,6 +1610,8 @@ export interface TenantFile {
     publicUrl?: string;     // If publicly accessible
     gcsPath: string;        // e.g. tenants/{churchId}/uploads/{id}
     createdAt: number;
+    folder?: string;        // Virtual folder path or name
+    tags?: string[];        // Array of organizational tags
 }
 
 export interface BillingUsage {
