@@ -27,41 +27,41 @@ import {
 const API_BASE = ''; // Relative — same origin
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-    draft:     { label: 'Draft',    color: 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300' },
-    scheduled: { label: 'Scheduled',color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' },
-    sending:   { label: 'Sending…', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
-    sent:      { label: 'Sent',     color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' },
-    failed:    { label: 'Failed',   color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
+    draft: { label: 'Draft', color: 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300' },
+    scheduled: { label: 'Scheduled', color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' },
+    sending: { label: 'Sending…', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
+    sent: { label: 'Sent', color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' },
+    failed: { label: 'Failed', color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
 };
 
 const SEGMENT_NOTE = 'SMS segments: 1 segment = 160 chars. Merge tags like {firstName} count toward length.';
 
 const ALL_MERGE_TAGS: { tag: string; label: string }[] = [
-    { tag: '{firstName}',   label: 'First Name'   },
-    { tag: '{lastName}',    label: 'Last Name'    },
-    { tag: '{fullName}',    label: 'Full Name'    },
-    { tag: '{email}',       label: 'Email'        },
-    { tag: '{phone}',       label: 'Phone'        },
-    { tag: '{city}',        label: 'City'         },
-    { tag: '{state}',       label: 'State'        },
-    { tag: '{birthday}',    label: 'Birthday'     },
-    { tag: '{anniversary}', label: 'Anniversary'  },
+    { tag: '{firstName}', label: 'First Name' },
+    { tag: '{lastName}', label: 'Last Name' },
+    { tag: '{fullName}', label: 'Full Name' },
+    { tag: '{email}', label: 'Email' },
+    { tag: '{phone}', label: 'Phone' },
+    { tag: '{city}', label: 'City' },
+    { tag: '{state}', label: 'State' },
+    { tag: '{birthday}', label: 'Birthday' },
+    { tag: '{anniversary}', label: 'Anniversary' },
 ];
 
 const COMMON_EMOJIS = [
-    '😊','🙏','❤️','✝️','🎉','👋','📖','⭐','🔥','💫',
-    '🌟','🕊️','🏠','📅','📣','💬','🎵','🤝','💜','🌈',
+    '😊', '🙏', '❤️', '✝️', '🎉', '👋', '📖', '⭐', '🔥', '💫',
+    '🌟', '🕊️', '🏠', '📅', '📣', '💬', '🎵', '🤝', '💜', '🌈',
 ];
 
 // ─── Tag colour map ───────────────────────────────────────────────────────────
 
 const TAG_COLOR_MAP: Record<SmsTag['color'], { bg: string; text: string; border: string; dot: string }> = {
-    violet:  { bg: 'bg-violet-100 dark:bg-violet-900/40',  text: 'text-violet-700 dark:text-violet-300',  border: 'border-violet-300 dark:border-violet-700',  dot: 'bg-violet-500' },
-    blue:    { bg: 'bg-blue-100 dark:bg-blue-900/40',       text: 'text-blue-700 dark:text-blue-300',       border: 'border-blue-300 dark:border-blue-700',       dot: 'bg-blue-500' },
+    violet: { bg: 'bg-violet-100 dark:bg-violet-900/40', text: 'text-violet-700 dark:text-violet-300', border: 'border-violet-300 dark:border-violet-700', dot: 'bg-violet-500' },
+    blue: { bg: 'bg-blue-100 dark:bg-blue-900/40', text: 'text-blue-700 dark:text-blue-300', border: 'border-blue-300 dark:border-blue-700', dot: 'bg-blue-500' },
     emerald: { bg: 'bg-emerald-100 dark:bg-emerald-900/40', text: 'text-emerald-700 dark:text-emerald-300', border: 'border-emerald-300 dark:border-emerald-700', dot: 'bg-emerald-500' },
-    amber:   { bg: 'bg-amber-100 dark:bg-amber-900/40',     text: 'text-amber-700 dark:text-amber-300',     border: 'border-amber-300 dark:border-amber-700',     dot: 'bg-amber-500' },
-    red:     { bg: 'bg-red-100 dark:bg-red-900/40',         text: 'text-red-700 dark:text-red-300',         border: 'border-red-300 dark:border-red-700',         dot: 'bg-red-500' },
-    pink:    { bg: 'bg-pink-100 dark:bg-pink-900/40',       text: 'text-pink-700 dark:text-pink-300',       border: 'border-pink-300 dark:border-pink-700',       dot: 'bg-pink-500' },
+    amber: { bg: 'bg-amber-100 dark:bg-amber-900/40', text: 'text-amber-700 dark:text-amber-300', border: 'border-amber-300 dark:border-amber-700', dot: 'bg-amber-500' },
+    red: { bg: 'bg-red-100 dark:bg-red-900/40', text: 'text-red-700 dark:text-red-300', border: 'border-red-300 dark:border-red-700', dot: 'bg-red-500' },
+    pink: { bg: 'bg-pink-100 dark:bg-pink-900/40', text: 'text-pink-700 dark:text-pink-300', border: 'border-pink-300 dark:border-pink-700', dot: 'bg-pink-500' },
 };
 
 const SmsTagChip: React.FC<{ tag: SmsTag; onRemove?: () => void; size?: 'sm' | 'xs' }> = ({ tag, onRemove, size = 'xs' }) => {
@@ -190,7 +190,7 @@ function formatPhone(phone: string): string {
 
 function timeAgo(ts: number): string {
     const diffMs = Date.now() - ts;
-    const mins   = Math.floor(diffMs / 60_000);
+    const mins = Math.floor(diffMs / 60_000);
     if (mins < 1) return 'just now';
     if (mins < 60) return `${mins}m ago`;
     const hrs = Math.floor(mins / 60);
@@ -222,7 +222,7 @@ const ScheduleModal: React.FC<{
         const pad = (n: number) => String(n).padStart(2, '0');
         return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
     };
-    const [dateTime, setDateTime]   = useState(defaultDt);
+    const [dateTime, setDateTime] = useState(defaultDt);
     const [frequency, setFrequency] = useState<'none' | 'daily' | 'weekly' | 'monthly'>('none');
 
     const handleConfirm = () => {
@@ -297,7 +297,7 @@ const FilePickerDialog: React.FC<{
                     <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
                         <FileText size={16} className="text-violet-500" /> Select a File to Attach
                     </h3>
-                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={16}/></button>
+                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
                 </div>
                 {loading ? (
                     <div className="flex-1 flex items-center justify-center py-10"><Loader2 size={24} className="animate-spin text-slate-400" /></div>
@@ -349,28 +349,28 @@ import { SimpleRichTextEditor } from './SimpleRichTextEditor';
 const CampaignComposer: React.FC<ComposerProps> = ({
     campaign, churchId, onBack, onSave, onSend, onSchedule, onCancelSchedule, isSending,
 }) => {
-    const [local, setLocal]         = useState<SmsCampaign>(campaign);
-    const [pcoLists, setPcoLists]   = useState<{ id: string; name: string; total_people: number }[]>([]);
+    const [local, setLocal] = useState<SmsCampaign>(campaign);
+    const [pcoLists, setPcoLists] = useState<{ id: string; name: string; total_people: number }[]>([]);
     const [pcoGroups, setPcoGroups] = useState<{ id: string; name: string; memberCount: number }[]>([]);
-    const [toTab, setToTab]         = useState<'lists' | 'groups'>('lists');
-    const [loadingLists, setLoadingLists]   = useState(false);
+    const [toTab, setToTab] = useState<'lists' | 'groups'>('lists');
+    const [loadingLists, setLoadingLists] = useState(false);
     const [loadingGroups, setLoadingGroups] = useState(false);
-    const [showSchedule, setShowSchedule]   = useState(false);
-    const [lastSaved, setLastSaved]         = useState<number | null>(null);
+    const [showSchedule, setShowSchedule] = useState(false);
+    const [lastSaved, setLastSaved] = useState<number | null>(null);
 
     // Composer extras
-    const [showEmojis, setShowEmojis]   = useState(false);
+    const [showEmojis, setShowEmojis] = useState(false);
     const [showLinkDlg, setShowLinkDlg] = useState(false);
     const [showFilePicker, setShowFilePicker] = useState(false);
-    const [linkUrl, setLinkUrl]         = useState('');
-    const [imageUrl, setImageUrl]       = useState((local.mediaUrls && local.mediaUrls[0]) || '');
-    const [aiSuggestion, setAiSuggestion]   = useState('');
-    const [aiLoading, setAiLoading]         = useState(false);
-    const [showAiPanel, setShowAiPanel]     = useState(false);
+    const [linkUrl, setLinkUrl] = useState('');
+    const [imageUrl, setImageUrl] = useState((local.mediaUrls && local.mediaUrls[0]) || '');
+    const [aiSuggestion, setAiSuggestion] = useState('');
+    const [aiLoading, setAiLoading] = useState(false);
+    const [showAiPanel, setShowAiPanel] = useState(false);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     const segments = countSegments(local.body || '');
-    const canSend  = !!(local.body?.trim()) && !!(local.toListId || local.toGroupId) && (local.channelType === 'email' ? !!(local.emailSubject?.trim()) : true);
+    const canSend = !!(local.body?.trim()) && !!(local.toListId || local.toGroupId) && (local.channelType === 'email' ? !!(local.emailSubject?.trim()) : true);
 
     const update = useCallback((patch: Partial<SmsCampaign>) => {
         setLocal(prev => ({ ...prev, ...patch }));
@@ -382,9 +382,9 @@ const CampaignComposer: React.FC<ComposerProps> = ({
         const el = textareaRef.current;
         if (!el) { update({ body: (local.body || '') + text }); return; }
         const start = el.selectionStart ?? (local.body || '').length;
-        const end   = el.selectionEnd   ?? start;
+        const end = el.selectionEnd ?? start;
         const before = (local.body || '').slice(0, start);
-        const after  = (local.body || '').slice(end);
+        const after = (local.body || '').slice(end);
         const newBody = before + text + after;
         update({ body: newBody });
         requestAnimationFrame(() => {
@@ -719,10 +719,9 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                                 const url = window.prompt('Enter image URL (MMS — may incur additional carrier fees):');
                                                 if (url) { setImageUrl(url); update({ mediaUrls: [url] }); }
                                             }}
-                                            className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition ${
-                                                imageUrl ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
-                                                : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700'
-                                            }`}
+                                            className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition ${imageUrl ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
+                                                    : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700'
+                                                }`}
                                         >
                                             <ImageIcon size={13} /> {imageUrl ? 'Image ✓' : 'Image'}
                                         </button>
@@ -768,7 +767,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                                 <>
                                                     <p className="text-sm text-violet-800 dark:text-violet-200 leading-relaxed whitespace-pre-wrap mb-3">{aiSuggestion}</p>
                                                     <div className="flex items-center gap-2">
-                                                        <span className={`text-xs font-bold ${ countSegments(aiSuggestion) > 1 ? 'text-amber-600' : 'text-emerald-600' }`}>
+                                                        <span className={`text-xs font-bold ${countSegments(aiSuggestion) > 1 ? 'text-amber-600' : 'text-emerald-600'}`}>
                                                             {aiSuggestion.length} chars · {countSegments(aiSuggestion)} seg
                                                         </span>
                                                         <div className="flex-1" />
@@ -831,7 +830,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                         .replace('{phone}', '(615) 555-0100').replace('{city}', 'Nashville')
                                         .replace('{state}', 'TN').replace('{birthday}', 'Jan 15')
                                         .replace('{anniversary}', 'Jun 10')
-                                    || <span className="opacity-50 italic">Your message will appear here…</span>}
+                                        || <span className="opacity-50 italic">Your message will appear here…</span>}
                                 </div>
                             </div>
                         </div>
@@ -853,7 +852,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                     isBusy={isSending}
                 />
             )}
-            
+
             {/* File Picker */}
             {showFilePicker && (
                 <FilePickerDialog
@@ -989,59 +988,59 @@ const NewMessageComposer: React.FC<{
     onClose: () => void;
     onSent: () => void;
 }> = ({ churchId, currentUser, twilioNumberId, onClose, onSent }) => {
-    const [mode, setMode]             = useState<RecipientMode>('individual');
-    const [body, setBody]             = useState('');
-    const [sending, setSending]       = useState(false);
-    const [error, setError]           = useState('');
-    const [sentCount, setSentCount]   = useState<number | null>(null);
+    const [mode, setMode] = useState<RecipientMode>('individual');
+    const [body, setBody] = useState('');
+    const [sending, setSending] = useState(false);
+    const [error, setError] = useState('');
+    const [sentCount, setSentCount] = useState<number | null>(null);
 
     // Individual — PCO person search
-    const [personSearch, setPersonSearch]     = useState('');
-    const [personResults, setPersonResults]   = useState<{ id: string; name: string; phone?: string; avatar?: string | null; membership?: string | null }[]>([]);
-    const [personLoading, setPersonLoading]   = useState(false);
+    const [personSearch, setPersonSearch] = useState('');
+    const [personResults, setPersonResults] = useState<{ id: string; name: string; phone?: string; avatar?: string | null; membership?: string | null }[]>([]);
+    const [personLoading, setPersonLoading] = useState(false);
     const [selectedPerson, setSelectedPerson] = useState<{ id: string; name: string; phone: string; avatar?: string | null } | null>(null);
-    const [manualEntry, setManualEntry]       = useState(false);
-    const [phone, setPhone]                   = useState('');
-    const [recipientName, setRecipientName]   = useState('');
+    const [manualEntry, setManualEntry] = useState(false);
+    const [phone, setPhone] = useState('');
+    const [recipientName, setRecipientName] = useState('');
 
     // PCO Lists
-    const [pcoLists, setPcoLists]     = useState<{ id: string; name: string; total_people: number }[]>([]);
+    const [pcoLists, setPcoLists] = useState<{ id: string; name: string; total_people: number }[]>([]);
     const [listSearch, setListSearch] = useState('');
     const [selectedList, setSelectedList] = useState<{ id: string; name: string; total_people: number } | null>(null);
     const [loadingLists, setLoadingLists] = useState(false);
 
     // PCO Groups
-    const [pcoGroups, setPcoGroups]   = useState<{ id: string; name: string; memberCount: number }[]>([]);
+    const [pcoGroups, setPcoGroups] = useState<{ id: string; name: string; memberCount: number }[]>([]);
     const [groupSearch, setGroupSearch] = useState('');
     const [selectedGroup, setSelectedGroup] = useState<{ id: string; name: string; memberCount: number } | null>(null);
     const [loadingGroups, setLoadingGroups] = useState(false);
 
     // Composer extras
-    const [showEmojisNM, setShowEmojisNM]     = useState(false);
-    const [showLinkDlgNM, setShowLinkDlgNM]   = useState(false);
+    const [showEmojisNM, setShowEmojisNM] = useState(false);
+    const [showLinkDlgNM, setShowLinkDlgNM] = useState(false);
     const [showFilePickerNM, setShowFilePickerNM] = useState(false);
-    const [linkUrlNM, setLinkUrlNM]           = useState('');
-    const [imageUrlNM, setImageUrlNM]         = useState(''); // final publicly-accessible URL (MMS)
+    const [linkUrlNM, setLinkUrlNM] = useState('');
+    const [imageUrlNM, setImageUrlNM] = useState(''); // final publicly-accessible URL (MMS)
     const [aiSuggestionNM, setAiSuggestionNM] = useState('');
-    const [aiLoadingNM, setAiLoadingNM]       = useState(false);
-    const [showAiPanelNM, setShowAiPanelNM]   = useState(false);
+    const [aiLoadingNM, setAiLoadingNM] = useState(false);
+    const [showAiPanelNM, setShowAiPanelNM] = useState(false);
     const [showImagePanelNM, setShowImagePanelNM] = useState(false); // expanded image panel
     const [imageUploadProgress, setImageUploadProgress] = useState<number | null>(null); // 0-100
-    const [imageUploadError, setImageUploadError]       = useState('');
-    const [urlInputNM, setUrlInputNM]         = useState(''); // manual URL tab input
-    const [imageTab, setImageTab]             = useState<'upload' | 'url'>('upload');
+    const [imageUploadError, setImageUploadError] = useState('');
+    const [urlInputNM, setUrlInputNM] = useState(''); // manual URL tab input
+    const [imageTab, setImageTab] = useState<'upload' | 'url'>('upload');
     const fileInputRefNM = useRef<HTMLInputElement>(null);
-    const textareaRefNM  = useRef<HTMLTextAreaElement>(null);
+    const textareaRefNM = useRef<HTMLTextAreaElement>(null);
 
-    const MAX_CHARS  = 1600;
-    const segCount   = Math.ceil((body.length || 1) / 160);
-    const charLeft   = MAX_CHARS - body.length;
+    const MAX_CHARS = 1600;
+    const segCount = Math.ceil((body.length || 1) / 160);
+    const charLeft = MAX_CHARS - body.length;
 
     const insertAtCursorNM = (text: string) => {
         const el = textareaRefNM.current;
         if (!el) { setBody(b => b + text); return; }
         const start = el.selectionStart ?? body.length;
-        const end   = el.selectionEnd ?? start;
+        const end = el.selectionEnd ?? start;
         const newBody = body.slice(0, start) + text + body.slice(end);
         setBody(newBody);
         requestAnimationFrame(() => {
@@ -1079,12 +1078,12 @@ const NewMessageComposer: React.FC<{
         setImageUploadError('');
         setImageUploadProgress(0);
         const path = `mms/${churchId}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-        const sRef  = storageRef(storage, path);
-        const task  = uploadBytesResumable(sRef, file);
+        const sRef = storageRef(storage, path);
+        const task = uploadBytesResumable(sRef, file);
         task.on(
             'state_changed',
             snap => setImageUploadProgress(Math.round((snap.bytesTransferred / snap.totalBytes) * 100)),
-            err  => { setImageUploadError('Upload failed: ' + err.message); setImageUploadProgress(null); },
+            err => { setImageUploadError('Upload failed: ' + err.message); setImageUploadProgress(null); },
             async () => {
                 const url = await getDownloadURL(task.snapshot.ref);
                 setImageUrlNM(url);
@@ -1102,7 +1101,7 @@ const NewMessageComposer: React.FC<{
 
         const col = collection(firebaseDb, 'people');
         const isPhone = /^[\d\s+()\-]{4,}$/.test(q);
-        const qLower  = q.toLowerCase();
+        const qLower = q.toLowerCase();
 
         // Build two queries: one exact prefix match on `name`, one on `nameLower` (if it exists),
         // plus a phone match so both typing styles work. We run all in parallel and merge.
@@ -1119,7 +1118,7 @@ const NewMessageComposer: React.FC<{
             const qCap = q.charAt(0).toUpperCase() + q.slice(1).toLowerCase(); // 'jo' → 'Jo'
             queries.push(
                 // Original prefix (catches exact or Title-Case typing)
-                getDocs(query(col, where('churchId', '==', churchId), where('name', '>=', q),    where('name', '<=', q + '\uffff'),    limit(25))),
+                getDocs(query(col, where('churchId', '==', churchId), where('name', '>=', q), where('name', '<=', q + '\uffff'), limit(25))),
                 // Title-case prefix (most common)
                 getDocs(query(col, where('churchId', '==', churchId), where('name', '>=', qCap), where('name', '<=', qCap + '\uffff'), limit(25))),
                 // Lowercase-stored name (nameLower field, populated by newer syncs)
@@ -1159,11 +1158,11 @@ const NewMessageComposer: React.FC<{
         setLoadingLists(true);
         pcoService.getPeopleLists(churchId)
             .then(raw => setPcoLists(raw.map((l: any) => ({
-                id:          l.id,
-                name:        l.attributes?.name || l.name || 'Unnamed List',
+                id: l.id,
+                name: l.attributes?.name || l.name || 'Unnamed List',
                 total_people: l.attributes?.total_people ?? l.total_people ?? 0,
             }))))
-            .catch(() => {})
+            .catch(() => { })
             .finally(() => setLoadingLists(false));
     }, [mode]);
 
@@ -1173,23 +1172,23 @@ const NewMessageComposer: React.FC<{
         setLoadingGroups(true);
         pcoService.getGroups(churchId)
             .then((raw: any[]) => setPcoGroups(raw.map(x => ({
-                id:          x.id,
-                name:        x.attributes?.name || x.name || 'Unnamed Group',
+                id: x.id,
+                name: x.attributes?.name || x.name || 'Unnamed Group',
                 memberCount: x.attributes?.members_count ?? x.attributes?.member_count ?? x.memberCount ?? 0,
             }))))
-            .catch(() => {})
+            .catch(() => { })
             .finally(() => setLoadingGroups(false));
     }, [mode]);
 
-    const filteredLists  = pcoLists.filter(l  => l.name.toLowerCase().includes(listSearch.toLowerCase()));
+    const filteredLists = pcoLists.filter(l => l.name.toLowerCase().includes(listSearch.toLowerCase()));
     const filteredGroups = pcoGroups.filter(g => g.name.toLowerCase().includes(groupSearch.toLowerCase()));
 
     const canSend = body.trim().length > 0 && (
         (mode === 'individual' && (
-            (selectedPerson && selectedPerson.phone.replace(/\D/g,'').length >= 10) ||
-            (manualEntry && phone.replace(/\D/g,'').length >= 10)
+            (selectedPerson && selectedPerson.phone.replace(/\D/g, '').length >= 10) ||
+            (manualEntry && phone.replace(/\D/g, '').length >= 10)
         )) ||
-        (mode === 'list'  && !!selectedList) ||
+        (mode === 'list' && !!selectedList) ||
         (mode === 'group' && !!selectedGroup)
     );
 
@@ -1211,20 +1210,20 @@ const NewMessageComposer: React.FC<{
         try {
             if (mode === 'individual') {
                 const toPhone = selectedPerson ? selectedPerson.phone : phone;
-                const toName  = selectedPerson ? selectedPerson.name  : recipientName.trim();
+                const toName = selectedPerson ? selectedPerson.name : recipientName.trim();
                 const res = await fetch(`${API_BASE}/api/messaging/send-individual`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         churchId,
-                        toPhone:         toPhone.replace(/[^\d+]/g, ''),
+                        toPhone: toPhone.replace(/[^\d+]/g, ''),
                         body,
-                        mediaUrls:       imageUrlNM ? [imageUrlNM] : undefined,
-                        sentBy:          currentUser.id,
-                        sentByName:      currentUser.name,
-                        personName:      toName || undefined,
-                        personId:        selectedPerson?.id || undefined,
-                        twilioNumberId:  twilioNumberId ?? undefined,
+                        mediaUrls: imageUrlNM ? [imageUrlNM] : undefined,
+                        sentBy: currentUser.id,
+                        sentByName: currentUser.name,
+                        personName: toName || undefined,
+                        personId: selectedPerson?.id || undefined,
+                        twilioNumberId: twilioNumberId ?? undefined,
                     }),
                 });
                 const data = await safeJson(res);
@@ -1236,12 +1235,12 @@ const NewMessageComposer: React.FC<{
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         churchId,
-                        pcoListId:   selectedList.id,
-                        listName:    selectedList.name,
+                        pcoListId: selectedList.id,
+                        listName: selectedList.name,
                         body,
-                        mediaUrls:   imageUrlNM ? [imageUrlNM] : undefined,
-                        sentBy:      currentUser.id,
-                        sentByName:  currentUser.name,
+                        mediaUrls: imageUrlNM ? [imageUrlNM] : undefined,
+                        sentBy: currentUser.id,
+                        sentByName: currentUser.name,
                     }),
                 });
                 const data = await safeJson(res);
@@ -1253,12 +1252,12 @@ const NewMessageComposer: React.FC<{
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         churchId,
-                        pcoGroupId:  selectedGroup.id,
-                        groupName:   selectedGroup.name,
+                        pcoGroupId: selectedGroup.id,
+                        groupName: selectedGroup.name,
                         body,
-                        mediaUrls:   imageUrlNM ? [imageUrlNM] : undefined,
-                        sentBy:      currentUser.id,
-                        sentByName:  currentUser.name,
+                        mediaUrls: imageUrlNM ? [imageUrlNM] : undefined,
+                        sentBy: currentUser.id,
+                        sentByName: currentUser.name,
                     }),
                 });
                 const data = await safeJson(res);
@@ -1317,17 +1316,16 @@ const NewMessageComposer: React.FC<{
                         <div className="grid grid-cols-3 gap-2">
                             {([
                                 { key: 'individual', icon: <UserCheck size={16} />, label: 'Individual' },
-                                { key: 'list',       icon: <List     size={16} />, label: 'PCO List'   },
-                                { key: 'group',      icon: <Layers   size={16} />, label: 'PCO Group'  },
+                                { key: 'list', icon: <List size={16} />, label: 'PCO List' },
+                                { key: 'group', icon: <Layers size={16} />, label: 'PCO Group' },
                             ] as { key: RecipientMode; icon: React.ReactNode; label: string }[]).map(opt => (
                                 <button
                                     key={opt.key}
                                     onClick={() => setMode(opt.key)}
-                                    className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-2xl border-2 transition text-xs font-black ${
-                                        mode === opt.key
+                                    className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-2xl border-2 transition text-xs font-black ${mode === opt.key
                                             ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20 text-violet-600 dark:text-violet-400'
                                             : 'border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-violet-300'
-                                    }`}
+                                        }`}
                                 >
                                     {opt.icon}
                                     {opt.label}
@@ -1358,6 +1356,7 @@ const NewMessageComposer: React.FC<{
                                         onClick={() => { setSelectedPerson(null); setPersonSearch(''); setManualEntry(false); }}
                                         title="Change recipient"
                                         className="text-violet-400 hover:text-violet-600 transition shrink-0"
+
                                     >
                                         <X size={16} />
                                     </button>
@@ -1419,9 +1418,8 @@ const NewMessageComposer: React.FC<{
                                                         setPersonResults([]);
                                                     }}
                                                     disabled={!p.phone}
-                                                    className={`w-full flex items-center gap-3 px-3 py-2.5 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition text-left ${
-                                                        !p.phone ? 'opacity-40 cursor-not-allowed' : ''
-                                                    }`}
+                                                    className={`w-full flex items-center gap-3 px-3 py-2.5 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition text-left ${!p.phone ? 'opacity-40 cursor-not-allowed' : ''
+                                                        }`}
                                                 >
                                                     <div className="w-8 h-8 rounded-full bg-violet-100 dark:bg-violet-900/40 overflow-hidden flex items-center justify-center shrink-0">
                                                         {p.avatar
@@ -1543,9 +1541,8 @@ const NewMessageComposer: React.FC<{
                     <div>
                         <div className="flex items-center justify-between mb-1.5">
                             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Message</label>
-                            <span className={`text-[10px] font-semibold ${
-                                charLeft < 0 ? 'text-red-500' : charLeft < 50 ? 'text-amber-500' : 'text-slate-400'
-                            }`}>
+                            <span className={`text-[10px] font-semibold ${charLeft < 0 ? 'text-red-500' : charLeft < 50 ? 'text-amber-500' : 'text-slate-400'
+                                }`}>
                                 {body.length}/{MAX_CHARS} · {segCount} segment{segCount !== 1 ? 's' : ''}
                             </span>
                         </div>
@@ -1662,7 +1659,7 @@ const NewMessageComposer: React.FC<{
                                     <>
                                         <p className="text-sm text-violet-800 dark:text-violet-200 leading-relaxed whitespace-pre-wrap mb-2">{aiSuggestionNM}</p>
                                         <div className="flex items-center gap-2">
-                                            <span className={`text-xs font-bold ${ countSegments(aiSuggestionNM) > 1 ? 'text-amber-600' : 'text-emerald-600' }`}>
+                                            <span className={`text-xs font-bold ${countSegments(aiSuggestionNM) > 1 ? 'text-amber-600' : 'text-emerald-600'}`}>
                                                 {aiSuggestionNM.length} chars · {countSegments(aiSuggestionNM)} seg
                                             </span>
                                             <div className="flex-1" />
@@ -1733,31 +1730,31 @@ const SmsInbox: React.FC<{
     isDefaultNumber?: boolean;
 }> = ({ churchId, currentUser, church, twilioNumberId, isDefaultNumber }) => {
     const [conversations, setConversations] = useState<SmsConversation[]>([]);
-    const [activeConv, setActiveConv]       = useState<SmsConversation | null>(null);
-    const [messages, setMessages]           = useState<SmsMessage[]>([]);
-    const [replyBody, setReplyBody]         = useState('');
+    const [activeConv, setActiveConv] = useState<SmsConversation | null>(null);
+    const [messages, setMessages] = useState<SmsMessage[]>([]);
+    const [replyBody, setReplyBody] = useState('');
     const [replyMediaUrl, setReplyMediaUrl] = useState('');
     const [replyUploading, setReplyUploading] = useState(false);
     const [replyUploadPct, setReplyUploadPct] = useState(0);
     const replyFileRef = useRef<HTMLInputElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
-    const [loadingMsgs, setLoadingMsgs]     = useState(false);
-    const [isSending, setIsSending]         = useState(false);
-    const [search, setSearch]               = useState('');
-    const [showComposer, setShowComposer]   = useState(false);
+    const [loadingMsgs, setLoadingMsgs] = useState(false);
+    const [isSending, setIsSending] = useState(false);
+    const [search, setSearch] = useState('');
+    const [showComposer, setShowComposer] = useState(false);
 
     // Tags
-    const [tags, setTags]               = useState<SmsTag[]>([]);
-    const [tagFilter, setTagFilter]     = useState<string | null>(null); // tag id to filter by
+    const [tags, setTags] = useState<SmsTag[]>([]);
+    const [tagFilter, setTagFilter] = useState<string | null>(null); // tag id to filter by
     const [showTagPicker, setShowTagPicker] = useState(false);
 
     // AI Agent suggestions
     const [aiSuggestions, setAiSuggestions] = useState<SmsAiSuggestion[]>([]);
-    const [aiGenerating, setAiGenerating]   = useState(false);
+    const [aiGenerating, setAiGenerating] = useState(false);
     const smsAgentEnabled = !!(church.smsSettings?.smsAgentEnabled);
 
     // Toast
-    const [inboxToast, setInboxToast]   = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+    const [inboxToast, setInboxToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
     const showInboxToast = (msg: string, type: 'success' | 'error' = 'success') => {
         setInboxToast({ msg, type });
         setTimeout(() => setInboxToast(null), 4000);
@@ -1822,7 +1819,7 @@ const SmsInbox: React.FC<{
             setLoadingMsgs(false);
         });
         // Mark as read
-        updateDoc(doc(firebaseDb, 'smsConversations', activeConv.id), { unreadCount: 0 }).catch(() => {});
+        updateDoc(doc(firebaseDb, 'smsConversations', activeConv.id), { unreadCount: 0 }).catch(() => { });
 
         // Load AI suggestions for this conversation (real-time)
         const sugQ = query(
@@ -1856,15 +1853,15 @@ const SmsInbox: React.FC<{
             const kb = kbSnap.exists() ? (kbSnap.data() as Record<string, string>) : {};
 
             const kbText = [
-                kb.address      && `Address: ${kb.address}`,
+                kb.address && `Address: ${kb.address}`,
                 kb.serviceTimes && `Service Times: ${kb.serviceTimes}`,
-                kb.pastor       && `Lead Pastor: ${kb.pastor}`,
-                kb.ministries   && `Ministries: ${kb.ministries}`,
-                kb.classes      && `Classes/Groups: ${kb.classes}`,
-                kb.locations    && `Locations: ${kb.locations}`,
-                kb.website      && `Website: ${kb.website}`,
-                kb.phone        && `Phone: ${kb.phone}`,
-                kb.customFacts  && kb.customFacts,
+                kb.pastor && `Lead Pastor: ${kb.pastor}`,
+                kb.ministries && `Ministries: ${kb.ministries}`,
+                kb.classes && `Classes/Groups: ${kb.classes}`,
+                kb.locations && `Locations: ${kb.locations}`,
+                kb.website && `Website: ${kb.website}`,
+                kb.phone && `Phone: ${kb.phone}`,
+                kb.customFacts && kb.customFacts,
             ].filter(Boolean).join('\n');
 
             // Last few messages for context
@@ -2003,7 +2000,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
     };
 
     const handleSendReply = async () => {
-        const hasBody  = !!replyBody.trim();
+        const hasBody = !!replyBody.trim();
         const hasMedia = !!replyMediaUrl;
         if ((!hasBody && !hasMedia) || !activeConv || isSending) return;
         setIsSending(true);
@@ -2019,14 +2016,14 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
 
             const payload: Record<string, any> = {
                 churchId,
-                toPhone:        activeConv.phoneNumber,
-                body:           replyBody,
-                sentBy:         currentUser.id,
-                sentByName:     currentUser.name,
+                toPhone: activeConv.phoneNumber,
+                body: replyBody,
+                sentBy: currentUser.id,
+                sentByName: currentUser.name,
                 conversationId: activeConv.id,
             };
-            if (resolvedNumberId)  payload.twilioNumberId = resolvedNumberId;
-            if (hasMedia)          payload.mediaUrls      = [replyMediaUrl];
+            if (resolvedNumberId) payload.twilioNumberId = resolvedNumberId;
+            if (hasMedia) payload.mediaUrls = [replyMediaUrl];
             const res = await fetch(`${API_BASE}/api/messaging/send-individual`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -2088,11 +2085,10 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                         <div className="flex flex-wrap gap-1.5 mt-1">
                             <button
                                 onClick={() => setTagFilter(null)}
-                                className={`px-2 py-0.5 text-[10px] font-bold rounded-full border transition ${
-                                    tagFilter === null
+                                className={`px-2 py-0.5 text-[10px] font-bold rounded-full border transition ${tagFilter === null
                                         ? 'bg-violet-600 text-white border-violet-600'
                                         : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-violet-400'
-                                }`}
+                                    }`}
                             >All</button>
                             {tags.map(t => {
                                 const c = TAG_COLOR_MAP[t.color] || TAG_COLOR_MAP.violet;
@@ -2101,9 +2097,8 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                     <button
                                         key={t.id}
                                         onClick={() => setTagFilter(isActive ? null : t.id)}
-                                        className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full border transition ${
-                                            isActive ? `${c.bg} ${c.text} ${c.border}` : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-violet-400'
-                                        }`}
+                                        className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full border transition ${isActive ? `${c.bg} ${c.text} ${c.border}` : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-violet-400'
+                                            }`}
                                     >
                                         {t.emoji && <span>{t.emoji}</span>}
                                         {t.name}
@@ -2127,9 +2122,8 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                         return (
                             <button
                                 key={conv.id}
-                                className={`w-full text-left px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800 transition relative ${
-                                    isActive ? 'bg-violet-50 dark:bg-violet-900/20' : ''
-                                }`}
+                                className={`w-full text-left px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800 transition relative ${isActive ? 'bg-violet-50 dark:bg-violet-900/20' : ''
+                                    }`}
                                 onClick={() => setActiveConv(conv)}
                             >
                                 {/* Unread left accent bar */}
@@ -2146,26 +2140,23 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                                 onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; (e.currentTarget.nextElementSibling as HTMLElement)!.style.display = 'flex'; }}
                                             />
                                         ) : null}
-                                        <div className={`w-9 h-9 rounded-full text-violet-600 dark:text-violet-300 items-center justify-center font-black text-sm shrink-0 ${
-                                            isUnread
+                                        <div className={`w-9 h-9 rounded-full text-violet-600 dark:text-violet-300 items-center justify-center font-black text-sm shrink-0 ${isUnread
                                                 ? 'bg-violet-200 dark:bg-violet-700'
                                                 : 'bg-violet-100 dark:bg-violet-900/40'
-                                        } ${conv.personAvatar ? 'hidden' : 'flex'}`}>
+                                            } ${conv.personAvatar ? 'hidden' : 'flex'}`}>
                                             {(conv.personName || conv.phoneNumber).charAt(0).toUpperCase()}
                                         </div>
                                         <div className="min-w-0">
                                             <div className="flex items-center gap-1.5">
-                                                <p className={`text-sm truncate ${
-                                                    isUnread ? 'font-black text-slate-900 dark:text-white' : 'font-semibold text-slate-700 dark:text-slate-200'
-                                                }`}>{conv.personName || formatPhone(conv.phoneNumber)}</p>
+                                                <p className={`text-sm truncate ${isUnread ? 'font-black text-slate-900 dark:text-white' : 'font-semibold text-slate-700 dark:text-slate-200'
+                                                    }`}>{conv.personName || formatPhone(conv.phoneNumber)}</p>
                                                 {convTags.some(t => t.name === 'Needs Prayer') && conv.lastMessageDirection === 'inbound' && (
                                                     <span title="Needs Prayer (waiting for reply)" className="shrink-0 text-[13px] leading-none">🙏</span>
                                                 )}
                                             </div>
-                                            {conv.personName && <p className={`text-[10px] ${ isUnread ? 'text-slate-500' : 'text-slate-400' }`}>{formatPhone(conv.phoneNumber)}</p>}
-                                            <p className={`text-xs truncate mt-0.5 ${
-                                                isUnread ? 'text-slate-600 dark:text-slate-300 font-medium' : 'text-slate-400 dark:text-slate-500'
-                                            }`}>{conv.lastMessageBody || '…'}</p>
+                                            {conv.personName && <p className={`text-[10px] ${isUnread ? 'text-slate-500' : 'text-slate-400'}`}>{formatPhone(conv.phoneNumber)}</p>}
+                                            <p className={`text-xs truncate mt-0.5 ${isUnread ? 'text-slate-600 dark:text-slate-300 font-medium' : 'text-slate-400 dark:text-slate-500'
+                                                }`}>{conv.lastMessageBody || '…'}</p>
                                             {/* Tag chips */}
                                             {convTags.length > 0 && (
                                                 <div className="flex flex-wrap gap-1 mt-1">
@@ -2180,7 +2171,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                         </div>
                                     </div>
                                     <div className="shrink-0 flex flex-col items-end gap-1">
-                                        <span className={`text-[10px] ${ isUnread ? 'text-violet-500 font-semibold' : 'text-slate-400' }`}>{timeAgo(conv.lastMessageAt)}</span>
+                                        <span className={`text-[10px] ${isUnread ? 'text-violet-500 font-semibold' : 'text-slate-400'}`}>{timeAgo(conv.lastMessageAt)}</span>
                                         {isUnread && (
                                             <span className="min-w-[18px] h-[18px] bg-violet-600 text-white text-[10px] font-black rounded-full flex items-center justify-center px-1">
                                                 {conv.unreadCount}
@@ -2200,8 +2191,8 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                 <div className={`flex-1 flex flex-col min-h-0 overflow-hidden ${!activeConv ? 'hidden md:flex' : 'flex'}`}>
                     {/* Thread header */}
                     <div className="shrink-0 px-5 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex items-center gap-3 flex-wrap">
-                        <button 
-                            onClick={() => setActiveConv(null)} 
+                        <button
+                            onClick={() => setActiveConv(null)}
                             className="md:hidden p-1.5 -ml-2 rounded-full text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition shrink-0"
                             title="Back"
                         >
@@ -2260,15 +2251,13 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                                     <button
                                                         key={t.id}
                                                         onClick={() => handleToggleConvTag(activeConv, t.id)}
-                                                        className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl transition text-sm font-semibold ${
-                                                            isOn
+                                                        className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl transition text-sm font-semibold ${isOn
                                                                 ? `${c.bg} ${c.text}`
                                                                 : 'hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
-                                                        }`}
+                                                            }`}
                                                     >
-                                                        <span className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                                                            isOn ? `${c.dot.replace('bg-', 'border-')} ${c.dot}` : 'border-slate-300 dark:border-slate-600'
-                                                        }`}>
+                                                        <span className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${isOn ? `${c.dot.replace('bg-', 'border-')} ${c.dot}` : 'border-slate-300 dark:border-slate-600'
+                                                            }`}>
                                                             {isOn && <CheckCircle size={10} className="text-white" />}
                                                         </span>
                                                         {t.emoji && <span>{t.emoji}</span>}
@@ -2310,11 +2299,11 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                             {msg.direction === 'outbound' && msg.sentByName && ` · ${msg.sentByName}`}
                                             {msg.direction === 'outbound' && msg.status && (() => {
                                                 const s = msg.status;
-                                                if (s === 'delivered')    return <span className="text-emerald-300 font-semibold" title="Delivered">✓✓ delivered</span>;
-                                                if (s === 'sent')         return <span className="text-violet-300" title="Accepted by carrier">✓ sent</span>;
-                                                if (s === 'queued')       return <span className="text-violet-300/70" title="Queued by Twilio">· queued</span>;
-                                                if (s === 'failed')       return <span className="text-red-400 font-bold" title="Failed — not delivered">⚠ failed</span>;
-                                                if (s === 'undelivered')  return <span className="text-red-400 font-bold" title="Undelivered — carrier rejected">⚠ undelivered</span>;
+                                                if (s === 'delivered') return <span className="text-emerald-300 font-semibold" title="Delivered">✓✓ delivered</span>;
+                                                if (s === 'sent') return <span className="text-violet-300" title="Accepted by carrier">✓ sent</span>;
+                                                if (s === 'queued') return <span className="text-violet-300/70" title="Queued by Twilio">· queued</span>;
+                                                if (s === 'failed') return <span className="text-red-400 font-bold" title="Failed — not delivered">⚠ failed</span>;
+                                                if (s === 'undelivered') return <span className="text-red-400 font-bold" title="Undelivered — carrier rejected">⚠ undelivered</span>;
                                                 return <span className="opacity-60">· {s}</span>;
                                             })()}
                                         </div>
@@ -2348,7 +2337,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                                     await updateDoc(
                                                         doc(firebaseDb, 'smsConversations', activeConv.id, 'aiSuggestions', sug.id),
                                                         { status: 'accepted' }
-                                                    ).catch(() => {});
+                                                    ).catch(() => { });
                                                 }}
                                                 className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition"
                                             >
@@ -2360,7 +2349,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                                     await updateDoc(
                                                         doc(firebaseDb, 'smsConversations', activeConv.id, 'aiSuggestions', sug.id),
                                                         { status: 'dismissed' }
-                                                    ).catch(() => {});
+                                                    ).catch(() => { });
                                                 }}
                                                 className="p-1 text-violet-400 hover:text-violet-600 rounded-lg hover:bg-violet-100 dark:hover:bg-violet-900/40 transition"
                                             >
@@ -2442,7 +2431,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                         value={replyBody}
                                         onChange={e => setReplyBody(e.target.value)}
                                         placeholder={replyMediaUrl ? 'Add a caption (optional)…' : 'Type a reply…'}
-                                        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendReply(); }}}
+                                        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendReply(); } }}
                                         onFocus={() => {
                                             // On mobile, scroll to bottom when keyboard opens
                                             setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 350);
@@ -2454,11 +2443,10 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                         onClick={() => replyFileRef.current?.click()}
                                         disabled={replyUploading || isSending}
                                         title="Attach image (sends as MMS)"
-                                        className={`flex items-center justify-center w-10 h-10 shrink-0 rounded-xl border transition disabled:opacity-50 ${
-                                            replyMediaUrl
+                                        className={`flex items-center justify-center w-10 h-10 shrink-0 rounded-xl border transition disabled:opacity-50 ${replyMediaUrl
                                                 ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 border-blue-300 dark:border-blue-700'
                                                 : 'bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-500 hover:border-blue-300'
-                                        }`}
+                                            }`}
                                     >
                                         <ImageIcon size={16} />
                                     </button>
@@ -2491,11 +2479,10 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                         )}
                                     </div>
                                     {replyBody.trim() && (
-                                        <span className={`text-[10px] font-mono tabular-nums font-bold transition-colors ${
-                                            replyBody.length > 160 ? 'text-red-500' :
-                                            replyBody.length > 120 ? 'text-amber-500' :
-                                            'text-slate-400 dark:text-slate-500'
-                                        }`}>
+                                        <span className={`text-[10px] font-mono tabular-nums font-bold transition-colors ${replyBody.length > 160 ? 'text-red-500' :
+                                                replyBody.length > 120 ? 'text-amber-500' :
+                                                    'text-slate-400 dark:text-slate-500'
+                                            }`}>
                                             {replyBody.length}/160
                                         </span>
                                     )}
@@ -2530,36 +2517,36 @@ interface KeywordModalProps {
 }
 
 const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingLists, tags, polls, allSmsNumbers, onSave, onClose, isBusy, saveError }) => {
-    const [keyword, setKeyword]           = useState(initial?.keyword || '');
-    const [actionType, setActionType]     = useState<SmsKeywordAction>(initial?.actionType || 'static');
+    const [keyword, setKeyword] = useState(initial?.keyword || '');
+    const [actionType, setActionType] = useState<SmsKeywordAction>(initial?.actionType || 'static');
     const [replyMessage, setReplyMessage] = useState(initial?.replyMessage || '');
-    const [addToListId, setAddToListId]   = useState(initial?.addToListId || '');
-    const [isActive, setIsActive]         = useState(initial?.isActive ?? true);
-    const [autoTagIds, setAutoTagIds]     = useState<string[]>(initial?.autoTagIds || []);
+    const [addToListId, setAddToListId] = useState(initial?.addToListId || '');
+    const [isActive, setIsActive] = useState(initial?.isActive ?? true);
+    const [autoTagIds, setAutoTagIds] = useState<string[]>(initial?.autoTagIds || []);
     const [linkedPollId, setLinkedPollId] = useState(initial?.linkedPollId || '');
-    const [numberIds, setNumberIds]       = useState<string[]>(initial?.numberIds || []);
-    const [error, setError]               = useState('');
+    const [numberIds, setNumberIds] = useState<string[]>(initial?.numberIds || []);
+    const [error, setError] = useState('');
 
-    const segs    = countSegments(replyMessage);
-    const isEdit  = !!initial;
+    const segs = countSegments(replyMessage);
+    const isEdit = !!initial;
 
     const handleSubmit = async () => {
         const kw = keyword.trim().toUpperCase().replace(/\s+/g, '');
-        if (!kw)            { setError('Keyword is required.'); return; }
+        if (!kw) { setError('Keyword is required.'); return; }
         if (!replyMessage.trim()) { setError('Auto-reply message is required.'); return; }
         if (!/^[A-Z0-9]+$/.test(kw)) { setError('Keywords can only contain letters and numbers.'); return; }
         setError('');
         const selectedList = pcoLists.find(l => l.id === addToListId);
         const selectedPoll = polls.find(p => p.id === linkedPollId);
         await onSave({
-            churchId:      initial?.churchId || '',   // parent will fill in
-            keyword:       kw,
-            actionType:    actionType,
-            replyMessage:  replyMessage.trim(),
-            addToListId:   addToListId || null,
+            churchId: initial?.churchId || '',   // parent will fill in
+            keyword: kw,
+            actionType: actionType,
+            replyMessage: replyMessage.trim(),
+            addToListId: addToListId || null,
             addToListName: selectedList?.name || null,
-            autoTagIds:    autoTagIds.length > 0 ? autoTagIds : [],
-            linkedPollId:  linkedPollId || null,
+            autoTagIds: autoTagIds.length > 0 ? autoTagIds : [],
+            linkedPollId: linkedPollId || null,
             linkedPollTitle: selectedPoll?.title || null,
             numberIds,
             isActive,
@@ -2675,11 +2662,10 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingL
                                         onClick={() => setAutoTagIds(prev =>
                                             isOn ? prev.filter(id => id !== t.id) : [...prev, t.id]
                                         )}
-                                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border-2 transition ${
-                                            isOn
+                                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border-2 transition ${isOn
                                                 ? `${c.bg} ${c.text} ${c.border}`
                                                 : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-violet-300'
-                                        }`}
+                                            }`}
                                     >
                                         {isOn && <CheckCircle size={11} />}
                                         {t.emoji && <span>{t.emoji}</span>}
@@ -2737,15 +2723,13 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingL
                                                     : [...prev, num.id]
                                             );
                                         }}
-                                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-semibold border transition ${
-                                            isChecked
+                                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-semibold border transition ${isChecked
                                                 ? 'bg-violet-50 dark:bg-violet-900/40 border-violet-200 dark:border-violet-800 text-violet-700 dark:text-violet-300'
                                                 : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-violet-300'
-                                        }`}
+                                            }`}
                                     >
-                                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
-                                            isChecked ? 'bg-violet-600 border-violet-600' : 'border-slate-300 dark:border-slate-600'
-                                        }`}>
+                                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-colors ${isChecked ? 'bg-violet-600 border-violet-600' : 'border-slate-300 dark:border-slate-600'
+                                            }`}>
                                             {isChecked && <CheckCircle size={10} className="text-white" />}
                                         </div>
                                         {num.friendlyLabel}
@@ -2802,30 +2786,30 @@ const SmsKeywordsManager: React.FC<{
     twilioNumberId?: string | null;
     onUpdateChurch?: (updates: Partial<Church>) => void;
 }> = ({ churchId, church, currentUser, twilioNumberId, onUpdateChurch }) => {
-    const [keywords, setKeywords]   = useState<SmsKeyword[]>([]);
+    const [keywords, setKeywords] = useState<SmsKeyword[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [listError, setListError] = useState<string | null>(null);
-    const [editKw, setEditKw]       = useState<SmsKeyword | null>(null);
+    const [editKw, setEditKw] = useState<SmsKeyword | null>(null);
     const [modalOpen, setModalOpen] = useState(false);
-    const [isBusy, setIsBusy]       = useState(false);
+    const [isBusy, setIsBusy] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
-    const [pcoLists, setPcoLists]   = useState<{ id: string; name: string; total_people: number }[]>([]);
+    const [pcoLists, setPcoLists] = useState<{ id: string; name: string; total_people: number }[]>([]);
     const [loadingLists, setLoadingLists] = useState(false);
 
     // Tags
-    const [tags, setTags]                       = useState<SmsTag[]>([]);
-    const [tagModalOpen, setTagModalOpen]       = useState(false);
-    const [editTag, setEditTag]                 = useState<SmsTag | null>(null);
-    const [tagName, setTagName]                 = useState('');
-    const [tagEmoji, setTagEmoji]               = useState('');
-    const [tagColor, setTagColor]               = useState<SmsTag['color']>('violet');
-    const [tagAutoReply, setTagAutoReply]        = useState('');
+    const [tags, setTags] = useState<SmsTag[]>([]);
+    const [tagModalOpen, setTagModalOpen] = useState(false);
+    const [editTag, setEditTag] = useState<SmsTag | null>(null);
+    const [tagName, setTagName] = useState('');
+    const [tagEmoji, setTagEmoji] = useState('');
+    const [tagColor, setTagColor] = useState<SmsTag['color']>('violet');
+    const [tagAutoReply, setTagAutoReply] = useState('');
     const [tagDetectionEnabled, setTagDetectionEnabled] = useState(false);
     const [tagDetectionPhrases, setTagDetectionPhrases] = useState('');
-    const [tagClarifyingReply, setTagClarifyingReply]   = useState('');
+    const [tagClarifyingReply, setTagClarifyingReply] = useState('');
     const [tagDetectionNumberIds, setTagDetectionNumberIds] = useState<string[]>([]); // empty = all numbers
-    const [tagBusy, setTagBusy]                 = useState(false);
-    const [activeSection, setActiveSection]     = useState<'keywords' | 'tags'>('keywords');
+    const [tagBusy, setTagBusy] = useState(false);
+    const [activeSection, setActiveSection] = useState<'keywords' | 'tags'>('keywords');
 
     // Phone numbers — used to restrict auto-detection per line
     const { numbers: allSmsNumbers } = useTwilioNumbers(churchId);
@@ -2835,7 +2819,7 @@ const SmsKeywordsManager: React.FC<{
     useEffect(() => {
         firestore.getPolls(churchId)
             .then(ps => setPolls(ps.filter(p => p.status !== 'closed').map(p => ({ id: p.id, title: p.title }))))
-            .catch(() => {});
+            .catch(() => { });
     }, [churchId]);
 
 
@@ -2960,14 +2944,16 @@ const SmsKeywordsManager: React.FC<{
     const openEdit = (kw: SmsKeyword) => { setSaveError(null); setEditKw(kw); setModalOpen(true); };
 
     // Tag CRUD
-    const openNewTag = () =>
-        { setEditTag(null); setTagName(''); setTagEmoji(''); setTagColor('violet'); setTagAutoReply('');
-          setTagDetectionEnabled(false); setTagDetectionPhrases(''); setTagClarifyingReply('');
-          setTagDetectionNumberIds([]); setTagModalOpen(true); };
-    const openEditTag = (t: SmsTag) =>
-        { setEditTag(t); setTagName(t.name); setTagEmoji(t.emoji || ''); setTagColor(t.color); setTagAutoReply(t.autoReplyMessage || '');
-          setTagDetectionEnabled(t.detectionEnabled ?? false); setTagDetectionPhrases(t.detectionPhrases || ''); setTagClarifyingReply(t.clarifyingReply || '');
-          setTagDetectionNumberIds(t.detectionNumberIds || []); setTagModalOpen(true); };
+    const openNewTag = () => {
+        setEditTag(null); setTagName(''); setTagEmoji(''); setTagColor('violet'); setTagAutoReply('');
+        setTagDetectionEnabled(false); setTagDetectionPhrases(''); setTagClarifyingReply('');
+        setTagDetectionNumberIds([]); setTagModalOpen(true);
+    };
+    const openEditTag = (t: SmsTag) => {
+        setEditTag(t); setTagName(t.name); setTagEmoji(t.emoji || ''); setTagColor(t.color); setTagAutoReply(t.autoReplyMessage || '');
+        setTagDetectionEnabled(t.detectionEnabled ?? false); setTagDetectionPhrases(t.detectionPhrases || ''); setTagClarifyingReply(t.clarifyingReply || '');
+        setTagDetectionNumberIds(t.detectionNumberIds || []); setTagModalOpen(true);
+    };
     const handleSaveTag = async () => {
         if (!tagName.trim()) return;
         setTagBusy(true);
@@ -2979,25 +2965,25 @@ const SmsKeywordsManager: React.FC<{
                 if (tagAutoReply.trim()) updatePayload.autoReplyMessage = tagAutoReply.trim();
                 else updatePayload.autoReplyMessage = null;
                 // Detection fields
-                updatePayload.detectionEnabled  = tagDetectionEnabled;
-                updatePayload.detectionPhrases  = tagDetectionEnabled ? tagDetectionPhrases.trim() : null;
-                updatePayload.clarifyingReply   = tagDetectionEnabled && tagClarifyingReply.trim() ? tagClarifyingReply.trim() : null;
+                updatePayload.detectionEnabled = tagDetectionEnabled;
+                updatePayload.detectionPhrases = tagDetectionEnabled ? tagDetectionPhrases.trim() : null;
+                updatePayload.clarifyingReply = tagDetectionEnabled && tagClarifyingReply.trim() ? tagClarifyingReply.trim() : null;
                 updatePayload.detectionNumberIds = tagDetectionEnabled ? tagDetectionNumberIds : [];
                 await updateDoc(doc(firebaseDb, 'smsTags', editTag.id), updatePayload);
             } else {
                 const newTag: any = {
                     churchId,
-                    name:      tagName.trim(),
-                    color:     tagColor,
+                    name: tagName.trim(),
+                    color: tagColor,
                     createdAt: Date.now(),
                 };
                 if (tagEmoji.trim()) newTag.emoji = tagEmoji.trim();
                 if (tagAutoReply.trim()) newTag.autoReplyMessage = tagAutoReply.trim();
                 if (tagDetectionEnabled) {
-                    newTag.detectionEnabled    = true;
-                    newTag.detectionPhrases    = tagDetectionPhrases.trim() || null;
-                    newTag.clarifyingReply     = tagClarifyingReply.trim() || null;
-                    newTag.detectionNumberIds  = tagDetectionNumberIds;
+                    newTag.detectionEnabled = true;
+                    newTag.detectionPhrases = tagDetectionPhrases.trim() || null;
+                    newTag.clarifyingReply = tagClarifyingReply.trim() || null;
+                    newTag.detectionNumberIds = tagDetectionNumberIds;
                 }
                 await addDoc(collection(firebaseDb, 'smsTags'), newTag);
             }
@@ -3027,15 +3013,13 @@ const SmsKeywordsManager: React.FC<{
                 <div className="flex gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
                     <button
                         onClick={() => setActiveSection('keywords')}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition ${
-                            activeSection === 'keywords' ? 'bg-white dark:bg-slate-700 text-violet-600 dark:text-violet-300 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'
-                        }`}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition ${activeSection === 'keywords' ? 'bg-white dark:bg-slate-700 text-violet-600 dark:text-violet-300 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'
+                            }`}
                     ><Key size={13} /> Keywords</button>
                     <button
                         onClick={() => setActiveSection('tags')}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition ${
-                            activeSection === 'tags' ? 'bg-white dark:bg-slate-700 text-violet-600 dark:text-violet-300 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'
-                        }`}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition ${activeSection === 'tags' ? 'bg-white dark:bg-slate-700 text-violet-600 dark:text-violet-300 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'
+                            }`}
                     ><Tag size={13} /> Tags</button>
                 </div>
                 {activeSection === 'keywords' && (
@@ -3052,189 +3036,189 @@ const SmsKeywordsManager: React.FC<{
 
             {/* ─── KEYWORDS section ─────────────────────────────────────────── */}
             {activeSection === 'keywords' && (
-            <>
-            {(() => {
-                const filteredKeywords = twilioNumberId 
-                    ? keywords.filter(k => !k.twilioNumberId || k.twilioNumberId === twilioNumberId || (k.numberIds && k.numberIds.includes(twilioNumberId)))
-                    : keywords;
-                
-                return (
-                    <>
-                    {/* List */}
-                    {listError && (
-                        <div className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl px-4 py-3 mb-4">
-                            <AlertTriangle size={14} className="shrink-0 mt-0.5 text-amber-500" />
-                            <span>{listError}</span>
-                        </div>
-                    )}
-                    {isLoading ? (
-                        <div className="flex items-center justify-center h-40 text-slate-400"><Loader2 size={20} className="animate-spin mr-2" /> Loading keywords…</div>
-                    ) : filteredKeywords.length === 0 && !listError ? (
-                        <div className="text-center py-20 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
-                            <Key size={40} className="mx-auto text-slate-300 dark:text-slate-600 mb-3" />
-                            <p className="text-slate-600 dark:text-slate-400 font-semibold">No keywords yet</p>
-                            <p className="text-sm text-slate-400 dark:text-slate-500 mt-1 mb-4">Create your first keyword to start auto-replying to texts.</p>
-                            <button onClick={openNew} className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold rounded-xl transition">
-                                <span className="flex items-center gap-1.5"><Plus size={14} /> New Keyword</span>
-                            </button>
-                        </div>
-                    ) : (
-                        <div className="space-y-3">
-                            {filteredKeywords.map(kw => {
-                                const kwTags = tags.filter(t => (kw.autoTagIds || []).includes(t.id));
+                <>
+                    {(() => {
+                        const filteredKeywords = twilioNumberId
+                            ? keywords.filter(k => !k.twilioNumberId || k.twilioNumberId === twilioNumberId || (k.numberIds && k.numberIds.includes(twilioNumberId)))
+                            : keywords;
+
                         return (
-                        <div
-                            key={kw.id}
-                            className="p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl hover:border-violet-200 dark:hover:border-violet-700 transition"
-                        >
-                            <div className="flex items-start gap-3">
-                                {/* Keyword badge */}
-                                <div className={`shrink-0 px-2.5 py-1.5 rounded-xl text-sm font-black tracking-widest self-start ${kw.isActive ? 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-200' : 'bg-slate-100 dark:bg-slate-700 text-slate-400 line-through'}`}>
-                                    {kw.keyword}
-                                </div>
-
-                                {/* Reply preview */}
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-sm text-slate-700 dark:text-slate-300">{kw.replyMessage}</p>
-                                    <div className="flex items-center flex-wrap gap-x-3 gap-y-1 mt-1">
-                                        {kw.addToListName && (
-                                            <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1">
-                                                <Users size={10} /> → {kw.addToListName}
-                                            </span>
-                                        )}
-                                        {kw.linkedPollTitle && (
-                                            <span className="text-[10px] text-violet-600 dark:text-violet-400 font-semibold flex items-center gap-1">
-                                                <Tv2 size={10} /> Poll: {kw.linkedPollTitle}
-                                            </span>
-                                        )}
-                                        {kwTags.map(t => (
-                                            <SmsTagChip key={t.id} tag={t} />
-                                        ))}
-                                        <span className="text-[10px] text-slate-400">
-                                            {new Date(kw.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                        </span>
+                            <>
+                                {/* List */}
+                                {listError && (
+                                    <div className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl px-4 py-3 mb-4">
+                                        <AlertTriangle size={14} className="shrink-0 mt-0.5 text-amber-500" />
+                                        <span>{listError}</span>
                                     </div>
-                                </div>
-
-                                {/* Match count + actions */}
-                                <div className="flex items-center gap-2 shrink-0">
-                                    <div className="text-center hidden sm:block">
-                                        <p className="text-lg font-black text-violet-600 dark:text-violet-300">{kw.matchCount}</p>
-                                        <p className="text-[10px] text-slate-400 uppercase tracking-widest">matches</p>
-                                    </div>
-                                    {/* Active toggle */}
-                                    <button
-                                        onClick={() => handleToggleActive(kw)}
-                                        title={kw.isActive ? 'Deactivate' : 'Activate'}
-                                        className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${kw.isActive ? 'bg-violet-600' : 'bg-slate-300 dark:bg-slate-600'}`}
-                                    >
-                                        <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${kw.isActive ? 'translate-x-5' : 'translate-x-0'}`} />
-                                    </button>
-                                    {/* Always-visible on mobile */}
-                                    <div className="flex items-center gap-1">
-                                        <button onClick={() => openEdit(kw)} className="p-1.5 text-slate-400 hover:text-violet-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition" title="Edit">
-                                            <Pencil size={14} />
-                                        </button>
-                                        <button onClick={() => handleDelete(kw)} className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition" title="Delete">
-                                            <Trash2 size={14} />
+                                )}
+                                {isLoading ? (
+                                    <div className="flex items-center justify-center h-40 text-slate-400"><Loader2 size={20} className="animate-spin mr-2" /> Loading keywords…</div>
+                                ) : filteredKeywords.length === 0 && !listError ? (
+                                    <div className="text-center py-20 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
+                                        <Key size={40} className="mx-auto text-slate-300 dark:text-slate-600 mb-3" />
+                                        <p className="text-slate-600 dark:text-slate-400 font-semibold">No keywords yet</p>
+                                        <p className="text-sm text-slate-400 dark:text-slate-500 mt-1 mb-4">Create your first keyword to start auto-replying to texts.</p>
+                                        <button onClick={openNew} className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold rounded-xl transition">
+                                            <span className="flex items-center gap-1.5"><Plus size={14} /> New Keyword</span>
                                         </button>
                                     </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {filteredKeywords.map(kw => {
+                                            const kwTags = tags.filter(t => (kw.autoTagIds || []).includes(t.id));
+                                            return (
+                                                <div
+                                                    key={kw.id}
+                                                    className="p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl hover:border-violet-200 dark:hover:border-violet-700 transition"
+                                                >
+                                                    <div className="flex items-start gap-3">
+                                                        {/* Keyword badge */}
+                                                        <div className={`shrink-0 px-2.5 py-1.5 rounded-xl text-sm font-black tracking-widest self-start ${kw.isActive ? 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-200' : 'bg-slate-100 dark:bg-slate-700 text-slate-400 line-through'}`}>
+                                                            {kw.keyword}
+                                                        </div>
+
+                                                        {/* Reply preview */}
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-sm text-slate-700 dark:text-slate-300">{kw.replyMessage}</p>
+                                                            <div className="flex items-center flex-wrap gap-x-3 gap-y-1 mt-1">
+                                                                {kw.addToListName && (
+                                                                    <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1">
+                                                                        <Users size={10} /> → {kw.addToListName}
+                                                                    </span>
+                                                                )}
+                                                                {kw.linkedPollTitle && (
+                                                                    <span className="text-[10px] text-violet-600 dark:text-violet-400 font-semibold flex items-center gap-1">
+                                                                        <Tv2 size={10} /> Poll: {kw.linkedPollTitle}
+                                                                    </span>
+                                                                )}
+                                                                {kwTags.map(t => (
+                                                                    <SmsTagChip key={t.id} tag={t} />
+                                                                ))}
+                                                                <span className="text-[10px] text-slate-400">
+                                                                    {new Date(kw.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Match count + actions */}
+                                                        <div className="flex items-center gap-2 shrink-0">
+                                                            <div className="text-center hidden sm:block">
+                                                                <p className="text-lg font-black text-violet-600 dark:text-violet-300">{kw.matchCount}</p>
+                                                                <p className="text-[10px] text-slate-400 uppercase tracking-widest">matches</p>
+                                                            </div>
+                                                            {/* Active toggle */}
+                                                            <button
+                                                                onClick={() => handleToggleActive(kw)}
+                                                                title={kw.isActive ? 'Deactivate' : 'Activate'}
+                                                                className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${kw.isActive ? 'bg-violet-600' : 'bg-slate-300 dark:bg-slate-600'}`}
+                                                            >
+                                                                <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${kw.isActive ? 'translate-x-5' : 'translate-x-0'}`} />
+                                                            </button>
+                                                            {/* Always-visible on mobile */}
+                                                            <div className="flex items-center gap-1">
+                                                                <button onClick={() => openEdit(kw)} className="p-1.5 text-slate-400 hover:text-violet-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition" title="Edit">
+                                                                    <Pencil size={14} />
+                                                                </button>
+                                                                <button onClick={() => handleDelete(kw)} className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition" title="Delete">
+                                                                    <Trash2 size={14} />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+
+                                {/* Carrier reserved keywords note */}
+                                <div className="mt-6 flex items-start gap-2 text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3">
+                                    <AlertTriangle size={13} className="text-amber-500 mt-0.5 shrink-0" />
+                                    <span>
+                                        <strong>Reserved words:</strong> STOP, STOPALL, UNSUBSCRIBE, CANCEL, END, QUIT, HELP, and START are reserved by carriers and cannot be used as custom keywords. These responses are handled automatically.
+                                    </span>
                                 </div>
-                            </div>
-                        </div>
+                            </>
                         );
-                    })}
-                </div>
-            )}
-
-            {/* Carrier reserved keywords note */}
-            <div className="mt-6 flex items-start gap-2 text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3">
-                <AlertTriangle size={13} className="text-amber-500 mt-0.5 shrink-0" />
-                <span>
-                    <strong>Reserved words:</strong> STOP, STOPALL, UNSUBSCRIBE, CANCEL, END, QUIT, HELP, and START are reserved by carriers and cannot be used as custom keywords. These responses are handled automatically.
-                </span>
-            </div>
-            </>
-            );
-            })()}
-            </>
+                    })()}
+                </>
             )}
 
             {/* ─── TAGS section ─────────────────────────────────────────────── */}
             {activeSection === 'tags' && (
-            <>
-            <div className="flex items-start gap-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-2xl p-4 mb-6">
-                <div className="text-3xl">🏷️</div>
-                <div>
-                    <p className="text-sm font-bold text-emerald-800 dark:text-emerald-200 mb-1">Conversation Tags</p>
-                    <p className="text-xs text-emerald-700 dark:text-emerald-300 leading-relaxed">
-                        Tags let you categorise and filter SMS conversations. Apply them manually from any conversation, or automatically when a keyword is matched. Create tags like{' '}
-                        <span className="font-bold">Prayer Request 🙏</span>,{' '}<span className="font-bold">Service Times 📅</span>, or{' '}<span className="font-bold">Pastoral Care ❤️</span>.
-                    </p>
-                </div>
-            </div>
+                <>
+                    <div className="flex items-start gap-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-2xl p-4 mb-6">
+                        <div className="text-3xl">🏷️</div>
+                        <div>
+                            <p className="text-sm font-bold text-emerald-800 dark:text-emerald-200 mb-1">Conversation Tags</p>
+                            <p className="text-xs text-emerald-700 dark:text-emerald-300 leading-relaxed">
+                                Tags let you categorise and filter SMS conversations. Apply them manually from any conversation, or automatically when a keyword is matched. Create tags like{' '}
+                                <span className="font-bold">Prayer Request 🙏</span>,{' '}<span className="font-bold">Service Times 📅</span>, or{' '}<span className="font-bold">Pastoral Care ❤️</span>.
+                            </p>
+                        </div>
+                    </div>
 
-            {tagLoadError && (
-                <div className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl px-4 py-3 mb-4">
-                    <AlertTriangle size={14} className="shrink-0 mt-0.5 text-amber-500" />
-                    <span>{tagLoadError}</span>
-                </div>
-            )}
+                    {tagLoadError && (
+                        <div className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl px-4 py-3 mb-4">
+                            <AlertTriangle size={14} className="shrink-0 mt-0.5 text-amber-500" />
+                            <span>{tagLoadError}</span>
+                        </div>
+                    )}
 
-            {tags.length === 0 ? (
-                <div className="text-center py-20 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
-                    <Tag size={40} className="mx-auto text-slate-300 dark:text-slate-600 mb-3" />
-                    <p className="text-slate-600 dark:text-slate-400 font-semibold">No tags yet</p>
-                    <p className="text-sm text-slate-400 dark:text-slate-500 mt-1 mb-4">Tags help you track conversations by topic.</p>
-                    <button onClick={openNewTag} className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold rounded-xl transition">
-                        <span className="flex items-center gap-1.5"><Plus size={14} /> New Tag</span>
-                    </button>
-                </div>
-            ) : (
-                <div className="space-y-3">
-                    {tags.map(t => {
-                        const c = TAG_COLOR_MAP[t.color] || TAG_COLOR_MAP.violet;
-                        return (
-                            <div key={t.id} className="flex items-center gap-4 p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl hover:border-violet-200 dark:hover:border-violet-700 transition group">
-                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0 ${c.bg}`}>
-                                    {t.emoji || <Tag size={18} className={c.text} />}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                        <p className={`font-bold text-sm ${c.text}`}>{t.name}</p>
-                                        <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full border capitalize ${c.bg} ${c.text} ${c.border}`}>{t.color}</span>
-                                        {t.autoReplyMessage && (
-                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-700">
-                                                <MessageSquare size={9} /> Auto-Reply
-                                            </span>
-                                        )}
-                                        {t.detectionEnabled && (
-                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-700">
-                                                <Sparkles size={9} /> Auto-Detect
-                                            </span>
-                                        )}
+                    {tags.length === 0 ? (
+                        <div className="text-center py-20 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
+                            <Tag size={40} className="mx-auto text-slate-300 dark:text-slate-600 mb-3" />
+                            <p className="text-slate-600 dark:text-slate-400 font-semibold">No tags yet</p>
+                            <p className="text-sm text-slate-400 dark:text-slate-500 mt-1 mb-4">Tags help you track conversations by topic.</p>
+                            <button onClick={openNewTag} className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold rounded-xl transition">
+                                <span className="flex items-center gap-1.5"><Plus size={14} /> New Tag</span>
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            {tags.map(t => {
+                                const c = TAG_COLOR_MAP[t.color] || TAG_COLOR_MAP.violet;
+                                return (
+                                    <div key={t.id} className="flex items-center gap-4 p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl hover:border-violet-200 dark:hover:border-violet-700 transition group">
+                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0 ${c.bg}`}>
+                                            {t.emoji || <Tag size={18} className={c.text} />}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <p className={`font-bold text-sm ${c.text}`}>{t.name}</p>
+                                                <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full border capitalize ${c.bg} ${c.text} ${c.border}`}>{t.color}</span>
+                                                {t.autoReplyMessage && (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-700">
+                                                        <MessageSquare size={9} /> Auto-Reply
+                                                    </span>
+                                                )}
+                                                {t.detectionEnabled && (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-700">
+                                                        <Sparkles size={9} /> Auto-Detect
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="text-[10px] text-slate-400 mt-0.5">
+                                                {t.autoReplyMessage
+                                                    ? <span className="text-slate-500 dark:text-slate-400 truncate block max-w-xs">↩ "{t.autoReplyMessage}"</span>
+                                                    : <span>Created {new Date(t.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                                                }
+                                            </p>
+                                        </div>
+                                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                                            <button onClick={() => openEditTag(t)} className="p-1.5 text-slate-400 hover:text-violet-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition" title="Edit tag">
+                                                <Pencil size={14} />
+                                            </button>
+                                            <button onClick={() => handleDeleteTag(t)} className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition" title="Delete tag">
+                                                <Trash2 size={14} />
+                                            </button>
+                                        </div>
                                     </div>
-                                    <p className="text-[10px] text-slate-400 mt-0.5">
-                                        {t.autoReplyMessage
-                                            ? <span className="text-slate-500 dark:text-slate-400 truncate block max-w-xs">↩ "{t.autoReplyMessage}"</span>
-                                            : <span>Created {new Date(t.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-                                        }
-                                    </p>
-                                </div>
-                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
-                                    <button onClick={() => openEditTag(t)} className="p-1.5 text-slate-400 hover:text-violet-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition" title="Edit tag">
-                                        <Pencil size={14} />
-                                    </button>
-                                    <button onClick={() => handleDeleteTag(t)} className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition" title="Delete tag">
-                                        <Trash2 size={14} />
-                                    </button>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-            )}
-            </>
+                                );
+                            })}
+                        </div>
+                    )}
+                </>
             )}
 
             {/* ─── PRAYER REQUEST DETECTION ─────────────────────────────────── */}
@@ -3299,20 +3283,17 @@ const SmsKeywordsManager: React.FC<{
                                     onClick={handleTogglePrayer}
                                     disabled={prayerSaving}
                                     title={prayerEnabled ? 'Disable prayer detection' : 'Enable prayer detection'}
-                                    className={`relative shrink-0 w-12 h-6 rounded-full transition-colors disabled:opacity-60 ${
-                                        prayerEnabled ? 'bg-violet-600' : 'bg-slate-300 dark:bg-slate-600'
-                                    }`}
+                                    className={`relative shrink-0 w-12 h-6 rounded-full transition-colors disabled:opacity-60 ${prayerEnabled ? 'bg-violet-600' : 'bg-slate-300 dark:bg-slate-600'
+                                        }`}
                                 >
-                                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                                        prayerEnabled ? 'translate-x-6' : 'translate-x-0'
-                                    }`} />
+                                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${prayerEnabled ? 'translate-x-6' : 'translate-x-0'
+                                        }`} />
                                 </button>
                             ) : (
-                                <span className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${
-                                    prayerEnabled
+                                <span className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${prayerEnabled
                                         ? 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300'
                                         : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
-                                }`}>
+                                    }`}>
                                     {prayerEnabled ? 'On' : 'Off'}
                                 </span>
                             )}
@@ -3444,20 +3425,17 @@ const SmsKeywordsManager: React.FC<{
                                     onClick={handleToggleAgent}
                                     disabled={agentSaving}
                                     title={agentOn ? 'Disable SMS AI Agent' : 'Enable SMS AI Agent'}
-                                    className={`relative shrink-0 w-12 h-6 rounded-full transition-colors disabled:opacity-60 ${
-                                        agentOn ? 'bg-violet-600' : 'bg-slate-300 dark:bg-slate-600'
-                                    }`}
+                                    className={`relative shrink-0 w-12 h-6 rounded-full transition-colors disabled:opacity-60 ${agentOn ? 'bg-violet-600' : 'bg-slate-300 dark:bg-slate-600'
+                                        }`}
                                 >
-                                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                                        agentOn ? 'translate-x-6' : 'translate-x-0'
-                                    }`} />
+                                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${agentOn ? 'translate-x-6' : 'translate-x-0'
+                                        }`} />
                                 </button>
                             ) : (
-                                <span className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${
-                                    agentOn
+                                <span className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${agentOn
                                         ? 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300'
                                         : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
-                                }`}>
+                                    }`}>
                                     {agentOn ? 'On' : 'Off'}
                                 </span>
                             )}
@@ -3533,9 +3511,8 @@ const SmsKeywordsManager: React.FC<{
                                             type="button"
                                             onClick={() => setTagColor(color)}
                                             title={color}
-                                            className={`w-8 h-8 rounded-full border-4 transition ${
-                                                tagColor === color ? 'border-slate-900 dark:border-white scale-110' : 'border-transparent hover:scale-105'
-                                            } ${c.dot}`}
+                                            className={`w-8 h-8 rounded-full border-4 transition ${tagColor === color ? 'border-slate-900 dark:border-white scale-110' : 'border-transparent hover:scale-105'
+                                                } ${c.dot}`}
                                         />
                                     );
                                 })}
@@ -3592,12 +3569,10 @@ const SmsKeywordsManager: React.FC<{
                                         </p>
                                     </div>
                                 </div>
-                                <span className={`relative shrink-0 w-10 h-5 rounded-full transition-colors ${
-                                    tagDetectionEnabled ? 'bg-violet-600' : 'bg-slate-300 dark:bg-slate-600'
-                                }`}>
-                                    <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
-                                        tagDetectionEnabled ? 'translate-x-5' : 'translate-x-0'
-                                    }`} />
+                                <span className={`relative shrink-0 w-10 h-5 rounded-full transition-colors ${tagDetectionEnabled ? 'bg-violet-600' : 'bg-slate-300 dark:bg-slate-600'
+                                    }`}>
+                                    <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${tagDetectionEnabled ? 'translate-x-5' : 'translate-x-0'
+                                        }`} />
                                 </span>
                             </button>
 
@@ -3653,15 +3628,13 @@ const SmsKeywordsManager: React.FC<{
                                                                         : [...prev, num.id]
                                                                 );
                                                             }}
-                                                            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-semibold border transition ${
-                                                                isChecked
+                                                            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-semibold border transition ${isChecked
                                                                     ? 'bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-200 border-violet-300 dark:border-violet-700'
                                                                     : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-violet-300'
-                                                            }`}
+                                                                }`}
                                                         >
-                                                            <span className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition ${
-                                                                isChecked ? 'bg-violet-600 border-violet-600' : 'border-slate-300 dark:border-slate-600'
-                                                            }`}>
+                                                            <span className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition ${isChecked ? 'bg-violet-600 border-violet-600' : 'border-slate-300 dark:border-slate-600'
+                                                                }`}>
                                                                 {isChecked && <CheckCircle size={10} className="text-white" />}
                                                             </span>
                                                             <Phone size={12} className="text-slate-400 shrink-0" />
@@ -3744,11 +3717,11 @@ interface UsageSummary {
     deliveryRate: number;
 }
 
-const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 function currentMonthKey(): string {
     const d = new Date();
-    return `${d.getFullYear()}_${String(d.getMonth() + 1).padStart(2,'0')}`;
+    return `${d.getFullYear()}_${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
 const StatCard: React.FC<{
@@ -3762,10 +3735,10 @@ const StatCard: React.FC<{
     const colorMap: Record<string, string> = {
         violet: 'bg-violet-50 dark:bg-violet-900/20 text-violet-600 dark:text-violet-300',
         emerald: 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-300',
-        amber:   'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400',
-        red:     'bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400',
-        blue:    'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-300',
-        slate:   'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300',
+        amber: 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400',
+        red: 'bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400',
+        blue: 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-300',
+        slate: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300',
     };
     return (
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
@@ -3798,11 +3771,11 @@ const MiniBar: React.FC<{ pct: number; color?: string; label?: string }> = ({ pc
 );
 
 const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[]; smsNumberId?: string | null }> = ({ churchId, campaigns, smsNumberId }) => {
-    const [summary, setSummary]     = useState<UsageSummary | null>(null);
+    const [summary, setSummary] = useState<UsageSummary | null>(null);
     const [isLoading, setIsLoading] = useState(true);
-    const [optOuts, setOptOuts]     = useState(0);
+    const [optOuts, setOptOuts] = useState(0);
     const [monthlyData, setMonthlyData] = useState<{ month: string; label: string; sent: number; delivered: number }[]>([]);
-    const [period, setPeriod]       = useState<'30d' | '90d' | 'all'>('30d');
+    const [period, setPeriod] = useState<'30d' | '90d' | 'all'>('30d');
 
     useEffect(() => {
         let active = true;
@@ -3826,23 +3799,23 @@ const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[]; smsNu
                     )
                 );
                 let usageRecords: any[] = usageSnap.docs.map(d => d.data());
-                
+
                 if (smsNumberId) {
                     usageRecords = usageRecords.filter(r => r.smsNumberId === smsNumberId || r.numberId === smsNumberId || r.twilioNumberId === smsNumberId);
                 }
 
                 // Derive summary from sent campaigns + usage records
                 let sentCampaigns = campaigns.filter(c => c.status === 'sent');
-                
+
                 if (smsNumberId) {
                     sentCampaigns = sentCampaigns.filter(c => c.smsNumberId === smsNumberId || c.twilioNumberId === smsNumberId);
                 }
 
-                const totalSent       = sentCampaigns.reduce((s, c) => s + (c.recipientCount ?? 0), 0);
-                const totalDelivered  = sentCampaigns.reduce((s, c) => s + (c.deliveredCount ?? 0), 0);
-                const totalFailed     = sentCampaigns.reduce((s, c) => s + (c.failedCount ?? 0), 0);
-                const totalOptOutC    = sentCampaigns.reduce((s, c) => s + (c.optOutCount ?? 0), 0);
-                const totalCost       = usageRecords.reduce((s, r) => s + (r.costUsd ?? 0), 0);
+                const totalSent = sentCampaigns.reduce((s, c) => s + (c.recipientCount ?? 0), 0);
+                const totalDelivered = sentCampaigns.reduce((s, c) => s + (c.deliveredCount ?? 0), 0);
+                const totalFailed = sentCampaigns.reduce((s, c) => s + (c.failedCount ?? 0), 0);
+                const totalOptOutC = sentCampaigns.reduce((s, c) => s + (c.optOutCount ?? 0), 0);
+                const totalCost = usageRecords.reduce((s, r) => s + (r.costUsd ?? 0), 0);
 
                 // Inbound conversation count as proxy for replies
                 const convSnap = await getDocs(
@@ -3860,16 +3833,16 @@ const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[]; smsNu
                 const now = new Date();
                 for (let i = 5; i >= 0; i--) {
                     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-                    const key = `${d.getFullYear()}_${String(d.getMonth() + 1).padStart(2,'0')}`;
+                    const key = `${d.getFullYear()}_${String(d.getMonth() + 1).padStart(2, '0')}`;
                     monthMap[key] = { sent: 0, delivered: 0 };
                 }
                 for (const c of sentCampaigns) {
                     if (!c.sentAt) continue;
                     const d = new Date(c.sentAt);
-                    const key = `${d.getFullYear()}_${String(d.getMonth() + 1).padStart(2,'0')}`;
+                    const key = `${d.getFullYear()}_${String(d.getMonth() + 1).padStart(2, '0')}`;
                     if (monthMap[key]) {
-                        monthMap[key].sent      += c.recipientCount  ?? 0;
-                        monthMap[key].delivered += c.deliveredCount  ?? 0;
+                        monthMap[key].sent += c.recipientCount ?? 0;
+                        monthMap[key].delivered += c.deliveredCount ?? 0;
                     }
                 }
                 const monthly = Object.entries(monthMap).map(([key, v]) => {
@@ -3884,11 +3857,11 @@ const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[]; smsNu
                     totalSent,
                     totalDelivered,
                     totalFailed,
-                    totalBulk:       sentCampaigns.length,
+                    totalBulk: sentCampaigns.length,
                     totalReplies,
-                    totalOptOuts:    Math.max(optOutCount, totalOptOutC),
+                    totalOptOuts: Math.max(optOutCount, totalOptOutC),
                     estimatedCostUsd: totalCost,
-                    deliveryRate:    totalSent > 0 ? Math.round((totalDelivered / totalSent) * 100) : 0,
+                    deliveryRate: totalSent > 0 ? Math.round((totalDelivered / totalSent) * 100) : 0,
                 });
             } catch (e) {
                 console.error('[SmsAnalytics] failed', e);
@@ -3903,8 +3876,8 @@ const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[]; smsNu
 
     // Filter campaigns by period
     const cutoff = period === '30d' ? Date.now() - 30 * 86400_000
-                  : period === '90d' ? Date.now() - 90 * 86400_000
-                  : 0;
+        : period === '90d' ? Date.now() - 90 * 86400_000
+            : 0;
     const periodCampaigns = campaigns.filter(c => c.status === 'sent' && (c.sentAt ?? 0) >= cutoff);
 
     const maxSent = Math.max(...monthlyData.map(m => m.sent), 1);
@@ -3933,9 +3906,8 @@ const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[]; smsNu
                         <button
                             key={p}
                             onClick={() => setPeriod(p)}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                                period === p ? 'bg-white dark:bg-slate-700 text-violet-600 dark:text-violet-300 shadow-sm' : 'text-slate-500 dark:text-slate-400'
-                            }`}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${period === p ? 'bg-white dark:bg-slate-700 text-violet-600 dark:text-violet-300 shadow-sm' : 'text-slate-500 dark:text-slate-400'
+                                }`}
                         >
                             {p === '30d' ? 'Last 30d' : p === '90d' ? 'Last 90d' : 'All time'}
                         </button>
@@ -3993,7 +3965,7 @@ const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[]; smsNu
                         <div className="flex items-end gap-3 h-36">
                             {monthlyData.map(m => {
                                 const heightPct = (m.sent / maxSent) * 100;
-                                const delivPct  = m.sent > 0 ? (m.delivered / m.sent) * 100 : 0;
+                                const delivPct = m.sent > 0 ? (m.delivered / m.sent) * 100 : 0;
                                 return (
                                     <div key={m.month} className="flex-1 flex flex-col items-center gap-1.5">
                                         <div className="w-full flex flex-col items-center group relative">
@@ -4080,10 +4052,10 @@ const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[]; smsNu
                             .sort((a, b) => (b.sentAt ?? 0) - (a.sentAt ?? 0))
                             .slice(0, 10)
                             .map(c => {
-                                const total     = c.recipientCount ?? 0;
+                                const total = c.recipientCount ?? 0;
                                 const delivered = c.deliveredCount ?? 0;
-                                const failed    = c.failedCount ?? 0;
-                                const rate      = total > 0 ? Math.round((delivered / total) * 100) : 0;
+                                const failed = c.failedCount ?? 0;
+                                const rate = total > 0 ? Math.round((delivered / total) * 100) : 0;
                                 return (
                                     <div key={c.id} className="px-5 py-3 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition">
                                         <div className="flex items-start justify-between gap-4 mb-2">
@@ -4131,17 +4103,23 @@ const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[]; smsNu
                     <p className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4">Compliance Health</p>
                     <div className="space-y-3">
                         {[
-                            { label: 'Delivery rate', pct: summary?.deliveryRate ?? 0,
-                              color: (summary?.deliveryRate ?? 0) >= 90 ? 'bg-emerald-500' : 'bg-amber-400',
-                              note: (summary?.deliveryRate ?? 0) >= 90 ? 'Excellent' : 'Needs attention' },
-                            { label: 'Opt-out rate',
-                              pct: summary && summary.totalSent > 0 ? Math.round((summary.totalOptOuts / summary.totalSent) * 100) : 0,
-                              color: 'bg-red-400',
-                              note: summary && summary.totalSent > 0 ? `${((summary.totalOptOuts / summary.totalSent) * 100).toFixed(1)}% of recipients` : 'No data' },
-                            { label: 'Failed rate',
-                              pct: summary && summary.totalSent > 0 ? Math.round((summary.totalFailed / summary.totalSent) * 100) : 0,
-                              color: 'bg-slate-400',
-                              note: summary && summary.totalSent > 0 ? `${((summary.totalFailed / summary.totalSent) * 100).toFixed(1)}% of sends` : 'No data' },
+                            {
+                                label: 'Delivery rate', pct: summary?.deliveryRate ?? 0,
+                                color: (summary?.deliveryRate ?? 0) >= 90 ? 'bg-emerald-500' : 'bg-amber-400',
+                                note: (summary?.deliveryRate ?? 0) >= 90 ? 'Excellent' : 'Needs attention'
+                            },
+                            {
+                                label: 'Opt-out rate',
+                                pct: summary && summary.totalSent > 0 ? Math.round((summary.totalOptOuts / summary.totalSent) * 100) : 0,
+                                color: 'bg-red-400',
+                                note: summary && summary.totalSent > 0 ? `${((summary.totalOptOuts / summary.totalSent) * 100).toFixed(1)}% of recipients` : 'No data'
+                            },
+                            {
+                                label: 'Failed rate',
+                                pct: summary && summary.totalSent > 0 ? Math.round((summary.totalFailed / summary.totalSent) * 100) : 0,
+                                color: 'bg-slate-400',
+                                note: summary && summary.totalSent > 0 ? `${((summary.totalFailed / summary.totalSent) * 100).toFixed(1)}% of sends` : 'No data'
+                            },
                         ].map(row => (
                             <div key={row.label}>
                                 <div className="flex justify-between text-xs mb-1">
@@ -4190,11 +4168,11 @@ function uid(): string {
 
 // Channel metadata
 const CHANNEL_CONFIG: Record<WorkflowChannelType, { label: string; icon: React.ReactNode; color: string; badge: string }> = {
-    sms:        { label: 'SMS',        icon: <MessageSquare size={13} />, color: 'bg-violet-600 text-white hover:bg-violet-700',   badge: 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300' },
-    mms:        { label: 'MMS',        icon: <ImageIcon size={13} />,     color: 'bg-blue-600 text-white hover:bg-blue-700',       badge: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'       },
-    email:      { label: 'Email',      icon: <Mail size={13} />,           color: 'bg-emerald-600 text-white hover:bg-emerald-700', badge: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
-    staff_sms:  { label: 'Staff SMS',  icon: <Users size={13} />,          color: 'bg-amber-500 text-white hover:bg-amber-600',     badge: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300'     },
-    staff_email:{ label: 'Staff Email',icon: <Mail size={13} />,           color: 'bg-rose-500 text-white hover:bg-rose-600',       badge: 'bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300'         },
+    sms: { label: 'SMS', icon: <MessageSquare size={13} />, color: 'bg-violet-600 text-white hover:bg-violet-700', badge: 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300' },
+    mms: { label: 'MMS', icon: <ImageIcon size={13} />, color: 'bg-blue-600 text-white hover:bg-blue-700', badge: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300' },
+    email: { label: 'Email', icon: <Mail size={13} />, color: 'bg-emerald-600 text-white hover:bg-emerald-700', badge: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
+    staff_sms: { label: 'Staff SMS', icon: <Users size={13} />, color: 'bg-amber-500 text-white hover:bg-amber-600', badge: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' },
+    staff_email: { label: 'Staff Email', icon: <Mail size={13} />, color: 'bg-rose-500 text-white hover:bg-rose-600', badge: 'bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300' },
 };
 
 // ─── Step Editor Row ─────────────────────────────────────────────────────────
@@ -4207,10 +4185,10 @@ const StaffStepEditor: React.FC<{
     pcoLists: { id: string; name: string }[];
     pcoGroups: { id: string; name: string }[];
 }> = ({ step, onChange, pcoLists, pcoGroups }) => {
-    const isEmail    = step.channelType === 'staff_email';
+    const isEmail = step.channelType === 'staff_email';
     const targetType = step.staffTargetType ?? 'individuals';
     const recipients = step.staffRecipients ?? [];
-    const [addName, setAddName]       = useState('');
+    const [addName, setAddName] = useState('');
     const [addContact, setAddContact] = useState('');
 
     const addRecipient = () => {
@@ -4291,7 +4269,7 @@ const StaffStepEditor: React.FC<{
             )}
             {/* Contact merge tags */}
             <div className='flex gap-1.5 flex-wrap'>
-                {['{contact.firstName}','{contact.lastName}','{contact.name}','{contact.phone}','{contact.email}'].map(t => (
+                {['{contact.firstName}', '{contact.lastName}', '{contact.name}', '{contact.phone}', '{contact.email}'].map(t => (
                     <button key={t} type='button' onClick={() => isEmail ? onChange({ emailBody: (step.emailBody || '') + t }) : onChange({ message: step.message + t })}
                         className={`px-2 py-0.5 text-[10px] font-mono font-semibold rounded-lg border transition ${isEmail ? 'bg-rose-50 dark:bg-rose-900/20 text-rose-700 border-rose-200 hover:bg-rose-100' : 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 border-amber-200 hover:bg-amber-100'}`}
                     >{t}</button>
@@ -4310,17 +4288,17 @@ function fmt12(hhmm: string): string {
     return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${ampm}`;
 }
 
-const DOW_LABELS_LONG  = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-const DOW_LABELS_SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-const ORDINAL_SUFFIX   = (n: number) => n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th';
+const DOW_LABELS_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const DOW_LABELS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const ORDINAL_SUFFIX = (n: number) => n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th';
 
 /** Human-readable timing label used in the delay connector between nodes. */
 function stepTimingLabel(node: WorkflowDelayNode): string {
-    const sType  = node.scheduleType ?? 'relative';
+    const sType = node.scheduleType ?? 'relative';
     const repeat = node.repeatType && node.repeatType !== 'none';
 
     if (sType === 'day_of_week') {
-        const day  = DOW_LABELS_LONG[node.scheduleDayOfWeek ?? 1];
+        const day = DOW_LABELS_LONG[node.scheduleDayOfWeek ?? 1];
         const time = node.scheduleTime ? ` at ${fmt12(node.scheduleTime)}` : '';
         if (repeat && node.repeatType === 'weekly' && (node.repeatDays?.length ?? 0) > 0) {
             const days = node.repeatDays!.map(d => DOW_LABELS_SHORT[d]).join(', ');
@@ -4329,7 +4307,7 @@ function stepTimingLabel(node: WorkflowDelayNode): string {
         return `next ${day}${time}`;
     }
     if (sType === 'day_of_month') {
-        const d    = node.scheduleDayOfMonth ?? 1;
+        const d = node.scheduleDayOfMonth ?? 1;
         const time = node.scheduleTime ? ` at ${fmt12(node.scheduleTime)}` : '';
         if (repeat && node.repeatType === 'monthly' && (node.repeatDays?.length ?? 0) > 0) {
             const dates = node.repeatDays!.map(v => `${v}${ORDINAL_SUFFIX(v)}`).join(', ');
@@ -4355,10 +4333,10 @@ const DelayNodeCard: React.FC<{
     onChange: (patch: Partial<WorkflowDelayNode>) => void;
     onDelete: () => void;
 }> = ({ node, onChange, onDelete }) => {
-    const schedType  = node.scheduleType  ?? 'relative';
-    const repeatType = node.repeatType    ?? 'none';
-    const repeatDays = node.repeatDays    ?? [];
-    const summary    = stepTimingLabel(node);
+    const schedType = node.scheduleType ?? 'relative';
+    const repeatType = node.repeatType ?? 'none';
+    const repeatDays = node.repeatDays ?? [];
+    const summary = stepTimingLabel(node);
     const isRepeating = repeatType !== 'none';
 
     // Toggle a day in the repeatDays array
@@ -4393,14 +4371,13 @@ const DelayNodeCard: React.FC<{
             {/* Schedule type toggle */}
             <div className="flex rounded-xl overflow-hidden border border-amber-200 dark:border-amber-700">
                 {([
-                    { id: 'relative',     label: '⏱ Relative'  },
-                    { id: 'day_of_week',  label: '📅 Weekday'   },
+                    { id: 'relative', label: '⏱ Relative' },
+                    { id: 'day_of_week', label: '📅 Weekday' },
                     { id: 'day_of_month', label: '🗓 Month Day' },
                 ] as const).map(({ id, label }) => (
                     <button key={id} type="button" onClick={() => onChange({ scheduleType: id, repeatType: 'none', repeatDays: [] })}
-                        className={`flex-1 py-1.5 text-[10px] font-bold transition border-r last:border-r-0 border-amber-200 dark:border-amber-700 ${
-                            schedType === id ? 'bg-amber-500 text-white' : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-amber-50 dark:hover:bg-slate-600'
-                        }`}
+                        className={`flex-1 py-1.5 text-[10px] font-bold transition border-r last:border-r-0 border-amber-200 dark:border-amber-700 ${schedType === id ? 'bg-amber-500 text-white' : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-amber-50 dark:hover:bg-slate-600'
+                            }`}
                     >{label}</button>
                 ))}
             </div>
@@ -4429,11 +4406,10 @@ const DelayNodeCard: React.FC<{
                     <div className="flex gap-1">
                         {DOW_LABELS_SHORT.map((d, i) => (
                             <button key={i} type="button" onClick={() => onChange({ scheduleDayOfWeek: i })} title={DOW_LABELS_LONG[i]}
-                                className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition ${
-                                    (node.scheduleDayOfWeek ?? 1) === i
+                                className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition ${(node.scheduleDayOfWeek ?? 1) === i
                                         ? 'bg-amber-500 text-white shadow-sm'
                                         : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-amber-100 dark:hover:bg-amber-900/30'
-                                }`}
+                                    }`}
                             >{d}</button>
                         ))}
                     </div>
@@ -4480,11 +4456,10 @@ const DelayNodeCard: React.FC<{
                         {(['none', 'weekly', 'monthly'] as const).map(rt => (
                             <button key={rt} type="button"
                                 onClick={() => onChange({ repeatType: rt, repeatDays: [] })}
-                                className={`px-3 py-1 transition border-r last:border-r-0 border-amber-200 dark:border-amber-700 capitalize ${
-                                    repeatType === rt
+                                className={`px-3 py-1 transition border-r last:border-r-0 border-amber-200 dark:border-amber-700 capitalize ${repeatType === rt
                                         ? 'bg-violet-600 text-white'
                                         : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-violet-50 dark:hover:bg-slate-600'
-                                }`}
+                                    }`}
                             >{rt}</button>
                         ))}
                     </div>
@@ -4501,11 +4476,10 @@ const DelayNodeCard: React.FC<{
                                     <button key={i} type="button"
                                         onClick={() => toggleRepeatDay(i)}
                                         title={DOW_LABELS_LONG[i]}
-                                        className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition ${
-                                            active
+                                        className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition ${active
                                                 ? 'bg-violet-600 text-white shadow-sm'
                                                 : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-violet-100 dark:hover:bg-violet-900/30'
-                                        }`}
+                                            }`}
                                     >{d}</button>
                                 );
                             })}
@@ -4535,11 +4509,10 @@ const DelayNodeCard: React.FC<{
                                     <button key={d} type="button"
                                         onClick={() => toggleRepeatDay(d)}
                                         title={`${d}${ORDINAL_SUFFIX(d)} of the month`}
-                                        className={`w-8 h-8 text-[10px] font-bold rounded-lg transition ${
-                                            active
+                                        className={`w-8 h-8 text-[10px] font-bold rounded-lg transition ${active
                                                 ? 'bg-violet-600 text-white shadow-sm'
                                                 : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-violet-100 dark:hover:bg-violet-900/30'
-                                        }`}
+                                            }`}
                                     >{d}</button>
                                 );
                             })}
@@ -4642,10 +4615,10 @@ const BranchNodeCard: React.FC<{
 
     const conditionSummary = () => {
         switch (condType) {
-            case 'replied':      return 'Contact replied to previous message';
+            case 'replied': return 'Contact replied to previous message';
             case 'email_opened': return 'Contact opened previous email';
-            case 'tag_applied':  return node.conditionTagName ? `Tag "${node.conditionTagName}" applied` : 'Tag is applied';
-            case 'custom':       return node.conditionCustom || 'Custom condition';
+            case 'tag_applied': return node.conditionTagName ? `Tag "${node.conditionTagName}" applied` : 'Tag is applied';
+            case 'custom': return node.conditionCustom || 'Custom condition';
         }
     };
 
@@ -4679,15 +4652,14 @@ const BranchNodeCard: React.FC<{
                         {/* Condition type picker */}
                         <div className="flex rounded-xl overflow-hidden border border-slate-200 dark:border-slate-600">
                             {([
-                                { id: 'replied',      label: '↩ Replied'     },
-                                { id: 'email_opened', label: '✉ Email Opened'},
-                                { id: 'tag_applied',  label: '🏷 Tag Applied' },
-                                { id: 'custom',       label: '⚙ Custom'       },
+                                { id: 'replied', label: '↩ Replied' },
+                                { id: 'email_opened', label: '✉ Email Opened' },
+                                { id: 'tag_applied', label: '🏷 Tag Applied' },
+                                { id: 'custom', label: '⚙ Custom' },
                             ] as const).map(({ id, label }) => (
                                 <button key={id} type="button" onClick={() => onChange({ conditionType: id })}
-                                    className={`flex-1 py-1.5 text-[10px] font-bold transition border-r last:border-r-0 border-slate-200 dark:border-slate-600 ${
-                                        condType === id ? 'bg-blue-600 text-white' : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-blue-50 dark:hover:bg-slate-600'
-                                    }`}
+                                    className={`flex-1 py-1.5 text-[10px] font-bold transition border-r last:border-r-0 border-slate-200 dark:border-slate-600 ${condType === id ? 'bg-blue-600 text-white' : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-blue-50 dark:hover:bg-slate-600'
+                                        }`}
                                 >{label}</button>
                             ))}
                         </div>
@@ -4735,7 +4707,7 @@ const BranchNodeCard: React.FC<{
                                             step={an} index={i} total={node.thenNodes.length}
                                             onChange={p => updateThenNode(i, p)}
                                             onDelete={() => deleteThenNode(i)}
-                                            onMoveUp={() => {}} onMoveDown={() => {}}
+                                            onMoveUp={() => { }} onMoveDown={() => { }}
                                             pcoLists={pcoLists} pcoGroups={pcoGroups} churchId={churchId} isSubStep
                                         />
                                     </div>
@@ -4760,7 +4732,7 @@ const BranchNodeCard: React.FC<{
                                             step={an} index={i} total={node.elseNodes.length}
                                             onChange={p => updateElseNode(i, p)}
                                             onDelete={() => deleteElseNode(i)}
-                                            onMoveUp={() => {}} onMoveDown={() => {}}
+                                            onMoveUp={() => { }} onMoveDown={() => { }}
                                             pcoLists={pcoLists} pcoGroups={pcoGroups} churchId={churchId} isSubStep
                                         />
                                     </div>
@@ -4785,9 +4757,9 @@ const WorkflowMmsUploader: React.FC<{
     churchId: string;
     onUrlChange: (url: string) => void;
 }> = ({ mmsUrl, churchId, onUrlChange }) => {
-    const [uploading, setUploading]   = useState(false);
-    const [uploadPct, setUploadPct]   = useState(0);
-    const [urlInput, setUrlInput]     = useState(mmsUrl);
+    const [uploading, setUploading] = useState(false);
+    const [uploadPct, setUploadPct] = useState(0);
+    const [urlInput, setUrlInput] = useState(mmsUrl);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Keep url input in sync with external changes
@@ -4982,8 +4954,8 @@ const ActionNodeCard: React.FC<{
     /** When true, renders in compact mode inside a branch sub-timeline. */
     isSubStep?: boolean;
 }> = ({ step, index, total, onChange, onDelete, onMoveUp, onMoveDown, pcoLists, pcoGroups, churchId, isSubStep }) => {
-    const channel   = step.channelType  ?? 'sms';
-    const segs       = countSegments(step.message);
+    const channel = step.channelType ?? 'sms';
+    const segs = countSegments(step.message);
     const [mmsUrl, setMmsUrl] = React.useState((step.mediaUrls && step.mediaUrls[0]) || '');
 
     // Keep mmsUrl in sync when external step changes (e.g. on first load)
@@ -5050,9 +5022,8 @@ const ActionNodeCard: React.FC<{
                 <div>
                     <div className="flex items-center justify-between mb-1.5">
                         <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Message</label>
-                        <span className={`text-[10px] font-bold ${
-                            segs > 3 ? 'text-red-500' : segs > 1 ? 'text-amber-600' : 'text-slate-400'
-                        }`}>{step.message.length} chars · {segs} seg{segs !== 1 ? 's' : ''}</span>
+                        <span className={`text-[10px] font-bold ${segs > 3 ? 'text-red-500' : segs > 1 ? 'text-amber-600' : 'text-slate-400'
+                            }`}>{step.message.length} chars · {segs} seg{segs !== 1 ? 's' : ''}</span>
                     </div>
                     <textarea
                         rows={3}
@@ -5096,9 +5067,8 @@ const ActionNodeCard: React.FC<{
                     <div>
                         <div className="flex items-center justify-between mb-1.5">
                             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Message</label>
-                            <span className={`text-[10px] font-bold ${
-                                segs > 3 ? 'text-red-500' : segs > 1 ? 'text-amber-600' : 'text-slate-400'
-                            }`}>{step.message.length} chars · {segs} seg{segs !== 1 ? 's' : ''}</span>
+                            <span className={`text-[10px] font-bold ${segs > 3 ? 'text-red-500' : segs > 1 ? 'text-amber-600' : 'text-slate-400'
+                                }`}>{step.message.length} chars · {segs} seg{segs !== 1 ? 's' : ''}</span>
                         </div>
                         <textarea
                             rows={3}
@@ -5173,7 +5143,7 @@ const ActionNodeCard: React.FC<{
                                     .split('{phone}').join('(615) 555-0100').split('{birthday}').join('Jan 15')
                                     .split('{anniversary}').join('Jun 10').split('{city}').join('Nashville')
                                     .split('{state}').join('TN')
-                                || <span className="opacity-40 italic">No body yet</span>}
+                                    || <span className="opacity-40 italic">No body yet</span>}
                             </div>
                         </div>
                     )}
@@ -5197,10 +5167,10 @@ const AiWorkflowBuilderPanel: React.FC<{
     onApply: (draft: AiWorkflowDraft) => void;
     onClose: () => void;
 }> = ({ onApply, onClose }) => {
-    const [prompt, setPrompt]  = useState('');
+    const [prompt, setPrompt] = useState('');
     const [loading, setLoading] = useState(false);
-    const [error, setError]    = useState('');
-    const [draft, setDraft]    = useState<AiWorkflowDraft | null>(null);
+    const [error, setError] = useState('');
+    const [draft, setDraft] = useState<AiWorkflowDraft | null>(null);
 
     const handleGenerate = async () => {
         if (!prompt.trim()) return;
@@ -5222,8 +5192,8 @@ const AiWorkflowBuilderPanel: React.FC<{
     };
 
     const chBadgeClass: Record<string, string> = {
-        sms:   'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300',
-        mms:   'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
+        sms: 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300',
+        mms: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
         email: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
     };
 
@@ -5607,9 +5577,9 @@ const WorkflowEditor: React.FC<{
             const err = validateActionNode(an);
             if (err) { setError(err); return; }
         }
-        if (wf.trigger === 'keyword'            && !wf.triggerKeywordId) { setError('Select a keyword trigger.'); return; }
-        if (wf.trigger === 'list_add'            && !wf.triggerListId)   { setError('Select a PCO list trigger.'); return; }
-        if (wf.trigger === 'event_registration'  && !wf.triggerEventId)  { setError('Select a PCO event trigger.'); return; }
+        if (wf.trigger === 'keyword' && !wf.triggerKeywordId) { setError('Select a keyword trigger.'); return; }
+        if (wf.trigger === 'list_add' && !wf.triggerListId) { setError('Select a PCO list trigger.'); return; }
+        if (wf.trigger === 'event_registration' && !wf.triggerEventId) { setError('Select a PCO event trigger.'); return; }
         setError('');
         // Build backward-compat flat steps for the scheduler
         const flatSteps = nodesToSteps(nodes);
@@ -5617,11 +5587,11 @@ const WorkflowEditor: React.FC<{
     };
 
     const triggerLabel: Record<string, string> = {
-        manual:             'Staff manually enrolls a contact',
-        keyword:            'Contact texts a keyword',
-        list_add:           'Contact added to a PCO List',
-        birthday:           'Fires each year on birthdays',
-        anniversary:        'Fires each year on anniversaries',
+        manual: 'Staff manually enrolls a contact',
+        keyword: 'Contact texts a keyword',
+        list_add: 'Contact added to a PCO List',
+        birthday: 'Fires each year on birthdays',
+        anniversary: 'Fires each year on anniversaries',
         event_registration: 'Contact registers for a PCO event',
     };
 
@@ -5651,11 +5621,10 @@ const WorkflowEditor: React.FC<{
                     {/* Active toggle */}
                     <button
                         onClick={() => patch({ isActive: !wf.isActive })}
-                        className={`flex items-center gap-2 px-3 py-1.5 text-xs font-bold rounded-xl border transition ${
-                            wf.isActive ? 'border-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300' : 'border-slate-300 dark:border-slate-600 text-slate-500'
-                        }`}
+                        className={`flex items-center gap-2 px-3 py-1.5 text-xs font-bold rounded-xl border transition ${wf.isActive ? 'border-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300' : 'border-slate-300 dark:border-slate-600 text-slate-500'
+                            }`}
                     >
-                        <span className={`w-2 h-2 rounded-full ${ wf.isActive ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                        <span className={`w-2 h-2 rounded-full ${wf.isActive ? 'bg-emerald-500' : 'bg-slate-400'}`} />
                         {wf.isActive ? 'Active' : 'Paused'}
                     </button>
                     <button
@@ -5717,9 +5686,8 @@ const WorkflowEditor: React.FC<{
                                 <button
                                     key={t}
                                     onClick={() => patch({ trigger: t })}
-                                    className={`p-3 rounded-xl border-2 text-left transition ${
-                                        wf.trigger === t ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20' : 'border-slate-200 dark:border-slate-700 hover:border-violet-300'
-                                    }`}
+                                    className={`p-3 rounded-xl border-2 text-left transition ${wf.trigger === t ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20' : 'border-slate-200 dark:border-slate-700 hover:border-violet-300'
+                                        }`}
                                 >
                                     <p className="text-xs font-black text-slate-900 dark:text-white mb-0.5">
                                         {t === 'manual' ? '✍️ Manual' : t === 'keyword' ? '💬 Keyword' : '📝 List Add'}
@@ -5735,11 +5703,10 @@ const WorkflowEditor: React.FC<{
                                 <button
                                     key={t}
                                     onClick={() => patch({ trigger: t })}
-                                    className={`p-3 rounded-xl border-2 text-left transition ${
-                                        wf.trigger === t
+                                    className={`p-3 rounded-xl border-2 text-left transition ${wf.trigger === t
                                             ? 'border-pink-500 bg-pink-50 dark:bg-pink-900/20'
                                             : 'border-slate-200 dark:border-slate-700 hover:border-pink-300'
-                                    }`}
+                                        }`}
                                 >
                                     <p className="text-xs font-black text-slate-900 dark:text-white mb-0.5">
                                         {t === 'birthday' ? '🎂 Birthday' : '💍 Anniversary'}
@@ -5752,11 +5719,10 @@ const WorkflowEditor: React.FC<{
                         {/* Row 3 — PCO Event Registration trigger */}
                         <button
                             onClick={() => patch({ trigger: 'event_registration' })}
-                            className={`w-full p-3 rounded-xl border-2 text-left transition ${
-                                wf.trigger === 'event_registration'
+                            className={`w-full p-3 rounded-xl border-2 text-left transition ${wf.trigger === 'event_registration'
                                     ? 'border-teal-500 bg-teal-50 dark:bg-teal-900/20'
                                     : 'border-slate-200 dark:border-slate-700 hover:border-teal-300'
-                            }`}
+                                }`}
                         >
                             <p className="text-xs font-black text-slate-900 dark:text-white mb-0.5">🗓️ Event Registration</p>
                             <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">{triggerLabel.event_registration}</p>
@@ -6013,11 +5979,11 @@ const EnrollmentPane: React.FC<{
     onClose: () => void;
 }> = ({ workflow, churchId, onClose }) => {
     const [enrollments, setEnrollments] = useState<SmsWorkflowEnrollment[]>([]);
-    const [isLoading, setIsLoading]     = useState(true);
-    const [phone, setPhone]             = useState('');
-    const [name, setName]               = useState('');
-    const [enrolling, setEnrolling]     = useState(false);
-    const [errMsg, setErrMsg]           = useState('');
+    const [isLoading, setIsLoading] = useState(true);
+    const [phone, setPhone] = useState('');
+    const [name, setName] = useState('');
+    const [enrolling, setEnrolling] = useState(false);
+    const [errMsg, setErrMsg] = useState('');
 
     useEffect(() => {
         const q = query(
@@ -6035,23 +6001,23 @@ const EnrollmentPane: React.FC<{
 
     const handleEnroll = async () => {
         const digits = phone.replace(/\D/g, '');
-        const e164   = digits.length === 10 ? `+1${digits}` : digits.length === 11 ? `+${digits}` : '';
+        const e164 = digits.length === 10 ? `+1${digits}` : digits.length === 11 ? `+${digits}` : '';
         if (!e164) { setErrMsg('Enter a valid US phone number.'); return; }
         setErrMsg('');
         setEnrolling(true);
         try {
             const enrollId = `${workflow.id}_${e164.replace(/\+/g, '')}`;
             const enrollment: SmsWorkflowEnrollment = {
-                id:           enrollId,
+                id: enrollId,
                 churchId,
-                workflowId:   workflow.id,
-                phoneNumber:  e164,
-                personName:   name.trim() || null,
-                personId:     null,
-                currentStep:  0,
-                nextSendAt:   Date.now(),   // scheduler picks it up immediately
-                completed:    false,
-                enrolledAt:   Date.now(),
+                workflowId: workflow.id,
+                phoneNumber: e164,
+                personName: name.trim() || null,
+                personId: null,
+                currentStep: 0,
+                nextSendAt: Date.now(),   // scheduler picks it up immediately
+                completed: false,
+                enrolledAt: Date.now(),
                 lastStepSentAt: null,
             };
             await setDoc(doc(firebaseDb, 'smsWorkflowEnrollments', enrollId), enrollment, { merge: false });
@@ -6127,9 +6093,8 @@ const EnrollmentPane: React.FC<{
                                             Step {en.currentStep + 1} of {workflow.steps.length} · enrolled {timeAgo(en.enrolledAt)}
                                         </p>
                                     </div>
-                                    <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${
-                                        en.completed ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300' : 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300'
-                                    }`}>{en.completed ? 'Done' : 'Active'}</span>
+                                    <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${en.completed ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300' : 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300'
+                                        }`}>{en.completed ? 'Done' : 'Active'}</span>
                                 </div>
                             ))}
                         </div>
@@ -6152,25 +6117,25 @@ const BulkEnrollFromListModal: React.FC<{
     onClose: () => void;
 }> = ({ workflow, churchId, onClose }) => {
     type AudienceTab = 'lists' | 'groups';
-    const [tab, setTab]                       = useState<AudienceTab>('lists');
-    const [pcoLists, setPcoLists]             = useState<{ id: string; name: string }[]>([]);
-    const [pcoGroups, setPcoGroups]           = useState<{ id: string; name: string }[]>([]);
-    const [loadingLists, setLoadingLists]     = useState(false);
-    const [loadingGroups, setLoadingGroups]   = useState(false);
+    const [tab, setTab] = useState<AudienceTab>('lists');
+    const [pcoLists, setPcoLists] = useState<{ id: string; name: string }[]>([]);
+    const [pcoGroups, setPcoGroups] = useState<{ id: string; name: string }[]>([]);
+    const [loadingLists, setLoadingLists] = useState(false);
+    const [loadingGroups, setLoadingGroups] = useState(false);
     const [selectedListId, setSelectedListId] = useState('');
     const [selectedGroupId, setSelectedGroupId] = useState('');
-    const [memberCount, setMemberCount]       = useState<number | null>(null);
-    const [loadingCount, setLoadingCount]     = useState(false);
-    const [enrolling, setEnrolling]           = useState(false);
-    const [result, setResult]                 = useState<{ enrolled: number; skipped: number } | null>(null);
-    const [errMsg, setErrMsg]                 = useState('');
+    const [memberCount, setMemberCount] = useState<number | null>(null);
+    const [loadingCount, setLoadingCount] = useState(false);
+    const [enrolling, setEnrolling] = useState(false);
+    const [result, setResult] = useState<{ enrolled: number; skipped: number } | null>(null);
+    const [errMsg, setErrMsg] = useState('');
 
     // Load PCO lists on mount
     useEffect(() => {
         setLoadingLists(true);
         pcoService.getPeopleLists(churchId)
             .then(raw => setPcoLists(raw.map((r: any) => ({ id: r.id, name: r.attributes?.name || 'Unnamed List' }))))
-            .catch(() => {})
+            .catch(() => { })
             .finally(() => setLoadingLists(false));
     }, [churchId]);
 
@@ -6180,7 +6145,7 @@ const BulkEnrollFromListModal: React.FC<{
         setLoadingGroups(true);
         pcoService.getGroups(churchId)
             .then(raw => setPcoGroups(raw.map((r: any) => ({ id: r.id, name: r.attributes?.name || 'Unnamed Group' }))))
-            .catch(() => {})
+            .catch(() => { })
             .finally(() => setLoadingGroups(false));
     }, [tab, churchId, pcoGroups.length]);
 
@@ -6200,7 +6165,7 @@ const BulkEnrollFromListModal: React.FC<{
         })
             .then(r => r.json())
             .then(d => { if (d.success) setMemberCount(d.totalCount); })
-            .catch(() => {})
+            .catch(() => { })
             .finally(() => setLoadingCount(false));
     }, [selectedListId, selectedGroupId, tab, churchId]);
 
@@ -6213,7 +6178,7 @@ const BulkEnrollFromListModal: React.FC<{
             const body = tab === 'lists'
                 ? { churchId, workflowId: workflow.id, listId: selectedListId }
                 : { churchId, workflowId: workflow.id, groupId: selectedGroupId };
-            const res  = await fetch('/api/messaging/workflow-enroll-list', {
+            const res = await fetch('/api/messaging/workflow-enroll-list', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body),
@@ -6284,11 +6249,10 @@ const BulkEnrollFromListModal: React.FC<{
                                 <button
                                     key={t}
                                     onClick={() => setTab(t)}
-                                    className={`flex-1 py-2 text-xs font-bold transition ${
-                                        tab === t
+                                    className={`flex-1 py-2 text-xs font-bold transition ${tab === t
                                             ? 'bg-violet-600 text-white'
                                             : 'bg-white dark:bg-slate-800 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700'
-                                    }`}
+                                        }`}
                                 >
                                     PCO {t === 'lists' ? 'Lists' : 'Groups'}
                                 </button>
@@ -6384,17 +6348,17 @@ const BulkEnrollFromListModal: React.FC<{
 
 export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
     const [workflows, setWorkflows] = useState<SmsWorkflow[]>([]);
-    const [keywords, setKeywords]   = useState<SmsKeyword[]>([]);
-    const [pcoLists, setPcoLists]   = useState<{ id: string; name: string }[]>([]);
+    const [keywords, setKeywords] = useState<SmsKeyword[]>([]);
+    const [pcoLists, setPcoLists] = useState<{ id: string; name: string }[]>([]);
     const [pcoGroups, setPcoGroups] = useState<{ id: string; name: string }[]>([]);
-    const [smsTags, setSmsTags]     = useState<SmsTag[]>([]);
+    const [smsTags, setSmsTags] = useState<SmsTag[]>([]);
     const [pcoRegistrationEvents, setPcoRegistrationEvents] = useState<{ id: string; pcoId: string; name: string; startsAt?: string | null }[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [editing, setEditing]     = useState<SmsWorkflow | null>(null);
-    const [viewMode, setViewMode]   = useState<'list' | 'editor'>('list');
-    const [isBusy, setIsBusy]       = useState(false);
+    const [editing, setEditing] = useState<SmsWorkflow | null>(null);
+    const [viewMode, setViewMode] = useState<'list' | 'editor'>('list');
+    const [isBusy, setIsBusy] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
-    const [enrollTarget, setEnrollTarget]         = useState<SmsWorkflow | null>(null);
+    const [enrollTarget, setEnrollTarget] = useState<SmsWorkflow | null>(null);
     const [listEnrollTarget, setListEnrollTarget] = useState<SmsWorkflow | null>(null);
 
     // Live listener
@@ -6419,10 +6383,10 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
             .then(snap => setSmsTags(snap.docs.map(d => ({ id: d.id, ...d.data() } as SmsTag))));
         pcoService.getPeopleLists(churchId)
             .then((raw: any[]) => setPcoLists(raw.map(r => ({ id: r.id, name: r.attributes?.name || 'Unnamed' }))))
-            .catch(() => {});
+            .catch(() => { });
         pcoService.getGroups(churchId)
             .then((raw: any[]) => setPcoGroups(raw.map(r => ({ id: r.id, name: r.attributes?.name || 'Unnamed' }))))
-            .catch(() => {});
+            .catch(() => { });
         // Load synced registration events from Firestore cache
         getDocs(query(collection(firebaseDb, 'pco_registrations'), where('churchId', '==', churchId)))
             .then(snap => setPcoRegistrationEvents(
@@ -6431,7 +6395,7 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
                     return { id: d.id, pcoId: data.pcoId, name: data.name || 'Unnamed Event', startsAt: data.startsAt || null };
                 }).sort((a, b) => (a.startsAt || '').localeCompare(b.startsAt || ''))
             ))
-            .catch(() => {});
+            .catch(() => { });
     }, [churchId]);
 
     /** Recursively remove undefined values — Firestore rejects them */
@@ -6481,12 +6445,12 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
     const openEdit = (wf: SmsWorkflow) => { setEditing(wf); setSaveError(null); setViewMode('editor'); };
 
     const TRIGGER_BADGE: Record<string, { label: string; color: string; icon: string }> = {
-        manual:             { label: 'Manual',             color: 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300',    icon: '✍️' },
-        keyword:            { label: 'Keyword',            color: 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300', icon: '💬' },
-        list_add:           { label: 'List Add',           color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300',      icon: '📝' },
-        birthday:           { label: 'Birthday',           color: 'bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300',      icon: '🎂' },
-        anniversary:        { label: 'Anniversary',        color: 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300',      icon: '💍' },
-        event_registration: { label: 'Event Registration', color: 'bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300',      icon: '🗓️' },
+        manual: { label: 'Manual', color: 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300', icon: '✍️' },
+        keyword: { label: 'Keyword', color: 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300', icon: '💬' },
+        list_add: { label: 'List Add', color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300', icon: '📝' },
+        birthday: { label: 'Birthday', color: 'bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300', icon: '🎂' },
+        anniversary: { label: 'Anniversary', color: 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300', icon: '💍' },
+        event_registration: { label: 'Event Registration', color: 'bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300', icon: '🗓️' },
     };
 
     // Show editor view
@@ -6558,7 +6522,7 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
             ) : (
                 <div className="space-y-3">
                     {workflows.map(wf => {
-                        const tb  = TRIGGER_BADGE[wf.trigger] || TRIGGER_BADGE.manual;
+                        const tb = TRIGGER_BADGE[wf.trigger] || TRIGGER_BADGE.manual;
                         return (
                             <div key={wf.id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 hover:border-violet-200 dark:hover:border-violet-700 transition group">
                                 <div className="flex items-start justify-between gap-4">
@@ -6660,7 +6624,7 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
                                                         <span className="text-[9px] text-slate-400 whitespace-nowrap">
                                                             {(() => {
                                                                 const st = step.scheduleType ?? 'relative';
-                                                                if (st === 'day_of_week')  return DOW_LABELS_SHORT[step.scheduleDayOfWeek ?? 1];
+                                                                if (st === 'day_of_week') return DOW_LABELS_SHORT[step.scheduleDayOfWeek ?? 1];
                                                                 if (st === 'day_of_month') return `${step.scheduleDayOfMonth ?? 1}${ORDINAL_SUFFIX(step.scheduleDayOfMonth ?? 1)}`;
                                                                 return step.delayDays === 0 ? 'now' : `+${step.delayDays}d`;
                                                             })()}
@@ -6709,10 +6673,10 @@ const SmsTermsModal: React.FC<{
     onAccepted: (ts: number) => void;
     onCancel: () => void;
 }> = ({ churchId, userId, onAccepted, onCancel }) => {
-    const [checkedTos, setCheckedTos]         = useState(false);
+    const [checkedTos, setCheckedTos] = useState(false);
     const [checkedPrivacy, setCheckedPrivacy] = useState(false);
     const [checkedCompliance, setCheckedCompliance] = useState(false);
-    const [saving, setSaving]                 = useState(false);
+    const [saving, setSaving] = useState(false);
     const allChecked = checkedTos && checkedPrivacy && checkedCompliance;
 
     const handleAccept = async () => {
@@ -6769,15 +6733,15 @@ const SmsTermsModal: React.FC<{
                 </div>
                 <div className="px-7 py-5 bg-slate-50 dark:bg-slate-800/60 border-t border-slate-200 dark:border-slate-700 shrink-0 space-y-3">
                     {([
-                        { id: 'tos',        checked: checkedTos,        setter: setCheckedTos,        label: 'I have read and agree to the Terms of Service.' },
-                        { id: 'privacy',    checked: checkedPrivacy,    setter: setCheckedPrivacy,    label: 'I have read and agree to the Privacy Policy for SMS data.' },
+                        { id: 'tos', checked: checkedTos, setter: setCheckedTos, label: 'I have read and agree to the Terms of Service.' },
+                        { id: 'privacy', checked: checkedPrivacy, setter: setCheckedPrivacy, label: 'I have read and agree to the Privacy Policy for SMS data.' },
                         { id: 'compliance', checked: checkedCompliance, setter: setCheckedCompliance, label: 'I confirm I am an authorized representative and acknowledge the A2P 10DLC requirements.' },
                     ] as const).map(item => (
                         <label key={item.id} className="flex items-start gap-3 cursor-pointer select-none group" onClick={() => item.setter(!item.checked)}>
-                            <div className={`mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all ${ item.checked ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300 dark:border-slate-600 group-hover:border-indigo-400' }`}>
+                            <div className={`mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all ${item.checked ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300 dark:border-slate-600 group-hover:border-indigo-400'}`}>
                                 {item.checked && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
                             </div>
-                            <span className={`text-xs leading-relaxed ${ item.checked ? 'text-slate-800 dark:text-slate-200 font-semibold' : 'text-slate-600 dark:text-slate-400' }`}>{item.label}</span>
+                            <span className={`text-xs leading-relaxed ${item.checked ? 'text-slate-800 dark:text-slate-200 font-semibold' : 'text-slate-600 dark:text-slate-400'}`}>{item.label}</span>
                         </label>
                     ))}
                     <div className="flex gap-3 pt-1">
@@ -6843,35 +6807,35 @@ const SmsSetupWizard: React.FC<{
 }> = ({ churchId, church, onComplete, onBack, mode = 'setup', termsAcceptedAt, currentUserId }) => {
     // Show terms step first if not yet accepted (setup mode only)
     const needsTerms = mode === 'setup' && !termsAcceptedAt;
-    const [step, setStep]               = useState<'terms' | 'search' | 'pick-number' | 'done'>(needsTerms ? 'terms' : 'search');
-    const [termsTs, setTermsTs]         = useState<number | null>(termsAcceptedAt || null);
-    const [searchMode, setSearchMode]   = useState<'area-code' | 'city-state'>('city-state');
-    const [areaCode, setAreaCode]       = useState(church.zip?.slice(0, 3) || '');
-    const [city, setCity]               = useState(church.city || '');
-    const [stateAbbr, setStateAbbr]     = useState(church.state || '');
-    const [numbers, setNumbers]         = useState<{ phoneNumber: string; friendlyName: string; locality: string; region: string }[]>([]);
+    const [step, setStep] = useState<'terms' | 'search' | 'pick-number' | 'done'>(needsTerms ? 'terms' : 'search');
+    const [termsTs, setTermsTs] = useState<number | null>(termsAcceptedAt || null);
+    const [searchMode, setSearchMode] = useState<'area-code' | 'city-state'>('city-state');
+    const [areaCode, setAreaCode] = useState(church.zip?.slice(0, 3) || '');
+    const [city, setCity] = useState(church.city || '');
+    const [stateAbbr, setStateAbbr] = useState(church.state || '');
+    const [numbers, setNumbers] = useState<{ phoneNumber: string; friendlyName: string; locality: string; region: string }[]>([]);
     const [resolvedSearch, setResolvedSearch] = useState('');
-    const [canExpand, setCanExpand]     = useState(false);
-    const [page, setPage]               = useState(0);
-    const PAGE_SIZE                     = 10;
+    const [canExpand, setCanExpand] = useState(false);
+    const [page, setPage] = useState(0);
+    const PAGE_SIZE = 10;
     const [loadingNums, setLoadingNums] = useState(false);
     const [selectedNumber, setSelectedNumber] = useState('');
-    const [senderName, setSenderName]   = useState(church.name || '');
+    const [senderName, setSenderName] = useState(church.name || '');
     const [friendlyLabel, setFriendlyLabel] = useState('');
     const [provisioning, setProvisioning] = useState(false);
-    const [error, setError]             = useState('');
+    const [error, setError] = useState('');
 
     const US_STATES = [
-        ['AL','Alabama'],['AK','Alaska'],['AZ','Arizona'],['AR','Arkansas'],['CA','California'],
-        ['CO','Colorado'],['CT','Connecticut'],['DE','Delaware'],['FL','Florida'],['GA','Georgia'],
-        ['HI','Hawaii'],['ID','Idaho'],['IL','Illinois'],['IN','Indiana'],['IA','Iowa'],
-        ['KS','Kansas'],['KY','Kentucky'],['LA','Louisiana'],['ME','Maine'],['MD','Maryland'],
-        ['MA','Massachusetts'],['MI','Michigan'],['MN','Minnesota'],['MS','Mississippi'],['MO','Missouri'],
-        ['MT','Montana'],['NE','Nebraska'],['NV','Nevada'],['NH','New Hampshire'],['NJ','New Jersey'],
-        ['NM','New Mexico'],['NY','New York'],['NC','North Carolina'],['ND','North Dakota'],['OH','Ohio'],
-        ['OK','Oklahoma'],['OR','Oregon'],['PA','Pennsylvania'],['RI','Rhode Island'],['SC','South Carolina'],
-        ['SD','South Dakota'],['TN','Tennessee'],['TX','Texas'],['UT','Utah'],['VT','Vermont'],
-        ['VA','Virginia'],['WA','Washington'],['WV','West Virginia'],['WI','Wisconsin'],['WY','Wyoming'],
+        ['AL', 'Alabama'], ['AK', 'Alaska'], ['AZ', 'Arizona'], ['AR', 'Arkansas'], ['CA', 'California'],
+        ['CO', 'Colorado'], ['CT', 'Connecticut'], ['DE', 'Delaware'], ['FL', 'Florida'], ['GA', 'Georgia'],
+        ['HI', 'Hawaii'], ['ID', 'Idaho'], ['IL', 'Illinois'], ['IN', 'Indiana'], ['IA', 'Iowa'],
+        ['KS', 'Kansas'], ['KY', 'Kentucky'], ['LA', 'Louisiana'], ['ME', 'Maine'], ['MD', 'Maryland'],
+        ['MA', 'Massachusetts'], ['MI', 'Michigan'], ['MN', 'Minnesota'], ['MS', 'Mississippi'], ['MO', 'Missouri'],
+        ['MT', 'Montana'], ['NE', 'Nebraska'], ['NV', 'Nevada'], ['NH', 'New Hampshire'], ['NJ', 'New Jersey'],
+        ['NM', 'New Mexico'], ['NY', 'New York'], ['NC', 'North Carolina'], ['ND', 'North Dakota'], ['OH', 'Ohio'],
+        ['OK', 'Oklahoma'], ['OR', 'Oregon'], ['PA', 'Pennsylvania'], ['RI', 'Rhode Island'], ['SC', 'South Carolina'],
+        ['SD', 'South Dakota'], ['TN', 'Tennessee'], ['TX', 'Texas'], ['UT', 'Utah'], ['VT', 'Vermont'],
+        ['VA', 'Virginia'], ['WA', 'Washington'], ['WV', 'West Virginia'], ['WI', 'Wisconsin'], ['WY', 'Wyoming'],
     ];
 
     const fetchNumbers = async (expandToState = false) => {
@@ -6889,7 +6853,7 @@ const SmsSetupWizard: React.FC<{
                 url += `&state=${encodeURIComponent(stateAbbr)}`;
             }
 
-            const res  = await fetch(url);
+            const res = await fetch(url);
             const data = await res.json();
             if (!data.success) throw new Error(data.error || 'Failed to fetch numbers');
             setNumbers(data.numbers || []);
@@ -6953,262 +6917,260 @@ const SmsSetupWizard: React.FC<{
             )}
 
             {step !== 'terms' && (
-            <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 p-8 shadow-sm">
-                {/* Step progress indicator */}
-                {mode === 'setup' && (
-                    <div className="flex items-center gap-2 mb-6">
-                        {(['search', 'pick-number', 'done'] as const).map((s, i) => (
-                            <React.Fragment key={s}>
-                                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black transition-all ${
-                                    step === s ? 'bg-violet-600 text-white' :
-                                    ['pick-number', 'done'].indexOf(step) > ['pick-number', 'done'].indexOf(s) || (s === 'search' && step !== 'search')
-                                        ? 'bg-emerald-500 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-400'
-                                }`}>
-                                    {i + 1}
-                                </div>
-                                {i < 2 && <div className="flex-1 h-0.5 bg-slate-200 dark:bg-slate-700 rounded-full" />}
-                            </React.Fragment>
-                        ))}
-                    </div>
-                )}
-                {step === 'search' && (
-                    <>
-                        <h2 className="text-xl font-black text-slate-900 dark:text-white mb-1">Find a Local Number</h2>
-                        <p className="text-sm text-slate-500 dark:text-slate-400 mb-5">Search by city &amp; state, or enter an area code directly.</p>
-
-                        {/* Mode toggle */}
-                        <div className="flex rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 mb-5">
-                            {(['city-state', 'area-code'] as const).map(mode => (
-                                <button
-                                    key={mode}
-                                    onClick={() => { setSearchMode(mode); setError(''); }}
-                                    className={`flex-1 py-2 text-xs font-black uppercase tracking-widest transition ${
-                                        searchMode === mode
-                                            ? 'bg-violet-600 text-white'
-                                            : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'
-                                    }`}
-                                >
-                                    {mode === 'city-state' ? '🏙 City & State' : '# Area Code'}
-                                </button>
+                <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 p-8 shadow-sm">
+                    {/* Step progress indicator */}
+                    {mode === 'setup' && (
+                        <div className="flex items-center gap-2 mb-6">
+                            {(['search', 'pick-number', 'done'] as const).map((s, i) => (
+                                <React.Fragment key={s}>
+                                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black transition-all ${step === s ? 'bg-violet-600 text-white' :
+                                            ['pick-number', 'done'].indexOf(step) > ['pick-number', 'done'].indexOf(s) || (s === 'search' && step !== 'search')
+                                                ? 'bg-emerald-500 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-400'
+                                        }`}>
+                                        {i + 1}
+                                    </div>
+                                    {i < 2 && <div className="flex-1 h-0.5 bg-slate-200 dark:bg-slate-700 rounded-full" />}
+                                </React.Fragment>
                             ))}
                         </div>
+                    )}
+                    {step === 'search' && (
+                        <>
+                            <h2 className="text-xl font-black text-slate-900 dark:text-white mb-1">Find a Local Number</h2>
+                            <p className="text-sm text-slate-500 dark:text-slate-400 mb-5">Search by city &amp; state, or enter an area code directly.</p>
 
-                        {searchMode === 'city-state' && (
-                            <div className="space-y-3">
-                                <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">City <span className="font-normal normal-case">(optional)</span></label>
-                                    <input
-                                        type="text"
-                                        value={city}
-                                        onChange={e => setCity(e.target.value)}
-                                        onKeyDown={e => e.key === 'Enter' && canSearch && fetchNumbers()}
-                                        placeholder="e.g. Nashville"
-                                        className="w-full text-base font-semibold border-2 border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500"
-                                    />
-                                    <p className="text-[10px] text-slate-400 mt-1">Leave blank to search across the whole state.</p>
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">State <span className="text-red-400">*</span></label>
-                                    <select
-                                        value={stateAbbr}
-                                        onChange={e => setStateAbbr(e.target.value)}
-                                        title="State"
-                                        className="w-full text-base border-2 border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500 appearance-none"
+                            {/* Mode toggle */}
+                            <div className="flex rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 mb-5">
+                                {(['city-state', 'area-code'] as const).map(mode => (
+                                    <button
+                                        key={mode}
+                                        onClick={() => { setSearchMode(mode); setError(''); }}
+                                        className={`flex-1 py-2 text-xs font-black uppercase tracking-widest transition ${searchMode === mode
+                                                ? 'bg-violet-600 text-white'
+                                                : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'
+                                            }`}
                                     >
-                                        <option value="">Select a state…</option>
-                                        {US_STATES.map(([abbr, name]) => (
-                                            <option key={abbr} value={abbr}>{name} ({abbr})</option>
-                                        ))}
-                                    </select>
-                                </div>
+                                        {mode === 'city-state' ? '🏙 City & State' : '# Area Code'}
+                                    </button>
+                                ))}
                             </div>
-                        )}
 
-                        {searchMode === 'area-code' && (
-                            <div>
-                                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Area Code (3 digits)</label>
-                                <input
-                                    type="text"
-                                    maxLength={3}
-                                    value={areaCode}
-                                    onChange={e => setAreaCode(e.target.value.replace(/\D/g, ''))}
-                                    onKeyDown={e => e.key === 'Enter' && canSearch && fetchNumbers()}
-                                    placeholder="e.g. 615"
-                                    className="w-full text-2xl font-black border-2 border-slate-200 dark:border-slate-600 rounded-2xl px-5 py-4 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500 tracking-widest"
-                                />
-                            </div>
-                        )}
-
-                        {error && <p className="text-sm text-red-500 mt-3">{error}</p>}
-
-                        <button
-                            onClick={fetchNumbers}
-                            disabled={loadingNums || !canSearch}
-                            className="w-full py-3 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white font-black rounded-2xl transition mt-5 flex items-center justify-center gap-2"
-                        >
-                            {loadingNums ? <><Loader2 size={16} className="animate-spin" /> Searching…</> : 'Find Available Numbers →'}
-                        </button>
-                    </>
-                )}
-
-                {step === 'pick-number' && (() => {
-                    const totalPages  = Math.ceil(numbers.length / PAGE_SIZE);
-                    const pageNumbers = numbers.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-
-                    return (
-                    <>
-                        {/* Header */}
-                        <div className="flex items-start justify-between gap-2 mb-1">
-                            <h2 className="text-xl font-black text-slate-900 dark:text-white">Pick a Number</h2>
-                            {numbers.length > 0 && (
-                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-full shrink-0">
-                                    {numbers.length} found
-                                </span>
-                            )}
-                        </div>
-
-                        {/* Results context */}
-                        <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">
-                            {numbers.length > 0
-                                ? <>Numbers for <span className="font-semibold text-violet-600 dark:text-violet-400">{resolvedSearch}</span>.</>
-                                : <>No numbers found for <span className="font-semibold text-violet-600 dark:text-violet-400">{resolvedSearch}</span>.</>
-                            }
-                        </p>
-
-                        {/* Cross-state fallback notice (city found in a different state) */}
-                        {numbers.length > 0 && city && resolvedSearch.includes('(any state)') && (
-                            <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl px-3 py-2 mb-3">
-                                ℹ️ No numbers found in <strong>{city}, {stateAbbr}</strong> — showing numbers for <strong>{city}</strong> in another state instead.
-                            </p>
-                        )}
-
-                        {/* canExpand: city search returned 0, offer explicit state-wide search */}
-                        {canExpand && (
-                            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl p-4 mb-4 text-center">
-                                <p className="text-sm text-amber-700 dark:text-amber-400 font-semibold mb-1">No local numbers found for "{city}"</p>
-                                <p className="text-xs text-amber-600 dark:text-amber-500 mb-3">Twilio doesn't have numbers available in that specific city. Would you like to search across all of {stateAbbr}?</p>
-                                <button
-                                    onClick={() => fetchNumbers(true)}
-                                    disabled={loadingNums}
-                                    className="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-black rounded-xl transition flex items-center gap-2 mx-auto"
-                                >
-                                    {loadingNums ? <><Loader2 size={12} className="animate-spin" /> Searching…</> : `Search all of ${stateAbbr} →`}
-                                </button>
-                            </div>
-                        )}
-
-                        {/* Number list */}
-                        {numbers.length > 0 && (
-                            <div className="space-y-2 mb-3">
-                                {pageNumbers.map(n => {
-                                    const cityState = [n.locality, n.region].filter(Boolean).join(', ');
-                                    return (
-                                        <label
-                                            key={n.phoneNumber}
-                                            className={`flex items-center gap-3 p-4 rounded-2xl border-2 cursor-pointer transition ${selectedNumber === n.phoneNumber ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20' : 'border-slate-200 dark:border-slate-700 hover:border-violet-300 dark:hover:border-violet-600'}`}
-                                        >
-                                            <input type="radio" name="number" value={n.phoneNumber} checked={selectedNumber === n.phoneNumber} onChange={() => setSelectedNumber(n.phoneNumber)} className="accent-violet-600 mt-0.5 shrink-0" />
-                                            <div className="flex-1 min-w-0">
-                                                <p className="font-black text-lg text-slate-900 dark:text-white tracking-wide">{n.friendlyName}</p>
-                                                <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold">
-                                                    📍 {cityState || `Area code ${areaCode}`}
-                                                </span>
-                                            </div>
-                                            {selectedNumber === n.phoneNumber && (
-                                                <CheckCircle size={18} className="text-violet-600 shrink-0" />
-                                            )}
-                                        </label>
-                                    );
-                                })}
-                            </div>
-                        )}
-
-                        {/* Pagination */}
-                        {totalPages > 1 && (
-                            <div className="flex items-center justify-between mb-4 bg-slate-50 dark:bg-slate-800/60 rounded-xl px-3 py-2">
-                                <button
-                                    onClick={() => { setPage(p => Math.max(0, p - 1)); setSelectedNumber(''); }}
-                                    disabled={page === 0}
-                                    className="flex items-center gap-1 text-xs font-bold text-slate-600 dark:text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 disabled:opacity-30 transition"
-                                >
-                                    ← Prev
-                                </button>
-                                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                                    Page {page + 1} of {totalPages}
-                                    <span className="text-slate-400 dark:text-slate-500 ml-1">({numbers.length} total)</span>
-                                </span>
-                                <button
-                                    onClick={() => { setPage(p => Math.min(totalPages - 1, p + 1)); setSelectedNumber(''); }}
-                                    disabled={page >= totalPages - 1}
-                                    className="flex items-center gap-1 text-xs font-bold text-slate-600 dark:text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 disabled:opacity-30 transition"
-                                >
-                                    Next →
-                                </button>
-                            </div>
-                        )}
-
-                        {/* Sender Name + (in add-number mode) Inbox Label */}
-                        {numbers.length > 0 && (
-                            <>
-                                {mode === 'add-number' && (
-                                    <>
-                                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Inbox Label (e.g. "Youth Line")</label>
+                            {searchMode === 'city-state' && (
+                                <div className="space-y-3">
+                                    <div>
+                                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">City <span className="font-normal normal-case">(optional)</span></label>
                                         <input
                                             type="text"
-                                            value={friendlyLabel}
-                                            onChange={e => setFriendlyLabel(e.target.value)}
+                                            value={city}
+                                            onChange={e => setCity(e.target.value)}
+                                            onKeyDown={e => e.key === 'Enter' && canSearch && fetchNumbers()}
+                                            placeholder="e.g. Nashville"
+                                            className="w-full text-base font-semibold border-2 border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500"
+                                        />
+                                        <p className="text-[10px] text-slate-400 mt-1">Leave blank to search across the whole state.</p>
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">State <span className="text-red-400">*</span></label>
+                                        <select
+                                            value={stateAbbr}
+                                            onChange={e => setStateAbbr(e.target.value)}
+                                            title="State"
+                                            className="w-full text-base border-2 border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500 appearance-none"
+                                        >
+                                            <option value="">Select a state…</option>
+                                            {US_STATES.map(([abbr, name]) => (
+                                                <option key={abbr} value={abbr}>{name} ({abbr})</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+                            )}
+
+                            {searchMode === 'area-code' && (
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Area Code (3 digits)</label>
+                                    <input
+                                        type="text"
+                                        maxLength={3}
+                                        value={areaCode}
+                                        onChange={e => setAreaCode(e.target.value.replace(/\D/g, ''))}
+                                        onKeyDown={e => e.key === 'Enter' && canSearch && fetchNumbers()}
+                                        placeholder="e.g. 615"
+                                        className="w-full text-2xl font-black border-2 border-slate-200 dark:border-slate-600 rounded-2xl px-5 py-4 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500 tracking-widest"
+                                    />
+                                </div>
+                            )}
+
+                            {error && <p className="text-sm text-red-500 mt-3">{error}</p>}
+
+                            <button
+                                onClick={fetchNumbers}
+                                disabled={loadingNums || !canSearch}
+                                className="w-full py-3 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white font-black rounded-2xl transition mt-5 flex items-center justify-center gap-2"
+                            >
+                                {loadingNums ? <><Loader2 size={16} className="animate-spin" /> Searching…</> : 'Find Available Numbers →'}
+                            </button>
+                        </>
+                    )}
+
+                    {step === 'pick-number' && (() => {
+                        const totalPages = Math.ceil(numbers.length / PAGE_SIZE);
+                        const pageNumbers = numbers.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
+                        return (
+                            <>
+                                {/* Header */}
+                                <div className="flex items-start justify-between gap-2 mb-1">
+                                    <h2 className="text-xl font-black text-slate-900 dark:text-white">Pick a Number</h2>
+                                    {numbers.length > 0 && (
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-full shrink-0">
+                                            {numbers.length} found
+                                        </span>
+                                    )}
+                                </div>
+
+                                {/* Results context */}
+                                <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">
+                                    {numbers.length > 0
+                                        ? <>Numbers for <span className="font-semibold text-violet-600 dark:text-violet-400">{resolvedSearch}</span>.</>
+                                        : <>No numbers found for <span className="font-semibold text-violet-600 dark:text-violet-400">{resolvedSearch}</span>.</>
+                                    }
+                                </p>
+
+                                {/* Cross-state fallback notice (city found in a different state) */}
+                                {numbers.length > 0 && city && resolvedSearch.includes('(any state)') && (
+                                    <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl px-3 py-2 mb-3">
+                                        ℹ️ No numbers found in <strong>{city}, {stateAbbr}</strong> — showing numbers for <strong>{city}</strong> in another state instead.
+                                    </p>
+                                )}
+
+                                {/* canExpand: city search returned 0, offer explicit state-wide search */}
+                                {canExpand && (
+                                    <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl p-4 mb-4 text-center">
+                                        <p className="text-sm text-amber-700 dark:text-amber-400 font-semibold mb-1">No local numbers found for "{city}"</p>
+                                        <p className="text-xs text-amber-600 dark:text-amber-500 mb-3">Twilio doesn't have numbers available in that specific city. Would you like to search across all of {stateAbbr}?</p>
+                                        <button
+                                            onClick={() => fetchNumbers(true)}
+                                            disabled={loadingNums}
+                                            className="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-black rounded-xl transition flex items-center gap-2 mx-auto"
+                                        >
+                                            {loadingNums ? <><Loader2 size={12} className="animate-spin" /> Searching…</> : `Search all of ${stateAbbr} →`}
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* Number list */}
+                                {numbers.length > 0 && (
+                                    <div className="space-y-2 mb-3">
+                                        {pageNumbers.map(n => {
+                                            const cityState = [n.locality, n.region].filter(Boolean).join(', ');
+                                            return (
+                                                <label
+                                                    key={n.phoneNumber}
+                                                    className={`flex items-center gap-3 p-4 rounded-2xl border-2 cursor-pointer transition ${selectedNumber === n.phoneNumber ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20' : 'border-slate-200 dark:border-slate-700 hover:border-violet-300 dark:hover:border-violet-600'}`}
+                                                >
+                                                    <input type="radio" name="number" value={n.phoneNumber} checked={selectedNumber === n.phoneNumber} onChange={() => setSelectedNumber(n.phoneNumber)} className="accent-violet-600 mt-0.5 shrink-0" />
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="font-black text-lg text-slate-900 dark:text-white tracking-wide">{n.friendlyName}</p>
+                                                        <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold">
+                                                            📍 {cityState || `Area code ${areaCode}`}
+                                                        </span>
+                                                    </div>
+                                                    {selectedNumber === n.phoneNumber && (
+                                                        <CheckCircle size={18} className="text-violet-600 shrink-0" />
+                                                    )}
+                                                </label>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+
+                                {/* Pagination */}
+                                {totalPages > 1 && (
+                                    <div className="flex items-center justify-between mb-4 bg-slate-50 dark:bg-slate-800/60 rounded-xl px-3 py-2">
+                                        <button
+                                            onClick={() => { setPage(p => Math.max(0, p - 1)); setSelectedNumber(''); }}
+                                            disabled={page === 0}
+                                            className="flex items-center gap-1 text-xs font-bold text-slate-600 dark:text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 disabled:opacity-30 transition"
+                                        >
+                                            ← Prev
+                                        </button>
+                                        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                            Page {page + 1} of {totalPages}
+                                            <span className="text-slate-400 dark:text-slate-500 ml-1">({numbers.length} total)</span>
+                                        </span>
+                                        <button
+                                            onClick={() => { setPage(p => Math.min(totalPages - 1, p + 1)); setSelectedNumber(''); }}
+                                            disabled={page >= totalPages - 1}
+                                            className="flex items-center gap-1 text-xs font-bold text-slate-600 dark:text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 disabled:opacity-30 transition"
+                                        >
+                                            Next →
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* Sender Name + (in add-number mode) Inbox Label */}
+                                {numbers.length > 0 && (
+                                    <>
+                                        {mode === 'add-number' && (
+                                            <>
+                                                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Inbox Label (e.g. "Youth Line")</label>
+                                                <input
+                                                    type="text"
+                                                    value={friendlyLabel}
+                                                    onChange={e => setFriendlyLabel(e.target.value)}
+                                                    className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 mb-4"
+                                                    placeholder="Youth Ministry"
+                                                />
+                                            </>
+                                        )}
+                                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Sender Name (shown in message headers)</label>
+                                        <input
+                                            type="text"
+                                            value={senderName}
+                                            onChange={e => setSenderName(e.target.value)}
                                             className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 mb-4"
-                                            placeholder="Youth Ministry"
+                                            placeholder="Grace Community Church"
                                         />
                                     </>
                                 )}
-                                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Sender Name (shown in message headers)</label>
-                                <input
-                                    type="text"
-                                    value={senderName}
-                                    onChange={e => setSenderName(e.target.value)}
-                                    className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 mb-4"
-                                    placeholder="Grace Community Church"
-                                />
+
+                                {error && <p className="text-sm text-red-500 mb-3">{error}</p>}
+
+                                <div className="flex gap-2">
+                                    <button onClick={() => setStep('search')} className="flex-1 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 transition">← Search Again</button>
+                                    {numbers.length > 0 && (
+                                        <button
+                                            onClick={provision}
+                                            disabled={provisioning || !selectedNumber}
+                                            className="flex-1 py-2.5 text-sm font-black bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-xl transition flex items-center justify-center gap-2"
+                                        >
+                                            {provisioning ? <><Loader2 size={14} className="animate-spin" />Provisioning…</> : 'Claim Number →'}
+                                        </button>
+                                    )}
+                                </div>
                             </>
-                        )}
+                        );
+                    })()}
 
-                        {error && <p className="text-sm text-red-500 mb-3">{error}</p>}
-
-                        <div className="flex gap-2">
-                            <button onClick={() => setStep('search')} className="flex-1 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 transition">← Search Again</button>
-                            {numbers.length > 0 && (
-                                <button
-                                    onClick={provision}
-                                    disabled={provisioning || !selectedNumber}
-                                    className="flex-1 py-2.5 text-sm font-black bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-xl transition flex items-center justify-center gap-2"
-                                >
-                                    {provisioning ? <><Loader2 size={14} className="animate-spin" />Provisioning…</> : 'Claim Number →'}
-                                </button>
-                            )}
+                    {step === 'done' && (
+                        <div className="text-center py-4">
+                            <div className="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mx-auto mb-4">
+                                <CheckCircle size={32} className="text-emerald-600" />
+                            </div>
+                            <h2 className="text-xl font-black text-slate-900 dark:text-white mb-2">You're All Set! 🎉</h2>
+                            <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+                                Your church phone number has been provisioned. You can now send text campaigns and receive replies in your inbox.
+                            </p>
+                            <div className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-3 mb-6 text-left">
+                                <strong>Next step:</strong> For high-volume sending (more than 200 msgs/day), complete A2P 10DLC brand registration in your Twilio Console to avoid carrier filtering.
+                            </div>
+                            <button onClick={onComplete} className="px-8 py-3 bg-violet-600 hover:bg-violet-700 text-white font-black rounded-2xl transition">
+                                Start Messaging →
+                            </button>
                         </div>
-                    </>
-                    );
-                })()}
-
-                {step === 'done' && (
-                    <div className="text-center py-4">
-                        <div className="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mx-auto mb-4">
-                            <CheckCircle size={32} className="text-emerald-600" />
-                        </div>
-                        <h2 className="text-xl font-black text-slate-900 dark:text-white mb-2">You're All Set! 🎉</h2>
-                        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
-                            Your church phone number has been provisioned. You can now send text campaigns and receive replies in your inbox.
-                        </p>
-                        <div className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-3 mb-6 text-left">
-                            <strong>Next step:</strong> For high-volume sending (more than 200 msgs/day), complete A2P 10DLC brand registration in your Twilio Console to avoid carrier filtering.
-                        </div>
-                        <button onClick={onComplete} className="px-8 py-3 bg-violet-600 hover:bg-violet-700 text-white font-black rounded-2xl transition">
-                            Start Messaging →
-                        </button>
-                    </div>
-                )}
-            </div>
+                    )}
+                </div>
             )}
         </div>
     );
@@ -7261,22 +7223,22 @@ function canUserUseFeature(num: TwilioPhoneNumber | null | undefined, user: User
 // Admin-only panel for managing provisioned numbers.
 
 const NumberManager: React.FC<{
-    churchId:     string;
-    church:       Church;
-    currentUser:  User;
-    numbers:      TwilioPhoneNumber[];
-    onClose:      () => void;
-    onAddNumber:  () => void;
-    allUsers:     User[];
+    churchId: string;
+    church: Church;
+    currentUser: User;
+    numbers: TwilioPhoneNumber[];
+    onClose: () => void;
+    onAddNumber: () => void;
+    allUsers: User[];
 }> = ({ churchId, numbers, currentUser, onClose, onAddNumber, allUsers }) => {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [labelDraft, setLabelDraft] = useState('');
     const [usersDraft, setUsersDraft] = useState<string[]>([]);
     const [senderDraft, setSenderDraft] = useState('');
     const [saving, setSaving] = useState(false);
-    const [toast, setToast] = useState<{ msg: string; type: 'success'|'error' } | null>(null);
+    const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
-    const showToast = (msg: string, type: 'success'|'error' = 'success') => {
+    const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
         setToast({ msg, type });
         setTimeout(() => setToast(null), 3500);
     };
@@ -7297,9 +7259,9 @@ const NumberManager: React.FC<{
                 body: JSON.stringify({
                     churchId,
                     twilioNumberId: numId,
-                    friendlyLabel:  labelDraft,
+                    friendlyLabel: labelDraft,
                     allowedUserIds: usersDraft,
-                    senderName:     senderDraft,
+                    senderName: senderDraft,
                 }),
             });
             setEditingId(null);
@@ -7313,9 +7275,9 @@ const NumberManager: React.FC<{
 
     const setDefault = async (numId: string) => {
         await fetch(`${API_BASE}/api/messaging/set-default-number`, {
-            method:  'POST',
+            method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ churchId, twilioNumberId: numId }),
+            body: JSON.stringify({ churchId, twilioNumberId: numId }),
         });
         showToast('Default number updated ✓');
     };
@@ -7323,9 +7285,9 @@ const NumberManager: React.FC<{
     const releaseNumber = async (num: TwilioPhoneNumber) => {
         if (!window.confirm(`Release ${num.phoneNumber} (${num.friendlyLabel})? This cannot be undone.`)) return;
         await fetch(`${API_BASE}/api/messaging/release-number`, {
-            method:  'POST',
+            method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ churchId, twilioNumberId: num.id }),
+            body: JSON.stringify({ churchId, twilioNumberId: num.id }),
         });
         showToast(`${num.phoneNumber} released`);
     };
@@ -7509,22 +7471,22 @@ const SmsAgentTab: React.FC<{
     const [pcoLists, setPcoLists] = useState<{ id: string; attributes: { name: string; total_people: number } }[]>([]);
     const [loadingLists, setLoadingLists] = useState(false);
 
-    const [kb, setKb]               = useState<Partial<SmsAgentKnowledge>>({});
+    const [kb, setKb] = useState<Partial<SmsAgentKnowledge>>({});
     const [kbLoading, setKbLoading] = useState(true);
-    const [saving, setSaving]       = useState(false);
-    const [savedAt, setSavedAt]     = useState<number | null>(null);
-    const [toast, setToast]         = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+    const [saving, setSaving] = useState(false);
+    const [savedAt, setSavedAt] = useState<number | null>(null);
+    const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
     // Test preview
-    const [testInput, setTestInput]   = useState('');
+    const [testInput, setTestInput] = useState('');
     const [testOutput, setTestOutput] = useState('');
     const [testLoading, setTestLoading] = useState(false);
 
     // Website scanner
-    const [scanUrl, setScanUrl]         = useState(church.smsSettings?.a2pWebsite || church.website || '');
+    const [scanUrl, setScanUrl] = useState(church.smsSettings?.a2pWebsite || church.website || '');
     const [scanLoading, setScanLoading] = useState(false);
-    const [scanResult, setScanResult]   = useState<Record<string, string> | null>(null);
-    const [scanError, setScanError]     = useState('');
+    const [scanResult, setScanResult] = useState<Record<string, string> | null>(null);
+    const [scanError, setScanError] = useState('');
 
     const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
         setToast({ msg, type }); setTimeout(() => setToast(null), 3500);
@@ -7596,12 +7558,12 @@ const SmsAgentTab: React.FC<{
         const listName = pcoLists.find(l => l.id === listId)?.attributes.name || '';
         try {
             const churchRef = doc(firebaseDb, 'churches', churchId);
-            await updateDoc(churchRef, { 
+            await updateDoc(churchRef, {
                 'smsSettings.executiveAiAgentListId': listId,
-                'smsSettings.executiveAiAgentListName': listName 
+                'smsSettings.executiveAiAgentListName': listName
             });
-            if (onUpdateChurch) onUpdateChurch({ 
-                smsSettings: { ...church.smsSettings, executiveAiAgentListId: listId, executiveAiAgentListName: listName } 
+            if (onUpdateChurch) onUpdateChurch({
+                smsSettings: { ...church.smsSettings, executiveAiAgentListId: listId, executiveAiAgentListName: listName }
             });
             showToast('✓ Authorized list saved');
         } catch {
@@ -7650,15 +7612,15 @@ Only answer based on the church facts below. If the answer is not in the facts, 
 Keep replies under 160 characters when possible (1 SMS segment). Return ONLY the reply text.
 
 CHURCH FACTS:
-${kb.address       ? `Address: ${kb.address}`           : ''}
-${kb.serviceTimes  ? `Service Times: ${kb.serviceTimes}` : ''}
-${kb.pastor        ? `Lead Pastor: ${kb.pastor}`         : ''}
-${kb.ministries    ? `Ministries: ${kb.ministries}`      : ''}
-${kb.classes       ? `Classes: ${kb.classes}`            : ''}
-${kb.locations     ? `Locations: ${kb.locations}`        : ''}
-${kb.website       ? `Website: ${kb.website}`            : ''}
-${kb.phone         ? `Phone: ${kb.phone}`                : ''}
-${kb.customFacts   ? `Other Info: ${kb.customFacts}`     : ''}
+${kb.address ? `Address: ${kb.address}` : ''}
+${kb.serviceTimes ? `Service Times: ${kb.serviceTimes}` : ''}
+${kb.pastor ? `Lead Pastor: ${kb.pastor}` : ''}
+${kb.ministries ? `Ministries: ${kb.ministries}` : ''}
+${kb.classes ? `Classes: ${kb.classes}` : ''}
+${kb.locations ? `Locations: ${kb.locations}` : ''}
+${kb.website ? `Website: ${kb.website}` : ''}
+${kb.phone ? `Phone: ${kb.phone}` : ''}
+${kb.customFacts ? `Other Info: ${kb.customFacts}` : ''}
 
 INCOMING MESSAGE:
 "${testInput}"
@@ -7734,21 +7696,18 @@ Write the reply:`;
                         </p>
                     </div>
                     <div className="flex items-center gap-3">
-                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
-                            agentEnabled ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                                         : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
-                        }`}>{agentEnabled ? 'Active' : 'Off'}</span>
+                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${agentEnabled ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                                : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
+                            }`}>{agentEnabled ? 'Active' : 'Off'}</span>
                         {isAdmin && (
                             <button
                                 onClick={handleToggleAgent}
                                 title={agentEnabled ? 'Disable SMS Agent' : 'Enable SMS Agent'}
-                                className={`relative w-14 h-7 rounded-full transition-colors ${
-                                    agentEnabled ? 'bg-violet-600' : 'bg-slate-300 dark:bg-slate-600'
-                                }`}
+                                className={`relative w-14 h-7 rounded-full transition-colors ${agentEnabled ? 'bg-violet-600' : 'bg-slate-300 dark:bg-slate-600'
+                                    }`}
                             >
-                                <span className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow transition-transform ${
-                                    agentEnabled ? 'translate-x-7' : 'translate-x-0'
-                                }`} />
+                                <span className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow transition-transform ${agentEnabled ? 'translate-x-7' : 'translate-x-0'
+                                    }`} />
                             </button>
                         )}
                     </div>
@@ -7771,21 +7730,18 @@ Write the reply:`;
                         </p>
                     </div>
                     <div className="flex items-center gap-3">
-                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
-                            execAgentEnabled ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400'
-                                         : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
-                        }`}>{execAgentEnabled ? 'Active' : 'Off'}</span>
+                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${execAgentEnabled ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400'
+                                : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
+                            }`}>{execAgentEnabled ? 'Active' : 'Off'}</span>
                         {isAdmin && (
                             <button
                                 onClick={handleToggleExecAgent}
                                 title={execAgentEnabled ? 'Disable Executive AI' : 'Enable Executive AI'}
-                                className={`relative w-14 h-7 rounded-full transition-colors ${
-                                    execAgentEnabled ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'
-                                }`}
+                                className={`relative w-14 h-7 rounded-full transition-colors ${execAgentEnabled ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'
+                                    }`}
                             >
-                                <span className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow transition-transform ${
-                                    execAgentEnabled ? 'translate-x-7' : 'translate-x-0'
-                                }`} />
+                                <span className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow transition-transform ${execAgentEnabled ? 'translate-x-7' : 'translate-x-0'
+                                    }`} />
                             </button>
                         )}
                     </div>
@@ -7802,7 +7758,7 @@ Write the reply:`;
                             <div className="text-xs text-amber-600">No lists found in Planning Center or PCO is not connected.</div>
                         ) : (
                             <div className="flex items-center gap-3">
-                                <select 
+                                <select
                                     value={execListId}
                                     onChange={handleExecListSelect}
                                     disabled={!isAdmin}
@@ -7844,14 +7800,14 @@ Write the reply:`;
                     <div className="flex items-center gap-2 text-slate-400 text-sm"><Loader2 size={16} className="animate-spin" /> Loading…</div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {field('address',      'Church Address',          '123 Main St, Nashville, TN 37201')}
-                        {field('pastor',       'Lead Pastor',             'Pastor John Smith')}
-                        {field('serviceTimes', 'Service Times',           'Sundays 9am & 11am, Wednesdays 7pm', true)}
-                        {field('locations',    'Campus / Meeting Locations', 'Main campus, East campus…', true)}
-                        {field('ministries',   'Ministries Offered',        "Youth, Worship, Men's / Women's\u2026", true)}
-                        {field('classes',      'Classes & Small Groups',    'Life Groups, Alpha Course, Discipleship 101…', true)}
-                        {field('website',      'Website',                   'https://www.gracechurch.org')}
-                        {field('phone',        'Main Phone',                '(615) 555-0100')}
+                        {field('address', 'Church Address', '123 Main St, Nashville, TN 37201')}
+                        {field('pastor', 'Lead Pastor', 'Pastor John Smith')}
+                        {field('serviceTimes', 'Service Times', 'Sundays 9am & 11am, Wednesdays 7pm', true)}
+                        {field('locations', 'Campus / Meeting Locations', 'Main campus, East campus…', true)}
+                        {field('ministries', 'Ministries Offered', "Youth, Worship, Men's / Women's\u2026", true)}
+                        {field('classes', 'Classes & Small Groups', 'Life Groups, Alpha Course, Discipleship 101…', true)}
+                        {field('website', 'Website', 'https://www.gracechurch.org')}
+                        {field('phone', 'Main Phone', '(615) 555-0100')}
                         <div className="md:col-span-2">
                             {field('customFacts', 'Additional Facts', 'Parking info, childcare details, special events, FAQs…', true)}
                         </div>
@@ -7969,7 +7925,7 @@ Write the reply:`;
                         <p className="text-[10px] font-black uppercase tracking-widest text-violet-500">Agent Reply Preview</p>
                         <div className="bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700 rounded-xl p-4">
                             <p className="text-sm text-violet-900 dark:text-violet-100 leading-relaxed">{testOutput}</p>
-                            <p className={`text-xs font-bold mt-2 ${ testOutput.length > 160 ? 'text-amber-600' : 'text-emerald-600' }`}>
+                            <p className={`text-xs font-bold mt-2 ${testOutput.length > 160 ? 'text-amber-600' : 'text-emerald-600'}`}>
                                 {testOutput.length} chars · {Math.ceil(testOutput.length / 160)} segment{Math.ceil(testOutput.length / 160) !== 1 ? 's' : ''}
                             </p>
                         </div>
@@ -7989,8 +7945,8 @@ Write the reply:`;
 // ─── Main MessagingModule ─────────────────────────────────────────────────────
 
 interface MessagingModuleProps {
-    churchId:    string;
-    church:      Church;
+    churchId: string;
+    church: Church;
     currentUser: User;
     onUpdateChurch?: (updates: Partial<Church>) => void;
     /** When provided by a parent route, drives the active tab and hides the internal pill nav */
@@ -8005,14 +7961,14 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
     const smsEnabled = church.smsSettings?.smsEnabled;
 
     type Tab = 'campaigns' | 'inbox' | 'keywords' | 'analytics' | 'workflows' | 'agent';
-    const [activeTab, setActiveTab]   = useState<Tab>('campaigns');
+    const [activeTab, setActiveTab] = useState<Tab>('campaigns');
     const effectiveTab: Tab = controlledTab ?? activeTab;
-    const [campaigns, setCampaigns]   = useState<SmsCampaign[]>([]);
-    const [isLoading, setIsLoading]   = useState(true);
+    const [campaigns, setCampaigns] = useState<SmsCampaign[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
     const [activeCampaign, setActiveCampaign] = useState<SmsCampaign | null>(null);
-    const [toast, setToast]           = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
-    const [isSending, setIsSending]   = useState(false);
-    const [showSetup, setShowSetup]   = useState(false);
+    const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+    const [isSending, setIsSending] = useState(false);
+    const [showSetup, setShowSetup] = useState(false);
 
     // ── Multi-number support ───────────────────────────────────────────────────
     const { numbers: twilioNumbers, loading: numbersLoading } = useTwilioNumbers(churchId);
@@ -8050,17 +8006,17 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
         if (legacyPhone && hasRealSubAccount && !numbersLoading && twilioNumbers.length === 0) {
             const migratedId = `${churchId}_migrated`;
             setDoc(doc(firebaseDb, 'twilioNumbers', migratedId), {
-                id:             migratedId,
+                id: migratedId,
                 churchId,
-                phoneNumber:    legacyPhone,
-                phoneSid:       legacyPhoneSid || '',
-                friendlyLabel:  'Main Line',
-                isDefault:      true,
-                smsEnabled:     true,
+                phoneNumber: legacyPhone,
+                phoneSid: legacyPhoneSid || '',
+                friendlyLabel: 'Main Line',
+                isDefault: true,
+                smsEnabled: true,
                 allowedUserIds: [],
-                createdAt:      Date.now(),
-                updatedAt:      Date.now(),
-            }).catch(() => {/* silent – may race with another tab */});
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+            }).catch(() => {/* silent – may race with another tab */ });
         }
     }, [numbersLoading, twilioNumbers.length, church.smsSettings?.twilioPhoneNumber]);
 
@@ -8070,10 +8026,10 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
         const allowedTabs = ([
             { key: 'campaigns', perm: 'broadcastUserIds' },
             { key: 'workflows', perm: 'broadcastUserIds' },
-            { key: 'inbox',     perm: 'inboxUserIds' },
-            { key: 'keywords',  perm: 'keywordsUserIds' },
+            { key: 'inbox', perm: 'inboxUserIds' },
+            { key: 'keywords', perm: 'keywordsUserIds' },
             { key: 'analytics', perm: 'analyticsUserIds' },
-            { key: 'agent',     perm: 'aiAgentUserIds' },
+            { key: 'agent', perm: 'aiAgentUserIds' },
         ] as const).filter(t => canUserUseFeature(activeNumber, currentUser, t.perm as any));
 
         if (allowedTabs.length > 0 && !allowedTabs.some(t => t.key === activeTab) && !controlledTab) {
@@ -8105,7 +8061,7 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
 
     const handleCreate = async () => {
         const name = `Text Campaign ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
-        const now  = Date.now();
+        const now = Date.now();
         const data: Omit<SmsCampaign, 'id'> = {
             churchId, name, status: 'draft', body: '',
             toListId: null, toGroupId: null,
@@ -8131,7 +8087,7 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
     };
 
     const handleDuplicate = async (c: SmsCampaign) => {
-        const now  = Date.now();
+        const now = Date.now();
         const data = { ...c, name: `Copy of ${c.name}`, status: 'draft' as const, sentAt: null, scheduledAt: null, createdAt: now, updatedAt: now, twilioNumberId: activeNumberId || null };
         delete (data as any).id;
         await addDoc(collection(firebaseDb, 'smsCampaigns'), data);
@@ -8161,13 +8117,13 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         churchId,
-                        campaignId:  activeCampaign.id,
-                        phones:      [],          // Scheduler / backend resolves from listId/groupId
-                        body:        activeCampaign.body,
-                        mediaUrls:   activeCampaign.mediaUrls || [],
-                        sentBy:      currentUser.id,
-                        sentByName:  currentUser.name,
-                        resolveFromList:  activeCampaign.toListId  || null,
+                        campaignId: activeCampaign.id,
+                        phones: [],          // Scheduler / backend resolves from listId/groupId
+                        body: activeCampaign.body,
+                        mediaUrls: activeCampaign.mediaUrls || [],
+                        sentBy: currentUser.id,
+                        sentByName: currentUser.name,
+                        resolveFromList: activeCampaign.toListId || null,
                         resolveFromGroup: activeCampaign.toGroupId || null,
                     }),
                 });
@@ -8305,8 +8261,8 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
     }
 
 
-    const filteredCampaigns = activeNumberId 
-        ? campaigns.filter(c => !c.twilioNumberId || c.twilioNumberId === activeNumberId) 
+    const filteredCampaigns = activeNumberId
+        ? campaigns.filter(c => !c.twilioNumberId || c.twilioNumberId === activeNumberId)
         : campaigns;
 
     return (
@@ -8322,21 +8278,21 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                             {([
                                 { key: 'campaigns', label: 'Broadcast', icon: <MessageSquare size={13} />, perm: 'broadcastUserIds' },
                                 { key: 'workflows', label: 'Workflows', icon: <Zap size={13} />, perm: 'broadcastUserIds' },
-                                { key: 'inbox',     label: 'Inbox',     icon: <Inbox size={13} />, perm: 'inboxUserIds' },
-                                { key: 'keywords',  label: 'Keywords',  icon: <Key size={13} />, perm: 'keywordsUserIds' },
+                                { key: 'inbox', label: 'Inbox', icon: <Inbox size={13} />, perm: 'inboxUserIds' },
+                                { key: 'keywords', label: 'Keywords', icon: <Key size={13} />, perm: 'keywordsUserIds' },
                                 { key: 'analytics', label: 'Analytics', icon: <BarChart3 size={13} />, perm: 'analyticsUserIds' },
-                                { key: 'agent',     label: 'AI Agent',  icon: <Sparkles size={13} />, perm: 'aiAgentUserIds' },
+                                { key: 'agent', label: 'AI Agent', icon: <Sparkles size={13} />, perm: 'aiAgentUserIds' },
                             ] as const)
-                            .filter(t => canUserUseFeature(activeNumber, currentUser, t.perm as any))
-                            .map(t => (
-                                <button
-                                    key={t.key}
-                                    onClick={() => setActiveTab(t.key as any)}
-                                    className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-semibold transition ${effectiveTab === t.key ? 'bg-white dark:bg-slate-700 text-violet-600 dark:text-violet-300 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}
-                                >
-                                    {t.icon} {t.label}
-                                </button>
-                            ))}
+                                .filter(t => canUserUseFeature(activeNumber, currentUser, t.perm as any))
+                                .map(t => (
+                                    <button
+                                        key={t.key}
+                                        onClick={() => setActiveTab(t.key as any)}
+                                        className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-semibold transition ${effectiveTab === t.key ? 'bg-white dark:bg-slate-700 text-violet-600 dark:text-violet-300 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                                    >
+                                        {t.icon} {t.label}
+                                    </button>
+                                ))}
                         </div>
                     ) : (
                         <div className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-400">

@@ -73,11 +73,11 @@ async function matchKeyword(db: any, churchId: string, body: string, smsNumberId
         if (snap.empty) return null;
 
         const matches = snap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
-        
+
         // Find the most appropriate keyword match for this phone line
         const validMatch = matches.find((m: any) => {
             if (!smsNumberId) return true;
-            
+
             if (Array.isArray(m.numberIds) && m.numberIds.length > 0) {
                 return m.numberIds.includes(smsNumberId);
             }
@@ -119,15 +119,15 @@ Only answer based on the church facts below. If the answer is not in the facts, 
 Keep replies under 160 characters when possible (1 SMS segment). Do NOT include any explanation, preamble, or quotes —â€ return ONLY the reply text.
 
 CHURCH FACTS:
-${kb.address       ? `Address: ${kb.address}`             : ''}
-${kb.serviceTimes  ? `Service Times: ${kb.serviceTimes}`   : ''}
-${kb.pastor        ? `Lead Pastor: ${kb.pastor}`           : ''}
-${kb.ministries    ? `Ministries: ${kb.ministries}`        : ''}
-${kb.classes       ? `Classes: ${kb.classes}`              : ''}
-${kb.locations     ? `Locations: ${kb.locations}`          : ''}
-${kb.website       ? `Website: ${kb.website}`              : ''}
-${kb.phone         ? `Phone: ${kb.phone}`                  : ''}
-${kb.customFacts   ? `Other Info: ${kb.customFacts}`       : ''}
+${kb.address ? `Address: ${kb.address}` : ''}
+${kb.serviceTimes ? `Service Times: ${kb.serviceTimes}` : ''}
+${kb.pastor ? `Lead Pastor: ${kb.pastor}` : ''}
+${kb.ministries ? `Ministries: ${kb.ministries}` : ''}
+${kb.classes ? `Classes: ${kb.classes}` : ''}
+${kb.locations ? `Locations: ${kb.locations}` : ''}
+${kb.website ? `Website: ${kb.website}` : ''}
+${kb.phone ? `Phone: ${kb.phone}` : ''}
+${kb.customFacts ? `Other Info: ${kb.customFacts}` : ''}
 
 INCOMING MESSAGE:
 "${inboundBody}"
@@ -176,13 +176,13 @@ Write the reply:`;
         const suggestionId = `sug_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         await db.collection('smsConversations').doc(convId)
             .collection('aiSuggestions').doc(suggestionId).set({
-                id:                suggestionId,
-                conversationId:    convId,
+                id: suggestionId,
+                conversationId: convId,
                 churchId,
                 inboundMessageId,
                 suggestedBody,
-                status:            'pending',
-                createdAt:         Date.now(),
+                status: 'pending',
+                createdAt: Date.now(),
             });
 
         log.info(`[SMS Agent] Generated suggestion for conversation ${convId}`, 'system', { churchId, convId }, churchId);
@@ -273,9 +273,9 @@ async function getOrCreatePrayerTag(db: any, churchId: string, log: any): Promis
     // Auto-create the tag so churches don't need to set it up manually
     const newTag = {
         churchId,
-        name:      'Needs Prayer',
-        emoji:     'Ã°Å¸â„¢Â',
-        color:     'violet',
+        name: 'Needs Prayer',
+        emoji: 'Ã°Å¸â„¢Â',
+        color: 'violet',
         createdAt: Date.now(),
     };
     const ref = await db.collection('smsTags').add(newTag);
@@ -290,17 +290,17 @@ async function getOrCreatePrayerTag(db: any, churchId: string, log: any): Promis
 // Responds with TwiML (200 + empty response body, or keyword auto-reply).
 
 export const handleInboundSms = async (req: any, res: any) => {
-    const db  = getDb();
+    const db = getDb();
     const log = createServerLogger(db);
 
     // â”€â”€ Webhook signature validation (required for production per SignalWire docs) â”€â”€
     try {
         const signingKey = await getSignalWireSigningKey();
         if (signingKey) {
-            const baseUrl    = await getSmsWebhookBaseUrl();
+            const baseUrl = await getSmsWebhookBaseUrl();
             const webhookUrl = `${baseUrl}/api/messaging/inbound`;
-            const signature  = (req.headers['x-signalwire-signature'] || '') as string;
-            const isValid    = validateRequest(signingKey, signature, webhookUrl, req.body as Record<string, string> || {});
+            const signature = (req.headers['x-signalwire-signature'] || '') as string;
+            const isValid = validateRequest(signingKey, signature, webhookUrl, req.body as Record<string, string> || {});
             if (!isValid) {
                 log.warn('[Inbound SMS] Invalid webhook signature â€” request rejected', 'system', { signature }, '');
                 return res.status(401).send('Invalid signature');
@@ -333,7 +333,7 @@ export const handleInboundSms = async (req: any, res: any) => {
 
     try {
         const from = normaliseE164(fromRaw || '');
-        const to   = normaliseE164(toRaw   || '');
+        const to = normaliseE164(toRaw || '');
 
         // 1. Find the church via the twilioNumbers collection (new multi-number routing)
         const numSnap = await db.collection('smsNumbers')
@@ -343,17 +343,17 @@ export const handleInboundSms = async (req: any, res: any) => {
             .get();
 
         // Fallback: legacy single-number lookup on the church doc itself
-        let churchId    = '';
+        let churchId = '';
         let smsNumberId: string | null = null;
         let smsSettings: any = {};
 
         if (!numSnap.empty) {
-            const numDoc    = numSnap.docs[0];
-            churchId        = numDoc.data().churchId;
-            smsNumberId     = numDoc.id;
+            const numDoc = numSnap.docs[0];
+            churchId = numDoc.data().churchId;
+            smsNumberId = numDoc.id;
 
             const churchSnap2 = await db.collection('churches').doc(churchId).get();
-            smsSettings       = churchSnap2.data()?.smsSettings || {};
+            smsSettings = churchSnap2.data()?.smsSettings || {};
         } else {
             // Fallback to legacy church field (for churches not yet migrated)
             const legacySnap = await db.collection('churches')
@@ -366,9 +366,9 @@ export const handleInboundSms = async (req: any, res: any) => {
                 res.set('Content-Type', 'text/xml');
                 return res.status(200).send('<Response></Response>');
             }
-            const churchDoc2  = legacySnap.docs[0];
-            churchId          = churchDoc2.id;
-            smsSettings       = churchDoc2.data()?.smsSettings || {};
+            const churchDoc2 = legacySnap.docs[0];
+            churchId = churchDoc2.id;
+            smsSettings = churchDoc2.data()?.smsSettings || {};
         }
 
         if (!churchId) {
@@ -385,11 +385,11 @@ export const handleInboundSms = async (req: any, res: any) => {
             // Carrier handles STOP automatically; we mirror it in Firestore for UI awareness
             const optOutId = convIdKeyword;
             await db.collection('smsOptOuts').doc(optOutId).set({
-                id:          optOutId,
+                id: optOutId,
                 churchId,
                 phoneNumber: from,
-                optedOutAt:  Date.now(),
-                source:      'STOP_reply',
+                optedOutAt: Date.now(),
+                source: 'STOP_reply',
             });
             await db.collection('smsConversations').doc(convIdKeyword).set({ isOptedOut: true }, { merge: true });
             log.info(`[Inbound SMS] STOP received from ${from} for church ${churchId}`, 'system', { churchId, from }, churchId);
@@ -400,7 +400,7 @@ export const handleInboundSms = async (req: any, res: any) => {
         if (upperBody === 'START' || upperBody === 'UNSTOP' || upperBody === 'YES') {
             // Contact re-opted-in â€” clear our Firestore opt-out record so sends resume
             const optOutId = convIdKeyword;
-            await db.collection('smsOptOuts').doc(optOutId).delete().catch(() => {});
+            await db.collection('smsOptOuts').doc(optOutId).delete().catch(() => { });
             await db.collection('smsConversations').doc(convIdKeyword).set({ isOptedOut: false }, { merge: true });
             log.info(`[Inbound SMS] START/UNSTOP received from ${from} for church ${churchId} â€” opt-out cleared`, 'system', { churchId, from }, churchId);
             // Carrier sends the mandated opt-in confirmation; we return empty TwiML
@@ -428,42 +428,42 @@ export const handleInboundSms = async (req: any, res: any) => {
 
         if (!convSnap.exists) {
             const convData: any = {
-                id:                  convId,
+                id: convId,
                 churchId,
-                phoneNumber:         from,
-                lastMessageAt:       now,
-                lastMessageBody:     body,
-                lastMessageDirection:'inbound',
-                unreadCount:         1,
-                isOptedOut:          false,
-                smsNumberId:         smsNumberId,
-                twilioNumberId:      smsNumberId,   // alias used by twilioSend.ts for reply routing
-                inboxId:             smsNumberId,   // legacy alias — keep in sync
-                toPhoneNumber:       to,
+                phoneNumber: from,
+                lastMessageAt: now,
+                lastMessageBody: body,
+                lastMessageDirection: 'inbound',
+                unreadCount: 1,
+                isOptedOut: false,
+                smsNumberId: smsNumberId,
+                twilioNumberId: smsNumberId,   // alias used by twilioSend.ts for reply routing
+                inboxId: smsNumberId,   // legacy alias — keep in sync
+                toPhoneNumber: to,
             };
             if (personMatch) {
-                convData.personId     = personMatch.personId;
-                convData.personName   = personMatch.personName;
+                convData.personId = personMatch.personId;
+                convData.personName = personMatch.personName;
                 convData.personAvatar = personMatch.personAvatar;
             }
             await convRef.set(convData);
         } else {
             const updateData: any = {
-                lastMessageAt:       now,
-                lastMessageBody:     body,
-                lastMessageDirection:'inbound',
-                unreadCount:         (convSnap.data()?.unreadCount || 0) + 1,
+                lastMessageAt: now,
+                lastMessageBody: body,
+                lastMessageDirection: 'inbound',
+                unreadCount: (convSnap.data()?.unreadCount || 0) + 1,
             };
             // Backfill number fields if not set (migration / first inbound on existing conv)
             if (!convSnap.data()?.smsNumberId && smsNumberId) {
-                updateData.smsNumberId    = smsNumberId;
+                updateData.smsNumberId = smsNumberId;
                 updateData.twilioNumberId = smsNumberId;   // alias for twilioSend.ts
-                updateData.inboxId        = smsNumberId;
-                updateData.toPhoneNumber  = to;
+                updateData.inboxId = smsNumberId;
+                updateData.toPhoneNumber = to;
             }
             if (personMatch) {
-                updateData.personId     = personMatch.personId;
-                updateData.personName   = personMatch.personName;
+                updateData.personId = personMatch.personId;
+                updateData.personName = personMatch.personName;
                 updateData.personAvatar = personMatch.personAvatar;
             }
             await convRef.update(updateData);
@@ -474,45 +474,45 @@ export const handleInboundSms = async (req: any, res: any) => {
         const messageId = `msg_${now}_${Math.random().toString(36).slice(2, 8)}`;
         await db.collection('smsConversations').doc(convId)
             .collection('messages').doc(messageId).set({
-                id:             messageId,
+                id: messageId,
                 conversationId: convId,
                 churchId,
-                direction:      'inbound',
+                direction: 'inbound',
                 body,
-                mediaUrls:      mediaUrls.length > 0 ? mediaUrls : [],
-                status:         'received',
-                messageSid:     smsSid || null,
-                createdAt:      now,
+                mediaUrls: mediaUrls.length > 0 ? mediaUrls : [],
+                status: 'received',
+                messageSid: smsSid || null,
+                createdAt: now,
             });
 
         // 4-A. Push notification — fire-and-forget, must not block the TwiML response
         const senderName = personMatch?.personName || convSnap.data()?.personName || from;
-        const preview    = body.length > 80 ? body.slice(0, 77) + '...' : body;
+        const preview = body.length > 80 ? body.slice(0, 77) + '...' : body;
         sendPushToChurch({
             churchId,
             numberId: smsNumberId,
-            title:    `New SMS from ${senderName}`,
-            body:     preview,
-            url:      `/mobile/sms?tab=inbox`,
-            tag:      `sms-${convId}`,
-        }).catch(() => {});
+            title: `New SMS from ${senderName}`,
+            body: preview,
+            url: `/mobile/sms?tab=inbox`,
+            tag: `sms-${convId}`,
+        }).catch(() => { });
 
         // 4-B. Executive AI Auto-Responder
         const bodyTrimmed = body.trim();
         const aiAgentPrefix = 'ai agent';
         const isAiAgentTrigger = bodyTrimmed.toLowerCase().startsWith(aiAgentPrefix);
-        
+
         const actualPersonId = personMatch?.personId || convSnap.data()?.personId;
 
         if (smsSettings?.executiveAiAgentEnabled && smsSettings?.executiveAiAgentListId && actualPersonId && isAiAgentTrigger) {
             // Strip the trigger prefix
             const queryBody = bodyTrimmed.substring(aiAgentPrefix.length).trim();
-            
+
             // Non-blocking
             processExecutiveAiQuery(
-                db, log, churchId, actualPersonId, from, queryBody, 
+                db, log, churchId, actualPersonId, from, queryBody,
                 smsSettings.executiveAiAgentListId, smsNumberId
-            ).catch(() => {});
+            ).catch(() => { });
         }
 
         // 4-B. SMS AI Agent —â€ fire-and-forget suggestion generation
@@ -535,7 +535,7 @@ export const handleInboundSms = async (req: any, res: any) => {
                 const churchSnap = await db.collection('churches').doc(churchId).get();
                 const churchName = churchSnap.data()?.name || 'Church';
                 let lineName = 'Main Line';
-                
+
                 if (smsNumberId) {
                     const numSnap = await db.collection('smsNumbers').doc(smsNumberId).get();
                     if (numSnap.exists) lineName = numSnap.data()?.friendlyLabel || 'Main Line';
@@ -551,16 +551,16 @@ export const handleInboundSms = async (req: any, res: any) => {
                 const replyId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
                 await db.collection('smsConversations').doc(convId)
                     .collection('messages').doc(replyId).set({
-                        id:             replyId,
+                        id: replyId,
                         conversationId: convId,
                         churchId,
-                        direction:      'outbound',
-                        body:           whoIsThisReplyMessage,
-                        mediaUrls:      whoIsThisMediaUrl ? [whoIsThisMediaUrl] : [],
-                        status:         'sent',
-                        sentBy:         null,
-                        sentByName:     'Auto-Reply (Contact Card)',
-                        createdAt:      Date.now(),
+                        direction: 'outbound',
+                        body: whoIsThisReplyMessage,
+                        mediaUrls: whoIsThisMediaUrl ? [whoIsThisMediaUrl] : [],
+                        status: 'sent',
+                        sentBy: null,
+                        sentByName: 'Auto-Reply (Contact Card)',
+                        createdAt: Date.now(),
                     });
 
                 log.info(`[Inbound SMS] "Who Is This" matched from ${from} for church ${churchId}`, 'system', { churchId }, churchId);
@@ -656,16 +656,16 @@ export const handleInboundSms = async (req: any, res: any) => {
             const replyId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
             await db.collection('smsConversations').doc(convId)
                 .collection('messages').doc(replyId).set({
-                    id:             replyId,
+                    id: replyId,
                     conversationId: convId,
                     churchId,
-                    direction:      'outbound',
-                    body:           kw.replyMessage,
-                    mediaUrls:      [],
-                    status:         'sent',
-                    sentBy:         null,
-                    sentByName:     'Auto-Reply',
-                    createdAt:      Date.now(),
+                    direction: 'outbound',
+                    body: kw.replyMessage,
+                    mediaUrls: [],
+                    status: 'sent',
+                    sentBy: null,
+                    sentByName: 'Auto-Reply',
+                    createdAt: Date.now(),
                 });
 
             log.info(`[Inbound SMS] Keyword "${kw.keyword}" matched from ${from} for church ${churchId}`, 'system', { churchId, keyword: kw.keyword }, churchId);
@@ -691,7 +691,7 @@ export const handleInboundSms = async (req: any, res: any) => {
                     const { FieldValue } = require('firebase-admin/firestore');
                     const prayerTagId = await getOrCreatePrayerTag(db, churchId, log);
                     await convRef.update({
-                        tags:               FieldValue.arrayUnion(prayerTagId),
+                        tags: FieldValue.arrayUnion(prayerTagId),
                         prayerFollowUpState: null,
                     });
                     log.info(`[Prayer Detection] Tagged conversation ${convId} "Needs Prayer" (follow-up detail received)`, 'system', { churchId, convId }, churchId);
@@ -710,16 +710,16 @@ export const handleInboundSms = async (req: any, res: any) => {
                         const clarifyId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
                         await db.collection('smsConversations').doc(convId)
                             .collection('messages').doc(clarifyId).set({
-                                id:             clarifyId,
+                                id: clarifyId,
                                 conversationId: convId,
                                 churchId,
-                                direction:      'outbound',
-                                body:           clarifyingReply,
-                                mediaUrls:      [],
-                                status:         'sent',
-                                sentBy:         null,
-                                sentByName:     'Auto-Reply (Prayer)',
-                                createdAt:      Date.now(),
+                                direction: 'outbound',
+                                body: clarifyingReply,
+                                mediaUrls: [],
+                                status: 'sent',
+                                sentBy: null,
+                                sentByName: 'Auto-Reply (Prayer)',
+                                createdAt: Date.now(),
                             });
 
                         // Mark conversation as awaiting prayer detail
@@ -769,7 +769,7 @@ export const handleInboundSms = async (req: any, res: any) => {
                         // Two-step follow-up: this tag is waiting for the next reply
                         if (tagFollowUpState === `awaiting_tag_${tagId}`) {
                             await convRef.update({
-                                tags:             FieldValue.arrayUnion(tagId),
+                                tags: FieldValue.arrayUnion(tagId),
                                 tagFollowUpState: null,
                             });
                             log.info(`[Tag Detection] Follow-up tag "${tag.name}" applied to conv ${convId}`, 'system', { churchId, convId, tagId }, churchId);
@@ -843,16 +843,17 @@ export const handleInboundSms = async (req: any, res: any) => {
             const tagReplyId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
             await db.collection('smsConversations').doc(convId)
                 .collection('messages').doc(tagReplyId).set({
-                    id:             tagReplyId,
+                    id: tagReplyId,
+
                     conversationId: convId,
                     churchId,
-                    direction:      'outbound',
-                    body:           tagReplyBody,
-                    mediaUrls:      [],
-                    status:         'sent',
-                    sentBy:         null,
-                    sentByName:     'Auto-Reply (Tag)',
-                    createdAt:      Date.now(),
+                    direction: 'outbound',
+                    body: tagReplyBody,
+                    mediaUrls: [],
+                    status: 'sent',
+                    sentBy: null,
+                    sentByName: 'Auto-Reply (Tag)',
+                    createdAt: Date.now(),
                 });
         }
 
@@ -937,8 +938,8 @@ export const handleInboundSms = async (req: any, res: any) => {
         if (allReplies.length > 0) {
             const msgXml = allReplies
                 .map(r => {
-                    const safeBody = r.body.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-                    const mediaTag = r.mediaUrl ? `<Media>${r.mediaUrl.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</Media>` : '';
+                    const safeBody = r.body.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    const mediaTag = r.mediaUrl ? `<Media>${r.mediaUrl.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</Media>` : '';
                     return `<Message><Body>${safeBody}</Body>${mediaTag}</Message>`;
                 })
                 .join('');
