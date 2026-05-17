@@ -24,7 +24,7 @@ service firebase.storage {
     match /tenants/{churchId}/uploads/{fileName} {
       allow read: if true; // Public read so URLs work in SMS / Emails, or we can restrict if using proxy
       allow write: if request.auth != null && 
-                   firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.churchId == churchId;
+                   firestore.get(/databases/pcforpco/documents/users/$(request.auth.uid)).data.churchId == churchId;
     }
 
     // ─── All other paths blocked by default ──────────────────────────────────
