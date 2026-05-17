@@ -51,10 +51,12 @@ export async function resolvePcoRecipients(
     const token  = church.pcoAccessToken;
     if (!token) throw new Error('No PCO access token for this church.');
 
-    // Determine the PCO endpoint — include emails & addresses for merge tags
+    // Determine the PCO endpoint.
+    // - For lists: include phone_numbers and emails so we get them in the `included` array.
+    // - For groups: include person so we have the embedded person data.
     let url: string;
     if (listId) {
-        url = `https://api.planningcenteronline.com/people/v2/lists/${listId}/people?per_page=100&include=emails,addresses&fields[Person]=name,first_name,last_name,phone_numbers,birthdate,anniversary`;
+        url = `https://api.planningcenteronline.com/people/v2/lists/${listId}/people?per_page=100&include=phone_numbers,emails,addresses`;
     } else if (groupId) {
         url = `https://api.planningcenteronline.com/groups/v2/groups/${groupId}/memberships?include=person&per_page=100`;
     } else {
@@ -76,17 +78,27 @@ export async function resolvePcoRecipients(
         const people: any[] = data.data     || [];
         const included: any[] = data.included || [];
 
-        // Build lookup maps from included resources (Email, Address)
-        const emailByPersonId = new Map<string, string>();
-        const cityByPersonId  = new Map<string, string>();
-        const stateByPersonId = new Map<string, string>();
+        // Build lookup maps from included resources (PhoneNumber, Email, Address)
+        const phonesByPersonId = new Map<string, string>();   // personId → primary E.164
+        const emailByPersonId  = new Map<string, string>();
+        const cityByPersonId   = new Map<string, string>();
+        const stateByPersonId  = new Map<string, string>();
 
         for (const inc of included) {
-            const attrs = inc.attributes || {};
-            const rels  = inc.relationships || {};
+            const attrs    = inc.attributes || {};
+            const rels     = inc.relationships || {};
+            // PhoneNumber resources link back to person via relationships.person
             const personId = rels.person?.data?.id;
             if (!personId) continue;
 
+            if (inc.type === 'PhoneNumber') {
+                // Only use primary phone, or the first one we see if no primary set yet
+                const digits = (attrs.number || '').replace(/\D/g, '');
+                const e164   = digits.length === 10 ? `+1${digits}` : digits.length === 11 ? `+${digits}` : '';
+                if (e164 && (attrs.primary || !phonesByPersonId.has(personId))) {
+                    phonesByPersonId.set(personId, e164);
+                }
+            }
             if (inc.type === 'Email' && attrs.primary) {
                 emailByPersonId.set(personId, attrs.address || '');
             }
@@ -94,33 +106,45 @@ export async function resolvePcoRecipients(
                 cityByPersonId.set(personId,  attrs.city  || '');
                 stateByPersonId.set(personId, attrs.state || '');
             }
+
+            // Groups API embeds the full Person object in included
+            if (inc.type === 'Person') {
+                const pAttrs = inc.attributes || {};
+                // Extract phone from attributes.phone_numbers array (Groups API path)
+                const pPhones: any[] = pAttrs.phone_numbers || [];
+                const primary = pPhones.find((p: any) => p.primary) || pPhones[0];
+                if (primary) {
+                    const digits = (primary.number || '').replace(/\D/g, '');
+                    const e164   = digits.length === 10 ? `+1${digits}` : digits.length === 11 ? `+${digits}` : '';
+                    if (e164 && !phonesByPersonId.has(inc.id)) {
+                        phonesByPersonId.set(inc.id, e164);
+                    }
+                }
+            }
         }
 
         for (const person of people) {
-            const attrs  = person.attributes || {};
-            const phones_: any[] = attrs.phone_numbers || [];
-            const primaryPhone   = phones_.find((p: any) => p.primary) || phones_[0];
-            const rawPhone       = primaryPhone?.number || '';
-            const digits         = rawPhone.replace(/\D/g, '');
-            const e164           = digits.length === 10 ? `+1${digits}` : digits.length === 11 ? `+${digits}` : '';
+            const attrs    = person.attributes || {};
+            // For groups API, the person's id may be linked via relationships
+            const personId = person.id || person.relationships?.person?.data?.id;
 
             let dest = '';
             if (channelType === 'email') {
-                dest = emailByPersonId.get(person.id) || '';
+                dest = emailByPersonId.get(personId) || '';
             } else {
-                dest = e164;
+                dest = phonesByPersonId.get(personId) || '';
             }
 
             if (dest) {
                 phones.push(dest);
                 personMap[dest] = {
                     personName:  attrs.name || `${attrs.first_name || ''} ${attrs.last_name || ''}`.trim(),
-                    email:       emailByPersonId.get(person.id) || '',
-                    phone:       e164,
+                    email:       emailByPersonId.get(personId)  || '',
+                    phone:       phonesByPersonId.get(personId) || dest,
                     birthday:    fmtDate(attrs.birthdate),
                     anniversary: fmtDate(attrs.anniversary),
-                    city:        cityByPersonId.get(person.id)  || '',
-                    state:       stateByPersonId.get(person.id) || '',
+                    city:        cityByPersonId.get(personId)   || '',
+                    state:       stateByPersonId.get(personId)  || '',
                 };
             }
         }

@@ -207,6 +207,49 @@ async function startServer() {
     // Sending
     app.post('/api/messaging/send-individual', express.json(), sendIndividual);
     app.post('/api/messaging/send-bulk', express.json(), sendBulk);
+
+    // Quick-send routes used by the NewMessageComposer modal (sends to a PCO List or Group
+    // without creating a campaign doc first — delegates to the same bulk-send pipeline).
+    app.post('/api/messaging/send-to-list', express.json(), async (req: any, res: any) => {
+        const { churchId, pcoListId, listName, body, mediaUrls = [], sentBy, sentByName, smsNumberId, twilioNumberId } = req.body || {};
+        if (!churchId || !pcoListId || !body) {
+            return res.status(400).json({ error: 'Missing churchId, pcoListId, or body' });
+        }
+        try {
+            const db = getDb();
+            const { resolvePcoRecipients } = await import('./backend/smsCampaignScheduler.js');
+            const { sendBulkInternal }     = await import('./backend/smsSend.js');
+            const { destinations, personMap } = await resolvePcoRecipients(db, churchId, pcoListId, undefined, 'sms');
+            if (!destinations.length) {
+                return res.status(400).json({ error: 'No phone numbers found in this PCO list (members may be missing phone numbers).' });
+            }
+            const result = await sendBulkInternal({ db, churchId, phones: destinations, body, mediaUrls, sentBy, sentByName, personMap, smsNumberId: smsNumberId || twilioNumberId || null });
+            return res.json({ success: true, listName, ...result });
+        } catch (e: any) {
+            console.error('[send-to-list]', e.message);
+            return res.status(500).json({ error: e.message || 'Send failed' });
+        }
+    });
+    app.post('/api/messaging/send-to-group', express.json(), async (req: any, res: any) => {
+        const { churchId, pcoGroupId, groupName, body, mediaUrls = [], sentBy, sentByName, smsNumberId, twilioNumberId } = req.body || {};
+        if (!churchId || !pcoGroupId || !body) {
+            return res.status(400).json({ error: 'Missing churchId, pcoGroupId, or body' });
+        }
+        try {
+            const db = getDb();
+            const { resolvePcoRecipients } = await import('./backend/smsCampaignScheduler.js');
+            const { sendBulkInternal }     = await import('./backend/smsSend.js');
+            const { destinations, personMap } = await resolvePcoRecipients(db, churchId, undefined, pcoGroupId, 'sms');
+            if (!destinations.length) {
+                return res.status(400).json({ error: 'No phone numbers found in this PCO group (members may be missing phone numbers).' });
+            }
+            const result = await sendBulkInternal({ db, churchId, phones: destinations, body, mediaUrls, sentBy, sentByName, personMap, smsNumberId: smsNumberId || twilioNumberId || null });
+            return res.json({ success: true, groupName, ...result });
+        } catch (e: any) {
+            console.error('[send-to-group]', e.message);
+            return res.status(500).json({ error: e.message || 'Send failed' });
+        }
+    });
     // Workflow bulk-enrollment from a PCO List or Group
     app.post('/api/messaging/workflow-enroll-list', express.json(), workflowEnrollList);
     app.post('/api/messaging/workflow-enroll-preview', express.json(), workflowEnrollPreview);
