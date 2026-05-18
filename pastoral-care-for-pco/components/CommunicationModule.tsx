@@ -1222,7 +1222,7 @@ export const CommunicationModule: React.FC<{ churchId: string; church?: Church; 
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ campaignId, churchId, ...(testEmail ? { testEmail } : {}) })
+      body: JSON.stringify({ campaignId, churchId, sentBy: currentUserId, ...(testEmail ? { testEmail } : {}) })
     });
 
     const data = await res.json();
@@ -1269,7 +1269,7 @@ export const CommunicationModule: React.FC<{ churchId: string; church?: Church; 
       const res = await fetch(`${apiBaseUrl}/email/schedule`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ campaignId: activeCampaign.id, churchId, scheduledAt, recurringFrequency }),
+        body: JSON.stringify({ campaignId: activeCampaign.id, churchId, scheduledAt, recurringFrequency, sentBy: currentUserId }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to schedule');

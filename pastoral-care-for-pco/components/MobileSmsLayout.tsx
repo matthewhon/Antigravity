@@ -454,7 +454,7 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
         const res = await fetch(`${apiBaseUrl}/email/send`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ campaignId: campaign.id, churchId })
+            body: JSON.stringify({ campaignId: campaign.id, churchId, sentBy: currentUser.id })
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);

@@ -128,6 +128,10 @@ export interface Church {
         /** If true, people whose PCO status is 'inactive' are hidden throughout the app */
         hideInactiveMembers?: boolean;
     };
+    /** Permissions mapping for SMS/Email Broadcasts to Lists and Groups */
+    broadcastPermissions?: {
+        allowedAccess: Record<string, { roles: string[]; userIds: string[] }>;
+    };
     /** Grow integration settings */
     growSettings?: {
         growTracksEnabled?: boolean;
@@ -1620,4 +1624,19 @@ export interface BillingUsage {
     date: string;           // YYYY-MM-DD
     storageBytes: number;   // Daily snapshot of storage used
     egressBytes: number;    // Accumulated egress for this day
+}
+
+export function hasBroadcastAccess(currentUser: User | undefined, targetId: string, church?: Church): boolean {
+    if (!currentUser) return false;
+    if (currentUser.roles.includes('System Administration') || currentUser.roles.includes('Church Admin')) {
+        return true;
+    }
+    const accessMap = church?.broadcastPermissions?.allowedAccess || {};
+    const access = accessMap[targetId];
+    if (!access) return false; // Default restricted
+
+    if (access.userIds.includes(currentUser.id)) return true;
+    if (access.roles.some(r => currentUser.roles.includes(r as UserRole))) return true;
+    
+    return false;
 }

@@ -11,7 +11,7 @@ import {
 } from 'firebase/firestore';
 import { pcoService } from '../services/pcoService';
 import { firestore } from '../services/firestoreService';
-import { SmsCampaign, SmsConversation, SmsMessage, SmsKeyword, SmsKeywordAction, SmsOptOut, SmsWorkflow, SmsWorkflowStep, SmsWorkflowEnrollment, SmsTag, Church, User, WorkflowChannelType, WorkflowNode, WorkflowActionNode, WorkflowDelayNode, WorkflowBranchNode, WorkflowBranchConditionType, TwilioPhoneNumber, SmsAgentKnowledge, SmsAiSuggestion } from '../types';
+import { SmsCampaign, SmsConversation, SmsMessage, SmsKeyword, SmsKeywordAction, SmsOptOut, SmsWorkflow, SmsWorkflowStep, SmsWorkflowEnrollment, SmsTag, Church, User, WorkflowChannelType, WorkflowNode, WorkflowActionNode, WorkflowDelayNode, WorkflowBranchNode, WorkflowBranchConditionType, TwilioPhoneNumber, SmsAgentKnowledge, SmsAiSuggestion, hasBroadcastAccess } from '../types';
 import {
     MessageSquare, Send, Clock, Users, Plus, ArrowLeft, Trash2,
     Eye, Pencil, ChevronDown, CheckCircle, Circle, Loader2, X,
@@ -21,6 +21,7 @@ import {
     Smile, Image as ImageIcon, Link, Sparkles, ChevronRight, RotateCcw,
     Mail, Tag, Filter, Hash, Upload, ExternalLink, GitBranch, Info, ShieldCheck, Globe2, PlusCircle, Lock, Unlock, ListPlus, Tv2, FileText
 } from 'lucide-react';
+import { BroadcastPermissionsTab } from './BroadcastPermissionsTab';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -335,6 +336,8 @@ const FilePickerDialog: React.FC<{
 interface ComposerProps {
     campaign: SmsCampaign;
     churchId: string;
+    church: Church;
+    currentUser: User;
     apiBase: string;
     onBack: () => void;
     onSave: (updates: Partial<SmsCampaign>) => Promise<void>;
@@ -347,7 +350,7 @@ interface ComposerProps {
 import { SimpleRichTextEditor } from './SimpleRichTextEditor';
 
 const CampaignComposer: React.FC<ComposerProps> = ({
-    campaign, churchId, onBack, onSave, onSend, onSchedule, onCancelSchedule, isSending,
+    campaign, churchId, church, currentUser, onBack, onSave, onSend, onSchedule, onCancelSchedule, isSending,
 }) => {
     const [local, setLocal] = useState<SmsCampaign>(campaign);
     const [pcoLists, setPcoLists] = useState<{ id: string; name: string; total_people: number }[]>([]);
@@ -416,10 +419,10 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                 id: r.id,
                 name: r.attributes?.name || 'Unnamed',
                 total_people: r.attributes?.total_people ?? 0,
-            })));
+            })).filter(list => hasBroadcastAccess(currentUser, list.id, church)));
             setLoadingLists(false);
         }).catch(() => setLoadingLists(false));
-    }, [churchId]);
+    }, [churchId, church, currentUser]);
 
     useEffect(() => {
         if (toTab === 'groups' && pcoGroups.length === 0) {
@@ -429,11 +432,11 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                     id: r.id,
                     name: r.attributes?.name || 'Unnamed',
                     memberCount: r.attributes?.memberships_count ?? r.attributes?.member_count ?? 0,
-                })));
+                })).filter(group => hasBroadcastAccess(currentUser, group.id, church)));
                 setLoadingGroups(false);
             }).catch(() => setLoadingGroups(false));
         }
-    }, [toTab, churchId, pcoGroups.length]);
+    }, [toTab, churchId, pcoGroups.length, church, currentUser]);
 
     const recipientLabel = local.toGroupName ? `Group: ${local.toGroupName}` : local.toListName || '';
 
@@ -982,12 +985,13 @@ type RecipientMode = 'individual' | 'list' | 'group';
 
 const NewMessageComposer: React.FC<{
     churchId: string;
+    church: Church;
     currentUser: User;
     /** When set, all sends go from this specific phone number */
     twilioNumberId?: string | null;
     onClose: () => void;
     onSent: () => void;
-}> = ({ churchId, currentUser, twilioNumberId, onClose, onSent }) => {
+}> = ({ churchId, church, currentUser, twilioNumberId, onClose, onSent }) => {
     const [mode, setMode] = useState<RecipientMode>('individual');
     const [body, setBody] = useState('');
     const [sending, setSending] = useState(false);
@@ -1161,10 +1165,10 @@ const NewMessageComposer: React.FC<{
                 id: l.id,
                 name: l.attributes?.name || l.name || 'Unnamed List',
                 total_people: l.attributes?.total_people ?? l.total_people ?? 0,
-            }))))
+            })).filter(list => hasBroadcastAccess(currentUser, list.id, church)))
             .catch(() => { })
             .finally(() => setLoadingLists(false));
-    }, [mode]);
+    }, [mode, churchId, currentUser, church]);
 
     // Load PCO groups when mode switches
     useEffect(() => {
@@ -1175,10 +1179,10 @@ const NewMessageComposer: React.FC<{
                 id: x.id,
                 name: x.attributes?.name || x.name || 'Unnamed Group',
                 memberCount: x.attributes?.members_count ?? x.attributes?.member_count ?? x.memberCount ?? 0,
-            }))))
+            })).filter(group => hasBroadcastAccess(currentUser, group.id, church)))
             .catch(() => { })
             .finally(() => setLoadingGroups(false));
-    }, [mode]);
+    }, [mode, churchId, currentUser, church]);
 
     const filteredLists = pcoLists.filter(l => l.name.toLowerCase().includes(listSearch.toLowerCase()));
     const filteredGroups = pcoGroups.filter(g => g.name.toLowerCase().includes(groupSearch.toLowerCase()));
@@ -2048,6 +2052,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
             {showComposer && (
                 <NewMessageComposer
                     churchId={churchId}
+                    church={church}
                     currentUser={currentUser}
                     twilioNumberId={twilioNumberId}
                     onClose={() => setShowComposer(false)}
@@ -7950,7 +7955,7 @@ interface MessagingModuleProps {
     currentUser: User;
     onUpdateChurch?: (updates: Partial<Church>) => void;
     /** When provided by a parent route, drives the active tab and hides the internal pill nav */
-    controlledTab?: 'campaigns' | 'inbox' | 'keywords' | 'analytics' | 'workflows' | 'agent';
+    controlledTab?: 'campaigns' | 'inbox' | 'keywords' | 'analytics' | 'workflows' | 'agent' | 'permissions';
     /** Pre-selected phone number ID supplied by a parent (e.g. MobileSmsLayout). */
     initialNumberId?: string | null;
     /** When true the built-in number dropdown is hidden (parent owns the selector UI). */
@@ -7960,7 +7965,7 @@ interface MessagingModuleProps {
 const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, currentUser, onUpdateChurch, controlledTab, initialNumberId, hideNumberSelector }) => {
     const smsEnabled = church.smsSettings?.smsEnabled;
 
-    type Tab = 'campaigns' | 'inbox' | 'keywords' | 'analytics' | 'workflows' | 'agent';
+    type Tab = 'campaigns' | 'inbox' | 'keywords' | 'analytics' | 'workflows' | 'agent' | 'permissions';
     const [activeTab, setActiveTab] = useState<Tab>('campaigns');
     const effectiveTab: Tab = controlledTab ?? activeTab;
     const [campaigns, setCampaigns] = useState<SmsCampaign[]>([]);
@@ -8032,6 +8037,10 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
             { key: 'analytics', perm: 'analyticsUserIds' },
             { key: 'agent', perm: 'aiAgentUserIds' },
         ] as const).filter(t => canUserUseFeature(activeNumber, currentUser, t.perm as any));
+
+        if (currentUser.roles.includes('Church Admin') || currentUser.roles.includes('System Administration')) {
+            allowedTabs.push({ key: 'permissions', perm: 'broadcastUserIds' as any });
+        }
 
         if (allowedTabs.length > 0 && !allowedTabs.some(t => t.key === activeTab) && !controlledTab) {
             setActiveTab(allowedTabs[0].key as Tab);
@@ -8106,6 +8115,7 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                     body: JSON.stringify({
                         churchId,
                         campaignId: campaignToSend.id,
+                        sentBy: currentUser.id,
                         collectionName: 'smsCampaigns' // Let backend know it's stored here
                     }),
                 });
@@ -8263,15 +8273,20 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
         ? campaigns.filter(c => !c.twilioNumberId || c.twilioNumberId === activeNumberId)
         : campaigns;
 
+    const hasPillNav = !controlledTab;
+    const hasNumberSelector = !hideNumberSelector && smsEnabled && visibleNumbers.length > 0;
+    const hasFallbackBadge = !!(!activeCampaign && controlledTab && visibleNumbers.length === 0 && church.smsSettings?.twilioSubAccountSid && church.smsSettings?.twilioPhoneNumber);
+    const showTopSection = !activeCampaign && (hasPillNav || hasNumberSelector || hasFallbackBadge);
+
     return (
         <div className="flex flex-col h-full">
             {/* Toast */}
             {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
 
             {/* Top section: tabs + phone number badge */}
-            {!activeCampaign && (
+            {showTopSection && (
                 <div className={`flex flex-col md:flex-row md:items-center justify-between gap-4 px-4 md:px-6 pt-3 pb-3 shrink-0 ${controlledTab ? 'border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/20' : ''}`}>
-                    {!controlledTab ? (
+                    {!controlledTab && (
                         <div className="flex gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl overflow-x-auto no-scrollbar w-full md:w-auto">
                             {([
                                 { key: 'campaigns', label: 'Broadcast', icon: <MessageSquare size={13} />, perm: 'broadcastUserIds' },
@@ -8282,6 +8297,7 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                                 { key: 'agent', label: 'AI Agent', icon: <Sparkles size={13} />, perm: 'aiAgentUserIds' },
                             ] as const)
                                 .filter(t => canUserUseFeature(activeNumber, currentUser, t.perm as any))
+                                .concat((currentUser.roles.includes('Church Admin') || currentUser.roles.includes('System Administration')) ? [{ key: 'permissions', label: 'Permissions', icon: <Shield size={13} />, perm: 'broadcastUserIds' }] : [])
                                 .map(t => (
                                     <button
                                         key={t.key}
@@ -8291,10 +8307,6 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                                         {t.icon} {t.label}
                                     </button>
                                 ))}
-                        </div>
-                    ) : (
-                        <div className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-400">
-                            Active Line
                         </div>
                     )}
                     {/* Number selector dropdown — hidden when parent (MobileSmsLayout) owns this UI */}
@@ -8418,6 +8430,18 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                 {effectiveTab === 'agent' && (
                     <div className="h-full overflow-y-auto">
                         <SmsAgentTab
+                            churchId={churchId}
+                            church={church}
+                            currentUser={currentUser}
+                            onUpdateChurch={onUpdateChurch}
+                        />
+                    </div>
+                )}
+
+                {/* Permissions tab */}
+                {effectiveTab === 'permissions' && (
+                    <div className="h-full overflow-y-auto">
+                        <BroadcastPermissionsTab
                             churchId={churchId}
                             church={church}
                             currentUser={currentUser}

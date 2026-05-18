@@ -17,7 +17,7 @@ import { PcoImportModal } from './PcoImportModal';
 import MessagingModule from './MessagingModule';
 import QrCodeGenerator from './QrCodeGenerator';
 import { FileManager } from './FileManager';
-import { EmailCampaign, TemplateSettings, PcoList, Church, User, EmailUnsubscribe, SmsOptOut } from '../types';
+import { EmailCampaign, TemplateSettings, PcoList, Church, User, EmailUnsubscribe, SmsOptOut, hasBroadcastAccess } from '../types';
 import { 
   Trash2, Eye, Pencil, Loader2, X, List, UserMinus, Search, Copy, Globe, BarChart2, MessageSquare, Phone,
   Mail, CheckCircle, Circle, ChevronUp, ChevronDown, Clock, Calendar, Plus, Send, ArrowLeft, AlignLeft, Users, AtSign, FileText, Smartphone, ExternalLink, Folder
@@ -1380,9 +1380,10 @@ const SendTestModal: React.FC<SendTestModalProps> = ({ onConfirm, onCancel, isSe
 export const QuickSendModal: React.FC<{
   churchId: string;
   church?: Church;
+  currentUser: User;
   onClose: () => void;
   onSendQuickEmail: (campaign: EmailCampaign) => Promise<void>;
-}> = ({ churchId, church, onClose, onSendQuickEmail }) => {
+}> = ({ churchId, church, currentUser, onClose, onSendQuickEmail }) => {
   const [targetType, setTargetType] = useState<'group' | 'list'>('group');
   const [targetId, setTargetId] = useState('');
   const [subject, setSubject] = useState('');
@@ -1403,7 +1404,7 @@ export const QuickSendModal: React.FC<{
           id: r.id,
           name: r.attributes?.name || 'Unnamed',
           memberCount: r.attributes?.memberships_count ?? r.attributes?.member_count ?? 0,
-        })));
+        })).filter(group => hasBroadcastAccess(currentUser, group.id, church)));
       })
       .catch(e => console.error('Failed to load PCO groups', e))
       .finally(() => setLoadingGroups(false));
@@ -1414,11 +1415,11 @@ export const QuickSendModal: React.FC<{
           id: r.id,
           name: r.attributes?.name || 'Unnamed',
           memberCount: r.attributes?.total_people ?? 0,
-        })));
+        })).filter(list => hasBroadcastAccess(currentUser, list.id, church)));
       })
       .catch(e => console.error('Failed to load PCO lists', e))
       .finally(() => setLoadingLists(false));
-  }, [churchId]);
+  }, [churchId, church, currentUser]);
 
   // Reset target ID when switching types
   useEffect(() => {
@@ -1739,7 +1740,7 @@ currentUser, onUpdateChurch, activePage, smsTab, mobileSmsUrl }) => {
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ campaignId, churchId, ...(testEmail ? { testEmail } : {}) })
+      body: JSON.stringify({ campaignId, churchId, sentBy: currentUser.id, ...(testEmail ? { testEmail } : {}) })
     });
 
     const data = await res.json();
@@ -1800,7 +1801,7 @@ currentUser, onUpdateChurch, activePage, smsTab, mobileSmsUrl }) => {
       const res = await fetch(`${apiBaseUrl}/email/schedule`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ campaignId: activeCampaign.id, churchId, scheduledAt, recurringFrequency }),
+        body: JSON.stringify({ campaignId: activeCampaign.id, churchId, scheduledAt, recurringFrequency, sentBy: currentUser.id }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to schedule');
@@ -2215,10 +2216,11 @@ currentUser, onUpdateChurch, activePage, smsTab, mobileSmsUrl }) => {
       )}
 
       {/* Quick Send Modal */}
-      {showQuickSendModal && (
+      {showQuickSendModal && currentUser && (
         <QuickSendModal
           churchId={churchId}
           church={church}
+          currentUser={currentUser}
           onClose={() => setShowQuickSendModal(false)}
           onSendQuickEmail={handleSendQuickEmail}
         />
