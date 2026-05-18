@@ -467,41 +467,54 @@ async function runWorkflowStepExecutor(db: any): Promise<void> {
                     }
 
                 } else if (channelType === 'staff_sms') {
-                    const notifyIds = step.notifyTargetIds || [];
-                    if (notifyIds.length > 0) {
-                        const { sendBulkInternal } = await import('./smsSend.js');
-                        
-                        const staffPhones: string[] = [];
-                        for (const uid of notifyIds) {
-                             const userSnap = await db.collection('users').doc(uid).get();
-                             if (userSnap.exists) {
-                                  const userData = userSnap.data() as any;
-                                  if (userData.phone) staffPhones.push(userData.phone);
-                             }
-                        }
-                        
-                        if (staffPhones.length > 0) {
-                            const pMap: any = {};
-                            for (const sp of staffPhones) {
-                                pMap[sp] = personInfo;
+                    const { sendBulkInternal } = await import('./smsSend.js');
+                    const staffTargetType = step.staffTargetType || 'individuals';
+                    const staffPhones: string[] = [];
+                    
+                    if (staffTargetType === 'individuals') {
+                        const recs = step.staffRecipients || [];
+                        for (const r of recs) {
+                            if (r.phone) {
+                                const digits = r.phone.replace(/\D/g, '');
+                                const e164 = digits.length === 10 ? `+1${digits}` : digits.length === 11 ? `+${digits}` : '';
+                                if (e164) staffPhones.push(e164);
                             }
-                            
-                            await sendBulkInternal({
-                                db,
-                                churchId,
-                                campaignId:     `wf_${workflowId}_step${currentStep}_staff`,
-                                phones:         staffPhones,
-                                body:           step.message || '',
-                                mediaUrls:      step.mediaUrls || [],
-                                personMap:      pMap,
-                                twilioNumberId: wf.twilioNumberId || null,
-                            });
-                            log.info(`[WorkflowExecutor] Sent staff_sms to ${staffPhones.length} staff members`, 'system', { enrollId }, churchId);
-                        } else {
-                            log.warn(`[WorkflowExecutor] staff_sms step skipped - no valid phone numbers found for target staff`, 'system', { enrollId }, churchId);
                         }
+                    } else if ((staffTargetType === 'list' && step.staffListId) || (staffTargetType === 'group' && step.staffGroupId)) {
+                        const churchSnap = await db.collection('churches').doc(churchId).get();
+                        const token = churchSnap.data()?.pcoAccessToken || '';
+                        if (token) {
+                            const { resolvePcoPersons } = await import('./workflowEnrollEndpoint.js');
+                            const persons = await resolvePcoPersons(
+                                token,
+                                staffTargetType === 'list' ? step.staffListId : null,
+                                staffTargetType === 'group' ? step.staffGroupId : null
+                            );
+                            for (const p of persons) {
+                                if (p.e164) staffPhones.push(p.e164);
+                            }
+                        }
+                    }
+                    
+                    if (staffPhones.length > 0) {
+                        const pMap: any = {};
+                        for (const sp of staffPhones) {
+                            pMap[sp] = personInfo;
+                        }
+                        
+                        await sendBulkInternal({
+                            db,
+                            churchId,
+                            campaignId:     `wf_${workflowId}_step${currentStep}_staff`,
+                            phones:         staffPhones,
+                            body:           step.message || '',
+                            mediaUrls:      step.mediaUrls || [],
+                            personMap:      pMap,
+                            twilioNumberId: wf.twilioNumberId || null,
+                        });
+                        log.info(`[WorkflowExecutor] Sent staff_sms to ${staffPhones.length} staff members`, 'system', { enrollId }, churchId);
                     } else {
-                        log.warn(`[WorkflowExecutor] staff_sms step skipped - no target staff selected`, 'system', { enrollId }, churchId);
+                        log.warn(`[WorkflowExecutor] staff_sms step skipped - no valid phone numbers found for target staff`, 'system', { enrollId }, churchId);
                     }
                 }
 

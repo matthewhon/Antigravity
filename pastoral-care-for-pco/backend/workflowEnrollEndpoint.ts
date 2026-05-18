@@ -28,7 +28,7 @@ interface PersonInfo {
  * Returns a flat array of PersonInfo objects (phone numbers in E.164 format).
  * Handles PCO pagination automatically.
  */
-async function resolvePcoPersons(
+export async function resolvePcoPersons(
     token: string,
     listId?: string | null,
     groupId?: string | null,
