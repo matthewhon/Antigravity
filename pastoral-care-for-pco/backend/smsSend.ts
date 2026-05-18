@@ -374,7 +374,7 @@ export async function sendBulkInternal(params: {
         }
     }
 
-    if (campaignId && !campaignId.startsWith('wf_')) {
+    if (campaignId && !campaignId.startsWith('wf_') && !campaignId.startsWith('services_')) {
         await db.collection('smsCampaigns').doc(campaignId).update({
             status: 'sent', sentAt: Date.now(),
             recipientCount: phones.length,
