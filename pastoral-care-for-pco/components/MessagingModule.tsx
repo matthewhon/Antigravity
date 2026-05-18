@@ -19,7 +19,7 @@ import {
     Inbox, BarChart3, Copy, Zap, MessageCircle, TrendingUp, TrendingDown,
     Activity, DollarSign, UserX, Edit3, UserCheck, List, Layers,
     Smile, Image as ImageIcon, Link, Sparkles, ChevronRight, RotateCcw,
-    Mail, Tag, Filter, Hash, Upload, ExternalLink, GitBranch, Info, ShieldCheck, Globe2, PlusCircle, Lock, Unlock, ListPlus, Tv2, FileText
+    Mail, Tag, Filter, Hash, Upload, ExternalLink, GitBranch, Info, ShieldCheck, Shield, Globe2, PlusCircle, Lock, Unlock, ListPlus, Tv2, FileText
 } from 'lucide-react';
 import { BroadcastPermissionsTab } from './BroadcastPermissionsTab';
 
@@ -8297,7 +8297,7 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                                 { key: 'agent', label: 'AI Agent', icon: <Sparkles size={13} />, perm: 'aiAgentUserIds' },
                             ] as const)
                                 .filter(t => canUserUseFeature(activeNumber, currentUser, t.perm as any))
-                                .concat((currentUser.roles.includes('Church Admin') || currentUser.roles.includes('System Administration')) ? [{ key: 'permissions', label: 'Permissions', icon: <Shield size={13} />, perm: 'broadcastUserIds' }] : [])
+                                .concat((currentUser.roles.includes('Church Admin') || currentUser.roles.includes('System Administration')) ? [{ key: 'permissions', label: 'Permissions', icon: <Shield size={13} />, perm: 'broadcastUserIds' } as any] : [])
                                 .map(t => (
                                     <button
                                         key={t.key}

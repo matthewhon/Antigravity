@@ -13,9 +13,6 @@ interface BroadcastPermissionsTabProps {
     onUpdateChurch?: (updates: Partial<Church>) => void;
 }
 
-    'Email', 'Polls', 'Workflows', 'Notes'
-];
-
 export const BroadcastPermissionsTab: React.FC<BroadcastPermissionsTabProps> = ({ churchId, church, currentUser, allUsers, onUpdateChurch }) => {
     const [lists, setLists] = useState<any[]>([]);
     const [groups, setGroups] = useState<any[]>([]);
