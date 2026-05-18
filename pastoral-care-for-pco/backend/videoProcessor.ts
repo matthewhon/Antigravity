@@ -29,7 +29,7 @@ export async function processVideoJob(job: any) {
     await new Promise<void>((resolve, reject) => {
       ffmpeg(tempInputPath)
         .outputOptions([
-          '-vf scale=\\'trunc(oh*a/2)*2:min(480,ih)\\'', // scale height to 480p max, keeping aspect ratio
+          "-vf scale='trunc(oh*a/2)*2:min(480,ih)'", // scale height to 480p max, keeping aspect ratio
           '-c:v libx264',
           '-crf 28', // Good balance between quality and size
           '-preset veryfast',
