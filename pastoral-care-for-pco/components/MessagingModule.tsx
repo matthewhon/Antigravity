@@ -6467,8 +6467,7 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
                     body: JSON.stringify({
                         churchId,
                         workflowId: wf.id,
-                        targetType: 'list',
-                        targetId: wf.triggerListId,
+                        listId: wf.triggerListId,
                     })
                 }).catch(e => console.error('Failed to trigger list enrollment:', e));
             } else if (wf.trigger === 'event_registration' || wf.trigger === 'birthday' || wf.trigger === 'anniversary') {
