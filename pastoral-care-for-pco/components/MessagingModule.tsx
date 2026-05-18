@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { db as firebaseDb } from '../services/firebase';
@@ -557,7 +557,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                             update({ toListId: sel?.id ?? null, toListName: sel?.name, toGroupId: null, toGroupName: undefined });
                                         }}
                                     >
-                                        <option value="">� Select a PCO List �</option>
+                                        <option value="">— Select a PCO List —</option>
                                         {pcoLists.map(l => <option key={l.id} value={l.id}>{l.name} ({l.total_people})</option>)}
                                     </select>
                                 )}
@@ -578,7 +578,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                             update({ toGroupId: sel?.id ?? null, toGroupName: sel?.name, toListId: null, toListName: undefined });
                                         }}
                                     >
-                                        <option value="">� Select a PCO Group �</option>
+                                        <option value="">— Select a PCO Group —</option>
                                         {pcoGroups.map(g => <option key={g.id} value={g.id}>{g.name}{g.memberCount > 0 ? ` (${g.memberCount})` : ''}</option>)}
                                     </select>
                                 )}
@@ -2776,7 +2776,7 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingL
                         disabled={isBusy}
                         className="flex-1 py-2.5 text-sm font-black bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-xl transition flex items-center justify-center gap-2"
                     >
-                        {isBusy ? <><Loader2 size={14} className="animate-spin" />Saving�</> : <><CheckCircle size={14} />{isEdit ? 'Save Changes' : 'Create Keyword'}</>}
+                        {isBusy ? <><Loader2 size={14} className="animate-spin" />Saving...</> : <><CheckCircle size={14} />{isEdit ? 'Save Changes' : 'Create Keyword'}</>}
                     </button>
                 </div>
             </div>
@@ -3699,7 +3699,7 @@ const SmsKeywordsManager: React.FC<{
                                 disabled={tagBusy || !tagName.trim()}
                                 className="flex-1 py-2.5 text-sm font-black bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-xl transition flex items-center justify-center gap-2"
                             >
-                                {tagBusy ? <><Loader2 size={14} className="animate-spin" />Saving�</> : <><CheckCircle size={14} />{editTag ? 'Save' : 'Create Tag'}</>}
+                                {tagBusy ? <><Loader2 size={14} className="animate-spin" />Saving...</> : <><CheckCircle size={14} />{editTag ? 'Save' : 'Create Tag'}</>}
                             </button>
                         </div>
                     </div>
@@ -6077,7 +6077,7 @@ const EnrollmentPane: React.FC<{
                         disabled={!phone.trim() || enrolling}
                         className="w-full py-2.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-sm font-bold rounded-xl transition flex items-center justify-center gap-2"
                     >
-                        {enrolling ? <><Loader2 size={13} className="animate-spin" />Enrolling�</> : <><Plus size={13} />Enroll in Workflow</>}
+                        {enrolling ? <><Loader2 size={13} className="animate-spin" />Enrolling...</> : <><Plus size={13} />Enroll in Workflow</>}
                     </button>
                 </div>
 
@@ -6267,7 +6267,7 @@ const BulkEnrollFromListModal: React.FC<{
                         {/* Dropdown */}
                         {tab === 'lists' ? (
                             loadingLists ? (
-                                <div className="flex items-center gap-2 text-slate-400 text-xs py-2"><Loader2 size={13} className="animate-spin" /> Loading PCO Lists�</div>
+                                <div className="flex items-center gap-2 text-slate-400 text-xs py-2"><Loader2 size={13} className="animate-spin" /> Loading PCO Lists...</div>
                             ) : (
                                 <div>
                                     <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">PCO List</label>
@@ -6278,7 +6278,7 @@ const BulkEnrollFromListModal: React.FC<{
                                         aria-label="Select a PCO List"
                                         className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
                                     >
-                                        <option value="">� Select a PCO List �</option>
+                                        <option value="">— Select a PCO List —</option>
                                         {pcoLists.length === 0 && <option disabled>No lists found (connect PCO first)</option>}
                                         {pcoLists.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
                                     </select>
@@ -6286,7 +6286,7 @@ const BulkEnrollFromListModal: React.FC<{
                             )
                         ) : (
                             loadingGroups ? (
-                                <div className="flex items-center gap-2 text-slate-400 text-xs py-2"><Loader2 size={13} className="animate-spin" /> Loading PCO Groups�</div>
+                                <div className="flex items-center gap-2 text-slate-400 text-xs py-2"><Loader2 size={13} className="animate-spin" /> Loading PCO Groups...</div>
                             ) : (
                                 <div>
                                     <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">PCO Group</label>
@@ -6297,7 +6297,7 @@ const BulkEnrollFromListModal: React.FC<{
                                         aria-label="Select a PCO Group"
                                         className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
                                     >
-                                        <option value="">� Select a PCO Group �</option>
+                                        <option value="">— Select a PCO Group —</option>
                                         {pcoGroups.length === 0 && <option disabled>No groups found (connect PCO first)</option>}
                                         {pcoGroups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
                                     </select>
@@ -6309,7 +6309,7 @@ const BulkEnrollFromListModal: React.FC<{
                         {selectedId && (
                             <div className="flex items-center gap-2">
                                 {loadingCount ? (
-                                    <span className="flex items-center gap-1.5 text-xs text-slate-400"><Loader2 size={11} className="animate-spin" /> Fetching count�</span>
+                                    <span className="flex items-center gap-1.5 text-xs text-slate-400"><Loader2 size={11} className="animate-spin" /> Fetching count...</span>
                                 ) : memberCount !== null ? (
                                     <span className="flex items-center gap-1.5 text-xs font-bold text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/30 px-2.5 py-1 rounded-full">
                                         <Users size={11} /> {memberCount.toLocaleString()} member{memberCount !== 1 ? 's' : ''}
@@ -6338,7 +6338,7 @@ const BulkEnrollFromListModal: React.FC<{
                                 className="flex-1 py-2.5 text-sm font-black text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition shadow-md shadow-violet-200 dark:shadow-violet-900/30 flex items-center justify-center gap-2"
                             >
                                 {enrolling
-                                    ? <><Loader2 size={13} className="animate-spin" /> Enrolling�</>
+                                    ? <><Loader2 size={13} className="animate-spin" /> Enrolling...</>
                                     : <><ListPlus size={13} /> Start Workflow</>}
                             </button>
                         </div>
@@ -6450,12 +6450,12 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
     const openEdit = (wf: SmsWorkflow) => { setEditing(wf); setSaveError(null); setViewMode('editor'); };
 
     const TRIGGER_BADGE: Record<string, { label: string; color: string; icon: string }> = {
-        manual: { label: 'Manual', color: 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300', icon: '??' },
-        keyword: { label: 'Keyword', color: 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300', icon: '??' },
-        list_add: { label: 'List Add', color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300', icon: '??' },
-        birthday: { label: 'Birthday', color: 'bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300', icon: '??' },
-        anniversary: { label: 'Anniversary', color: 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300', icon: '??' },
-        event_registration: { label: 'Event Registration', color: 'bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300', icon: '???' },
+        manual: { label: 'Manual', color: 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300', icon: '✋' },
+        keyword: { label: 'Keyword', color: 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300', icon: '💬' },
+        list_add: { label: 'List Add', color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300', icon: '📋' },
+        birthday: { label: 'Birthday', color: 'bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300', icon: '🎂' },
+        anniversary: { label: 'Anniversary', color: 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300', icon: '💍' },
+        event_registration: { label: 'Event Registration', color: 'bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300', icon: '🎟️' },
     };
 
     // Show editor view
@@ -6493,7 +6493,7 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
                         <Zap size={26} className="text-violet-500" /> Workflows
                     </h1>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                        Automated drip sequences � the right message at the right time.
+                        Automated drip sequences — the right message at the right time.
                     </p>
                 </div>
                 <button onClick={openNew} className="flex items-center gap-2 px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold rounded-xl transition shadow-md shadow-violet-200 dark:shadow-violet-900/40">
@@ -6503,18 +6503,18 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
 
             {/* Explainer */}
             <div className="flex items-start gap-4 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-2xl p-4 mb-6">
-                <div className="text-3xl">?</div>
+                <div className="text-3xl">💡</div>
                 <div>
                     <p className="text-sm font-bold text-violet-800 dark:text-violet-200 mb-1">How Workflows Work</p>
                     <p className="text-xs text-violet-700 dark:text-violet-300 leading-relaxed">
-                        Build a multi-step message sequence with custom delays between each step. Triggered automatically by a keyword text, a PCO List add, a <strong>?? birthday</strong>, a <strong>?? anniversary</strong>, a <strong>??? PCO event registration</strong> � or manually by staff. Once enrolled, contacts move through each step on schedule.
+                        Build a multi-step message sequence with custom delays between each step. Triggered automatically by a keyword text, a PCO List add, a <strong>🎂 birthday</strong>, a <strong>💍 anniversary</strong>, a <strong>🎟️ PCO event registration</strong> — or manually by staff. Once enrolled, contacts move through each step on schedule.
                     </p>
                 </div>
             </div>
 
             {/* Workflow cards */}
             {isLoading ? (
-                <div className="flex items-center justify-center h-40 text-slate-400"><Loader2 size={20} className="animate-spin mr-2" />Loading workflows�</div>
+                <div className="flex items-center justify-center h-40 text-slate-400"><Loader2 size={20} className="animate-spin mr-2" />Loading workflows...</div>
             ) : workflows.length === 0 ? (
                 <div className="text-center py-20 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
                     <Zap size={40} className="mx-auto text-slate-300 dark:text-slate-600 mb-3" />
@@ -6595,7 +6595,7 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
 
                                         {/* Actions on hover */}
                                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
-                                            {/* Bulk-enroll from PCO list � available on all workflows */}
+                                            {/* Bulk-enroll from PCO list — available on all workflows */}
                                             <button
                                                 onClick={() => setListEnrollTarget(wf)}
                                                 className="p-1.5 text-slate-400 hover:text-violet-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition"
@@ -6670,7 +6670,7 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
 };
 
 // --- SMS Terms & Privacy Modal -----------------------------------------------
-// First step of SmsSetupWizard � tenant must accept before claiming a number.
+// First step of SmsSetupWizard — tenant must accept before claiming a number.
 
 const SmsTermsModal: React.FC<{
     churchId: string;
@@ -6704,7 +6704,7 @@ const SmsTermsModal: React.FC<{
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onCancel}>
             <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
                 <div className="px-7 pt-7 pb-4 border-b border-slate-100 dark:border-slate-800 flex items-start gap-4 shrink-0">
-                    <div className="w-12 h-12 rounded-2xl bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center shrink-0"><span className="text-2xl">??</span></div>
+                    <div className="w-12 h-12 rounded-2xl bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center shrink-0"><span className="text-2xl">📜</span></div>
                     <div>
                         <h2 className="text-lg font-black text-slate-900 dark:text-white">SMS Service Terms of Use</h2>
                         <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Please read and accept before activating your church's SMS line.</p>
@@ -6732,7 +6732,7 @@ const SmsTermsModal: React.FC<{
                             <li>I am authorized to register commercial texting on behalf of this church.</li>
                             <li>We only message recipients who have <strong>explicitly opted in</strong> and will honor all STOP requests.</li>
                             <li>We will submit accurate legal info (name, EIN, address) for brand registration.</li>
-                            <li>We understand carrier approval may take 1�10 business days.</li>
+                            <li>We understand carrier approval may take 1-10 business days.</li>
                         </ul>
                     </section>
                 </div>
@@ -6752,7 +6752,7 @@ const SmsTermsModal: React.FC<{
                     <div className="flex gap-3 pt-1">
                         <button onClick={onCancel} className="flex-1 py-2.5 text-sm font-bold text-slate-600 dark:text-slate-400 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition">Cancel</button>
                         <button onClick={handleAccept} disabled={!allChecked || saving} className="flex-1 py-2.5 text-sm font-black text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition shadow-md shadow-indigo-200 dark:shadow-indigo-900/30">
-                            {saving ? 'Saving�' : 'I Accept � Continue ?'}
+                            {saving ? 'Saving...' : 'I Accept — Continue ➡️'}
                         </button>
                     </div>
                     {!allChecked && <p className="text-[10px] text-slate-400 text-center">Please check all three boxes above to continue.</p>}
@@ -6776,9 +6776,9 @@ const SmsSetupBanner: React.FC<{ onSetup: () => void }> = ({ onSetup }) => (
             </p>
             <div className="grid grid-cols-3 gap-4 mb-8 text-center">
                 {[
-                    { icon: '??', title: 'Local Number', desc: 'Pick an area code' },
-                    { icon: '??', title: 'Bulk Texts', desc: 'Reach entire lists' },
-                    { icon: '??', title: '2-Way Inbox', desc: 'Real conversations' },
+                    { icon: '📱', title: 'Local Number', desc: 'Pick an area code' },
+                    { icon: '📣', title: 'Bulk Texts', desc: 'Reach entire lists' },
+                    { icon: '💬', title: '2-Way Inbox', desc: 'Real conversations' },
                 ].map(f => (
                     <div key={f.title} className="bg-white/10 rounded-2xl p-3">
                         <div className="text-2xl mb-1">{f.icon}</div>
@@ -6791,7 +6791,7 @@ const SmsSetupBanner: React.FC<{ onSetup: () => void }> = ({ onSetup }) => (
                 onClick={onSetup}
                 className="px-8 py-3 bg-white text-violet-700 font-black rounded-2xl hover:bg-violet-50 transition text-sm shadow-lg"
             >
-                Get Started ?
+                Get Started 🚀
             </button>
         </div>
     </div>
@@ -6955,7 +6955,7 @@ const SmsSetupWizard: React.FC<{
                                                 : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'
                                             }`}
                                     >
-                                        {mode === 'city-state' ? '?? City & State' : '# Area Code'}
+                                        {mode === 'city-state' ? '📍 City & State' : '# Area Code'}
                                     </button>
                                 ))}
                             </div>
@@ -7013,7 +7013,7 @@ const SmsSetupWizard: React.FC<{
                                 disabled={loadingNums || !canSearch}
                                 className="w-full py-3 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white font-black rounded-2xl transition mt-5 flex items-center justify-center gap-2"
                             >
-                                {loadingNums ? <><Loader2 size={16} className="animate-spin" /> Searching�</> : 'Find Available Numbers ?'}
+                                {loadingNums ? <><Loader2 size={16} className="animate-spin" /> Searching...</> : 'Find Available Numbers 🔍'}
                             </button>
                         </>
                     )}
@@ -7045,7 +7045,7 @@ const SmsSetupWizard: React.FC<{
                                 {/* Cross-state fallback notice (city found in a different state) */}
                                 {numbers.length > 0 && city && resolvedSearch.includes('(any state)') && (
                                     <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl px-3 py-2 mb-3">
-                                        ?? No numbers found in <strong>{city}, {stateAbbr}</strong> � showing numbers for <strong>{city}</strong> in another state instead.
+                                        ⚠️ No numbers found in <strong>{city}, {stateAbbr}</strong> — showing numbers for <strong>{city}</strong> in another state instead.
                                     </p>
                                 )}
 
@@ -7059,7 +7059,7 @@ const SmsSetupWizard: React.FC<{
                                             disabled={loadingNums}
                                             className="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-black rounded-xl transition flex items-center gap-2 mx-auto"
                                         >
-                                            {loadingNums ? <><Loader2 size={12} className="animate-spin" /> Searching�</> : `Search all of ${stateAbbr} ?`}
+                                            {loadingNums ? <><Loader2 size={12} className="animate-spin" /> Searching...</> : `Search all of ${stateAbbr} 🔍`}
                                         </button>
                                     </div>
                                 )}
@@ -7078,7 +7078,7 @@ const SmsSetupWizard: React.FC<{
                                                     <div className="flex-1 min-w-0">
                                                         <p className="font-black text-lg text-slate-900 dark:text-white tracking-wide">{n.friendlyName}</p>
                                                         <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold">
-                                                            ?? {cityState || `Area code ${areaCode}`}
+                                                            📍 {cityState || `Area code ${areaCode}`}
                                                         </span>
                                                     </div>
                                                     {selectedNumber === n.phoneNumber && (
@@ -7098,7 +7098,7 @@ const SmsSetupWizard: React.FC<{
                                             disabled={page === 0}
                                             className="flex items-center gap-1 text-xs font-bold text-slate-600 dark:text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 disabled:opacity-30 transition"
                                         >
-                                            ? Prev
+                                            ⬅️ Prev
                                         </button>
                                         <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
                                             Page {page + 1} of {totalPages}
@@ -7109,7 +7109,7 @@ const SmsSetupWizard: React.FC<{
                                             disabled={page >= totalPages - 1}
                                             className="flex items-center gap-1 text-xs font-bold text-slate-600 dark:text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 disabled:opacity-30 transition"
                                         >
-                                            Next ?
+                                            Next ➡️
                                         </button>
                                     </div>
                                 )}
@@ -7143,14 +7143,14 @@ const SmsSetupWizard: React.FC<{
                                 {error && <p className="text-sm text-red-500 mb-3">{error}</p>}
 
                                 <div className="flex gap-2">
-                                    <button onClick={() => setStep('search')} className="flex-1 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 transition">? Search Again</button>
+                                    <button onClick={() => setStep('search')} className="flex-1 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 transition">🔍 Search Again</button>
                                     {numbers.length > 0 && (
                                         <button
                                             onClick={provision}
                                             disabled={provisioning || !selectedNumber}
                                             className="flex-1 py-2.5 text-sm font-black bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-xl transition flex items-center justify-center gap-2"
                                         >
-                                            {provisioning ? <><Loader2 size={14} className="animate-spin" />Provisioning�</> : 'Claim Number ?'}
+                                            {provisioning ? <><Loader2 size={14} className="animate-spin" />Provisioning...</> : 'Claim Number ✅'}
                                         </button>
                                     )}
                                 </div>
@@ -7163,7 +7163,7 @@ const SmsSetupWizard: React.FC<{
                             <div className="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mx-auto mb-4">
                                 <CheckCircle size={32} className="text-emerald-600" />
                             </div>
-                            <h2 className="text-xl font-black text-slate-900 dark:text-white mb-2">You're All Set! ??</h2>
+                            <h2 className="text-xl font-black text-slate-900 dark:text-white mb-2">You're All Set! 🎉</h2>
                             <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
                                 Your church phone number has been provisioned. You can now send text campaigns and receive replies in your inbox.
                             </p>
@@ -7171,7 +7171,7 @@ const SmsSetupWizard: React.FC<{
                                 <strong>Next step:</strong> For high-volume sending (more than 200 msgs/day), complete A2P 10DLC brand registration in your Twilio Console to avoid carrier filtering.
                             </div>
                             <button onClick={onComplete} className="px-8 py-3 bg-violet-600 hover:bg-violet-700 text-white font-black rounded-2xl transition">
-                                Start Messaging ?
+                                Start Messaging 💬
                             </button>
                         </div>
                     )}
@@ -7270,7 +7270,7 @@ const NumberManager: React.FC<{
                 }),
             });
             setEditingId(null);
-            showToast('Saved ?');
+            showToast('Saved ✅');
         } catch {
             showToast('Save failed', 'error');
         } finally {
@@ -7284,7 +7284,7 @@ const NumberManager: React.FC<{
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ churchId, twilioNumberId: numId }),
         });
-        showToast('Default number updated ?');
+        showToast('Default number updated ✅');
     };
 
     const releaseNumber = async (num: TwilioPhoneNumber) => {
@@ -7437,7 +7437,7 @@ const NumberManager: React.FC<{
                                     </div>
                                     <div className="flex gap-2 pt-1">
                                         <button onClick={() => saveEdit(num.id)} disabled={saving} className="flex-1 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold transition disabled:opacity-50">
-                                            {saving ? 'Saving�' : 'Save Changes'}
+                                            {saving ? 'Saving...' : 'Save Changes'}
                                         </button>
                                         <button onClick={() => setEditingId(null)} className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-sm font-semibold hover:bg-slate-200 dark:hover:bg-slate-700 transition">
                                             Cancel
@@ -7825,7 +7825,7 @@ Write the reply:`;
                         disabled={saving}
                         className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-sm font-bold rounded-xl transition"
                     >
-                        {saving ? <><Loader2 size={14} className="animate-spin" /> Saving�</> : <><CheckCircle size={14} /> Save Knowledge Base</>}
+                        {saving ? <><Loader2 size={14} className="animate-spin" /> Saving...</> : <><CheckCircle size={14} /> Save Knowledge Base</>}
                     </button>
                 )}
             </div>
@@ -8203,7 +8203,7 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
             <div className="p-6 max-w-2xl mx-auto mt-12">
                 <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 p-8 shadow-sm">
                     <div className="w-14 h-14 rounded-2xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center mx-auto mb-4">
-                        <span className="text-2xl">??</span>
+                        <span className="text-2xl">📜</span>
                     </div>
                     <h2 className="text-xl font-black text-slate-900 dark:text-white text-center mb-2">
                         Complete Your Business Profile First
