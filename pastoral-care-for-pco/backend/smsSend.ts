@@ -38,15 +38,15 @@ function resolveMergeTags(body: string, person: PersonInfo): string {
     const firstName = parts[0] || '';
     const lastName  = parts.slice(1).join(' ') || '';
     return body
-        .replace(/\{firstName\}/gi,   firstName)
-        .replace(/\{lastName\}/gi,    lastName)
-        .replace(/\{fullName\}/gi,    person.personName || '')
-        .replace(/\{email\}/gi,       person.email      || '')
-        .replace(/\{phone\}/gi,       person.phone      || '')
-        .replace(/\{birthday\}/gi,    person.birthday   || '')
-        .replace(/\{anniversary\}/gi, person.anniversary || '')
-        .replace(/\{city\}/gi,        person.city       || '')
-        .replace(/\{state\}/gi,       person.state      || '');
+        .replace(/\{contact\.firstName\}|\{firstName\}/gi,   firstName)
+        .replace(/\{contact\.lastName\}|\{lastName\}/gi,    lastName)
+        .replace(/\{contact\.fullName\}|\{contact\.name\}|\{fullName\}/gi,    person.personName || '')
+        .replace(/\{contact\.email\}|\{email\}/gi,       person.email      || '')
+        .replace(/\{contact\.phone\}|\{phone\}/gi,       person.phone      || '')
+        .replace(/\{contact\.birthday\}|\{birthday\}/gi,    person.birthday   || '')
+        .replace(/\{contact\.anniversary\}|\{anniversary\}/gi, person.anniversary || '')
+        .replace(/\{contact\.city\}|\{city\}/gi,        person.city       || '')
+        .replace(/\{contact\.state\}|\{state\}/gi,       person.state      || '');
 }
 
 /**

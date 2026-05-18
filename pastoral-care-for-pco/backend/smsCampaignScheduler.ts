@@ -468,9 +468,42 @@ async function runWorkflowStepExecutor(db: any): Promise<void> {
                     }
 
                 } else if (channelType === 'staff_sms') {
-                    // Staff reminder — resolve staff recipients and send
-                    // For now, log only; full implementation can be added later
-                    log.info(`[WorkflowExecutor] staff_sms step skipped (not yet implemented)`, 'system', { enrollId }, churchId);
+                    const notifyIds = step.notifyTargetIds || [];
+                    if (notifyIds.length > 0) {
+                        const { sendBulkInternal } = await import('./smsSend.js');
+                        
+                        const staffPhones: string[] = [];
+                        for (const uid of notifyIds) {
+                             const userSnap = await db.collection('users').doc(uid).get();
+                             if (userSnap.exists) {
+                                  const userData = userSnap.data() as any;
+                                  if (userData.phone) staffPhones.push(userData.phone);
+                             }
+                        }
+                        
+                        if (staffPhones.length > 0) {
+                            const pMap: any = {};
+                            for (const sp of staffPhones) {
+                                pMap[sp] = personInfo;
+                            }
+                            
+                            await sendBulkInternal({
+                                db,
+                                churchId,
+                                campaignId:     `wf_${workflowId}_step${currentStep}_staff`,
+                                phones:         staffPhones,
+                                body:           step.message || '',
+                                mediaUrls:      step.mediaUrls || [],
+                                personMap:      pMap,
+                                twilioNumberId: wf.twilioNumberId || null,
+                            });
+                            log.info(`[WorkflowExecutor] Sent staff_sms to ${staffPhones.length} staff members`, 'system', { enrollId }, churchId);
+                        } else {
+                            log.warn(`[WorkflowExecutor] staff_sms step skipped - no valid phone numbers found for target staff`, 'system', { enrollId }, churchId);
+                        }
+                    } else {
+                        log.warn(`[WorkflowExecutor] staff_sms step skipped - no target staff selected`, 'system', { enrollId }, churchId);
+                    }
                 }
 
                 // ── Advance to next step ─────────────────────────────────────
