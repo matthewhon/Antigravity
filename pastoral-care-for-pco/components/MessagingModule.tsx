@@ -181,10 +181,10 @@ ${prompt}`;
 function formatPhone(phone: string): string {
     const digits = phone.replace(/\D/g, '');
     if (digits.length === 11 && digits.startsWith('1')) {
-        return `(${digits.slice(1, 4)}) ${digits.slice(4, 7)}�${digits.slice(7)}`;
+        return `(${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
     }
     if (digits.length === 10) {
-        return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}�${digits.slice(6)}`;
+        return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
     }
     return phone;
 }
@@ -3271,7 +3271,7 @@ const SmsKeywordsManager: React.FC<{
                         <div className="flex items-start justify-between gap-4 mb-4">
                             <div className="flex items-start gap-3">
                                 <div className="w-10 h-10 rounded-2xl bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center text-xl shrink-0">
-                                    ??
+                                    🙏
                                 </div>
                                 <div>
                                     <h3 className="text-sm font-black text-slate-900 dark:text-white">Prayer Request Detection</h3>
