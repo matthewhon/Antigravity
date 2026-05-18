@@ -393,7 +393,7 @@ export async function sendBulkInternal(params: {
 export const sendBulk = async (req: any, res: any) => {
     res.set('Access-Control-Allow-Origin', '*');
 
-    let { churchId, campaignId, phones = [], body, mediaUrls = [], sentBy, sentByName, personMap = {}, resolveFromList, resolveFromGroup } = req.body || {};
+    let { churchId, campaignId, phones = [], body, mediaUrls = [], sentBy, sentByName, personMap = {}, resolveFromList, resolveFromGroup, smsNumberId, twilioNumberId } = req.body || {};
 
     const db = getDb();
 
@@ -413,7 +413,7 @@ export const sendBulk = async (req: any, res: any) => {
             return res.status(400).json({ error: 'No phone numbers provided or resolved for this campaign.' });
         }
 
-        const result = await sendBulkInternal({ db, churchId, campaignId, phones, body, mediaUrls, sentBy, sentByName, personMap });
+        const result = await sendBulkInternal({ db, churchId, campaignId, phones, body, mediaUrls, sentBy, sentByName, personMap, smsNumberId, twilioNumberId });
         return res.json({ success: true, ...result });
     } catch (e: any) {
         const log = createServerLogger(db);

@@ -1245,6 +1245,7 @@ const NewMessageComposer: React.FC<{
                         mediaUrls: imageUrlNM ? [imageUrlNM] : undefined,
                         sentBy: currentUser.id,
                         sentByName: currentUser.name,
+                        twilioNumberId: twilioNumberId ?? undefined,
                     }),
                 });
                 const data = await safeJson(res);
@@ -1262,6 +1263,7 @@ const NewMessageComposer: React.FC<{
                         mediaUrls: imageUrlNM ? [imageUrlNM] : undefined,
                         sentBy: currentUser.id,
                         sentByName: currentUser.name,
+                        twilioNumberId: twilioNumberId ?? undefined,
                     }),
                 });
                 const data = await safeJson(res);
@@ -6434,7 +6436,7 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
     };
 
     const handleSave = async (wf: SmsWorkflow) => {
-        setIsBusy(true);
+                setIsBusy(true);
         setSaveError(null);
         try {
             const isNew = editing === null; // null = new workflow, SmsWorkflow = editing existing
@@ -6453,9 +6455,30 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
             setIsBusy(false);
         }
     };
-
     const handleToggleActive = async (wf: SmsWorkflow) => {
-        await updateDoc(doc(firebaseDb, 'smsWorkflows', wf.id), { isActive: !wf.isActive });
+        const newlyActive = !wf.isActive;
+        await updateDoc(doc(firebaseDb, 'smsWorkflows', wf.id), { isActive: newlyActive });
+        
+        if (newlyActive) {
+            if (wf.trigger === 'list_add' && wf.triggerListId) {
+                fetch(`${API_BASE}/api/messaging/workflow-enroll-list`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        churchId,
+                        workflowId: wf.id,
+                        targetType: 'list',
+                        targetId: wf.triggerListId,
+                    })
+                }).catch(e => console.error('Failed to trigger list enrollment:', e));
+            } else if (wf.trigger === 'event_registration' || wf.trigger === 'birthday' || wf.trigger === 'anniversary') {
+                fetch(`${API_BASE}/api/messaging/workflow-force-scan`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ churchId })
+                }).catch(e => console.error('Failed to trigger force scan:', e));
+            }
+        }
     };
 
     const handleDelete = async (wf: SmsWorkflow) => {

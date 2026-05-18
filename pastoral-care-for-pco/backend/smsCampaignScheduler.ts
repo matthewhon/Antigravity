@@ -164,7 +164,7 @@ export async function resolvePcoRecipients(
  * Enrollment IDs use `{workflowId}_{personId}_{year}` to prevent re-enrollment
  * in the same calendar year.
  */
-async function runBirthdayAnniversaryScanner(db: any): Promise<void> {
+export async function runBirthdayAnniversaryScanner(db: any): Promise<void> {
     const log = createServerLogger(db as any);
 
     try {
@@ -439,11 +439,12 @@ async function runWorkflowStepExecutor(db: any): Promise<void> {
                     await sendBulkInternal({
                         db,
                         churchId,
-                        campaignId:  `wf_${workflowId}_step${currentStep}`,
-                        phones:      [phoneNumber],
-                        body:        step.message || '',
-                        mediaUrls:   step.mediaUrls || [],
-                        personMap:   { [phoneNumber]: personInfo },
+                        campaignId:     `wf_${workflowId}_step${currentStep}`,
+                        phones:         [phoneNumber],
+                        body:           step.message || '',
+                        mediaUrls:      step.mediaUrls || [],
+                        personMap:      { [phoneNumber]: personInfo },
+                        twilioNumberId: wf.twilioNumberId || null,
                     });
 
                 } else if (channelType === 'email') {
@@ -526,7 +527,7 @@ async function runWorkflowStepExecutor(db: any): Promise<void> {
  * Enrollment ID: `{workflowId}_{personId}` — one enrolment per person per
  * workflow, regardless of how many times the scanner runs.
  */
-async function runEventRegistrationScanner(db: any): Promise<void> {
+export async function runEventRegistrationScanner(db: any): Promise<void> {
     const log = createServerLogger(db as any);
 
     try {
@@ -741,9 +742,10 @@ export function startSmsCampaignScheduler(db: any): void {
                                 churchId,
                                 campaignId,
                                 phones,
-                                body:       campaign.body,
-                                mediaUrls:  campaign.mediaUrls || [],
+                                body:        campaign.body,
+                                mediaUrls:   campaign.mediaUrls || [],
                                 personMap,
+                                smsNumberId: campaign.smsNumberId || campaign.twilioNumberId || null,
                             });
                         }
 
