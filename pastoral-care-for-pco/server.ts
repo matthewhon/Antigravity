@@ -30,6 +30,7 @@ import { workflowEnrollList, workflowEnrollPreview } from './backend/workflowEnr
 import { handleGrowDailyEmail, setupGrowIntegration, requestGrowAccess, getGrowStatus } from './backend/growIntegration';
 import { getVapidPublicKey, savePushSubscription, removePushSubscription } from './backend/webPushService';
 import { handleFileProxy } from './backend/fileProxy';
+import { videoProcessingQueue } from './services/jobQueue.js';
 
 // Fix for bundled CJS environment
 const __dirname = process.cwd();
@@ -190,6 +191,24 @@ async function startServer() {
 
     // ─── File Proxy & Egress Tracking ───────────────────────────────
     app.get('/f/:fileId', handleFileProxy);
+
+    app.post('/api/files/process-video', express.json(), async (req: any, res: any) => {
+        const { fileId, churchId, gcsPath } = req.body || {};
+        if (!fileId || !churchId || !gcsPath) {
+            return res.status(400).json({ error: 'Missing fileId, churchId, or gcsPath' });
+        }
+        try {
+            const db = getDb();
+            await db.collection('tenantFiles').doc(fileId).update({
+                processingStatus: 'processing'
+            });
+            await videoProcessingQueue.add('compress-video', { fileId, churchId, gcsPath });
+            res.json({ success: true, message: 'Video queued for compression' });
+        } catch (e: any) {
+            console.error('[process-video]', e.message);
+            res.status(500).json({ error: e.message });
+        }
+    });
 
     // ─── SMS / Messaging Endpoints ────────────────────────────────────────────
     // SignalWire webhooks — support both form-encoded (compatibility SDK) and

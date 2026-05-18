@@ -75,14 +75,17 @@ const DEFAULT_TEMPLATE: TemplateSettings = {
   showLogo: true,
 };
 
-export const newCampaign = (churchId: string, name: string): EmailCampaign => ({
+export const newCampaign = (churchId: string, name: string, churchName?: string): EmailCampaign => ({
   id: `email_${Date.now()}`,
   churchId,
   name,
   status: 'draft',
   subject: name,
   blocks: [],
-  templateSettings: DEFAULT_TEMPLATE,
+  templateSettings: {
+    ...DEFAULT_TEMPLATE,
+    footer: `© ${new Date().getFullYear()} ${churchName || 'Church Name'}`
+  },
   createdAt: Date.now(),
   updatedAt: Date.now()
 });
@@ -1456,7 +1459,7 @@ export const QuickSendModal: React.FC<{
         ? pcoGroups.find(g => g.id === targetId)?.name
         : pcoLists.find(l => l.id === targetId)?.name;
 
-      const c = newCampaign(churchId, `Quick Email: ${subject}`);
+      const c = newCampaign(churchId, `Quick Email: ${subject}`, church?.name);
       
       if (targetType === 'group') {
         c.toGroupId = targetId;
@@ -1696,7 +1699,7 @@ currentUser, onUpdateChurch, activePage, smsTab, mobileSmsUrl }) => {
 
   const handleCreate = async (name: string) => {
     setShowNewModal(false);
-    const c = newCampaign(churchId, name);
+    const c = newCampaign(churchId, name, church?.name);
     // Prefill From fields from tenant email settings if configured
     if (church?.emailSettings?.fromEmail) {
       c.fromEmail = church.emailSettings.fromEmail;

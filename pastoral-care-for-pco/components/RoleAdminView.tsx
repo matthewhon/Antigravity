@@ -2394,7 +2394,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             value={sender.name}
                                             onChange={e => {
                                                 const newSenders = [...mailAdditionalSenders];
-                                                newSenders[index].name = e.target.value;
+                                                newSenders[index] = { ...newSenders[index], name: e.target.value };
                                                 setMailAdditionalSenders(newSenders);
                                             }}
                                             placeholder="Display Name"
@@ -2405,7 +2405,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             value={sender.email}
                                             onChange={e => {
                                                 const newSenders = [...mailAdditionalSenders];
-                                                newSenders[index].email = e.target.value;
+                                                newSenders[index] = { ...newSenders[index], email: e.target.value };
                                                 setMailAdditionalSenders(newSenders);
                                             }}
                                             placeholder={`email@${church.emailSettings?.customDomain || SHARED_DOMAIN}`}
@@ -2424,6 +2424,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 
                                 <div className="flex justify-between items-center mt-4">
                                     <button
+                                        type="button"
                                         onClick={() => setMailAdditionalSenders([...mailAdditionalSenders, { name: '', email: '' }])}
                                         className="text-indigo-600 dark:text-indigo-400 text-xs font-bold flex items-center gap-1 hover:underline"
                                     >
@@ -2431,7 +2432,9 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                     </button>
                                     
                                     <button
-                                        onClick={async () => {
+                                        type="button"
+                                        onClick={async (e) => {
+                                            e.preventDefault();
                                             if (!onUpdateChurch) return;
                                             setIsMailSaving(true);
                                             try {
@@ -2442,8 +2445,19 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                     }
                                                 });
                                                 setMailMessage({ type: 'success', text: 'Additional senders saved successfully.' });
-                                            } catch (e: any) {
-                                                setMailMessage({ type: 'error', text: e.message });
+                                                // Local visual feedback on the button itself
+                                                const btn = e.currentTarget;
+                                                const originalText = btn.innerText;
+                                                btn.innerText = 'Saved!';
+                                                btn.classList.add('bg-emerald-600', 'text-white', 'dark:bg-emerald-600', 'dark:text-white');
+                                                btn.classList.remove('bg-slate-900', 'dark:bg-white', 'text-white', 'dark:text-slate-900');
+                                                setTimeout(() => {
+                                                    btn.innerText = 'Save Additional Addresses';
+                                                    btn.classList.remove('bg-emerald-600', 'text-white', 'dark:bg-emerald-600', 'dark:text-white');
+                                                    btn.classList.add('bg-slate-900', 'dark:bg-white', 'text-white', 'dark:text-slate-900');
+                                                }, 2000);
+                                            } catch (err: any) {
+                                                setMailMessage({ type: 'error', text: err.message });
                                             } finally {
                                                 setIsMailSaving(false);
                                             }

@@ -76,6 +76,7 @@ export const FileManager: React.FC<FileManagerProps> = ({ churchId, currentUser 
 
       const publicUrl = await getDownloadURL(sRef);
 
+      const isVideo = file.type?.startsWith('video/');
       const tenantFile: TenantFile = {
         id: fileId,
         churchId,
@@ -87,12 +88,29 @@ export const FileManager: React.FC<FileManagerProps> = ({ churchId, currentUser 
         gcsPath,
         createdAt: Date.now(),
         folder: currentFolder || undefined,
-        tags: []
+        tags: [],
+        processingStatus: isVideo ? 'processing' : undefined
       };
 
       await firestore.saveTenantFile(tenantFile);
       setFiles(prev => [tenantFile, ...prev]);
-      showToast('File uploaded successfully!');
+
+      if (isVideo) {
+        try {
+          await fetch('/api/files/process-video', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fileId, churchId, gcsPath })
+          });
+          showToast('Video uploaded and queued for compression.');
+        } catch (err) {
+          console.error('Failed to trigger video compression', err);
+          showToast('File uploaded, but compression failed to start.', 'error');
+        }
+      } else {
+        showToast('File uploaded successfully!');
+      }
+
     } catch (e: any) {
       console.error('Upload failed', e);
       showToast(e.message || 'File upload failed.', 'error');
@@ -357,14 +375,21 @@ export const FileManager: React.FC<FileManagerProps> = ({ churchId, currentUser 
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <a 
-                            href={`/f/${file.id}`} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="font-bold text-sm text-slate-800 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400 truncate block"
-                          >
-                            {file.originalName}
-                          </a>
+                          <div className="flex items-center gap-2">
+                            <a 
+                              href={`/f/${file.id}`} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="font-bold text-sm text-slate-800 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400 truncate block"
+                            >
+                              {file.originalName}
+                            </a>
+                            {file.processingStatus === 'processing' && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 uppercase tracking-wider">
+                                <Loader2 size={10} className="animate-spin" /> Processing
+                              </span>
+                            )}
+                          </div>
                           <div className="text-[11px] text-slate-400 uppercase tracking-widest mt-0.5">
                             {file.mimeType}
                           </div>

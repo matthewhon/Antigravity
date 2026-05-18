@@ -1618,6 +1618,7 @@ export interface TenantFile {
     createdAt: number;
     folder?: string;        // Virtual folder path or name
     tags?: string[];        // Array of organizational tags
+    processingStatus?: 'processing' | 'completed' | 'failed';
 }
 
 export interface BillingUsage {
