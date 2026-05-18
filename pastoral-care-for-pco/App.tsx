@@ -97,6 +97,7 @@ const App: React.FC = () => {
      if (path.startsWith('/tools/sms/campaigns')) return 'tools-sms-campaigns';
      if (path.startsWith('/tools/sms/keywords')) return 'tools-sms-keywords';
      if (path.startsWith('/tools/sms/analytics')) return 'tools-sms-analytics';
+     if (path.startsWith('/tools/sms/permissions')) return 'tools-sms-permissions';
      if (path.startsWith('/tools/sms/agent')) return 'tools-sms-agent';
      if (path.startsWith('/tools/sms')) return 'tools-sms-inbox';
      if (path.startsWith('/tools')) return 'tools';
@@ -457,6 +458,7 @@ const App: React.FC = () => {
           'tools-sms-keywords': 'Messaging',
           'tools-sms-analytics': 'Messaging',
           'tools-sms-agent': 'Messaging',
+          'tools-sms-permissions': 'Messaging',
           'tools-emails': 'Email',
           'tools-polls': 'Polls',
           'tools-workflows': 'Workflows',
@@ -516,6 +518,7 @@ const App: React.FC = () => {
               'tools-sms-keywords': '/tools/sms/keywords',
               'tools-sms-analytics': '/tools/sms/analytics',
               'tools-sms-agent': '/tools/sms/agent',
+              'tools-sms-permissions': '/tools/sms/permissions',
               'tools-workflows': '/tools/workflows',
               'tools-polls': '/tools/polls',
               'tools-notes': '/tools/notes',
@@ -815,7 +818,8 @@ const App: React.FC = () => {
                     { label: 'Keywords',  view: 'tools-sms-keywords',  icon: <span className="text-sm">🔑</span> },
                     { label: 'Analytics', view: 'tools-sms-analytics', icon: <span className="text-sm">📊</span> },
                     { label: 'AI Agent',  view: 'tools-sms-agent',     icon: <span className="text-sm">✨</span> },
-                ] : undefined}
+                    (user.roles.includes('Church Admin') || user.roles.includes('System Administration')) ? { label: 'Permissions', view: 'tools-sms-permissions', icon: <span className="text-sm">🛡️</span> } : null
+                ].filter(Boolean) as any : undefined}
             >
             <Routes>
                 <Route path="/" element={
@@ -953,6 +957,7 @@ const App: React.FC = () => {
                             view === 'tools-sms-workflows' ? 'workflows' :
                             view === 'tools-sms-keywords'  ? 'keywords'  :
                             view === 'tools-sms-analytics' ? 'analytics' :
+                            view === 'tools-sms-permissions' ? 'permissions' :
                             view === 'tools-sms-agent'     ? 'agent'     : 'inbox'
                         }
                         mobileSmsUrl={`${window.location.protocol}//${window.location.host}/mobile/sms`}
