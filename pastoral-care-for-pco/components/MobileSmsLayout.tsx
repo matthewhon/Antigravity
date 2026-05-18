@@ -4,7 +4,7 @@ import MessagingModule from './MessagingModule';
 import { useTwilioNumbers, canUserSeeNumber, canUserUseFeature } from '../hooks/useTwilioNumbers';
 import {
     Inbox, MessageSquare, Key, BarChart3, ArrowLeft, Phone, ChevronDown,
-    Loader2, Share2, Copy, CheckCircle2, X, Link2, Mail, Bell, BellOff,
+    Loader2, Share2, Copy, CheckCircle2, X, Link2, Mail, Bell, BellOff, Folder,
 } from 'lucide-react';
 import { QuickSendModal } from './ToolsView';
 import { firestore } from '../services/firestoreService';
@@ -28,7 +28,7 @@ async function getApiBase(): Promise<string> {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type SmsTab = 'inbox' | 'campaigns' | 'keywords' | 'analytics';
+type SmsTab = 'inbox' | 'campaigns' | 'files' | 'analytics';
 
 interface MobileSmsLayoutProps {
     churchId: string;
@@ -68,9 +68,9 @@ const TABS: { id: SmsTab; label: string; icon: React.ReactNode; activeIcon: Reac
         activeIcon: <MessageSquare size={24} strokeWidth={2.5} />,
     },
     {
-        id: 'keywords', label: 'Keywords', perm: 'keywordsUserIds',
-        icon:       <Key size={24} strokeWidth={1.6} />,
-        activeIcon: <Key size={24} strokeWidth={2.5} />,
+        id: 'files', label: 'Files', perm: '',
+        icon:       <Folder size={24} strokeWidth={1.6} />,
+        activeIcon: <Folder size={24} strokeWidth={2.5} />,
     },
     {
         id: 'analytics', label: 'Analytics', perm: 'analyticsUserIds',
@@ -363,7 +363,7 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
 
     // ── Derived state ─────────────────────────────────────────────────────────
     const activeNumber = visibleNumbers.find(n => n.id === activeNumberId) ?? null;
-    const visibleTabs  = TABS.filter(t => canUserUseFeature(activeNumber, currentUser, t.perm as any));
+    const visibleTabs  = TABS.filter(t => t.id === 'files' || canUserUseFeature(activeNumber, currentUser, t.perm as any));
 
     useEffect(() => {
         if (visibleTabs.length > 0 && !visibleTabs.some(t => t.id === activeTab)) {

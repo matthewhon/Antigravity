@@ -1,0 +1,13 @@
+    /** When provided by a parent route, drives the active tab and hides the internal pill nav */
+    controlledTab?: 'campaigns' | 'inbox' | 'keywords' | 'analytics' | 'workflows' | 'agent' | 'permissions';
+    /** Pre-selected phone number ID supplied by a parent (e.g. MobileSmsLayout). */
+    initialNumberId?: string | null;
+    /** When true the built-in number dropdown is hidden (parent owns the selector UI). */
+    hideNumberSelector?: boolean;
+}
+
+const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, currentUser, onUpdateChurch, controlledTab, initialNumberId, hideNumberSelector }) => {
+    const smsEnabled = church.smsSettings?.smsEnabled;
+
+    type Tab = 'campaigns' | 'inbox' | 'keywords' | 'analytics' | 'workflows' | 'agent' | 'permissions';
+    const [activeTab, setActiveTab] = useState<Tab>('campaigns');
