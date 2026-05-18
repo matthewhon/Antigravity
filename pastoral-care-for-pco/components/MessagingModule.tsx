@@ -1165,7 +1165,7 @@ const NewMessageComposer: React.FC<{
                 id: l.id,
                 name: l.attributes?.name || l.name || 'Unnamed List',
                 total_people: l.attributes?.total_people ?? l.total_people ?? 0,
-            })).filter(list => hasBroadcastAccess(currentUser, list.id, church)))
+            })).filter(list => hasBroadcastAccess(currentUser, list.id, church))))
             .catch(() => { })
             .finally(() => setLoadingLists(false));
     }, [mode, churchId, currentUser, church]);
@@ -1179,7 +1179,7 @@ const NewMessageComposer: React.FC<{
                 id: x.id,
                 name: x.attributes?.name || x.name || 'Unnamed Group',
                 memberCount: x.attributes?.members_count ?? x.attributes?.member_count ?? x.memberCount ?? 0,
-            })).filter(group => hasBroadcastAccess(currentUser, group.id, church)))
+            })).filter(group => hasBroadcastAccess(currentUser, group.id, church))))
             .catch(() => { })
             .finally(() => setLoadingGroups(false));
     }, [mode, churchId, currentUser, church]);

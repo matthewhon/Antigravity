@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Church, User, UserRole } from '../types';
 import { pcoService } from '../services/pcoService';
-import { firebaseDb } from '../services/firebase';
+import { db as firebaseDb } from '../services/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 import { Loader2, Shield, Search, Check, X, ShieldAlert } from 'lucide-react';
 
