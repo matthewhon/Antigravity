@@ -37,12 +37,17 @@ function resolveMergeTags(body: string, person: PersonInfo): string {
     const parts = (person.personName || '').split(' ');
     const firstName = parts[0] || '';
     const lastName  = parts.slice(1).join(' ') || '';
+    const rawPhone = (person.phone || '').replace(/^\+1/, '');
+    const formattedPhone = rawPhone.length === 10
+        ? `(${rawPhone.slice(0,3)}) ${rawPhone.slice(3,6)}-${rawPhone.slice(6)}`
+        : rawPhone;
+
     return body
         .replace(/\{contact\.firstName\}|\{firstName\}/gi,   firstName)
         .replace(/\{contact\.lastName\}|\{lastName\}/gi,    lastName)
         .replace(/\{contact\.fullName\}|\{contact\.name\}|\{fullName\}/gi,    person.personName || '')
         .replace(/\{contact\.email\}|\{email\}/gi,       person.email      || '')
-        .replace(/\{contact\.phone\}|\{phone\}/gi,       person.phone      || '')
+        .replace(/\{contact\.phone\}|\{phone\}/gi,       formattedPhone)
         .replace(/\{contact\.birthday\}|\{birthday\}/gi,    person.birthday   || '')
         .replace(/\{contact\.anniversary\}|\{anniversary\}/gi, person.anniversary || '')
         .replace(/\{contact\.city\}|\{city\}/gi,        person.city       || '')
