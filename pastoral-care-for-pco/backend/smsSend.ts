@@ -374,7 +374,7 @@ export async function sendBulkInternal(params: {
         }
     }
 
-    if (campaignId) {
+    if (campaignId && !campaignId.startsWith('wf_')) {
         await db.collection('smsCampaigns').doc(campaignId).update({
             status: 'sent', sentAt: Date.now(),
             recipientCount: phones.length,
@@ -382,6 +382,8 @@ export async function sendBulkInternal(params: {
             failedCount:    failed,
             optOutCount:    optedOut,
             updatedAt:      Date.now(),
+        }).catch((e: any) => {
+            log.warn(`[BulkSend] Failed to update campaign doc ${campaignId}: ${e.message}`, 'system', { campaignId }, churchId);
         });
     }
 

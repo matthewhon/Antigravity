@@ -318,15 +318,15 @@ function calcNextSendAt(step: any, fromMs: number): number {
 
     if (scheduleType === 'day_of_week') {
         const targetDay: number = step.scheduleDayOfWeek ?? 1; // default: Monday
-        // Walk from the day AFTER fromMs until we hit the target weekday.
         const candidate = new Date(fromMs);
-        candidate.setDate(candidate.getDate() + 1);
-        candidate.setHours(0, 0, 0, 0);
-        while (candidate.getDay() !== targetDay) {
+        candidate.setHours(schedHours, schedMinutes, 0, 0);
+        
+        for (let i = 0; i <= 7; i++) {
+            if (candidate.getDay() === targetDay && candidate.getTime() > fromMs) {
+                return candidate.getTime();
+            }
             candidate.setDate(candidate.getDate() + 1);
         }
-        candidate.setHours(schedHours, schedMinutes, 0, 0);
-        return candidate.getTime();
     }
 
     if (scheduleType === 'day_of_month') {

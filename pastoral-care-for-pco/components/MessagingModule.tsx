@@ -5438,7 +5438,7 @@ const WorkflowEditor: React.FC<{
                 staffListName: an.staffListName,
                 staffGroupId: an.staffGroupId,
                 staffGroupName: an.staffGroupName,
-                delayDays: delay?.delayDays ?? (steps.length === 0 ? 0 : 1),
+                delayDays: delay?.delayDays ?? 0,
                 scheduleType: delay?.scheduleType,
                 scheduleDayOfWeek: delay?.scheduleDayOfWeek,
                 scheduleDayOfMonth: delay?.scheduleDayOfMonth,
