@@ -598,10 +598,10 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Send Results</p>
                             <div className="grid grid-cols-2 gap-3">
                                 {[
-                                    { label: 'Sent', value: local.deliveredCount ?? '�', color: 'text-emerald-600' },
-                                    { label: 'Failed', value: local.failedCount ?? '�', color: 'text-red-500' },
-                                    { label: 'Opt-Outs', value: local.optOutCount ?? '�', color: 'text-amber-600' },
-                                    { label: 'Total', value: local.recipientCount ?? '�', color: 'text-slate-700 dark:text-slate-300' },
+                                    { label: 'Sent', value: local.deliveredCount ?? '—', color: 'text-emerald-600' },
+                                    { label: 'Failed', value: local.failedCount ?? '—', color: 'text-red-500' },
+                                    { label: 'Opt-Outs', value: local.optOutCount ?? '—', color: 'text-amber-600' },
+                                    { label: 'Total', value: local.recipientCount ?? '—', color: 'text-slate-700 dark:text-slate-300' },
                                 ].map(s => (
                                     <div key={s.label} className="text-center p-2 bg-slate-50 dark:bg-slate-900/50 rounded-xl">
                                         <p className={`text-xl font-black ${s.color}`}>{s.value}</p>
@@ -2156,7 +2156,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                                 <p className={`text-sm truncate ${isUnread ? 'font-black text-slate-900 dark:text-white' : 'font-semibold text-slate-700 dark:text-slate-200'
                                                     }`}>{conv.personName || formatPhone(conv.phoneNumber)}</p>
                                                 {convTags.some(t => t.name === 'Needs Prayer') && conv.lastMessageDirection === 'inbound' && (
-                                                    <span title="Needs Prayer (waiting for reply)" className="shrink-0 text-[13px] leading-none">??</span>
+                                                    <span title="Needs Prayer (waiting for reply)" className="shrink-0 text-[13px] leading-none">🙏</span>
                                                 )}
                                             </div>
                                             {conv.personName && <p className={`text-[10px] ${isUnread ? 'text-slate-500' : 'text-slate-400'}`}>{formatPhone(conv.phoneNumber)}</p>}
@@ -2304,7 +2304,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                             {msg.direction === 'outbound' && msg.sentByName && ` � ${msg.sentByName}`}
                                             {msg.direction === 'outbound' && msg.status && (() => {
                                                 const s = msg.status;
-                                                if (s === 'delivered') return <span className="text-emerald-300 font-semibold" title="Delivered">?? delivered</span>;
+                                                if (s === 'delivered') return <span className="text-emerald-300 font-semibold" title="Delivered">✅ delivered</span>;
                                                 if (s === 'sent') return <span className="text-violet-300" title="Accepted by carrier">? sent</span>;
                                                 if (s === 'queued') return <span className="text-violet-300/70" title="Queued by Twilio">� queued</span>;
                                                 if (s === 'failed') return <span className="text-red-400 font-bold" title="Failed � not delivered">? failed</span>;
@@ -3153,12 +3153,12 @@ const SmsKeywordsManager: React.FC<{
             {activeSection === 'tags' && (
                 <>
                     <div className="flex items-start gap-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-2xl p-4 mb-6">
-                        <div className="text-3xl">???</div>
+                        <div className="text-3xl">🤖</div>
                         <div>
                             <p className="text-sm font-bold text-emerald-800 dark:text-emerald-200 mb-1">Conversation Tags</p>
                             <p className="text-xs text-emerald-700 dark:text-emerald-300 leading-relaxed">
                                 Tags let you categorise and filter SMS conversations. Apply them manually from any conversation, or automatically when a keyword is matched. Create tags like{' '}
-                                <span className="font-bold">Prayer Request ??</span>,{' '}<span className="font-bold">Service Times ??</span>, or{' '}<span className="font-bold">Pastoral Care ??</span>.
+                                <span className="font-bold">Prayer Request 🙏</span>,{' '}<span className="font-bold">Service Times ⏰</span>, or{' '}<span className="font-bold">Pastoral Care 🤝</span>.
                             </p>
                         </div>
                     </div>
@@ -3276,7 +3276,7 @@ const SmsKeywordsManager: React.FC<{
                                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed max-w-lg">
                                         Automatically recognises natural-language prayer requests in incoming SMS messages
                                         and tags the conversation{' '}
-                                        <span className="font-semibold text-violet-600 dark:text-violet-400">?? Needs Prayer</span>{' '}
+                                        <span className="font-semibold text-violet-600 dark:text-violet-400">🏷️ Needs Prayer</span>{' '}
                                         in your Inbox. Generic asks (e.g. &ldquo;Will you pray for me?&rdquo;) trigger a clarifying reply first.
                                     </p>
                                 </div>
@@ -3314,7 +3314,7 @@ const SmsKeywordsManager: React.FC<{
                                     &ldquo;Please pray for my mom&rsquo;s surgery&rdquo;
                                 </p>
                                 <div className="mt-2 flex items-center gap-1.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
-                                    <CheckCircle size={11} /> Tagged <span className="font-bold ml-0.5">?? Needs Prayer</span> immediately
+                                    <CheckCircle size={11} /> Tagged <span className="font-bold ml-0.5">🏷️ Needs Prayer</span> immediately
                                 </div>
                             </div>
                             <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4">
@@ -3329,7 +3329,7 @@ const SmsKeywordsManager: React.FC<{
                                         <MessageSquare size={11} /> Clarifying reply sent first
                                     </div>
                                     <div className="flex items-center gap-1.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
-                                        <CheckCircle size={11} /> On reply ? tagged <span className="font-bold ml-0.5">?? Needs Prayer</span>
+                                        <CheckCircle size={11} /> On reply ➡️ tagged <span className="font-bold ml-0.5">🏷️ Needs Prayer</span>
                                     </div>
                                 </div>
                             </div>
@@ -3375,7 +3375,7 @@ const SmsKeywordsManager: React.FC<{
                         <div className="mt-4 flex items-start gap-2 text-[10px] text-slate-400 dark:text-slate-500">
                             <Info size={11} className="shrink-0 mt-0.5 text-violet-400" />
                             <span>
-                                The <span className="font-semibold">?? Needs Prayer</span> tag is created automatically the first time a prayer request is detected.
+                                The <span className="font-semibold">🏷️ Needs Prayer</span> tag is created automatically the first time a prayer request is detected.
                                 Keyword-based auto-replies always take priority over prayer detection.
                             </span>
                         </div>
@@ -3499,7 +3499,7 @@ const SmsKeywordsManager: React.FC<{
                                 type="text"
                                 value={tagEmoji}
                                 onChange={e => setTagEmoji(e.target.value)}
-                                placeholder="??"
+                                placeholder="👋"
                                 maxLength={4}
                                 className="w-24 text-xl border-2 border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500 text-center"
                             />
@@ -4147,9 +4147,9 @@ const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[]; smsNu
                     <div className="space-y-3">
                         {[
                             { label: 'Avg. recipients per campaign', value: summary && summary.totalBulk > 0 ? Math.round(summary.totalSent / summary.totalBulk).toLocaleString() : '�' },
-                            { label: 'Total 2-way conversations', value: summary?.totalReplies.toLocaleString() ?? '�' },
-                            { label: 'Total opt-outs (all time)', value: summary?.totalOptOuts.toLocaleString() ?? '�' },
-                            { label: 'Campaigns sent', value: summary?.totalBulk.toLocaleString() ?? '�' },
+                            { label: 'Total 2-way conversations', value: summary?.totalReplies.toLocaleString() ?? '—' },
+                            { label: 'Total opt-outs (all time)', value: summary?.totalOptOuts.toLocaleString() ?? '—' },
+                            { label: 'Campaigns sent', value: summary?.totalBulk.toLocaleString() ?? '—' },
                             { label: 'Est. cost per delivered msg', value: summary && summary.totalDelivered > 0 ? `$${((summary.estimatedCostUsd / summary.totalDelivered)).toFixed(4)}` : '�' },
                         ].map(row => (
                             <div key={row.label} className="flex items-center justify-between py-1.5 border-b border-slate-100 dark:border-slate-700 last:border-0">
@@ -4377,8 +4377,8 @@ const DelayNodeCard: React.FC<{
             <div className="flex rounded-xl overflow-hidden border border-amber-200 dark:border-amber-700">
                 {([
                     { id: 'relative', label: '? Relative' },
-                    { id: 'day_of_week', label: '?? Weekday' },
-                    { id: 'day_of_month', label: '?? Month Day' },
+                    { id: 'day_of_week', label: '📅 Weekday' },
+                    { id: 'day_of_month', label: '📆 Month Day' },
                 ] as const).map(({ id, label }) => (
                     <button key={id} type="button" onClick={() => onChange({ scheduleType: id, repeatType: 'none', repeatDays: [] })}
                         className={`flex-1 py-1.5 text-[10px] font-bold transition border-r last:border-r-0 border-amber-200 dark:border-amber-700 ${schedType === id ? 'bg-amber-500 text-white' : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-amber-50 dark:hover:bg-slate-600'
@@ -4659,7 +4659,7 @@ const BranchNodeCard: React.FC<{
                             {([
                                 { id: 'replied', label: '? Replied' },
                                 { id: 'email_opened', label: '? Email Opened' },
-                                { id: 'tag_applied', label: '?? Tag Applied' },
+                                { id: 'tag_applied', label: '🏷️ Tag Applied' },
                                 { id: 'custom', label: '? Custom' },
                             ] as const).map(({ id, label }) => (
                                 <button key={id} type="button" onClick={() => onChange({ conditionType: id })}
@@ -5111,7 +5111,7 @@ const ActionNodeCard: React.FC<{
                             type="text"
                             value={step.emailSubject || ''}
                             onChange={e => onChange({ emailSubject: e.target.value })}
-                            placeholder="e.g. Welcome to Grace Church! ??"
+                            placeholder="e.g. Welcome to Grace Church! 👋"
                             className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                         />
                     </div>
@@ -5373,10 +5373,11 @@ const WorkflowEditor: React.FC<{
     pcoGroups: { id: string; name: string }[];
     smsTags: SmsTag[];
     pcoRegistrationEvents: { id: string; pcoId: string; name: string; startsAt?: string | null }[];
+    twilioNumbers: TwilioPhoneNumber[];
     onSave: (wf: SmsWorkflow) => Promise<void>;
     onBack: () => void;
     isBusy: boolean;
-}> = ({ initial, churchId, keywords, pcoLists, pcoGroups, smsTags, pcoRegistrationEvents, onSave, onBack, isBusy }) => {
+}> = ({ initial, churchId, keywords, pcoLists, pcoGroups, smsTags, pcoRegistrationEvents, twilioNumbers, onSave, onBack, isBusy }) => {
 
     /** Convert legacy flat SmsWorkflowStep[] to WorkflowNode[]. */
     const stepsToNodes = (steps: SmsWorkflowStep[]): WorkflowNode[] => {
@@ -5470,6 +5471,7 @@ const WorkflowEditor: React.FC<{
         churchId,
         name: '',
         description: '',
+        twilioNumberId: null,
         trigger: 'manual',
         triggerKeywordId: null,
         triggerKeywordWord: null,
@@ -5678,6 +5680,20 @@ const WorkflowEditor: React.FC<{
                                 className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
                             />
                         </div>
+                        <div>
+                            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Sending Phone Number</label>
+                            <select
+                                value={wf.twilioNumberId || ''}
+                                onChange={e => patch({ twilioNumberId: e.target.value || null })}
+                                className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                            >
+                                <option value="">(Default Church Number)</option>
+                                {twilioNumbers.map(num => (
+                                    <option key={num.id} value={num.id}>{num.friendlyLabel} ({num.phoneNumber})</option>
+                                ))}
+                            </select>
+                            <p className="text-[10px] text-slate-400 mt-1">If set, all steps in this workflow will be sent from this specific number instead of your church's default number.</p>
+                        </div>
                     </div>
 
                     {/* Trigger */}
@@ -5695,7 +5711,7 @@ const WorkflowEditor: React.FC<{
                                         }`}
                                 >
                                     <p className="text-xs font-black text-slate-900 dark:text-white mb-0.5">
-                                        {t === 'manual' ? '?? Manual' : t === 'keyword' ? '?? Keyword' : '?? List Add'}
+                                        {t === 'manual' ? '✋ Manual' : t === 'keyword' ? '💬 Keyword' : '📋 List Add'}
                                     </p>
                                     <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">{triggerLabel[t]}</p>
                                 </button>
@@ -5714,7 +5730,7 @@ const WorkflowEditor: React.FC<{
                                         }`}
                                 >
                                     <p className="text-xs font-black text-slate-900 dark:text-white mb-0.5">
-                                        {t === 'birthday' ? '?? Birthday' : '?? Anniversary'}
+                                        {t === 'birthday' ? '🎂 Birthday' : '💍 Anniversary'}
                                     </p>
                                     <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">{triggerLabel[t]}</p>
                                 </button>
@@ -5729,7 +5745,7 @@ const WorkflowEditor: React.FC<{
                                     : 'border-slate-200 dark:border-slate-700 hover:border-teal-300'
                                 }`}
                         >
-                            <p className="text-xs font-black text-slate-900 dark:text-white mb-0.5">??? Event Registration</p>
+                            <p className="text-xs font-black text-slate-900 dark:text-white mb-0.5">🎟️ Event Registration</p>
                             <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">{triggerLabel.event_registration}</p>
                         </button>
 
@@ -5806,7 +5822,7 @@ const WorkflowEditor: React.FC<{
                                     )}
                                 </div>
                                 <div className="flex items-start gap-2.5 p-3.5 bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-xl">
-                                    <span className="text-lg shrink-0 mt-0.5">???</span>
+                                    <span className="text-lg shrink-0 mt-0.5">🎟️</span>
                                     <div className="text-xs text-teal-700 dark:text-teal-300 leading-relaxed">
                                         <p className="font-bold mb-0.5">Enrolls once per person</p>
                                         <p>The daily scanner checks confirmed registrants for this event and enrolls anyone not yet in the workflow. Each person is only enrolled once, regardless of how many times the scanner runs. Use <span className="font-mono bg-teal-100 dark:bg-teal-900/40 px-1 rounded">{'{firstName}'}</span> in your messages to personalize them.</p>
@@ -5848,7 +5864,7 @@ const WorkflowEditor: React.FC<{
                                 </div>
                                 {/* Info banner */}
                                 <div className="flex items-start gap-2.5 p-3.5 bg-pink-50 dark:bg-pink-900/20 border border-pink-200 dark:border-pink-800 rounded-xl">
-                                    <span className="text-lg shrink-0 mt-0.5">{wf.trigger === 'birthday' ? '??' : '??'}</span>
+                                    <span className="text-lg shrink-0 mt-0.5">{wf.trigger === 'birthday' ? '🎂' : '💍'}</span>
                                     <div className="text-xs text-pink-700 dark:text-pink-300 leading-relaxed">
                                         <p className="font-bold mb-0.5">
                                             Automatically fires every year
@@ -6352,6 +6368,7 @@ const BulkEnrollFromListModal: React.FC<{
 // --- Workflows List + Manager -------------------------------------------------
 
 export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
+    const { numbers: twilioNumbers } = useTwilioNumbers(churchId);
     const [workflows, setWorkflows] = useState<SmsWorkflow[]>([]);
     const [keywords, setKeywords] = useState<SmsKeyword[]>([]);
     const [pcoLists, setPcoLists] = useState<{ id: string; name: string }[]>([]);
@@ -6470,6 +6487,7 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
                     pcoGroups={pcoGroups}
                     smsTags={smsTags}
                     pcoRegistrationEvents={pcoRegistrationEvents}
+                    twilioNumbers={twilioNumbers}
                     onSave={handleSave}
                     onBack={() => { setViewMode('list'); setSaveError(null); }}
                     isBusy={isBusy}
