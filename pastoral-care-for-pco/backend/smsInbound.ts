@@ -499,7 +499,7 @@ export const handleInboundSms = async (req: any, res: any) => {
 
         // 4-B. Executive AI Auto-Responder
         const bodyTrimmed = body.trim();
-        const aiAgentPrefix = 'ai agent';
+        const aiAgentPrefix = ((smsSettings as any)?.executiveAiAgentKeyword || 'AI Agent').toLowerCase();
         const isAiAgentTrigger = bodyTrimmed.toLowerCase().startsWith(aiAgentPrefix);
 
         const actualPersonId = personMatch?.personId || convSnap.data()?.personId;

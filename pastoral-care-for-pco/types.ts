@@ -970,6 +970,8 @@ export interface SmsSettings {
     // -- Executive AI Auto-Responder -------------------------------------------
     /** Whether the Executive AI Auto-Responder is enabled */
     executiveAiAgentEnabled?: boolean;
+    /** The keyword required at the beginning of the SMS to trigger the Executive AI. Default: "AI Agent" */
+    executiveAiAgentKeyword?: string;
     /** PCO List ID for the Executive AI Auto-Responder. Only members of this list can use it. */
     executiveAiAgentListId?: string;
     /** Display name of the selected PCO list */

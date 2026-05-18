@@ -7511,6 +7511,7 @@ const SmsAgentTab: React.FC<{
     const isAdmin = currentUser.roles.includes('Church Admin') || currentUser.roles.includes('System Administration');
     const agentEnabled = !!(church.smsSettings?.smsAgentEnabled);
     const execAgentEnabled = !!(church.smsSettings?.executiveAiAgentEnabled);
+    const execAgentKeyword = church.smsSettings?.executiveAiAgentKeyword || 'AI Agent';
     const execListId = church.smsSettings?.executiveAiAgentListId || '';
 
     const [pcoLists, setPcoLists] = useState<{ id: string; attributes: { name: string; total_people: number } }[]>([]);
@@ -7595,6 +7596,21 @@ const SmsAgentTab: React.FC<{
             showToast(next ? '? Executive AI enabled' : 'Executive AI disabled');
         } catch {
             showToast('Failed to update setting', 'error');
+        }
+    };
+
+    const handleExecKeywordBlur = async (e: React.FocusEvent<HTMLInputElement>) => {
+        const keyword = e.target.value.trim() || 'AI Agent';
+        if (keyword === execAgentKeyword) return;
+        try {
+            const churchRef = doc(firebaseDb, 'churches', churchId);
+            await updateDoc(churchRef, { 'smsSettings.executiveAiAgentKeyword': keyword });
+            if (onUpdateChurch) onUpdateChurch({
+                smsSettings: { ...church.smsSettings, executiveAiAgentKeyword: keyword }
+            });
+            showToast('Keyword updated');
+        } catch {
+            showToast('Failed to update keyword', 'error');
         }
     };
 
@@ -7793,10 +7809,25 @@ Write the reply:`;
                 </div>
 
                 {execAgentEnabled && (
-                    <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
-                        <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">
-                            Authorized PCO List
-                        </label>
+                    <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700 space-y-4">
+                        <div>
+                            <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">
+                                Activation Keyword
+                            </label>
+                            <input
+                                type="text"
+                                defaultValue={execAgentKeyword}
+                                onBlur={handleExecKeywordBlur}
+                                disabled={!isAdmin}
+                                placeholder="e.g. AI Agent"
+                                className="w-full max-w-sm text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            />
+                            <p className="text-[10px] text-slate-400 mt-1">If the incoming text starts with this phrase, it will route to the Executive AI (e.g. "AI Agent how many people gave today?").</p>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">
+                                Authorized PCO List
+                            </label>
                         {loadingLists ? (
                             <div className="text-xs text-slate-400 flex items-center gap-2"><Loader2 size={12} className="animate-spin" /> Loading lists from PCO...</div>
                         ) : pcoLists.length === 0 ? (
@@ -7821,6 +7852,7 @@ Write the reply:`;
                                 )}
                             </div>
                         )}
+                        </div>
                     </div>
                 )}
             </div>
