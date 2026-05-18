@@ -238,10 +238,9 @@ export async function runBirthdayAnniversaryScanner(db: any): Promise<void> {
                     const existing = await db.collection('smsWorkflowEnrollments').doc(enrollId).get();
                     if (existing.exists) continue;
 
-                    // 4. Need a phone number — look it up from the person record
+                    // 4. Look up phone number from the person record (can be empty for staff/email workflows)
                     const personPhone: string = (person.phone || '').replace(/\D/g, '');
                     const e164 = personPhone.length === 10 ? `+1${personPhone}` : personPhone.length === 11 ? `+${personPhone}` : '';
-                    if (!e164) continue;
 
                     // 5. Create enrollment — nextSendAt = beginning of today
                     const today = new Date();
@@ -647,8 +646,6 @@ export async function runEventRegistrationScanner(db: any): Promise<void> {
                     const e164 =
                         rawPhone.length === 10 ? `+1${rawPhone}` :
                         rawPhone.length === 11 ? `+${rawPhone}` : '';
-
-                    if (!e164) continue; // no usable phone number
 
                     // 5. Create the enrollment — fires at 9 am on the next scheduler tick
                     const today = new Date();

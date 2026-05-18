@@ -72,7 +72,6 @@ async function resolvePcoPersons(
                 const rawPhone   = primary?.number || '';
                 const digits     = rawPhone.replace(/\D/g, '');
                 const e164       = digits.length === 10 ? `+1${digits}` : digits.length === 11 ? `+${digits}` : '';
-                if (!e164) continue;
 
                 persons.push({
                     e164,
@@ -110,7 +109,6 @@ async function resolvePcoPersons(
                 const rawPhone = primary?.number || attrs.phone || '';
                 const digits   = rawPhone.replace(/\D/g, '');
                 const e164     = digits.length === 10 ? `+1${digits}` : digits.length === 11 ? `+${digits}` : '';
-                if (!e164) continue;
 
                 persons.push({
                     e164,
