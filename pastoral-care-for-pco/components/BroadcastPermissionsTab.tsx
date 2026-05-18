@@ -9,6 +9,7 @@ interface BroadcastPermissionsTabProps {
     churchId: string;
     church: Church;
     currentUser: User;
+    allUsers: User[];
     onUpdateChurch?: (updates: Partial<Church>) => void;
 }
 
@@ -18,7 +19,7 @@ const ROLES: UserRole[] = [
     'Email', 'Polls', 'Workflows', 'Notes'
 ];
 
-export const BroadcastPermissionsTab: React.FC<BroadcastPermissionsTabProps> = ({ churchId, church, currentUser, onUpdateChurch }) => {
+export const BroadcastPermissionsTab: React.FC<BroadcastPermissionsTabProps> = ({ churchId, church, currentUser, allUsers, onUpdateChurch }) => {
     const [lists, setLists] = useState<any[]>([]);
     const [groups, setGroups] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -62,6 +63,32 @@ export const BroadcastPermissionsTab: React.FC<BroadcastPermissionsTabProps> = (
         const newAccessMap = {
             ...broadcastPermissions.allowedAccess,
             [itemId]: { ...access, roles: newRoles }
+        };
+
+        try {
+            await updateDoc(doc(firebaseDb, 'churches', churchId), {
+                'broadcastPermissions.allowedAccess': newAccessMap
+            });
+            if (onUpdateChurch) {
+                onUpdateChurch({ broadcastPermissions: { allowedAccess: newAccessMap } });
+            }
+        } catch (e) {
+            console.error('Failed to update permissions', e);
+        } finally {
+            setSaving(null);
+        }
+    };
+
+    const handleUserToggle = async (itemId: string, userId: string) => {
+        setSaving(itemId);
+        const access = broadcastPermissions.allowedAccess[itemId] || { roles: [], userIds: [] };
+        const newUserIds = access.userIds.includes(userId) 
+            ? access.userIds.filter((id: string) => id !== userId)
+            : [...access.userIds, userId];
+        
+        const newAccessMap = {
+            ...broadcastPermissions.allowedAccess,
+            [itemId]: { ...access, userIds: newUserIds }
         };
 
         try {
@@ -123,7 +150,7 @@ export const BroadcastPermissionsTab: React.FC<BroadcastPermissionsTabProps> = (
                         <tr className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-500 uppercase tracking-wider">
                             <th className="px-6 py-4">Name</th>
                             <th className="px-6 py-4">Type / Count</th>
-                            <th className="px-6 py-4">Allowed Roles</th>
+                            <th className="px-6 py-4">Allowed Roles & Users</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
@@ -177,6 +204,40 @@ export const BroadcastPermissionsTab: React.FC<BroadcastPermissionsTabProps> = (
                                                     <Check size={12} /> {r}
                                                 </button>
                                             ))}
+                                            <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-2"></div>
+                                            {/* Specific Users */}
+                                            {access.userIds?.map((uid: string) => {
+                                                const u = allUsers.find(x => x.id === uid);
+                                                return (
+                                                    <button
+                                                        key={uid}
+                                                        onClick={() => handleUserToggle(item.id, uid)}
+                                                        disabled={saving === item.id}
+                                                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 border bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-900/30 dark:border-emerald-800 dark:text-emerald-300 ${saving === item.id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                    >
+                                                        <Check size={12} /> {u ? (u.firstName + ' ' + u.lastName).trim() || u.email : 'Unknown User'}
+                                                    </button>
+                                                );
+                                            })}
+                                            <select
+                                                className={`px-2 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer ${saving === item.id ? 'opacity-50' : ''}`}
+                                                disabled={saving === item.id}
+                                                value=""
+                                                onChange={(e) => {
+                                                    if (e.target.value) handleUserToggle(item.id, e.target.value);
+                                                }}
+                                            >
+                                                <option value="">+ Add User</option>
+                                                {allUsers
+                                                    .filter(u => !access.userIds?.includes(u.id))
+                                                    .sort((a, b) => (a.firstName || '').localeCompare(b.firstName || ''))
+                                                    .map(u => (
+                                                        <option key={u.id} value={u.id}>
+                                                            {(u.firstName + ' ' + u.lastName).trim() || u.email}
+                                                        </option>
+                                                    ))
+                                                }
+                                            </select>
                                         </div>
                                     </td>
                                 </tr>

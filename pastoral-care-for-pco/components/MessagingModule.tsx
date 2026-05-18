@@ -8445,6 +8445,7 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                             churchId={churchId}
                             church={church}
                             currentUser={currentUser}
+                            allUsers={allUsers}
                             onUpdateChurch={onUpdateChurch}
                         />
                     </div>
