@@ -162,6 +162,66 @@ export const pcoService = {
                 }
             }
         });
+    },
+
+    async getListMembersDetails(churchId: string, listId: string): Promise<any[]> {
+        try {
+            const data = await pcoFetch(churchId, `https://api.planningcenteronline.com/people/v2/lists/${listId}/people?per_page=100&include=emails,phone_numbers`);
+            const people = safeData(data);
+            const included = data.included || [];
+
+            return people.map(person => {
+                const emails = included
+                    .filter((inc: any) => inc.type === 'Email' && person.relationships?.emails?.data?.find((e: any) => e.id === inc.id))
+                    .map((inc: any) => inc.attributes.address);
+                const phones = included
+                    .filter((inc: any) => inc.type === 'PhoneNumber' && person.relationships?.phone_numbers?.data?.find((p: any) => p.id === inc.id))
+                    .map((inc: any) => inc.attributes.number);
+
+                return {
+                    id: person.id,
+                    name: person.attributes.name,
+                    emails,
+                    phones
+                };
+            });
+        } catch {
+            return [];
+        }
+    },
+
+    async getGroupMembersDetails(churchId: string, groupId: string): Promise<any[]> {
+        try {
+            const data = await pcoFetch(churchId,
+                `https://api.planningcenteronline.com/groups/v2/groups/${groupId}/memberships?include=person&per_page=100`
+            );
+            const included: any[] = data?.included || [];
+            const members = [];
+
+            for (const person of included) {
+                if (person.type !== 'Person') continue;
+                
+                const emails = (person.attributes?.email_addresses || []).map((e: any) => e.address);
+                if (emails.length === 0 && person.attributes?.primary_email) {
+                    emails.push(person.attributes.primary_email);
+                }
+
+                const phones = (person.attributes?.phone_numbers || []).map((p: any) => p.number);
+                if (phones.length === 0 && person.attributes?.primary_phone_number) {
+                    phones.push(person.attributes.primary_phone_number);
+                }
+
+                members.push({
+                    id: person.id,
+                    name: person.attributes?.name || `${person.attributes?.first_name || ''} ${person.attributes?.last_name || ''}`.trim(),
+                    emails,
+                    phones
+                });
+            }
+            return members;
+        } catch {
+            return [];
+        }
     }
 };
 

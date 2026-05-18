@@ -8029,17 +8029,17 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
     const activeNumber = visibleNumbers.find(n => n.id === activeNumberId) ?? visibleNumbers[0] ?? null;
 
     useEffect(() => {
-        const allowedTabs = ([
+        const allowedTabs: { key: Tab; perm: string }[] = ([
             { key: 'campaigns', perm: 'broadcastUserIds' },
             { key: 'workflows', perm: 'broadcastUserIds' },
             { key: 'inbox', perm: 'inboxUserIds' },
             { key: 'keywords', perm: 'keywordsUserIds' },
             { key: 'analytics', perm: 'analyticsUserIds' },
             { key: 'agent', perm: 'aiAgentUserIds' },
-        ] as const).filter(t => canUserUseFeature(activeNumber, currentUser, t.perm as any));
+        ] as const).filter(t => canUserUseFeature(activeNumber, currentUser, t.perm as any)) as any;
 
         if (currentUser.roles.includes('Church Admin') || currentUser.roles.includes('System Administration')) {
-            allowedTabs.push({ key: 'permissions', perm: 'broadcastUserIds' as any });
+            allowedTabs.push({ key: 'permissions', perm: 'broadcastUserIds' });
         }
 
         if (allowedTabs.length > 0 && !allowedTabs.some(t => t.key === activeTab) && !controlledTab) {
