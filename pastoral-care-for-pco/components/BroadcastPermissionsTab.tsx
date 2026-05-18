@@ -13,9 +13,6 @@ interface BroadcastPermissionsTabProps {
     onUpdateChurch?: (updates: Partial<Church>) => void;
 }
 
-const ROLES: UserRole[] = [
-    'Church Admin', 'Pastor', 'Pastor AI', 'People', 'Services', 'Groups', 'Giving', 
-    'Finance', 'Pastoral Care', 'Metrics', 'System Administration', 'Messaging', 
     'Email', 'Polls', 'Workflows', 'Notes'
 ];
 
@@ -52,32 +49,6 @@ export const BroadcastPermissionsTab: React.FC<BroadcastPermissionsTabProps> = (
             setLoading(false);
         });
     }, [churchId]);
-
-    const handleRoleToggle = async (itemId: string, role: string) => {
-        setSaving(itemId);
-        const access = broadcastPermissions.allowedAccess[itemId] || { roles: [], userIds: [] };
-        const newRoles = access.roles.includes(role) 
-            ? access.roles.filter(r => r !== role)
-            : [...access.roles, role];
-        
-        const newAccessMap = {
-            ...broadcastPermissions.allowedAccess,
-            [itemId]: { ...access, roles: newRoles }
-        };
-
-        try {
-            await updateDoc(doc(firebaseDb, 'churches', churchId), {
-                'broadcastPermissions.allowedAccess': newAccessMap
-            });
-            if (onUpdateChurch) {
-                onUpdateChurch({ broadcastPermissions: { allowedAccess: newAccessMap } });
-            }
-        } catch (e) {
-            console.error('Failed to update permissions', e);
-        } finally {
-            setSaving(null);
-        }
-    };
 
     const handleUserToggle = async (itemId: string, userId: string) => {
         setSaving(itemId);
@@ -150,7 +121,7 @@ export const BroadcastPermissionsTab: React.FC<BroadcastPermissionsTabProps> = (
                         <tr className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-500 uppercase tracking-wider">
                             <th className="px-6 py-4">Name</th>
                             <th className="px-6 py-4">Type / Count</th>
-                            <th className="px-6 py-4">Allowed Roles & Users</th>
+                            <th className="px-6 py-4">Allowed Users</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
@@ -173,38 +144,6 @@ export const BroadcastPermissionsTab: React.FC<BroadcastPermissionsTabProps> = (
                                     </td>
                                     <td className="px-6 py-4">
                                         <div className="flex flex-wrap gap-2 items-center">
-                                            {/* Common roles for quick selection */}
-                                            {['Pastor', 'Groups', 'Messaging'].map(role => {
-                                                const isActive = access.roles.includes(role);
-                                                return (
-                                                    <button
-                                                        key={role}
-                                                        onClick={() => handleRoleToggle(item.id, role)}
-                                                        disabled={saving === item.id}
-                                                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 border
-                                                            ${isActive 
-                                                                ? 'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-300' 
-                                                                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-700'
-                                                            } ${saving === item.id ? 'opacity-50 cursor-not-allowed' : ''}
-                                                        `}
-                                                    >
-                                                        {isActive && <Check size={12} />}
-                                                        {role}
-                                                    </button>
-                                                )
-                                            })}
-                                            {/* If they want more roles, we can expand it, but these 3 cover 90% of use cases. 
-                                                We'll add a catch-all indicator if there are other roles */}
-                                            {access.roles.filter((r: string) => !['Pastor', 'Groups', 'Messaging'].includes(r)).map((r: string) => (
-                                                <button
-                                                    key={r}
-                                                    onClick={() => handleRoleToggle(item.id, r)}
-                                                    className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-50 border border-indigo-200 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-300 flex items-center gap-1.5"
-                                                >
-                                                    <Check size={12} /> {r}
-                                                </button>
-                                            ))}
-                                            <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-2"></div>
                                             {/* Specific Users */}
                                             {access.userIds?.map((uid: string) => {
                                                 const u = allUsers.find(x => x.id === uid);
@@ -215,7 +154,7 @@ export const BroadcastPermissionsTab: React.FC<BroadcastPermissionsTabProps> = (
                                                         disabled={saving === item.id}
                                                         className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 border bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-900/30 dark:border-emerald-800 dark:text-emerald-300 ${saving === item.id ? 'opacity-50 cursor-not-allowed' : ''}`}
                                                     >
-                                                        <Check size={12} /> {u ? (u.firstName + ' ' + u.lastName).trim() || u.email : 'Unknown User'}
+                                                        <Check size={12} /> {u ? (u.name || u.email) : 'Unknown User'}
                                                     </button>
                                                 );
                                             })}
@@ -230,10 +169,10 @@ export const BroadcastPermissionsTab: React.FC<BroadcastPermissionsTabProps> = (
                                                 <option value="">+ Add User</option>
                                                 {allUsers
                                                     .filter(u => !access.userIds?.includes(u.id))
-                                                    .sort((a, b) => (a.firstName || '').localeCompare(b.firstName || ''))
+                                                    .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
                                                     .map(u => (
                                                         <option key={u.id} value={u.id}>
-                                                            {(u.firstName + ' ' + u.lastName).trim() || u.email}
+                                                            {u.name || u.email}
                                                         </option>
                                                     ))
                                                 }
