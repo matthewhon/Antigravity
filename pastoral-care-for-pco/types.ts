@@ -106,6 +106,8 @@ export interface Church {
         fromEmail?: string;
         /** Display name for the From field */
         fromName?: string;
+        /** Additional authorized sender identities */
+        additionalSenders?: { name: string; email: string }[];
         // Custom domain fields
         /** e.g. "mychurch.org" */
         customDomain?: string;
@@ -141,7 +143,7 @@ export interface Church {
         /**
          * Shared secret used to authenticate requests from the Grow Application.
          * The Grow App must send this value as `PASTORAL_CARE_API_SECRET` in its
-         * integration settings. Generate a new one from System Settings → Tenants
+         * integration settings. Generate a new one from System Settings ? Tenants
          * or approve a pending access request from the Grow Integration tab.
          */
         growIntegrationSecret?: string;
@@ -489,9 +491,9 @@ export interface SystemSettings {
     // Scripture Library feature flag
     enableLibrary?: boolean;
     // -- SignalWire SMS ---------------------------------------------------------
-    /** SignalWire Project ID (UUID) — from Dashboard → API → API Tokens */
+    /** SignalWire Project ID (UUID) � from Dashboard ? API ? API Tokens */
     signalwireProjectId?: string;
-    /** SignalWire API Token — from Dashboard → API → API Tokens */
+    /** SignalWire API Token � from Dashboard ? API ? API Tokens */
     signalwireApiToken?: string;
     /** SignalWire Space URL, e.g. "barnabassoftware.signalwire.com" */
     signalwireSpaceUrl?: string;
@@ -505,12 +507,12 @@ export interface SystemSettings {
     /** Cost per MMS in USD (default 0.0200) */
     smsMmsSegmentCostUsd?: number;
     /**
-     * SignalWire Webhook Signing Key — from Dashboard → API → API Credentials → Signing Key.
+     * SignalWire Webhook Signing Key � from Dashboard ? API ? API Credentials ? Signing Key.
      * Used to verify the HMAC-SHA256 signature on all inbound webhook requests.
      */
     signalwireSigningKey?: string;
     /**
-     * 10DLC Campaign ID (TCR) — from SignalWire Dashboard → Messaging Campaigns.
+     * 10DLC Campaign ID (TCR) � from SignalWire Dashboard ? Messaging Campaigns.
      * Newly provisioned church numbers are auto-assigned to this campaign for carrier approval.
      */
     signalwireCampaignId?: string;
@@ -810,7 +812,7 @@ export interface Poll {
     updatedAt: number;
     createdBy: string;
 
-    // ─── Live Projector Display ─────────────────────────────────────────────
+    // --- Live Projector Display ---------------------------------------------
     /**
      * Index (0-based) of the question currently displayed on the live projector.
      * Admin can advance this via the projector control overlay.
@@ -818,8 +820,8 @@ export interface Poll {
      */
     activeQuestionIndex?: number;
 
-    // ─── SMS Text-to-Vote ──────────────────────────────────────────────────
-    /** When true, respondents can text a number (1, 2, 3…) to vote on the first choice question */
+    // --- SMS Text-to-Vote --------------------------------------------------
+    /** When true, respondents can text a number (1, 2, 3�) to vote on the first choice question */
     smsVotingEnabled?: boolean;
     /**
      * Optional SMS keyword to activate this poll's text-to-vote mode.
@@ -1090,7 +1092,7 @@ export interface SmsConversation {
     twilioNumberId?: string | null;
     /** The Twilio E.164 number that received / will send messages in this thread */
     toPhoneNumber?: string | null;
-    /** Named inbox this conversation belongs to (legacy — same value as twilioNumberId) */
+    /** Named inbox this conversation belongs to (legacy � same value as twilioNumberId) */
     inboxId?: string | null;
     /**
      * Prayer detection follow-up state.
@@ -1152,7 +1154,7 @@ export interface SmsTag {
     churchId: string;
     /** Display name, e.g. "Prayer Request" */
     name: string;
-    /** Optional emoji prefix, e.g. "🙏" */
+    /** Optional emoji prefix, e.g. "??" */
     emoji?: string;
     /** Color theme for tag chip UI */
     color: 'violet' | 'blue' | 'emerald' | 'amber' | 'red' | 'pink';
@@ -1164,7 +1166,7 @@ export interface SmsTag {
     autoReplyMessage?: string;
     /**
      * When true, incoming SMS messages are scanned for detectionPhrases.
-     * If matched, this tag is auto-applied — similar to Prayer Request Detection.
+     * If matched, this tag is auto-applied � similar to Prayer Request Detection.
      */
     detectionEnabled?: boolean;
     /**
@@ -1279,7 +1281,7 @@ export interface SmsPhoneNumber {
     createdAt: number;
     updatedAt: number;
 
-    // ── Per-number feature permissions ────────────────────────────────────────
+    // -- Per-number feature permissions ----------------------------------------
     /**
      * Granular access controls for this number's features.
      * Absent = all Messaging users have access (backwards-compatible default).
@@ -1509,7 +1511,7 @@ export interface WorkflowActionNode {
 }
 
 /**
- * A *delay* node — a pure wait period; no message is sent.
+ * A *delay* node � a pure wait period; no message is sent.
  * Sits in the timeline between action nodes to control timing.
  */
 export interface WorkflowDelayNode {
@@ -1519,19 +1521,19 @@ export interface WorkflowDelayNode {
     /** Days to wait in 'relative' mode. */
     delayDays: number;
     scheduleType?: 'relative' | 'day_of_week' | 'day_of_month';
-    /** 0 = Sunday — 6 = Saturday. Used when scheduleType = 'day_of_week'. */
+    /** 0 = Sunday � 6 = Saturday. Used when scheduleType = 'day_of_week'. */
     scheduleDayOfWeek?: number;
-    /** 1–31. Used when scheduleType = 'day_of_month'. */
+    /** 1�31. Used when scheduleType = 'day_of_month'. */
     scheduleDayOfMonth?: number;
     /** 'HH:MM' 24-hour send time for day_of_week / day_of_month modes. */
     scheduleTime?: string;
-    // ── Recurrence ─────────────────────────────────────────────────────────
+    // -- Recurrence ---------------------------------------------------------
     /** 'none' = fire once; 'weekly' = repeat on selected days of week; 'monthly' = repeat on selected dates */
     repeatType?: 'none' | 'weekly' | 'monthly';
     /**
      * Days on which the action repeats.
-     * For repeatType 'weekly'  : day-of-week values (0–6, Sunday = 0).
-     * For repeatType 'monthly' : day-of-month values (1–31).
+     * For repeatType 'weekly'  : day-of-week values (0�6, Sunday = 0).
+     * For repeatType 'monthly' : day-of-month values (1�31).
      * Leave empty for a single-occurrence send.
      */
     repeatDays?: number[];
@@ -1570,7 +1572,7 @@ export interface WorkflowBranchNode {
 /** Discriminated union of all workflow node types. */
 export type WorkflowNode = WorkflowActionNode | WorkflowDelayNode | WorkflowBranchNode;
 
-// ─── Multi-Number Support ────────────────────────────────────────────────────
+// --- Multi-Number Support ----------------------------------------------------
 
 /**
  * A Twilio phone number provisioned for a specific church.

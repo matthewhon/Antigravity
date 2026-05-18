@@ -1397,6 +1397,24 @@ export const QuickSendModal: React.FC<{
 
   const [isSending, setIsSending] = useState(false);
 
+  const senders = React.useMemo(() => {
+    const list = [];
+    if (church?.emailSettings?.fromEmail) {
+      list.push({
+        name: church.emailSettings.fromName || church.name || '',
+        email: church.emailSettings.fromEmail
+      });
+    }
+    (church?.emailSettings?.additionalSenders || []).forEach(s => {
+      if (s.name && s.email) list.push(s);
+    });
+    return list;
+  }, [church]);
+
+  const [selectedSenderStr, setSelectedSenderStr] = useState(() => 
+    senders.length > 0 ? JSON.stringify(senders[0]) : ''
+  );
+
   useEffect(() => {
     pcoService.getGroups(churchId)
       .then((raw: any[]) => {
@@ -1452,8 +1470,14 @@ export const QuickSendModal: React.FC<{
       c.contentType = 'html';
       // Convert basic newlines to <br> for HTML mode to ensure it displays nicely
       c.content = content.replace(/\n/g, '<br/>');
-      c.fromEmail = church.emailSettings.fromEmail;
-      c.fromName = church.emailSettings.fromName || church.name || '';
+      
+      const sender = selectedSenderStr ? JSON.parse(selectedSenderStr) : {
+        email: church.emailSettings.fromEmail,
+        name: church.emailSettings.fromName || church.name || ''
+      };
+      
+      c.fromEmail = sender.email;
+      c.fromName = sender.name;
       
       await onSendQuickEmail(c);
       onClose();
@@ -1526,6 +1550,21 @@ export const QuickSendModal: React.FC<{
             )}
           </div>
           
+          {senders.length > 0 && (
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">From Address <span className="text-red-500">*</span></label>
+              <select
+                className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                value={selectedSenderStr}
+                onChange={e => setSelectedSenderStr(e.target.value)}
+              >
+                {senders.map((s, i) => (
+                  <option key={i} value={JSON.stringify(s)}>{s.name} &lt;{s.email}&gt;</option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div>
             <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Subject <span className="text-red-500">*</span></label>
             <input

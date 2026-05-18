@@ -296,6 +296,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   const [mailCnameRecords, setMailCnameRecords] = useState<{ host: string; type: 'CNAME'; data: string }[]>(church.emailSettings?.cnameRecords || []);
   const [mailDomainAuthId, setMailDomainAuthId] = useState<string>(church.emailSettings?.domainAuthId || '');
   const [mailDomainVerified, setMailDomainVerified] = useState(church.emailSettings?.domainVerified || false);
+  const [mailAdditionalSenders, setMailAdditionalSenders] = useState<{name: string, email: string}[]>(church.emailSettings?.additionalSenders || []);
   const [isMailSaving, setIsMailSaving] = useState(false);
   const [mailMessage, setMailMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [mailDiagEmail, setMailDiagEmail] = useState('');
@@ -486,6 +487,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
           setMailCnameRecords(es.cnameRecords || []);
           setMailDomainAuthId(es.domainAuthId || '');
           setMailDomainVerified(es.domainVerified || false);
+          setMailAdditionalSenders(es.additionalSenders || []);
       }
   }, [church.emailSettings]);
 
@@ -2376,6 +2378,84 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 )}
                             </div>
                         )}
+
+                        {/* ── Additional Senders ── */}
+                        <div className="space-y-4 mt-8 pt-8 border-t border-slate-100 dark:border-slate-800">
+                            <div>
+                                <h4 className="font-bold text-slate-900 dark:text-white text-sm">Additional "From" Addresses</h4>
+                                <p className="text-[10px] text-slate-400 mt-0.5">Add other sender identities (like Pastors or Ministry Leaders) that can be selected when sending Quick Send Emails.</p>
+                            </div>
+                            
+                            <div className="space-y-3">
+                                {mailAdditionalSenders.map((sender, index) => (
+                                    <div key={index} className="flex items-center gap-3">
+                                        <input
+                                            type="text"
+                                            value={sender.name}
+                                            onChange={e => {
+                                                const newSenders = [...mailAdditionalSenders];
+                                                newSenders[index].name = e.target.value;
+                                                setMailAdditionalSenders(newSenders);
+                                            }}
+                                            placeholder="Display Name"
+                                            className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                        />
+                                        <input
+                                            type="email"
+                                            value={sender.email}
+                                            onChange={e => {
+                                                const newSenders = [...mailAdditionalSenders];
+                                                newSenders[index].email = e.target.value;
+                                                setMailAdditionalSenders(newSenders);
+                                            }}
+                                            placeholder={`email@${church.emailSettings?.customDomain || SHARED_DOMAIN}`}
+                                            className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                        />
+                                        <button
+                                            onClick={() => {
+                                                setMailAdditionalSenders(mailAdditionalSenders.filter((_, i) => i !== index));
+                                            }}
+                                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-rose-50 text-rose-500 hover:bg-rose-100 transition-colors"
+                                        >
+                                            ✕
+                                        </button>
+                                    </div>
+                                ))}
+                                
+                                <div className="flex justify-between items-center mt-4">
+                                    <button
+                                        onClick={() => setMailAdditionalSenders([...mailAdditionalSenders, { name: '', email: '' }])}
+                                        className="text-indigo-600 dark:text-indigo-400 text-xs font-bold flex items-center gap-1 hover:underline"
+                                    >
+                                        <span>+ Add Address</span>
+                                    </button>
+                                    
+                                    <button
+                                        onClick={async () => {
+                                            if (!onUpdateChurch) return;
+                                            setIsMailSaving(true);
+                                            try {
+                                                await onUpdateChurch({
+                                                    emailSettings: {
+                                                        ...(church.emailSettings as any),
+                                                        additionalSenders: mailAdditionalSenders.filter(s => s.name.trim() && s.email.trim())
+                                                    }
+                                                });
+                                                setMailMessage({ type: 'success', text: 'Additional senders saved successfully.' });
+                                            } catch (e: any) {
+                                                setMailMessage({ type: 'error', text: e.message });
+                                            } finally {
+                                                setIsMailSaving(false);
+                                            }
+                                        }}
+                                        disabled={isMailSaving}
+                                        className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-5 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg disabled:opacity-50"
+                                    >
+                                        {isMailSaving ? 'Saving...' : 'Save Additional Addresses'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     {/* Info card */}
