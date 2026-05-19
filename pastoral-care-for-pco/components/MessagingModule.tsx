@@ -8511,6 +8511,17 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                     </div>
                 )}
 
+                {/* Files tab */}
+                {effectiveTab === 'files' && (
+                    <div className="h-full overflow-y-auto">
+                        <FileManager
+                            churchId={churchId}
+                            currentUser={currentUser}
+                            church={church}
+                        />
+                    </div>
+                )}
+
                 {/* Permissions tab */}
                 {effectiveTab === 'permissions' && (
                     <div className="h-full overflow-y-auto">

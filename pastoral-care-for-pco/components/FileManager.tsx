@@ -257,7 +257,7 @@ export const FileManager: React.FC<FileManagerProps> = ({ churchId, currentUser 
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <h2 className="text-xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
             <FolderOpen className="text-indigo-600 dark:text-indigo-400" /> 
@@ -268,7 +268,7 @@ export const FileManager: React.FC<FileManagerProps> = ({ churchId, currentUser 
           </p>
         </div>
 
-        <div>
+        <div className="shrink-0">
           <input
             type="file"
             ref={fileInputRef}
@@ -282,7 +282,7 @@ export const FileManager: React.FC<FileManagerProps> = ({ churchId, currentUser 
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading}
-            className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-lg shadow-indigo-600/30 transition disabled:opacity-50"
+            className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-lg shadow-indigo-600/30 transition disabled:opacity-50 w-full sm:w-auto justify-center"
           >
             {isUploading ? <Loader2 size={18} className="animate-spin" /> : <UploadCloud size={18} />}
             {isUploading ? `Uploading... ${Math.round(uploadProgress)}%` : 'Upload File'}
