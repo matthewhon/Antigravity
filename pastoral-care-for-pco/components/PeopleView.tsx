@@ -238,6 +238,23 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
     );
   }
 
+  // --- Average age across all people with a known birthdate ---
+  const avgAge = useMemo(() => {
+    if (!data.allPeople?.length) return null;
+    const currentYear = new Date().getFullYear();
+    let total = 0;
+    let count = 0;
+    data.allPeople.forEach(p => {
+      if (!p.birthdate) return;
+      const birthYear = parseInt(p.birthdate.split('-')[0], 10);
+      if (!isNaN(birthYear) && birthYear > 1900 && birthYear <= currentYear) {
+        total += currentYear - birthYear;
+        count++;
+      }
+    });
+    return count > 0 ? Math.round(total / count) : null;
+  }, [data.allPeople]);
+
   const renderWidget = (id: string) => {
     const gridColor = currentTheme === 'dark' ? '#334155' : '#f1f5f9';
     const axisColor = currentTheme === 'dark' ? '#94a3b8' : '#94a3b8';
@@ -246,11 +263,12 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
         case 'people_stats':
             return (
                 <div key="people_stats" className="col-span-1 md:col-span-2 lg:col-span-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
                         <StatCard label="Total People" value={data.stats.total.toLocaleString()} color="indigo" source="Planning Center" />
                         <StatCard label="Members" value={data.stats.members.toLocaleString()} color="emerald" source="Planning Center" />
                         <StatCard label="New (30d)" value={data.stats.newThisMonth.toLocaleString()} color="violet" source="Planning Center" />
                         <StatCard label="Households" value={data.stats.households.toLocaleString()} color="amber" source="Planning Center" />
+                        <StatCard label="Avg Age" value={avgAge !== null ? `${avgAge} yrs` : '—'} color="rose" source="w/ Birthdate" />
                     </div>
                 </div>
             );
