@@ -3,7 +3,7 @@ import { Church, User, UserRole } from '../types';
 import { pcoService } from '../services/pcoService';
 import { db as firebaseDb } from '../services/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
-import { Loader2, Shield, Search, Check, X, ShieldAlert } from 'lucide-react';
+import { Loader2, Shield, Search, Check, X, ShieldAlert, Users, List } from 'lucide-react';
 
 interface BroadcastPermissionsTabProps {
     churchId: string;
@@ -23,6 +23,7 @@ export const BroadcastPermissionsTab: React.FC<BroadcastPermissionsTabProps> = (
     const [members, setMembers] = useState<any[]>([]);
     const [loadingMembers, setLoadingMembers] = useState(false);
     const [selectedItems, setSelectedItems] = useState<string[]>([]);
+    const [typeFilter, setTypeFilter] = useState<'all' | 'list' | 'group'>('all');
 
     const broadcastPermissions = church.broadcastPermissions || { allowedAccess: {} };
 
@@ -123,6 +124,32 @@ export const BroadcastPermissionsTab: React.FC<BroadcastPermissionsTabProps> = (
         }
     };
 
+    const handleBulkRemove = async (userId: string) => {
+        if (!userId || selectedItems.length === 0) return;
+        
+        const newAccessMap = { ...broadcastPermissions.allowedAccess };
+        
+        selectedItems.forEach(itemId => {
+            const access = newAccessMap[itemId] || { roles: [], userIds: [] };
+            const currentUserIds = access.userIds || [];
+            if (currentUserIds.includes(userId)) {
+                newAccessMap[itemId] = { ...access, userIds: currentUserIds.filter(id => id !== userId) };
+            }
+        });
+
+        try {
+            await updateDoc(doc(firebaseDb, 'churches', churchId), {
+                'broadcastPermissions.allowedAccess': newAccessMap
+            });
+            if (onUpdateChurch) {
+                onUpdateChurch({ broadcastPermissions: { allowedAccess: newAccessMap } });
+            }
+            setSelectedItems([]); 
+        } catch (e) {
+            console.error('Failed to update bulk permissions', e);
+        }
+    };
+
     const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>, currentItems: any[]) => {
         if (e.target.checked) {
             const allIds = currentItems.map(i => i.id);
@@ -137,9 +164,11 @@ export const BroadcastPermissionsTab: React.FC<BroadcastPermissionsTabProps> = (
         setSelectedItems(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
     };
 
-    const combinedItems = [...lists, ...groups].filter(item => 
-        item.name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const combinedItems = [...lists, ...groups].filter(item => {
+        const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesType = typeFilter === 'all' || item.type === typeFilter;
+        return matchesSearch && matchesType;
+    });
 
     if (loading) {
         return (
@@ -165,15 +194,26 @@ export const BroadcastPermissionsTab: React.FC<BroadcastPermissionsTabProps> = (
                 </div>
             </div>
 
-            <div className="relative mb-6">
-                <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input 
-                    type="text"
-                    placeholder="Search groups and lists..."
-                    value={searchTerm}
-                    onChange={e => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
-                />
+            <div className="flex flex-col sm:flex-row gap-4 mb-6">
+                <div className="relative flex-1">
+                    <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input 
+                        type="text"
+                        placeholder="Search groups and lists..."
+                        value={searchTerm}
+                        onChange={e => setSearchTerm(e.target.value)}
+                        className="w-full pl-10 pr-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                    />
+                </div>
+                <select 
+                    value={typeFilter} 
+                    onChange={e => setTypeFilter(e.target.value as any)}
+                    className="px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm text-slate-600 dark:text-slate-300 font-medium cursor-pointer"
+                >
+                    <option value="all">All Types</option>
+                    <option value="list">Lists Only</option>
+                    <option value="group">Groups Only</option>
+                </select>
             </div>
 
             {selectedItems.length > 0 && (
@@ -189,7 +229,24 @@ export const BroadcastPermissionsTab: React.FC<BroadcastPermissionsTabProps> = (
                                 if (e.target.value) handleBulkAssign(e.target.value);
                             }}
                         >
-                            <option value="">+ Assign User to Selected</option>
+                            <option value="">+ Assign User...</option>
+                            {allUsers
+                                .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+                                .map(u => (
+                                    <option key={u.id} value={u.id}>
+                                        {u.name || u.email}
+                                    </option>
+                                ))
+                            }
+                        </select>
+                        <select
+                            className="px-3 py-2 rounded-lg text-sm font-semibold border border-rose-200 dark:border-rose-700 bg-white dark:bg-slate-800 text-rose-600 dark:text-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-500 cursor-pointer"
+                            value=""
+                            onChange={(e) => {
+                                if (e.target.value) handleBulkRemove(e.target.value);
+                            }}
+                        >
+                            <option value="">- Remove User...</option>
                             {allUsers
                                 .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
                                 .map(u => (
@@ -248,6 +305,11 @@ export const BroadcastPermissionsTab: React.FC<BroadcastPermissionsTabProps> = (
                                             onClick={() => handleViewMembers(item)}
                                         >
                                             {!hasAccess && <ShieldAlert size={14} className="text-amber-500 shrink-0" title="Restricted by default" />}
+                                            {item.type === 'list' ? (
+                                                <List size={14} className="text-slate-400 group-hover:text-indigo-500 transition shrink-0" />
+                                            ) : (
+                                                <Users size={14} className="text-slate-400 group-hover:text-indigo-500 transition shrink-0" />
+                                            )}
                                             <span className="font-semibold text-slate-900 dark:text-white group-hover:text-indigo-500 transition">{item.name}</span>
                                         </div>
                                     </td>
