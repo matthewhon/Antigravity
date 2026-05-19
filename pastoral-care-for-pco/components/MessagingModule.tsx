@@ -3231,7 +3231,7 @@ const SmsKeywordsManager: React.FC<{
 
             {/* --- PRAYER REQUEST DETECTION ----------------------------------- */}
             {(() => {
-                const isAdmin = currentUser.roles.includes('Church Admin') || currentUser.roles.includes('System Administration');
+                const isAdmin = currentUser.roles?.includes('Church Admin') || currentUser.roles?.includes('System Administration');
                 const prayerEnabled = !!(church.smsSettings?.prayerDetectionEnabled);
                 const [draftReply, setDraftReply] = React.useState(church.smsSettings?.prayerClarifyingReply || '');
                 const [prayerSaving, setPrayerSaving] = React.useState(false);
@@ -3388,7 +3388,7 @@ const SmsKeywordsManager: React.FC<{
 
             {/* --- SMS AI AGENT TOGGLE ------------------------------------------ */}
             {(() => {
-                const isAdmin = currentUser.roles.includes('Church Admin') || currentUser.roles.includes('System Administration');
+                const isAdmin = currentUser.roles?.includes('Church Admin') || currentUser.roles?.includes('System Administration');
                 const agentOn = !!(church.smsSettings?.smsAgentEnabled);
                 const [agentSaving, setAgentSaving] = React.useState(false);
 
@@ -7253,13 +7253,13 @@ function useTwilioNumbers(churchId: string) {
 
 /** Returns true if the current user is allowed to see/use a given number. */
 function canUserSeeNumber(num: TwilioPhoneNumber, user: User): boolean {
-    if (user.roles.includes('Church Admin') || user.roles.includes('System Administration')) return true;
+    if (user.roles?.includes('Church Admin') || user.roles?.includes('System Administration')) return true;
     return !num.allowedUserIds || num.allowedUserIds.length === 0 || num.allowedUserIds.includes(user.id);
 }
 
 function canUserUseFeature(num: TwilioPhoneNumber | null | undefined, user: User, featureKey: keyof NonNullable<TwilioPhoneNumber['permissions']>): boolean {
     if (!num) return false;
-    if (user.roles.includes('Church Admin') || user.roles.includes('System Administration')) return true;
+    if (user.roles?.includes('Church Admin') || user.roles?.includes('System Administration')) return true;
     if (num.allowedUserIds && num.allowedUserIds.length > 0 && !num.allowedUserIds.includes(user.id)) return false;
     const featureIds = num.permissions?.[featureKey] || [];
     return featureIds.length === 0 || featureIds.includes(user.id);
@@ -7338,7 +7338,7 @@ const NumberManager: React.FC<{
         showToast(`${num.phoneNumber} released`);
     };
 
-    const isAdmin = currentUser.roles.includes('Church Admin') || currentUser.roles.includes('System Administration');
+    const isAdmin = currentUser.roles?.includes('Church Admin') || currentUser.roles?.includes('System Administration');
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
@@ -7509,7 +7509,7 @@ const SmsAgentTab: React.FC<{
     currentUser: User;
     onUpdateChurch?: (updates: Partial<Church>) => void;
 }> = ({ churchId, church, currentUser, onUpdateChurch }) => {
-    const isAdmin = currentUser.roles.includes('Church Admin') || currentUser.roles.includes('System Administration');
+    const isAdmin = currentUser.roles?.includes('Church Admin') || currentUser.roles?.includes('System Administration');
     const agentEnabled = !!(church.smsSettings?.smsAgentEnabled);
     const execAgentEnabled = !!(church.smsSettings?.executiveAiAgentEnabled);
     const execAgentKeyword = church.smsSettings?.executiveAiAgentKeyword || 'AI Agent';
@@ -8111,7 +8111,7 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
             { key: 'agent', perm: 'aiAgentUserIds' },
         ] as const).filter(t => canUserUseFeature(activeNumber, currentUser, t.perm as any)) as any;
 
-        if (currentUser.roles.includes('Church Admin') || currentUser.roles.includes('System Administration')) {
+        if (currentUser.roles?.includes('Church Admin') || currentUser.roles?.includes('System Administration')) {
             allowedTabs.push({ key: 'permissions', perm: 'broadcastUserIds' });
         }
 
@@ -8370,7 +8370,7 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                                 { key: 'agent', label: 'AI Agent', icon: <Sparkles size={13} />, perm: 'aiAgentUserIds' },
                             ] as const)
                                 .filter(t => canUserUseFeature(activeNumber, currentUser, t.perm as any))
-                                .concat((currentUser.roles.includes('Church Admin') || currentUser.roles.includes('System Administration')) ? [{ key: 'permissions', label: 'Permissions', icon: <Shield size={13} />, perm: 'broadcastUserIds' } as any] : [])
+                                .concat((currentUser.roles?.includes('Church Admin') || currentUser.roles?.includes('System Administration')) ? [{ key: 'permissions', label: 'Permissions', icon: <Shield size={13} />, perm: 'broadcastUserIds' } as any] : [])
                                 .map(t => (
                                     <button
                                         key={t.key}
@@ -8405,7 +8405,7 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                                     <ChevronDown size={12} />
                                 </div>
                             </div>
-                            {(currentUser.roles.includes('Church Admin') || currentUser.roles.includes('System Administration')) && (
+                            {(currentUser.roles?.includes('Church Admin') || currentUser.roles?.includes('System Administration')) && (
                                 <button
                                     onClick={() => setShowNumberManager(true)}
                                     className="p-1.5 rounded-xl text-slate-500 hover:text-violet-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition border border-transparent hover:border-slate-200 dark:hover:border-slate-700 bg-white dark:bg-slate-900 shadow-sm"

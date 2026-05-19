@@ -1635,7 +1635,7 @@ export interface BillingUsage {
 
 export function hasBroadcastAccess(currentUser: User | undefined, targetId: string, church?: Church): boolean {
     if (!currentUser) return false;
-    if (currentUser.roles.includes('System Administration') || currentUser.roles.includes('Church Admin')) {
+    if (currentUser.roles?.includes('System Administration') || currentUser.roles?.includes('Church Admin')) {
         return true;
     }
     const accessMap = church?.broadcastPermissions?.allowedAccess || {};
@@ -1643,7 +1643,7 @@ export function hasBroadcastAccess(currentUser: User | undefined, targetId: stri
     if (!access) return false; // Default restricted
 
     if (access.userIds?.includes(currentUser.id)) return true;
-    if (access.roles?.some(r => currentUser.roles.includes(r as UserRole))) return true;
+    if (access.roles?.some(r => currentUser.roles?.includes(r as UserRole))) return true;
     
     return false;
 }
