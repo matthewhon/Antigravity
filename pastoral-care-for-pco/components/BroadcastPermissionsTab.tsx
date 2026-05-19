@@ -54,9 +54,10 @@ export const BroadcastPermissionsTab: React.FC<BroadcastPermissionsTabProps> = (
     const handleUserToggle = async (itemId: string, userId: string) => {
         setSaving(itemId);
         const access = broadcastPermissions.allowedAccess[itemId] || { roles: [], userIds: [] };
-        const newUserIds = access.userIds.includes(userId) 
-            ? access.userIds.filter((id: string) => id !== userId)
-            : [...access.userIds, userId];
+        const currentUserIds = access.userIds || [];
+        const newUserIds = currentUserIds.includes(userId) 
+            ? currentUserIds.filter((id: string) => id !== userId)
+            : [...currentUserIds, userId];
         
         const newAccessMap = {
             ...broadcastPermissions.allowedAccess,
@@ -103,8 +104,9 @@ export const BroadcastPermissionsTab: React.FC<BroadcastPermissionsTabProps> = (
         
         selectedItems.forEach(itemId => {
             const access = newAccessMap[itemId] || { roles: [], userIds: [] };
-            if (!access.userIds.includes(userId)) {
-                newAccessMap[itemId] = { ...access, userIds: [...access.userIds, userId] };
+            const currentUserIds = access.userIds || [];
+            if (!currentUserIds.includes(userId)) {
+                newAccessMap[itemId] = { ...access, userIds: [...currentUserIds, userId] };
             }
         });
 

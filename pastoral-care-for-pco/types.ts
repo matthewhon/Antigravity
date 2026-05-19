@@ -1642,8 +1642,8 @@ export function hasBroadcastAccess(currentUser: User | undefined, targetId: stri
     const access = accessMap[targetId];
     if (!access) return false; // Default restricted
 
-    if (access.userIds.includes(currentUser.id)) return true;
-    if (access.roles.some(r => currentUser.roles.includes(r as UserRole))) return true;
+    if (access.userIds?.includes(currentUser.id)) return true;
+    if (access.roles?.some(r => currentUser.roles.includes(r as UserRole))) return true;
     
     return false;
 }
