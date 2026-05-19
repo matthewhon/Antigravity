@@ -653,7 +653,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </header>
 
-        <div className="columns-1 md:columns-2 lg:columns-3 gap-6 [column-fill:balance]">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 grid-flow-row-dense">
             {safeVisibleWidgets.map((id, index) => {
                 return (
                     <div

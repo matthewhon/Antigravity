@@ -591,7 +591,7 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
                     </div>
 
                     {/* Unified Drag & Drop Grid */}
-                    <div className="columns-1 md:columns-2 lg:columns-4 gap-6 [column-fill:balance]">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 grid-flow-row-dense">
                         {widgetOrder.map((id, index) => {
                             let colSpan = 'col-span-1';
                             if (id.startsWith('ministry_') || id === 'city_penetration') colSpan = 'col-span-1 md:col-span-2 lg:col-span-2';
@@ -599,7 +599,7 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
                             return (
                                 <div 
                                     key={id} 
-                                    className={`${colSpan} cursor-grab active:cursor-grabbing transition-transform break-inside-avoid mb-8 w-full inline-block`}
+                                    className={`${colSpan} cursor-grab active:cursor-grabbing transition-transform`}
                                     draggable
                                     onDragStart={(e) => handleDragStart(e, index)}
                                     onDragEnter={(e) => handleDragEnter(e, index)}

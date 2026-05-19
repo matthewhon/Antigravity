@@ -1542,12 +1542,12 @@ export const GivingView: React.FC<GivingViewProps> = ({
         {activeTab === 'overview' && (
             <div className="space-y-8 animate-in fade-in no-print">
                 {renderFilterControls()}
-                <div className="columns-1 md:columns-2 lg:columns-4 gap-8 [column-fill:balance]">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 grid-flow-row-dense">
                     {widgetsToRender.map((id, index) => {
                         return (
                             <div 
                                 key={id} 
-                                className={`${getWidgetSpan(id)} cursor-grab active:cursor-grabbing transition-transform break-inside-avoid mb-8 w-full inline-block`}
+                                className={`${getWidgetSpan(id)} cursor-grab active:cursor-grabbing transition-transform`}
                                 draggable
                                 onDragStart={(e) => handleDragStart(e, index)}
                                 onDragEnter={(e) => handleDragEnter(e, index)}
@@ -1564,12 +1564,12 @@ export const GivingView: React.FC<GivingViewProps> = ({
         
         {activeTab === 'donor' && (
             <div className="space-y-8 animate-in fade-in no-print">
-                <div className="columns-1 md:columns-2 lg:columns-4 gap-8 [column-fill:balance]">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 grid-flow-row-dense">
                     {widgetsToRender.map((id, index) => {
                         return (
                             <div 
                                 key={id} 
-                                className={`${getWidgetSpan(id)} cursor-grab active:cursor-grabbing transition-transform break-inside-avoid mb-8 w-full inline-block`} 
+                                className={`${getWidgetSpan(id)} cursor-grab active:cursor-grabbing transition-transform`} 
                                 draggable 
                                 onDragStart={(e) => handleDragStart(e, index)} 
                                 onDragEnter={(e) => handleDragEnter(e, index)} 
