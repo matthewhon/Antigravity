@@ -884,7 +884,7 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
       {activePage === 'reports' ? (
         <PeopleReportsTab data={data} />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div className="columns-1 md:columns-2 lg:columns-4 gap-8 [column-fill:balance]">
         {safeVisibleWidgets.map((id, index) => {
             // Full-width stat rows span all columns and skip DnD to avoid layout jumps
             if (id === 'people_stats' || id === 'householdSummary') return renderWidget(id);
@@ -896,7 +896,7 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
           return (
               <div
                   key={id}
-                  className={`${spanClass} cursor-grab active:cursor-grabbing transition-opacity`}
+                  className={`${spanClass} cursor-grab active:cursor-grabbing transition-opacity break-inside-avoid mb-8 w-full inline-block`}
                   draggable
                   onDragStart={(e) => handleDragStart(e, index)}
                   onDragEnter={(e) => handleDragEnter(e, index)}

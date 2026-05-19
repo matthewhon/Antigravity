@@ -1456,7 +1456,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                           return (
                               <div
                                   key={`${loc.id}-${id}`}
-                                  className={`${spanClass} cursor-grab active:cursor-grabbing transition-opacity`}
+                                  className={`${spanClass} cursor-grab active:cursor-grabbing transition-opacity break-inside-avoid mb-8 w-full inline-block`}
                                   draggable
                                   onDragStart={(e) => handleDragStart(e, index)}
                                   onDragEnter={(e) => handleDragEnter(e, index)}
@@ -1483,7 +1483,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                       return (
                           <div
                               key={id}
-                              className={`${spanClass} cursor-grab active:cursor-grabbing transition-opacity`}
+                              className={`${spanClass} cursor-grab active:cursor-grabbing transition-opacity break-inside-avoid mb-8 w-full inline-block`}
                               draggable
                               onDragStart={(e) => handleDragStart(e, index)}
                               onDragEnter={(e) => handleDragEnter(e, index)}

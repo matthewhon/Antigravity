@@ -1364,7 +1364,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
               </div>
           </div>
       ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="columns-1 md:columns-2 lg:columns-4 gap-8 [column-fill:balance]">
             {safeVisibleWidgets.map((id, index) => {
                 let spanClass = "col-span-1";
                 if (['services_stats', 'checkin_history', 'teams', 'services_teams_list'].includes(id)) spanClass = "col-span-1 md:col-span-2 lg:col-span-4";
@@ -1373,7 +1373,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                 return (
                     <div
                         key={id}
-                        className={`${spanClass} cursor-grab active:cursor-grabbing transition-opacity`}
+                        className={`${spanClass} cursor-grab active:cursor-grabbing transition-opacity break-inside-avoid mb-8 w-full inline-block`}
                         draggable
                         onDragStart={(e) => handleDragStart(e, index)}
                         onDragEnter={(e) => handleDragEnter(e, index)}
