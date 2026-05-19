@@ -8461,6 +8461,8 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                         <CampaignComposer
                             campaign={activeCampaign}
                             churchId={churchId}
+                            currentUser={currentUser}
+                            church={church}
                             apiBase={API_BASE}
                             onBack={() => setActiveCampaign(null)}
                             onSave={handleSave}
