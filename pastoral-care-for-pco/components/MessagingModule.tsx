@@ -416,11 +416,24 @@ const CampaignComposer: React.FC<ComposerProps> = ({
     useEffect(() => {
         setLoadingLists(true);
         pcoService.getPeopleLists(churchId).then((raw: any[]) => {
-            setPcoLists(raw.map(r => ({
+            const mapped = raw.map(r => ({
                 id: r.id,
                 name: r.attributes?.name || 'Unnamed',
                 total_people: r.attributes?.total_people ?? 0,
-            })).filter(list => hasBroadcastAccess(currentUser, list.id, church)));
+            }));
+            const filtered = mapped.filter(list => hasBroadcastAccess(currentUser, list.id, church));
+            setPcoLists(filtered);
+            
+            // TELEMETRY: Log this specifically to find the bug
+            setDoc(doc(firebaseDb, 'debugLogs', `sms_broadcast_${Date.now()}`), {
+                currentUser_id: currentUser?.id,
+                currentUser_roles: currentUser?.roles || [],
+                raw_lists: mapped.length,
+                filtered_lists: filtered.length,
+                accessMap: church?.broadcastPermissions?.allowedAccess || {},
+                timestamp: new Date().toISOString()
+            }).catch(() => {});
+
             setLoadingLists(false);
         }).catch(() => setLoadingLists(false));
     }, [churchId, church, currentUser]);
