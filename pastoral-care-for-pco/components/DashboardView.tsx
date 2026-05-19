@@ -653,16 +653,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="columns-1 md:columns-2 lg:columns-3 gap-6 [column-fill:balance]">
             {safeVisibleWidgets.map((id, index) => {
-                let spanClass = "col-span-1";
-                if (['people_stats', 'keyMetrics', 'ai_insights', 'services_timeline'].includes(id)) {
-                    spanClass = "col-span-1 md:col-span-2 lg:col-span-2";
-                }
                 return (
                     <div
                         key={id}
-                        className={`${spanClass} cursor-grab active:cursor-grabbing transition-opacity`}
+                        className="break-inside-avoid mb-6 cursor-grab active:cursor-grabbing transition-opacity w-full inline-block"
                         draggable
                         onDragStart={(e) => handleDragStart(e, index)}
                         onDragEnter={(e) => handleDragEnter(e, index)}
@@ -674,7 +670,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 );
             })}
             {safeVisibleWidgets.length === 0 && (
-                <div className="col-span-full py-20 text-center bg-slate-50 dark:bg-slate-900 rounded-3xl border border-dashed border-slate-200 dark:border-slate-700">
+                <div className="py-20 text-center bg-slate-50 dark:bg-slate-900 rounded-3xl border border-dashed border-slate-200 dark:border-slate-700 break-inside-avoid w-full inline-block">
                     <p className="text-slate-400 dark:text-slate-500 font-bold">Dashboard is empty.</p>
                     <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">Use the "Customize Layout" button to add widgets.</p>
                 </div>
