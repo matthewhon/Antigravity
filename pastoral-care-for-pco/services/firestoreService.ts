@@ -282,7 +282,7 @@ class FirestoreService {
   async getUserProfile(uid: string): Promise<User | null> {
     try {
       const userDoc = await getDoc(doc(db, 'users', uid));
-      return userDoc.exists() ? (userDoc.data() as User) : null;
+      return userDoc.exists() ? ({ id: userDoc.id, ...userDoc.data() } as User) : null;
     } catch (e) {
       this.handleFirestoreError(e);
       return null;
