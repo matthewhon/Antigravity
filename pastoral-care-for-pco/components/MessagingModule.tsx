@@ -8059,7 +8059,7 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
     const [allUsers, setAllUsers] = useState<User[]>([]);
     useEffect(() => {
         const q = query(collection(firebaseDb, 'users'), where('churchId', '==', churchId));
-        getDocs(q).then(snap => setAllUsers(snap.docs.map(d => ({ id: d.id, ...d.data() } as User))));
+        getDocs(q).then(snap => setAllUsers(snap.docs.map(d => ({ ...d.data(), id: d.id } as User))));
     }, [churchId]);
 
     // Sync when parent changes the initialNumberId (e.g. mobile number switcher)

@@ -372,7 +372,7 @@ class FirestoreService {
       const q = query(collection(db, 'users'), where('email', '==', email.toLowerCase().trim()), limit(1));
       const snapshot = await getDocs(q);
       if (snapshot.empty) return null;
-      return snapshot.docs[0].data() as User;
+      return { ...snapshot.docs[0].data(), id: snapshot.docs[0].id } as User;
     } catch (e) {
       this.handleFirestoreError(e);
       return null;
@@ -383,7 +383,7 @@ class FirestoreService {
     try {
       const q = query(collection(db, 'users'), where('churchId', '==', churchId));
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(d => d.data() as User);
+      return snapshot.docs.map(d => ({ ...d.data(), id: d.id } as User));
     } catch (e) {
       this.handleFirestoreError(e);
       return [];
@@ -393,7 +393,7 @@ class FirestoreService {
   async getAllUsersAcrossTenants(): Promise<User[]> {
     try {
       const snapshot = await getDocs(collection(db, 'users'));
-      return snapshot.docs.map(d => d.data() as User);
+      return snapshot.docs.map(d => ({ ...d.data(), id: d.id } as User));
     } catch (e) {
       this.handleFirestoreError(e);
       return [];
@@ -404,7 +404,7 @@ class FirestoreService {
       try {
           const q = query(collection(db, 'users'), where('roles', 'array-contains', 'System Administration'));
           const snapshot = await getDocs(q);
-          return snapshot.docs.map(d => d.data() as User);
+          return snapshot.docs.map(d => ({ ...d.data(), id: d.id } as User));
       } catch (e) {
           this.handleFirestoreError(e);
           return [];
