@@ -1040,7 +1040,9 @@ const GroupsView: React.FC<GroupsViewProps> = ({
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 grid-flow-row-dense">
+          {safeVisibleWidgets.includes('groups_stats') && renderWidget('groups_stats')}
           {safeVisibleWidgets.map((id, index) => {
+              if (id === 'groups_stats') return null;
               let spanClass = "col-span-1";
               if (id === 'groups_stats') spanClass = "col-span-1 md:col-span-2 lg:col-span-4";
               if (id === 'groups_ai_agent' || id === 'groups_risk_agent' || id === 'event_attendance' || id === 'group_leaders' || id === 'groups_age_demographics') spanClass = "col-span-1 lg:col-span-2";
