@@ -1449,6 +1449,8 @@ export interface SmsWorkflow {
      * 0 = send on the event day (default), 7 = send 1 week early, etc.
      */
     triggerDayOffset?: number;
+    /** The time of day to trigger the workflow, format HH:MM. Default 09:00 */
+    triggerTime?: string;
     /** The specific Twilio number ID to send from. If null, uses the church's default number. */
     twilioNumberId?: string | null;
     /** Legacy flat step array  kept in sync by the editor for the scheduler */

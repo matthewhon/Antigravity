@@ -5837,6 +5837,28 @@ const WorkflowEditor: React.FC<{
                                         </select>
                                     )}
                                 </div>
+                                {/* Send time */}
+                                <div>
+                                    <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
+                                        Send at what time?
+                                    </label>
+                                    <div className="flex items-center gap-3">
+                                        <input
+                                            type="time"
+                                            value={wf.triggerTime ?? '09:00'}
+                                            onChange={e => patch({ triggerTime: e.target.value })}
+                                            className="w-48 text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                        />
+                                        <span className="text-xs text-slate-400">
+                                            Step 1 will fire at {(() => {
+                                                const [h, m] = (wf.triggerTime ?? '09:00').split(':').map(Number);
+                                                const ampm = h >= 12 ? 'PM' : 'AM';
+                                                const h12 = h % 12 || 12;
+                                                return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
+                                            })()}
+                                        </span>
+                                    </div>
+                                </div>
                                 <div className="flex items-start gap-2.5 p-3.5 bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-xl">
                                     <span className="text-lg shrink-0 mt-0.5">🎟️</span>
                                     <div className="text-xs text-teal-700 dark:text-teal-300 leading-relaxed">
@@ -5875,6 +5897,28 @@ const WorkflowEditor: React.FC<{
                                                 ? `on their ${wf.trigger}`
                                                 : `${wf.triggerDayOffset} day${wf.triggerDayOffset !== 1 ? 's' : ''} before their ${wf.trigger}`
                                             }
+                                        </span>
+                                    </div>
+                                </div>
+                                {/* Send time */}
+                                <div>
+                                    <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
+                                        Send at what time?
+                                    </label>
+                                    <div className="flex items-center gap-3">
+                                        <input
+                                            type="time"
+                                            value={wf.triggerTime ?? '09:00'}
+                                            onChange={e => patch({ triggerTime: e.target.value })}
+                                            className="w-48 text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-pink-500"
+                                        />
+                                        <span className="text-xs text-slate-400">
+                                            Step 1 will fire at {(() => {
+                                                const [h, m] = (wf.triggerTime ?? '09:00').split(':').map(Number);
+                                                const ampm = h >= 12 ? 'PM' : 'AM';
+                                                const h12 = h % 12 || 12;
+                                                return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
+                                            })()}
                                         </span>
                                     </div>
                                 </div>

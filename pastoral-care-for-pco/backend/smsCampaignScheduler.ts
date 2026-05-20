@@ -244,7 +244,10 @@ export async function runBirthdayAnniversaryScanner(db: any): Promise<void> {
 
                     // 5. Create enrollment — nextSendAt = beginning of today
                     const today = new Date();
-                    today.setHours(9, 0, 0, 0); // fire at 9am local server time
+                    const timeParts = (wf.triggerTime || '09:00').split(':').map(Number);
+                    const schedHours = timeParts[0] ?? 9;
+                    const schedMinutes = timeParts[1] ?? 0;
+                    today.setHours(schedHours, schedMinutes, 0, 0); // fire at configured local server time
 
                     const enrollment = {
                         id:           enrollId,
@@ -660,9 +663,12 @@ export async function runEventRegistrationScanner(db: any): Promise<void> {
                         rawPhone.length === 10 ? `+1${rawPhone}` :
                         rawPhone.length === 11 ? `+${rawPhone}` : '';
 
-                    // 5. Create the enrollment — fires at 9 am on the next scheduler tick
+                    // 5. Create the enrollment — fires at configured time on the next scheduler tick
                     const today = new Date();
-                    today.setHours(9, 0, 0, 0);
+                    const timeParts = (wf.triggerTime || '09:00').split(':').map(Number);
+                    const schedHours = timeParts[0] ?? 9;
+                    const schedMinutes = timeParts[1] ?? 0;
+                    today.setHours(schedHours, schedMinutes, 0, 0);
 
                     const enrollment = {
                         id:            enrollId,

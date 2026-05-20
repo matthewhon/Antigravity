@@ -1342,6 +1342,8 @@ export interface SmsWorkflow {
      * 0 = send on the event day (default), 7 = send 1 week early, etc.
      */
     triggerDayOffset?: number;
+    /** The time of day to trigger the workflow, format HH:MM. Default 09:00 */
+    triggerTime?: string;
     /** Legacy flat step array  kept in sync by the editor for the scheduler */
     steps: SmsWorkflowStep[];
     /**
