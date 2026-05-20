@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { useParams } from 'react-router-dom';
 import GroupsView from '../GroupsView';
 import { GroupAbsenteesReport } from '../GroupAbsenteesReport';
 import { useTenantData } from '../../contexts/TenantDataContext';
 import { useGroupsDashboardData, useRiskEnrichedPeople, usePeopleDashboardData } from '../../hooks/useDashboardData';
-import { BarChart2, FileText } from 'lucide-react';
 
 interface GroupsPageProps {
     allowedWidgetIds?: string[];
@@ -14,12 +14,11 @@ interface GroupsPageProps {
     onUpdateWidgets: (widgets: string[]) => void;
 }
 
-type GroupsTab = 'dashboard' | 'reports';
-
 export const GroupsPage: React.FC<GroupsPageProps> = ({
     allowedWidgetIds, onSync, onSyncGroups, isSyncing, onUpdateTheme, onUpdateWidgets
 }) => {
-    const [activeTab, setActiveTab] = useState<GroupsTab>('dashboard');
+    const { '*': subpath } = useParams();
+    const activeTab = subpath === 'reports' ? 'reports' : 'dashboard';
 
     const {
         user, church, widgets, groups, people, donations, teams,
@@ -32,31 +31,8 @@ export const GroupsPage: React.FC<GroupsPageProps> = ({
 
     if (!user || !church) return null;
 
-    const tabs: { id: GroupsTab; label: string; icon: React.ReactNode }[] = [
-        { id: 'dashboard', label: 'Dashboard', icon: <BarChart2 size={14} /> },
-        { id: 'reports',   label: 'Reports',   icon: <FileText size={14} /> },
-    ];
-
     return (
         <div className="space-y-6">
-            {/* Tab bar */}
-            <div className="flex gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl w-fit">
-                {tabs.map(tab => (
-                    <button
-                        key={tab.id}
-                        onClick={() => setActiveTab(tab.id)}
-                        className={`flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
-                            activeTab === tab.id
-                                ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
-                                : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
-                        }`}
-                    >
-                        {tab.icon}
-                        {tab.label}
-                    </button>
-                ))}
-            </div>
-
             {activeTab === 'dashboard' && (
                 <GroupsView
                     data={groupsDashboardData}
