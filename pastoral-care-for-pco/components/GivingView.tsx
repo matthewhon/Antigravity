@@ -63,7 +63,7 @@ const TOOLTIP_STYLE = {
 };
 
 const getWidgetSpan = (id: string) => {
-    if (['keyMetrics', 'trends', 'fundPerformance', 'cumulativeYTD', 'donorLifecycle', 'trendsComparison', 'benchmark_giving_avg', 'budgetProgress', 'givingVsBudget', 'givingByStatus', 'givingAgeDemographics', 'averageGiving'].includes(id)) return 'col-span-1 md:col-span-2 lg:col-span-2';
+    if (['keyMetrics', 'trends', 'fundPerformance', 'cumulativeYTD', 'donorLifecycle', 'trendsComparison', 'benchmark_giving_avg', 'budgetProgress', 'givingVsBudget', 'givingByStatus', 'givingAgeDemographics', 'averageGiving', 'donorAcquisition'].includes(id)) return 'col-span-1 md:col-span-2 lg:col-span-2';
     return 'col-span-1';
 };
 
@@ -933,29 +933,86 @@ export const GivingView: React.FC<GivingViewProps> = ({
                       </div>
                   </WidgetWrapper>
               );
-          case 'trendsComparison':
+          case 'trendsComparison': {
+              const currentTotal = analytics.comparisonTrends.reduce((s, t) => s + (t.current || 0), 0);
+              const previousTotal = analytics.comparisonTrends.reduce((s, t) => s + (t.previous || 0), 0);
+              const comparisonPct = previousTotal > 0 ? ((currentTotal - previousTotal) / previousTotal) * 100 : 0;
+              
+              // Colour palette for rows
+              const TREND_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#06b6d4', '#f43f5e', '#8b5cf6', '#ec4899', '#14b8a6'];
+
               return (
-                  <WidgetWrapper title="Giving Time Comparison" onRemove={() => handleRemoveWidget(id)} source="Current vs Prev">
-                      <div className="h-64">
-                          <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={1}>
-                              <BarChart data={analytics.comparisonTrends}>
-                                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
-                                  <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: axisColor}} />
-                                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: axisColor}} />
-                                  <Tooltip cursor={{fill: currentTheme === 'dark' ? '#334155' : '#f8fafc'}} contentStyle={TOOLTIP_STYLE} itemStyle={{ color: '#fff' }} formatter={(value: number) => `$${value.toLocaleString()}`} />
-                                  <Legend verticalAlign="top" iconType="circle" wrapperStyle={{fontSize: '10px'}} />
-                                  <Bar dataKey="current" name={analytics.currentLabel || "Current"} fill="#6366f1" radius={[4, 4, 0, 0]} />
-                                  <Bar dataKey="previous" name={analytics.previousLabel || "Previous"} fill="#cbd5e1" radius={[4, 4, 0, 0]} />
-                              </BarChart>
-                          </ResponsiveContainer>
-                      </div>
-                      {analytics.timePeriodLabel && (
-                          <div className="text-center mt-2 text-[10px] text-slate-400 dark:text-slate-500 font-medium tracking-wide">
-                              {analytics.timePeriodLabel}
+                  <WidgetWrapper
+                      title="Giving Time Comparison"
+                      onRemove={() => handleRemoveWidget(id)}
+                      source="Current vs Prev"
+                      headerControl={
+                          analytics.timePeriodLabel ? (
+                              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500">{analytics.timePeriodLabel}</span>
+                          ) : undefined
+                      }
+                  >
+                      {analytics.comparisonTrends.length === 0 ? (
+                          <div className="flex flex-col items-center justify-center h-32 text-center space-y-2">
+                              <div className="text-3xl opacity-30">📭</div>
+                              <p className="text-xs font-bold text-slate-400 dark:text-slate-500">No comparison data available</p>
+                          </div>
+                      ) : (
+                          <div className="space-y-4">
+                              {/* Total hero */}
+                              <div className="p-4 rounded-xl bg-gradient-to-br from-indigo-50 to-emerald-50 dark:from-indigo-900/20 dark:to-emerald-900/20 flex flex-col justify-center space-y-1">
+                                  <div className="flex items-center justify-between">
+                                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                                          {analytics.currentLabel || "Current Total"}
+                                      </p>
+                                      <div className={`text-[11px] font-bold flex items-center gap-0.5 ${currentTotal >= previousTotal ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                          {currentTotal >= previousTotal ? '↑' : '↓'}
+                                          {Math.abs(Math.round(comparisonPct))}% vs prev
+                                      </div>
+                                  </div>
+                                  <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
+                                      ${currentTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                  </p>
+                              </div>
+                              
+                              {/* Rows */}
+                              <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
+                                  {analytics.comparisonTrends.map((trend, i) => {
+                                      const pct = currentTotal > 0 ? ((trend.current || 0) / currentTotal) * 100 : 0;
+                                      const trendDiff = (trend.previous || 0) > 0 ? (((trend.current || 0) - (trend.previous || 0)) / (trend.previous || 0)) * 100 : 0;
+                                      const isUp = trendDiff >= 0;
+                                      const color = TREND_COLORS[i % TREND_COLORS.length];
+                                      
+                                      return (
+                                          <div key={trend.label || i} className="space-y-1">
+                                              <div className="flex items-center justify-between">
+                                                  <div className="flex items-center gap-2">
+                                                      <div className="color-dot" style={{ '--dot-color': color } as React.CSSProperties} />
+                                                      <span className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate max-w-[140px]">{trend.label}</span>
+                                                  </div>
+                                                  <div className="flex items-center gap-2">
+                                                      <span className={`text-[10px] font-bold ${(trend.previous || 0) > 0 ? (isUp ? 'text-emerald-500' : 'text-rose-500') : 'text-slate-400'}`}>
+                                                          {(trend.previous || 0) > 0 ? `${isUp ? '+' : ''}${Math.round(trendDiff)}%` : 'new'}
+                                                      </span>
+                                                      <span className="text-xs font-black text-slate-800 dark:text-white w-14 text-right">
+                                                          ${(trend.current || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                                      </span>
+                                                  </div>
+                                              </div>
+                                              <div className="relative h-2 bg-slate-100 dark:bg-slate-700/60 rounded-full overflow-hidden">
+                                                  <div
+                                                      className="gv-bar-fill" style={{ '--bar-w': `${pct}%`, '--bar-color': color, '--bar-opacity': '0.85' } as React.CSSProperties}
+                                                  />
+                                              </div>
+                                          </div>
+                                      );
+                                  })}
+                              </div>
                           </div>
                       )}
                   </WidgetWrapper>
               );
+          }
           case 'fundPerformance':
               return (
                   <WidgetWrapper title="Fund Performance" onRemove={() => handleRemoveWidget(id)} source="PCO Funds">
