@@ -1013,22 +1013,60 @@ export const GivingView: React.FC<GivingViewProps> = ({
                   </WidgetWrapper>
               );
           }
-          case 'fundPerformance':
+          case 'fundPerformance': {
+              const performanceData = analytics.givingByFund.slice(0, 8);
+              const performanceTotal = performanceData.reduce((s, item) => s + (item.value || 0), 0);
+              const FUND_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#06b6d4', '#f43f5e', '#8b5cf6', '#ec4899', '#14b8a6'];
+
               return (
-                  <WidgetWrapper title="Fund Performance" onRemove={() => handleRemoveWidget(id)} source="PCO Funds">
-                      <div className="h-64">
-                          <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={1}>
-                              <BarChart data={analytics.givingByFund.slice(0, 8)} layout="vertical" margin={{ left: 40 }}>
-                                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={gridColor} />
-                                  <XAxis type="number" hide />
-                                  <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: axisColor}} width={100} />
-                                  <Tooltip contentStyle={TOOLTIP_STYLE} itemStyle={{ color: '#fff' }} cursor={{fill: currentTheme === 'dark' ? '#334155' : '#f8fafc'}} formatter={(value: number) => `$${value.toLocaleString()}`} />
-                                  <Bar dataKey="value" fill="#6366f1" radius={[0, 4, 4, 0]} barSize={20} />
-                              </BarChart>
-                          </ResponsiveContainer>
-                      </div>
+                  <WidgetWrapper
+                      title="Fund Performance"
+                      onRemove={() => handleRemoveWidget(id)}
+                      source="PCO Funds"
+                  >
+                      {performanceData.length === 0 ? (
+                          <div className="flex flex-col items-center justify-center h-32 text-center space-y-2">
+                              <div className="text-3xl opacity-30">📭</div>
+                              <p className="text-xs font-bold text-slate-400 dark:text-slate-500">No fund data available</p>
+                          </div>
+                      ) : (
+                          <div className="space-y-4">
+                              {/* Total hero */}
+                              <div className="p-4 rounded-xl bg-gradient-to-br from-indigo-50 to-emerald-50 dark:from-indigo-900/20 dark:to-emerald-900/20 flex items-center justify-between">
+                                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Total Giving</p>
+                                  <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400">${performanceTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                              </div>
+                              {/* Per-fund rows */}
+                              <div className="space-y-3">
+                                  {performanceData.map((item, i) => {
+                                      const pct = performanceTotal > 0 ? (item.value / performanceTotal) * 100 : 0;
+                                      const color = FUND_COLORS[i % FUND_COLORS.length];
+                                      return (
+                                          <div key={item.name} className="space-y-1">
+                                              <div className="flex items-center justify-between">
+                                                  <div className="flex items-center gap-2">
+                                                      <div className="color-dot" style={{ '--dot-color': color } as React.CSSProperties} />
+                                                      <span className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate max-w-[140px]">{item.name}</span>
+                                                  </div>
+                                                  <div className="flex items-center gap-2">
+                                                      <span className="text-xs font-black text-slate-800 dark:text-white">${item.value.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                                                      <span className="text-[10px] text-slate-400 dark:text-slate-500 w-8 text-right">{Math.round(pct)}%</span>
+                                                  </div>
+                                              </div>
+                                              <div className="relative h-2 bg-slate-100 dark:bg-slate-700/60 rounded-full overflow-hidden">
+                                                  <div
+                                                      className="gv-bar-fill" style={{ '--bar-w': `${pct}%`, '--bar-color': color, '--bar-opacity': '0.85' } as React.CSSProperties}
+                                                  />
+                                              </div>
+                                          </div>
+                                      );
+                                  })}
+                              </div>
+                          </div>
+                      )}
                   </WidgetWrapper>
               );
+          }
           case 'givingVsBudget':
               return (
                   <WidgetWrapper 
