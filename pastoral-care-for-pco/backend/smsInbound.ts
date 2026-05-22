@@ -523,13 +523,17 @@ export const handleInboundSms = async (req: any, res: any) => {
 
         const actualPersonId = personMatch?.personId || convSnap.data()?.personId;
 
-        if (resolvedExecutiveAiAgentEnabled && resolvedExecutiveAiAgentListId && actualPersonId && isAiAgentTrigger) {
+        if (resolvedExecutiveAiAgentEnabled && resolvedExecutiveAiAgentListId && isAiAgentTrigger) {
             // Strip the trigger prefix
-            const queryBody = bodyTrimmed.substring(aiAgentPrefix.length).trim();
+            let queryBody = bodyTrimmed.substring(aiAgentPrefix.length).trim();
+            // If the query body starts with a colon, comma, or dash, strip it
+            if (/^[::,\-—–\s]+/.test(queryBody)) {
+                queryBody = queryBody.replace(/^[::,\-—–\s]+/, '').trim();
+            }
 
             // Non-blocking
             processExecutiveAiQuery(
-                db, log, churchId, actualPersonId, from, queryBody,
+                db, log, churchId, from, queryBody,
                 resolvedExecutiveAiAgentListId, smsNumberId
             ).catch(() => { });
         }

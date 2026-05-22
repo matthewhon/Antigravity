@@ -12,11 +12,15 @@ import {
 } from '../services/analyticsService';
 import { fetchFromPco } from './publicApi';
 
+function normalizeToLast10Digits(phone: string): string {
+    const digits = phone.replace(/\D/g, '');
+    return digits.slice(-10);
+}
+
 export async function processExecutiveAiQuery(
     db: Firestore,
     log: ReturnType<typeof createServerLogger>,
     churchId: string,
-    personId: string,
     phoneNumber: string,
     body: string,
     listId: string,
@@ -27,25 +31,72 @@ export async function processExecutiveAiQuery(
         const churchSnap = await db.collection('churches').doc(churchId).get();
         if (!churchSnap.exists) return;
         const churchData = churchSnap.data()!;
+
+        const inputNormalized = normalizeToLast10Digits(phoneNumber);
+        if (!inputNormalized || inputNormalized.length < 10) {
+            log.warn(`[Executive AI] Incoming phone number ${phoneNumber} is invalid or too short for verification.`, 'system', { churchId }, churchId);
+            return;
+        }
         
         let listData;
         try {
-            const listUrl = `https://api.planningcenteronline.com/people/v2/lists/${listId}/people?where[id]=${personId}`;
+            const listUrl = `https://api.planningcenteronline.com/people/v2/lists/${listId}/people?per_page=100&include=phone_numbers`;
             listData = await fetchFromPco(churchId, listUrl);
         } catch (err: any) {
             log.warn(`[Executive AI] Failed to fetch PCO list ${listId}: ${err.message}`, 'system', { churchId }, churchId);
             return;
         }
 
-        const isInList = listData.data && listData.data.length > 0;
+        const people = listData?.data || [];
+        const included = listData?.included || [];
 
-        if (!isInList) {
-            log.info(`[Executive AI] Person ${personId} is not in authorized list ${listId}. Ignoring.`, 'system', { churchId }, churchId);
+        let matchedPerson: { id: string; name: string; avatar: string | null } | null = null;
+
+        for (const person of people) {
+            const personId = person.id;
+            const personName = person.attributes?.name || '';
+            const personAvatar = person.attributes?.avatar || null;
+
+            // Find all phone numbers for this person in the included object
+            const phones = included
+                .filter((inc: any) => inc.type === 'PhoneNumber' && person.relationships?.phone_numbers?.data?.some((p: any) => p.id === inc.id))
+                .map((inc: any) => inc.attributes?.number)
+                .filter(Boolean);
+
+            const hasMatchingPhone = phones.some((phone: string) => {
+                const norm = normalizeToLast10Digits(phone);
+                return norm === inputNormalized;
+            });
+
+            if (hasMatchingPhone) {
+                matchedPerson = { id: personId, name: personName, avatar: personAvatar };
+                break;
+            }
+        }
+
+        if (!matchedPerson) {
+            log.info(`[Executive AI] Phone number ${phoneNumber} is not associated with any member in the authorized list ${listId}. Ignoring.`, 'system', { churchId }, churchId);
             return;
         }
 
+        // Backfill local conversation with person details if not set
+        const convId = `${churchId}_${phoneNumber.replace(/\+/g, '')}`;
+        const convRef = db.collection('smsConversations').doc(convId);
+        const convSnap = await convRef.get();
+        if (convSnap.exists) {
+            const convData = convSnap.data();
+            if (!convData?.personId) {
+                await convRef.update({
+                    personId: matchedPerson.id,
+                    personName: matchedPerson.name,
+                    personAvatar: matchedPerson.avatar
+                });
+                log.info(`[Executive AI] Backfilled conversation ${convId} with PCO member ${matchedPerson.name} (${matchedPerson.id})`, 'system', { churchId }, churchId);
+            }
+        }
+
         // 2. Gather Context
-        log.info(`[Executive AI] Authorized query received from ${phoneNumber}: ${body}`, 'system', { churchId }, churchId);
+        log.info(`[Executive AI] Authorized query received from ${matchedPerson.name} (${phoneNumber}): ${body}`, 'system', { churchId }, churchId);
         
         const [
             peopleSnap,
