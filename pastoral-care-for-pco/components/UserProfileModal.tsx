@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { auth } from '../services/firebase';
-import { updateEmail, updatePassword, reauthenticateWithCredential, EmailAuthProvider, updateProfile } from 'firebase/auth';
+import { verifyBeforeUpdateEmail, updatePassword, reauthenticateWithCredential, EmailAuthProvider, updateProfile } from 'firebase/auth';
 import { firestore } from '../services/firestoreService';
 import { User, Church } from '../types';
 
@@ -46,7 +46,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ user, church, onClo
 
       // 1. Auth Updates
       if (isEmailChanged) {
-        updates.push(updateEmail(currentUser, cleanEmail));
+        updates.push(verifyBeforeUpdateEmail(currentUser, cleanEmail));
       }
       if (isPasswordChanged) {
         updates.push(updatePassword(currentUser, newPassword));
@@ -57,24 +57,24 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ user, church, onClo
 
       await Promise.all(updates);
 
-      // Force reload the user and refresh the ID token so the new email is reflected in the JWT claims for Firestore rules
-      if (isEmailChanged) {
-        await currentUser.reload();
-        await currentUser.getIdToken(true);
-      }
-
       // 2. Firestore Update
-      if (name !== user.name || isEmailChanged) {
+      // If email changed, we do not update it in Firestore yet because the new email is not verified
+      // and request.auth.token.email still holds the old email, causing Firestore rules to reject it.
+      // Firestore email will sync on next app load once user completes the verification link.
+      if (name !== user.name) {
         await firestore.createUserProfile({ 
             ...user, 
-            name, 
-            email: cleanEmail.toLowerCase() 
+            name 
         });
       }
 
       onUpdate();
       onClose();
-      alert("Profile updated successfully.");
+      if (isEmailChanged) {
+        alert(`Profile updated. A verification link has been sent to ${cleanEmail}. Please click the link to verify and complete the email change.`);
+      } else {
+        alert("Profile updated successfully.");
+      }
 
     } catch (err: any) {
       console.error(err);

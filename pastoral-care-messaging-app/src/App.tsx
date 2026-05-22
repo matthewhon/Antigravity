@@ -29,7 +29,14 @@ const App: React.FC = () => {
           const userProfile = await firestore.getUserProfile(authUser.uid);
           console.log("User profile fetched:", userProfile);
           if (userProfile && (userProfile.roles.includes('Messaging') || userProfile.roles.includes('Church Admin') || userProfile.roles.includes('System Administration'))) {
-            setUser(userProfile);
+            // Sync Firestore user profile email with Auth user email if changed & verified
+            if (authUser.email && authUser.email.toLowerCase() !== userProfile.email.toLowerCase()) {
+              const updatedProfile = { ...userProfile, email: authUser.email.toLowerCase() };
+              await firestore.createUserProfile(updatedProfile);
+              setUser(updatedProfile);
+            } else {
+              setUser(userProfile);
+            }
             if (userProfile.churchId) {
               console.log("Fetching church profile for:", userProfile.churchId);
               const churchProfile = await firestore.getChurch(userProfile.churchId);

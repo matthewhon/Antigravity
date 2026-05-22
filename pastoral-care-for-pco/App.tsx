@@ -156,7 +156,14 @@ const App: React.FC = () => {
         try {
           const userProfile = await firestore.getUserProfile(authUser.uid);
           if (userProfile) {
-            setUser(userProfile);
+            // Sync Firestore user profile email with Auth user email if changed & verified
+            if (authUser.email && authUser.email.toLowerCase() !== userProfile.email.toLowerCase()) {
+              const updatedProfile = { ...userProfile, email: authUser.email.toLowerCase() };
+              await firestore.createUserProfile(updatedProfile);
+              setUser(updatedProfile);
+            } else {
+              setUser(userProfile);
+            }
             
             // Update last login timestamp
             firestore.updateUserLastLogin(authUser.uid);
