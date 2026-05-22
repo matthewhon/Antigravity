@@ -1748,7 +1748,9 @@ const SmsInbox: React.FC<{
     /** If provided, only shows conversations for this TwilioPhoneNumber doc */
     twilioNumberId?: string | null;
     isDefaultNumber?: boolean;
-}> = ({ churchId, currentUser, church, twilioNumberId, isDefaultNumber }) => {
+    allowedNumberIds?: string[];
+    defaultNumberId?: string | null;
+}> = ({ churchId, currentUser, church, twilioNumberId, isDefaultNumber, allowedNumberIds = [], defaultNumberId = null }) => {
     const [conversations, setConversations] = useState<SmsConversation[]>([]);
     const [activeConv, setActiveConv] = useState<SmsConversation | null>(null);
     const [messages, setMessages] = useState<SmsMessage[]>([]);
@@ -1805,25 +1807,36 @@ const SmsInbox: React.FC<{
         );
         const unsub = onSnapshot(baseQ, snap => {
             const all = snap.docs.map(d => ({ id: d.id, ...d.data() } as SmsConversation));
-
-            if (!twilioNumberId) {
-                setConversations(all);
-                return;
-            }
+            const isAdmin = currentUser.roles?.includes('Church Admin') || currentUser.roles?.includes('System Administration');
 
             const filtered = all.filter(c => {
-                // Resolve whichever field the backend wrote the number ID into
                 const convNumberId = (c as any).smsNumberId || (c as any).inboxId || c.twilioNumberId || null;
-                if (!convNumberId) {
-                    // Legacy conversation with no number field ... only show in default inbox
-                    return !!isDefaultNumber;
+
+                // For non-admins, enforce number-level visibility permissions
+                if (!isAdmin) {
+                    const userHasAccessToNumber = (() => {
+                        if (!convNumberId) {
+                            return defaultNumberId ? (allowedNumberIds || []).includes(defaultNumberId) : false;
+                        }
+                        return (allowedNumberIds || []).includes(convNumberId);
+                    })();
+                    if (!userHasAccessToNumber) return false;
                 }
-                return convNumberId === twilioNumberId;
+
+                // If specific active number is selected, filter by it
+                if (twilioNumberId) {
+                    if (!convNumberId) {
+                        return !!isDefaultNumber;
+                    }
+                    return convNumberId === twilioNumberId;
+                }
+
+                return true;
             });
             setConversations(filtered);
         });
         return unsub;
-    }, [churchId, twilioNumberId]);
+    }, [churchId, twilioNumberId, allowedNumberIds, defaultNumberId, isDefaultNumber, currentUser.roles]);
 
     // Load messages for active conversation
     useEffect(() => {
@@ -7477,11 +7490,15 @@ const NumberManager: React.FC<{
 
                             {/* Access badge */}
                             <div className="px-4 py-2 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-700/50">
-                                {num.allowedUserIds.length === 0 ? (
-                                    <><Unlock size={11} className="text-emerald-500" /> Visible to all users</>
-                                ) : (
-                                    <><Lock size={11} className="text-amber-500" /> Restricted to {num.allowedUserIds.length} user{num.allowedUserIds.length !== 1 ? 's' : ''}</>
-                                )}
+                                {(() => {
+                                    const allowed = (num.allowedUserIds || []).filter((id: string) => id !== '_none_');
+                                    const restricted = (num.allowedUserIds || []).length > 0;
+                                    return !restricted ? (
+                                        <><Unlock size={11} className="text-emerald-500" /> Visible to all users</>
+                                    ) : (
+                                        <><Lock size={11} className="text-amber-500" /> Restricted to {allowed.length} user{allowed.length !== 1 ? 's' : ''}</>
+                                    );
+                                })()}
                             </div>
 
                             {/* Inline editor */}
@@ -7515,14 +7532,17 @@ const NumberManager: React.FC<{
                                         </label>
                                         <div className="flex flex-wrap gap-1.5 p-2 border border-slate-200 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-800 min-h-[36px]">
                                             {allUsers.map(u => {
-                                                const selected = usersDraft.includes(u.id);
+                                                const selected = (usersDraft || []).filter((id: string) => id !== '_none_').includes(u.id);
                                                 return (
                                                     <button
                                                         key={u.id}
                                                         type="button"
-                                                        onClick={() => setUsersDraft(prev =>
-                                                            selected ? prev.filter(id => id !== u.id) : [...prev, u.id]
-                                                        )}
+                                                        onClick={() => setUsersDraft(prev => {
+                                                            const cleaned = (prev || []).filter((id: string) => id !== '_none_');
+                                                            return cleaned.includes(u.id)
+                                                                ? cleaned.filter((id: string) => id !== u.id)
+                                                                : [...cleaned, u.id];
+                                                        })}
                                                         className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition ${selected ? 'bg-violet-600 text-white' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 hover:border-violet-400'}`}
                                                     >
                                                         {selected && <CheckCircle size={10} />}
@@ -8527,6 +8547,8 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                             church={church}
                             twilioNumberId={activeNumberId}
                             isDefaultNumber={activeNumber?.isDefault ?? false}
+                            allowedNumberIds={visibleNumbers.map(n => n.id)}
+                            defaultNumberId={twilioNumbers.find(n => n.isDefault)?.id}
                         />
                     </div>
                 )}

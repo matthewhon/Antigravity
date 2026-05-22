@@ -3388,8 +3388,8 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                 const allUserIds = users.map((u: any) => u.id);
 
                                                 // Restricted access: if allowedUserIds is non-empty, only those users can see the number
-                                                const restrictedToIds: string[] = num.allowedUserIds || [];
-                                                const isRestricted = restrictedToIds.length > 0;
+                                                const restrictedToIds: string[] = (num.allowedUserIds || []).filter((id: string) => id !== '_none_');
+                                                const isRestricted = (num.allowedUserIds || []).length > 0;
 
                                                 const FEATURES = [
                                                     { key: 'inboxUserIds',     label: 'Inbox',     icon: '💬', desc: 'Can read and reply to conversations' },
@@ -3419,18 +3419,50 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
 
                                                 const toggleAllowedUser = (userId: string) => {
                                                     const current: string[] = num.allowedUserIds || [];
-                                                    const next = current.includes(userId)
-                                                        ? current.filter((id: string) => id !== userId)
-                                                        : [...current, userId];
+                                                    let next: string[];
+                                                    if (current.length === 0) {
+                                                        // It was unrestricted. Restrict to all eligible users except this one.
+                                                        const nonAdmins = users.filter((u: any) => !u.roles?.includes('Church Admin'));
+                                                        next = nonAdmins.map(u => u.id).filter(id => id !== userId);
+                                                        if (next.length === 0) {
+                                                            next = ['_none_'];
+                                                        }
+                                                    } else {
+                                                        // It was restricted.
+                                                        const cleaned = current.filter(id => id !== '_none_');
+                                                        if (cleaned.includes(userId)) {
+                                                            next = cleaned.filter((id: string) => id !== userId);
+                                                            if (next.length === 0) {
+                                                                next = ['_none_'];
+                                                            }
+                                                        } else {
+                                                            next = [...cleaned, userId];
+                                                        }
+                                                    }
                                                     setSmsNumbers((prev: any[]) => prev.map(n => n.id === num.id ? { ...n, allowedUserIds: next } : n));
                                                 };
 
                                                 const toggleFeatureUser = (featureKey: string, userId: string) => {
                                                     const currentPerms = num.permissions || {};
                                                     const current: string[] = currentPerms[featureKey] || [];
-                                                    const next = current.includes(userId)
-                                                        ? current.filter((id: string) => id !== userId)
-                                                        : [...current, userId];
+                                                    let next: string[];
+                                                    if (current.length === 0) {
+                                                        // It was unrestricted. Restrict to all eligible users except this one.
+                                                        next = eligibleUsers.map(u => u.id).filter(id => id !== userId);
+                                                        if (next.length === 0) {
+                                                            next = ['_none_'];
+                                                        }
+                                                    } else {
+                                                        const cleaned = current.filter(id => id !== '_none_');
+                                                        if (cleaned.includes(userId)) {
+                                                            next = cleaned.filter((id: string) => id !== userId);
+                                                            if (next.length === 0) {
+                                                                next = ['_none_'];
+                                                            }
+                                                        } else {
+                                                            next = [...cleaned, userId];
+                                                        }
+                                                    }
                                                     setSmsNumbers((prev: any[]) => prev.map(n => n.id === num.id
                                                         ? { ...n, permissions: { ...n.permissions, [featureKey]: next } }
                                                         : n
@@ -3582,88 +3614,87 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                                             <h5 className="text-xs font-black text-slate-800 dark:text-white">Number Visibility</h5>
                                                                             <p className="text-[10px] text-slate-400 mt-0.5">Restrict which users can see this phone number in the SMS module. Leave all unchecked for unrestricted access.</p>
                                                                         </div>
-                                                                        <div className="flex gap-2 shrink-0">
-                                                                            <button
-                                                                                onClick={() => setSmsNumbers((prev: any[]) => prev.map(n => n.id === num.id ? { ...n, allowedUserIds: allUserIds } : n))}
-                                                                                className="text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-indigo-600 transition"
-                                                                            >Select All</button>
-                                                                            <button
-                                                                                onClick={() => setSmsNumbers((prev: any[]) => prev.map(n => n.id === num.id ? { ...n, allowedUserIds: [] } : n))}
-                                                                                className="text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-rose-600 transition"
-                                                                            >Clear</button>
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                                                        {users.filter((u: any) => !u.roles?.includes('Church Admin')).map((u: any) => {
-                                                                            const checked = !isRestricted || restrictedToIds.includes(u.id);
-                                                                            const isActuallyRestricted = (num.allowedUserIds || []).length > 0;
-                                                                            const isChecked = !isActuallyRestricted || (num.allowedUserIds || []).includes(u.id);
-                                                                            return (
-                                                                                <label key={u.id} className="flex items-center gap-2.5 p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-700 transition-all group">
-                                                                                    <div
-                                                                                        onClick={() => toggleAllowedUser(u.id)}
-                                                                                        className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-all cursor-pointer ${
-                                                                                            isChecked ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300 dark:border-slate-600 group-hover:border-indigo-400'
-                                                                                        }`}
-                                                                                    >
-                                                                                        {isChecked && <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
-                                                                                    </div>
-                                                                                    <div className="min-w-0 flex-1" onClick={() => toggleAllowedUser(u.id)}>
-                                                                                        <p className="text-xs font-bold text-slate-800 dark:text-white truncate">{u.name}</p>
-                                                                                        <p className="text-[9px] text-slate-400 truncate">{u.email}</p>
-                                                                                    </div>
-                                                                                </label>
-                                                                            );
-                                                                        })}
-                                                                        {users.filter((u: any) => !u.roles?.includes('Church Admin')).length === 0 && (
-                                                                            <p className="text-[10px] text-slate-400 col-span-2">No non-admin users found.</p>
-                                                                        )}
-                                                                    </div>
-                                                                    <p className="text-[9px] text-slate-400 mt-2">Church Admins always have full access regardless of this setting.</p>
-                                                                </div>
-
-                                                                {/* Section 2: Feature-level permissions */}
-                                                                <div>
-                                                                    <h5 className="text-xs font-black text-slate-800 dark:text-white mb-1">Feature Permissions</h5>
-                                                                    <p className="text-[10px] text-slate-400 mb-4">For each feature, control which users have access. Leave a feature's column fully unchecked to allow all visible users.</p>
-
-                                                                    {eligibleUsers.length === 0 ? (
-                                                                        <p className="text-[10px] text-slate-400">Add users to the visibility list above to configure feature permissions.</p>
-                                                                    ) : (
-                                                                        <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-700">
-                                                                            <table className="w-full text-xs">
-                                                                                <thead className="bg-slate-50 dark:bg-slate-800">
-                                                                                    <tr>
-                                                                                        <th className="px-4 py-3 text-left font-black text-slate-500 dark:text-slate-400 text-[10px] uppercase tracking-widest">User</th>
-                                                                                        {FEATURES.map(f => (
-                                                                                            <th key={f.key} className="px-3 py-3 text-center font-black text-slate-500 dark:text-slate-400 text-[10px] uppercase tracking-widest whitespace-nowrap" title={f.desc}>
-                                                                                                <span className="mr-1">{f.icon}</span>{f.label}
-                                                                                            </th>
-                                                                                        ))}
-                                                                                    </tr>
-                                                                                    <tr className="border-t border-slate-200 dark:border-slate-700 bg-slate-100/50 dark:bg-slate-800/80">
-                                                                                        <td className="px-4 py-1.5">
-                                                                                            <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Toggle All</span>
-                                                                                        </td>
-                                                                                        {FEATURES.map(f => {
-                                                                                            const featureIds: string[] = (num.permissions || {})[f.key] || [];
-                                                                                            const allSelected = eligibleUsers.every((u: any) => featureIds.includes(u.id));
-                                                                                            return (
-                                                                                                <td key={f.key} className="px-3 py-1.5 text-center">
-                                                                                                    <button
-                                                                                                        onClick={() => setAllFeatureUsers(f.key, allSelected ? [] : eligibleUsers.map((u: any) => u.id))}
-                                                                                                        className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border transition-all ${
-                                                                                                            allSelected
-                                                                                                                ? 'bg-indigo-100 dark:bg-indigo-900/30 border-indigo-300 dark:border-indigo-700 text-indigo-600 dark:text-indigo-400'
-                                                                                                                : 'border-slate-300 dark:border-slate-600 text-slate-400 hover:border-indigo-300 hover:text-indigo-500'
-                                                                                                        }`}
-                                                                                                    >
-                                                                                                        {allSelected ? 'All ✓' : 'All'}
-                                                                                                    </button>
-                                                                                                </td>
-                                                                                            );
-                                                                                        })}
-                                                                                    </tr>
+                                                                         <div className="flex gap-2 shrink-0">
+                                                                             <button
+                                                                                 onClick={() => setSmsNumbers((prev: any[]) => prev.map(n => n.id === num.id ? { ...n, allowedUserIds: [] } : n))}
+                                                                                 className="text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-indigo-600 transition"
+                                                                             >Select All</button>
+                                                                             <button
+                                                                                 onClick={() => setSmsNumbers((prev: any[]) => prev.map(n => n.id === num.id ? { ...n, allowedUserIds: ['_none_'] } : n))}
+                                                                                 className="text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-rose-600 transition"
+                                                                             >Clear</button>
+                                                                         </div>
+                                                                     </div>
+                                                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                                         {users.filter((u: any) => !u.roles?.includes('Church Admin')).map((u: any) => {
+                                                                             const isActuallyRestricted = (num.allowedUserIds || []).length > 0;
+                                                                             const isChecked = !isActuallyRestricted || (num.allowedUserIds || []).includes(u.id);
+                                                                             return (
+                                                                                 <label key={u.id} className="flex items-center gap-2.5 p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-700 transition-all group">
+                                                                                     <div
+                                                                                         onClick={() => toggleAllowedUser(u.id)}
+                                                                                         className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-all cursor-pointer ${
+                                                                                             isChecked ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300 dark:border-slate-600 group-hover:border-indigo-400'
+                                                                                         }`}
+                                                                                     >
+                                                                                         {isChecked && <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
+                                                                                     </div>
+                                                                                     <div className="min-w-0 flex-1" onClick={() => toggleAllowedUser(u.id)}>
+                                                                                         <p className="text-xs font-bold text-slate-800 dark:text-white truncate">{u.name}</p>
+                                                                                         <p className="text-[9px] text-slate-400 truncate">{u.email}</p>
+                                                                                     </div>
+                                                                                 </label>
+                                                                             );
+                                                                         })}
+                                                                         {users.filter((u: any) => !u.roles?.includes('Church Admin')).length === 0 && (
+                                                                             <p className="text-[10px] text-slate-400 col-span-2">No non-admin users found.</p>
+                                                                         )}
+                                                                     </div>
+                                                                     <p className="text-[9px] text-slate-400 mt-2">Church Admins always have full access regardless of this setting.</p>
+                                                                 </div>
+ 
+                                                                 {/* Section 2: Feature-level permissions */}
+                                                                 <div>
+                                                                     <h5 className="text-xs font-black text-slate-800 dark:text-white mb-1">Feature Permissions</h5>
+                                                                     <p className="text-[10px] text-slate-400 mb-4">For each feature, control which users have access. Leave a feature's column fully unchecked to allow all visible users.</p>
+ 
+                                                                     {eligibleUsers.length === 0 ? (
+                                                                         <p className="text-[10px] text-slate-400">Add users to the visibility list above to configure feature permissions.</p>
+                                                                     ) : (
+                                                                         <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-700">
+                                                                             <table className="w-full text-xs">
+                                                                                 <thead className="bg-slate-50 dark:bg-slate-800">
+                                                                                     <tr>
+                                                                                         <th className="px-4 py-3 text-left font-black text-slate-500 dark:text-slate-400 text-[10px] uppercase tracking-widest">User</th>
+                                                                                         {FEATURES.map(f => (
+                                                                                             <th key={f.key} className="px-3 py-3 text-center font-black text-slate-500 dark:text-slate-400 text-[10px] uppercase tracking-widest whitespace-nowrap" title={f.desc}>
+                                                                                                 <span className="mr-1">{f.icon}</span>{f.label}
+                                                                                             </th>
+                                                                                         ))}
+                                                                                     </tr>
+                                                                                     <tr className="border-t border-slate-200 dark:border-slate-700 bg-slate-100/50 dark:bg-slate-800/80">
+                                                                                         <td className="px-4 py-1.5">
+                                                                                             <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Toggle All</span>
+                                                                                         </td>
+                                                                                         {FEATURES.map(f => {
+                                                                                             const featureIds: string[] = (num.permissions || {})[f.key] || [];
+                                                                                             const allSelected = featureIds.length === 0 || (eligibleUsers.length > 0 && eligibleUsers.every((u: any) => featureIds.includes(u.id)));
+                                                                                             return (
+                                                                                                 <td key={f.key} className="px-3 py-1.5 text-center">
+                                                                                                     <button
+                                                                                                         onClick={() => setAllFeatureUsers(f.key, allSelected ? ['_none_'] : [])}
+                                                                                                         className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border transition-all ${
+                                                                                                             allSelected
+                                                                                                                 ? 'bg-indigo-100 dark:bg-indigo-900/30 border-indigo-300 dark:border-indigo-700 text-indigo-600 dark:text-indigo-400'
+                                                                                                                 : 'border-slate-300 dark:border-slate-600 text-slate-400 hover:border-indigo-300 hover:text-indigo-500'
+                                                                                                         }`}
+                                                                                                     >
+                                                                                                         {allSelected ? 'All ✓' : 'All'}
+                                                                                                     </button>
+                                                                                                 </td>
+                                                                                             );
+                                                                                         })}
+                                                                                     </tr>
                                                                                 </thead>
                                                                                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
                                                                                     {eligibleUsers.map((u: any) => (
