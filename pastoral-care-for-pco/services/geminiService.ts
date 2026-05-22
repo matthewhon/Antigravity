@@ -24,13 +24,49 @@ interface GeminiProxyResponse {
 }
 
 const callGemini = async (payload: GeminiProxyPayload): Promise<GeminiProxyResponse> => {
-    let url = '/ai/generate';
     if (typeof window === 'undefined') {
-        const port = process.env.PORT || 8080;
-        url = `http://127.0.0.1:${port}/ai/generate`;
+        try {
+            const { getDb } = await import('../backend/firebase.js');
+            const { GoogleGenAI } = await import('@google/genai');
+
+            let apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+            try {
+                const snap = await getDb().doc('system/settings').get();
+                const data = snap.data() || {};
+                if (data.geminiApiKey) {
+                    apiKey = data.geminiApiKey.trim();
+                }
+            } catch (dbErr) {
+                console.error('[GeminiService] Failed to fetch system settings:', dbErr);
+            }
+
+            if (!apiKey) {
+                throw new Error('AI service is not configured. Contact your administrator.');
+            }
+
+            const ai = new GoogleGenAI({ apiKey });
+            const mergedConfig: Record<string, any> = { ...(payload.config || {}) };
+            if (payload.systemInstruction) {
+                mergedConfig.systemInstruction = payload.systemInstruction;
+            }
+
+            const response = await ai.models.generateContent({
+                model: payload.model || 'gemini-2.5-flash',
+                contents: payload.prompt,
+                ...(Object.keys(mergedConfig).length > 0 ? { config: mergedConfig } : {}),
+            });
+
+            return {
+                text: response.text || '',
+                candidates: response.candidates || [],
+            };
+        } catch (serverErr: any) {
+            console.error('[GeminiService] Server-side direct Gemini call failed:', serverErr);
+            throw serverErr;
+        }
     }
-    
-    const res = await fetch(url, {
+
+    const res = await fetch('/ai/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

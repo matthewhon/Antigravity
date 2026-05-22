@@ -4,7 +4,7 @@ import { getDb } from './firebase.js';
 const cache: Record<string, { data: any; timestamp: number }> = {};
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-async function fetchFromPco(churchId: string, url: string) {
+export async function fetchFromPco(churchId: string, url: string) {
   const db = getDb();
   const churchDoc = await db.collection('churches').doc(churchId).get();
   if (!churchDoc.exists) throw new Error('Church not found');

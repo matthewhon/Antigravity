@@ -10,6 +10,7 @@ import {
     calculateGroupsDashboardData, 
     calculateServicesAnalytics 
 } from '../services/analyticsService';
+import { fetchFromPco } from './publicApi';
 
 export async function processExecutiveAiQuery(
     db: Firestore,
@@ -27,25 +28,15 @@ export async function processExecutiveAiQuery(
         if (!churchSnap.exists) return;
         const churchData = churchSnap.data()!;
         
-        const port = process.env.PORT || 8080;
-        const proxyUrl = `http://127.0.0.1:${port}/pco/proxy`;
-        
-        const pcoListRes = await fetch(proxyUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                churchId,
-                url: `https://api.planningcenteronline.com/people/v2/lists/${listId}/people?where[id]=${personId}`,
-                method: 'GET'
-            })
-        });
-
-        if (!pcoListRes.ok) {
-            log.warn(`[Executive AI] Failed to fetch PCO list ${listId}: ${pcoListRes.statusText}`, 'system', { churchId }, churchId);
+        let listData;
+        try {
+            const listUrl = `https://api.planningcenteronline.com/people/v2/lists/${listId}/people?where[id]=${personId}`;
+            listData = await fetchFromPco(churchId, listUrl);
+        } catch (err: any) {
+            log.warn(`[Executive AI] Failed to fetch PCO list ${listId}: ${err.message}`, 'system', { churchId }, churchId);
             return;
         }
 
-        const listData = await pcoListRes.json();
         const isInList = listData.data && listData.data.length > 0;
 
         if (!isInList) {
