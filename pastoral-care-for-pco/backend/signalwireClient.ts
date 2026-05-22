@@ -26,6 +26,21 @@ function sanitizeSpaceUrl(raw: string): string {
  * availablePhoneNumbers(), etc. — so all existing call patterns work unchanged.
  */
 export async function getSignalWireClient(): Promise<any> {
+    if (process.env.MOCK_SMS === 'true') {
+        return {
+            messages: {
+                create: async (params: any) => {
+                    console.log('--- [MOCK SMS SENT] ---');
+                    console.log('To:', params.to);
+                    console.log('From:', params.from);
+                    console.log('Body:', params.body);
+                    console.log('------------------------');
+                    return { sid: 'mock_sid_' + Math.random().toString(36).slice(2, 10), status: 'sent' };
+                }
+            }
+        };
+    }
+
     const snap = await getDb().doc('system/settings').get();
     const data  = snap.data() || {};
 

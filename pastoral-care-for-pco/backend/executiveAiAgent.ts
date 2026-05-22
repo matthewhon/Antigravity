@@ -1,8 +1,15 @@
 import { Firestore } from '@google-cloud/firestore';
 import { createServerLogger } from '../services/logService';
 import { askPastorAI } from '../services/geminiService';
-import fetch from 'node-fetch';
 import { sendIndividualInternal } from './smsSend';
+import { calculateBulkRisk, DEFAULT_RISK_SETTINGS } from '../services/riskService';
+import { 
+    calculateGivingAnalytics, 
+    DEFAULT_LIFECYCLE_SETTINGS, 
+    calculatePeopleDashboardData, 
+    calculateGroupsDashboardData, 
+    calculateServicesAnalytics 
+} from '../services/analyticsService';
 
 export async function processExecutiveAiQuery(
     db: Firestore,
@@ -49,21 +56,127 @@ export async function processExecutiveAiQuery(
         // 2. Gather Context
         log.info(`[Executive AI] Authorized query received from ${phoneNumber}: ${body}`, 'system', { churchId }, churchId);
         
-        const [peopleSnap, givingSnap, groupsSnap, servicesSnap, attendanceSnap] = await Promise.all([
-            db.collection('peopleDashboard').doc(churchId).get(),
-            db.collection('givingAnalytics').doc(churchId).get(),
-            db.collection('groupsDashboard').doc(churchId).get(),
-            db.collection('servicesDashboard').doc(churchId).get(),
-            db.collection('attendanceRecords').where('churchId', '==', churchId).orderBy('date', 'desc').limit(12).get()
+        const [
+            peopleSnap,
+            donationsSnap,
+            groupsSnap,
+            servicePlansSnap,
+            teamsSnap,
+            attendanceSnap,
+            budgetsSnap,
+            fundsSnap,
+            riskChangesSnap,
+            statusChangesSnap
+        ] = await Promise.all([
+            db.collection('people').where('churchId', '==', churchId).get(),
+            db.collection('detailed_donations').where('churchId', '==', churchId).get(),
+            db.collection('groups').where('churchId', '==', churchId).get(),
+            db.collection('service_plans').where('churchId', '==', churchId).get(),
+            db.collection('teams').where('churchId', '==', churchId).get(),
+            db.collection('attendance').where('churchId', '==', churchId).get(),
+            db.collection('budgets').where('churchId', '==', churchId).get(),
+            db.collection('funds').where('churchId', '==', churchId).get(),
+            db.collection('risk_changes').where('churchId', '==', churchId).get(),
+            db.collection('status_changes').where('churchId', '==', churchId).get()
         ]);
 
+        const peopleRaw = peopleSnap.docs.map(doc => doc.data() as any);
+        const donations = donationsSnap.docs.map(doc => doc.data() as any);
+        const groupsRaw = groupsSnap.docs.map(doc => doc.data() as any);
+        const servicePlans = servicePlansSnap.docs.map(doc => doc.data() as any);
+        const teams = teamsSnap.docs.map(doc => doc.data() as any);
+        const attendanceRaw = attendanceSnap.docs.map(doc => doc.data() as any);
+        const budgets = budgetsSnap.docs.map(doc => doc.data() as any);
+        const funds = fundsSnap.docs.map(doc => doc.data() as any);
+        const riskChangesRaw = riskChangesSnap.docs.map(doc => doc.data() as any);
+        const statusChangesRaw = statusChangesSnap.docs.map(doc => doc.data() as any);
+
+        const hideInactiveMembers = churchData.pcoSettings?.hideInactiveMembers ?? false;
+        const hideArchivedItems = churchData.pcoSettings?.hideArchivedItems ?? false;
+
+        const visiblePeople = hideInactiveMembers
+            ? peopleRaw.filter(p => p.status?.toLowerCase() !== 'inactive')
+            : peopleRaw;
+
+        const visibleGroups = hideArchivedItems
+            ? groupsRaw.filter(g => !g.archivedAt)
+            : groupsRaw;
+
+        const servicesData = calculateServicesAnalytics(servicePlans, teams, attendanceRaw, 'Month');
+
+        const groupMemberMap = new Set<string>();
+        visibleGroups.forEach(g => {
+            if (g.memberIds) {
+                g.memberIds.forEach(mid => groupMemberMap.add(mid));
+            }
+        });
+
+        const peopleWithGroups = visiblePeople.map(p => ({
+            ...p,
+            groupIds: groupMemberMap.has(p.id) ? ['exists'] : []
+        }));
+
+        const activeRiskSettings = churchData.riskSettings || DEFAULT_RISK_SETTINGS;
+        const riskEnrichedPeople = visiblePeople.length > 0
+            ? calculateBulkRisk(
+                peopleWithGroups,
+                donations,
+                visibleGroups,
+                servicesData?.recentPlans || [],
+                teams,
+                activeRiskSettings
+              )
+            : [];
+
+        const sortedRiskChanges = [...riskChangesRaw].sort((a, b) => b.timestamp - a.timestamp);
+        const sortedStatusChanges = [...statusChangesRaw].sort((a, b) => b.timestamp - a.timestamp);
+        const recentRiskChanges = sortedRiskChanges.slice(0, 10);
+        const recentStatusChanges = sortedStatusChanges.slice(0, 10);
+
+        const peopleDashboardData = calculatePeopleDashboardData(
+            visiblePeople,
+            riskEnrichedPeople,
+            recentRiskChanges,
+            recentStatusChanges
+        );
+
+        const givingAnalyticsData = calculateGivingAnalytics(
+            donations,
+            'Year',
+            undefined,
+            visiblePeople,
+            churchData.donorLifecycleSettings || DEFAULT_LIFECYCLE_SETTINGS
+        );
+
+        const groupsDashboardData = calculateGroupsDashboardData(
+            visibleGroups,
+            visiblePeople
+        );
+
+        const attendanceChartData = [...attendanceRaw]
+            .sort((a, b) => a.date.localeCompare(b.date))
+            .map(a => ({
+                date: a.date,
+                attendance: a.count || 0,
+                newComers: a.guests || 0
+            }));
+
+        const censusData = churchData.censusCache?.data || null;
+
         const context = {
+            people: peopleDashboardData,
+            giving: givingAnalyticsData,
+            groups: groupsDashboardData,
+            services: servicesData,
+            attendance: attendanceChartData,
+            census: censusData,
             churchName: churchData.name || 'Church',
-            people: peopleSnap.exists ? peopleSnap.data() as any : null,
-            giving: givingSnap.exists ? givingSnap.data() as any : null,
-            groups: groupsSnap.exists ? groupsSnap.data() as any : null,
-            services: servicesSnap.exists ? servicesSnap.data() as any : null,
-            attendance: attendanceSnap.docs.map(d => d.data() as any)
+            donations,
+            funds,
+            budgets,
+            teams,
+            recentRiskChanges,
+            recentStatusChanges
         };
 
         // 3. Query Gemini
