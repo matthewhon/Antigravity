@@ -586,7 +586,9 @@ const Layout: React.FC<LayoutProps> = ({
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto print:overflow-visible bg-slate-50 dark:bg-slate-950 transition-colors duration-300 relative scroll-smooth">
+      <main className={`flex-1 print:overflow-visible bg-slate-50 dark:bg-slate-950 transition-colors duration-300 relative ${
+        noPadding ? 'overflow-hidden flex flex-col min-h-0' : 'overflow-y-auto scroll-smooth'
+      }`}>
         
         {/* Page Context Header (Sticky) */}
         <div className="bg-white/80 dark:bg-slate-900/80 border-b border-slate-100 dark:border-slate-800 px-6 lg:px-10 py-4 sticky top-0 z-40 flex justify-between items-center backdrop-blur-md print:hidden transition-colors duration-300">

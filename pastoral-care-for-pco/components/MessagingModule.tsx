@@ -6,7 +6,7 @@ import { storage } from '../services/firebase';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import {
     collection, doc, onSnapshot, addDoc, updateDoc, deleteDoc,
-    query, where, orderBy, limit, getDocs, getDoc, setDoc,
+    query, where, orderBy, limit, limitToLast, getDocs, getDoc, setDoc,
     Timestamp, collectionGroup, arrayUnion, arrayRemove
 } from 'firebase/firestore';
 import { pcoService } from '../services/pcoService';
@@ -1762,6 +1762,14 @@ const SmsInbox: React.FC<{
     const replyFileRef = useRef<HTMLInputElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const [loadingMsgs, setLoadingMsgs] = useState(false);
+
+    // Pagination states & Scroll anchoring refs
+    const [messageLimit, setMessageLimit] = useState(30);
+    const [hasMoreMessages, setHasMoreMessages] = useState(true);
+    const messagesContainerRef = useRef<HTMLDivElement>(null);
+    const prevScrollHeightRef = useRef<number>(0);
+    const prevFirstMsgIdRef = useRef<string | null>(null);
+    const lastRenderedConvIdRef = useRef<string | null>(null);
     const [isSending, setIsSending] = useState(false);
     const [search, setSearch] = useState('');
     const [showComposer, setShowComposer] = useState(false);
@@ -1839,19 +1847,43 @@ const SmsInbox: React.FC<{
         return unsub;
     }, [churchId, twilioNumberId, allowedNumberIds, defaultNumberId, isDefaultNumber, currentUser.roles]);
 
-    // Load messages for active conversation
+    // Reset limit and states when conversation changes
+    useEffect(() => {
+        if (!activeConv) {
+            setMessages([]);
+            return;
+        }
+        setMessageLimit(30);
+        setHasMoreMessages(true);
+        setLoadingMsgs(true);
+        setMessages([]);
+        prevFirstMsgIdRef.current = null;
+        prevScrollHeightRef.current = 0;
+    }, [activeConv?.id]);
+
+    // Load messages for active conversation with pagination
     useEffect(() => {
         if (!activeConv) return;
-        setLoadingMsgs(true);
+
         const q = query(
             collection(firebaseDb, 'smsConversations', activeConv.id, 'messages'),
             orderBy('createdAt', 'asc'),
-            limit(100)
+            limitToLast(messageLimit)
         );
         const unsub = onSnapshot(q, snap => {
-            setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() } as SmsMessage)));
+            const fetched = snap.docs.map(d => ({ id: d.id, ...d.data() } as SmsMessage));
+            
+            // If we fetched fewer than messageLimit, we have reached the beginning of the chat history
+            if (fetched.length < messageLimit) {
+                setHasMoreMessages(false);
+            } else {
+                setHasMoreMessages(true);
+            }
+
+            setMessages(fetched);
             setLoadingMsgs(false);
         });
+
         // Mark as read
         updateDoc(doc(firebaseDb, 'smsConversations', activeConv.id), { unreadCount: 0 }).catch(() => { });
 
@@ -1867,14 +1899,61 @@ const SmsInbox: React.FC<{
         }, () => setAiSuggestions([]));
 
         return () => { unsub(); unsubSug(); };
-    }, [activeConv?.id]);
+    }, [activeConv?.id, messageLimit]);
 
-    // Auto-scroll to the newest message whenever messages change or conversation switches
-    useEffect(() => {
-        if (messagesEndRef.current) {
-            messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    // Scroll handling: scroll to bottom on switch/new message or adjust on load-more
+    React.useLayoutEffect(() => {
+        const container = messagesContainerRef.current;
+        if (!container || messages.length === 0) return;
+
+        const activeId = activeConv?.id || null;
+        const isNewConv = lastRenderedConvIdRef.current !== activeId;
+        const currentFirstMsgId = messages[0]?.id || null;
+
+        if (isNewConv) {
+            // Case 1: Switched to a new conversation. Scroll to bottom instantly.
+            container.scrollTop = container.scrollHeight;
+            lastRenderedConvIdRef.current = activeId;
+            prevFirstMsgIdRef.current = currentFirstMsgId;
+            prevScrollHeightRef.current = container.scrollHeight;
+            return;
         }
+
+        // Case 2: Prepend messages (paging).
+        if (prevFirstMsgIdRef.current && prevFirstMsgIdRef.current !== currentFirstMsgId) {
+            const scrollDiff = container.scrollHeight - prevScrollHeightRef.current;
+            container.scrollTop = container.scrollTop + scrollDiff;
+            
+            prevFirstMsgIdRef.current = currentFirstMsgId;
+            prevScrollHeightRef.current = container.scrollHeight;
+            return;
+        }
+
+        // Case 3: Appending new messages (real-time received or sent).
+        const lastMsg = messages[messages.length - 1];
+        const isOutbound = lastMsg?.direction === 'outbound';
+        const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 150;
+
+        if (isNearBottom || isOutbound) {
+            container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+        }
+
+        prevFirstMsgIdRef.current = currentFirstMsgId;
+        prevScrollHeightRef.current = container.scrollHeight;
     }, [messages, activeConv?.id]);
+
+    const handleScroll = () => {
+        const container = messagesContainerRef.current;
+        if (!container || !hasMoreMessages || loadingMsgs) return;
+
+        if (container.scrollTop <= 5) {
+            prevScrollHeightRef.current = container.scrollHeight;
+            if (messages.length > 0) {
+                prevFirstMsgIdRef.current = messages[0].id;
+            }
+            setMessageLimit(prev => prev + 30);
+        }
+    };
 
     // On-demand AI suggestion ... called when staff click the ? button
     const handleAiSuggest = async () => {
@@ -2312,7 +2391,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                     </div>
 
                     {/* Messages */}
-                    <div className="flex-1 overflow-y-auto overscroll-contain p-5 space-y-3 bg-slate-50 dark:bg-slate-950">
+                    <div ref={messagesContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto overscroll-contain p-5 space-y-3 bg-slate-50 dark:bg-slate-950">
                         {loadingMsgs ? (
                             <div className="flex justify-center py-12 text-slate-400"><Loader2 size={20} className="animate-spin" /></div>
                         ) : messages.length === 0 ? (

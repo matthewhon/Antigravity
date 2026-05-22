@@ -638,7 +638,10 @@ export const askPastorAI = async (
         budgets?: BudgetRecord[],
         teams?: ServicesTeam[],
         recentRiskChanges?: RiskChangeRecord[],
-        recentStatusChanges?: StatusChangeRecord[]
+        recentStatusChanges?: StatusChangeRecord[],
+        lastWeekGivingSummary?: string,
+        givingByFundByYearSummary?: string,
+        targetClassAbsenteeSummary?: string
     }
 ): Promise<string> => {
     const peopleSummary = context.people ? `
@@ -796,6 +799,21 @@ export const askPastorAI = async (
     ${context.recentStatusChanges.slice(0, 10).map(sc => `- ${sc.personName}: changed ${sc.type} from "${sc.oldValue || 'None'}" to "${sc.newValue || 'None'}" on ${sc.date}`).join('\n')}
     ` : 'RECENT STATUS CHANGES: No recent status changes.';
 
+    const lastWeekGivingText = context.lastWeekGivingSummary ? `
+    LAST WEEK GIVING SUMMARY:
+    ${context.lastWeekGivingSummary}
+    ` : '';
+
+    const givingByFundByYearText = context.givingByFundByYearSummary ? `
+    GIVING BY FUND BY YEAR SUMMARY:
+    ${context.givingByFundByYearSummary}
+    ` : '';
+
+    const classAbsenteeText = context.targetClassAbsenteeSummary ? `
+    CLASS/GROUP ATTENDANCE & ABSENTEE SUMMARY:
+    ${context.targetClassAbsenteeSummary}
+    ` : '';
+
     const systemInstruction = `
     You are Pastor AI, an intelligent, encouraging, and data-driven administrative assistant for ${context.churchName || 'the church'}.
     
@@ -813,6 +831,9 @@ export const askPastorAI = async (
     ${teamsSummary}
     ${riskChangesSummary}
     ${statusChangesSummary}
+    ${lastWeekGivingText}
+    ${givingByFundByYearText}
+    ${classAbsenteeText}
 
     Guidelines:
     1. Be concise, professional, and pastoral in tone.
@@ -822,6 +843,9 @@ export const askPastorAI = async (
     5. Highlight trends where visible (e.g., if attendance is trending up or down).
     6. For fund-specific questions, use the FUND DETAILS section which contains per-fund monthly giving history and unique donor counts.
     7. When asked about lapsed or at-risk donors for a specific fund, cross-reference the fund's donor list against the overall at-risk and lapsed donor data.
+    8. For questions about last week's giving, refer directly to the LAST WEEK GIVING SUMMARY.
+    9. For questions about giving in specific years or to specific funds, refer directly to the GIVING BY FUND BY YEAR SUMMARY.
+    10. For questions about class or group attendance, regulars, check-ins, or absentees, refer directly to the CLASS/GROUP ATTENDANCE & ABSENTEE SUMMARY.
     `;
 
     try {
