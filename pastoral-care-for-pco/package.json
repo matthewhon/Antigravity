@@ -10,7 +10,8 @@
     "start": "node dist/server.js",
     "preview": "vite preview",
     "lint": "tsc --noEmit",
-    "test:ai": "tsx scripts/ai-test-agent.ts"
+    "test:ai": "tsx scripts/ai-test-agent.ts",
+    "check-logs": "node scratch_check_logs_client.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

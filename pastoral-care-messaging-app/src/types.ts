@@ -89,7 +89,7 @@ export interface Church {
     allowSignups?: boolean;
     scheduledSyncTime?: string;
     communityLocations?: CommunityLocation[];
-    /** SMS / Twilio settings for this church */
+    /** SMS settings for this church (SignalWire) */
     smsSettings?: SmsSettings;
     /** Church-wide logo URL (stored in Firebase Storage, used as default in email templates) */
     logoUrl?: string;
@@ -97,6 +97,7 @@ export interface Church {
     regularAttendersListId?: string;
     /** Display name of the selected regular attenders PCO list */
     regularAttendersListName?: string;
+    folders?: string[];
     emailSettings?: {
         /** 'shared' = send from @pastoralcare.barnabassoftware.com; 'custom' = tenant's own domain */
         mode: 'shared' | 'custom';
@@ -106,6 +107,8 @@ export interface Church {
         fromEmail?: string;
         /** Display name for the From field */
         fromName?: string;
+        /** Additional authorized sender identities */
+        additionalSenders?: { name: string; email: string }[];
         // Custom domain fields
         /** e.g. "mychurch.org" */
         customDomain?: string;
@@ -120,6 +123,44 @@ export interface Church {
         sendGridSubuserId?: string;
         /** SendGrid API key scoped to this church's Subuser */
         sendGridSubuserApiKey?: string;
+    };
+    /** PCO sync & display preferences */
+    pcoSettings?: {
+        /** If true, archived groups/registrations/check-ins are hidden and excluded from counts */
+        hideArchivedItems?: boolean;
+        /** If true, people whose PCO status is 'inactive' are hidden throughout the app */
+        hideInactiveMembers?: boolean;
+    };
+    /** Permissions mapping for SMS/Email Broadcasts to Lists and Groups */
+    broadcastPermissions?: {
+        allowedAccess: Record<string, { roles: string[]; userIds: string[] }>;
+    };
+    /** Grow integration settings */
+    growSettings?: {
+        growTracksEnabled?: boolean;
+        bibleStudiesEnabled?: boolean;
+        dailyEmailsEnabled?: boolean;
+        collectionsEnabled?: boolean;
+        /**
+         * Shared secret used to authenticate requests from the Grow Application.
+         * The Grow App must send this value as `PASTORAL_CARE_API_SECRET` in its
+         * integration settings. Generate a new one from System Settings ? Tenants
+         * or approve a pending access request from the Grow Integration tab.
+         */
+        growIntegrationSecret?: string;
+        /**
+         * Tracks a pending access-request from the Grow Application.
+         * Set when Grow calls POST /api/integrations/grow/request-access.
+         * Cleared (with a generated secret) when the admin approves it.
+         */
+        growPendingRequest?: {
+            /** Human-readable name the Grow App sent to identify itself */
+            appName: string;
+            /** ISO timestamp when the request was received */
+            requestedAt: string;
+            /** 'pending' | 'approved' | 'rejected' */
+            status: 'pending' | 'approved' | 'rejected';
+        } | null;
     };
 }
 
@@ -152,6 +193,7 @@ export interface PcoPerson {
     name: string;
     email?: string;
     phone?: string;
+    e164Phone?: string | null;
     avatar?: string | null;
     membership?: string | null;
     status?: string | null;
@@ -169,6 +211,7 @@ export interface PcoPerson {
     lastUpdated?: number;
     riskProfile?: RiskProfile;
     historicRiskCategory?: string;
+    historicRiskScore?: number;
     isDonor?: boolean;
     engagementStatus?: string;
     spiritualMilestones?: {
@@ -376,6 +419,8 @@ export interface DetailedDonation {
     donorId: string;
     donorName: string;
     isRecurring: boolean;
+    labels?: string[];
+    paymentSource?: string;
 }
 
 export interface AttendanceEventSummary {
@@ -438,47 +483,40 @@ export interface SystemSettings {
     enabledModules?: { pastoral: boolean, people: boolean, groups: boolean, services: boolean, giving: boolean, metrics: boolean, communication: boolean };
     allowSignups?: boolean;
     scheduledSyncTime?: string;
+    // AI Features
+    geminiApiKey?: string;
     // SendGrid Email Delivery
     sendGridApiKey?: string;
     sendGridFromEmail?: string; // Must be a verified sender in SendGrid (e.g. hello@mychurch.org)
     sendGridFromName?: string;  // Default "From Name" if campaign doesn't specify one
     // Scripture Library feature flag
     enableLibrary?: boolean;
-    // -- Twilio SMS (Master Account) -------------------------------------------
-    /** Twilio master Account SID � used to create per-church sub-accounts */
-    twilioMasterAccountSid?: string;
-    /** Twilio master Auth Token */
-    twilioMasterAuthToken?: string;
+    // -- SignalWire SMS ---------------------------------------------------------
+    /** SignalWire Project ID (UUID) � from Dashboard ? API ? API Tokens */
+    signalwireProjectId?: string;
+    /** SignalWire API Token � from Dashboard ? API ? API Tokens */
+    signalwireApiToken?: string;
+    /** SignalWire Space URL, e.g. "barnabassoftware.signalwire.com" */
+    signalwireSpaceUrl?: string;
     /**
-     * Base URL where the backend is reachable by Twilio's webhook callbacks.
+     * Base URL where the backend is reachable for SignalWire webhook callbacks.
      * Defaults to apiBaseUrl.  Example: https://api.pastoralcare.barnabassoftware.com
      */
-    twilioWebhookBaseUrl?: string;
+    smsWebhookBaseUrl?: string;
     /** Cost per SMS segment in USD, used for the in-app usage estimate (default 0.0079) */
-    twilioSegmentCostUsd?: number;
-    /** Cost per MMS segment in USD (default 0.0200) */
-    twilioMmsSegmentCostUsd?: number;
-    /** When true, require A2P 10DLC brand + campaign registration before provisioning numbers */
-    twilioRequireA2PRegistration?: boolean;
-    /** When true, perform a Carrier Lookup on every inbound number (adds ~$0.005/lookup) */
-    twilioEnableCarrierLookup?: boolean;
-    /** Twilio API Key SID (alternative to Auth Token for tighter scope) */
-    twilioApiKeySid?: string;
-    /** Twilio API Key Secret */
-    twilioApiKeySecret?: string;
+    smsSegmentCostUsd?: number;
+    /** Cost per MMS in USD (default 0.0200) */
+    smsMmsSegmentCostUsd?: number;
     /**
-     * Primary Customer Profile SID (BU...) for Hon Ventures LLC.
-     * This is Barnabas Software's master ISV profile in Twilio Trust Hub.
-     * It must be assigned as an entity in every secondary (per-church) customer profile
-     * so Twilio can validate the ISV chain before approving. Set in System Settings → Twilio SMS.
+     * SignalWire Webhook Signing Key � from Dashboard ? API ? API Credentials ? Signing Key.
+     * Used to verify the HMAC-SHA256 signature on all inbound webhook requests.
      */
-    primaryCustomerProfileSid?: string;
+    signalwireSigningKey?: string;
     /**
-     * A2P Profile Bundle SID (BN...) — the ISV master A2P profile bundle for Hon Ventures LLC.
-     * Required when submitting brand registrations via the Twilio messaging.v1.brandRegistrations API.
-     * Find it at: Twilio Console → Messaging → Regulatory → A2P Registration.
+     * 10DLC Campaign ID (TCR) � from SignalWire Dashboard ? Messaging Campaigns.
+     * Newly provisioned church numbers are auto-assigned to this campaign for carrier approval.
      */
-    twilioA2pProfileBundleSid?: string;
+    signalwireCampaignId?: string;
 }
 
 export interface TemplateSettings {
@@ -538,10 +576,12 @@ export interface EmailCampaign {
     // Content
     subject?: string;
     blocks?: any[];
+    contentType?: 'blocks' | 'text' | 'html';
+    content?: string;
     templateSettings?: TemplateSettings;
     // Scheduling
     sendAt?: string | null;         // ISO string display value set by UI
-    scheduledAt?: number | null;    // Epoch ms � authoritative trigger for the scheduler
+    scheduledAt?: number | null;    // Epoch ms  authoritative trigger for the scheduler
     sentAt?: number | null;
     recurringFrequency?: 'daily' | 'weekly' | 'monthly' | null;
     lastSentAt?: number | null;
@@ -669,7 +709,7 @@ export interface PcoRegistrationEvent {
     visibility?: string | null;    // 'public' | 'private' | 'link_only'
     registrationType?: string | null; // 'detailed' | 'simple'
     // Dates
-    startsAt?: string | null;      // ISO � first event date
+    startsAt?: string | null;      // ISO  first event date
     endsAt?: string | null;
     openAt?: string | null;        // when registration opens
     closeAt?: string | null;       // when registration closes
@@ -773,7 +813,7 @@ export interface Poll {
     updatedAt: number;
     createdBy: string;
 
-    // ─── Live Projector Display ─────────────────────────────────────────────
+    // --- Live Projector Display ---------------------------------------------
     /**
      * Index (0-based) of the question currently displayed on the live projector.
      * Admin can advance this via the projector control overlay.
@@ -781,8 +821,8 @@ export interface Poll {
      */
     activeQuestionIndex?: number;
 
-    // ─── SMS Text-to-Vote ──────────────────────────────────────────────────
-    /** When true, respondents can text a number (1, 2, 3…) to vote on the first choice question */
+    // --- SMS Text-to-Vote --------------------------------------------------
+    /** When true, respondents can text a number (1, 2, 3�) to vote on the first choice question */
     smsVotingEnabled?: boolean;
     /**
      * Optional SMS keyword to activate this poll's text-to-vote mode.
@@ -818,6 +858,8 @@ export interface RiskChangeRecord {
     date: string;           // ISO date string
     oldCategory: string;    // 'Healthy' | 'At Risk' | 'Disconnected'
     newCategory: string;
+    oldScore?: number;
+    newScore?: number;
     reasons?: string[];
     timestamp: number;
 }
@@ -853,116 +895,72 @@ export interface ChurchNote {
 
 // --- SMS / Messaging Module ---------------------------------------------------
 
+export interface ServicesReminderSchedule {
+    daysBefore: number;
+    messageTemplate: string;
+}
+
+export interface EscalationContact {
+    name: string;
+    phone: string; // E.164 or raw digits
+}
+
+export interface EscalationRule {
+    daysBefore: number;
+    messageTemplate: string;
+    contacts: EscalationContact[];
+}
+
+export interface SmsServicesReminders {
+    enabled: boolean;
+    remindOnlyUnconfirmed: boolean;
+    leaderReminderEnabled: boolean;
+    leaderDaysBefore: number;
+    leaderMessageTemplate: string;
+    memberReminderEnabled: boolean;
+    memberDaysBefore: number;
+    memberMessageTemplate: string;
+    
+    leaderReminders?: ServicesReminderSchedule[];
+    memberReminders?: ServicesReminderSchedule[];
+    
+    // Scheduling Reminder for Leaders (remind leader to schedule the team in advance)
+    leaderSchedulingReminderEnabled?: boolean;
+    leaderSchedulingReminders?: ServicesReminderSchedule[];
+    leaderSchedulingReminderTemplate?: string; // legacy single template fallback
+
+    // Escalation Contacts for Understaffed Teams
+    escalationEnabled?: boolean;
+    escalationRules?: EscalationRule[];
+
+    // Warnings for Leaders
+    leaderWarningUnderstaffedEnabled?: boolean;
+    leaderWarningUnderstaffedTemplate?: string;
+    
+    leaderWarningOverScheduledEnabled?: boolean;
+    leaderWarningOverScheduledThreshold?: number; // e.g. scheduled more than X times in 30 days
+    leaderWarningOverScheduledTemplate?: string;
+}
+
 export interface SmsSettings {
+    /** Automated reminders for upcoming service plans */
+    servicesReminders?: SmsServicesReminders;
+    a2pWebsite?: string;
+    twilioPhoneNumber?: string;
+    twilioPhoneSid?: string;
+    twilioSubAccountSid?: string;
+    twilioCustomerProfileSid?: string;
     /** Whether SMS module is enabled for this tenant */
     smsEnabled?: boolean;
-    /** Twilio Sub-Account SID for this church */
-    twilioSubAccountSid?: string;
-    /** Twilio Sub-Account Auth Token */
-    twilioSubAccountAuthToken?: string;
-    /** E.164 Twilio number assigned to this church, e.g. +15551234567 */
-    twilioPhoneNumber?: string;
-    /** Twilio Phone Number SID */
-    twilioPhoneSid?: string;
-
-    // -- A2P 10DLC Brand Registration ------------------------------------------
-    /** A2P 10DLC registration status */
-    twilioA2pStatus?: 'not_started' | 'pending' | 'in_review' | 'approved' | 'failed';
-    /** Twilio Brand Registration SID (e.g. BN...) */
-    twilioBrandSid?: string;
-    /** Twilio Messaging Service Campaign SID (e.g. QE...) */
-    twilioCampaignSid?: string;
-    /** Twilio Messaging Service SID (e.g. MG...) � required for campaigns */
-    twilioMessagingServiceSid?: string;
-    /** Legal business name (must match IRS / EIN records) */
-    a2pBusinessName?: string;
-    /** Federal Employer Identification Number (EIN) e.g. 12-3456789 */
-    a2pEin?: string;
-    /** Business type for 10DLC registration — must match Twilio's exact enum value */
-    a2pBusinessType?: 'Sole Proprietorship' | 'Partnership' | 'Limited Liability Corporation' | 'Co-operative' | 'Non-profit Corporation' | 'Corporation';
-    /** Industry vertical for TCR brand registration */
-    a2pVertical?: string;
-    /** Website URL submitted during brand registration */
-    a2pWebsite?: string;
-    /** Stock ticker (only for publicly traded entities) */
-    a2pStockTicker?: string;
-    /** Stock exchange (only for publicly traded entities) */
-    a2pStockExchange?: string;
-    /** Contact first name for brand registration */
-    a2pContactFirstName?: string;
-    /** Contact last name */
-    a2pContactLastName?: string;
-    /** Contact email */
-    a2pContactEmail?: string;
-    /** Contact phone (E.164) */
-    a2pContactPhone?: string;
-    /**
-     * Contact's specific job title, e.g. "Senior Pastor", "Executive Director".
-     * Maps to Twilio Trust Hub authorized_representative_1 `business_title`.
-     */
-    a2pContactJobTitle?: string;
-    /**
-     * Contact's job level — must be one of Twilio's accepted enum values:
-     * Director | VP | GM | CEO | CFO | General Counsel
-     * Maps to Twilio Trust Hub authorized_representative_1 `job_position`.
-     */
-    a2pContactJobPosition?: 'Director' | 'VP' | 'GM' | 'CEO' | 'CFO' | 'General Counsel';
-    /** Street address for brand registration */
-    a2pAddress?: string;
-    /** City */
-    a2pCity?: string;
-    /** 2-letter state code */
-    a2pState?: string;
-    /** ZIP code */
-    a2pZip?: string;
-    /** Use case / campaign type e.g. "MIXED" | "2FA" | "CUSTOMER_CARE" | "DELIVERY_NOTIFICATION" | "MARKETING" | "MIXED" | "POLLING_VOTING" | "PUBLIC_SERVICE_ANNOUNCEMENT" | "SECURITY_ALERT" */
-    a2pUseCaseCategory?: string;
-    /** Short description of how the church uses SMS (140 chars max) */
-    a2pDescription?: string;
-    /** Sample message 1 submitted to TCR */
-    a2pSampleMessage1?: string;
-    /** Sample message 2 submitted to TCR */
-    a2pSampleMessage2?: string;
-    /** Whether subscribers can opt in via a web form */
-    a2pOptInWebForm?: boolean;
-    /** Whether subscribers opt in via a text-to-join keyword */
-    a2pOptInSmsKeyword?: boolean;
-    /** Whether subscribers opt in via a paper / verbal process */
-    a2pOptInPaperVoice?: boolean;
-    /** Freeform description of opt-in process */
-    a2pOptInDescription?: string;
-    /** Epoch ms when A2P form was submitted to Twilio */
-    a2pSubmittedAt?: number;
-    /** Epoch ms of last Twilio status check */
-    a2pLastStatusCheck?: number;
-    /** Failure reason returned by Twilio (if status = failed) */
-    a2pFailureReason?: string | null;
-    /** Twilio Customer Profile Bundle SID � required for full brand registration */
-    twilioCustomerProfileSid?: string;
-    /** Twilio A2P Profile Bundle SID � required for full brand registration */
-    twilioA2pProfileSid?: string;
-    twilioEndUserSid?: string;
-    twilioRepEndUserSid?: string;
-    twilioRep2EndUserSid?: string;
-    twilioAddressSid?: string;
-    twilioSupportingDocSid?: string;
-    /** Epoch ms when the SupportingDocument was created — used to track Twilio's 30-day PII data retention limit */
-    twilioSupportingDocCreatedAt?: number;
-    twilioCustomerProfileStatus?: string;
-    twilioCustomerProfileEvaluation?: string;
-    twilioCustomerProfileCreatedAt?: number;
-    twilioCustomerProfileUpdatedAt?: number;
-    a2pRep2FirstName?: string;
-    a2pRep2LastName?: string;
-    a2pRep2Email?: string;
-    a2pRep2Phone?: string;
-    a2pRep2JobTitle?: string;
-    a2pRep2JobPosition?: string;
+    /** E.164 phone number assigned to this church, e.g. +15551234567 */
+    smsPhoneNumber?: string;
+    /** SignalWire Phone Number SID */
+    smsPhoneSid?: string;
 
     // -- Opt-Out / Sender ID Settings ------------------------------------------
     /** Display name used as sender context in message headers */
     senderName?: string;
-    /** Custom opt-out reply (STOP keyword auto-response). If blank, Twilio's default is used. */
+    /** Custom opt-out reply (STOP keyword auto-response). If blank, provider default is used. */
     optOutMessage?: string;
     /** Custom opt-in / double-opt-in reply (START keyword) */
     optInMessage?: string;
@@ -974,6 +972,16 @@ export interface SmsSettings {
     messageFooter?: string;
     /** Whether the SMS AI Agent is enabled for this tenant */
     smsAgentEnabled?: boolean;
+    
+    // -- Executive AI Auto-Responder -------------------------------------------
+    /** Whether the Executive AI Auto-Responder is enabled */
+    executiveAiAgentEnabled?: boolean;
+    /** The keyword required at the beginning of the SMS to trigger the Executive AI. Default: "AI Agent" */
+    executiveAiAgentKeyword?: string;
+    /** PCO List ID for the Executive AI Auto-Responder. Only members of this list can use it. */
+    executiveAiAgentListId?: string;
+    /** Display name of the selected PCO list */
+    executiveAiAgentListName?: string;
 
     // -- Prayer Request Detection (NLP) ----------------------------------------
     /**
@@ -992,6 +1000,53 @@ export interface SmsSettings {
     termsAcceptedAt?: number;
     /** User ID of the admin who accepted the terms */
     termsAcceptedByUserId?: string;
+
+    // -- 10DLC Brand Registration (per-tenant) ----------------------------------
+    /** TCR Brand UUID returned by SignalWire after POST /brands */
+    brandId?: string;
+    /** Current brand approval status */
+    brandStatus?: 'pending' | 'approved' | 'failed';
+    /** Legal organization name submitted for brand registration */
+    brandLegalName?: string;
+    /** EIN / Tax ID */
+    brandEin?: string;
+    /** Legal entity type */
+    brandLegalEntityType?: 'private' | 'public' | 'non_profit' | 'government' | 'sole_proprietor';
+    /** Contact email address for the brand */
+    brandContactEmail?: string;
+    /** Contact phone number for the brand */
+    brandContactPhone?: string;
+    /** Church website URL */
+    brandWebsite?: string;
+    /** Street address */
+    brandAddress?: string;
+    brandCity?: string;
+    brandState?: string;
+    brandZip?: string;
+    /** Epoch ms when brand was submitted to TCR */
+    brandSubmittedAt?: number;
+
+    // -- 10DLC Campaign Registration (per-tenant) -------------------------------
+    /** TCR Campaign UUID returned by SignalWire after POST /brands/:id/campaigns */
+    campaignId?: string;
+    /** Current campaign approval status */
+    campaignStatus?: 'pending' | 'approved' | 'failed';
+    /** TCR use-case code, e.g. 'MIXED', 'CUSTOMER_CARE', '2FA' */
+    campaignUsecase?: string;
+    /** Sub use cases (required if usecase is MIXED or LOW_VOLUME) */
+    campaignSubUsecases?: string[];
+    /** Campaign description submitted to TCR */
+    campaignDescription?: string;
+    /** Sample message 1 */
+    campaignSample1?: string;
+    /** Sample message 2 */
+    campaignSample2?: string;
+    /** How subscribers opt-in (required by TCR) */
+    campaignMessageFlow?: string;
+    /** Epoch ms when campaign was submitted */
+    campaignSubmittedAt?: number;
+
+
 }
 
 export type SmsDirection = 'inbound' | 'outbound';
@@ -1012,7 +1067,7 @@ export interface SmsMessage {
     mediaUrls?: string[];
     status: SmsStatus;
     errorCode?: string | null;
-    twilioSid?: string | null;
+    messageSid?: string | null;
     /** userId of the staff member who sent it (outbound), or null for inbound / auto-reply */
     sentBy?: string | null;
     sentByName?: string | null;
@@ -1045,7 +1100,7 @@ export interface SmsConversation {
     twilioNumberId?: string | null;
     /** The Twilio E.164 number that received / will send messages in this thread */
     toPhoneNumber?: string | null;
-    /** Named inbox this conversation belongs to (legacy — same value as twilioNumberId) */
+    /** Named inbox this conversation belongs to (legacy � same value as twilioNumberId) */
     inboxId?: string | null;
     /**
      * Prayer detection follow-up state.
@@ -1062,6 +1117,7 @@ export type SmsCampaignStatus = 'draft' | 'scheduled' | 'sending' | 'sent' | 'fa
 export interface SmsCampaign {
     id: string;
     churchId: string;
+    smsNumberId?: string | null;
     name: string;
     status: SmsCampaignStatus;
     channelType?: 'sms' | 'email';
@@ -1076,6 +1132,8 @@ export interface SmsCampaign {
     toGroupName?: string | null;
     /** Flat array of E.164 numbers for ad-hoc sends */
     toPhones?: string[];
+    /** The Twilio phone number ID to send from */
+    twilioNumberId?: string | null;
     // Scheduling
     sendAt?: string | null;       // ISO string for UI display
     scheduledAt?: number | null;  // epoch ms  authoritative trigger for the scheduler
@@ -1085,7 +1143,6 @@ export interface SmsCampaign {
     sentHistory?: { sentAt: number; recipientCount: number }[];
     // Sending number override
     /** TwilioPhoneNumber doc ID to use for this campaign. Falls back to the church default number. */
-    twilioNumberId?: string | null;
     // Analytics
     recipientCount?: number;
     deliveredCount?: number;
@@ -1116,6 +1173,30 @@ export interface SmsTag {
      * includes this tag's ID. Only fires once per conversation per tag application.
      */
     autoReplyMessage?: string;
+    /**
+     * When true, incoming SMS messages are scanned for detectionPhrases.
+     * If matched, this tag is auto-applied � similar to Prayer Request Detection.
+     */
+    detectionEnabled?: boolean;
+    /**
+     * Comma-separated phrases or words to scan for in inbound message bodies.
+     * Case-insensitive substring match. e.g. "counseling,mental health,struggling"
+     */
+    detectionPhrases?: string;
+    /**
+     * Optional clarifying reply sent when the message matches detectionPhrases
+     * but the tag needs follow-up context (like "generic" prayer requests).
+     * If set, the conversation enters a follow-up state and the tag is applied
+     * on the next inbound reply.
+     * Leave blank to apply the tag immediately without sending a reply.
+     */
+    clarifyingReply?: string;
+    /**
+     * Restricts auto-detection to specific phone line IDs (TwilioPhoneNumber doc IDs).
+     * Empty array or undefined = detection runs on ALL phone numbers for this church.
+     * Populated = detection only fires when the inbound message arrives on one of these lines.
+     */
+    detectionNumberIds?: string[];
     createdAt: number;
 }
 
@@ -1133,6 +1214,8 @@ export interface SmsKeyword {
     /** Optionally add the replying contact to this PCO list */
     addToListId?: string | null;
     addToListName?: string | null;
+    /** The Twilio phone number ID this keyword applies to */
+    twilioNumberId?: string | null;
     /** Tag IDs (SmsTag.id) to automatically apply to the conversation when this keyword matches */
     autoTagIds?: string[];
     /**
@@ -1175,7 +1258,7 @@ export interface SmsInbox {
  * Stored in the top-level `twilioNumbers` collection (one doc per number).
  * Replaces the single-number pattern in Church.smsSettings.
  */
-export interface TwilioPhoneNumber {
+export interface SmsPhoneNumber {
     id: string;                   // Firestore doc ID (auto)
     churchId: string;
     /** E.164 phone number, e.g. "+15551234567" */
@@ -1193,14 +1276,45 @@ export interface TwilioPhoneNumber {
      * Church Admins always bypass this restriction.
      */
     allowedUserIds: string[];
-    /** Webhook URL configured on this number in Twilio */
+    /** Webhook URL configured on this number in SignalWire */
     webhookUrl?: string;
-    /** Twilio Messaging Service SID linked to this number */
-    messagingServiceSid?: string;
     /** Sender name prefix shown to recipients */
     senderName?: string;
+    /** Campaign assignment status for this number */
+    campaignAssigned?: boolean;
+    campaignAssignmentStatus?: 'not_configured' | 'pending' | 'approved' | 'error';
+    campaignAssignmentOrderId?: string;
+    campaignId?: string;
+    campaignAssignedAt?: number;
+    campaignAssignmentError?: string;
     createdAt: number;
     updatedAt: number;
+
+    // -- Per-number feature permissions ----------------------------------------
+    /**
+     * Granular access controls for this number's features.
+     * Absent = all Messaging users have access (backwards-compatible default).
+     * Church Admins always bypass these restrictions.
+     */
+    permissions?: SmsNumberPermissions;
+}
+
+/**
+ * Per-number feature-level access control.
+ * Each field restricts which user IDs can use that feature on this number.
+ * An empty array or absent field means "all users with Messaging role can access".
+ */
+export interface SmsNumberPermissions {
+    /** User IDs who can read and reply to inbox conversations on this number */
+    inboxUserIds?: string[];
+    /** User IDs who can send broadcast campaigns from this number */
+    broadcastUserIds?: string[];
+    /** User IDs who can view analytics for this number */
+    analyticsUserIds?: string[];
+    /** User IDs who can manage keywords tied to this number */
+    keywordsUserIds?: string[];
+    /** User IDs who can use the AI Agent on this number */
+    aiAgentUserIds?: string[];
 }
 
 export interface SmsUsageRecord {
@@ -1344,6 +1458,8 @@ export interface SmsWorkflow {
     triggerDayOffset?: number;
     /** The time of day to trigger the workflow, format HH:MM. Default 09:00 */
     triggerTime?: string;
+    /** The specific Twilio number ID to send from. If null, uses the church's default number. */
+    twilioNumberId?: string | null;
     /** Legacy flat step array  kept in sync by the editor for the scheduler */
     steps: SmsWorkflowStep[];
     /**
@@ -1408,7 +1524,7 @@ export interface WorkflowActionNode {
 }
 
 /**
- * A *delay* node — a pure wait period; no message is sent.
+ * A *delay* node � a pure wait period; no message is sent.
  * Sits in the timeline between action nodes to control timing.
  */
 export interface WorkflowDelayNode {
@@ -1418,19 +1534,19 @@ export interface WorkflowDelayNode {
     /** Days to wait in 'relative' mode. */
     delayDays: number;
     scheduleType?: 'relative' | 'day_of_week' | 'day_of_month';
-    /** 0 = Sunday — 6 = Saturday. Used when scheduleType = 'day_of_week'. */
+    /** 0 = Sunday � 6 = Saturday. Used when scheduleType = 'day_of_week'. */
     scheduleDayOfWeek?: number;
-    /** 1–31. Used when scheduleType = 'day_of_month'. */
+    /** 1�31. Used when scheduleType = 'day_of_month'. */
     scheduleDayOfMonth?: number;
     /** 'HH:MM' 24-hour send time for day_of_week / day_of_month modes. */
     scheduleTime?: string;
-    // ── Recurrence ─────────────────────────────────────────────────────────
+    // -- Recurrence ---------------------------------------------------------
     /** 'none' = fire once; 'weekly' = repeat on selected days of week; 'monthly' = repeat on selected dates */
     repeatType?: 'none' | 'weekly' | 'monthly';
     /**
      * Days on which the action repeats.
-     * For repeatType 'weekly'  : day-of-week values (0–6, Sunday = 0).
-     * For repeatType 'monthly' : day-of-month values (1–31).
+     * For repeatType 'weekly'  : day-of-week values (0�6, Sunday = 0).
+     * For repeatType 'monthly' : day-of-month values (1�31).
      * Leave empty for a single-occurrence send.
      */
     repeatDays?: number[];
@@ -1469,7 +1585,7 @@ export interface WorkflowBranchNode {
 /** Discriminated union of all workflow node types. */
 export type WorkflowNode = WorkflowActionNode | WorkflowDelayNode | WorkflowBranchNode;
 
-// ─── Multi-Number Support ────────────────────────────────────────────────────
+// --- Multi-Number Support ----------------------------------------------------
 
 /**
  * A Twilio phone number provisioned for a specific church.
@@ -1494,8 +1610,49 @@ export interface TwilioPhoneNumber {
      * Empty array = visible to all users in the church.
      */
     allowedUserIds: string[];
-    /** Optional display name shown in outbound message headers */
     senderName?: string;
+    /** Granular feature-level permissions */
+    permissions?: SmsNumberPermissions;
     createdAt: number;
     updatedAt: number;
+}
+
+// --- Tenant File Storage (GCS) ---
+
+export interface TenantFile {
+    id: string;             // Firestore doc ID
+    churchId: string;       // Tenant ID
+    uploaderUid: string;
+    originalName: string;
+    mimeType: string;
+    sizeBytes: number;
+    publicUrl?: string;     // If publicly accessible
+    gcsPath: string;        // e.g. tenants/{churchId}/uploads/{id}
+    createdAt: number;
+    folder?: string;        // Virtual folder path or name
+    tags?: string[];        // Array of organizational tags
+    processingStatus?: 'processing' | 'completed' | 'failed';
+}
+
+export interface BillingUsage {
+    id: string;             // e.g. {churchId}_{YYYY_MM_DD}
+    churchId: string;
+    date: string;           // YYYY-MM-DD
+    storageBytes: number;   // Daily snapshot of storage used
+    egressBytes: number;    // Accumulated egress for this day
+}
+
+export function hasBroadcastAccess(currentUser: User | undefined, targetId: string, church?: Church): boolean {
+    if (!currentUser) return false;
+    if (currentUser.roles?.includes('System Administration') || currentUser.roles?.includes('Church Admin')) {
+        return true;
+    }
+    const accessMap = church?.broadcastPermissions?.allowedAccess || {};
+    const access = accessMap[targetId];
+    if (!access) return false; // Default restricted
+
+    if (access.userIds?.includes(currentUser.id)) return true;
+    if (access.roles?.some(r => currentUser.roles?.includes(r as UserRole))) return true;
+    
+    return false;
 }

@@ -6,8 +6,7 @@ const pcoFetch = async (churchId: string, url: string, method = 'GET', body: any
     const response = await fetch(getProxyUrl(), {
         method: 'POST',
         headers: { 
-            'Content-Type': 'application/json',
-            'User-Agent': 'PastoralCareApp/1.0' 
+            'Content-Type': 'application/json'
         },
         body: JSON.stringify({ churchId, url, method, body })
     });

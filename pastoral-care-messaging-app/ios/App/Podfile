@@ -21,4 +21,18 @@ end
 
 post_install do |installer|
   assertDeploymentTarget(installer)
+  installer.pods_project.targets.each do |target|
+    target.build_configurations.each do |config|
+      config.build_settings['CLANG_ENABLE_EXPLICIT_MODULES'] = 'NO'
+    end
+    
+    # Add a build phase to strip extended attributes before signing
+    phase_name = 'Clear Extended Attributes'
+    existing_phase = target.shell_script_build_phases.find { |p| p.name == phase_name }
+    if existing_phase
+      target.build_phases.delete(existing_phase)
+    end
+    phase = target.new_shell_script_build_phase(phase_name)
+    phase.shell_script = 'xattr -cr "${BUILT_PRODUCTS_DIR}" || true'
+  end
 end

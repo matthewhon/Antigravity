@@ -431,21 +431,21 @@ export const FileManager: React.FC<FileManagerProps> = ({ churchId, currentUser 
                             setEditTags((file.tags || []).join(', '));
                           }}
                           title="Edit Details"
-                          className="p-2 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition opacity-0 group-hover:opacity-100 focus:opacity-100"
+                          className="p-2 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100"
                         >
                           <Edit2 size={16} />
                         </button>
                         <button
                           onClick={() => copyLink(`${window.location.origin}/f/${file.id}`)}
                           title="Copy Link"
-                          className="p-2 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition opacity-0 group-hover:opacity-100 focus:opacity-100"
+                          className="p-2 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100"
                         >
                           <Copy size={16} />
                         </button>
                         <button
                           onClick={() => handleDelete(file)}
                           title="Delete File"
-                          className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 transition opacity-0 group-hover:opacity-100 focus:opacity-100"
+                          className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 transition opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100"
                         >
                           <Trash2 size={16} />
                         </button>

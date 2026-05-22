@@ -36,6 +36,13 @@ export const calculateGivingAnalytics = (
         } else if (filter === 'This Week') {
             const day = now.getDay(); 
             startDate.setDate(now.getDate() - day); 
+        } else if (filter === 'Last Week') {
+            const day = now.getDay(); 
+            endDate = new Date(now);
+            endDate.setDate(now.getDate() - day - 1);
+            endDate.setHours(23, 59, 59, 999);
+            startDate = new Date(endDate);
+            startDate.setDate(endDate.getDate() - 6);
         } else if (filter === 'Month') {
             startDate.setDate(now.getDate() - 30);
         } else if (filter === 'This Month') {

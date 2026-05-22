@@ -1,37 +1,63 @@
 import { useState, useEffect } from 'react';
 import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
-import { db } from '../services/firebase';
+import { db as firebaseDb } from '../services/firebase';
 import { TwilioPhoneNumber, User } from '../types';
 
+/**
+ * Real-time listener for all phone numbers owned by a church tenant.
+ * Returns numbers sorted: default first, then by creation date ascending.
+ */
 export function useTwilioNumbers(churchId: string) {
     const [numbers, setNumbers] = useState<TwilioPhoneNumber[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!churchId) {
-            setLoading(false);
-            return;
-        }
-
         const q = query(
-            collection(db, 'twilioNumbers'),
+            collection(firebaseDb, 'smsNumbers'),
             where('churchId', '==', churchId),
-            orderBy('isDefault', 'desc'),
             orderBy('createdAt', 'asc')
         );
-        
         const unsub = onSnapshot(q, snap => {
-            setNumbers(snap.docs.map(d => ({ id: d.id, ...d.data() } as TwilioPhoneNumber)));
+            const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as TwilioPhoneNumber));
+            // Default number always comes first
+            list.sort((a, b) => {
+                if (a.isDefault && !b.isDefault) return -1;
+                if (!a.isDefault && b.isDefault) return 1;
+                return 0;
+            });
+            setNumbers(list);
             setLoading(false);
         });
-        
         return unsub;
     }, [churchId]);
-    
+
     return { numbers, loading };
 }
 
+/**
+ * Returns true if the given user is allowed to see / use a particular phone number.
+ * - Church Admins and System Admins always have access.
+ * - An empty allowedUserIds array means visible to everyone.
+ * - Otherwise the user must be in the allowedUserIds list.
+ */
 export function canUserSeeNumber(num: TwilioPhoneNumber, user: User): boolean {
     if (user.roles.includes('Church Admin') || user.roles.includes('System Administration')) return true;
-    return num.allowedUserIds.length === 0 || num.allowedUserIds.includes(user.id);
+    return !num.allowedUserIds || num.allowedUserIds.length === 0 || num.allowedUserIds.includes(user.id);
+}
+
+/**
+ * Returns true if the given user is allowed to access a specific feature on a phone number.
+ * - Church Admins and System Admins always have access.
+ * - Must have visibility to the number first (allowedUserIds).
+ * - Empty permissions array for a feature means open to all visible users.
+ */
+export function canUserUseFeature(num: TwilioPhoneNumber | null | undefined, user: User, featureKey: keyof NonNullable<TwilioPhoneNumber['permissions']>): boolean {
+    if (!num) return false;
+    if (user.roles.includes('Church Admin') || user.roles.includes('System Administration')) return true;
+    
+    // If restricted visibility, user must be in the visibility list
+    if (num.allowedUserIds && num.allowedUserIds.length > 0 && !num.allowedUserIds.includes(user.id)) return false;
+
+    const featureIds = num.permissions?.[featureKey] || [];
+    return featureIds.length === 0 || featureIds.includes(user.id);
 }

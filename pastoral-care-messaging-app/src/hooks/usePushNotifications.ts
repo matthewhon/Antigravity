@@ -44,7 +44,7 @@ export function usePushNotifications(user: User | null) {
         });
 
         // Some issue with our setup and push will not work
-        const addErrorListener = PushNotifications.addListener('registrationError', (error: any) => {
+        const addErrorListener = PushNotifications.addListener('registrationError', (error: { error: string }) => {
             console.error('Error on registration: ' + JSON.stringify(error));
         });
 

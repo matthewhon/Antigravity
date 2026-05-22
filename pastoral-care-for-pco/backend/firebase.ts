@@ -8,19 +8,24 @@ import { getStorage as getAdminStorage } from 'firebase-admin/storage';
  * The Admin SDK must explicitly specify both the projectId and the databaseId.
  */
 
+const initAdmin = () => {
+  if (!admin.apps.length) {
+    try {
+      admin.initializeApp({
+        projectId: 'pastoral-care-for-pco',
+        storageBucket: 'pastoral-care-for-pco.firebasestorage.app',
+      });
+    } catch (e) {
+      console.error('Firebase Admin init failed:', e);
+    }
+  }
+};
+
 let dbInstance: FirebaseFirestore.Firestore | null = null;
 
 export const getDb = () => {
   if (!dbInstance) {
-    if (!admin.apps.length) {
-      try {
-        admin.initializeApp({
-          projectId: 'pastoral-care-for-pco',
-        });
-      } catch (e) {
-        console.error('Firebase Admin init failed:', e);
-      }
-    }
+    initAdmin();
     // Use the named database "pcforpco" — the (default) database does not exist
     dbInstance = getFirestore(admin.app(), 'pcforpco');
   }
@@ -31,16 +36,9 @@ let storageInstance: any = null;
 
 export const getStorage = () => {
   if (!storageInstance) {
-    if (!admin.apps.length) {
-      try {
-        admin.initializeApp({
-          projectId: 'pastoral-care-for-pco',
-        });
-      } catch (e) {
-        console.error('Firebase Admin init failed:', e);
-      }
-    }
+    initAdmin();
     storageInstance = getAdminStorage(admin.app());
   }
   return storageInstance;
 };
+

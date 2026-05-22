@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { PcoPerson, PeopleDashboardData, GivingAnalytics, GroupsDashboardData, ServicesDashboardData, AttendanceData, CensusStats, DetailedDonation, PcoFund } from '../types';
+import { PcoPerson, PeopleDashboardData, GivingAnalytics, GroupsDashboardData, ServicesDashboardData, AttendanceData, CensusStats, DetailedDonation, PcoFund, BudgetRecord, ServicesTeam, RiskChangeRecord, StatusChangeRecord } from '../types';
 import { askPastorAI } from '../services/geminiService';
 
 interface PastorAIViewProps {
@@ -13,6 +13,10 @@ interface PastorAIViewProps {
     churchName: string;
     donations?: DetailedDonation[];
     funds?: PcoFund[];
+    budgets?: BudgetRecord[];
+    teams?: ServicesTeam[];
+    recentRiskChanges?: RiskChangeRecord[];
+    recentStatusChanges?: StatusChangeRecord[];
 }
 
 interface Message {
@@ -40,7 +44,11 @@ export const PastorAIView: React.FC<PastorAIViewProps> = ({
     censusData,
     churchName,
     donations,
-    funds
+    funds,
+    budgets,
+    teams,
+    recentRiskChanges,
+    recentStatusChanges
 }) => {
     const [messages, setMessages] = useState<Message[]>([
         {
@@ -86,7 +94,11 @@ export const PastorAIView: React.FC<PastorAIViewProps> = ({
                 census: censusData,
                 churchName,
                 donations,
-                funds
+                funds,
+                budgets,
+                teams,
+                recentRiskChanges,
+                recentStatusChanges
             });
 
             const aiMsg: Message = {

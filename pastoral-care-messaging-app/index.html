@@ -3,22 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>pastoral-care-messaging-app</title>
   </head>
   <body>
+
     <div id="root"></div>
-    <script type="module">
-      import('./src/main.tsx').catch(e => {
-        const root = document.getElementById('root');
-        if (root) {
-          root.innerHTML = '<div style="padding: 20px; color: purple; font-family: monospace;">' +
-            '<h3>Dynamic Import Error:</h3>' +
-            '<p>' + (e.message || String(e)) + '</p>' +
-            '<pre>' + (e.stack || '') + '</pre>' +
-            '</div>';
-        }
-      });
-    </script>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -3,6 +3,8 @@ import React, { useState } from 'react';
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '../services/firebase';
 import { MessageSquare } from 'lucide-react';
+import logoIcon from '../assets/logo-icon.png';
+
 
 
 interface LoginViewProps {
@@ -26,11 +28,12 @@ export const LoginView: React.FC<LoginViewProps> = ({ onRegister }) => {
       // Trim email to remove accidental whitespace
       await signInWithEmailAndPassword(auth, email.trim(), password);
       // Auth listener in App.tsx will handle redirection
-    } catch (err: any) {
-      console.error(err);
-      if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+    } catch (err) {
+      const error = err as { code?: string; message?: string };
+      console.error(error);
+      if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
         setError("Invalid email or password.");
-      } else if (err.code === 'auth/too-many-requests') {
+      } else if (error.code === 'auth/too-many-requests') {
         setError("Too many failed attempts. Please reset your password or try again later.");
       } else {
         setError("Failed to sign in. Please try again.");
@@ -48,18 +51,20 @@ export const LoginView: React.FC<LoginViewProps> = ({ onRegister }) => {
         await sendPasswordResetEmail(auth, email.trim());
         setInfo("Password reset email sent! Check your inbox.");
         setError('');
-    } catch (e: any) {
-        setError("Failed to send reset email. " + e.message);
+    } catch (e) {
+        const error = e as { message?: string };
+        setError("Failed to send reset email. " + (error.message || ""));
     }
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-100 dark:bg-slate-950 p-4 animate-in fade-in zoom-in duration-300">
+    <div className="flex h-full w-full overflow-y-auto items-center justify-center bg-slate-100 dark:bg-slate-950 p-4 animate-in fade-in zoom-in duration-300">
       <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-[2rem] shadow-xl p-10 border border-slate-100 dark:border-slate-800">
-        <div className="flex justify-center mb-8">
-            <div className="w-16 h-16 bg-violet-600 rounded-2xl flex items-center justify-center">
-                <MessageSquare className="w-8 h-8 text-white" />
-            </div>
+        <div className="flex items-center justify-center gap-3 mb-8">
+            <img src={logoIcon} alt="Logo" className="w-12 h-12 object-contain" />
+            <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                Pastoral Care
+            </h1>
         </div>
         
         <div className="text-center mb-8">
@@ -130,7 +135,9 @@ export const LoginView: React.FC<LoginViewProps> = ({ onRegister }) => {
                 href="/register"
                 onClick={(e) => {
                     e.preventDefault();
-                    onRegister && onRegister();
+                    if (onRegister) {
+                        onRegister();
+                    }
                 }}
                 className="mt-2 inline-block text-xs font-black text-indigo-600 hover:text-indigo-800 transition-colors uppercase tracking-widest"
             >

@@ -6,15 +6,19 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "postbuild": "node -e \"const fs = require('fs'); const file = 'dist/index.html'; let html = fs.readFileSync(file, 'utf8'); html = html.replace(/ crossorigin/g, ''); fs.writeFileSync(file, html);\"",
+    "postbuild": "node postbuild.cjs",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "ios:build": "npm run build && npx cap sync ios && xcodebuild -workspace ios/App/App.xcworkspace -scheme App -sdk iphonesimulator -configuration Debug",
+    "ios:run": "npm run build && npx cap run ios --target B8F03C46-BDBF-406A-83F1-BD928AE06139"
   },
   "dependencies": {
-    "@capacitor/cli": "^7.6.2",
     "@capacitor/core": "^8.3.1",
     "@capacitor/ios": "^8.3.1",
     "@capacitor/push-notifications": "^8.0.3",
+    "@tiptap/extension-image": "^3.23.6",
+    "@tiptap/react": "^3.23.6",
+    "@tiptap/starter-kit": "^3.23.6",
     "firebase": "^12.12.1",
     "lucide-react": "^1.14.0",
     "react": "^19.2.5",
@@ -22,6 +26,7 @@
     "react-router-dom": "^7.14.2"
   },
   "devDependencies": {
+    "@capacitor/cli": "^7.6.2",
     "@eslint/js": "^10.0.1",
     "@tailwindcss/vite": "^4.2.4",
     "@types/node": "^24.12.2",

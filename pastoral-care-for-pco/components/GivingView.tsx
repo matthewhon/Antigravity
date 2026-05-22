@@ -1015,7 +1015,6 @@ export const GivingView: React.FC<GivingViewProps> = ({
           }
           case 'fundPerformance': {
               const performanceData = analytics.givingByFund.slice(0, 8);
-              const performanceTotal = performanceData.reduce((s, item) => s + (item.value || 0), 0);
               const FUND_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#06b6d4', '#f43f5e', '#8b5cf6', '#ec4899', '#14b8a6'];
 
               return (
@@ -1034,12 +1033,12 @@ export const GivingView: React.FC<GivingViewProps> = ({
                               {/* Total hero */}
                               <div className="p-4 rounded-xl bg-gradient-to-br from-indigo-50 to-emerald-50 dark:from-indigo-900/20 dark:to-emerald-900/20 flex items-center justify-between">
                                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Total Giving</p>
-                                  <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400">${performanceTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                                  <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400">${analytics.totalGiving.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
                               </div>
                               {/* Per-fund rows */}
                               <div className="space-y-3">
                                   {performanceData.map((item, i) => {
-                                      const pct = performanceTotal > 0 ? (item.value / performanceTotal) * 100 : 0;
+                                      const pct = analytics.totalGiving > 0 ? (item.value / analytics.totalGiving) * 100 : 0;
                                       const color = FUND_COLORS[i % FUND_COLORS.length];
                                       return (
                                           <div key={item.name} className="space-y-1">

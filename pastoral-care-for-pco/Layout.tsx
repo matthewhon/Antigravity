@@ -115,11 +115,13 @@ const Layout: React.FC<LayoutProps> = ({ children, church, allChurches, onSwitch
                 path="/metrics"
               />
             )}
-             <NavItem 
+             {hasPermission('pastor-ai') && (
+              <NavItem 
                 icon="🤖" 
                 label="AI Assistant" 
                 path="/ai-assistant"
               />
+             )}
              {hasPermission('settings') && (
               <NavItem 
                 icon="⚙️" 

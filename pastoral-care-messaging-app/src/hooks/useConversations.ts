@@ -6,20 +6,24 @@ import { SmsConversation } from '../types';
 export function useConversations(churchId: string, twilioNumberId: string | null) {
     const [conversations, setConversations] = useState<SmsConversation[]>([]);
     const [loading, setLoading] = useState(true);
+    const [prevKeys, setPrevKeys] = useState({ churchId, twilioNumberId });
+
+    if (churchId !== prevKeys.churchId || twilioNumberId !== prevKeys.twilioNumberId) {
+        setPrevKeys({ churchId, twilioNumberId });
+        setConversations([]);
+        setLoading(true);
+    }
 
     useEffect(() => {
         if (!churchId || !twilioNumberId) {
-            setConversations([]);
-            setLoading(false);
             return;
         }
 
-        setLoading(true);
         const q = query(
             collection(db, 'smsConversations'),
             where('churchId', '==', churchId),
             where('twilioNumberId', '==', twilioNumberId),
-            orderBy('updatedAt', 'desc')
+            orderBy('lastMessageAt', 'desc')
         );
         
         const unsub = onSnapshot(q, snap => {
@@ -30,5 +34,9 @@ export function useConversations(churchId: string, twilioNumberId: string | null
         return unsub;
     }, [churchId, twilioNumberId]);
     
-    return { conversations, loading };
+    const isReady = !!(churchId && twilioNumberId);
+    return { 
+        conversations: isReady ? conversations : [], 
+        loading: isReady ? loading : false 
+    };
 }

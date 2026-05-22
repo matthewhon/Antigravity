@@ -1,6 +1,5 @@
 
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
@@ -17,11 +16,25 @@ export const firebaseConfig = {
   measurementId: "G-SE7TBF0HVB"
 };
 
+import { initializeAuth, indexedDBLocalPersistence, browserLocalPersistence, getAuth } from "firebase/auth";
+import { Capacitor } from '@capacitor/core';
+
 // Initialize Firebase App
 const app = initializeApp(firebaseConfig);
 
 // Export Auth Instance
-export const auth = getAuth(app);
+const getFirebaseAuthConfig = () => {
+  if (Capacitor.isNativePlatform()) {
+    console.log("Firebase Auth: Initializing on Native Platform using explicit persistence");
+    return initializeAuth(app, {
+      persistence: [indexedDBLocalPersistence, browserLocalPersistence]
+    });
+  } else {
+    console.log("Firebase Auth: Initializing on Web Platform");
+    return getAuth(app);
+  }
+};
+export const auth = getFirebaseAuthConfig();
 
 /** 
  * CRITICAL: Use the named database instance "pcforpco".

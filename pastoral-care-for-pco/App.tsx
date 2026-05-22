@@ -59,6 +59,7 @@ const App: React.FC = () => {
 
   const view = useMemo(() => {
      const path = location.pathname;
+     if (path.startsWith('/ai-assistant')) return 'pastor-ai';
      if (path.startsWith('/people/households')) return 'people-households';
      if (path.startsWith('/people/risk')) return 'people-risk';
      if (path.startsWith('/people/reports')) return 'people-reports';
@@ -485,6 +486,7 @@ const App: React.FC = () => {
       if (hasPermission(resolvedView)) {
           const viewToPath: Record<string, string> = {
               'dashboard': '/',
+              'pastor-ai': '/ai-assistant',
               'people': '/people',
               'people-households': '/people/households',
               'people-risk': '/people/risk',
@@ -964,7 +966,28 @@ const App: React.FC = () => {
                         mobileSmsUrl={`${window.location.protocol}//${window.location.host}/mobile/sms`}
                     /> 
                 } />
-                
+                <Route path="/ai-assistant" element={
+                    hasPermission('pastor-ai') ? (
+                        <div className="flex-1 min-h-0 p-6">
+                            <PastorAIView 
+                                peopleData={peopleDashboardData}
+                                givingAnalytics={givingAnalyticsData}
+                                groupsData={groupsDashboardData}
+                                servicesData={servicesData}
+                                attendanceData={attendanceChartData}
+                                censusData={censusData}
+                                churchName={church.name}
+                                donations={donations}
+                                funds={funds}
+                                budgets={budgets}
+                                teams={teams}
+                                recentRiskChanges={recentRiskChanges}
+                                recentStatusChanges={recentStatusChanges}
+                            />
+                        </div>
+                    ) : <Navigate to="/" replace />
+                } />
+
                 {/* Fallback route */}
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

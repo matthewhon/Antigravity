@@ -3,7 +3,8 @@ import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { 
     User, PeopleDashboardData, GivingAnalytics, GroupsDashboardData, 
     ServicesDashboardData, AttendanceData, CensusStats, BudgetRecord, 
-    PcoFund, DetailedDonation, ChurchRiskSettings, GroupRiskSettings
+    PcoFund, DetailedDonation, ChurchRiskSettings, GroupRiskSettings,
+    ServicesTeam, RiskChangeRecord, StatusChangeRecord
 } from '../types';
 import { 
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -30,6 +31,9 @@ interface DashboardViewProps {
   budgets: BudgetRecord[];
   funds: PcoFund[];
   donations: DetailedDonation[];
+  teams: ServicesTeam[];
+  recentRiskChanges?: RiskChangeRecord[];
+  recentStatusChanges?: StatusChangeRecord[];
   pcoConnected: boolean;
   onConnectPco: () => void;
   allowedWidgetIds?: string[];
@@ -65,6 +69,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   budgets,
   funds,
   donations,
+  teams,
+  recentRiskChanges,
+  recentStatusChanges,
   pcoConnected,
   onConnectPco,
   allowedWidgetIds,
@@ -691,6 +698,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               churchName={churchName}
               donations={donations}
               funds={funds}
+              budgets={budgets}
+              teams={teams}
+              recentRiskChanges={recentRiskChanges}
+              recentStatusChanges={recentStatusChanges}
           />
         </div>
       )}

@@ -3,7 +3,7 @@ import {
     AttendanceData, GivingData, PeopleDashboardData, GivingAnalytics, 
     GeoInsight, GroupsDashboardData, ServicesDashboardData, CensusStats, 
     BudgetRecord, PcoFund, GroupRiskSettings, PcoGroup, PastoralNote, PcoPerson,
-    UserRole, WidgetDefinition, DetailedDonation
+    UserRole, WidgetDefinition, DetailedDonation, ServicesTeam, RiskChangeRecord, StatusChangeRecord
 } from "../types";
 import { getRoleBasedDefaults, ALL_WIDGETS } from "../constants/widgetRegistry";
 
@@ -598,7 +598,11 @@ export const askPastorAI = async (
         census?: CensusStats | null,
         churchName?: string,
         donations?: DetailedDonation[],
-        funds?: PcoFund[]
+        funds?: PcoFund[],
+        budgets?: BudgetRecord[],
+        teams?: ServicesTeam[],
+        recentRiskChanges?: RiskChangeRecord[],
+        recentStatusChanges?: StatusChangeRecord[]
     }
 ): Promise<string> => {
     const peopleSummary = context.people ? `
@@ -736,6 +740,26 @@ export const askPastorAI = async (
     - Demographics: ${JSON.stringify(context.census.ethnicity)}
     ` : 'COMMUNITY: No census data.';
 
+    const budgetsSummary = context.budgets && context.budgets.length > 0 ? `
+    BUDGETS:
+    ${context.budgets.map(b => `- ${b.fundName} (${b.year}): Budget $${b.totalAmount} (Active: ${b.isActive ? 'Yes' : 'No'})`).join('\n')}
+    ` : 'BUDGETS: No budget data available.';
+
+    const teamsSummary = context.teams && context.teams.length > 0 ? `
+    TEAMS:
+    ${context.teams.map(t => `- ${t.name}: ${t.memberIds?.length || 0} members, ${t.leaderCount || 0} leaders${t.serviceTypeName ? ` (Service Type: ${t.serviceTypeName})` : ''}`).join('\n')}
+    ` : 'TEAMS: No team data available.';
+
+    const riskChangesSummary = context.recentRiskChanges && context.recentRiskChanges.length > 0 ? `
+    RECENT RISK CHANGES (Last Changes):
+    ${context.recentRiskChanges.slice(0, 10).map(rc => `- ${rc.personName}: ${rc.oldCategory} -> ${rc.newCategory} on ${rc.date} (Score: ${rc.oldScore || 0} -> ${rc.newScore || 0})${rc.reasons && rc.reasons.length > 0 ? ` Reasons: ${rc.reasons.join(', ')}` : ''}`).join('\n')}
+    ` : 'RECENT RISK CHANGES: No recent risk changes.';
+
+    const statusChangesSummary = context.recentStatusChanges && context.recentStatusChanges.length > 0 ? `
+    RECENT STATUS CHANGES (Last Changes):
+    ${context.recentStatusChanges.slice(0, 10).map(sc => `- ${sc.personName}: changed ${sc.type} from "${sc.oldValue || 'None'}" to "${sc.newValue || 'None'}" on ${sc.date}`).join('\n')}
+    ` : 'RECENT STATUS CHANGES: No recent status changes.';
+
     const systemInstruction = `
     You are Pastor AI, an intelligent, encouraging, and data-driven administrative assistant for ${context.churchName || 'the church'}.
     
@@ -749,6 +773,10 @@ export const askPastorAI = async (
     ${attendanceSummary}
     ${censusSummary}
     ${fundDetailsSummary}
+    ${budgetsSummary}
+    ${teamsSummary}
+    ${riskChangesSummary}
+    ${statusChangesSummary}
 
     Guidelines:
     1. Be concise, professional, and pastoral in tone.

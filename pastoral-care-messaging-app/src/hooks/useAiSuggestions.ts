@@ -5,10 +5,15 @@ import { SmsAiSuggestion } from '../types';
 
 export function useAiSuggestions(churchId: string, conversationId: string) {
     const [suggestion, setSuggestion] = useState<SmsAiSuggestion | null>(null);
+    const [prevId, setPrevId] = useState(conversationId);
+
+    if (conversationId !== prevId) {
+        setPrevId(conversationId);
+        setSuggestion(null);
+    }
 
     useEffect(() => {
         if (!churchId || !conversationId) {
-            setSuggestion(null);
             return;
         }
 
@@ -32,5 +37,5 @@ export function useAiSuggestions(churchId: string, conversationId: string) {
         return unsub;
     }, [churchId, conversationId]);
     
-    return { suggestion };
+    return { suggestion: churchId && conversationId ? suggestion : null };
 }

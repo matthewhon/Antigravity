@@ -7,9 +7,8 @@ import { User, Church } from './types';
 import { Loader2 } from 'lucide-react';
 
 import { LoginView } from './components/LoginView';
-
-import { Dashboard } from './components/Dashboard';
-
+import MobileSmsLayout from './components/MobileSmsLayout';
+import { NoChurchAccess } from './components/NoChurchAccess';
 import { usePushNotifications } from './hooks/usePushNotifications';
 
 const App: React.FC = () => {
@@ -21,14 +20,20 @@ const App: React.FC = () => {
   usePushNotifications(user);
 
   useEffect(() => {
+    console.log("App useEffect mounted, registering onAuthStateChanged");
     const unsubscribe = onAuthStateChanged(auth, async (authUser) => {
+      console.log("onAuthStateChanged triggered, authUser:", authUser ? authUser.uid : "null");
       if (authUser) {
         try {
+          console.log("Fetching user profile for:", authUser.uid);
           const userProfile = await firestore.getUserProfile(authUser.uid);
+          console.log("User profile fetched:", userProfile);
           if (userProfile && (userProfile.roles.includes('Messaging') || userProfile.roles.includes('Church Admin') || userProfile.roles.includes('System Administration'))) {
             setUser(userProfile);
             if (userProfile.churchId) {
+              console.log("Fetching church profile for:", userProfile.churchId);
               const churchProfile = await firestore.getChurch(userProfile.churchId);
+              console.log("Church profile fetched:", churchProfile);
               setChurch(churchProfile);
             }
           } else {
@@ -39,9 +44,11 @@ const App: React.FC = () => {
           console.error("Error fetching user profile", e);
         }
       } else {
+        console.log("No authenticated user, clearing state");
         setUser(null);
         setChurch(null);
       }
+      console.log("Setting loading to false");
       setLoading(false);
     });
     return () => unsubscribe();
@@ -57,13 +64,36 @@ const App: React.FC = () => {
 
   return (
     <HashRouter>
-
       <Routes>
-        <Route path="/" element={user && church ? <Dashboard user={user} church={church} /> : <Navigate to="/login" replace />} />
+        <Route 
+          path="/" 
+          element={
+            user ? (
+              church ? (
+                <MobileSmsLayout
+                  churchId={church.id}
+                  church={church}
+                  currentUser={user}
+                  onUpdateChurch={async (updates) => {
+                    const updated = { ...church, ...updates };
+                    setChurch(updated);
+                    await firestore.updateChurch(church.id, updates);
+                  }}
+                  onNavigateHome={() => {
+                    auth.signOut();
+                  }}
+                />
+              ) : (
+                <NoChurchAccess />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          } 
+        />
         <Route path="/login" element={!user ? <LoginView /> : <Navigate to="/" replace />} />
       </Routes>
     </HashRouter>
-
   );
 };
 

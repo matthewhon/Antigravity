@@ -6,16 +6,20 @@ import { SmsMessage } from '../types';
 export function useMessages(churchId: string, conversationId: string) {
     const [messages, setMessages] = useState<SmsMessage[]>([]);
     const [loading, setLoading] = useState(true);
+    const [prevKeys, setPrevKeys] = useState({ churchId, conversationId });
+
+    if (churchId !== prevKeys.churchId || conversationId !== prevKeys.conversationId) {
+        setPrevKeys({ churchId, conversationId });
+        setMessages([]);
+        setLoading(true);
+    }
 
     useEffect(() => {
         if (!churchId || !conversationId) {
-            setMessages([]);
-            setLoading(false);
             return;
         }
 
-        setLoading(true);
-        // We order by createdAt desc to easily get the latest, then reverse in UI or flex-col-reverse
+        // We query the smsMessages subcollection/collection
         const q = query(
             collection(db, 'smsMessages'),
             where('churchId', '==', churchId),
@@ -34,5 +38,9 @@ export function useMessages(churchId: string, conversationId: string) {
         return unsub;
     }, [churchId, conversationId]);
     
-    return { messages, loading };
+    const isReady = !!(churchId && conversationId);
+    return { 
+        messages: isReady ? messages : [], 
+        loading: isReady ? loading : false 
+    };
 }

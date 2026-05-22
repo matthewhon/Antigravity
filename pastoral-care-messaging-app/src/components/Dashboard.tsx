@@ -22,13 +22,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, church }) => {
         return numbers.filter(n => canUserSeeNumber(n, user));
     }, [numbers, user]);
 
-    // Automatically select the first visible number if none is selected
-    React.useEffect(() => {
-        if (!selectedNumberId && visibleNumbers.length > 0) {
-            setSelectedNumberId(visibleNumbers[0].id);
-        }
-    }, [visibleNumbers, selectedNumberId]);
-
     const activeNumber = visibleNumbers.find(n => n.id === selectedNumberId) || visibleNumbers[0];
 
     // If viewing a conversation, render the chat view instead of dashboard
@@ -67,7 +60,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, church }) => {
                         {church.name}
                     </p>
                     <select 
-                        value={selectedNumberId || ''} 
+                        value={selectedNumberId || (visibleNumbers[0]?.id || '')} 
                         onChange={(e) => setSelectedNumberId(e.target.value)}
                         className="text-lg font-black text-slate-900 dark:text-white bg-transparent border-none p-0 focus:ring-0 outline-none appearance-none cursor-pointer"
                     >

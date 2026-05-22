@@ -1,21 +1,26 @@
 import admin from 'firebase-admin';
 import { getFirestore } from 'firebase-admin/firestore';
 
-function getDb() {
+function getDb(dbId) {
     if (!admin.apps.length) {
         admin.initializeApp({
             projectId: 'pastoral-care-for-pco',
         });
     }
-    return getFirestore(admin.app(), 'pcforpco');
+    return dbId ? getFirestore(admin.app(), dbId) : getFirestore(admin.app());
 }
 
 async function check() {
-  const db = getDb();
-  const snap = await db.collection('smsNumbers').where('churchId', '==', 'ch_v0cjkh0z1').get();
-  console.log('Numbers:', JSON.stringify(snap.docs.map(d => ({id: d.id, ...d.data()})), null, 2));
-
-  const churchSnap = await db.collection('churches').doc('ch_v0cjkh0z1').get();
-  console.log('Church SMS Settings:', JSON.stringify(churchSnap.data()?.smsSettings, null, 2));
+  const defaultDb = getDb();
+  console.log('Checking default database for users...');
+  const userSnap = await defaultDb.collection('users').doc('MR9FBPeop3TRfsujxtvcDEIvd492').get();
+  console.log('Default DB User exists:', userSnap.exists);
+  if (userSnap.exists) {
+    console.log('Default DB User data:', userSnap.data());
+  } else {
+    // List collections in default DB
+    const cols = await defaultDb.listCollections();
+    console.log('Default DB collections:', cols.map(c => c.id));
+  }
 }
 check().catch(console.error);

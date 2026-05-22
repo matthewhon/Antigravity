@@ -44,22 +44,40 @@ export const handleFileProxy = async (req: any, res: any) => {
 
     // Proxy the file using Signed URL or stream directly.
     // Given the requirement for "signed-URL generation for secure, efficient large file uploads and public access",
-    // we generate a short-lived signed URL and redirect the user.
+    // we attempt to generate a short-lived signed URL and redirect the user.
+    // If that fails (e.g. IAM permission issue for signing on the service account), we fall back to streaming.
     const storage = getStorage();
     // gcsPath from client is typically: tenants/{churchId}/uploads/{fileId}_{originalName}
     // But getStorage().bucket().file(gcsPath) works because firebase client uses default bucket.
     const fileRef = storage.bucket().file(gcsPath);
     
-    const [url] = await fileRef.getSignedUrl({
-      version: 'v4',
-      action: 'read',
-      expires: Date.now() + 15 * 60 * 1000, // 15 minutes
-      responseDisposition: `inline; filename="${originalName}"`,
-      responseType: mimeType || 'application/octet-stream',
-    });
+    try {
+      const [url] = await fileRef.getSignedUrl({
+        version: 'v4',
+        action: 'read',
+        expires: Date.now() + 15 * 60 * 1000, // 15 minutes
+        responseDisposition: `inline; filename="${originalName}"`,
+        responseType: mimeType || 'application/octet-stream',
+      });
 
-    // Redirect user to the GCS signed URL to download/stream the file directly from Google.
-    res.redirect(302, url);
+      // Redirect user to the GCS signed URL to download/stream the file directly from Google.
+      res.redirect(302, url);
+    } catch (signErr) {
+      console.warn('[FileProxy] getSignedUrl failed, falling back to streaming:', signErr);
+      res.setHeader('Content-Type', mimeType || 'application/octet-stream');
+      res.setHeader('Content-Disposition', `inline; filename="${originalName}"`);
+      if (sizeBytes) {
+        res.setHeader('Content-Length', String(sizeBytes));
+      }
+      fileRef.createReadStream()
+        .on('error', (streamErr: any) => {
+          console.error('[FileProxy] Stream error:', streamErr);
+          if (!res.headersSent) {
+            res.status(500).send('Error streaming file');
+          }
+        })
+        .pipe(res);
+    }
 
   } catch (e: any) {
     console.error('[FileProxy] Error:', e);
