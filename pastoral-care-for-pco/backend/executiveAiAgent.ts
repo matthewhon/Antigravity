@@ -24,36 +24,40 @@ function findMatchingGroupOrEvent(
 ): { type: 'group' | 'event'; item: any } | null {
     const qLower = query.toLowerCase();
     
-    // 1. Try exact/substring matches on group names
-    for (const g of groups) {
-        if (!g.name) continue;
-        const name = g.name.toLowerCase();
-        // Remove trailing 's' or 'es' to match singular/plural differences
-        const nameNormalized = name.replace(/s$/, '').replace(/classes$/, 'class');
-        const qNormalized = qLower.replace(/s$/, '').replace(/classes$/, 'class');
-        
-        if (qNormalized.includes(nameNormalized) || nameNormalized.includes(qNormalized)) {
-            return { type: 'group', item: g };
-        }
-        // Let's also do a word-by-word overlap check for groups
-        const words = name.split(/\s+/).filter(w => w.length > 3 && w !== 'class' && w !== 'classes' && w !== 'group' && w !== 'meeting');
-        if (words.length > 0 && words.every(w => qLower.includes(w))) {
-            return { type: 'group', item: g };
+    // Create candidates with normalized names and original items
+    const groupCandidates = groups
+        .filter(g => g.name)
+        .map(g => {
+            const name = g.name.toLowerCase();
+            const nameNormalized = name.replace(/s$/, '').replace(/classes$/, 'class');
+            return { type: 'group' as const, item: g, nameNormalized, name };
+        });
+
+    const eventCandidates = pcoEvents
+        .map(ev => {
+            const name = (ev.attributes?.name || '').toLowerCase();
+            const nameNormalized = name.replace(/s$/, '').replace(/classes$/, 'class');
+            return { type: 'event' as const, item: ev, nameNormalized, name };
+        });
+
+    // Combine and sort by normalized name length descending so that more specific/longer matches are checked first
+    const candidates = [...groupCandidates, ...eventCandidates].sort((a, b) => b.nameNormalized.length - a.nameNormalized.length);
+
+    const qNormalized = qLower.replace(/s$/, '').replace(/classes$/, 'class');
+
+    // 1. Try exact/substring matches on the sorted candidates
+    for (const c of candidates) {
+        if (qNormalized.includes(c.nameNormalized) || c.nameNormalized.includes(qNormalized)) {
+            return { type: c.type, item: c.item };
         }
     }
-    
-    // 2. Try exact/substring matches on check-in event names
-    for (const ev of pcoEvents) {
-        const name = (ev.attributes?.name || '').toLowerCase();
-        const nameNormalized = name.replace(/s$/, '').replace(/classes$/, 'class');
-        const qNormalized = qLower.replace(/s$/, '').replace(/classes$/, 'class');
-        
-        if (qNormalized.includes(nameNormalized) || nameNormalized.includes(qNormalized)) {
-            return { type: 'event', item: ev };
-        }
-        const words = name.split(/\s+/).filter(w => w.length > 3 && w !== 'class' && w !== 'classes' && w !== 'group' && w !== 'event');
+
+    // 2. Try word-by-word overlap check on the sorted candidates
+    for (const c of candidates) {
+        const wordFilterWord = c.type === 'group' ? 'group' : 'event';
+        const words = c.name.split(/\s+/).filter(w => w.length > 3 && w !== 'class' && w !== 'classes' && w !== 'group' && w !== 'meeting' && w !== wordFilterWord);
         if (words.length > 0 && words.every(w => qLower.includes(w))) {
-            return { type: 'event', item: ev };
+            return { type: c.type, item: c.item };
         }
     }
     
@@ -377,7 +381,7 @@ export async function processExecutiveAiQuery(
                     const ev = match.item;
                     const eventName = ev.attributes?.name || 'Event';
                     try {
-                        const timesRes = await fetchFromPco(churchId, `https://api.planningcenteronline.com/check-ins/v2/events/${ev.id}/event_times?order=-starts_at&per_page=20`);
+                        const timesRes = await fetchFromPco(churchId, `https://api.planningcenteronline.com/check-ins/v2/event_times?where[event_id]=${ev.id}&order=-starts_at&per_page=20`);
                         const times = timesRes.data || [];
                         const pastTimes = times.filter((t: any) => new Date(t.attributes?.starts_at) < now);
 
