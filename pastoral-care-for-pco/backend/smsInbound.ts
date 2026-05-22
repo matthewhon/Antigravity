@@ -346,10 +346,12 @@ export const handleInboundSms = async (req: any, res: any) => {
         let churchId = '';
         let smsNumberId: string | null = null;
         let smsSettings: any = {};
+        let numberData: any = null;
 
         if (!numSnap.empty) {
             const numDoc = numSnap.docs[0];
-            churchId = numDoc.data().churchId;
+            numberData = numDoc.data();
+            churchId = numberData.churchId;
             smsNumberId = numDoc.id;
 
             const churchSnap2 = await db.collection('churches').doc(churchId).get();
@@ -376,6 +378,23 @@ export const handleInboundSms = async (req: any, res: any) => {
             res.set('Content-Type', 'text/xml');
             return res.status(200).send('<Response></Response>');
         }
+
+        // Compute resolved settings, falling back to church-level settings if not defined per-number
+        const resolvedSmsAgentEnabled = numberData?.smsAgentEnabled !== undefined
+            ? numberData.smsAgentEnabled
+            : !!smsSettings?.smsAgentEnabled;
+
+        const resolvedExecutiveAiAgentEnabled = numberData?.executiveAiAgentEnabled !== undefined
+            ? numberData.executiveAiAgentEnabled
+            : !!smsSettings?.executiveAiAgentEnabled;
+
+        const resolvedExecutiveAiAgentKeyword = numberData?.executiveAiAgentKeyword
+            ? numberData.executiveAiAgentKeyword
+            : (smsSettings?.executiveAiAgentKeyword || 'AI Agent');
+
+        const resolvedExecutiveAiAgentListId = numberData?.executiveAiAgentListId !== undefined
+            ? numberData.executiveAiAgentListId
+            : smsSettings?.executiveAiAgentListId;
 
         // 2. Handle STOP / HELP / START (carrier compliance)
         const upperBody = body.trim().toUpperCase();
@@ -499,25 +518,25 @@ export const handleInboundSms = async (req: any, res: any) => {
 
         // 4-B. Executive AI Auto-Responder
         const bodyTrimmed = body.trim();
-        const aiAgentPrefix = ((smsSettings as any)?.executiveAiAgentKeyword || 'AI Agent').toLowerCase();
+        const aiAgentPrefix = resolvedExecutiveAiAgentKeyword.toLowerCase();
         const isAiAgentTrigger = bodyTrimmed.toLowerCase().startsWith(aiAgentPrefix);
 
         const actualPersonId = personMatch?.personId || convSnap.data()?.personId;
 
-        if (smsSettings?.executiveAiAgentEnabled && smsSettings?.executiveAiAgentListId && actualPersonId && isAiAgentTrigger) {
+        if (resolvedExecutiveAiAgentEnabled && resolvedExecutiveAiAgentListId && actualPersonId && isAiAgentTrigger) {
             // Strip the trigger prefix
             const queryBody = bodyTrimmed.substring(aiAgentPrefix.length).trim();
 
             // Non-blocking
             processExecutiveAiQuery(
                 db, log, churchId, actualPersonId, from, queryBody,
-                smsSettings.executiveAiAgentListId, smsNumberId
+                resolvedExecutiveAiAgentListId, smsNumberId
             ).catch(() => { });
         }
 
-        // 4-B. SMS AI Agent —â€ fire-and-forget suggestion generation
+        // 4-B. SMS AI Agent —â€  fire-and-forget suggestion generation
         //      Runs only when smsAgentEnabled is true and the body is not a carrier keyword.
-        if (smsSettings?.smsAgentEnabled === true) {
+        if (resolvedSmsAgentEnabled === true) {
             const churchSnap = await db.collection('churches').doc(churchId).get();
             const churchName = churchSnap.data()?.name || 'Church';
             // Non-blocking: do not await so TwiML response is never delayed

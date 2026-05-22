@@ -1836,7 +1836,9 @@ const SmsInbox: React.FC<{
     // AI Agent suggestions
     const [aiSuggestions, setAiSuggestions] = useState<SmsAiSuggestion[]>([]);
     const [aiGenerating, setAiGenerating] = useState(false);
-    const smsAgentEnabled = !!(church.smsSettings?.smsAgentEnabled);
+    const smsAgentEnabled = activeNumber
+        ? (activeNumber.smsAgentEnabled !== undefined ? activeNumber.smsAgentEnabled : !!(church.smsSettings?.smsAgentEnabled))
+        : !!(church.smsSettings?.smsAgentEnabled);
     const userCanUseAiAgent = canUserUseFeature(activeNumber, currentUser, 'aiAgentUserIds');
 
     // Toast
@@ -2893,8 +2895,9 @@ const SmsKeywordsManager: React.FC<{
     church: Church;
     currentUser: User;
     twilioNumberId?: string | null;
+    activeNumber?: TwilioPhoneNumber | null;
     onUpdateChurch?: (updates: Partial<Church>) => void;
-}> = ({ churchId, church, currentUser, twilioNumberId, onUpdateChurch }) => {
+}> = ({ churchId, church, currentUser, twilioNumberId, activeNumber, onUpdateChurch }) => {
     const [keywords, setKeywords] = useState<SmsKeyword[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [listError, setListError] = useState<string | null>(null);
@@ -3490,19 +3493,35 @@ const SmsKeywordsManager: React.FC<{
             {/* --- SMS AI AGENT TOGGLE ------------------------------------------ */}
             {(() => {
                 const isAdmin = currentUser.roles?.includes('Church Admin') || currentUser.roles?.includes('System Administration');
-                const agentOn = !!(church.smsSettings?.smsAgentEnabled);
+                const agentOn = activeNumber
+                    ? (activeNumber.smsAgentEnabled !== undefined ? activeNumber.smsAgentEnabled : !!(church.smsSettings?.smsAgentEnabled))
+                    : !!(church.smsSettings?.smsAgentEnabled);
                 const [agentSaving, setAgentSaving] = React.useState(false);
 
                 const handleToggleAgent = async () => {
-                    if (!onUpdateChurch) return;
                     setAgentSaving(true);
                     try {
-                        await onUpdateChurch({
-                            smsSettings: {
-                                ...church.smsSettings,
-                                smsAgentEnabled: !agentOn,
-                            },
-                        });
+                        if (activeNumber) {
+                            await fetch(`${API_BASE}/api/messaging/number-settings`, {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    churchId,
+                                    twilioNumberId: activeNumber.id,
+                                    smsAgentEnabled: !agentOn
+                                })
+                            });
+                        } else {
+                            if (!onUpdateChurch) return;
+                            await onUpdateChurch({
+                                smsSettings: {
+                                    ...church.smsSettings,
+                                    smsAgentEnabled: !agentOn,
+                                },
+                            });
+                        }
+                    } catch (err) {
+                        console.error('Failed to toggle agent:', err);
                     } finally {
                         setAgentSaving(false);
                     }
@@ -7677,12 +7696,38 @@ const SmsAgentTab: React.FC<{
     church: Church;
     currentUser: User;
     onUpdateChurch?: (updates: Partial<Church>) => void;
-}> = ({ churchId, church, currentUser, onUpdateChurch }) => {
+    numbers?: TwilioPhoneNumber[];
+    activeNumberId?: string | null;
+}> = ({ churchId, church, currentUser, onUpdateChurch, numbers = [], activeNumberId }) => {
+    const [selectedNumberId, setSelectedNumberId] = useState<string>('');
+
+    useEffect(() => {
+        if (activeNumberId) {
+            setSelectedNumberId(activeNumberId);
+        } else if (numbers.length > 0 && !selectedNumberId) {
+            setSelectedNumberId(numbers[0].id);
+        }
+    }, [activeNumberId, numbers]);
+
+    const selectedNumber = numbers.find(n => n.id === selectedNumberId) || null;
+
     const isAdmin = currentUser.roles?.includes('Church Admin') || currentUser.roles?.includes('System Administration');
-    const agentEnabled = !!(church.smsSettings?.smsAgentEnabled);
-    const execAgentEnabled = !!(church.smsSettings?.executiveAiAgentEnabled);
-    const execAgentKeyword = church.smsSettings?.executiveAiAgentKeyword || 'AI Agent';
-    const execListId = church.smsSettings?.executiveAiAgentListId || '';
+
+    const agentEnabled = selectedNumber
+        ? (selectedNumber.smsAgentEnabled !== undefined ? selectedNumber.smsAgentEnabled : !!(church.smsSettings?.smsAgentEnabled))
+        : !!(church.smsSettings?.smsAgentEnabled);
+
+    const execAgentEnabled = selectedNumber
+        ? (selectedNumber.executiveAiAgentEnabled !== undefined ? selectedNumber.executiveAiAgentEnabled : !!(church.smsSettings?.executiveAiAgentEnabled))
+        : !!(church.smsSettings?.executiveAiAgentEnabled);
+
+    const execAgentKeyword = selectedNumber
+        ? (selectedNumber.executiveAiAgentKeyword !== undefined ? selectedNumber.executiveAiAgentKeyword : (church.smsSettings?.executiveAiAgentKeyword || 'AI Agent'))
+        : (church.smsSettings?.executiveAiAgentKeyword || 'AI Agent');
+
+    const execListId = selectedNumber
+        ? (selectedNumber.executiveAiAgentListId !== undefined ? selectedNumber.executiveAiAgentListId : (church.smsSettings?.executiveAiAgentListId || ''))
+        : (church.smsSettings?.executiveAiAgentListId || '');
 
     const [pcoLists, setPcoLists] = useState<{ id: string; attributes: { name: string; total_people: number } }[]>([]);
     const [loadingLists, setLoadingLists] = useState(false);
@@ -7760,10 +7805,22 @@ const SmsAgentTab: React.FC<{
     const handleToggleExecAgent = async () => {
         const next = !execAgentEnabled;
         try {
-            const churchRef = doc(firebaseDb, 'churches', churchId);
-            await updateDoc(churchRef, { 'smsSettings.executiveAiAgentEnabled': next });
-            if (onUpdateChurch) onUpdateChurch({ smsSettings: { ...church.smsSettings, executiveAiAgentEnabled: next } });
-            showToast(next ? '? Executive AI enabled' : 'Executive AI disabled');
+            if (selectedNumber) {
+                await fetch(`${API_BASE}/api/messaging/number-settings`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        churchId,
+                        twilioNumberId: selectedNumber.id,
+                        executiveAiAgentEnabled: next
+                    })
+                });
+            } else {
+                const churchRef = doc(firebaseDb, 'churches', churchId);
+                await updateDoc(churchRef, { 'smsSettings.executiveAiAgentEnabled': next });
+                if (onUpdateChurch) onUpdateChurch({ smsSettings: { ...church.smsSettings, executiveAiAgentEnabled: next } });
+            }
+            showToast(next ? '🚀 Executive AI enabled' : 'Executive AI disabled');
         } catch {
             showToast('Failed to update setting', 'error');
         }
@@ -7773,11 +7830,23 @@ const SmsAgentTab: React.FC<{
         const keyword = e.target.value.trim() || 'AI Agent';
         if (keyword === execAgentKeyword) return;
         try {
-            const churchRef = doc(firebaseDb, 'churches', churchId);
-            await updateDoc(churchRef, { 'smsSettings.executiveAiAgentKeyword': keyword });
-            if (onUpdateChurch) onUpdateChurch({
-                smsSettings: { ...church.smsSettings, executiveAiAgentKeyword: keyword }
-            });
+            if (selectedNumber) {
+                await fetch(`${API_BASE}/api/messaging/number-settings`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        churchId,
+                        twilioNumberId: selectedNumber.id,
+                        executiveAiAgentKeyword: keyword
+                    })
+                });
+            } else {
+                const churchRef = doc(firebaseDb, 'churches', churchId);
+                await updateDoc(churchRef, { 'smsSettings.executiveAiAgentKeyword': keyword });
+                if (onUpdateChurch) onUpdateChurch({
+                    smsSettings: { ...church.smsSettings, executiveAiAgentKeyword: keyword }
+                });
+            }
             showToast('Keyword updated');
         } catch {
             showToast('Failed to update keyword', 'error');
@@ -7788,15 +7857,28 @@ const SmsAgentTab: React.FC<{
         const listId = e.target.value;
         const listName = pcoLists.find(l => l.id === listId)?.attributes.name || '';
         try {
-            const churchRef = doc(firebaseDb, 'churches', churchId);
-            await updateDoc(churchRef, {
-                'smsSettings.executiveAiAgentListId': listId,
-                'smsSettings.executiveAiAgentListName': listName
-            });
-            if (onUpdateChurch) onUpdateChurch({
-                smsSettings: { ...church.smsSettings, executiveAiAgentListId: listId, executiveAiAgentListName: listName }
-            });
-            showToast('? Authorized list saved');
+            if (selectedNumber) {
+                await fetch(`${API_BASE}/api/messaging/number-settings`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        churchId,
+                        twilioNumberId: selectedNumber.id,
+                        executiveAiAgentListId: listId,
+                        executiveAiAgentListName: listName
+                    })
+                });
+            } else {
+                const churchRef = doc(firebaseDb, 'churches', churchId);
+                await updateDoc(churchRef, {
+                    'smsSettings.executiveAiAgentListId': listId,
+                    'smsSettings.executiveAiAgentListName': listName
+                });
+                if (onUpdateChurch) onUpdateChurch({
+                    smsSettings: { ...church.smsSettings, executiveAiAgentListId: listId, executiveAiAgentListName: listName }
+                });
+            }
+            showToast('✅ Authorized list saved');
         } catch {
             showToast('Failed to save authorized list', 'error');
         }
@@ -7805,10 +7887,22 @@ const SmsAgentTab: React.FC<{
     const handleToggleAgent = async () => {
         const next = !agentEnabled;
         try {
-            const churchRef = doc(firebaseDb, 'churches', churchId);
-            await updateDoc(churchRef, { 'smsSettings.smsAgentEnabled': next });
-            if (onUpdateChurch) onUpdateChurch({ smsSettings: { ...church.smsSettings, smsAgentEnabled: next } });
-            showToast(next ? '? SMS Agent enabled' : 'SMS Agent disabled');
+            if (selectedNumber) {
+                await fetch(`${API_BASE}/api/messaging/number-settings`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        churchId,
+                        twilioNumberId: selectedNumber.id,
+                        smsAgentEnabled: next
+                    })
+                });
+            } else {
+                const churchRef = doc(firebaseDb, 'churches', churchId);
+                await updateDoc(churchRef, { 'smsSettings.smsAgentEnabled': next });
+                if (onUpdateChurch) onUpdateChurch({ smsSettings: { ...church.smsSettings, smsAgentEnabled: next } });
+            }
+            showToast(next ? '🚀 SMS Agent enabled' : 'SMS Agent disabled');
         } catch {
             showToast('Failed to update setting', 'error');
         }
@@ -7914,6 +8008,29 @@ Write the reply:`;
                     When enabled, the agent analyzes every incoming SMS and suggests a contextual reply for your staff ... drawing from your church knowledge base below.
                 </p>
             </div>
+
+            {/* Phone Line Selector */}
+            {numbers.length > 0 && (
+                <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <p className="font-bold text-slate-900 dark:text-white text-sm">Select Phone Line to Configure</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                            SMS Agent and Executive AI settings are number-independent.
+                        </p>
+                    </div>
+                    <select
+                        value={selectedNumberId}
+                        onChange={e => setSelectedNumberId(e.target.value)}
+                        className="w-full md:w-64 text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                    >
+                        {numbers.map(num => (
+                            <option key={num.id} value={num.id}>
+                                {num.friendlyLabel} ({num.phoneNumber})
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            )}
 
             {/* Toggle card */}
             <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
@@ -8202,9 +8319,11 @@ interface MessagingModuleProps {
     initialNumberId?: string | null;
     /** When true the built-in number dropdown is hidden (parent owns the selector UI). */
     hideNumberSelector?: boolean;
+    activeNumberId?: string | null;
+    onActiveNumberIdChange?: (id: string | null) => void;
 }
 
-const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, currentUser, onUpdateChurch, controlledTab, initialNumberId, hideNumberSelector }) => {
+const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, currentUser, onUpdateChurch, controlledTab, initialNumberId, hideNumberSelector, activeNumberId: propActiveNumberId, onActiveNumberIdChange: propOnActiveNumberIdChange }) => {
     const smsEnabled = church.smsSettings?.smsEnabled;
 
     type Tab = 'campaigns' | 'inbox' | 'keywords' | 'analytics' | 'workflows' | 'agent' | 'permissions' | 'files';
@@ -8229,7 +8348,15 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
     const { numbers: twilioNumbers, loading: numbersLoading } = useTwilioNumbers(churchId);
     const visibleNumbers = twilioNumbers.filter(n => canUserSeeNumber(n, currentUser));
     // Initialise from prop (mobile parent) or null; auto-select happens in the effect below
-    const [activeNumberId, setActiveNumberId] = useState<string | null>(initialNumberId ?? null);
+    const [localActiveNumberId, setLocalActiveNumberId] = useState<string | null>(initialNumberId ?? null);
+    const activeNumberId = propActiveNumberId !== undefined ? propActiveNumberId : localActiveNumberId;
+    const setActiveNumberId = (id: string | null) => {
+        if (propOnActiveNumberIdChange) {
+            propOnActiveNumberIdChange(id);
+        } else {
+            setLocalActiveNumberId(id);
+        }
+    };
     const [showNumberManager, setShowNumberManager] = useState(false);
     const [showAddNumber, setShowAddNumber] = useState(false);
     // All users in the church ... needed for the user restriction picker
@@ -8677,6 +8804,7 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                                 church={church}
                                 currentUser={currentUser}
                                 twilioNumberId={activeNumberId}
+                                activeNumber={activeNumber}
                                 onUpdateChurch={onUpdateChurch}
                             />
                         )}
@@ -8716,6 +8844,8 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                                 church={church}
                                 currentUser={currentUser}
                                 onUpdateChurch={onUpdateChurch}
+                                numbers={visibleNumbers}
+                                activeNumberId={activeNumberId}
                             />
                         )}
                     </div>

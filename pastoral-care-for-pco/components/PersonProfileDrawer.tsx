@@ -2,6 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { Drawer } from './Drawer';
 import { firestore } from '../services/firestoreService';
 import { PcoPerson, RiskChangeRecord } from '../types';
+import { useTenantData } from '../contexts/TenantDataContext';
+import { Mail, Phone, Send, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+
+const API_BASE = '';
 
 interface PersonProfileDrawerProps {
   personId: string | null;
@@ -10,9 +14,61 @@ interface PersonProfileDrawerProps {
 }
 
 export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ personId, churchId, onClose }) => {
+  const { user, church } = useTenantData();
   const [person, setPerson] = useState<PcoPerson | null>(null);
   const [timeline, setTimeline] = useState<RiskChangeRecord[]>([]);
   const [loading, setLoading] = useState(false);
+  const [smsBody, setSmsBody] = useState('');
+  const [sendingSms, setSendingSms] = useState(false);
+  const [smsError, setSmsError] = useState('');
+  const [smsSuccess, setSmsSuccess] = useState(false);
+
+  useEffect(() => {
+    if (smsSuccess) {
+      const timer = setTimeout(() => setSmsSuccess(false), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [smsSuccess]);
+
+  const handleSendSms = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!person || !person.phone) return;
+    if (!smsBody.trim()) return;
+
+    setSendingSms(true);
+    setSmsError('');
+    setSmsSuccess(false);
+
+    try {
+      const cleanedPhone = person.phone.replace(/[^\d+]/g, '');
+      const res = await fetch(`${API_BASE}/api/messaging/send-individual`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          churchId,
+          toPhone: cleanedPhone,
+          body: smsBody.trim(),
+          sentBy: user?.id || null,
+          sentByName: user?.name || null,
+          personId: person.id,
+          personName: person.name,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || `Send failed (HTTP ${res.status})`);
+      }
+
+      setSmsSuccess(true);
+      setSmsBody('');
+    } catch (err: any) {
+      console.error('Failed to send SMS', err);
+      setSmsError(err.message || 'An error occurred while sending the message.');
+    } finally {
+      setSendingSms(false);
+    }
+  };
 
   useEffect(() => {
     if (!personId || !churchId) return;
@@ -78,6 +134,107 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
               View in PCO
             </a>
           </div>
+
+          {/* Contact Details */}
+          <div className="p-4 rounded-2xl border border-slate-100 bg-slate-50 space-y-3">
+            <h3 className="text-xs font-black uppercase text-slate-400 tracking-widest">Contact Information</h3>
+            <div className="space-y-2">
+              {/* Email */}
+              <div className="flex items-center gap-2 text-sm">
+                <Mail className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                {person.email ? (
+                  <a 
+                    href={`mailto:${person.email}`} 
+                    className="text-indigo-600 hover:underline break-all font-semibold"
+                  >
+                    {person.email}
+                  </a>
+                ) : (
+                  <span className="text-slate-400 italic">No email address</span>
+                )}
+              </div>
+              
+              {/* Phone */}
+              <div className="flex items-center gap-2 text-sm">
+                <Phone className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                {person.phone ? (
+                  <a 
+                    href={`tel:${person.phone}`} 
+                    className="text-indigo-600 hover:underline font-semibold"
+                  >
+                    {person.phone}
+                  </a>
+                ) : (
+                  <span className="text-slate-400 italic">No phone number</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Send SMS Section */}
+          {church?.smsSettings?.smsEnabled && (
+            <div className="p-4 rounded-2xl border border-slate-100 bg-slate-50 space-y-3">
+              <h3 className="text-xs font-black uppercase text-slate-400 tracking-widest">Send SMS Message</h3>
+              
+              {!person.phone ? (
+                <p className="text-xs text-slate-500 italic">SMS sending is unavailable because this person has no phone number.</p>
+              ) : (
+                <form onSubmit={handleSendSms} className="space-y-3">
+                  <div>
+                    <textarea
+                      value={smsBody}
+                      onChange={(e) => {
+                        setSmsBody(e.target.value);
+                        if (smsError) setSmsError('');
+                        if (smsSuccess) setSmsSuccess(false);
+                      }}
+                      placeholder={`Type a message to ${person.name}...`}
+                      rows={3}
+                      maxLength={1600}
+                      className="w-full text-sm rounded-xl border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 p-3 outline-none resize-none bg-white transition-colors"
+                      disabled={sendingSms}
+                    />
+                    <div className="flex justify-between items-center mt-1 text-[10px] text-slate-400 font-bold uppercase tracking-widest px-1">
+                      <span>{smsBody.length} characters</span>
+                      <span>{Math.ceil(smsBody.length / 160) || 0} segment{Math.ceil(smsBody.length / 160) !== 1 ? 's' : ''}</span>
+                    </div>
+                  </div>
+
+                  {smsError && (
+                    <div className="flex items-start gap-2 text-xs text-rose-600 bg-rose-50 border border-rose-100 rounded-xl p-3">
+                      <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                      <span>{smsError}</span>
+                    </div>
+                  )}
+
+                  {smsSuccess && (
+                    <div className="flex items-start gap-2 text-xs text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-xl p-3">
+                      <CheckCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                      <span>Message sent successfully!</span>
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={sendingSms || !smsBody.trim()}
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors text-xs cursor-pointer disabled:cursor-not-allowed"
+                  >
+                    {sendingSms ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4" />
+                        Send SMS
+                      </>
+                    )}
+                  </button>
+                </form>
+              )}
+            </div>
+          )}
 
           {/* Current Risk Status */}
           {person.riskProfile && (

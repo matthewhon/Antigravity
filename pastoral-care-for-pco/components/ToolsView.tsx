@@ -1612,11 +1612,13 @@ currentUserId?: string; currentUser?: User; onUpdateChurch?: (updates: Partial<C
 /** When provided by a parent route, controls which tab is shown and hides the internal tab bar */
 activePage?: 'website' | 'emails' | 'polls' | 'messaging' | 'unsubscribers' | 'qrcodes' | 'notes' | 'files';
 /** When activePage='messaging', this controls the active SMS sub-tab */
-smsTab?: 'campaigns' | 'inbox' | 'keywords' | 'analytics' | 'workflows' | 'agent';
+smsTab?: 'campaigns' | 'inbox' | 'keywords' | 'analytics' | 'workflows' | 'agent' | 'permissions';
 /** When provided, shows an "Open Mobile App" banner in the SMS tab */
 mobileSmsUrl?: string;
+activeNumberId?: string | null;
+onActiveNumberIdChange?: (id: string | null) => void;
 }> = ({ churchId, church, currentUserId,
-currentUser, onUpdateChurch, activePage, smsTab, mobileSmsUrl }) => {
+currentUser, onUpdateChurch, activePage, smsTab, mobileSmsUrl, activeNumberId, onActiveNumberIdChange }) => {
   const [activeTab, setActiveTab] = useState<'website' | 'emails' | 'polls' | 'unsubscribers' | 'messaging' | 'qrcodes' | 'notes' | 'files'>('emails');
   const effectiveTab = activePage ?? activeTab;
   const [campaigns, setCampaigns] = useState<EmailCampaign[]>([]);
@@ -2123,6 +2125,8 @@ currentUser, onUpdateChurch, activePage, smsTab, mobileSmsUrl }) => {
               currentUser={currentUser}
               onUpdateChurch={onUpdateChurch || (() => {})}
               controlledTab={smsTab}
+              activeNumberId={activeNumberId}
+              onActiveNumberIdChange={onActiveNumberIdChange}
             />
           </div>
         </div>

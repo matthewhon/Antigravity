@@ -425,7 +425,19 @@ export const releaseSpecificNumber = async (req: any, res: any) => {
 export const updateNumberSettings = async (req: any, res: any) => {
     res.set('Access-Control-Allow-Origin', '*');
 
-    const { churchId, smsNumberId, twilioNumberId, friendlyLabel, allowedUserIds, senderName } = req.body || {};
+    const {
+        churchId,
+        smsNumberId,
+        twilioNumberId,
+        friendlyLabel,
+        allowedUserIds,
+        senderName,
+        smsAgentEnabled,
+        executiveAiAgentEnabled,
+        executiveAiAgentKeyword,
+        executiveAiAgentListId,
+        executiveAiAgentListName
+    } = req.body || {};
     const numberId = smsNumberId || twilioNumberId;
     if (!churchId || !numberId) {
         return res.status(400).json({ error: 'Missing churchId or smsNumberId' });
@@ -446,9 +458,14 @@ export const updateNumberSettings = async (req: any, res: any) => {
         if (numSnap.data()?.churchId !== churchId) return res.status(403).json({ error: 'Forbidden' });
 
         const patch: Record<string, any> = { updatedAt: Date.now() };
-        if (friendlyLabel  !== undefined) patch.friendlyLabel  = friendlyLabel;
-        if (allowedUserIds !== undefined) patch.allowedUserIds = allowedUserIds;
-        if (senderName     !== undefined) patch.senderName     = senderName;
+        if (friendlyLabel             !== undefined) patch.friendlyLabel             = friendlyLabel;
+        if (allowedUserIds            !== undefined) patch.allowedUserIds            = allowedUserIds;
+        if (senderName                !== undefined) patch.senderName                = senderName;
+        if (smsAgentEnabled           !== undefined) patch.smsAgentEnabled           = smsAgentEnabled;
+        if (executiveAiAgentEnabled   !== undefined) patch.executiveAiAgentEnabled   = executiveAiAgentEnabled;
+        if (executiveAiAgentKeyword   !== undefined) patch.executiveAiAgentKeyword   = executiveAiAgentKeyword;
+        if (executiveAiAgentListId    !== undefined) patch.executiveAiAgentListId    = executiveAiAgentListId;
+        if (executiveAiAgentListName  !== undefined) patch.executiveAiAgentListName  = executiveAiAgentListName;
 
         await db.collection(col).doc(numberId).update(patch);
         log.info(`[updateNumberSettings] Updated ${numberId} for church ${churchId}`, 'system', { churchId, numberId, patch }, churchId);

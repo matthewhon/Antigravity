@@ -1297,6 +1297,12 @@ export interface SmsPhoneNumber {
      * Church Admins always bypass these restrictions.
      */
     permissions?: SmsNumberPermissions;
+
+    smsAgentEnabled?: boolean;
+    executiveAiAgentEnabled?: boolean;
+    executiveAiAgentKeyword?: string;
+    executiveAiAgentListId?: string;
+    executiveAiAgentListName?: string;
 }
 
 /**
@@ -1615,6 +1621,12 @@ export interface TwilioPhoneNumber {
     permissions?: SmsNumberPermissions;
     createdAt: number;
     updatedAt: number;
+
+    smsAgentEnabled?: boolean;
+    executiveAiAgentEnabled?: boolean;
+    executiveAiAgentKeyword?: string;
+    executiveAiAgentListId?: string;
+    executiveAiAgentListName?: string;
 }
 
 // --- Tenant File Storage (GCS) ---

@@ -36,6 +36,7 @@ import { ToolsView } from './components/ToolsView';
 import { SmsWorkflowsManager } from './components/MessagingModule';
 import MobileSmsLayout from './components/MobileSmsLayout';
 import { PersonProfileDrawer } from './components/PersonProfileDrawer';
+import { useTwilioNumbers, canUserSeeNumber, canUserUseFeature } from './hooks/useTwilioNumbers';
 import { 
   User, Church, PeopleDashboardData, GivingAnalytics, GroupsDashboardData, 
   ServicesDashboardData, AttendanceData, CensusStats, BudgetRecord, PcoFund, 
@@ -146,6 +147,46 @@ const App: React.FC = () => {
   
   // Global drawer state
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
+
+  // Twilio Active Number and permissions state
+  const [smsActiveNumberId, setSmsActiveNumberId] = useState<string | null>(null);
+  const { numbers: twilioNumbers } = useTwilioNumbers(church?.id || '');
+
+  const visibleNumbers = useMemo(() => {
+    if (!user) return [];
+    return twilioNumbers.filter(n => canUserSeeNumber(n, user));
+  }, [twilioNumbers, user]);
+
+  const activeNumber = useMemo(() => {
+    return visibleNumbers.find(n => n.id === smsActiveNumberId) ?? 
+           visibleNumbers.find(n => n.isDefault) ?? 
+           visibleNumbers[0] ?? null;
+  }, [visibleNumbers, smsActiveNumberId]);
+
+  useEffect(() => {
+    if (!smsActiveNumberId && activeNumber) {
+      setSmsActiveNumberId(activeNumber.id);
+    }
+  }, [activeNumber, smsActiveNumberId]);
+
+  // Redirect guard for unauthorized SMS deep links/refreshes
+  useEffect(() => {
+    if (!user) return;
+    const path = location.pathname;
+    if (path.startsWith('/tools/sms/')) {
+      if (activeNumber) {
+        if (path.startsWith('/tools/sms/campaigns') && !canUserUseFeature(activeNumber, user, 'broadcastUserIds')) {
+          navigate('/tools/sms/inbox', { replace: true });
+        } else if (path.startsWith('/tools/sms/keywords') && !canUserUseFeature(activeNumber, user, 'keywordsUserIds')) {
+          navigate('/tools/sms/inbox', { replace: true });
+        } else if (path.startsWith('/tools/sms/analytics') && !canUserUseFeature(activeNumber, user, 'analyticsUserIds')) {
+          navigate('/tools/sms/inbox', { replace: true });
+        } else if (path.startsWith('/tools/sms/agent') && !canUserUseFeature(activeNumber, user, 'aiAgentUserIds')) {
+          navigate('/tools/sms/inbox', { replace: true });
+        }
+      }
+    }
+  }, [location.pathname, user, activeNumber, navigate]);
 
   // Refs
   const processedCodeRef = useRef<string | null>(null);
@@ -824,11 +865,11 @@ const App: React.FC = () => {
                 noPadding={view.startsWith('tools')}
                 subNavItems={view.startsWith('tools-sms') ? [
                     { label: 'Inbox',     view: 'tools-sms-inbox',     icon: <span className="text-sm">📥</span> },
-                    { label: 'Broadcast', view: 'tools-sms-campaigns', icon: <span className="text-sm">📨</span> },
-                    { label: 'Keywords',  view: 'tools-sms-keywords',  icon: <span className="text-sm">🔑</span> },
-                    { label: 'Analytics', view: 'tools-sms-analytics', icon: <span className="text-sm">📊</span> },
-                    { label: 'AI Agent',  view: 'tools-sms-agent',     icon: <span className="text-sm">✨</span> },
-                    (user.roles.includes('Church Admin') || user.roles.includes('System Administration')) ? { label: 'Permissions', view: 'tools-sms-permissions', icon: <span className="text-sm">🛡️</span> } : null
+                    (user && canUserUseFeature(activeNumber, user, 'broadcastUserIds')) ? { label: 'Broadcast', view: 'tools-sms-campaigns', icon: <span className="text-sm">📨</span> } : null,
+                    (user && canUserUseFeature(activeNumber, user, 'keywordsUserIds')) ? { label: 'Keywords',  view: 'tools-sms-keywords',  icon: <span className="text-sm">🔑</span> } : null,
+                    (user && canUserUseFeature(activeNumber, user, 'analyticsUserIds')) ? { label: 'Analytics', view: 'tools-sms-analytics', icon: <span className="text-sm">📊</span> } : null,
+                    (user && canUserUseFeature(activeNumber, user, 'aiAgentUserIds')) ? { label: 'AI Agent',  view: 'tools-sms-agent',     icon: <span className="text-sm">✨</span> } : null,
+                    (user && (user.roles.includes('Church Admin') || user.roles.includes('System Administration'))) ? { label: 'Permissions', view: 'tools-sms-permissions', icon: <span className="text-sm">🛡️</span> } : null
                 ].filter(Boolean) as any : undefined}
             >
             <Routes>
@@ -971,6 +1012,8 @@ const App: React.FC = () => {
                             view === 'tools-sms-agent'     ? 'agent'     : 'inbox'
                         }
                         mobileSmsUrl={`${window.location.protocol}//${window.location.host}/mobile/sms`}
+                        activeNumberId={smsActiveNumberId}
+                        onActiveNumberIdChange={setSmsActiveNumberId}
                     /> 
                 } />
                 <Route path="/ai-assistant" element={
@@ -998,17 +1041,16 @@ const App: React.FC = () => {
                 {/* Fallback route */}
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
+            {/* Global Profile Drawer Overlay */}
+            {selectedPersonId && church && (
+                <PersonProfileDrawer 
+                    personId={selectedPersonId}
+                    churchId={church.id}
+                    onClose={() => setSelectedPersonId(null)}
+                />
+            )}
             </Layout>
         </TenantDataProvider>
-
-    {/* Global Profile Drawer Overlay */}
-    {selectedPersonId && church && (
-        <PersonProfileDrawer 
-            personId={selectedPersonId}
-            churchId={church.id}
-            onClose={() => setSelectedPersonId(null)}
-        />
-    )}
     </>
   );
 };
