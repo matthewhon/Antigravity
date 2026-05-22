@@ -1807,12 +1807,13 @@ const SmsInbox: React.FC<{
     churchId: string;
     currentUser: User;
     church: Church;
+    activeNumber?: TwilioPhoneNumber | null;
     /** If provided, only shows conversations for this TwilioPhoneNumber doc */
     twilioNumberId?: string | null;
     isDefaultNumber?: boolean;
     allowedNumberIds?: string[];
     defaultNumberId?: string | null;
-}> = ({ churchId, currentUser, church, twilioNumberId, isDefaultNumber, allowedNumberIds = [], defaultNumberId = null }) => {
+}> = ({ churchId, currentUser, church, activeNumber, twilioNumberId, isDefaultNumber, allowedNumberIds = [], defaultNumberId = null }) => {
     const [conversations, setConversations] = useState<SmsConversation[]>([]);
     const [activeConv, setActiveConv] = useState<SmsConversation | null>(null);
     const [messages, setMessages] = useState<SmsMessage[]>([]);
@@ -1836,6 +1837,7 @@ const SmsInbox: React.FC<{
     const [aiSuggestions, setAiSuggestions] = useState<SmsAiSuggestion[]>([]);
     const [aiGenerating, setAiGenerating] = useState(false);
     const smsAgentEnabled = !!(church.smsSettings?.smsAgentEnabled);
+    const userCanUseAiAgent = canUserUseFeature(activeNumber, currentUser, 'aiAgentUserIds');
 
     // Toast
     const [inboxToast, setInboxToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
@@ -1869,21 +1871,18 @@ const SmsInbox: React.FC<{
         );
         const unsub = onSnapshot(baseQ, snap => {
             const all = snap.docs.map(d => ({ id: d.id, ...d.data() } as SmsConversation));
-            const isAdmin = currentUser.roles?.includes('Church Admin') || currentUser.roles?.includes('System Administration');
 
             const filtered = all.filter(c => {
                 const convNumberId = (c as any).smsNumberId || (c as any).inboxId || c.twilioNumberId || null;
 
-                // For non-admins, enforce number-level visibility permissions
-                if (!isAdmin) {
-                    const userHasAccessToNumber = (() => {
-                        if (!convNumberId) {
-                            return defaultNumberId ? (allowedNumberIds || []).includes(defaultNumberId) : false;
-                        }
-                        return (allowedNumberIds || []).includes(convNumberId);
-                    })();
-                    if (!userHasAccessToNumber) return false;
-                }
+                // Enforce number-level visibility permissions for all users
+                const userHasAccessToNumber = (() => {
+                    if (!convNumberId) {
+                        return defaultNumberId ? (allowedNumberIds || []).includes(defaultNumberId) : false;
+                    }
+                    return (allowedNumberIds || []).includes(convNumberId);
+                })();
+                if (!userHasAccessToNumber) return false;
 
                 // If specific active number is selected, filter by it
                 if (twilioNumberId) {
@@ -2423,7 +2422,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                     {/* Reply box */}
                     <div className="shrink-0 p-4 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
                         {/* AI Suggested Replies panel */}
-                        {smsAgentEnabled && !activeConv.isOptedOut && aiSuggestions.length > 0 && (
+                        {smsAgentEnabled && userCanUseAiAgent && !activeConv.isOptedOut && aiSuggestions.length > 0 && (
                             <div className="mb-3 space-y-2">
                                 <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-violet-500">
                                     <Sparkles size={10} /> AI Suggested Replies
@@ -2519,18 +2518,20 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                     onChange={handleReplyFileChange}
                                 />
                                 <div className="flex items-end gap-2">
-                                    {/* AI suggest button ... always visible in inbox */}
-                                    <button
-                                        onClick={handleAiSuggest}
-                                        disabled={aiGenerating}
-                                        title="AI: Suggest a reply based on this conversation"
-                                        className="flex items-center gap-1.5 px-3 h-10 shrink-0 rounded-xl bg-violet-50 hover:bg-violet-100 dark:bg-violet-900/30 dark:hover:bg-violet-900/50 text-violet-600 dark:text-violet-400 border border-violet-200 dark:border-violet-700 transition disabled:opacity-50 text-[11px] font-bold whitespace-nowrap"
-                                    >
-                                        {aiGenerating
-                                            ? <Loader2 size={14} className="animate-spin" />
-                                            : <Sparkles size={14} />}
-                                        <span>{aiGenerating ? 'Thinking...' : 'Suggest'}</span>
-                                    </button>
+                                    {/* AI suggest button ... visible only when permitted */}
+                                    {userCanUseAiAgent && (
+                                        <button
+                                            onClick={handleAiSuggest}
+                                            disabled={aiGenerating}
+                                            title="AI: Suggest a reply based on this conversation"
+                                            className="flex items-center gap-1.5 px-3 h-10 shrink-0 rounded-xl bg-violet-50 hover:bg-violet-100 dark:bg-violet-900/30 dark:hover:bg-violet-900/50 text-violet-600 dark:text-violet-400 border border-violet-200 dark:border-violet-700 transition disabled:opacity-50 text-[11px] font-bold whitespace-nowrap"
+                                        >
+                                            {aiGenerating
+                                                ? <Loader2 size={14} className="animate-spin" />
+                                                : <Sparkles size={14} />}
+                                            <span>{aiGenerating ? 'Thinking...' : 'Suggest'}</span>
+                                        </button>
+                                    )}
                                     <textarea
                                         rows={2}
                                         value={replyBody}
@@ -2566,7 +2567,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                 {/* AI shorten + char counter + MMS badge */}
                                 <div className="flex items-center justify-between px-1">
                                     <div className="flex items-center gap-2">
-                                        {replyBody.trim() && (
+                                        {userCanUseAiAgent && replyBody.trim() && (
                                             <button
                                                 onClick={handleAiShorten}
                                                 disabled={aiGenerating || replyBody.length <= 160}
@@ -8608,86 +8609,115 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                 {/* Campaigns tab */}
                 {effectiveTab === 'campaigns' && !activeCampaign && (
                     <div className="h-full overflow-y-auto">
-                        <CampaignList
-                            campaigns={filteredCampaigns}
-                            isLoading={isLoading}
-                            onOpen={c => setActiveCampaign(c)}
-                            onDelete={handleDelete}
-                            onDuplicate={handleDuplicate}
-                            onCreate={handleCreate}
-                        />
+                        {!canUserUseFeature(activeNumber, currentUser, 'broadcastUserIds') ? (
+                            <div className="flex flex-col items-center justify-center h-full p-8 text-center text-slate-500">Access Restricted</div>
+                        ) : (
+                            <CampaignList
+                                campaigns={filteredCampaigns}
+                                isLoading={isLoading}
+                                onOpen={c => setActiveCampaign(c)}
+                                onDelete={handleDelete}
+                                onDuplicate={handleDuplicate}
+                                onCreate={handleCreate}
+                            />
+                        )}
                     </div>
                 )}
 
                 {effectiveTab === 'campaigns' && activeCampaign && (
                     <div className="h-full">
-                        <CampaignComposer
-                            campaign={activeCampaign}
-                            churchId={churchId}
-                            currentUser={currentUser}
-                            church={church}
-                            apiBase={API_BASE}
-                            onBack={() => setActiveCampaign(null)}
-                            onSave={handleSave}
-                            onSend={handleSendNow}
-                            onSchedule={handleSchedule}
-                            onCancelSchedule={handleCancelSchedule}
-                            isSending={isSending}
-                        />
+                        {!canUserUseFeature(activeNumber, currentUser, 'broadcastUserIds') ? (
+                            <div className="flex flex-col items-center justify-center h-full p-8 text-center text-slate-500">Access Restricted</div>
+                        ) : (
+                            <CampaignComposer
+                                campaign={activeCampaign}
+                                churchId={churchId}
+                                currentUser={currentUser}
+                                church={church}
+                                apiBase={API_BASE}
+                                onBack={() => setActiveCampaign(null)}
+                                onSave={handleSave}
+                                onSend={handleSendNow}
+                                onSchedule={handleSchedule}
+                                onCancelSchedule={handleCancelSchedule}
+                                isSending={isSending}
+                            />
+                        )}
                     </div>
                 )}
 
                 {/* Inbox tab */}
                 {effectiveTab === 'inbox' && (
                     <div className="h-full flex flex-col min-h-0">
-                        <SmsInbox
-                            churchId={churchId}
-                            currentUser={currentUser}
-                            church={church}
-                            twilioNumberId={activeNumberId}
-                            isDefaultNumber={activeNumber?.isDefault ?? false}
-                            allowedNumberIds={visibleNumbers.map(n => n.id)}
-                            defaultNumberId={twilioNumbers.find(n => n.isDefault)?.id}
-                        />
+                        {!canUserUseFeature(activeNumber, currentUser, 'inboxUserIds') ? (
+                            <div className="flex flex-col items-center justify-center h-full p-8 text-center text-slate-500">Access Restricted</div>
+                        ) : (
+                            <SmsInbox
+                                churchId={churchId}
+                                currentUser={currentUser}
+                                church={church}
+                                activeNumber={activeNumber}
+                                twilioNumberId={activeNumberId}
+                                isDefaultNumber={activeNumber?.isDefault ?? false}
+                                allowedNumberIds={visibleNumbers.map(n => n.id)}
+                                defaultNumberId={twilioNumbers.find(n => n.isDefault)?.id}
+                            />
+                        )}
                     </div>
                 )}
 
                 {/* Keywords tab */}
                 {effectiveTab === 'keywords' && (
                     <div className="h-full overflow-y-auto">
-                        <SmsKeywordsManager
-                            churchId={churchId}
-                            church={church}
-                            currentUser={currentUser}
-                            twilioNumberId={activeNumberId}
-                            onUpdateChurch={onUpdateChurch}
-                        />
+                        {!canUserUseFeature(activeNumber, currentUser, 'keywordsUserIds') ? (
+                            <div className="flex flex-col items-center justify-center h-full p-8 text-center text-slate-500">Access Restricted</div>
+                        ) : (
+                            <SmsKeywordsManager
+                                churchId={churchId}
+                                church={church}
+                                currentUser={currentUser}
+                                twilioNumberId={activeNumberId}
+                                onUpdateChurch={onUpdateChurch}
+                            />
+                        )}
                     </div>
                 )}
 
                 {/* Workflows tab */}
                 {effectiveTab === 'workflows' && (
                     <div className="h-full overflow-y-auto">
-                        <SmsWorkflowsManager churchId={churchId} />
+                        {!canUserUseFeature(activeNumber, currentUser, 'broadcastUserIds') ? (
+                            <div className="flex flex-col items-center justify-center h-full p-8 text-center text-slate-500">Access Restricted</div>
+                        ) : (
+                            <SmsWorkflowsManager churchId={churchId} />
+                        )}
                     </div>
                 )}
 
                 {/* Analytics tab */}
                 {effectiveTab === 'analytics' && (
                     <div className="h-full overflow-y-auto">
-                        <SmsAnalytics churchId={churchId} campaigns={filteredCampaigns} smsNumberId={activeNumberId} />
+                        {!canUserUseFeature(activeNumber, currentUser, 'analyticsUserIds') ? (
+                            <div className="flex flex-col items-center justify-center h-full p-8 text-center text-slate-500">Access Restricted</div>
+                        ) : (
+                            <SmsAnalytics churchId={churchId} campaigns={filteredCampaigns} smsNumberId={activeNumberId} />
+                        )}
                     </div>
                 )}
 
                 {/* AI Agent tab */}
                 {effectiveTab === 'agent' && (
                     <div className="h-full overflow-y-auto">
-                        <SmsAgentTab
-                            churchId={churchId}
-                            church={church}
-                            currentUser={currentUser}
-                            onUpdateChurch={onUpdateChurch}
-                        />
+                        {!canUserUseFeature(activeNumber, currentUser, 'aiAgentUserIds') ? (
+                            <div className="flex flex-col items-center justify-center h-full p-8 text-center text-slate-500">Access Restricted</div>
+                        ) : (
+                            <SmsAgentTab
+                                churchId={churchId}
+                                church={church}
+                                currentUser={currentUser}
+                                onUpdateChurch={onUpdateChurch}
+                            />
+                        )}
                     </div>
                 )}
 
