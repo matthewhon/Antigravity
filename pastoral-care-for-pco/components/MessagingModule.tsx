@@ -7323,13 +7323,11 @@ function useTwilioNumbers(churchId: string) {
 
 /** Returns true if the current user is allowed to see/use a given number. */
 function canUserSeeNumber(num: TwilioPhoneNumber, user: User): boolean {
-    if (user.roles?.includes('Church Admin') || user.roles?.includes('System Administration')) return true;
     return !num.allowedUserIds || num.allowedUserIds.length === 0 || num.allowedUserIds.includes(user.id);
 }
 
 function canUserUseFeature(num: TwilioPhoneNumber | null | undefined, user: User, featureKey: keyof NonNullable<TwilioPhoneNumber['permissions']>): boolean {
     if (!num) return false;
-    if (user.roles?.includes('Church Admin') || user.roles?.includes('System Administration')) return true;
     if (num.allowedUserIds && num.allowedUserIds.length > 0 && !num.allowedUserIds.includes(user.id)) return false;
     const featureIds = num.permissions?.[featureKey] || [];
     return featureIds.length === 0 || featureIds.includes(user.id);
@@ -7539,9 +7537,10 @@ const NumberManager: React.FC<{
                                                         type="button"
                                                         onClick={() => setUsersDraft(prev => {
                                                             const cleaned = (prev || []).filter((id: string) => id !== '_none_');
-                                                            return cleaned.includes(u.id)
+                                                            const next = cleaned.includes(u.id)
                                                                 ? cleaned.filter((id: string) => id !== u.id)
                                                                 : [...cleaned, u.id];
+                                                            return next.length === 0 ? ['_none_'] : next;
                                                         })}
                                                         className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition ${selected ? 'bg-violet-600 text-white' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 hover:border-violet-400'}`}
                                                     >

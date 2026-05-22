@@ -3422,8 +3422,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                     let next: string[];
                                                     if (current.length === 0) {
                                                         // It was unrestricted. Restrict to all eligible users except this one.
-                                                        const nonAdmins = users.filter((u: any) => !u.roles?.includes('Church Admin'));
-                                                        next = nonAdmins.map(u => u.id).filter(id => id !== userId);
+                                                        next = users.map((u: any) => u.id).filter(id => id !== userId);
                                                         if (next.length === 0) {
                                                             next = ['_none_'];
                                                         }
@@ -3626,7 +3625,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                                          </div>
                                                                      </div>
                                                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                                                         {users.filter((u: any) => !u.roles?.includes('Church Admin')).map((u: any) => {
+                                                                         {users.map((u: any) => {
                                                                              const isActuallyRestricted = (num.allowedUserIds || []).length > 0;
                                                                              const isChecked = !isActuallyRestricted || (num.allowedUserIds || []).includes(u.id);
                                                                              return (
@@ -3646,11 +3645,11 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                                                  </label>
                                                                              );
                                                                          })}
-                                                                         {users.filter((u: any) => !u.roles?.includes('Church Admin')).length === 0 && (
-                                                                             <p className="text-[10px] text-slate-400 col-span-2">No non-admin users found.</p>
+                                                                         {users.length === 0 && (
+                                                                             <p className="text-[10px] text-slate-400 col-span-2">No users found.</p>
                                                                          )}
                                                                      </div>
-                                                                     <p className="text-[9px] text-slate-400 mt-2">Church Admins always have full access regardless of this setting.</p>
+                                                                     <p className="text-[9px] text-slate-400 mt-2">Restrict visibility for any user by unchecking them above.</p>
                                                                  </div>
  
                                                                  {/* Section 2: Feature-level permissions */}

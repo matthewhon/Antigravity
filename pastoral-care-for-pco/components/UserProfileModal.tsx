@@ -57,6 +57,12 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ user, church, onClo
 
       await Promise.all(updates);
 
+      // Force reload the user and refresh the ID token so the new email is reflected in the JWT claims for Firestore rules
+      if (isEmailChanged) {
+        await currentUser.reload();
+        await currentUser.getIdToken(true);
+      }
+
       // 2. Firestore Update
       if (name !== user.name || isEmailChanged) {
         await firestore.createUserProfile({ 
