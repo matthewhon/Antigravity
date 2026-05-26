@@ -247,10 +247,11 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
     });
 
     useEffect(() => {
+        if (numbersLoading) return;
         if (visibleTabs.length > 0 && !visibleTabs.some(t => t.id === activeTab)) {
             setActiveTab(visibleTabs[0].id);
         }
-    }, [activeNumber, activeTab, currentUser, isTablet, visibleTabs]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [activeNumber, activeTab, currentUser, isTablet, visibleTabs, numbersLoading]); // eslint-disable-line react-hooks/exhaustive-deps
 
 
 
