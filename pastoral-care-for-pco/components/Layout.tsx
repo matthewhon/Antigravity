@@ -1,5 +1,5 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Church, User } from '../types';
 import UserProfileModal from './UserProfileModal';
 import { AppLogo } from './AppLogo';
@@ -59,6 +59,50 @@ const Layout: React.FC<LayoutProps> = ({
   const [toolsOpen, setToolsOpen] = useState(false);
   const toolsRef = useRef<HTMLDivElement>(null);
 
+  // -- Nav scrollbar state --
+  const navRef = useRef<HTMLDivElement>(null);
+  const [showLeftScroll, setShowLeftScroll] = useState(false);
+  const [showRightScroll, setShowRightScroll] = useState(false);
+
+  const checkScroll = useCallback(() => {
+    const el = navRef.current;
+    if (!el) return;
+    setShowLeftScroll(el.scrollLeft > 5);
+    setShowRightScroll(el.scrollLeft < el.scrollWidth - el.clientWidth - 5);
+  }, []);
+
+  useEffect(() => {
+    const el = navRef.current;
+    if (!el) return;
+    checkScroll();
+    el.addEventListener('scroll', checkScroll);
+    window.addEventListener('resize', checkScroll);
+    const timer = setTimeout(checkScroll, 500);
+    return () => {
+      el.removeEventListener('scroll', checkScroll);
+      window.removeEventListener('resize', checkScroll);
+      clearTimeout(timer);
+    };
+  }, [checkScroll]);
+
+  const handleNavButtonClick = (e: React.MouseEvent, view: string, isOpen: boolean, setter: (v: boolean) => void) => {
+    const isTouchOrKeyboard = e.detail === 0 || ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+    if (isTouchOrKeyboard && !isOpen) {
+      e.preventDefault();
+      setPeopleOpen(false);
+      setGroupsOpen(false);
+      setServicesOpen(false);
+      setGivingOpen(false);
+      setCareOpen(false);
+      setMetricsOpen(false);
+      setToolsOpen(false);
+      setter(true);
+    } else {
+      onNavigate(view);
+      setter(false);
+    }
+  };
+
   // ── Close-delay timers ──────────────────────────────────────────────────────
   // The dropdown panels are fixed-position with an 8px gap below the trigger.
   // Without a delay, moving the mouse from the button across that gap fires
@@ -102,7 +146,23 @@ const Layout: React.FC<LayoutProps> = ({
             </div>
 
             {/* Main Navigation - Horizontal Scrollable */}
-            <nav className="flex-1 flex items-center gap-1.5 overflow-x-auto no-scrollbar mask-linear-fade px-2">
+            <div className="relative flex-1 min-w-0">
+              {/* Left scroll shadow/gradient indicator */}
+              <div 
+                className={`absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-slate-900 dark:from-black to-transparent pointer-events-none z-10 transition-opacity duration-300 ${
+                  showLeftScroll ? 'opacity-100' : 'opacity-0'
+                }`} 
+              />
+              {/* Right scroll shadow/gradient indicator */}
+              <div 
+                className={`absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-slate-900 dark:from-black to-transparent pointer-events-none z-10 transition-opacity duration-300 ${
+                  showRightScroll ? 'opacity-100' : 'opacity-0'
+                }`} 
+              />
+              <nav 
+                ref={navRef}
+                className="flex-1 flex items-center gap-1.5 overflow-x-auto no-scrollbar mask-linear-fade px-2"
+              >
                 
                 {hasPermission('dashboard') && (
                   <NavItem 
@@ -129,9 +189,11 @@ const Layout: React.FC<LayoutProps> = ({
                     className="relative shrink-0"
                     onMouseEnter={() => { cancelClose('people'); setPeopleOpen(true); }}
                     onMouseLeave={() => scheduleClose('people', setPeopleOpen)}
+                    onFocus={() => { cancelClose('people'); setPeopleOpen(true); }}
+                    onBlur={() => scheduleClose('people', setPeopleOpen)}
                   >
                     <button
-                      onClick={() => onNavigate('people')}
+                      onClick={(e) => handleNavButtonClick(e, 'people', peopleOpen, setPeopleOpen)}
                       className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all border ${
                         currentView.startsWith('people')
                           ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 ring-1 ring-indigo-500 border-transparent'
@@ -153,9 +215,11 @@ const Layout: React.FC<LayoutProps> = ({
                     className="relative shrink-0"
                     onMouseEnter={() => { cancelClose('groups'); setGroupsOpen(true); }}
                     onMouseLeave={() => scheduleClose('groups', setGroupsOpen)}
+                    onFocus={() => { cancelClose('groups'); setGroupsOpen(true); }}
+                    onBlur={() => scheduleClose('groups', setGroupsOpen)}
                   >
                     <button
-                      onClick={() => onNavigate('groups')}
+                      onClick={(e) => handleNavButtonClick(e, 'groups', groupsOpen, setGroupsOpen)}
                       className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all border ${
                         currentView.startsWith('groups')
                           ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 ring-1 ring-indigo-500 border-transparent'
@@ -175,9 +239,11 @@ const Layout: React.FC<LayoutProps> = ({
                     className="relative shrink-0"
                     onMouseEnter={() => { cancelClose('services'); setServicesOpen(true); }}
                     onMouseLeave={() => scheduleClose('services', setServicesOpen)}
+                    onFocus={() => { cancelClose('services'); setServicesOpen(true); }}
+                    onBlur={() => scheduleClose('services', setServicesOpen)}
                   >
                     <button
-                      onClick={() => onNavigate('services')}
+                      onClick={(e) => handleNavButtonClick(e, 'services', servicesOpen, setServicesOpen)}
                       className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all border ${
                         currentView.startsWith('services')
                           ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 ring-1 ring-indigo-500 border-transparent'
@@ -197,9 +263,11 @@ const Layout: React.FC<LayoutProps> = ({
                     className="relative shrink-0"
                     onMouseEnter={() => { cancelClose('giving'); setGivingOpen(true); }}
                     onMouseLeave={() => scheduleClose('giving', setGivingOpen)}
+                    onFocus={() => { cancelClose('giving'); setGivingOpen(true); }}
+                    onBlur={() => scheduleClose('giving', setGivingOpen)}
                   >
                     <button
-                      onClick={() => onNavigate('giving')}
+                      onClick={(e) => handleNavButtonClick(e, 'giving', givingOpen, setGivingOpen)}
                       className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all border ${
                         currentView.startsWith('giving')
                           ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 ring-1 ring-indigo-500 border-transparent'
@@ -219,9 +287,11 @@ const Layout: React.FC<LayoutProps> = ({
                     className="relative shrink-0"
                     onMouseEnter={() => { cancelClose('care'); setCareOpen(true); }}
                     onMouseLeave={() => scheduleClose('care', setCareOpen)}
+                    onFocus={() => { cancelClose('care'); setCareOpen(true); }}
+                    onBlur={() => scheduleClose('care', setCareOpen)}
                   >
                     <button
-                      onClick={() => onNavigate('pastoral')}
+                      onClick={(e) => handleNavButtonClick(e, 'pastoral', careOpen, setCareOpen)}
                       className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all border ${
                         currentView.startsWith('pastoral')
                           ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 ring-1 ring-indigo-500 border-transparent'
@@ -241,9 +311,11 @@ const Layout: React.FC<LayoutProps> = ({
                     className="relative shrink-0"
                     onMouseEnter={() => { cancelClose('metrics'); setMetricsOpen(true); }}
                     onMouseLeave={() => scheduleClose('metrics', setMetricsOpen)}
+                    onFocus={() => { cancelClose('metrics'); setMetricsOpen(true); }}
+                    onBlur={() => scheduleClose('metrics', setMetricsOpen)}
                   >
                     <button
-                      onClick={() => onNavigate('metrics')}
+                      onClick={(e) => handleNavButtonClick(e, 'metrics', metricsOpen, setMetricsOpen)}
                       className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all border ${
                         currentView.startsWith('metrics')
                           ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 ring-1 ring-indigo-500 border-transparent'
@@ -260,9 +332,11 @@ const Layout: React.FC<LayoutProps> = ({
                 {/* Metrics dropdown — rendered via fixed position to escape overflow-x-auto clipping */}
                 {metricsOpen && hasPermission('metrics') && (
                   <div
-                    className="nav-dropdown-panel" ref={el => el && Object.assign(el.style, getDropdownStyle(metricsRef))}
+                    className="nav-dropdown-panel animate-in fade-in slide-in-from-top-2 duration-150 ease-out" ref={el => el && Object.assign(el.style, getDropdownStyle(metricsRef))}
                     onMouseEnter={() => { cancelClose('metrics'); setMetricsOpen(true); }}
                     onMouseLeave={() => scheduleClose('metrics', setMetricsOpen)}
+                    onFocus={() => { cancelClose('metrics'); setMetricsOpen(true); }}
+                    onBlur={() => scheduleClose('metrics', setMetricsOpen)}
                   >
                     <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl shadow-black/40 p-2 flex flex-col gap-1 min-w-[180px]">
                       {[
@@ -290,9 +364,11 @@ const Layout: React.FC<LayoutProps> = ({
                 {/* Care dropdown — fixed position to escape overflow-x-auto clipping */}
                 {careOpen && hasPermission('pastoral') && (
                   <div
-                    className="nav-dropdown-panel" ref={el => el && Object.assign(el.style, getDropdownStyle(careRef))}
+                    className="nav-dropdown-panel animate-in fade-in slide-in-from-top-2 duration-150 ease-out" ref={el => el && Object.assign(el.style, getDropdownStyle(careRef))}
                     onMouseEnter={() => { cancelClose('care'); setCareOpen(true); }}
                     onMouseLeave={() => scheduleClose('care', setCareOpen)}
+                    onFocus={() => { cancelClose('care'); setCareOpen(true); }}
+                    onBlur={() => scheduleClose('care', setCareOpen)}
                   >
                     <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl shadow-black/40 p-2 flex flex-col gap-1 min-w-[180px]">
                       {[
@@ -322,9 +398,11 @@ const Layout: React.FC<LayoutProps> = ({
                 {/* People dropdown */}
                 {peopleOpen && hasPermission('people') && (
                   <div
-                    className="nav-dropdown-panel" ref={el => el && Object.assign(el.style, getDropdownStyle(peopleRef))}
+                    className="nav-dropdown-panel animate-in fade-in slide-in-from-top-2 duration-150 ease-out" ref={el => el && Object.assign(el.style, getDropdownStyle(peopleRef))}
                     onMouseEnter={() => { cancelClose('people'); setPeopleOpen(true); }}
                     onMouseLeave={() => scheduleClose('people', setPeopleOpen)}
+                    onFocus={() => { cancelClose('people'); setPeopleOpen(true); }}
+                    onBlur={() => scheduleClose('people', setPeopleOpen)}
                   >
                     <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl shadow-black/40 p-2 flex flex-col gap-1 min-w-[180px]">
                       {[
@@ -353,9 +431,11 @@ const Layout: React.FC<LayoutProps> = ({
                 {/* Groups dropdown */}
                 {groupsOpen && hasPermission('groups') && (
                   <div
-                    className="nav-dropdown-panel" ref={el => el && Object.assign(el.style, getDropdownStyle(groupsRef))}
+                    className="nav-dropdown-panel animate-in fade-in slide-in-from-top-2 duration-150 ease-out" ref={el => el && Object.assign(el.style, getDropdownStyle(groupsRef))}
                     onMouseEnter={() => { cancelClose('groups'); setGroupsOpen(true); }}
                     onMouseLeave={() => scheduleClose('groups', setGroupsOpen)}
+                    onFocus={() => { cancelClose('groups'); setGroupsOpen(true); }}
+                    onBlur={() => scheduleClose('groups', setGroupsOpen)}
                   >
                     <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl shadow-black/40 p-2 flex flex-col gap-1 min-w-[180px]">
                       {[
@@ -382,9 +462,11 @@ const Layout: React.FC<LayoutProps> = ({
                 {/* Services dropdown */}
                 {servicesOpen && hasPermission('services') && (
                   <div
-                    className="nav-dropdown-panel" ref={el => el && Object.assign(el.style, getDropdownStyle(servicesRef))}
+                    className="nav-dropdown-panel animate-in fade-in slide-in-from-top-2 duration-150 ease-out" ref={el => el && Object.assign(el.style, getDropdownStyle(servicesRef))}
                     onMouseEnter={() => { cancelClose('services'); setServicesOpen(true); }}
                     onMouseLeave={() => scheduleClose('services', setServicesOpen)}
+                    onFocus={() => { cancelClose('services'); setServicesOpen(true); }}
+                    onBlur={() => scheduleClose('services', setServicesOpen)}
                   >
                     <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl shadow-black/40 p-2 flex flex-col gap-1 min-w-[180px]">
                       {[
@@ -413,9 +495,11 @@ const Layout: React.FC<LayoutProps> = ({
                 {/* Giving dropdown */}
                 {givingOpen && hasPermission('giving') && (
                   <div
-                    className="nav-dropdown-panel" ref={el => el && Object.assign(el.style, getDropdownStyle(givingRef))}
+                    className="nav-dropdown-panel animate-in fade-in slide-in-from-top-2 duration-150 ease-out" ref={el => el && Object.assign(el.style, getDropdownStyle(givingRef))}
                     onMouseEnter={() => { cancelClose('giving'); setGivingOpen(true); }}
                     onMouseLeave={() => scheduleClose('giving', setGivingOpen)}
+                    onFocus={() => { cancelClose('giving'); setGivingOpen(true); }}
+                    onBlur={() => scheduleClose('giving', setGivingOpen)}
                   >
                     <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl shadow-black/40 p-2 flex flex-col gap-1 min-w-[180px]">
                       {[
@@ -448,9 +532,11 @@ const Layout: React.FC<LayoutProps> = ({
                     className="relative shrink-0"
                     onMouseEnter={() => { cancelClose('tools'); setToolsOpen(true); }}
                     onMouseLeave={() => scheduleClose('tools', setToolsOpen)}
+                    onFocus={() => { cancelClose('tools'); setToolsOpen(true); }}
+                    onBlur={() => scheduleClose('tools', setToolsOpen)}
                   >
                     <button
-                      onClick={() => onNavigate('tools')}
+                      onClick={(e) => handleNavButtonClick(e, 'tools', toolsOpen, setToolsOpen)}
                       className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all border ${
                         currentView.startsWith('tools')
                           ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 ring-1 ring-indigo-500 border-transparent'
@@ -467,9 +553,11 @@ const Layout: React.FC<LayoutProps> = ({
                 {/* Tools dropdown — fixed position to escape overflow clipping */}
                 {toolsOpen && hasPermission('tools') && (
                   <div
-                    className="nav-dropdown-panel" ref={el => el && Object.assign(el.style, getDropdownStyle(toolsRef))}
+                    className="nav-dropdown-panel animate-in fade-in slide-in-from-top-2 duration-150 ease-out" ref={el => el && Object.assign(el.style, getDropdownStyle(toolsRef))}
                     onMouseEnter={() => { cancelClose('tools'); setToolsOpen(true); }}
                     onMouseLeave={() => scheduleClose('tools', setToolsOpen)}
+                    onFocus={() => { cancelClose('tools'); setToolsOpen(true); }}
+                    onBlur={() => scheduleClose('tools', setToolsOpen)}
                   >
                     <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl shadow-black/40 p-2 flex flex-col gap-1 min-w-[180px]">
                       {[
@@ -520,7 +608,8 @@ const Layout: React.FC<LayoutProps> = ({
                     onClick={() => onNavigate('app-settings')} 
                   />
                 )}
-            </nav>
+             </nav>
+            </div>
 
             {/* Right Side: User Controls */}
             <div className="flex items-center gap-3 shrink-0">

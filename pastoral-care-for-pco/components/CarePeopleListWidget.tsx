@@ -146,7 +146,7 @@ export const CarePeopleListWidget: React.FC<CarePeopleListWidgetProps> = ({
                                         <td className="p-2 py-3">
                                             <div className="flex items-center gap-3">
                                                 {person.avatar ? (
-                                                    <img src={person.avatar} alt={person.name} className="w-8 h-8 rounded-full bg-slate-200" />
+                                                    <img src={person.avatar} alt={person.name} width="32" height="32" loading="lazy" className="w-8 h-8 rounded-full bg-slate-200" />
                                                 ) : (
                                                     <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-xs uppercase">
                                                         {person.name.substring(0, 2)}

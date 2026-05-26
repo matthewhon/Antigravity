@@ -106,7 +106,7 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 rounded-2xl overflow-hidden bg-slate-200 flex-shrink-0">
               {person.avatar ? (
-                <img src={person.avatar} alt="" className="w-full h-full object-cover" />
+                <img src={person.avatar} alt="" width="64" height="64" className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center font-black text-slate-400 text-xl">
                   {person.name.charAt(0)}

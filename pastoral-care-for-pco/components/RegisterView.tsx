@@ -4,6 +4,7 @@ import { createUserWithEmailAndPassword, signOut } from 'firebase/auth';
 import { auth } from '../services/firebase';
 import { firestore } from '../services/firestoreService';
 import { AppLogo } from './AppLogo';
+import { Eye, EyeOff } from 'lucide-react';
 
 interface RegisterViewProps {
   onCancel: () => void;
@@ -27,6 +28,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({ onCancel }) => {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [countdown, setCountdown] = useState(10);
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     let timer: any;
@@ -155,39 +157,56 @@ export const RegisterView: React.FC<RegisterViewProps> = ({ onCancel }) => {
                 </div>
                 
                 <div>
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Your Name</label>
+                    <label htmlFor="reg-name" className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Your Name</label>
                     <input 
+                        id="reg-name"
                         type="text" 
                         value={name} 
                         onChange={e => setName(e.target.value)} 
                         className="w-full p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-900 dark:text-white transition-all" 
                         required 
                         placeholder="Full Name"
+                        autoComplete="name"
                     />
                 </div>
 
                 <div>
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Email Address</label>
+                    <label htmlFor="reg-email" className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Email Address</label>
                     <input 
+                        id="reg-email"
                         type="email" 
                         value={email} 
                         onChange={e => setEmail(e.target.value)} 
                         className="w-full p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-900 dark:text-white transition-all" 
                         required 
                         placeholder="name@church.com"
+                        autoComplete="email"
+                        inputMode="email"
                     />
                 </div>
 
                 <div>
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Password</label>
-                    <input 
-                        type="password" 
-                        value={password} 
-                        onChange={e => setPassword(e.target.value)} 
-                        className="w-full p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-900 dark:text-white transition-all" 
-                        required 
-                        placeholder="Min 6 characters"
-                    />
+                    <label htmlFor="reg-password" className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Password</label>
+                    <div className="relative">
+                        <input 
+                            id="reg-password"
+                            type={showPassword ? "text" : "password"} 
+                            value={password} 
+                            onChange={e => setPassword(e.target.value)} 
+                            className="w-full p-3 pr-10 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-900 dark:text-white transition-all" 
+                            required 
+                            placeholder="Min 6 characters"
+                            autoComplete="new-password"
+                        />
+                        <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                            aria-label={showPassword ? "Hide password" : "Show password"}
+                        >
+                            {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                    </div>
                 </div>
 
                 {/* Organization Info */}
@@ -196,82 +215,98 @@ export const RegisterView: React.FC<RegisterViewProps> = ({ onCancel }) => {
                 </div>
 
                 <div className="col-span-1 md:col-span-2">
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Church / Organization Name</label>
+                    <label htmlFor="reg-churchname" className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Church / Organization Name</label>
                     <input 
+                        id="reg-churchname"
                         type="text" 
                         value={churchName} 
                         onChange={e => setChurchName(e.target.value)} 
                         className="w-full p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-900 dark:text-white transition-all" 
                         required 
                         placeholder="e.g. Grace Community"
+                        autoComplete="organization"
                     />
                 </div>
 
                 <div className="col-span-1 md:col-span-2">
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Street Address</label>
+                    <label htmlFor="reg-address" className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Street Address</label>
                     <input 
+                        id="reg-address"
                         type="text" 
                         value={address} 
                         onChange={e => setAddress(e.target.value)} 
                         className="w-full p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-900 dark:text-white transition-all" 
                         placeholder="123 Main St"
+                        autoComplete="street-address"
                     />
                 </div>
 
                 <div>
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">City</label>
+                    <label htmlFor="reg-city" className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">City</label>
                     <input 
+                        id="reg-city"
                         type="text" 
                         value={city} 
                         onChange={e => setCity(e.target.value)} 
                         className="w-full p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-900 dark:text-white transition-all" 
                         placeholder="City"
                         required
+                        autoComplete="address-level2"
                     />
                 </div>
 
                 <div>
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">State</label>
+                    <label htmlFor="reg-state" className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">State</label>
                     <input 
+                        id="reg-state"
                         type="text" 
                         value={state} 
                         onChange={e => setState(e.target.value)} 
                         className="w-full p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-900 dark:text-white transition-all" 
                         placeholder="State"
                         required
+                        autoComplete="address-level1"
                     />
                 </div>
 
                 <div>
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Zip Code</label>
+                    <label htmlFor="reg-zip" className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Zip Code</label>
                     <input 
+                        id="reg-zip"
                         type="text" 
                         value={zip} 
                         onChange={e => setZip(e.target.value)} 
                         className="w-full p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-900 dark:text-white transition-all" 
                         placeholder="Zip"
+                        autoComplete="postal-code"
+                        inputMode="numeric"
                     />
                 </div>
 
                 <div>
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Phone</label>
+                    <label htmlFor="reg-phone" className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Phone</label>
                     <input 
+                        id="reg-phone"
                         type="tel" 
                         value={phone} 
                         onChange={e => setPhone(e.target.value)} 
                         className="w-full p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-900 dark:text-white transition-all" 
                         placeholder="(555) 555-5555"
+                        autoComplete="tel"
+                        inputMode="tel"
                     />
                 </div>
 
                 <div className="col-span-1 md:col-span-2">
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Website</label>
+                    <label htmlFor="reg-website" className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Website</label>
                     <input 
+                        id="reg-website"
                         type="url" 
                         value={website} 
                         onChange={e => setWebsite(e.target.value)} 
                         className="w-full p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-900 dark:text-white transition-all" 
                         placeholder="https://yourchurch.com"
+                        autoComplete="url"
                     />
                 </div>
             </div>

@@ -1,5 +1,6 @@
 
 import React, { useCallback, useMemo, useRef, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { 
     User, PeopleDashboardData, GivingAnalytics, GroupsDashboardData, 
     ServicesDashboardData, AttendanceData, CensusStats, BudgetRecord, 
@@ -169,6 +170,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       const gridColor = currentTheme === 'dark' ? '#334155' : '#f1f5f9';
       const axisColor = currentTheme === 'dark' ? '#94a3b8' : '#94a3b8';
 
+      const tooltipStyle = {
+          borderRadius: '12px',
+          border: currentTheme === 'dark' ? '1px solid #475569' : '1px solid #e2e8f0',
+          backgroundColor: currentTheme === 'dark' ? '#1e293b' : '#ffffff',
+          color: currentTheme === 'dark' ? '#f1f5f9' : '#0f172a',
+          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)'
+      };
+
+      const tooltipItemStyle = {
+          color: currentTheme === 'dark' ? '#f1f5f9' : '#0f172a'
+      };
+
+      const tooltipLabelStyle = {
+          color: currentTheme === 'dark' ? '#94a3b8' : '#475569',
+          fontWeight: 'bold'
+      };
+
       switch(id) {
           case 'ai_insights':
               return (
@@ -189,10 +207,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           </div>
 
                           {globalInsights ? (
-                              <div className="prose prose-sm prose-slate dark:prose-invert max-w-none">
-                                  <div dangerouslySetInnerHTML={{ __html: globalInsights.replace(/\n/g, '<br/>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
-                              </div>
-                          ) : (
+                               <div className="prose prose-sm prose-slate dark:prose-invert max-w-none">
+                                   <ReactMarkdown>{globalInsights}</ReactMarkdown>
+                               </div>
+                           ) : (
                               <div className="py-8 text-center">
                                   <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-4">Generate a strategic analysis of your current metrics.</p>
                                   <button 
@@ -218,7 +236,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               );
           case 'people_stats':
               return peopleData ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 h-full">
                       <StatCard label="Total People" value={peopleData.stats.total.toLocaleString()} color="indigo" source="PCO" />
                       <StatCard label="New (30d)" value={peopleData.stats.newThisMonth.toLocaleString()} color="emerald" source="PCO" />
                       <StatCard label="Members" value={peopleData.stats.members.toLocaleString()} color="violet" source="PCO" />
@@ -227,7 +245,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               ) : null;
           case 'keyMetrics':
               return givingAnalytics ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 h-full">
                       <StatCard label="Total Giving" value={`$${givingAnalytics.totalGiving.toLocaleString()}`} color="emerald" source="PCO" />
                       <StatCard label="Donors" value={givingAnalytics.contributingPeople.toLocaleString()} color="indigo" source="PCO" />
                       <StatCard label="Recurring" value={givingAnalytics.recurringGivers.toLocaleString()} color="cyan" source="PCO" />
@@ -518,7 +536,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                                               <Cell key={index} fill={ENGAGEMENT_COLORS[entry.name] || COLORS[index % COLORS.length]} />
                                           ))}
                                       </Pie>
-                                      <Tooltip contentStyle={TOOLTIP_STYLE} itemStyle={{ color: '#fff' }} />
+                                      <Tooltip contentStyle={tooltipStyle} itemStyle={tooltipItemStyle} labelStyle={tooltipLabelStyle} />
                                       <Legend verticalAlign="middle" align="right" layout="vertical" iconType="circle" wrapperStyle={{fontSize: '10px', fontWeight: 'bold', color: axisColor}} />
                                   </PieChart>
                               </ResponsiveContainer>
@@ -549,7 +567,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                                   >
                                       {peopleData.genderData.map((entry, index) => <Cell key={index} fill={COLORS[index % COLORS.length]} />)}
                                   </Pie>
-                                  <Tooltip contentStyle={TOOLTIP_STYLE} />
+                                  <Tooltip contentStyle={tooltipStyle} itemStyle={tooltipItemStyle} labelStyle={tooltipLabelStyle} />
                                   <Legend verticalAlign="bottom" align="center" iconType="circle" wrapperStyle={{fontSize: '10px', fontWeight: 'bold', color: axisColor, paddingTop: '8px'}} />
                               </PieChart>
                           </ResponsiveContainer>
@@ -566,7 +584,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
                                   <XAxis dataKey="range" axisLine={false} tickLine={false} tick={{fontSize: 9, fill: axisColor}} />
                                   <Tooltip 
-                                      contentStyle={TOOLTIP_STYLE} 
+                                      contentStyle={tooltipStyle} 
+                                      itemStyle={tooltipItemStyle}
+                                      labelStyle={tooltipLabelStyle}
                                       cursor={{fill: currentTheme === 'dark' ? '#334155' : '#f8fafc'}}
                                   />
                                   <Bar dataKey="count" fill="#8b5cf6" radius={[4, 4, 0, 0]} label={{ position: 'top', fontSize: 9, fill: axisColor, fontWeight: 'bold' }} />
@@ -592,8 +612,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                                   />
                                   <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: axisColor}} />
                                   <Tooltip 
-                                    contentStyle={TOOLTIP_STYLE} 
-                                    labelFormatter={(val) => new Date(val).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                                    contentStyle={tooltipStyle} 
+                                    itemStyle={tooltipItemStyle}
+                                    labelStyle={tooltipLabelStyle}
+                                    labelFormatter={(val) => new Date(val).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                     formatter={(value: number) => `$${value.toLocaleString()}`}
                                     cursor={{fill: currentTheme === 'dark' ? '#334155' : '#f8fafc'}}
                                   />
@@ -620,10 +642,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   };
 
   return (
-    <div className="grid grid-cols-4 gap-8 animate-in fade-in duration-500 items-start">
+    <div className="grid grid-cols-1 xl:grid-cols-4 gap-8 animate-in fade-in duration-500 items-start">
 
       {/* COLUMNS 1–3 (or 1–4 when AI hidden) — Widgets */}
-      <div className={`${showAI ? 'col-span-3' : 'col-span-4'} space-y-10`}>
+      <div className={`${showAI ? 'col-span-1 xl:col-span-3' : 'col-span-1 xl:col-span-4'} space-y-10`}>
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
             <h3 className="text-4xl font-black tracking-tighter text-slate-900 dark:text-white">Dashboard</h3>
@@ -687,7 +709,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       {/* COLUMN 4 — AI Assistant (sticky, toggleable) */}
       {showAI && (
-        <div className="col-span-1 sticky top-0" style={{ height: 'calc(100vh - 140px)' }}>
+        <div className="col-span-1 xl:sticky xl:top-0 h-[600px] xl:h-[calc(100vh-140px)]">
           <PastorAIView
               peopleData={peopleData}
               givingAnalytics={givingAnalytics}

@@ -831,6 +831,8 @@ const App: React.FC = () => {
 
   const safeEnabledWidgets = (church.enabledWidgets && church.enabledWidgets.length > 0) ? church.enabledWidgets : undefined;
 
+  const isOverlayOpen = selectedPersonId !== null || layoutSuggestion !== null;
+
   return (
     <>
     {layoutSuggestion !== null && (
@@ -850,7 +852,8 @@ const App: React.FC = () => {
             setPeople, setGroups, setAttendance, setDonations, setFunds, setBudgets,
             setTeams, setRecentRiskChanges, setRecentStatusChanges, setServicesData
         }}>
-            <Layout 
+            <div inert={isOverlayOpen ? true : undefined} className="flex flex-col min-h-screen">
+                <Layout 
                 user={user} 
                 church={church} 
                 allChurches={allChurches}
@@ -1041,6 +1044,9 @@ const App: React.FC = () => {
                 {/* Fallback route */}
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
+            </Layout>
+            </div>
+            
             {/* Global Profile Drawer Overlay */}
             {selectedPersonId && church && (
                 <PersonProfileDrawer 
@@ -1049,7 +1055,6 @@ const App: React.FC = () => {
                     onClose={() => setSelectedPersonId(null)}
                 />
             )}
-            </Layout>
         </TenantDataProvider>
     </>
   );

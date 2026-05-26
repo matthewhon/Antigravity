@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '../services/firebase';
 import { AppLogo } from './AppLogo';
+import { Eye, EyeOff } from 'lucide-react';
 
 interface LoginViewProps {
   onRegister: () => void;
@@ -14,6 +15,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onRegister }) => {
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,20 +82,23 @@ export const LoginView: React.FC<LoginViewProps> = ({ onRegister }) => {
 
         <form onSubmit={handleLogin} className="space-y-5">
             <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Email</label>
+                <label htmlFor="login-email" className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Email</label>
                 <input 
+                    id="login-email"
                     type="email" 
                     value={email} 
                     onChange={e => setEmail(e.target.value)} 
                     className="w-full p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-900 dark:text-white transition-all" 
                     required 
                     placeholder="name@church.com"
+                    autoComplete="username"
+                    inputMode="email"
                 />
             </div>
 
             <div>
                 <div className="flex justify-between items-center mb-2">
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Password</label>
+                    <label htmlFor="login-password" className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Password</label>
                     <button 
                         type="button"
                         onClick={handleForgotPassword}
@@ -102,14 +107,26 @@ export const LoginView: React.FC<LoginViewProps> = ({ onRegister }) => {
                         Forgot Password?
                     </button>
                 </div>
-                <input 
-                    type="password" 
-                    value={password} 
-                    onChange={e => setPassword(e.target.value)} 
-                    className="w-full p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-900 dark:text-white transition-all" 
-                    required 
-                    placeholder="••••••••"
-                />
+                <div className="relative">
+                    <input 
+                        id="login-password"
+                        type={showPassword ? "text" : "password"} 
+                        value={password} 
+                        onChange={e => setPassword(e.target.value)} 
+                        className="w-full p-3 pr-10 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-900 dark:text-white transition-all" 
+                        required 
+                        placeholder="••••••••"
+                        autoComplete="current-password"
+                    />
+                    <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                </div>
             </div>
 
             <button 

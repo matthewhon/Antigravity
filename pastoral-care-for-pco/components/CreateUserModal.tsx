@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { firestore } from '../services/firestoreService';
 import { UserRole } from '../types';
+import { Eye, EyeOff } from 'lucide-react';
 
 interface CreateUserModalProps {
   churchId: string;
@@ -34,6 +35,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ churchId, onCl
   const [roles, setRoles] = useState<UserRole[]>(['Pastoral Care']); // Default role
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleToggleRole = (role: UserRole) => {
     if (roles.includes(role)) {
@@ -99,37 +101,54 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ churchId, onCl
         <form onSubmit={handleSubmit} className="space-y-5">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
-                    <label className="block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-2">Full Name</label>
+                    <label htmlFor="create-name" className="block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-2">Full Name</label>
                     <input 
+                        id="create-name"
                         type="text" 
                         value={name} 
                         onChange={e => setName(e.target.value)} 
                         className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
                         required
+                        autoComplete="name"
                     />
                 </div>
                 <div>
-                    <label className="block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-2">Email Address</label>
+                    <label htmlFor="create-email" className="block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-2">Email Address</label>
                     <input 
+                        id="create-email"
                         type="email" 
                         value={email} 
                         onChange={e => setEmail(e.target.value)} 
                         className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
                         required
+                        autoComplete="email"
+                        inputMode="email"
                     />
                 </div>
             </div>
 
             <div>
-                <label className="block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-2">Initial Password</label>
-                <input 
-                    type="password" 
-                    value={password} 
-                    onChange={e => setPassword(e.target.value)} 
-                    className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
-                    placeholder="Min 6 chars"
-                    required
-                />
+                <label htmlFor="create-password" className="block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-2">Initial Password</label>
+                <div className="relative">
+                    <input 
+                        id="create-password"
+                        type={showPassword ? "text" : "password"} 
+                        value={password} 
+                        onChange={e => setPassword(e.target.value)} 
+                        className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 pr-10 font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+                        placeholder="Min 6 chars"
+                        required
+                        autoComplete="new-password"
+                    />
+                    <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                </div>
             </div>
 
             <div>

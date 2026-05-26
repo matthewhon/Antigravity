@@ -471,7 +471,7 @@ export const PublicPollView: React.FC<PublicPollViewProps> = ({ pollId }) => {
         {/* Poll header card */}
         <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
           {poll.imageUrl && (
-            <img src={poll.imageUrl} alt={poll.title} className="w-full h-48 sm:h-64 object-cover" />
+            <img src={poll.imageUrl} alt={poll.title} width={800} height={256} fetchPriority="high" loading="eager" className="w-full h-48 sm:h-64 object-cover" />
           )}
           <div className="px-8 py-7">
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{poll.title}</h1>
@@ -548,7 +548,7 @@ export const PublicPollView: React.FC<PublicPollViewProps> = ({ pollId }) => {
 
             {q.imageUrl && (
               <div className="mb-5 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 w-full">
-                <img src={q.imageUrl} alt={q.text} className="w-full max-h-64 object-cover" />
+                <img src={q.imageUrl} alt={q.text} width={600} height={256} loading="lazy" className="w-full max-h-64 object-cover" />
               </div>
             )}
 
