@@ -875,6 +875,37 @@ function renderAnalyticsBlockHtml(
 
 // ─── Core send logic (shared by HTTP handler and scheduler) ────────────────
 
+interface PersonInfo {
+    personName?: string;
+    email?:      string;
+    phone?:      string;
+    birthday?:   string;
+    anniversary?: string;
+    city?:       string;
+    state?:      string;
+}
+
+function resolveMergeTags(body: string, person: PersonInfo): string {
+    const parts = (person.personName || '').split(' ');
+    const firstName = parts[0] || '';
+    const lastName  = parts.slice(1).join(' ') || '';
+    const rawPhone = (person.phone || '').replace(/^\+1/, '');
+    const formattedPhone = rawPhone.length === 10
+        ? `(${rawPhone.slice(0,3)}) ${rawPhone.slice(3,6)}-${rawPhone.slice(6)}`
+        : rawPhone;
+
+    return body
+        .replace(/\{contact\.firstName\}|\{firstName\}/gi,   firstName)
+        .replace(/\{contact\.lastName\}|\{lastName\}/gi,    lastName)
+        .replace(/\{contact\.fullName\}|\{contact\.name\}|\{fullName\}/gi,    person.personName || '')
+        .replace(/\{contact\.email\}|\{email\}/gi,       person.email      || '')
+        .replace(/\{contact\.phone\}|\{phone\}/gi,       formattedPhone)
+        .replace(/\{contact\.birthday\}|\{birthday\}/gi,    person.birthday   || '')
+        .replace(/\{contact\.anniversary\}|\{anniversary\}/gi, person.anniversary || '')
+        .replace(/\{contact\.city\}|\{city\}/gi,        person.city       || '')
+        .replace(/\{contact\.state\}|\{state\}/gi,       person.state      || '');
+}
+
 export async function executeSend(
     db: any,
     campaignId: string,
@@ -1010,120 +1041,18 @@ export async function executeSend(
 
     // 4. Determine recipients
     let recipients: string[] = [];
+    let personMap: Record<string, PersonInfo> = {};
 
     if (testEmail) {
         recipients = [testEmail];
         log.info(`Sending test email to ${testEmail}`, 'system', { campaignId, churchId }, churchId);
 
-    } else if (campaign.toListId) {
-        log.info(`Fetching PCO list ${campaign.toListId} for campaign ${campaignId}`, 'system', { churchId }, churchId);
-
-        // churchData already loaded above (for email settings)
-        const accessToken = churchData.pcoAccessToken;
-
-        if (!accessToken) throw new Error('Church not connected to Planning Center. Cannot fetch recipient list.');
-
-        // PCO emails are a related resource — use include=emails to sideload them.
-        // The per_page=100 limit applies to people; paginate if the list is larger.
-        let pcoPage = 1;
-        let hasMore = true;
-        while (hasMore) {
-            const pcoUrl = `https://api.planningcenteronline.com/people/v2/lists/${campaign.toListId}/people?include=emails&per_page=100&offset=${(pcoPage - 1) * 100}`;
-            const pcoRes = await fetch(pcoUrl, {
-                headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' }
-            });
-
-            if (!pcoRes.ok) {
-                const errBody = await pcoRes.text().catch(() => '');
-                const errDetail = pcoRes.status === 401
-                    ? 'PCO access token expired or revoked — re-connect Planning Center in Settings.'
-                    : `PCO API returned HTTP ${pcoRes.status} for list ${campaign.toListId}.`;
-                log.warn(`Failed to fetch PCO list members (page ${pcoPage}): ${pcoRes.status} — ${errDetail}`, 'system', { churchId, listId: campaign.toListId }, churchId);
-                throw new Error(errDetail);
-            }
-
-
-            const pcoData = await pcoRes.json();
-            const people: any[] = pcoData.data || [];
-            const included: any[] = pcoData.included || [];
-
-            // Build a lookup: personId → primary email from the included email objects
-            const emailByPersonId = new Map<string, string>();
-            for (const inc of included) {
-                if (inc.type === 'Email' && inc.attributes?.address) {
-                    // Each Email object has a relationships.person.data.id pointing back to the person
-                    const personId: string | undefined = inc.relationships?.person?.data?.id;
-                    if (personId && (!emailByPersonId.has(personId) || inc.attributes?.primary)) {
-                        emailByPersonId.set(personId, inc.attributes.address);
-                    }
-                }
-            }
-
-            for (const person of people) {
-                const email = emailByPersonId.get(person.id);
-                if (email) recipients.push(email);
-            }
-
-            // Check for next page
-            const nextOffset = pcoData.meta?.next?.offset;
-            hasMore = !!nextOffset && people.length === 100;
-            pcoPage++;
-        }
-
-        recipients = [...new Set(recipients.filter(Boolean))]; // dedupe
-        if (recipients.length === 0) throw new Error('No email addresses found for the selected list.');
-        log.info(`Sending campaign "${subject}" to ${recipients.length} recipients (PCO list)`, 'system', { campaignId, churchId }, churchId);
-
-    } else if (campaign.toGroupId) {
-        log.info(`Fetching PCO group ${campaign.toGroupId} members for campaign ${campaignId}`, 'system', { churchId }, churchId);
-
-        const accessToken = churchData.pcoAccessToken;
-        if (!accessToken) throw new Error('Church not connected to Planning Center. Cannot fetch group members.');
-
-        // Fetch group memberships with person included
-        const groupUrl = `https://api.planningcenteronline.com/groups/v2/groups/${campaign.toGroupId}/memberships?include=person&per_page=100`;
-        const groupRes = await fetch(groupUrl, {
-            headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' }
-        });
-
-        if (!groupRes.ok) {
-            throw new Error(`Failed to fetch PCO group members: ${groupRes.status}`);
-        }
-
-        const groupData = await groupRes.json();
-        const included: any[] = groupData?.included || [];
-        const personIds: string[] = [];
-
-        for (const item of included) {
-            if (item.type === 'Person') {
-                // Try to get email directly from included attributes
-                const emailAttr = item.attributes?.primary_email || item.attributes?.email;
-                if (emailAttr) {
-                    recipients.push(emailAttr);
-                } else {
-                    personIds.push(item.id);
-                }
-            }
-        }
-
-        // For persons without email in the included payload, fetch from People API
-        if (personIds.length > 0) {
-            await Promise.all(personIds.map(async (pid) => {
-                const pRes = await fetch(
-                    `https://api.planningcenteronline.com/people/v2/people/${pid}?include=emails`,
-                    { headers: { Authorization: `Bearer ${accessToken}` } }
-                );
-                if (!pRes.ok) return;
-                const pData = await pRes.json();
-                const emailsIncluded: any[] = pData.included || [];
-                const primary = emailsIncluded.find(e => e.attributes?.primary) || emailsIncluded[0];
-                if (primary?.attributes?.address) recipients.push(primary.attributes.address);
-            }));
-        }
-
-        recipients = [...new Set(recipients.filter(Boolean))]; // dedupe
-        if (recipients.length === 0) throw new Error('No email addresses found for the selected group.');
-        log.info(`Sending campaign "${subject}" to ${recipients.length} recipients (PCO group: ${campaign.toGroupName})`, 'system', { campaignId, churchId }, churchId);
+    } else if (campaign.toListId || campaign.toGroupId) {
+        const { resolvePcoRecipients } = await import('./smsCampaignScheduler.js');
+        const resolved = await resolvePcoRecipients(db, churchId, campaign.toListId || undefined, campaign.toGroupId || undefined, 'email');
+        recipients = resolved.destinations;
+        personMap = resolved.personMap;
+        log.info(`Sending campaign "${subject}" to ${recipients.length} recipients (PCO ${campaign.toListId ? 'list' : 'group'})`, 'system', { campaignId, churchId }, churchId);
 
     } else {
         throw new Error('No recipients configured. Select a PCO list or group on the campaign.');
@@ -1168,15 +1097,36 @@ export async function executeSend(
                 + (testEmail
                     ? `<div style="text-align:center;padding:0 32px 8px;"><p style="margin:0;font-family:${fontFamily};font-size:10px;color:#d1d5db;">(TEST SEND — unsubscribe link not active)</p></div>`
                     : '');
+
+            // Get recipient info or fall back to mock data for test email
+            const personInfo = personMap[recipientEmail] || {
+                personName: 'John Smith',
+                email: recipientEmail,
+                phone: '+16155550100',
+                birthday: 'Jan 15',
+                anniversary: 'Jun 10',
+                city: 'Nashville',
+                state: 'TN'
+            };
+
+            // Resolve merge tags on subject, blocks, and content!
+            const resolvedSubject = resolveMergeTags(subject, personInfo);
+            const resolvedBlocks = JSON.parse(
+                resolveMergeTags(JSON.stringify(campaign.blocks || []), personInfo)
+            );
+            const resolvedContent = campaign.content
+                ? resolveMergeTags(campaign.content, personInfo)
+                : campaign.content;
+
             const personalizedHtml = renderBlocksToHtml(
-                campaign.blocks || [],
+                resolvedBlocks,
                 campaign.templateSettings || {},
                 unsubHtml,
                 campaign.contentType,
-                campaign.content
+                resolvedContent
             );
             await sgSend(
-                [{ to: recipientEmail, from: { email: fromEmail, name: fromName }, replyTo: campaign.replyTo || undefined, subject, html: personalizedHtml }],
+                [{ to: recipientEmail, from: { email: fromEmail, name: fromName }, replyTo: campaign.replyTo || undefined, subject: resolvedSubject, html: personalizedHtml }],
                 globalApiKey,
                 subuserId,
                 campaignId

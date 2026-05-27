@@ -96,15 +96,24 @@ interface Props {
   content?: string;
 }
 
-const resolveMergeTags = (html: string) =>
-  html
-    .replace(/@first-name/g, '<span style="background:#e0e7ff;color:#4338ca;border-radius:4px;padding:0 4px;font-family:monospace;font-size:0.9em">John</span>')
-    .replace(/@last-name/g, '<span style="background:#e0e7ff;color:#4338ca;border-radius:4px;padding:0 4px;font-family:monospace;font-size:0.9em">Smith</span>')
-    .replace(/@email/g, '<span style="background:#e0e7ff;color:#4338ca;border-radius:4px;padding:0 4px;font-family:monospace;font-size:0.9em">john@example.com</span>')
+const resolveMergeTags = (html: string) => {
+  if (!html) return '';
+  const span = (val: string) => `<span style="background:#e0e7ff;color:#4338ca;border-radius:4px;padding:0 4px;font-family:monospace;font-size:0.9em">${val}</span>`;
+  return html
+    .replace(/@first-name|\{contact\.firstName\}|\{firstName\}/gi, span('John'))
+    .replace(/@last-name|\{contact\.lastName\}|\{lastName\}/gi, span('Smith'))
+    .replace(/\{contact\.fullName\}|\{contact\.name\}|\{fullName\}/gi, span('John Smith'))
+    .replace(/@email|\{contact\.email\}|\{email\}/gi, span('john@example.com'))
+    .replace(/\{contact\.phone\}|\{phone\}/gi, span('(615) 555-0100'))
+    .replace(/\{contact\.birthday\}|\{birthday\}/gi, span('Jan 15'))
+    .replace(/\{contact\.anniversary\}|\{anniversary\}/gi, span('Jun 10'))
+    .replace(/\{contact\.city\}|\{city\}/gi, span('Nashville'))
+    .replace(/\{contact\.state\}|\{state\}/gi, span('TN'))
     .replace(/@current-date/g, new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }))
     .replace(/@current-month/g, new Date().toLocaleDateString('en-US', { month: 'long' }))
     .replace(/@current-year/g, String(new Date().getFullYear()))
     .replace(/@view-in-browser/g, '<a href="#" style="color:#4338ca">View in browser</a>');
+};
 
 // Convert ColumnLayout string into per-column flex-basis percentages.
 function columnWidths(layout: ColumnLayout): string[] {

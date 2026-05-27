@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { EmailBuilder } from './EmailBuilder';
 import { EmailBlock } from './EmailBuilder';
 import { TemplateSettingsEditor } from './TemplateSettingsEditor';
@@ -74,6 +74,18 @@ const DEFAULT_TEMPLATE: TemplateSettings = {
   footer: '© 2026 Church Name · Unsubscribe',
   showLogo: true,
 };
+
+const ALL_MERGE_TAGS = [
+  { tag: '{firstName}', label: 'First Name' },
+  { tag: '{lastName}', label: 'Last Name' },
+  { tag: '{fullName}', label: 'Full Name' },
+  { tag: '{email}', label: 'Email' },
+  { tag: '{phone}', label: 'Phone' },
+  { tag: '{city}', label: 'City' },
+  { tag: '{state}', label: 'State' },
+  { tag: '{birthday}', label: 'Birthday' },
+  { tag: '{anniversary}', label: 'Anniversary' },
+];
 
 export const newCampaign = (churchId: string, name: string, churchName?: string): EmailCampaign => ({
   id: `email_${Date.now()}`,
@@ -634,6 +646,27 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
   const [isDataChartDrawerOpen, setIsDataChartDrawerOpen] = useState(false);
   const [isPastoralCareDrawerOpen, setIsPastoralCareDrawerOpen] = useState(false);
 
+  const contentTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const insertAtCursor = (text: string) => {
+    const el = contentTextareaRef.current;
+    if (!el) {
+      update({ content: (localCampaign.content || '') + text });
+      return;
+    }
+    const start = el.selectionStart ?? (localCampaign.content || '').length;
+    const end = el.selectionEnd ?? start;
+    const before = (localCampaign.content || '').slice(0, start);
+    const after = (localCampaign.content || '').slice(end);
+    const newContent = before + text + after;
+    update({ content: newContent });
+    requestAnimationFrame(() => {
+      el.focus();
+      const pos = start + text.length;
+      el.setSelectionRange(pos, pos);
+    });
+  };
+
   // Keep onSave ref up to date to avoid stale closure in update callback
   const onSaveRef = React.useRef(onSave);
   React.useEffect(() => { onSaveRef.current = onSave; }, [onSave]);
@@ -1061,13 +1094,30 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
                     </button>
                   </div>
                 ) : (
-                  <div className="mt-2">
+                  <div className="mt-2 space-y-3">
                     <textarea
+                      ref={contentTextareaRef}
                       className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 min-h-[200px]"
                       placeholder={localCampaign.contentType === 'html' ? '<p>Write your HTML email here...</p>' : 'Write your plain text email here...'}
                       value={localCampaign.content || ''}
                       onChange={e => update({ content: e.target.value })}
                     />
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Merge Tags</label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {ALL_MERGE_TAGS.map(({ tag, label }) => (
+                          <button
+                            key={tag}
+                            type="button"
+                            title={`Insert ${label} merge tag`}
+                            onClick={() => insertAtCursor(tag)}
+                            className="px-2.5 py-1.5 text-xs font-mono font-semibold bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-900/40 border border-indigo-250 dark:border-indigo-800 transition"
+                          >
+                            {tag}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 )}
               </AccordionSection>
@@ -1392,6 +1442,26 @@ export const QuickSendModal: React.FC<{
   const [subject, setSubject] = useState('');
   const [content, setContent] = useState('');
   
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+  
+  const insertAtCursor = (text: string) => {
+    const el = textareaRef.current;
+    if (!el) {
+      setContent(prev => prev + text);
+      return;
+    }
+    const start = el.selectionStart ?? content.length;
+    const end = el.selectionEnd ?? start;
+    const before = content.slice(0, start);
+    const after = content.slice(end);
+    setContent(before + text + after);
+    requestAnimationFrame(() => {
+      el.focus();
+      const pos = start + text.length;
+      el.setSelectionRange(pos, pos);
+    });
+  };
+  
   const [pcoGroups, setPcoGroups] = useState<{ id: string; name: string; memberCount: number }[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(true);
 
@@ -1579,14 +1649,31 @@ export const QuickSendModal: React.FC<{
             />
           </div>
           
-          <div>
+          <div className="space-y-3">
             <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Message Content <span className="text-red-500">*</span></label>
             <textarea
+              ref={textareaRef}
               className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-3 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 min-h-[200px]"
               placeholder="Write your message here..."
               value={content}
               onChange={e => setContent(e.target.value)}
             />
+            <div>
+              <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Merge Tags</label>
+              <div className="flex flex-wrap gap-1.5">
+                {ALL_MERGE_TAGS.map(({ tag, label }) => (
+                  <button
+                    key={tag}
+                    type="button"
+                    title={`Insert ${label} merge tag`}
+                    onClick={() => insertAtCursor(tag)}
+                    className="px-2.5 py-1.5 text-xs font-mono font-semibold bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 rounded-xl hover:bg-emerald-100 dark:hover:bg-emerald-900/40 border border-emerald-250 dark:border-emerald-800 transition"
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
         

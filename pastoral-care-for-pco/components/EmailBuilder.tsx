@@ -260,6 +260,18 @@ const MediaLibraryPicker: React.FC<{
 
 // ─── Inline text editor (embedded Tiptap) ─────────────────────────────────────
 
+const ALL_MERGE_TAGS = [
+  { tag: '{firstName}', label: 'First Name' },
+  { tag: '{lastName}', label: 'Last Name' },
+  { tag: '{fullName}', label: 'Full Name' },
+  { tag: '{email}', label: 'Email' },
+  { tag: '{phone}', label: 'Phone' },
+  { tag: '{city}', label: 'City' },
+  { tag: '{state}', label: 'State' },
+  { tag: '{birthday}', label: 'Birthday' },
+  { tag: '{anniversary}', label: 'Anniversary' },
+];
+
 const InlineTextEditor: React.FC<{
   block: EmailBlock;
   onUpdate: (content: any) => void;
@@ -359,6 +371,20 @@ const InlineTextEditor: React.FC<{
           editor={editor}
           className="prose prose-sm max-w-none p-3 min-h-[100px] bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus-within:outline-none"
         />
+      </div>
+      <div className="px-3 py-2 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-800 flex flex-wrap gap-1.5 items-center">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-1">Merge Tags:</span>
+        {ALL_MERGE_TAGS.map(({ tag, label }) => (
+          <button
+            key={tag}
+            type="button"
+            title={`Insert ${label}`}
+            onClick={() => editor?.chain().focus().insertContent(tag).run()}
+            className="px-2 py-1 text-[10px] font-mono font-semibold bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 rounded hover:bg-indigo-100 dark:hover:bg-indigo-900/40 border border-indigo-200 dark:border-indigo-800 transition"
+          >
+            {tag}
+          </button>
+        ))}
       </div>
     </div>
   );
