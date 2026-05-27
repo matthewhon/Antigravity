@@ -1306,6 +1306,9 @@ const ServicesView: React.FC<ServicesViewProps> = ({
         futurePlans={data?.futurePlans || []}
         teams={data?.teams || []}
         people={people}
+        pcoConnected={pcoConnected}
+        onSync={handleServiceSync}
+        isSyncing={isServicesSyncing}
       />
     );
   }

@@ -5,12 +5,18 @@ interface ServicesPlansTabProps {
   futurePlans: ServicePlanSnapshot[];
   teams: ServicesTeam[];
   people: PcoPerson[];
+  pcoConnected?: boolean;
+  onSync?: () => Promise<void>;
+  isSyncing?: boolean;
 }
 
 export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
   futurePlans,
   teams,
   people,
+  pcoConnected,
+  onSync,
+  isSyncing,
 }) => {
   // --- States ---
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
@@ -101,6 +107,17 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
             Order of Service, Schedule Roster &amp; Staffing Needs
           </p>
         </div>
+        
+        {pcoConnected && onSync && (
+          <button 
+            onClick={onSync}
+            disabled={isSyncing}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 font-black text-[10px] uppercase tracking-widest hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors disabled:opacity-50 cursor-pointer"
+          >
+            <span className={isSyncing ? 'animate-spin' : ''}>↻</span>
+            <span>{isSyncing ? 'Syncing...' : 'Sync Plans'}</span>
+          </button>
+        )}
       </header>
 
       {/* Two Column Layout */}
@@ -371,7 +388,27 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
                         
                         {selectedPlan.items.map((item, idx) => {
                           const isSong = item.type === 'song';
+                          const isHeader = item.type === 'header';
                           
+                          if (isHeader) {
+                            return (
+                              <div key={idx} className="relative pt-4 pb-2 first:pt-0 group">
+                                {/* Timeline Node */}
+                                <div className="absolute -left-[23px] top-6 w-3 h-3 rounded-full border-2 border-white dark:border-slate-900 bg-slate-350 dark:bg-slate-600 group-hover:bg-indigo-400 transition-colors" />
+                                <div className="pl-1">
+                                  <h5 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider">
+                                    {item.title}
+                                  </h5>
+                                  {item.description && (
+                                    <p className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold mt-0.5">
+                                      {item.description}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          }
+
                           return (
                             <div key={idx} className="relative group">
                               {/* Timeline Node */}
