@@ -18,7 +18,7 @@ import {
     Calendar, Phone, Search, RefreshCw, Settings, Key, AlertTriangle,
     Inbox, BarChart3, Copy, Zap, MessageCircle, TrendingUp, TrendingDown,
     Activity, DollarSign, UserX, Edit3, UserCheck, List, Layers,
-    Smile, Image as ImageIcon, Link, Sparkles, ChevronRight, RotateCcw,
+    Smile, Image as ImageIcon, Link, Sparkles, ChevronRight, RotateCcw, Contact,
     Mail, Tag, Filter, Hash, Upload, ExternalLink, GitBranch, Info, ShieldCheck, Shield, Globe2, PlusCircle, Lock, Unlock, ListPlus, Tv2, FileText
 } from 'lucide-react';
 import { BroadcastPermissionsTab } from './BroadcastPermissionsTab';
@@ -728,7 +728,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                         >
                                             <FileText size={13} /> File
                                         </button>
-                                        {/* Image URL */}
+                                                                       {/* Image URL */}
                                         <button
                                             type="button"
                                             title="Attach image (MMS)"
@@ -740,7 +740,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                                     : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700'
                                                 }`}
                                         >
-                                            <ImageIcon size={13} /> {imageUrl ? 'Image ?' : 'Image'}
+                                            <ImageIcon size={13} /> {imageUrl ? 'Image ✓' : 'Image'}
                                         </button>
                                         {imageUrl && (
                                             <button
@@ -752,6 +752,20 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                                 <X size={13} />
                                             </button>
                                         )}
+                                        {/* Attach vCard */}
+                                        <button
+                                            type="button"
+                                            title="Attach Church Contact Card (vCard)"
+                                            onClick={() => {
+                                                const newValue = !local.attachVcard;
+                                                update({ attachVcard: newValue });
+                                            }}
+                                            className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition ${local.attachVcard ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
+                                                    : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700'
+                                                }`}
+                                        >
+                                            <Contact size={13} /> {local.attachVcard ? 'Contact Card ✓' : 'Contact Card'}
+                                        </button>
                                         <div className="flex-1" />
                                         {/* AI Helper */}
                                         <button
@@ -769,6 +783,18 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                     {imageUrl && (
                                         <div className="mt-2 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 max-w-[200px]">
                                             <img src={imageUrl} alt="MMS attachment" className="w-full h-auto object-cover" onError={() => setImageUrl('')} />
+                                        </div>
+                                    )}
+                                    {/* Contact Card preview */}
+                                    {local.attachVcard && (
+                                        <div className="mt-2 flex items-center gap-2.5 p-2.5 bg-indigo-50 dark:bg-indigo-900/25 border border-indigo-200 dark:border-indigo-800 rounded-2xl max-w-[280px]">
+                                            <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
+                                                <Contact size={16} />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-xs font-bold text-indigo-700 dark:text-indigo-300 truncate">Contact Card Attached</p>
+                                                <p className="text-[10px] text-indigo-500 dark:text-indigo-400">Share your number and name</p>
+                                            </div>
                                         </div>
                                     )}
                                     {/* AI suggestion panel */}
@@ -838,6 +864,17 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                 {imageUrl && (
                                     <div className="mb-2 rounded-xl overflow-hidden max-w-[220px]">
                                         <img src={imageUrl} alt="MMS preview" className="w-full h-auto object-cover" />
+                                    </div>
+                                )}
+                                {local.attachVcard && (
+                                    <div className="mb-2 bg-indigo-50 dark:bg-indigo-900/40 border border-indigo-200 dark:border-indigo-850 rounded-2xl p-2.5 flex items-center gap-2 max-w-[220px]">
+                                        <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
+                                            <Contact size={16} />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-xs font-bold text-indigo-800 dark:text-indigo-200 truncate">Contact.vcf</p>
+                                            <p className="text-[10px] text-slate-400 dark:text-slate-500">VCARD File • {church.name || 'Church'}</p>
+                                        </div>
                                     </div>
                                 )}
                                 <div className="bg-violet-600 text-white text-sm px-3 py-2 rounded-2xl rounded-bl-sm shadow-sm max-w-[220px] leading-relaxed whitespace-pre-wrap break-words font-medium">
@@ -1039,6 +1076,7 @@ const NewMessageComposer: React.FC<{
     const [showFilePickerNM, setShowFilePickerNM] = useState(false);
     const [linkUrlNM, setLinkUrlNM] = useState('');
     const [imageUrlNM, setImageUrlNM] = useState(''); // final publicly-accessible URL (MMS)
+    const [attachVcardNM, setAttachVcardNM] = useState(false);
     const [aiSuggestionNM, setAiSuggestionNM] = useState('');
     const [aiLoadingNM, setAiLoadingNM] = useState(false);
     const [showAiPanelNM, setShowAiPanelNM] = useState(false);
@@ -1242,6 +1280,7 @@ const NewMessageComposer: React.FC<{
                         personName: toName || undefined,
                         personId: selectedPerson?.id || undefined,
                         twilioNumberId: twilioNumberId ?? undefined,
+                        attachVcard: attachVcardNM,
                     }),
                 });
                 const data = await safeJson(res);
@@ -1260,6 +1299,7 @@ const NewMessageComposer: React.FC<{
                         sentBy: currentUser.id,
                         sentByName: currentUser.name,
                         twilioNumberId: twilioNumberId ?? undefined,
+                        attachVcard: attachVcardNM,
                     }),
                 });
                 const data = await safeJson(res);
@@ -1278,6 +1318,7 @@ const NewMessageComposer: React.FC<{
                         sentBy: currentUser.id,
                         sentByName: currentUser.name,
                         twilioNumberId: twilioNumberId ?? undefined,
+                        attachVcard: attachVcardNM,
                     }),
                 });
                 const data = await safeJson(res);
@@ -1627,6 +1668,11 @@ const NewMessageComposer: React.FC<{
                             {imageUrlNM && (
                                 <button type="button" title="Remove image" onClick={() => { setImageUrlNM(''); setShowImagePanelNM(false); }} className="p-1 text-red-400 hover:text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition"><X size={12} /></button>
                             )}
+                            {/* Attach vCard */}
+                            <button type="button" title="Attach Church Contact Card (vCard)"
+                                onClick={() => setAttachVcardNM(v => !v)}
+                                className={`flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-lg border transition ${attachVcardNM ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700'}`}
+                            ><Contact size={12} /> {attachVcardNM ? 'Contact Card ✓' : 'Contact Card'}</button>
                             <div className="flex-1" />
                             {/* AI Helper */}
                             <button type="button" title="AI SMS helper" onClick={handleAiSuggestNM}
@@ -1663,6 +1709,18 @@ const NewMessageComposer: React.FC<{
                                         </div>
                                     )}
                                     {imageUrlNM && (<div className="flex items-center gap-3 p-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl"><img src={imageUrlNM} alt="MMS preview" className="w-16 h-16 object-cover rounded-lg shrink-0" onError={() => setImageUrlNM('')} /><div className="flex-1 min-w-0"><p className="text-xs font-bold text-emerald-700 dark:text-emerald-300">Image attached</p><p className="text-[10px] text-emerald-600 truncate">{imageUrlNM}</p></div><button type="button" title="Remove image" onClick={() => setImageUrlNM('')} className="text-red-400 hover:text-red-600 shrink-0"><X size={14} /></button></div>)}
+                                    {attachVcardNM && (
+                                        <div className="mt-2 flex items-center gap-2.5 p-2.5 bg-indigo-50 dark:bg-indigo-900/25 border border-indigo-200 dark:border-indigo-800 rounded-xl max-w-[280px]">
+                                            <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
+                                                <Contact size={16} />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-xs font-bold text-indigo-700 dark:text-indigo-300 truncate">Contact Card Attached</p>
+                                                <p className="text-[10px] text-indigo-550 dark:text-indigo-400">Share your number and name</p>
+                                            </div>
+                                            <button type="button" title="Remove contact card" onClick={() => setAttachVcardNM(false)} className="text-red-400 hover:text-red-600 shrink-0"><X size={14} /></button>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )}

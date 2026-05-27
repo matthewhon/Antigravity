@@ -297,7 +297,7 @@ interface CampaignListViewProps {
 const CampaignListView: React.FC<CampaignListViewProps & { setIsQuickSendOpen: (v: boolean) => void }> = ({
   churchId, church, campaigns, isLoading, onOpen, onPreview, onDelete, onDuplicate, onCreate, setIsQuickSendOpen
 }) => {
-  const [tab, setTab] = React.useState<'all' | 'draft' | 'sent'>('all');
+  const [tab, setTab] = React.useState<'all' | 'draft' | 'sent'>('draft');
   const filtered = tab === 'all' ? campaigns : campaigns.filter(c => c.status === tab);
   const counts = {
     all: campaigns.length,

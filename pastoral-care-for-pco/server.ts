@@ -230,7 +230,7 @@ async function startServer() {
     // Quick-send routes used by the NewMessageComposer modal (sends to a PCO List or Group
     // without creating a campaign doc first — delegates to the same bulk-send pipeline).
     app.post('/api/messaging/send-to-list', express.json(), async (req: any, res: any) => {
-        const { churchId, pcoListId, listName, body, mediaUrls = [], sentBy, sentByName, smsNumberId, twilioNumberId } = req.body || {};
+        const { churchId, pcoListId, listName, body, mediaUrls = [], sentBy, sentByName, smsNumberId, twilioNumberId, attachVcard } = req.body || {};
         if (!churchId || !pcoListId || !body) {
             return res.status(400).json({ error: 'Missing churchId, pcoListId, or body' });
         }
@@ -242,7 +242,7 @@ async function startServer() {
             if (!destinations.length) {
                 return res.status(400).json({ error: 'No phone numbers found in this PCO list (members may be missing phone numbers).' });
             }
-            const result = await sendBulkInternal({ db, churchId, phones: destinations, body, mediaUrls, sentBy, sentByName, personMap, smsNumberId: smsNumberId || twilioNumberId || null });
+            const result = await sendBulkInternal({ db, churchId, phones: destinations, body, mediaUrls, sentBy, sentByName, personMap, smsNumberId: smsNumberId || twilioNumberId || null, attachVcard });
             return res.json({ success: true, listName, ...result });
         } catch (e: any) {
             console.error('[send-to-list]', e.message);
@@ -250,7 +250,7 @@ async function startServer() {
         }
     });
     app.post('/api/messaging/send-to-group', express.json(), async (req: any, res: any) => {
-        const { churchId, pcoGroupId, groupName, body, mediaUrls = [], sentBy, sentByName, smsNumberId, twilioNumberId } = req.body || {};
+        const { churchId, pcoGroupId, groupName, body, mediaUrls = [], sentBy, sentByName, smsNumberId, twilioNumberId, attachVcard } = req.body || {};
         if (!churchId || !pcoGroupId || !body) {
             return res.status(400).json({ error: 'Missing churchId, pcoGroupId, or body' });
         }
@@ -262,7 +262,7 @@ async function startServer() {
             if (!destinations.length) {
                 return res.status(400).json({ error: 'No phone numbers found in this PCO group (members may be missing phone numbers).' });
             }
-            const result = await sendBulkInternal({ db, churchId, phones: destinations, body, mediaUrls, sentBy, sentByName, personMap, smsNumberId: smsNumberId || twilioNumberId || null });
+            const result = await sendBulkInternal({ db, churchId, phones: destinations, body, mediaUrls, sentBy, sentByName, personMap, smsNumberId: smsNumberId || twilioNumberId || null, attachVcard });
             return res.json({ success: true, groupName, ...result });
         } catch (e: any) {
             console.error('[send-to-group]', e.message);

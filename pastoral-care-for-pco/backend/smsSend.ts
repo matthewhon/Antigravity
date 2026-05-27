@@ -54,6 +54,36 @@ function resolveMergeTags(body: string, person: PersonInfo): string {
         .replace(/\{contact\.state\}|\{state\}/gi,       person.state      || '');
 }
 
+async function resolveDefaultNumberId(db: any, churchId: string): Promise<string | null> {
+    const defaultSnap = await db.collection('smsNumbers')
+        .where('churchId', '==', churchId)
+        .where('isDefault', '==', true)
+        .limit(1)
+        .get();
+    if (!defaultSnap.empty) return defaultSnap.docs[0].id;
+
+    const anySnap = await db.collection('smsNumbers')
+        .where('churchId', '==', churchId)
+        .limit(1)
+        .get();
+    if (!anySnap.empty) return anySnap.docs[0].id;
+
+    const defaultTwilioSnap = await db.collection('twilioNumbers')
+        .where('churchId', '==', churchId)
+        .where('isDefault', '==', true)
+        .limit(1)
+        .get();
+    if (!defaultTwilioSnap.empty) return defaultTwilioSnap.docs[0].id;
+
+    const anyTwilioSnap = await db.collection('twilioNumbers')
+        .where('churchId', '==', churchId)
+        .limit(1)
+        .get();
+    if (!anyTwilioSnap.empty) return anyTwilioSnap.docs[0].id;
+
+    return null;
+}
+
 /**
  * Get a SignalWire client and the correct from-number for a church.
  * Unlike the old Twilio pattern there is no sub-account — a single flat project
@@ -161,8 +191,9 @@ export async function sendIndividualInternal(params: {
     smsNumberId?: string;
     twilioNumberId?: string;
     conversationId?: string;
+    attachVcard?: boolean;
 }) {
-    const { db, log, churchId, toPhone, body, mediaUrls = [], sentBy, sentByName, smsNumberId, twilioNumberId, conversationId: existingConvId } = params;
+    const { db, log, churchId, toPhone, body, mediaUrls = [], sentBy, sentByName, smsNumberId, twilioNumberId, conversationId: existingConvId, attachVcard } = params;
 
     const to = normaliseE164(toPhone);
 
@@ -181,6 +212,9 @@ export async function sendIndividualInternal(params: {
             resolvedNumberId = cd?.smsNumberId || cd?.inboxId || cd?.twilioNumberId || null;
         }
     }
+    if (!resolvedNumberId) {
+        resolvedNumberId = await resolveDefaultNumberId(db, churchId);
+    }
 
     log.info(
         `[Send] Resolved numberId=${resolvedNumberId || 'default'} for church ${churchId} → to ${to}`,
@@ -189,14 +223,25 @@ export async function sendIndividualInternal(params: {
 
     const { client, fromNumber } = await getSmsClient(db, churchId, resolvedNumberId);
 
-    const isMms    = (mediaUrls as string[]).length > 0;
+    const localMediaUrls = [...mediaUrls];
+    if (attachVcard && resolvedNumberId) {
+        const baseUrl = await getSmsWebhookBaseUrl();
+        if (baseUrl) {
+            const vcardUrl = `${baseUrl}/api/messaging/vcard/${resolvedNumberId}`;
+            if (!localMediaUrls.includes(vcardUrl)) {
+                localMediaUrls.push(vcardUrl);
+            }
+        }
+    }
+
+    const isMms    = localMediaUrls.length > 0;
     const segments = isMms ? 1 : countSegments(body);
 
     const baseUrl = await getSmsWebhookBaseUrl();
     const statusCallbackUrl = baseUrl ? `${baseUrl}/api/messaging/status` : null;
 
     const msgParams: any = { from: fromNumber, to, body };
-    if (isMms) msgParams.mediaUrl = mediaUrls;
+    if (isMms) msgParams.mediaUrl = localMediaUrls;
     if (statusCallbackUrl) {
         msgParams.statusCallback       = statusCallbackUrl;
         msgParams.statusCallbackMethod = 'POST';
@@ -228,7 +273,7 @@ export async function sendIndividualInternal(params: {
     await convRef.collection('messages').doc(messageId).set({
         id: messageId, conversationId: convId, churchId,
         direction: 'outbound', body,
-        mediaUrls: mediaUrls || [], status: msg.status || 'queued',
+        mediaUrls: localMediaUrls, status: msg.status || 'queued',
         messageSid: msg.sid,        // renamed from twilioSid
         sentBy: sentBy || null, sentByName: sentByName || null,
         createdAt: now,
@@ -248,6 +293,7 @@ export const sendIndividual = async (req: any, res: any) => {
         smsNumberId,
         twilioNumberId,
         conversationId,
+        attachVcard,
     } = req.body || {};
 
     if (!churchId || !toPhone || !body) {
@@ -260,7 +306,7 @@ export const sendIndividual = async (req: any, res: any) => {
     try {
         const result = await sendIndividualInternal({
             db, log, churchId, toPhone, body, mediaUrls,
-            sentBy, sentByName, smsNumberId, twilioNumberId, conversationId
+            sentBy, sentByName, smsNumberId, twilioNumberId, conversationId, attachVcard
         });
         return res.json({ success: true, ...result });
     } catch (e: any) {
@@ -295,18 +341,33 @@ export async function sendBulkInternal(params: {
     smsNumberId?: string | null;
     /** Legacy alias — still accepted */
     twilioNumberId?: string | null;
+    attachVcard?:  boolean;
 }): Promise<{ sent: number; failed: number; optedOut: number; skipped: number; errors: { phone: string; error: string }[] }> {
     const {
         db, churchId, campaignId, phones, body,
         mediaUrls = [], sentBy, sentByName, personMap = {},
-        smsNumberId, twilioNumberId,
+        smsNumberId, twilioNumberId, attachVcard,
     } = params as any;
 
     const log    = createServerLogger(db);
-    const isMms  = (mediaUrls as string[]).length > 0;
-    const numberId = smsNumberId || twilioNumberId || null;
+    let numberId = smsNumberId || twilioNumberId || null;
+    if (!numberId) {
+        numberId = await resolveDefaultNumberId(db, churchId);
+    }
     const { client, fromNumber } = await getSmsClient(db, churchId, numberId);
 
+    const localMediaUrls = [...mediaUrls];
+    if (attachVcard && numberId) {
+        const baseUrl = await getSmsWebhookBaseUrl();
+        if (baseUrl) {
+            const vcardUrl = `${baseUrl}/api/messaging/vcard/${numberId}`;
+            if (!localMediaUrls.includes(vcardUrl)) {
+                localMediaUrls.push(vcardUrl);
+            }
+        }
+    }
+
+    const isMms  = localMediaUrls.length > 0;
     const baseUrl = await getSmsWebhookBaseUrl();
     const cbUrl   = baseUrl ? `${baseUrl}/api/messaging/status` : null;
 
@@ -330,7 +391,7 @@ export async function sendBulkInternal(params: {
 
             try {
                 const msgParams: any = { from: fromNumber, to, body: resolved };
-                if (isMms) msgParams.mediaUrl = mediaUrls;
+                if (isMms) msgParams.mediaUrl = localMediaUrls;
                 if (cbUrl) {
                     msgParams.statusCallback       = cbUrl;
                     msgParams.statusCallbackMethod = 'POST';
@@ -354,7 +415,7 @@ export async function sendBulkInternal(params: {
                 await convRef.collection('messages').doc(messageId).set({
                     id: messageId, conversationId: convId, churchId,
                     direction: 'outbound', body: resolved,
-                    mediaUrls: mediaUrls || [], status: msg.status || 'queued',
+                    mediaUrls: localMediaUrls, status: msg.status || 'queued',
                     messageSid: msg.sid,
                     sentBy: sentBy || null, sentByName: sentByName || null,
                     campaignId: campaignId || null, createdAt: now,
@@ -400,7 +461,7 @@ export async function sendBulkInternal(params: {
 export const sendBulk = async (req: any, res: any) => {
     res.set('Access-Control-Allow-Origin', '*');
 
-    let { churchId, campaignId, phones = [], body, mediaUrls = [], sentBy, sentByName, personMap = {}, resolveFromList, resolveFromGroup, smsNumberId, twilioNumberId } = req.body || {};
+    let { churchId, campaignId, phones = [], body, mediaUrls = [], sentBy, sentByName, personMap = {}, resolveFromList, resolveFromGroup, smsNumberId, twilioNumberId, attachVcard } = req.body || {};
 
     const db = getDb();
 
@@ -420,7 +481,7 @@ export const sendBulk = async (req: any, res: any) => {
             return res.status(400).json({ error: 'No phone numbers provided or resolved for this campaign.' });
         }
 
-        const result = await sendBulkInternal({ db, churchId, campaignId, phones, body, mediaUrls, sentBy, sentByName, personMap, smsNumberId, twilioNumberId });
+        const result = await sendBulkInternal({ db, churchId, campaignId, phones, body, mediaUrls, sentBy, sentByName, personMap, smsNumberId, twilioNumberId, attachVcard });
         return res.json({ success: true, ...result });
     } catch (e: any) {
         const log = createServerLogger(db);

@@ -1119,6 +1119,7 @@ export interface SmsCampaign {
     body: string;
     blocks?: any[];
     mediaUrls?: string[];
+    attachVcard?: boolean;
     // Recipients  one of listId, groupId, or toPhones
     toListId?: string | null;
     toListName?: string | null;

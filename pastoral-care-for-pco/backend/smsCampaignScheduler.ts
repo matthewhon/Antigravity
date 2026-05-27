@@ -795,6 +795,7 @@ export function startSmsCampaignScheduler(db: any): void {
                                 mediaUrls:   campaign.mediaUrls || [],
                                 personMap,
                                 smsNumberId: campaign.smsNumberId || campaign.twilioNumberId || null,
+                                attachVcard: campaign.attachVcard || false,
                             });
                         }
 
