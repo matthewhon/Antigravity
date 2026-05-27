@@ -848,7 +848,7 @@ export const syncServicesData = async (churchId: string) => {
 
         const membersUrl = `services/v2/service_types/${plan.serviceTypeId}/plans/${plan.id}/team_members`;
         const neededUrl = `services/v2/service_types/${plan.serviceTypeId}/plans/${plan.id}/needed_positions`;
-        const itemsUrl = `services/v2/service_types/${plan.serviceTypeId}/plans/${plan.id}/items?filter=song_items&include=song`;
+        const itemsUrl = `services/v2/service_types/${plan.serviceTypeId}/plans/${plan.id}/items?include=song`;
         
         try {
             // Fetch Members
@@ -915,9 +915,9 @@ export const syncServicesData = async (churchId: string) => {
             });
             const totalNeeded = neededPositions.reduce((sum: number, n: any) => sum + n.quantity, 0);
 
-            // Fetch Plan Items (Songs) — enables Top Songs widget
-            // Uses include=song to get title/author from the related Song resource
-            let items: { type: string; title: string; author?: string }[] = [];
+            // Fetch Plan Items (Songs and other elements) — enables Order of Service
+            // Uses include=song to get title/author from the related Song resource if available
+            let items: { type: string; title: string; author?: string; description?: string; sequence?: number }[] = [];
             try {
                 const itemsData = await pcoFetch(churchId, itemsUrl);
                 // Build a lookup map for included Song resources
@@ -932,18 +932,22 @@ export const syncServicesData = async (churchId: string) => {
                 });
 
                 items = (itemsData.data || [])
-                    .filter((item: any) => item.attributes.item_type === 'song' || item.relationships?.song?.data?.id)
                     .map((item: any) => {
                         const songId = item.relationships?.song?.data?.id;
                         const songDetail = songId ? includedSongs.get(songId) : null;
+                        const isSong = item.attributes.item_type === 'song' || !!songId;
                         return {
-                            type: 'song',
-                            title: songDetail?.title || item.attributes.title || 'Unknown Title',
-                            author: songDetail?.author || ''
+                            type: isSong ? 'song' : (item.attributes.item_type || 'item'),
+                            title: songDetail?.title || item.attributes.title || 'Untitled Item',
+                            author: songDetail?.author || '',
+                            description: item.attributes.description || '',
+                            sequence: item.attributes.sequence || 0
                         };
-                    }).filter((item: any) => item.title && item.title !== 'Unknown Title');
+                    })
+                    .filter((item: any) => item.title)
+                    .sort((a: any, b: any) => a.sequence - b.sequence);
             } catch (itemsErr) {
-                // Non-fatal — songs are optional; plan still saves without them
+                // Non-fatal — items are optional; plan still saves without them
                 console.warn(`Could not fetch items for plan ${plan.id}:`, itemsErr);
             }
 

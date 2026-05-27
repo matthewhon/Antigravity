@@ -473,6 +473,7 @@ const Layout: React.FC<LayoutProps> = ({
                         { view: 'services',            icon: '🎨', label: 'Overview'    },
                         { view: 'services-attendance', icon: '📌', label: 'Attendance' },
                         { view: 'services-teams',      icon: '👤', label: 'Teams'      },
+                        { view: 'services-plans',      icon: '📅', label: 'Plans'      },
                         ...(church?.smsSettings?.smsEnabled ? [{ view: 'services-reminders', icon: '📱', label: 'Reminders' }] : []),
                       ].map(item => (
                         <button

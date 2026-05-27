@@ -12,6 +12,7 @@ import { SERVICES_OVERVIEW_WIDGETS, SERVICES_ATTENDANCE_WIDGETS, SERVICES_TEAMS_
 import { WidgetWrapper, StatCard } from './SharedUI';
 import { syncServicesData, syncCheckInsData } from '../services/pcoSyncService'; 
 import ServicesRemindersTab from './ServicesRemindersTab';
+import ServicesPlansTab from './ServicesPlansTab';
 
 interface ServicesViewProps {
   data: ServicesDashboardData | null;
@@ -19,7 +20,7 @@ interface ServicesViewProps {
   filter: ServicesFilter;
   onFilterChange: (filter: ServicesFilter) => void;
   pcoConnected: boolean;
-  activePage?: 'Overview' | 'Attendance' | 'Teams' | 'Reminders';
+  activePage?: 'Overview' | 'Attendance' | 'Teams' | 'Reminders' | 'Plans';
   overviewWidgets: string[];
   attendanceWidgets: string[];
   teamsWidgets: string[];
@@ -1295,6 +1296,16 @@ const ServicesView: React.FC<ServicesViewProps> = ({
       <ServicesRemindersTab 
         church={church} 
         onUpdateChurch={onUpdateChurch} 
+      />
+    );
+  }
+
+  if (activePage === 'Plans') {
+    return (
+      <ServicesPlansTab 
+        futurePlans={data?.futurePlans || []}
+        teams={data?.teams || []}
+        people={people}
       />
     );
   }

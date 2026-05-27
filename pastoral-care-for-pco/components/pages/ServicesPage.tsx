@@ -27,6 +27,7 @@ export const ServicesPage: React.FC<ServicesPageProps> = ({
         subpath === 'attendance' ? 'Attendance' :
         subpath === 'teams'      ? 'Teams'      :
         subpath === 'reminders'  ? 'Reminders'  :
+        subpath === 'plans'      ? 'Plans'      :
         'Overview';
 
     if (!user || !church) return null;
