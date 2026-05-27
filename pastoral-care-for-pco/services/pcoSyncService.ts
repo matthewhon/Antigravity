@@ -853,13 +853,23 @@ export const syncServicesData = async (churchId: string) => {
         try {
             // Fetch Members
             const membersData = await pcoFetch(churchId, membersUrl);
-            const members = membersData.data.map((m: any) => ({
-                personId: m.relationships?.person?.data?.id || null,
-                teamName: m.attributes.team_name || 'Unknown',
-                status: m.attributes.status || 'Pending',
-                teamPositionName: m.attributes.team_position_name || null,
-                name: m.attributes.name || 'Unknown'
-            }));
+            const members = membersData.data.map((m: any) => {
+                const teamId = m.relationships?.team?.data?.id;
+                let teamName = null;
+                if (teamId) {
+                    const team = teams.find(t => t.id === teamId);
+                    if (team) {
+                        teamName = team.name;
+                    }
+                }
+                return {
+                    personId: m.relationships?.person?.data?.id || null,
+                    teamName: teamName || (teamId ? `Team ${teamId}` : 'Unknown'),
+                    status: m.attributes.status || 'Pending',
+                    teamPositionName: m.attributes.team_position_name || null,
+                    name: m.attributes.name || 'Unknown'
+                };
+            });
             
             // Update Serving Stats Map
             const planDate = new Date(plan.sortDate);
