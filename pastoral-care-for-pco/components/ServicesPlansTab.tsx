@@ -128,16 +128,16 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
           
           {/* Filters Card */}
           <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl p-6 shadow-sm space-y-4">
-            <h4 className="text-xs font-black uppercase text-slate-400 dark:text-slate-500 tracking-wider">Filters</h4>
+            <h4 className="text-xs font-black uppercase text-slate-400 dark:text-slate-400 tracking-wider">Filters</h4>
             
             {/* Service Type Filter */}
             <div className="space-y-1">
-              <label htmlFor="service-type" className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Service Type</label>
+              <label htmlFor="service-type" className="text-[10px] font-bold text-slate-500 dark:text-slate-300 uppercase tracking-wider">Service Type</label>
               <select
                 id="service-type"
                 value={serviceTypeFilter}
                 onChange={(e) => setServiceTypeFilter(e.target.value)}
-                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-350 rounded-xl py-2 px-3 outline-none focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer"
+                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 rounded-xl py-2 px-3 outline-none focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer"
               >
                 <option value="All">All Service Types</option>
                 {serviceTypes.map(type => (
@@ -149,23 +149,23 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
             {/* Date Range Filters */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <label htmlFor="start-date" className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">From Date</label>
+                <label htmlFor="start-date" className="text-[10px] font-bold text-slate-500 dark:text-slate-300 uppercase tracking-wider">From Date</label>
                 <input
                   id="start-date"
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-350 rounded-xl py-2 px-3 outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 rounded-xl py-2 px-3 outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
                 />
               </div>
               <div className="space-y-1">
-                <label htmlFor="end-date" className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">To Date</label>
+                <label htmlFor="end-date" className="text-[10px] font-bold text-slate-500 dark:text-slate-300 uppercase tracking-wider">To Date</label>
                 <input
                   id="end-date"
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-350 rounded-xl py-2 px-3 outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 rounded-xl py-2 px-3 outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
                 />
               </div>
             </div>
@@ -185,7 +185,7 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
                   setStartDate(todayStr);
                   setEndDate(end.toISOString().split('T')[0]);
                 }}
-                className="flex-1 text-[9px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 rounded-lg py-1.5 transition-colors"
+                className="flex-1 text-[9px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 rounded-lg py-1.5 transition-colors"
               >
                 Next 90 Days
               </button>
@@ -195,7 +195,7 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
           {/* Plans List Card */}
           <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl p-6 shadow-sm flex flex-col max-h-[600px]">
             <div className="flex justify-between items-center mb-4">
-              <h4 className="text-xs font-black uppercase text-slate-400 dark:text-slate-500 tracking-wider">
+              <h4 className="text-xs font-black uppercase text-slate-400 dark:text-slate-400 tracking-wider">
                 Upcoming Plans ({filteredPlans.length})
               </h4>
             </div>
@@ -249,14 +249,14 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
                               {plan.seriesTitle}
                             </p>
                           )}
-                          <p className="text-[9px] text-slate-400 dark:text-slate-500 font-medium mt-1">
+                          <p className="text-[9px] text-slate-400 dark:text-slate-400 font-medium mt-1">
                             ⏰ {planDate.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
                           </p>
                         </div>
                       </div>
 
                       {/* Small staffing stats */}
-                      <div className="mt-3 flex items-center justify-between text-[8px] font-black uppercase tracking-wider text-slate-400">
+                      <div className="mt-3 flex items-center justify-between text-[8px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-400">
                         <span>Staffing Load</span>
                         <span className={neededCount > 0 ? 'text-rose-500' : 'text-emerald-500'}>
                           {neededCount > 0 ? `${neededCount} Slots Needed` : 'Fully Staffed'}
@@ -303,7 +303,7 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
                   <h4 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight mt-2">
                     {selectedPlan.title || 'Service Plan'}
                   </h4>
-                  <p className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1">
+                  <p className="text-xs font-bold text-slate-400 dark:text-slate-400 uppercase tracking-widest mt-1">
                     🗓️ {getPlanDate(selectedPlan).toLocaleDateString(undefined, { 
                       weekday: 'long', 
                       year: 'numeric', 
@@ -324,7 +324,7 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
                     <span className="block text-2xl font-black text-indigo-600 dark:text-indigo-400 leading-none">
                       {selectedPlan.items?.length || 0}
                     </span>
-                    <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">Plan Items</span>
+                    <span className="text-[8px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider font-bold">Plan Items</span>
                   </div>
                   <div className="h-8 w-px bg-slate-200 dark:bg-slate-700" />
                   <div className="text-center">
@@ -333,7 +333,7 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
                     }`}>
                       {selectedPlan.positionsNeeded || 0}
                     </span>
-                    <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">Needed Slots</span>
+                    <span className="text-[8px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider font-bold">Needed Slots</span>
                   </div>
                 </div>
               </div>
@@ -345,7 +345,7 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
                   className={`px-6 py-3 text-xs font-black uppercase tracking-wider border-b-2 -mb-px transition-all ${
                     activeDetailTab === 'items'
                       ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
-                      : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+                      : 'border-transparent text-slate-400 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
                   }`}
                 >
                   📝 Order of Service
@@ -355,7 +355,7 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
                   className={`px-6 py-3 text-xs font-black uppercase tracking-wider border-b-2 -mb-px transition-all ${
                     activeDetailTab === 'roster'
                       ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
-                      : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+                      : 'border-transparent text-slate-400 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
                   }`}
                 >
                   👥 Scheduled Roster
@@ -365,7 +365,7 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
                   className={`px-6 py-3 text-xs font-black uppercase tracking-wider border-b-2 -mb-px transition-all relative ${
                     activeDetailTab === 'needs'
                       ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
-                      : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+                      : 'border-transparent text-slate-400 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
                   }`}
                 >
                   ⚠️ Open Positions
