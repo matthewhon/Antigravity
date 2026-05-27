@@ -16,9 +16,15 @@ interface Props {
 }
 
 const MERGE_TAGS = [
-  { tag: '@first-name',    label: 'First name' },
-  { tag: '@last-name',     label: 'Last name' },
-  { tag: '@email',         label: 'Email address' },
+  { tag: '{firstName}',    label: 'First Name' },
+  { tag: '{lastName}',     label: 'Last Name' },
+  { tag: '{fullName}',     label: 'Full Name' },
+  { tag: '{email}',        label: 'Email' },
+  { tag: '{phone}',        label: 'Phone' },
+  { tag: '{city}',         label: 'City' },
+  { tag: '{state}',        label: 'State' },
+  { tag: '{birthday}',     label: 'Birthday' },
+  { tag: '{anniversary}',  label: 'Anniversary' },
   { tag: '@view-in-browser', label: 'View in browser link' },
   { tag: '@current-date',  label: 'Current date' },
   { tag: '@current-month', label: 'Current month' },
