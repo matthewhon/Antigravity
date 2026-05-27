@@ -199,6 +199,7 @@ export interface PcoPerson {
     gender?: string | null;
     birthdate?: string | null;
     anniversary?: string | null;
+    needsGeocoding?: boolean;
     salvationDate?: string | null;
     baptismDate?: string | null;
     createdAt: string;

@@ -20,6 +20,14 @@
       "collectionGroup": "people",
       "queryScope": "COLLECTION",
       "fields": [
+        { "fieldPath": "churchId",       "order": "ASCENDING" },
+        { "fieldPath": "needsGeocoding", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "people",
+      "queryScope": "COLLECTION",
+      "fields": [
         { "fieldPath": "churchId",   "order": "ASCENDING" },
         { "fieldPath": "nameLower",  "order": "ASCENDING" }
       ]

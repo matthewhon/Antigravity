@@ -331,6 +331,33 @@ export const syncPeopleData = async (churchId: string) => {
 
         for (const newPerson of people) {
             const oldPerson = existingMap.get(newPerson.id);
+            
+            // Coordinate Preservation: if the address hasn't changed, keep the existing lat/lng
+            const newAddr = newPerson.addresses?.[0];
+            const oldAddr = oldPerson?.addresses?.[0];
+            if (newAddr && oldAddr) {
+                const streetMatch = (newAddr.street || '').trim().toLowerCase() === (oldAddr.street || '').trim().toLowerCase();
+                const cityMatch = (newAddr.city || '').trim().toLowerCase() === (oldAddr.city || '').trim().toLowerCase();
+                const stateMatch = (newAddr.state || '').trim().toLowerCase() === (oldAddr.state || '').trim().toLowerCase();
+                const zipMatch = (newAddr.zip || '').trim().toLowerCase() === (oldAddr.zip || '').trim().toLowerCase();
+                
+                if (streetMatch && cityMatch && stateMatch && zipMatch) {
+                    if (oldAddr.lat !== undefined && oldAddr.lat !== null) {
+                        newAddr.lat = oldAddr.lat;
+                    }
+                    if (oldAddr.lng !== undefined && oldAddr.lng !== null) {
+                        newAddr.lng = oldAddr.lng;
+                    }
+                }
+            }
+
+            // Set needsGeocoding flag: true if we have city/zip but no coordinates
+            if (newAddr && (newAddr.city || newAddr.zip) && (newAddr.lat === undefined || newAddr.lat === null)) {
+                newPerson.needsGeocoding = true;
+            } else {
+                newPerson.needsGeocoding = false;
+            }
+
             if (!oldPerson) continue; // New person, no change to track
 
             // Status Change
@@ -1698,14 +1725,8 @@ export const geocodePeopleAddresses = async (churchId: string): Promise<void> =>
     const sysSettings = await firestore.getSystemSettings();
     const googleApiKey: string | undefined = sysSettings?.googleMapsApiKey || undefined;
 
-    // Fetch all people for this church
-    const people = await firestore.getPeople(churchId);
-
-    // Filter to those whose first address has a city/zip but no lat/lng yet
-    const toGeocode = people.filter(p => {
-        const addr = p.addresses?.[0];
-        return addr && (addr.city || addr.zip) && (addr.lat === undefined || addr.lat === null);
-    });
+    // Fetch only people needing geocoding for this church
+    const toGeocode = await firestore.getPeopleNeedsGeocoding(churchId);
 
     if (toGeocode.length === 0) {
         logger.info('No new addresses to geocode.', 'sync', { churchId }, churchId);
@@ -1768,14 +1789,16 @@ export const geocodePeopleAddresses = async (churchId: string): Promise<void> =>
             if (coords) {
                 // Merge lat/lng into the first address, preserve all other fields
                 const updatedAddresses = [{ ...addr, lat: coords.lat, lng: coords.lng }, ...(person.addresses?.slice(1) || [])];
-                updated.push({ ...person, addresses: updatedAddresses });
+                updated.push({ ...person, addresses: updatedAddresses, needsGeocoding: false });
                 successCount++;
             } else {
                 failCount++;
+                updated.push({ ...person, needsGeocoding: false });
             }
         } catch (e: any) {
             failCount++;
             logger.warn(`Geocode failed for person ${person.id}`, 'sync', { churchId, error: e?.message });
+            updated.push({ ...person, needsGeocoding: false });
         }
 
         // Google: ~50ms between requests stays safely under quota; Nominatim: already delayed above

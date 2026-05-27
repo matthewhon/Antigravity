@@ -27,7 +27,8 @@ export const CarePage: React.FC<CarePageProps> = ({
 }) => {
     const { 
         user, church, people, groups, attendance, donations, 
-        teams, recentRiskChanges, recentStatusChanges, servicesData 
+        teams, recentRiskChanges, recentStatusChanges, servicesData,
+        systemSettings
     } = useTenantData();
     const { '*': subpath } = useParams();
 
@@ -84,7 +85,7 @@ export const CarePage: React.FC<CarePageProps> = ({
                 setUser({ ...user, widgetPreferences: newPrefs });
             }}
             allowedWidgetIds={allowedWidgetIds}
-            googleMapsApiKey={church.googleMapsApiKey}
+            googleMapsApiKey={systemSettings?.googleMapsApiKey || church.googleMapsApiKey}
             onUpdateTheme={onUpdateTheme}
         />
     );

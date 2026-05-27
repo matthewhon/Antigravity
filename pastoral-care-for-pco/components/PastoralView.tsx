@@ -121,6 +121,103 @@ const ensureLeafletCss = () => {
     document.head.appendChild(link);
 };
 
+declare const google: any;
+
+const loadGoogleMapsScript = (apiKey: string, callback: () => void) => {
+    if ((window as any).google && (window as any).google.maps) {
+        callback();
+        return;
+    }
+    const existingScript = document.getElementById('google-maps-script');
+    if (existingScript) {
+        const interval = setInterval(() => {
+            if ((window as any).google && (window as any).google.maps) {
+                clearInterval(interval);
+                callback();
+            }
+        }, 100);
+        return;
+    }
+    const script = document.createElement('script');
+    script.id = 'google-maps-script';
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=visualization`;
+    script.async = true;
+    script.defer = true;
+    script.onload = () => {
+        callback();
+    };
+    script.onerror = () => {
+        console.error('Failed to load Google Maps script.');
+    };
+    document.head.appendChild(script);
+};
+
+const GOOGLE_MAPS_DARK_STYLE = [
+  { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
+  {
+    featureType: "administrative.locality",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#d59563" }],
+  },
+  {
+    featureType: "poi",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#d59563" }],
+  },
+  {
+    featureType: "poi.park",
+    elementType: "geometry",
+    stylers: [{ color: "#263c3f" }],
+  },
+  {
+    featureType: "poi.park",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#6b9a76" }],
+  },
+  {
+    featureType: "road",
+    elementType: "geometry",
+    stylers: [{ color: "#38414e" }],
+  },
+  {
+    featureType: "road",
+    elementType: "geometry.stroke",
+    stylers: [{ color: "#212a37" }],
+  },
+  {
+    featureType: "road.highway",
+    elementType: "geometry",
+    stylers: [{ color: "#746855" }],
+  },
+  {
+    featureType: "road.highway",
+    elementType: "geometry.stroke",
+    stylers: [{ color: "#1f2835" }],
+  },
+  {
+    featureType: "transit",
+    elementType: "geometry",
+    stylers: [{ color: "#2f3948" }],
+  },
+  {
+    featureType: "water",
+    elementType: "geometry",
+    stylers: [{ color: "#17263c" }],
+  },
+  {
+    featureType: "water",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#515c6d" }],
+  },
+  {
+    featureType: "water",
+    elementType: "labels.text.stroke",
+    stylers: [{ color: "#17263c" }],
+  },
+];
+
 const PersonSearchCombobox = ({ 
     people, 
     value, 
@@ -284,6 +381,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
   const effectiveCensusError = (defaultLocation && locationErrorMap[defaultLocation.id]) || censusError;
   const [mapInstance, setMapInstance] = useState<any>(null);
   const [mapAuthError, setMapAuthError] = useState(false);
+  const [mapMode, setMapMode] = useState<'pins' | 'heatmap'>('heatmap');
   const [geocodeProgress, setGeocodeProgress] = useState<{ plotted: number; ungeocoded: number; topCities: string[] } | null>(null);
 
   // Care State
@@ -554,45 +652,26 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
       setStrategyReport('');
   }, [selectedLocationId, activeTab]);
 
-  // --- Map Initialization Effect (Leaflet + MarkerCluster) ---
+  // --- Map Initialization Effect (Google Maps) ---
   useEffect(() => {
-      if (activeTab !== 'Membership' || !peopleData || !mapRef.current || mapInstance || !safeVisibleWidgets.includes('member_map')) return;
+      if (activeTab !== 'Membership' || !peopleData || !mapRef.current || !safeVisibleWidgets.includes('member_map')) return;
 
-      ensureLeafletCss();
-
-      // Inject MarkerCluster CSS (needed for cluster spiderfy animations)
-      const clusterId = 'leaflet-cluster-css';
-      if (!document.getElementById(clusterId)) {
-          const link = document.createElement('link');
-          link.id = clusterId;
-          link.rel = 'stylesheet';
-          link.href = 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css';
-          document.head.appendChild(link);
-          const link2 = document.createElement('link');
-          link2.id = clusterId + '-default';
-          link2.rel = 'stylesheet';
-          link2.href = 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css';
-          document.head.appendChild(link2);
+      if (!googleMapsApiKey) {
+          // If no key, we don't attempt to load. A warning is rendered in the UI instead.
+          return;
       }
 
-      // leaflet.markercluster is a UMD plugin — it must find a mutable window.L at load time.
-      // IMPORTANT: import('leaflet') returns the ES *namespace* object, which is frozen by spec.
-      // Assigning it directly to window.L and then calling plugin.attach() throws:
-      //   "TypeError: Cannot add property MarkerClusterGroup, object is not extensible"
-      // Fix: use the .default export, which is the actual mutable Leaflet object.
-      import('leaflet').then(async (leafletModule) => {
+      setMapAuthError(false);
+
+      // Clear the map ref's innerHTML to clean up any old map instance
+      if (mapRef.current) {
+          mapRef.current.innerHTML = '';
+      }
+
+      loadGoogleMapsScript(googleMapsApiKey, () => {
           if (!mapRef.current) return;
 
-          // Use the mutable .default export, NOT the frozen namespace
-          const L = leafletModule.default;
-
-          // Expose to window so the UMD plugin can attach MarkerClusterGroup to it
-          (window as any).L = L;
-
-          // Now load the plugin — it will attach L.markerClusterGroup to window.L
-          await import('leaflet.markercluster');
-
-          // Build geocoded point list from people with lat/lng on their first address
+          // Build geocoded point list from people
           const points: { lat: number; lng: number; name: string; city?: string; membership?: string }[] = [];
           let ungeocodedCount = 0;
           const cityCounter = new Map<string, number>();
@@ -621,95 +700,94 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
 
           setGeocodeProgress({ plotted: points.length, ungeocoded: ungeocodedCount, topCities });
 
-          // Fix default icon paths broken by bundlers
-          (L.Icon.Default.prototype as any)._getIconUrl = undefined;
-          L.Icon.Default.mergeOptions({
-              iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-              iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-              shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-          });
-
-          const map = L.map(mapRef.current!, {
-              center: [39.8283, -98.5795],
+          const currentTheme = user.theme || 'traditional';
+          const mapOptions = {
+              center: { lat: 39.8283, lng: -98.5795 },
               zoom: 4,
-              zoomControl: true,
-              attributionControl: true,
-              maxZoom: 16,
-          });
+              styles: currentTheme === 'dark' ? GOOGLE_MAPS_DARK_STYLE : [],
+              mapTypeControl: false,
+              streetViewControl: false,
+              fullscreenControl: false,
+          };
 
-          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-              attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-              maxZoom: 19,
-          }).addTo(map);
+          try {
+              const map = new google.maps.Map(mapRef.current, mapOptions);
+              setMapInstance(map);
 
-          if (points.length > 0) {
-              // markerClusterGroup is now attached to window.L by the UMD plugin
-              const clusterGroup = (window as any).L.markerClusterGroup({
-                  maxClusterRadius: 60,
-                  showCoverageOnHover: false,
-                  iconCreateFunction: (cluster: any) => {
-                      const count = cluster.getChildCount();
-                      const size = count < 10 ? 36 : count < 50 ? 44 : 52;
-                      return L.divIcon({
-                          html: `<div style="
-                              width:${size}px;height:${size}px;
-                              background:linear-gradient(135deg,#6366f1,#8b5cf6);
-                              border:2px solid #fff;
-                              border-radius:50%;
-                              display:flex;align-items:center;justify-content:center;
-                              box-shadow:0 2px 8px rgba(99,102,241,0.5);
-                              font-size:${count < 100 ? 12 : 10}px;
-                              font-weight:800;
-                              color:#fff;
-                          ">${count}</div>`,
-                          className: '',
-                          iconSize: [size, size],
-                          iconAnchor: [size / 2, size / 2],
-                      });
-                  },
-              });
-
-              points.forEach(pt => {
-                  const memberColor = pt.membership === 'Member' ? '#10b981' : '#6366f1';
-                  const marker = L.circleMarker([pt.lat, pt.lng], {
-                      radius: 7,
-                      fillColor: memberColor,
-                      fillOpacity: 0.85,
-                      color: '#fff',
-                      weight: 1.5,
+              if (points.length > 0) {
+                  const bounds = new google.maps.LatLngBounds();
+                  points.forEach(pt => {
+                      bounds.extend({ lat: pt.lat, lng: pt.lng });
                   });
 
-                  marker.bindPopup(`
-                      <div style="text-align:center;padding:6px 10px;font-family:system-ui,sans-serif">
-                          <strong style="font-size:13px;color:#1e293b;display:block;margin-bottom:2px">${pt.name}</strong>
-                          <span style="font-size:11px;color:#64748b">${pt.city || 'Unknown city'}</span><br/>
-                          <span style="font-size:10px;font-weight:700;color:${memberColor}">${pt.membership}</span>
-                      </div>
-                  `);
+                  if (mapMode === 'pins') {
+                      points.forEach(pt => {
+                          const memberColor = pt.membership === 'Member' ? '#10b981' : '#6366f1';
+                          const pinSvg = `
+                              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+                                  <path fill="${memberColor}" stroke="#ffffff" stroke-width="1.5" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                              </svg>
+                          `;
+                          const marker = new google.maps.Marker({
+                              position: { lat: pt.lat, lng: pt.lng },
+                              map: map,
+                              title: pt.name,
+                              icon: {
+                                  url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(pinSvg),
+                                  scaledSize: new google.maps.Size(32, 32),
+                                  anchor: new google.maps.Point(16, 32)
+                              }
+                          });
 
-                  clusterGroup.addLayer(marker);
-              });
+                          const infoWindow = new google.maps.InfoWindow({
+                              content: `
+                                  <div style="text-align:center;padding:6px 10px;font-family:system-ui,sans-serif;color:#1e293b;">
+                                      <strong style="font-size:13px;display:block;margin-bottom:2px">${pt.name}</strong>
+                                      <span style="font-size:11px;color:#64748b">${pt.city || 'Unknown city'}</span><br/>
+                                      <span style="font-size:10px;font-weight:700;color:${memberColor}">${pt.membership}</span>
+                                  </div>
+                              `
+                          });
 
-              map.addLayer(clusterGroup);
+                          marker.addListener('click', () => {
+                              infoWindow.open(map, marker);
+                          });
+                      });
+                  } else {
+                      const heatmapData = points.map(pt => new google.maps.LatLng(pt.lat, pt.lng));
+                      new google.maps.visualization.HeatmapLayer({
+                          data: heatmapData,
+                          map: map,
+                          radius: 30,
+                          maxIntensity: 5,
+                      });
+                  }
 
-              try {
-                  map.fitBounds(clusterGroup.getBounds(), { padding: [40, 40], maxZoom: 12 });
-              } catch { /* bounds may fail if only 1 point */ }
+                  // Fit map bounds
+                  setTimeout(() => {
+                      try {
+                          map.fitBounds(bounds);
+                          const listener = google.maps.event.addListener(map, 'idle', () => {
+                              if (map.getZoom() > 14) {
+                                  map.setZoom(14);
+                              }
+                              google.maps.event.removeListener(listener);
+                          });
+                      } catch (e) {
+                          console.warn('fitBounds failed', e);
+                      }
+                  }, 100);
+              }
+          } catch (err) {
+              console.error('Google Maps init error:', err);
+              setMapAuthError(true);
           }
-
-          setMapInstance(map);
-      }).catch(err => {
-          console.error('Leaflet cluster load error:', err);
-          setMapAuthError(true);
       });
+  }, [activeTab, peopleData, safeVisibleWidgets, mapMode, googleMapsApiKey, user.theme]);
 
-      return () => {};
-  }, [activeTab, peopleData, safeVisibleWidgets, mapInstance]);
-
-  // Destroy Leaflet map and reset when leaving Membership tab so re-entry triggers fresh init
+  // Clean up when leaving Membership tab
   useEffect(() => {
       if (activeTab !== 'Membership' && mapInstance) {
-          try { (mapInstance as any).remove(); } catch { /* ignore */ }
           setMapInstance(null);
           setMapAuthError(false);
       }
@@ -826,18 +904,50 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
               ) : null;
           case 'member_map':
               return (
-                  <WidgetWrapper title="Member Heatmap" onRemove={() => handleRemoveWidget(id)} source="OpenStreetMap">
+                  <WidgetWrapper title="Member Heatmap" onRemove={() => handleRemoveWidget(id)} source={googleMapsApiKey ? "Google Maps" : "OpenStreetMap"}>
                       <div className="h-96 w-full rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-800 relative">
                           <div ref={mapRef} className="w-full h-full" />
+                          
+                          {/* Map Mode Toggle Overlay */}
+                          {googleMapsApiKey && !mapAuthError && (
+                              <div className="absolute top-4 right-4 z-10 flex bg-white/90 dark:bg-slate-900/90 backdrop-blur-md p-1 rounded-xl shadow-lg border border-slate-200/50 dark:border-slate-700/50 select-none">
+                                  <button
+                                      onClick={() => setMapMode('heatmap')}
+                                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${mapMode === 'heatmap' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80'}`}
+                                  >
+                                      🔥 Heatmap
+                                  </button>
+                                  <button
+                                      onClick={() => setMapMode('pins')}
+                                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${mapMode === 'pins' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80'}`}
+                                  >
+                                      📍 Pins
+                                  </button>
+                              </div>
+                          )}
+
+                          {!googleMapsApiKey && (
+                              <div className="absolute inset-0 flex items-center justify-center bg-slate-50 dark:bg-slate-900 z-10 px-6 text-center">
+                                  <div className="max-w-xs">
+                                      <span className="text-3xl mb-3 block">🗺️</span>
+                                      <p className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-2">Google Maps Key Required</p>
+                                      <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed mb-4">
+                                          To view the membership heatmap, please configure your Google Maps API Key in System Settings.
+                                      </p>
+                                  </div>
+                              </div>
+                          )}
+
                           {mapAuthError && (
                               <div className="absolute inset-0 flex items-center justify-center bg-slate-100/90 dark:bg-slate-900/90 z-10">
                                   <div className="text-center p-6">
                                       <p className="text-rose-500 font-bold mb-2">Map Load Error</p>
-                                      <p className="text-xs text-slate-500">Could not load the map. Check your network connection.</p>
+                                      <p className="text-xs text-slate-500">Could not load the map. Check your key and network connection.</p>
                                   </div>
                               </div>
                           )}
-                          {!mapInstance && !mapAuthError && (
+                          
+                          {googleMapsApiKey && !mapInstance && !mapAuthError && (
                               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                                   <div className="flex items-center gap-2">
                                       <svg className="animate-spin w-4 h-4 text-indigo-400" fill="none" viewBox="0 0 24 24">

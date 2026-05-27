@@ -421,6 +421,21 @@ class FirestoreService {
       } catch (e) { return []; }
   }
 
+  async getPeopleNeedsGeocoding(churchId: string): Promise<PcoPerson[]> {
+      try {
+          const q = query(
+              collection(db, 'people'), 
+              where('churchId', '==', churchId),
+              where('needsGeocoding', '==', true)
+          );
+          const snapshot = await getDocs(q);
+          return snapshot.docs.map(d => d.data() as PcoPerson);
+      } catch (e) { 
+          console.error('[FirestoreService] getPeopleNeedsGeocoding failed:', e);
+          return []; 
+      }
+  }
+
   /**
    * Batch-updates the `checkInCount` field on person documents.
    * @param churchId The church tenant ID
