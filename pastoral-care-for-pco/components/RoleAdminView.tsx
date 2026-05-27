@@ -363,10 +363,11 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   const [showAddNumber, setShowAddNumber] = useState(false);
   // Add-number wizard local state
   const [addNumStep, setAddNumStep] = useState<'search' | 'pick'>('search');
-  const [addNumMode, setAddNumMode] = useState<'city-state' | 'area-code'>('city-state');
+  const [addNumMode, setAddNumMode] = useState<'city-state' | 'area-code' | 'ported'>('city-state');
   const [addNumCity, setAddNumCity] = useState(church.city || '');
   const [addNumState, setAddNumState] = useState(church.state || '');
   const [addNumAreaCode, setAddNumAreaCode] = useState('');
+  const [addNumPorted, setAddNumPorted] = useState('');
   const [addNumResults, setAddNumResults] = useState<{ phoneNumber: string; friendlyName: string; locality: string; region: string }[]>([]);
   const [addNumSelected, setAddNumSelected] = useState('');
   const [addNumLabel, setAddNumLabel] = useState('');
@@ -3198,10 +3199,45 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                             ['VA','Virginia'],['WA','Washington'],['WV','West Virginia'],['WI','Wisconsin'],['WY','Wyoming'],
                         ];
 
+                        const formatPhone = (phone: string): string => {
+                            const digits = phone.replace(/\D/g, '');
+                            if (digits.length === 10) {
+                                return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+                            }
+                            if (digits.length === 11 && digits.startsWith('1')) {
+                                return `(${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+                            }
+                            return phone;
+                        };
+
                         const handleSearch = async () => {
                             setNumError('');
                             setAddNumBusy(true);
                             try {
+                                if (addNumMode === 'ported') {
+                                    const rawNum = addNumPorted.trim();
+                                    let cleanNum = rawNum.replace(/[^\d+]/g, '');
+                                    if (cleanNum.length === 10) {
+                                        cleanNum = `+1${cleanNum}`;
+                                    } else if (cleanNum.length === 11 && cleanNum.startsWith('1')) {
+                                        cleanNum = `+${cleanNum}`;
+                                    } else if (!cleanNum.startsWith('+')) {
+                                        cleanNum = `+${cleanNum}`;
+                                    }
+                                    if (!cleanNum.match(/^\+[1-9]\d{10,14}$/)) {
+                                        throw new Error('Enter a valid phone number in E.164 format (e.g. +16155550100).');
+                                    }
+                                    setAddNumResults([{
+                                        phoneNumber: cleanNum,
+                                        friendlyName: formatPhone(cleanNum),
+                                        locality: 'Ported Number',
+                                        region: 'SignalWire'
+                                    }]);
+                                    setAddNumSelected(cleanNum);
+                                    setAddNumStep('pick');
+                                    return;
+                                }
+
                                 let url = `/api/messaging/available-numbers?churchId=${encodeURIComponent(churchId)}`;
                                 if (addNumMode === 'area-code') {
                                     if (!addNumAreaCode || addNumAreaCode.length < 3) { setNumError('Enter a 3-digit area code.'); return; }
@@ -3793,22 +3829,22 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             <div className="space-y-5">
                                                 {/* Mode toggle */}
                                                 <div className="flex rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 w-fit">
-                                                    {(['city-state', 'area-code'] as const).map(m => (
+                                                    {(['city-state', 'area-code', 'ported'] as const).map(m => (
                                                         <button
                                                             key={m}
-                                                            onClick={() => setAddNumMode(m)}
+                                                            onClick={() => { setAddNumMode(m); setNumError(''); }}
                                                             className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all ${
                                                                 addNumMode === m
                                                                     ? 'bg-violet-600 text-white'
                                                                     : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50'
                                                             }`}
                                                         >
-                                                            {m === 'city-state' ? 'City / State' : 'Area Code'}
+                                                            {m === 'city-state' ? 'City / State' : m === 'area-code' ? 'Area Code' : 'Ported Number'}
                                                         </button>
                                                     ))}
                                                 </div>
 
-                                                {addNumMode === 'city-state' ? (
+                                                {addNumMode === 'city-state' && (
                                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                         <div>
                                                             <label className={labelCn}>City (optional)</label>
@@ -3825,7 +3861,9 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                             </select>
                                                         </div>
                                                     </div>
-                                                ) : (
+                                                )}
+
+                                                {addNumMode === 'area-code' && (
                                                     <div>
                                                         <label className={labelCn}>Area Code <span className="text-rose-500">*</span></label>
                                                         <input type="text" value={addNumAreaCode}
@@ -3834,12 +3872,22 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                     </div>
                                                 )}
 
+                                                {addNumMode === 'ported' && (
+                                                    <div>
+                                                        <label className={labelCn}>Ported Phone Number <span className="text-rose-500">*</span></label>
+                                                        <input type="tel" value={addNumPorted}
+                                                            onChange={e => setAddNumPorted(e.target.value)}
+                                                            className={inputCn} placeholder="e.g. +16155550100" />
+                                                        <p className="text-[10px] text-slate-400 mt-1">Enter the phone number that was ported into SignalWire.</p>
+                                                    </div>
+                                                )}
+
                                                 <button
                                                     onClick={handleSearch}
                                                     disabled={addNumBusy}
                                                     className="bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all"
                                                 >
-                                                    {addNumBusy ? 'Searching…' : 'Search Available Numbers'}
+                                                    {addNumBusy ? 'Searching…' : addNumMode === 'ported' ? 'Verify Ported Number' : 'Search Available Numbers'}
                                                 </button>
                                             </div>
                                         )}

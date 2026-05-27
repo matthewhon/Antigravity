@@ -7024,10 +7024,11 @@ const SmsSetupWizard: React.FC<{
     const needsTerms = mode === 'setup' && !termsAcceptedAt;
     const [step, setStep] = useState<'terms' | 'search' | 'pick-number' | 'done'>(needsTerms ? 'terms' : 'search');
     const [termsTs, setTermsTs] = useState<number | null>(termsAcceptedAt || null);
-    const [searchMode, setSearchMode] = useState<'area-code' | 'city-state'>('city-state');
+    const [searchMode, setSearchMode] = useState<'area-code' | 'city-state' | 'ported'>('city-state');
     const [areaCode, setAreaCode] = useState(church.zip?.slice(0, 3) || '');
     const [city, setCity] = useState(church.city || '');
     const [stateAbbr, setStateAbbr] = useState(church.state || '');
+    const [portedNumber, setPortedNumber] = useState('');
     const [numbers, setNumbers] = useState<{ phoneNumber: string; friendlyName: string; locality: string; region: string }[]>([]);
     const [resolvedSearch, setResolvedSearch] = useState('');
     const [canExpand, setCanExpand] = useState(false);
@@ -7057,6 +7058,32 @@ const SmsSetupWizard: React.FC<{
         setError('');
         setLoadingNums(true);
         try {
+            if (searchMode === 'ported') {
+                const rawNum = portedNumber.trim();
+                let cleanNum = rawNum.replace(/[^\d+]/g, '');
+                if (cleanNum.length === 10) {
+                    cleanNum = `+1${cleanNum}`;
+                } else if (cleanNum.length === 11 && cleanNum.startsWith('1')) {
+                    cleanNum = `+${cleanNum}`;
+                } else if (!cleanNum.startsWith('+')) {
+                    cleanNum = `+${cleanNum}`;
+                }
+                if (!cleanNum.match(/^\+[1-9]\d{10,14}$/)) {
+                    throw new Error('Please enter a valid phone number in E.164 format (e.g. +16155550100).');
+                }
+                setNumbers([{
+                    phoneNumber: cleanNum,
+                    friendlyName: formatPhone(cleanNum),
+                    locality: 'Ported Number',
+                    region: 'SignalWire'
+                }]);
+                setSelectedNumber(cleanNum);
+                setResolvedSearch(cleanNum);
+                setPage(0);
+                setStep('pick-number');
+                return;
+            }
+
             let url = `${API_BASE}/api/messaging/available-numbers?churchId=${encodeURIComponent(churchId)}`;
 
             if (searchMode === 'area-code') {
@@ -7113,7 +7140,9 @@ const SmsSetupWizard: React.FC<{
 
     const canSearch = searchMode === 'area-code'
         ? areaCode.length === 3
-        : !!stateAbbr;
+        : searchMode === 'ported'
+            ? !!portedNumber.trim()
+            : !!stateAbbr;
 
     return (
         <div className="p-6 max-w-xl mx-auto mt-8">
@@ -7140,7 +7169,7 @@ const SmsSetupWizard: React.FC<{
                                 <React.Fragment key={s}>
                                     <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black transition-all ${step === s ? 'bg-violet-600 text-white' :
                                             ['pick-number', 'done'].indexOf(step) > ['pick-number', 'done'].indexOf(s) || (s === 'search' && step !== 'search')
-                                                ? 'bg-emerald-500 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-400'
+                                                 ? 'bg-emerald-500 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-400'
                                         }`}>
                                         {i + 1}
                                     </div>
@@ -7156,7 +7185,7 @@ const SmsSetupWizard: React.FC<{
 
                             {/* Mode toggle */}
                             <div className="flex rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 mb-5">
-                                {(['city-state', 'area-code'] as const).map(mode => (
+                                {(['city-state', 'area-code', 'ported'] as const).map(mode => (
                                     <button
                                         key={mode}
                                         onClick={() => { setSearchMode(mode); setError(''); }}
@@ -7165,7 +7194,7 @@ const SmsSetupWizard: React.FC<{
                                                 : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'
                                             }`}
                                     >
-                                        {mode === 'city-state' ? '📍 City & State' : '# Area Code'}
+                                        {mode === 'city-state' ? '📍 City & State' : mode === 'area-code' ? '# Area Code' : '🔌 Ported Number'}
                                     </button>
                                 ))}
                             </div>
@@ -7216,6 +7245,21 @@ const SmsSetupWizard: React.FC<{
                                 </div>
                             )}
 
+                            {searchMode === 'ported' && (
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Ported Phone Number</label>
+                                    <input
+                                        type="tel"
+                                        value={portedNumber}
+                                        onChange={e => setPortedNumber(e.target.value)}
+                                        onKeyDown={e => e.key === 'Enter' && canSearch && fetchNumbers()}
+                                        placeholder="e.g. +1 (615) 555-0100"
+                                        className="w-full text-base font-semibold border-2 border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500"
+                                    />
+                                    <p className="text-[10px] text-slate-400 mt-1">Enter the phone number that was ported into SignalWire.</p>
+                                </div>
+                            )}
+
                             {error && <p className="text-sm text-red-500 mt-3">{error}</p>}
 
                             <button
@@ -7223,7 +7267,8 @@ const SmsSetupWizard: React.FC<{
                                 disabled={loadingNums || !canSearch}
                                 className="w-full py-3 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white font-black rounded-2xl transition mt-5 flex items-center justify-center gap-2"
                             >
-                                {loadingNums ? <><Loader2 size={16} className="animate-spin" /> Searching...</> : 'Find Available Numbers 🔍'}
+                                {loadingNums ? <><Loader2 size={16} className="animate-spin" /> Searching...</> : 
+                                 searchMode === 'ported' ? 'Verify Ported Number ➔' : 'Find Available Numbers 🔍'}
                             </button>
                         </>
                     )}
@@ -7327,7 +7372,7 @@ const SmsSetupWizard: React.FC<{
                                 {/* Sender Name + (in add-number mode) Inbox Label */}
                                 {numbers.length > 0 && (
                                     <>
-                                        {mode === 'add-number' && (
+                                        {(mode === 'add-number' || searchMode === 'ported') && (
                                             <>
                                                 <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Inbox Label (e.g. "Youth Line")</label>
                                                 <input

@@ -194,22 +194,52 @@ export const provisionSmsNumber = async (req: any, res: any) => {
         if (!churchSnap.exists) return res.status(404).json({ error: 'Church not found' });
         const church = churchSnap.data() || {};
 
+        // Check Firestore to make sure the number isn't already registered
+        const existingDbNum = await db.collection('smsNumbers')
+            .where('phoneNumber', '==', phoneNumber)
+            .limit(1)
+            .get();
+        if (!existingDbNum.empty) {
+            const dbNumData = existingDbNum.docs[0].data();
+            if (dbNumData.churchId === churchId) {
+                return res.status(400).json({ error: `Phone number ${phoneNumber} is already configured for this church.` });
+            } else {
+                return res.status(400).json({ error: `Phone number ${phoneNumber} is already registered to another church.` });
+            }
+        }
+
         const { inboundUrl, inboundFallbackUrl, statusCallback } = await resolveWebhookUrls();
         const client = await getSignalWireClient();
 
-        // Purchase the number directly on the project (no sub-account needed)
-        // Configures inbound webhook, fallback URL, and status callback per SignalWire best practices.
-        const purchased = await client.incomingPhoneNumbers.create({
-            phoneNumber,
-            smsUrl:               inboundUrl,
-            smsMethod:            'POST',
-            smsFallbackUrl:       inboundFallbackUrl,
-            smsFallbackMethod:    'POST',
-            statusCallback,
-            statusCallbackMethod: 'POST',
-        });
+        // Check if number already purchased/ported on the SignalWire project
+        const existingList = await client.incomingPhoneNumbers.list({ phoneNumber });
+        let purchased;
 
-        log.info(`[provisionSmsNumber] Purchased ${phoneNumber} (SID: ${purchased.sid}) for church ${churchId}`, 'system', { churchId, phoneNumber, sid: purchased.sid }, churchId);
+        if (existingList && existingList.length > 0) {
+            // Number already exists in the project (e.g. it was ported). Update webhook URLs.
+            const existingNumber = existingList[0];
+            purchased = await client.incomingPhoneNumbers(existingNumber.sid).update({
+                smsUrl:               inboundUrl,
+                smsMethod:            'POST',
+                smsFallbackUrl:       inboundFallbackUrl,
+                smsFallbackMethod:    'POST',
+                statusCallback,
+                statusCallbackMethod: 'POST',
+            });
+            log.info(`[provisionSmsNumber] Ported/Existing number ${phoneNumber} found on project (SID: ${purchased.sid}). Configured webhooks.`, 'system', { churchId, phoneNumber }, churchId);
+        } else {
+            // Purchase the number directly on the project
+            purchased = await client.incomingPhoneNumbers.create({
+                phoneNumber,
+                smsUrl:               inboundUrl,
+                smsMethod:            'POST',
+                smsFallbackUrl:       inboundFallbackUrl,
+                smsFallbackMethod:    'POST',
+                statusCallback,
+                statusCallbackMethod: 'POST',
+            });
+            log.info(`[provisionSmsNumber] Purchased ${phoneNumber} (SID: ${purchased.sid}) for church ${churchId}`, 'system', { churchId, phoneNumber, sid: purchased.sid }, churchId);
+        }
 
         const now = Date.now();
 
@@ -284,18 +314,52 @@ export const addSmsNumber = async (req: any, res: any) => {
         const church     = churchSnap.data() || {};
         const smsSettings = church.smsSettings || {};
 
+        // Check Firestore to make sure the number isn't already registered
+        const existingDbNum = await db.collection('smsNumbers')
+            .where('phoneNumber', '==', phoneNumber)
+            .limit(1)
+            .get();
+        if (!existingDbNum.empty) {
+            const dbNumData = existingDbNum.docs[0].data();
+            if (dbNumData.churchId === churchId) {
+                return res.status(400).json({ error: `Phone number ${phoneNumber} is already configured for this church.` });
+            } else {
+                return res.status(400).json({ error: `Phone number ${phoneNumber} is already registered to another church.` });
+            }
+        }
+
         const { inboundUrl, inboundFallbackUrl, statusCallback } = await resolveWebhookUrls();
         const client = await getSignalWireClient();
 
-        const purchased = await client.incomingPhoneNumbers.create({
-            phoneNumber,
-            smsUrl:               inboundUrl,
-            smsMethod:            'POST',
-            smsFallbackUrl:       inboundFallbackUrl,
-            smsFallbackMethod:    'POST',
-            statusCallback,
-            statusCallbackMethod: 'POST',
-        });
+        // Check if number already purchased/ported on the SignalWire project
+        const existingList = await client.incomingPhoneNumbers.list({ phoneNumber });
+        let purchased;
+
+        if (existingList && existingList.length > 0) {
+            // Number already exists in the project (e.g. it was ported). Update webhook URLs.
+            const existingNumber = existingList[0];
+            purchased = await client.incomingPhoneNumbers(existingNumber.sid).update({
+                smsUrl:               inboundUrl,
+                smsMethod:            'POST',
+                smsFallbackUrl:       inboundFallbackUrl,
+                smsFallbackMethod:    'POST',
+                statusCallback,
+                statusCallbackMethod: 'POST',
+            });
+            log.info(`[addSmsNumber] Ported/Existing number ${phoneNumber} found on project (SID: ${purchased.sid}). Configured webhooks.`, 'system', { churchId, phoneNumber }, churchId);
+        } else {
+            // Purchase the number directly on the project
+            purchased = await client.incomingPhoneNumbers.create({
+                phoneNumber,
+                smsUrl:               inboundUrl,
+                smsMethod:            'POST',
+                smsFallbackUrl:       inboundFallbackUrl,
+                smsFallbackMethod:    'POST',
+                statusCallback,
+                statusCallbackMethod: 'POST',
+            });
+            log.info(`[addSmsNumber] Purchased ${phoneNumber} (SID: ${purchased.sid}) for church ${churchId}`, 'system', { churchId, phoneNumber, sid: purchased.sid }, churchId);
+        }
 
         const now       = Date.now();
         const numDocId  = `${churchId}_${purchased.sid}`;
