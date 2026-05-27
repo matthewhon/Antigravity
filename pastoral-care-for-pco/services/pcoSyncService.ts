@@ -846,20 +846,31 @@ export const syncServicesData = async (churchId: string) => {
             continue;
         }
 
-        const membersUrl = `services/v2/service_types/${plan.serviceTypeId}/plans/${plan.id}/team_members`;
-        const neededUrl = `services/v2/service_types/${plan.serviceTypeId}/plans/${plan.id}/needed_positions`;
+        const membersUrl = `services/v2/service_types/${plan.serviceTypeId}/plans/${plan.id}/team_members?include=team`;
+        const neededUrl = `services/v2/service_types/${plan.serviceTypeId}/plans/${plan.id}/needed_positions?include=team`;
         const itemsUrl = `services/v2/service_types/${plan.serviceTypeId}/plans/${plan.id}/items?include=song`;
         
         try {
             // Fetch Members
             const membersData = await pcoFetch(churchId, membersUrl);
-            const members = membersData.data.map((m: any) => {
+            const members = (membersData.data || []).map((m: any) => {
                 const teamId = m.relationships?.team?.data?.id;
                 let teamName = null;
                 if (teamId) {
-                    const team = teams.find(t => t.id === teamId);
-                    if (team) {
-                        teamName = team.name;
+                    // Try to resolve team name from included resources first
+                    const teamObj = (membersData.included || []).find(
+                        (inc: any) => inc.type === 'Team' && String(inc.id) === String(teamId)
+                    );
+                    if (teamObj) {
+                        teamName = teamObj.attributes?.name || null;
+                    }
+                    
+                    // Fallback to global teams list
+                    if (!teamName) {
+                        const team = teams.find(t => String(t.id) === String(teamId));
+                        if (team) {
+                            teamName = team.name;
+                        }
                     }
                 }
                 return {
@@ -907,14 +918,25 @@ export const syncServicesData = async (churchId: string) => {
 
             // Fetch Needed Positions
             const neededData = await pcoFetch(churchId, neededUrl);
-            const neededPositions = neededData.data.map((np: any) => {
+            const neededPositions = (neededData.data || []).map((np: any) => {
                 let teamName = np.attributes.team_name;
                 const teamId = np.relationships?.team?.data?.id;
                 if (!teamName || teamName === 'Unknown') {
                     if (teamId) {
-                        const team = teams.find(t => t.id === teamId);
-                        if (team) {
-                            teamName = team.name;
+                        // Try to resolve team name from included resources first
+                        const teamObj = (neededData.included || []).find(
+                            (inc: any) => inc.type === 'Team' && String(inc.id) === String(teamId)
+                        );
+                        if (teamObj) {
+                            teamName = teamObj.attributes?.name || null;
+                        }
+                        
+                        // Fallback to global teams list
+                        if (!teamName) {
+                            const team = teams.find(t => String(t.id) === String(teamId));
+                            if (team) {
+                                teamName = team.name;
+                            }
                         }
                     }
                 }
