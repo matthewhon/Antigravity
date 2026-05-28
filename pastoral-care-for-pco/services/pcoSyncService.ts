@@ -15,20 +15,42 @@ import { calculateBulkRisk, DEFAULT_RISK_SETTINGS } from './riskService';
 // POST to the server), but getDb() must NOT be called because it requires
 // Firebase Admin env vars that don't exist in the browser.  Using a no-op
 // console fallback keeps the browser bundle from crashing.
-const logger = (() => {
-    if (typeof window === 'undefined') {
-        // Node.js / server context — safe to use Firebase Admin
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
+let serverLogger: any = null;
+if (typeof window === 'undefined') {
+    // Dynamic import to avoid client-side bundling issues and support ESM/CJS environments
+    const modName = 'module';
+    import(modName).then(m => {
+        const require = m.createRequire(import.meta.url);
         const { getDb } = require('../backend/firebase');
-        return createServerLogger(getDb());
+        serverLogger = createServerLogger(getDb());
+    }).catch(err => {
+        console.error('Failed to initialize server logger:', err);
+    });
+}
+
+const logger = {
+    info: (msg: string, ...rest: any[]) => {
+        if (serverLogger) {
+            serverLogger.info(msg, ...rest);
+        } else {
+            console.log('[sync]', msg, ...rest);
+        }
+    },
+    warn: (msg: string, ...rest: any[]) => {
+        if (serverLogger) {
+            serverLogger.warn(msg, ...rest);
+        } else {
+            console.warn('[sync]', msg, ...rest);
+        }
+    },
+    error: (msg: string, ...rest: any[]) => {
+        if (serverLogger) {
+            serverLogger.error(msg, ...rest);
+        } else {
+            console.error('[sync]', msg, ...rest);
+        }
     }
-    // Browser context — no-op stubs so all logger.xxx() calls are safe
-    return {
-        info:  (msg: string, ...rest: any[]) => console.log('[sync]', msg, ...rest),
-        warn:  (msg: string, ...rest: any[]) => console.warn('[sync]', msg, ...rest),
-        error: (msg: string, ...rest: any[]) => console.error('[sync]', msg, ...rest),
-    };
-})();
+};
 
 
 // Helper to get system settings and proxy URL
@@ -1718,15 +1740,26 @@ export const syncRegistrationsData = async (churchId: string) => {
  * otherwise falls back to Nominatim (free, 1 req/s, no key required).
  * Only processes people whose primary address lacks coordinates.
  */
-export const geocodePeopleAddresses = async (churchId: string): Promise<void> => {
-    logger.info('Geocoding people addresses...', 'sync', { churchId }, churchId);
+export const geocodePeopleAddresses = async (churchId: string, force = false): Promise<void> => {
+    logger.info(`Geocoding people addresses (force=${force})...`, 'sync', { churchId }, churchId);
 
     // Fetch Google Maps API key from App Config → SystemSettings (the canonical location)
     const sysSettings = await firestore.getSystemSettings();
     const googleApiKey: string | undefined = sysSettings?.googleMapsApiKey || undefined;
 
-    // Fetch only people needing geocoding for this church
-    const toGeocode = await firestore.getPeopleNeedsGeocoding(churchId);
+    // Fetch people needing geocoding for this church
+    let toGeocode: PcoPerson[] = [];
+    if (force) {
+        // If force is true, we evaluate anyone who has an address but lacks coordinates,
+        // ignoring needsGeocoding state.
+        const allPeople = await firestore.getPeople(churchId);
+        toGeocode = allPeople.filter(p => {
+            const addr = p.addresses?.[0];
+            return addr && (addr.city || addr.zip) && (addr.lat === undefined || addr.lat === null);
+        });
+    } else {
+        toGeocode = await firestore.getPeopleNeedsGeocoding(churchId);
+    }
 
     if (toGeocode.length === 0) {
         logger.info('No new addresses to geocode.', 'sync', { churchId }, churchId);
@@ -1735,14 +1768,14 @@ export const geocodePeopleAddresses = async (churchId: string): Promise<void> =>
 
     logger.info(`Geocoding ${toGeocode.length} addresses...`, 'sync', { churchId, count: toGeocode.length }, churchId);
 
-    const geocodeAddress = async (addr: { street?: string | null, city?: string | null, state?: string | null, zip?: string | null }): Promise<{ lat: number; lng: number } | null> => {
+    const geocodeAddress = async (addr: { street?: string | null, city?: string | null, state?: string | null, zip?: string | null }): Promise<{ coords: { lat: number; lng: number } | null, isPermanent: boolean }> => {
         const parts = [
             addr.street,
             addr.city,
             addr.state,
             addr.zip,
         ].filter(Boolean);
-        if (parts.length === 0) return null;
+        if (parts.length === 0) return { coords: null, isPermanent: true };
         const fullAddress = parts.join(', ');
 
         if (googleApiKey) {
@@ -1753,28 +1786,40 @@ export const geocodePeopleAddresses = async (churchId: string): Promise<void> =>
                 const data = await res.json();
                 if (data.status === 'OK' && data.results?.[0]?.geometry?.location) {
                     const { lat, lng } = data.results[0].geometry.location;
-                    return { lat, lng };
+                    return { coords: { lat, lng }, isPermanent: true };
                 }
-                logger.warn(`Google geocode failed for "${fullAddress}": ${data.status}`, 'sync', { churchId });
+                if (data.status === 'ZERO_RESULTS') {
+                    logger.warn(`Google geocode: no results for "${fullAddress}"`, 'sync', { churchId });
+                    return { coords: null, isPermanent: true };
+                }
+                logger.warn(`Google geocode failed for "${fullAddress}": ${data.status} ${data.error_message ? `(${data.error_message})` : ''}`, 'sync', { churchId });
             } catch (e: any) {
                 logger.warn(`Google geocode error: ${e?.message}`, 'sync', { churchId });
             }
-            return null;
-        } else {
-            // ── Nominatim fallback (free, no key) — rate-limited to 1 req/s ──
-            try {
-                const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(fullAddress)}`;
-                const res = await fetch(url, { headers: { 'User-Agent': 'PastoralCareApp/1.0' } });
-                const data = await res.json();
-                if (data?.[0]) {
-                    return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
-                }
-            } catch (e: any) {
-                logger.warn(`Nominatim geocode error: ${e?.message}`, 'sync', { churchId });
+            logger.info(`Google geocode failed/denied for "${fullAddress}". Falling back to Nominatim...`, 'sync', { churchId });
+        }
+
+        // ── Nominatim fallback (free, no key) — rate-limited to 1 req/s ──
+        try {
+            const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(fullAddress)}`;
+            const res = await fetch(url, { headers: { 'User-Agent': 'PastoralCareApp/1.0' } });
+            if (!res.ok) {
+                logger.warn(`Nominatim geocode returned HTTP ${res.status}`, 'sync', { churchId });
+                return { coords: null, isPermanent: false };
             }
+            const data = await res.json();
+            if (data && data[0]) {
+                return { coords: { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) }, isPermanent: true };
+            } else {
+                logger.warn(`Nominatim geocode: no results for "${fullAddress}"`, 'sync', { churchId });
+                return { coords: null, isPermanent: true };
+            }
+        } catch (e: any) {
+            logger.warn(`Nominatim geocode error: ${e?.message}`, 'sync', { churchId });
+            return { coords: null, isPermanent: false };
+        } finally {
             // Nominatim: respect 1 req/s
             await delay(1100);
-            return null;
         }
     };
 
@@ -1785,23 +1830,27 @@ export const geocodePeopleAddresses = async (churchId: string): Promise<void> =>
     for (const person of toGeocode) {
         const addr = person.addresses![0];
         try {
-            const coords = await geocodeAddress(addr);
+            const { coords, isPermanent } = await geocodeAddress(addr);
             if (coords) {
                 // Merge lat/lng into the first address, preserve all other fields
                 const updatedAddresses = [{ ...addr, lat: coords.lat, lng: coords.lng }, ...(person.addresses?.slice(1) || [])];
                 updated.push({ ...person, addresses: updatedAddresses, needsGeocoding: false });
                 successCount++;
-            } else {
+            } else if (isPermanent) {
                 failCount++;
                 updated.push({ ...person, needsGeocoding: false });
+            } else {
+                // Transient failure: keep needsGeocoding = true so it can be retried later
+                failCount++;
+                updated.push({ ...person, needsGeocoding: true });
             }
         } catch (e: any) {
             failCount++;
             logger.warn(`Geocode failed for person ${person.id}`, 'sync', { churchId, error: e?.message });
-            updated.push({ ...person, needsGeocoding: false });
+            updated.push({ ...person, needsGeocoding: true });
         }
 
-        // Google: ~50ms between requests stays safely under quota; Nominatim: already delayed above
+        // Google: ~50ms between requests stays safely under quota; Nominatim already delayed in finally block
         if (googleApiKey) await delay(60);
     }
 

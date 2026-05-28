@@ -120,7 +120,7 @@ async function startServer() {
       if (!churchId) return res.status(400).json({ error: 'Missing churchId' });
       try {
         const { geocodePeopleAddresses } = await import('./services/pcoSyncService.js');
-        await geocodePeopleAddresses(churchId);
+        await geocodePeopleAddresses(churchId, true);
         res.json({ success: true, message: 'Geocoding complete.' });
       } catch (e: any) {
         res.status(500).json({ error: e.message || 'Geocoding failed' });
