@@ -853,12 +853,34 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                           });
                       });
                   } else {
-                      const heatmapData = points.map(pt => new google.maps.LatLng(pt.lat, pt.lng));
-                      new google.maps.visualization.HeatmapLayer({
-                          data: heatmapData,
-                          map: map,
-                          radius: 30,
-                          maxIntensity: 5,
+                      // Ensure visualization library is loaded dynamically if not available
+                      const loadHeatmap = async () => {
+                          let HeatmapLayerClass = (google.maps as any).visualization?.HeatmapLayer;
+                          if (!HeatmapLayerClass && typeof (google.maps as any).importLibrary === 'function') {
+                              try {
+                                  const { HeatmapLayer } = await (google.maps as any).importLibrary("visualization");
+                                  HeatmapLayerClass = HeatmapLayer;
+                              } catch (e) {
+                                  console.error("Failed to dynamically import Google Maps visualization library:", e);
+                              }
+                          }
+                          
+                          if (!HeatmapLayerClass) {
+                              throw new Error("Google Maps Visualization library is not loaded.");
+                          }
+
+                          const heatmapData = points.map(pt => new google.maps.LatLng(pt.lat, pt.lng));
+                          new HeatmapLayerClass({
+                              data: heatmapData,
+                              map: map,
+                              radius: 30,
+                              maxIntensity: 5,
+                          });
+                      };
+
+                      loadHeatmap().catch(err => {
+                          console.error("Heatmap rendering failed:", err);
+                          setUsingLeaflet(true);
                       });
                   }
 
