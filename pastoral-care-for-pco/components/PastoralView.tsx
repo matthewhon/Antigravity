@@ -386,6 +386,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
   const effectiveCensusError = (defaultLocation && locationErrorMap[defaultLocation.id]) || censusError;
   const [mapInstance, setMapInstance] = useState<any>(null);
   const [mapAuthError, setMapAuthError] = useState(false);
+  const [usingLeaflet, setUsingLeaflet] = useState(false);
   const [mapMode, setMapMode] = useState<'pins' | 'heatmap'>('heatmap');
   const [geocodeProgress, setGeocodeProgress] = useState<{ plotted: number; ungeocoded: number; topCities: string[] } | null>(null);
 
@@ -657,12 +658,133 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
       setStrategyReport('');
   }, [selectedLocationId, activeTab]);
 
-  // --- Map Initialization Effect (Google Maps) ---
+  // --- Map Initialization Effect (Google Maps with Leaflet Fallback) ---
   useEffect(() => {
       if (activeTab !== 'Membership' || !peopleData || !mapRef.current || !safeVisibleWidgets.includes('member_map')) return;
 
-      if (!googleMapsApiKey) {
-          // If no key, we don't attempt to load. A warning is rendered in the UI instead.
+      // Clean up previous map container
+      if (mapRef.current) {
+          (mapRef.current as any)._leaflet_id = null;
+          mapRef.current.innerHTML = '';
+      }
+
+      // Build geocoded point list from people
+      const points: { lat: number; lng: number; name: string; city?: string; membership?: string }[] = [];
+      let ungeocodedCount = 0;
+      const cityCounter = new Map<string, number>();
+
+      peopleData.allPeople.forEach(p => {
+          const addr = p.addresses?.[0];
+          if (addr?.lat != null && addr?.lng != null) {
+              points.push({
+                  lat: addr.lat,
+                  lng: addr.lng,
+                  name: p.name,
+                  city: addr.city || '',
+                  membership: p.membership || 'Non-Member',
+              });
+              if (addr.city) cityCounter.set(addr.city, (cityCounter.get(addr.city) || 0) + 1);
+          } else if (addr && (addr.city || addr.zip)) {
+              ungeocodedCount++;
+              if (addr.city) cityCounter.set(addr.city, (cityCounter.get(addr.city) || 0) + 1);
+          }
+      });
+
+      const topCities = Array.from(cityCounter.entries())
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 3)
+          .map(([city]) => city);
+
+      setGeocodeProgress({ plotted: points.length, ungeocoded: ungeocodedCount, topCities });
+
+      const renderLeafletMap = (L: any) => {
+          if (!mapRef.current) return;
+          ensureLeafletCss();
+          
+          const map = L.map(mapRef.current, {
+              zoomControl: false,
+              attributionControl: false
+          }).setView([39.8283, -98.5795], 4);
+
+          const isDark = user.theme === 'dark';
+          const tilesUrl = isDark 
+              ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+              : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+
+          L.tileLayer(tilesUrl, {
+              maxZoom: 19
+          }).addTo(map);
+
+          if (points.length > 0) {
+              const group = L.featureGroup();
+
+              points.forEach(pt => {
+                  const memberColor = pt.membership === 'Member' ? '#10b981' : '#6366f1';
+
+                  if (mapMode === 'pins') {
+                      const pinSvg = `
+                          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+                              <path fill="${memberColor}" stroke="#ffffff" stroke-width="1.5" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                          </svg>
+                      `;
+                      const icon = L.divIcon({
+                          html: pinSvg,
+                          className: 'custom-pin-icon',
+                          iconSize: [24, 24],
+                          iconAnchor: [12, 24]
+                      });
+
+                      L.marker([pt.lat, pt.lng], { icon })
+                          .bindPopup(`
+                              <div style="text-align:center;padding:2px 4px;font-family:system-ui,sans-serif;color:#1e293b;line-height:1.4;">
+                                  <strong style="font-size:12px;display:block;margin-bottom:2px">${pt.name}</strong>
+                                  <span style="font-size:10px;color:#64748b">${pt.city || 'Unknown city'}</span><br/>
+                                  <span style="font-size:9px;font-weight:700;color:${memberColor}">${pt.membership}</span>
+                              </div>
+                          `)
+                          .addTo(group);
+                  } else {
+                      // Heatmap mode (semi-transparent circle markers for visual density)
+                      L.circleMarker([pt.lat, pt.lng], {
+                          radius: 12,
+                          fillColor: memberColor,
+                          color: memberColor,
+                          weight: 0,
+                          fillOpacity: 0.15
+                      }).addTo(group);
+
+                      L.circleMarker([pt.lat, pt.lng], {
+                          radius: 3,
+                          fillColor: memberColor,
+                          color: '#ffffff',
+                          weight: 1,
+                          fillOpacity: 0.9
+                      }).addTo(group);
+                  }
+              });
+
+              group.addTo(map);
+
+              try {
+                  map.fitBounds(group.getBounds(), { padding: [30, 30] });
+                  if (map.getZoom() > 14) {
+                      map.setZoom(14);
+                  }
+              } catch (e) {
+                  console.warn('Leaflet fitBounds failed', e);
+              }
+          }
+          setMapInstance(map);
+      };
+
+      if (!googleMapsApiKey || usingLeaflet) {
+          import('leaflet').then((LModule) => {
+              const L = LModule.default || LModule;
+              renderLeafletMap(L);
+          }).catch(err => {
+              console.error('Failed to load Leaflet:', err);
+              setMapAuthError(true);
+          });
           return;
       }
 
@@ -670,46 +792,12 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
 
       // Bind global Google Maps authentication failure handler
       (window as any).gm_authFailure = () => {
-          console.error('Google Maps API authentication failed.');
-          setMapAuthError(true);
+          console.error('Google Maps API authentication failed. Switching to Leaflet...');
+          setUsingLeaflet(true);
       };
-
-      // Clear the map ref's innerHTML to clean up any old map instance
-      if (mapRef.current) {
-          mapRef.current.innerHTML = '';
-      }
 
       loadGoogleMapsScript(googleMapsApiKey, () => {
           if (!mapRef.current) return;
-
-          // Build geocoded point list from people
-          const points: { lat: number; lng: number; name: string; city?: string; membership?: string }[] = [];
-          let ungeocodedCount = 0;
-          const cityCounter = new Map<string, number>();
-
-          peopleData.allPeople.forEach(p => {
-              const addr = p.addresses?.[0];
-              if (addr?.lat != null && addr?.lng != null) {
-                  points.push({
-                      lat: addr.lat,
-                      lng: addr.lng,
-                      name: p.name,
-                      city: addr.city || '',
-                      membership: p.membership || 'Non-Member',
-                  });
-                  if (addr.city) cityCounter.set(addr.city, (cityCounter.get(addr.city) || 0) + 1);
-              } else if (addr && (addr.city || addr.zip)) {
-                  ungeocodedCount++;
-                  if (addr.city) cityCounter.set(addr.city, (cityCounter.get(addr.city) || 0) + 1);
-              }
-          });
-
-          const topCities = Array.from(cityCounter.entries())
-              .sort((a, b) => b[1] - a[1])
-              .slice(0, 3)
-              .map(([city]) => city);
-
-          setGeocodeProgress({ plotted: points.length, ungeocoded: ungeocodedCount, topCities });
 
           const currentTheme = user.theme || 'traditional';
           const mapOptions = {
@@ -791,18 +879,28 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
               }
           } catch (err) {
               console.error('Google Maps init error:', err);
-              setMapAuthError(true);
+              setUsingLeaflet(true);
           }
       });
-  }, [activeTab, peopleData, safeVisibleWidgets, mapMode, googleMapsApiKey, user.theme]);
+  }, [activeTab, peopleData, safeVisibleWidgets, mapMode, googleMapsApiKey, usingLeaflet, user.theme]);
 
   // Clean up when leaving Membership tab
   useEffect(() => {
-      if (activeTab !== 'Membership' && mapInstance) {
-          setMapInstance(null);
+      if (activeTab !== 'Membership') {
+          if (mapInstance) {
+              try {
+                  if (typeof mapInstance.remove === 'function') {
+                      mapInstance.remove();
+                  }
+              } catch (e) {
+                  console.warn('Map cleanup failed:', e);
+              }
+              setMapInstance(null);
+          }
           setMapAuthError(false);
+          setUsingLeaflet(false);
       }
-  }, [activeTab]);
+  }, [activeTab, mapInstance]);
 
 
 
@@ -915,12 +1013,12 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
               ) : null;
           case 'member_map':
               return (
-                  <WidgetWrapper title="Member Heatmap" onRemove={() => handleRemoveWidget(id)} source={googleMapsApiKey ? "Google Maps" : "OpenStreetMap"}>
+                  <WidgetWrapper title="Member Heatmap" onRemove={() => handleRemoveWidget(id)} source={usingLeaflet || !googleMapsApiKey ? "OpenStreetMap" : "Google Maps"}>
                       <div className="h-96 w-full rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-800 relative">
                           <div ref={mapRef} className="w-full h-full" />
                           
                           {/* Map Mode Toggle Overlay */}
-                          {googleMapsApiKey && !mapAuthError && (
+                          {mapInstance && (
                               <div className="absolute top-4 right-4 z-10 flex bg-white/90 dark:bg-slate-900/90 backdrop-blur-md p-1 rounded-xl shadow-lg border border-slate-200/50 dark:border-slate-700/50 select-none">
                                   <button
                                       onClick={() => setMapMode('heatmap')}
@@ -937,18 +1035,6 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                               </div>
                           )}
 
-                          {!googleMapsApiKey && (
-                              <div className="absolute inset-0 flex items-center justify-center bg-slate-50 dark:bg-slate-900 z-10 px-6 text-center">
-                                  <div className="max-w-xs">
-                                      <span className="text-3xl mb-3 block">🗺️</span>
-                                      <p className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-2">Google Maps Key Required</p>
-                                      <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed mb-4">
-                                          To view the membership heatmap, please configure your Google Maps API Key in System Settings.
-                                      </p>
-                                  </div>
-                              </div>
-                          )}
-
                           {mapAuthError && (
                               <div className="absolute inset-0 flex items-center justify-center bg-slate-100/90 dark:bg-slate-900/90 z-10">
                                   <div className="text-center p-6">
@@ -958,7 +1044,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                               </div>
                           )}
                           
-                          {googleMapsApiKey && !mapInstance && !mapAuthError && (
+                          {!mapInstance && !mapAuthError && (
                               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                                   <div className="flex items-center gap-2">
                                       <svg className="animate-spin w-4 h-4 text-indigo-400" fill="none" viewBox="0 0 24 24">
