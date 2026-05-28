@@ -324,8 +324,7 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
     // ── Tab state ─────────────────────────────────────────────────────────────
     const [activeTab, setActiveTab] = useState<SmsTab>(() => {
         if (tabParam && TABS.some(t => t.id === tabParam)) return tabParam;
-        const saved = sessionStorage.getItem(SESSION_TAB_KEY) as SmsTab | null;
-        return saved && TABS.some(t => t.id === saved) ? saved : 'inbox';
+        return 'inbox';
     });
 
     const [pressedTab, setPressedTab] = useState<SmsTab | null>(null);
@@ -366,10 +365,11 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
     const visibleTabs  = TABS.filter(t => t.id === 'files' || canUserUseFeature(activeNumber, currentUser, t.perm as any));
 
     useEffect(() => {
+        if (numbersLoading || !activeNumber) return;
         if (visibleTabs.length > 0 && !visibleTabs.some(t => t.id === activeTab)) {
             setActiveTab(visibleTabs[0].id);
         }
-    }, [activeNumber, activeTab, currentUser]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [activeNumber, activeTab, currentUser, numbersLoading]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const [showShareSheet, setShowShareSheet] = useState(false);
     const [showEmailModal, setShowEmailModal] = useState(false);

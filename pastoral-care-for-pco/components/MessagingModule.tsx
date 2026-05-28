@@ -8422,7 +8422,7 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
     const smsEnabled = church.smsSettings?.smsEnabled;
 
     type Tab = 'campaigns' | 'inbox' | 'keywords' | 'analytics' | 'workflows' | 'agent' | 'permissions' | 'files';
-    const [activeTab, setActiveTab] = useState<Tab>('campaigns');
+    const [activeTab, setActiveTab] = useState<Tab>('inbox');
     const effectiveTab: Tab = controlledTab ?? activeTab;
     const [campaigns, setCampaigns] = useState<SmsCampaign[]>([]);
     const [isLoading, setIsLoading] = useState(true);

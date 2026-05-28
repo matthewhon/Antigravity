@@ -182,8 +182,7 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
     // ── Tab state ─────────────────────────────────────────────────────────────
     const [activeTab, setActiveTab] = useState<SmsTab>(() => {
         if (tabParam && TABS.some(t => t.id === tabParam)) return tabParam;
-        const saved = sessionStorage.getItem(SESSION_TAB_KEY) as SmsTab | null;
-        return saved && TABS.some(t => t.id === saved) ? saved : 'inbox';
+        return 'inbox';
     });
 
     const [pressedTab, setPressedTab] = useState<SmsTab | null>(null);
@@ -247,7 +246,7 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
     });
 
     useEffect(() => {
-        if (numbersLoading) return;
+        if (numbersLoading || !activeNumber) return;
         if (visibleTabs.length > 0 && !visibleTabs.some(t => t.id === activeTab)) {
             setActiveTab(visibleTabs[0].id);
         }
