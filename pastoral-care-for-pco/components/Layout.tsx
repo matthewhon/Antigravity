@@ -4,7 +4,7 @@ import { Church, User } from '../types';
 import UserProfileModal from './UserProfileModal';
 import { AppLogo } from './AppLogo';
 
-const LIBRARY_OWNER_EMAIL = 'matthewhon01@gmail.com';
+
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -18,7 +18,6 @@ interface LayoutProps {
   hasPermission: (view: any) => boolean;
   onRefreshUser?: () => void;
   isSyncing?: boolean;
-  enableLibrary?: boolean;
   metricsSubViews?: { label: string; view: string; icon: string }[];
   /** Secondary nav strip rendered below the context header (e.g. SMS sub-tabs) */
   subNavItems?: { label: string; view: string; icon: React.ReactNode }[];
@@ -38,11 +37,10 @@ const Layout: React.FC<LayoutProps> = ({
   hasPermission,
   onRefreshUser,
   isSyncing,
-  enableLibrary,
   subNavItems,
   noPadding,
 }) => {
-  const canSeeLibrary = user.email === LIBRARY_OWNER_EMAIL || enableLibrary === true;
+
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [metricsOpen, setMetricsOpen] = useState(false);
   const metricsRef = useRef<HTMLDivElement>(null);
@@ -591,15 +589,6 @@ const Layout: React.FC<LayoutProps> = ({
                   </div>
                 )}
 
-
-                {canSeeLibrary && (
-                    <NavItem 
-                        icon="📚" 
-                        label="Library" 
-                        active={currentView === 'library'} 
-                        onClick={() => onNavigate('library')} 
-                    />
-                )}
 
                 {isSystemAdmin && (
                   <NavItem 

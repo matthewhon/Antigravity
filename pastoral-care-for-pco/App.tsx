@@ -27,7 +27,6 @@ import { SystemSettingsView } from './components/SystemSettingsView';
 import { GlobalAdminManager } from './components/GlobalAdminManager';
 import { PastorAIView } from './components/PastorAIView';
 import { MetricsView } from './components/MetricsView';
-import LibraryView from './components/LibraryView';
 import WelcomeLayoutModal from './components/WelcomeLayoutModal';
 import { PublicPollView } from './components/PublicPollView';
 import { PollProjectorView } from './components/PollProjectorView';
@@ -867,7 +866,6 @@ const App: React.FC = () => {
                 hasPermission={hasPermission}
                 onRefreshUser={() => firestore.getUserProfile(user.id).then(u => u && setUser(u))}
                 isSyncing={isSyncing}
-                enableLibrary={systemSettings?.enableLibrary}
                 noPadding={view.startsWith('tools')}
                 subNavItems={view.startsWith('tools-sms') ? [
                     { label: 'Inbox',     view: 'tools-sms-inbox',     icon: <span className="text-sm">📥</span> },
@@ -985,13 +983,6 @@ const App: React.FC = () => {
                     />
                 } />
                 <Route path="/global-admin" element={<GlobalAdminManager />} />
-                <Route path="/library" element={
-                    (user?.email === 'matthewhon01@gmail.com' || systemSettings?.enableLibrary) ? (
-                        <div className="flex-1 min-h-0 overflow-y-auto p-6">
-                            <LibraryView churchId={church!.id} />
-                        </div>
-                    ) : <Navigate to="/" replace />
-                } />
                 
                 <Route path="/tools/emails" element={<ToolsView churchId={church!.id} church={church!} currentUserId={user!.id} currentUser={user!} onUpdateChurch={(updates) => { firestore.updateChurch(church!.id, updates); setChurch({ ...church!, ...updates }); }} activePage="emails" />} />
                 <Route path="/tools/polls" element={<ToolsView churchId={church!.id} church={church!} currentUserId={user!.id} currentUser={user!} onUpdateChurch={(updates) => { firestore.updateChurch(church!.id, updates); setChurch({ ...church!, ...updates }); }} activePage="polls" />} />

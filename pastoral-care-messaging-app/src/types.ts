@@ -489,8 +489,6 @@ export interface SystemSettings {
     sendGridApiKey?: string;
     sendGridFromEmail?: string; // Must be a verified sender in SendGrid (e.g. hello@mychurch.org)
     sendGridFromName?: string;  // Default "From Name" if campaign doesn't specify one
-    // Scripture Library feature flag
-    enableLibrary?: boolean;
     // -- SignalWire SMS ---------------------------------------------------------
     /** SignalWire Project ID (UUID) � from Dashboard ? API ? API Tokens */
     signalwireProjectId?: string;
