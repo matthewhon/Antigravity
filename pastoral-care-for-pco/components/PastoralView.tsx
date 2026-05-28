@@ -124,14 +124,14 @@ const ensureLeafletCss = () => {
 declare const google: any;
 
 const loadGoogleMapsScript = (apiKey: string, callback: () => void) => {
-    if ((window as any).google && (window as any).google.maps) {
+    if ((window as any).google && (window as any).google.maps && (window as any).google.maps.Map) {
         callback();
         return;
     }
     const existingScript = document.getElementById('google-maps-script');
     if (existingScript) {
         const interval = setInterval(() => {
-            if ((window as any).google && (window as any).google.maps) {
+            if ((window as any).google && (window as any).google.maps && (window as any).google.maps.Map) {
                 clearInterval(interval);
                 callback();
             }
@@ -144,7 +144,12 @@ const loadGoogleMapsScript = (apiKey: string, callback: () => void) => {
     script.async = true;
     script.defer = true;
     script.onload = () => {
-        callback();
+        const interval = setInterval(() => {
+            if ((window as any).google && (window as any).google.maps && (window as any).google.maps.Map) {
+                clearInterval(interval);
+                callback();
+            }
+        }, 50);
     };
     script.onerror = () => {
         console.error('Failed to load Google Maps script.');
@@ -662,6 +667,12 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
       }
 
       setMapAuthError(false);
+
+      // Bind global Google Maps authentication failure handler
+      (window as any).gm_authFailure = () => {
+          console.error('Google Maps API authentication failed.');
+          setMapAuthError(true);
+      };
 
       // Clear the map ref's innerHTML to clean up any old map instance
       if (mapRef.current) {
