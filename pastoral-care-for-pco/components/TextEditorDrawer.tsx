@@ -86,12 +86,12 @@ const MenuBar = ({ editor }: { editor: any }) => {
   return (
     <div className="flex flex-wrap items-center gap-1 p-2 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 rounded-t-xl sticky top-0 z-10">
       {/* Format buttons */}
-      <button onClick={() => editor.chain().focus().toggleBold().run()} className={btn(editor.isActive('bold'))}><Bold size={14} /></button>
-      <button onClick={() => editor.chain().focus().toggleItalic().run()} className={btn(editor.isActive('italic'))}><Italic size={14} /></button>
-      <button onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} className={btn(editor.isActive('heading', { level: 1 }))}><Heading1 size={14} /></button>
-      <button onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} className={btn(editor.isActive('heading', { level: 2 }))}><Heading2 size={14} /></button>
-      <button onClick={() => editor.chain().focus().toggleBulletList().run()} className={btn(editor.isActive('bulletList'))}><List size={14} /></button>
-      <button onClick={() => editor.chain().focus().toggleOrderedList().run()} className={btn(editor.isActive('orderedList'))}><ListOrdered size={14} /></button>
+      <button onClick={() => editor.chain().focus().toggleBold().run()} title="Bold" className={btn(editor.isActive('bold'))}><Bold size={14} /></button>
+      <button onClick={() => editor.chain().focus().toggleItalic().run()} title="Italic" className={btn(editor.isActive('italic'))}><Italic size={14} /></button>
+      <button onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} title="Heading 1" className={btn(editor.isActive('heading', { level: 1 }))}><Heading1 size={14} /></button>
+      <button onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} title="Heading 2" className={btn(editor.isActive('heading', { level: 2 }))}><Heading2 size={14} /></button>
+      <button onClick={() => editor.chain().focus().toggleBulletList().run()} title="Bullet List" className={btn(editor.isActive('bulletList'))}><List size={14} /></button>
+      <button onClick={() => editor.chain().focus().toggleOrderedList().run()} title="Ordered List" className={btn(editor.isActive('orderedList'))}><ListOrdered size={14} /></button>
 
       {/* Separator */}
       <div className="w-px h-5 bg-slate-200 dark:bg-slate-700 mx-0.5" />

@@ -299,7 +299,7 @@ const FilePickerDialog: React.FC<{
                     <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
                         <FileText size={16} className="text-violet-500" /> Select a File to Attach
                     </h3>
-                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
+                    <button onClick={onClose} title="Close" className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
                 </div>
                 {loading ? (
                     <div className="flex-1 flex items-center justify-center py-10"><Loader2 size={24} className="animate-spin text-slate-400" /></div>
@@ -5871,6 +5871,7 @@ const WorkflowEditor: React.FC<{
                             <select
                                 value={wf.twilioNumberId || ''}
                                 onChange={e => patch({ twilioNumberId: e.target.value || null })}
+                                title="Sending Phone Number"
                                 className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
                             >
                                 <option value="">(Default Church Number)</option>
@@ -6017,6 +6018,7 @@ const WorkflowEditor: React.FC<{
                                             type="time"
                                             value={wf.triggerTime ?? '09:00'}
                                             onChange={e => patch({ triggerTime: e.target.value })}
+                                            title="Trigger time"
                                             className="w-48 text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500"
                                         />
                                         <span className="text-xs text-slate-400">
@@ -6080,6 +6082,7 @@ const WorkflowEditor: React.FC<{
                                             type="time"
                                             value={wf.triggerTime ?? '09:00'}
                                             onChange={e => patch({ triggerTime: e.target.value })}
+                                            title="Trigger time"
                                             className="w-48 text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-pink-500"
                                         />
                                         <span className="text-xs text-slate-400">
@@ -8111,6 +8114,7 @@ Write the reply:`;
                     <select
                         value={selectedNumberId}
                         onChange={e => setSelectedNumberId(e.target.value)}
+                        title="Phone Line"
                         className="w-full md:w-64 text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
                     >
                         {numbers.map(num => (
@@ -8215,6 +8219,7 @@ Write the reply:`;
                                     value={execListId}
                                     onChange={handleExecListSelect}
                                     disabled={!isAdmin}
+                                    title="Authorized PCO List"
                                     className="flex-1 max-w-sm text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                 >
                                     <option value="">-- Select a PCO List --</option>

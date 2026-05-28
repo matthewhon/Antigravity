@@ -116,6 +116,7 @@ const CampaignPreviewModal: React.FC<{ campaign: EmailCampaign; onClose: () => v
           </div>
           <button
             onClick={onClose}
+            title="Close"
             className="ml-4 p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition shrink-0"
           >
             <X size={18} />
@@ -184,6 +185,7 @@ const ScheduleModal: React.FC<{
           value={dateTime}
           onChange={e => setDateTime(e.target.value)}
           min={new Date().toISOString().slice(0, 16)}
+          title="Send Date and Time"
           className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500 mb-4"
         />
         
@@ -191,6 +193,7 @@ const ScheduleModal: React.FC<{
         <select
           value={frequency}
           onChange={e => setFrequency(e.target.value as any)}
+          title="Repeat Options"
           className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500 mb-6"
         >
           <option value="none">Does not repeat</option>
@@ -550,6 +553,7 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
         <div className="flex items-center gap-3">
           <button
             onClick={onBack}
+            title="Back"
             className="p-1.5 rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
           >
             <ArrowLeft size={18} />
@@ -670,6 +674,7 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
                     ) : (
                       <select
                         className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-3"
+                        title="Select PCO List"
                         value={localCampaign.toListId || ''}
                         onChange={e => {
                           const selected = pcoLists.find(l => l.id === e.target.value);
@@ -703,6 +708,7 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
                     ) : (
                       <select
                         className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-3"
+                        title="Select PCO Group"
                         value={localCampaign.toGroupId || ''}
                         onChange={e => {
                           const selected = pcoGroups.find(g => g.id === e.target.value);
@@ -846,6 +852,7 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
                     <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Date & Time</label>
                     <input
                       type="datetime-local"
+                      title="Date and Time"
                       className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       value={localCampaign.sendAt ? localCampaign.sendAt.slice(0, 16) : ''}
                       onChange={e => update({ sendAt: e.target.value ? new Date(e.target.value).toISOString() : null })}

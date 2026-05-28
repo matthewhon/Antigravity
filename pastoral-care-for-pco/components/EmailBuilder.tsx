@@ -122,8 +122,7 @@ const BlockThumbnail: React.FC<{ block: EmailBlock }> = ({ block }) => {
             <img
               src={c.imageUrl}
               alt={c.name}
-              className="w-full block"
-              style={{ height: 'auto' }}
+              className="w-full block h-auto"
               onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
             />
           ) : (
@@ -232,7 +231,7 @@ const MediaLibraryPicker: React.FC<{
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-700">
           <h3 className="font-bold text-slate-900 dark:text-white text-sm">Media Library</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition">
+          <button onClick={onClose} title="Close Media Library" className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition">
             <X size={18} />
           </button>
         </div>
@@ -246,6 +245,7 @@ const MediaLibraryPicker: React.FC<{
               <button
                 key={i}
                 onClick={() => onPick(url)}
+                title="Select image"
                 className="aspect-square overflow-hidden rounded-xl border-2 border-transparent hover:border-indigo-500 transition group"
               >
                 <img src={url} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
@@ -332,14 +332,14 @@ const InlineTextEditor: React.FC<{
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-0.5 px-2 py-1.5 bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700">
         {/* Format */}
-        <button onClick={() => editor?.chain().focus().toggleBold().run()} className={btn(!!editor?.isActive('bold'))}><Bold size={12} /></button>
-        <button onClick={() => editor?.chain().focus().toggleItalic().run()} className={btn(!!editor?.isActive('italic'))}><Italic size={12} /></button>
-        <button onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()} className={btn(!!editor?.isActive('heading', { level: 1 }))}><span className="font-bold text-[11px]">H1</span></button>
-        <button onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()} className={btn(!!editor?.isActive('heading', { level: 2 }))}><span className="font-bold text-[11px]">H2</span></button>
+        <button onClick={() => editor?.chain().focus().toggleBold().run()} title="Bold" className={btn(!!editor?.isActive('bold'))}><Bold size={12} /></button>
+        <button onClick={() => editor?.chain().focus().toggleItalic().run()} title="Italic" className={btn(!!editor?.isActive('italic'))}><Italic size={12} /></button>
+        <button onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()} title="Heading 1" className={btn(!!editor?.isActive('heading', { level: 1 }))}><span className="font-bold text-[11px]">H1</span></button>
+        <button onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()} title="Heading 2" className={btn(!!editor?.isActive('heading', { level: 2 }))}><span className="font-bold text-[11px]">H2</span></button>
         <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-0.5" />
         {/* Lists */}
-        <button onClick={() => editor?.chain().focus().toggleBulletList().run()} className={btn(!!editor?.isActive('bulletList'))}><List size={12} /></button>
-        <button onClick={() => editor?.chain().focus().toggleOrderedList().run()} className={btn(!!editor?.isActive('orderedList'))}><ListOrdered size={12} /></button>
+        <button onClick={() => editor?.chain().focus().toggleBulletList().run()} title="Bullet List" className={btn(!!editor?.isActive('bulletList'))}><List size={12} /></button>
+        <button onClick={() => editor?.chain().focus().toggleOrderedList().run()} title="Ordered List" className={btn(!!editor?.isActive('orderedList'))}><ListOrdered size={12} /></button>
         <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-0.5" />
         {/* Alignment (stored in content.align, applied as wrapper style) */}
         <button onClick={() => handleAlignChange('left')} className={btn(align === 'left')} title="Align left"><AlignLeft size={12} /></button>
@@ -358,15 +358,16 @@ const InlineTextEditor: React.FC<{
             onChange={e => setLinkUrl(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') handleInsertLink(); if (e.key === 'Escape') setShowLinkInput(false); }}
             placeholder="https://…"
+            title="Link URL input"
             className="flex-1 text-xs border border-indigo-200 dark:border-indigo-700 rounded px-2 py-1 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none"
             autoFocus
           />
           <button onClick={handleInsertLink} className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline px-1">Insert</button>
-          <button onClick={() => setShowLinkInput(false)} className="text-slate-400 hover:text-slate-600"><X size={13} /></button>
+          <button onClick={() => setShowLinkInput(false)} title="Cancel" className="text-slate-400 hover:text-slate-600"><X size={13} /></button>
         </div>
       )}
       {/* Editor area */}
-      <div style={{ textAlign: align }}>
+      <div className={align === 'left' ? 'text-left' : align === 'right' ? 'text-right' : 'text-center'}>
         <EditorContent
           editor={editor}
           className="prose prose-sm max-w-none p-3 min-h-[100px] bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus-within:outline-none"
@@ -413,7 +414,7 @@ const InlineMediaEditor: React.FC<{
 
         {/* Upload + Library row */}
         <div className="flex gap-2">
-          <input ref={imgInputRef} type="file" accept="image/*" className="hidden" onChange={async e => {
+          <input ref={imgInputRef} type="file" accept="image/*" title="Upload Image file" className="hidden" onChange={async e => {
             const file = e.target.files?.[0];
             if (!file) return;
             try {
@@ -439,17 +440,17 @@ const InlineMediaEditor: React.FC<{
         {/* URL input */}
         <div>
           <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Or paste URL</label>
-          <input type="url" value={c.src || ''} onChange={e => onUpdate({ ...c, src: e.target.value })} placeholder="https://…"
+          <input type="url" value={c.src || ''} onChange={e => onUpdate({ ...c, src: e.target.value })} placeholder="https://…" title="Image URL"
             className="w-full text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500" />
         </div>
         <div>
           <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Alt text</label>
-          <input type="text" value={c.alt || ''} onChange={e => onUpdate({ ...c, alt: e.target.value })} placeholder="Describe the image…"
+          <input type="text" value={c.alt || ''} onChange={e => onUpdate({ ...c, alt: e.target.value })} placeholder="Describe the image…" title="Alt text"
             className="w-full text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500" />
         </div>
         <div>
           <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Link URL (optional)</label>
-          <input type="url" value={c.link || ''} onChange={e => onUpdate({ ...c, link: e.target.value })} placeholder="https://…"
+          <input type="url" value={c.link || ''} onChange={e => onUpdate({ ...c, link: e.target.value })} placeholder="https://…" title="Link URL"
             className="w-full text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500" />
         </div>
 
@@ -513,6 +514,7 @@ const InlineMediaEditor: React.FC<{
             value={c.src || ''}
             onChange={e => onUpdate({ ...c, src: e.target.value })}
             placeholder="https://youtube.com/watch?v=…"
+            title="YouTube URL"
             className="w-full text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
           />
         </div>
@@ -551,13 +553,13 @@ const InlineMediaEditor: React.FC<{
         {/* Label */}
         <div>
           <label className={labelCls}>Button Label</label>
-          <input type="text" value={c.text || ''} onChange={e => onUpdate({ ...c, text: e.target.value })} placeholder="Click Here" className={inputCls} />
+          <input type="text" value={c.text || ''} onChange={e => onUpdate({ ...c, text: e.target.value })} placeholder="Click Here" title="Button Label" className={inputCls} />
         </div>
 
         {/* URL */}
         <div>
           <label className={labelCls}>Link URL</label>
-          <input type="url" value={c.url || ''} onChange={e => onUpdate({ ...c, url: e.target.value })} placeholder="https://…" className={inputCls} />
+          <input type="url" value={c.url || ''} onChange={e => onUpdate({ ...c, url: e.target.value })} placeholder="https://…" title="Button Link URL" className={inputCls} />
         </div>
 
         {/* Colors */}
@@ -566,18 +568,18 @@ const InlineMediaEditor: React.FC<{
             <label className={labelCls}>Button Color</label>
             <div className="flex items-center gap-1.5">
               <input type="color" value={btnBg} onChange={e => onUpdate({ ...c, color: e.target.value })}
-                className="w-8 h-7 rounded cursor-pointer border border-slate-200 dark:border-slate-600 p-0" />
+                title="Button color picker" className="w-8 h-7 rounded cursor-pointer border border-slate-200 dark:border-slate-600 p-0" />
               <input type="text" value={btnBg} onChange={e => onUpdate({ ...c, color: e.target.value })}
-                className="flex-1 text-[11px] font-mono border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+                title="Button color hex code" placeholder="#ffffff" className="flex-1 text-[11px] font-mono border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500" />
             </div>
           </div>
           <div>
             <label className={labelCls}>Text Color</label>
             <div className="flex items-center gap-1.5">
               <input type="color" value={btnTc} onChange={e => onUpdate({ ...c, textColor: e.target.value })}
-                className="w-8 h-7 rounded cursor-pointer border border-slate-200 dark:border-slate-600 p-0" />
+                title="Button text color picker" className="w-8 h-7 rounded cursor-pointer border border-slate-200 dark:border-slate-600 p-0" />
               <input type="text" value={btnTc} onChange={e => onUpdate({ ...c, textColor: e.target.value })}
-                className="flex-1 text-[11px] font-mono border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+                title="Button text color hex code" placeholder="#ffffff" className="flex-1 text-[11px] font-mono border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500" />
             </div>
           </div>
         </div>
@@ -624,7 +626,7 @@ const InlineMediaEditor: React.FC<{
     return (
       <div className="space-y-2" onClick={e => e.stopPropagation()}>
         {/* Upload */}
-        <input ref={fileInputRef} type="file" className="hidden" onChange={async e => {
+        <input ref={fileInputRef} type="file" title="Upload file" className="hidden" onChange={async e => {
           const file = e.target.files?.[0];
           if (!file) return;
           try {
@@ -649,12 +651,12 @@ const InlineMediaEditor: React.FC<{
 
         <div>
           <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">File Name</label>
-          <input type="text" value={c.name || ''} onChange={e => onUpdate({ ...c, name: e.target.value })} placeholder="document.pdf"
+          <input type="text" value={c.name || ''} onChange={e => onUpdate({ ...c, name: e.target.value })} placeholder="document.pdf" title="File Name"
             className="w-full text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500" />
         </div>
         <div>
           <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Or paste URL</label>
-          <input type="url" value={c.url || ''} onChange={e => onUpdate({ ...c, url: e.target.value })} placeholder="https://…"
+          <input type="url" value={c.url || ''} onChange={e => onUpdate({ ...c, url: e.target.value })} placeholder="https://…" title="File URL"
             className="w-full text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500" />
         </div>
       </div>
@@ -1041,7 +1043,7 @@ const PcoQuickPicker: React.FC<{
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
         <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">{config.icon} Pick a {config.label}</span>
-        <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><X size={13} /></button>
+        <button onClick={onClose} title="Close picker" className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><X size={13} /></button>
       </div>
       {/* Search */}
       <div className="px-2 py-2 border-b border-slate-100 dark:border-slate-700">
@@ -1050,6 +1052,7 @@ const PcoQuickPicker: React.FC<{
           <input
             type="text"
             placeholder={`Search ${config.label.toLowerCase()}s…`}
+            title={`Search ${config.label.toLowerCase()}s`}
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="w-full pl-6 pr-2 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
@@ -1240,6 +1243,7 @@ const EmailAIPanel: React.FC<{
               )}
               <button
                 onClick={onClose}
+                title="Close AI panel"
                 className="p-1 rounded text-white/70 hover:text-white hover:bg-white/10 transition"
               >
                 <X size={15} />
@@ -1373,12 +1377,14 @@ const EmailAIPanel: React.FC<{
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Describe what to write…"
+                title="AI prompt input"
                 className="flex-1 bg-transparent text-xs text-slate-900 dark:text-white placeholder-slate-400 resize-none outline-none leading-relaxed"
                 disabled={loading}
               />
               <button
                 onClick={handleSend}
                 disabled={!input.trim() || loading}
+                title="Send"
                 className="p-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 dark:disabled:bg-slate-600 text-white transition shrink-0 self-end"
               >
                 <Send size={13} />
@@ -1493,7 +1499,7 @@ export const EmailBuilder: React.FC<EmailBuilderProps> = ({
   };
 
   return (
-    <div className="flex h-full" style={{ minHeight: 600 }}>
+    <div className="flex h-full min-h-[600px]">
 
       {/* ── Left Sidebar ── */}
       <div className="w-72 shrink-0 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 overflow-y-auto flex flex-col">

@@ -1608,6 +1608,7 @@ export const QuickSendModal: React.FC<{
               <select
                 className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 value={targetId}
+                title="Select Group or List"
                 onChange={e => setTargetId(e.target.value)}
               >
                 <option value="">— Select a Planning Center {targetType === 'group' ? 'Group' : 'List'} —</option>
@@ -1629,6 +1630,7 @@ export const QuickSendModal: React.FC<{
               <select
                 className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 value={selectedSenderStr}
+                title="From Address"
                 onChange={e => setSelectedSenderStr(e.target.value)}
               >
                 {senders.map((s, i) => (

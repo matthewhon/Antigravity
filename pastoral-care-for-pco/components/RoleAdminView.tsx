@@ -3146,7 +3146,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         </div>
                                         <button
                                             role="switch"
-                                            aria-checked={!!smsForm.prefixMessagesWithName}
+                                            aria-checked={smsForm.prefixMessagesWithName ? 'true' : 'false'}
                                             aria-label="Prefix Messages with Church Name"
                                             title="Prefix Messages with Church Name"
                                             onClick={() => handleSmsChange('prefixMessagesWithName', !smsForm.prefixMessagesWithName)}
@@ -4136,7 +4136,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                     </div>
                                     <button
                                         role="switch"
-                                        aria-checked={!!(church.growSettings as any)?.[key]}
+                                        aria-checked={(church.growSettings as any)?.[key] ? 'true' : 'false'}
                                         aria-label={label}
                                         title={label}
                                         onClick={() => onUpdateChurch && onUpdateChurch({ growSettings: { ...church.growSettings, [key]: !(church.growSettings as any)?.[key] } })}
