@@ -1227,23 +1227,31 @@ export const GivingView: React.FC<GivingViewProps> = ({
           case 'lifecycleInactive': return <DonorListWidget title="Inactive Donors" donors={analytics.lists?.inactive || []} color="rose" onRemove={() => handleRemoveWidget(id)} />;
           case 'lifecycleSecond': return <DonorListWidget title="Second Time Donors" donors={analytics.lists?.secondTime || []} color="violet" onRemove={() => handleRemoveWidget(id)} />;
           case 'lastWeekFunds': {
-              // Calculate Mon-Sun of last calendar week
+              // Calculate Sun-Sat of last calendar week
               const lwNow = new Date();
               const lwDay = lwNow.getDay(); // 0=Sun
               const lwEnd = new Date(lwNow);
               lwEnd.setDate(lwNow.getDate() - lwDay - 1); // last Saturday
               lwEnd.setHours(23, 59, 59, 999);
               const lwStart = new Date(lwEnd);
-              lwStart.setDate(lwEnd.getDate() - 6); // previous Monday
+              lwStart.setDate(lwEnd.getDate() - 6); // previous Sunday
               lwStart.setHours(0, 0, 0, 0);
 
               const weekLabel = `${lwStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${lwEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
 
+              // Build YYYY-MM-DD strings for comparison to avoid UTC/local timezone mismatch.
+              // PCO received_at dates are stored as UTC ISO strings (e.g. "2026-05-17T00:00:00Z"),
+              // so comparing Date objects against local-time boundaries shifts results by the
+              // timezone offset. Comparing date-portion strings avoids this entirely.
+              const pad2 = (n: number) => String(n).padStart(2, '0');
+              const lwStartStr = `${lwStart.getFullYear()}-${pad2(lwStart.getMonth() + 1)}-${pad2(lwStart.getDate())}`;
+              const lwEndStr = `${lwEnd.getFullYear()}-${pad2(lwEnd.getMonth() + 1)}-${pad2(lwEnd.getDate())}`;
+
               // Aggregate donations per fund for last week
               const fundTotals: Record<string, number> = {};
               donations.forEach(d => {
-                  const dDate = new Date(d.date);
-                  if (dDate >= lwStart && dDate <= lwEnd) {
+                  const dDateStr = (d.date || '').slice(0, 10); // "YYYY-MM-DD" from ISO string
+                  if (dDateStr >= lwStartStr && dDateStr <= lwEndStr) {
                       fundTotals[d.fundName] = (fundTotals[d.fundName] || 0) + Number(d.amount || 0);
                   }
               });
