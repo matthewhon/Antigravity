@@ -6,18 +6,34 @@ import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject }
 import { 
   FolderOpen, UploadCloud, Trash2, Link as LinkIcon, File as FileIcon, 
   Image as ImageIcon, Video, Music, FileText, CheckCircle, Loader2, Copy,
-  Folder, Plus, Edit2, Tag, X
+  Folder, Plus, Edit2, Tag, X, HardDrive
 } from 'lucide-react';
 
 interface FileManagerProps {
   churchId: string;
   currentUser: User;
   church?: Church;
+  files?: TenantFile[];
+  setFiles?: React.Dispatch<React.SetStateAction<TenantFile[]>>;
+  isLoading?: boolean;
+  loadFiles?: () => Promise<void>;
 }
 
-export const FileManager: React.FC<FileManagerProps> = ({ churchId, currentUser }) => {
-  const [files, setFiles] = useState<TenantFile[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+export const FileManager: React.FC<FileManagerProps> = ({ 
+  churchId, 
+  currentUser, 
+  files: propFiles, 
+  setFiles: propSetFiles, 
+  isLoading: propIsLoading, 
+  loadFiles: propLoadFiles 
+}) => {
+  const [localFiles, setLocalFiles] = useState<TenantFile[]>([]);
+  const [localIsLoading, setLocalIsLoading] = useState(true);
+
+  const files = propFiles ?? localFiles;
+  const setFiles = propSetFiles ?? setLocalFiles;
+  const isLoading = propIsLoading ?? localIsLoading;
+
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
@@ -35,21 +51,27 @@ export const FileManager: React.FC<FileManagerProps> = ({ churchId, currentUser 
   }, []);
 
   const loadFiles = useCallback(async () => {
-    setIsLoading(true);
+    if (propLoadFiles) {
+      await propLoadFiles();
+      return;
+    }
+    setLocalIsLoading(true);
     try {
       const data = await firestore.getTenantFiles(churchId);
-      setFiles(data);
+      setLocalFiles(data);
     } catch (e) {
       console.error('Failed to load files', e);
       showToast('Failed to load files.', 'error');
     } finally {
-      setIsLoading(false);
+      setLocalIsLoading(false);
     }
-  }, [churchId, showToast]);
+  }, [churchId, propLoadFiles, showToast]);
 
   useEffect(() => {
-    loadFiles();
-  }, [loadFiles]);
+    if (!propFiles) {
+      loadFiles();
+    }
+  }, [propFiles, loadFiles]);
 
   const handleFileUpload = async (file: File) => {
     if (!file) return;
@@ -287,6 +309,51 @@ export const FileManager: React.FC<FileManagerProps> = ({ churchId, currentUser 
             {isUploading ? <Loader2 size={18} className="animate-spin" /> : <UploadCloud size={18} />}
             {isUploading ? `Uploading... ${Math.round(uploadProgress)}%` : 'Upload File'}
           </button>
+        </div>
+      </div>
+
+      {/* Storage Statistics Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex items-center gap-4 transition-all hover:shadow-md hover:border-slate-300 dark:hover:border-slate-700 duration-200">
+          <div className="w-12 h-12 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+            <FileIcon size={22} />
+          </div>
+          <div>
+            <div className="text-xl font-black text-slate-900 dark:text-white leading-tight">
+              {files.length}
+            </div>
+            <div className="text-[10px] text-slate-500 dark:text-slate-400 font-extrabold uppercase tracking-wider mt-0.5">
+              Files Stored
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex items-center gap-4 transition-all hover:shadow-md hover:border-slate-300 dark:hover:border-slate-700 duration-200">
+          <div className="w-12 h-12 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+            <HardDrive size={22} />
+          </div>
+          <div>
+            <div className="text-xl font-black text-slate-900 dark:text-white leading-tight">
+              {formatSize(files.reduce((acc, f) => acc + (f.sizeBytes || 0), 0))}
+            </div>
+            <div className="text-[10px] text-slate-500 dark:text-slate-400 font-extrabold uppercase tracking-wider mt-0.5">
+              Storage Space Used
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex items-center gap-4 transition-all hover:shadow-md hover:border-slate-300 dark:hover:border-slate-700 duration-200">
+          <div className="w-12 h-12 rounded-xl bg-pink-50 dark:bg-pink-900/20 text-pink-600 dark:text-pink-400 flex items-center justify-center shrink-0">
+            <FolderOpen size={22} />
+          </div>
+          <div>
+            <div className="text-xl font-black text-slate-900 dark:text-white leading-tight">
+              {formatSize(files.length > 0 ? files.reduce((acc, f) => acc + (f.sizeBytes || 0), 0) / files.length : 0)}
+            </div>
+            <div className="text-[10px] text-slate-500 dark:text-slate-400 font-extrabold uppercase tracking-wider mt-0.5">
+              Average File Size
+            </div>
+          </div>
         </div>
       </div>
 

@@ -17,7 +17,7 @@ import { PcoImportModal } from './PcoImportModal';
 import MessagingModule from './MessagingModule';
 import QrCodeGenerator from './QrCodeGenerator';
 import { FileManager } from './FileManager';
-import { EmailCampaign, TemplateSettings, PcoList, Church, User, EmailUnsubscribe, SmsOptOut, hasBroadcastAccess } from '../types';
+import { EmailCampaign, TemplateSettings, PcoList, Church, User, EmailUnsubscribe, SmsOptOut, hasBroadcastAccess, TenantFile } from '../types';
 import { 
   Trash2, Eye, Pencil, Loader2, X, List, UserMinus, Search, Copy, Globe, BarChart2, MessageSquare, Phone,
   Mail, CheckCircle, Circle, ChevronUp, ChevronDown, Clock, Calendar, Plus, Send, ArrowLeft, AlignLeft, Users, AtSign, FileText, Smartphone, ExternalLink, Folder
@@ -1733,6 +1733,38 @@ currentUser, onUpdateChurch, activePage, smsTab, mobileSmsUrl, activeNumberId, o
   const [unsubLoaded, setUnsubLoaded] = useState(false);
   const [smsUnsubLoaded, setSmsUnsubLoaded] = useState(false);
 
+  // ── Files state ─────────────────────────────────────────────────────────────
+  const [files, setFiles] = useState<TenantFile[]>([]);
+  const [filesLoading, setFilesLoading] = useState(false);
+  const [filesLoaded, setFilesLoaded] = useState(false);
+
+  const loadToolsFiles = useCallback(async () => {
+    setFilesLoading(true);
+    try {
+      const data = await firestore.getTenantFiles(churchId);
+      setFiles(data);
+      setFilesLoaded(true);
+    } catch (e) {
+      console.error('[ToolsView] Failed to load files:', e);
+    } finally {
+      setFilesLoading(false);
+    }
+  }, [churchId]);
+
+  useEffect(() => {
+    if (!filesLoaded || effectiveTab === 'files') {
+      loadToolsFiles();
+    }
+  }, [effectiveTab, filesLoaded, loadToolsFiles]);
+
+  const formatSize = (bytes?: number) => {
+    if (!bytes || bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 4000);
@@ -2047,6 +2079,12 @@ currentUser, onUpdateChurch, activePage, smsTab, mobileSmsUrl, activeNumberId, o
           }`}
         >
           <Folder size={14} /> Files
+          {files.length > 0 && (
+            <span className="text-xs px-1.5 py-0.5 rounded-full font-semibold bg-violet-105 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 flex items-center gap-1">
+              <span>{files.length}</span>
+              <span className="text-[10px] opacity-65 font-medium">({formatSize(files.reduce((acc, f) => acc + (f.sizeBytes || 0), 0))})</span>
+            </span>
+          )}
         </button>
       </div>
       )}
@@ -2248,7 +2286,15 @@ currentUser, onUpdateChurch, activePage, smsTab, mobileSmsUrl, activeNumberId, o
       {/* ─── Files Tab ────────────────────────────────────────────────── */}
       {effectiveTab === 'files' && (
         <div className="flex-1 min-h-0 overflow-hidden">
-          <FileManager churchId={churchId} currentUser={currentUser!} church={church} />
+          <FileManager 
+            churchId={churchId} 
+            currentUser={currentUser!} 
+            church={church} 
+            files={files}
+            setFiles={setFiles}
+            isLoading={filesLoading}
+            loadFiles={loadToolsFiles}
+          />
         </div>
       )}
 
