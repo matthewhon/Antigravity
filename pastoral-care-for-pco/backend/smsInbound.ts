@@ -513,7 +513,7 @@ export const handleInboundSms = async (req: any, res: any) => {
             numberId: smsNumberId,
             title: `New SMS from ${senderName}`,
             body: preview,
-            url: `/mobile/sms?tab=inbox`,
+            url: `/mobile/sms?tab=inbox&numberId=${smsNumberId || ''}&conversationId=${convId}`,
             tag: `sms-${convId}`,
         }).catch(() => { });
 

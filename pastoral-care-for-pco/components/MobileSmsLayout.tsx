@@ -371,6 +371,29 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
         }
     }, [activeNumber, activeTab, currentUser, numbersLoading]); // eslint-disable-line react-hooks/exhaustive-deps
 
+    // Keep tab and number state in sync with URL search params (e.g. when app is focused/navigated via PWA click)
+    useEffect(() => {
+        const handleUrlChange = () => {
+            const params = new URLSearchParams(window.location.search);
+            const tabParam = params.get('tab') as SmsTab | null;
+            const numParam = params.get('numberId');
+            
+            if (tabParam && TABS.some(t => t.id === tabParam)) {
+                setActiveTab(tabParam);
+            }
+            if (numParam) {
+                setActiveNumberId(numParam);
+            }
+        };
+
+        window.addEventListener('popstate', handleUrlChange);
+        window.addEventListener('focus', handleUrlChange);
+        return () => {
+            window.removeEventListener('popstate', handleUrlChange);
+            window.removeEventListener('focus', handleUrlChange);
+        };
+    }, []);
+
     const [showShareSheet, setShowShareSheet] = useState(false);
     const [showEmailModal, setShowEmailModal] = useState(false);
 

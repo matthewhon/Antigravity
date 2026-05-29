@@ -1905,6 +1905,29 @@ const SmsInbox: React.FC<{
         return unsub;
     }, [churchId, twilioNumberId, allowedNumberIds, defaultNumberId, isDefaultNumber, currentUser.roles]);
 
+    // Deep-link: auto-select conversation if conversationId query parameter matches one in the list
+    useEffect(() => {
+        const handleSelectDeepLink = () => {
+            const params = new URLSearchParams(window.location.search);
+            const urlConvId = params.get('conversationId');
+            if (urlConvId && conversations.length > 0) {
+                const found = conversations.find(c => c.id === urlConvId);
+                if (found && (!activeConv || activeConv.id !== found.id)) {
+                    setActiveConv(found);
+                }
+            }
+        };
+
+        handleSelectDeepLink();
+
+        window.addEventListener('popstate', handleSelectDeepLink);
+        window.addEventListener('focus', handleSelectDeepLink);
+        return () => {
+            window.removeEventListener('popstate', handleSelectDeepLink);
+            window.removeEventListener('focus', handleSelectDeepLink);
+        };
+    }, [conversations, activeConv]);
+
     // Reset limit and states when conversation changes
     useEffect(() => {
         if (!activeConv) {
