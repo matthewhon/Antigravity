@@ -1826,6 +1826,7 @@ const SmsInbox: React.FC<{
     const [loadingMsgs, setLoadingMsgs] = useState(false);
     const [isSending, setIsSending] = useState(false);
     const [search, setSearch] = useState('');
+    const [showUnreadOnly, setShowUnreadOnly] = useState(false);
     const [showComposer, setShowComposer] = useState(false);
 
     // Tags
@@ -2058,11 +2059,23 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
         }
     };
 
+    const totalUnread = conversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
+
     const filtered = conversations.filter(c => {
         const matchSearch = !search || c.phoneNumber.includes(search) || (c.personName || '').toLowerCase().includes(search.toLowerCase());
         const matchTag = !tagFilter || (c.tags || []).includes(tagFilter);
-        return matchSearch && matchTag;
+        const matchUnread = !showUnreadOnly || (c.unreadCount || 0) > 0;
+        return matchSearch && matchTag && matchUnread;
     });
+
+    // Clear the iOS app icon badge when all conversations have been read
+    useEffect(() => {
+        if (totalUnread === 0 && Capacitor.isNativePlatform()) {
+            import('@capacitor/push-notifications').then(({ PushNotifications }) => {
+                PushNotifications.removeAllDeliveredNotifications().catch(() => {});
+            }).catch(() => {});
+        }
+    }, [totalUnread]);
 
     /** Upload a file to Firebase Storage and return the public download URL. */
     const uploadReplyImage = async (file: File): Promise<string> => {
@@ -2192,39 +2205,56 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                         />
                     </div>
 
-                    {/* Tag filter chips */}
-                    {tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 mt-1">
-                            <button
-                                onClick={() => setTagFilter(null)}
-                                className={`px-2 py-0.5 text-[10px] font-bold rounded-full border transition ${tagFilter === null
-                                        ? 'bg-violet-600 text-white border-violet-600'
-                                        : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-violet-400'
-                                    }`}
-                            >All</button>
-                            {tags.map(t => {
-                                const c = TAG_COLOR_MAP[t.color] || TAG_COLOR_MAP.violet;
-                                const isActive = tagFilter === t.id;
-                                return (
-                                    <button
-                                        key={t.id}
-                                        onClick={() => setTagFilter(isActive ? null : t.id)}
-                                        className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full border transition ${isActive ? `${c.bg} ${c.text} ${c.border}` : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-violet-400'
-                                            }`}
-                                    >
-                                        {t.emoji && <span>{t.emoji}</span>}
-                                        {t.name}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    )}
+                    {/* Filter chips: All + Unread + Tags */}
+                    <div className="flex flex-wrap gap-1.5 mt-1">
+                        {/* All */}
+                        <button
+                            onClick={() => { setTagFilter(null); setShowUnreadOnly(false); }}
+                            className={`px-2 py-0.5 text-[10px] font-bold rounded-full border transition ${!showUnreadOnly && tagFilter === null
+                                    ? 'bg-violet-600 text-white border-violet-600'
+                                    : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-violet-400'
+                                }`}
+                        >All</button>
+                        {/* Unread */}
+                        <button
+                            onClick={() => { setShowUnreadOnly(v => !v); setTagFilter(null); }}
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full border transition ${showUnreadOnly
+                                    ? 'bg-violet-600 text-white border-violet-600'
+                                    : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-violet-400'
+                                }`}
+                        >
+                            Unread
+                            {totalUnread > 0 && (
+                                <span className={`min-w-[15px] h-[15px] text-[9px] font-black rounded-full flex items-center justify-center px-1 ${
+                                    showUnreadOnly ? 'bg-white text-violet-600' : 'bg-violet-600 text-white'
+                                }`}>
+                                    {totalUnread}
+                                </span>
+                            )}
+                        </button>
+                        {/* Tag chips */}
+                        {tags.map(t => {
+                            const c = TAG_COLOR_MAP[t.color] || TAG_COLOR_MAP.violet;
+                            const isActive = tagFilter === t.id;
+                            return (
+                                <button
+                                    key={t.id}
+                                    onClick={() => { setTagFilter(isActive ? null : t.id); setShowUnreadOnly(false); }}
+                                    className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full border transition ${isActive ? `${c.bg} ${c.text} ${c.border}` : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-violet-400'
+                                        }`}
+                                >
+                                    {t.emoji && <span>{t.emoji}</span>}
+                                    {t.name}
+                                </button>
+                            );
+                        })}
+                    </div>
                 </div>
                 <div className="flex-1 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-700/60">
                     {filtered.length === 0 && (
                         <div className="text-center py-12 text-slate-400">
                             <MessageCircle size={28} className="mx-auto mb-2 opacity-40" />
-                            <p className="text-sm">{tagFilter ? 'No conversations with this tag' : 'No conversations yet'}</p>
+                            <p className="text-sm">{showUnreadOnly ? 'No unread conversations' : tagFilter ? 'No conversations with this tag' : 'No conversations yet'}</p>
                         </div>
                     )}
                     {filtered.map(conv => {
