@@ -1822,7 +1822,7 @@ const SmsInbox: React.FC<{
     const [replyUploading, setReplyUploading] = useState(false);
     const [replyUploadPct, setReplyUploadPct] = useState(0);
     const replyFileRef = useRef<HTMLInputElement>(null);
-    const messagesEndRef = useRef<HTMLDivElement>(null);
+    const messagesContainerRef = useRef<HTMLDivElement>(null);
     const [loadingMsgs, setLoadingMsgs] = useState(false);
     const [isSending, setIsSending] = useState(false);
     const [search, setSearch] = useState('');
@@ -1933,8 +1933,8 @@ const SmsInbox: React.FC<{
 
     // Auto-scroll to the newest message whenever messages change or conversation switches
     useEffect(() => {
-        if (messagesEndRef.current) {
-            messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+        if (messagesContainerRef.current) {
+            messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
         }
     }, [messages, activeConv?.id]);
 
@@ -2383,7 +2383,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                     </div>
 
                     {/* Messages */}
-                    <div className="flex-1 overflow-y-auto overscroll-contain p-5 space-y-3 bg-slate-50 dark:bg-slate-950">
+                    <div ref={messagesContainerRef} className="flex-1 overflow-y-auto overscroll-contain p-5 space-y-3 bg-slate-50 dark:bg-slate-950">
                         {loadingMsgs ? (
                             <div className="flex justify-center py-12 text-slate-400"><Loader2 size={20} className="animate-spin" /></div>
                         ) : messages.length === 0 ? (
@@ -2417,8 +2417,6 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                 </div>
                             ))
                         )}
-                        {/* Scroll anchor ... always at bottom of message list */}
-                        <div ref={messagesEndRef} aria-hidden="true" />
                     </div>
 
                     {/* Reply box */}
@@ -2542,7 +2540,11 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                         onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendReply(); } }}
                                         onFocus={() => {
                                             // On mobile, scroll to bottom when keyboard opens
-                                            setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 350);
+                                            setTimeout(() => {
+                                                if (messagesContainerRef.current) {
+                                                    messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+                                                }
+                                            }, 350);
                                         }}
                                         className="flex-1 text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
                                     />

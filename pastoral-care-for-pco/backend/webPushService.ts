@@ -41,6 +41,64 @@ async function configureWebPush(): Promise<string> {
     return publicKey;
 }
 
+/** Convert raw APNs hex tokens to FCM registration tokens using Google Batch Import API. */
+export async function convertApnsToFcm(apnsTokens: string[], sandbox: boolean): Promise<{ [apnsToken: string]: string }> {
+    const app = admin.app();
+    const credential = app.options.credential;
+    if (!credential || typeof credential.getAccessToken !== 'function') {
+        console.warn('[FCM] Credential getAccessToken is not available.');
+        return {};
+    }
+
+    let accessToken: string;
+    try {
+        const tokenObj = await credential.getAccessToken();
+        accessToken = tokenObj.access_token;
+    } catch (tokenErr: any) {
+        console.error('[FCM] Failed to get access token for batchImport:', tokenErr?.message || tokenErr);
+        return {};
+    }
+
+    const bundleId = 'com.barnabassoftware.pcmessaging';
+    try {
+        const response = await fetch('https://iid.googleapis.com/iid/v1:batchImport', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${accessToken}`,
+                'access_token_auth': 'true'
+            },
+            body: JSON.stringify({
+                application: bundleId,
+                sandbox: sandbox,
+                apns_tokens: apnsTokens
+            })
+        });
+
+        if (!response.ok) {
+            const errText = await response.text();
+            console.warn(`[FCM] batchImport returned status ${response.status}: ${errText}`);
+            return {};
+        }
+
+        const result = await response.json() as any;
+        const mapping: { [apnsToken: string]: string } = {};
+        if (result.results && Array.isArray(result.results)) {
+            for (const item of result.results) {
+                if (item.status === 'OK' && item.registration_token) {
+                    mapping[item.apns_token] = item.registration_token;
+                } else {
+                    console.warn(`[FCM] Token mapping item status for ${item.apns_token?.slice(0, 8)}...: ${item.status}`);
+                }
+            }
+        }
+        return mapping;
+    } catch (e: any) {
+        console.error('[FCM] batchImport request failed:', e?.message || e);
+        return {};
+    }
+}
+
 /**
  * Send a push notification to all subscribed users (Web Push and Native FCM) for a given church + phone number.
  * payload fields: title, body, url, tag
@@ -121,6 +179,7 @@ export async function sendPushToChurch(opts: {
 
             const tokensToSend: string[] = [];
             const tokenToUserMap: { [token: string]: string } = {};
+            const apnsTokensToConvert: { token: string; userId: string }[] = [];
 
             for (const userDoc of usersSnap.docs) {
                 const userData = userDoc.data();
@@ -138,8 +197,64 @@ export async function sendPushToChurch(opts: {
                 }
 
                 for (const tok of fcmTokens) {
-                    tokensToSend.push(tok);
-                    tokenToUserMap[tok] = userDoc.id;
+                    if (/^[0-9a-fA-F]{64}$/.test(tok)) {
+                        apnsTokensToConvert.push({ token: tok, userId: userDoc.id });
+                    } else {
+                        tokensToSend.push(tok);
+                        tokenToUserMap[tok] = userDoc.id;
+                    }
+                }
+            }
+
+            // Convert APNs tokens to FCM tokens dynamically
+            if (apnsTokensToConvert.length > 0) {
+                const uniqueApns = Array.from(new Set(apnsTokensToConvert.map(x => x.token)));
+                console.log(`[FCM] Converting ${uniqueApns.length} APNs tokens to FCM tokens...`);
+                
+                // Try production first (sandbox: false)
+                let converted: { [apnsToken: string]: string } = {};
+                try {
+                    converted = await convertApnsToFcm(uniqueApns, false);
+                } catch (e) {
+                    console.error('[FCM] APNs conversion (production) failed:', e);
+                }
+
+                // Try sandbox second for any that failed or weren't returned
+                const remainingApns = uniqueApns.filter(t => !converted[t]);
+                if (remainingApns.length > 0) {
+                    try {
+                        const convertedSandbox = await convertApnsToFcm(remainingApns, true);
+                        converted = { ...converted, ...convertedSandbox };
+                    } catch (e) {
+                        console.error('[FCM] APNs conversion (sandbox) failed:', e);
+                    }
+                }
+
+                // Add successfully converted tokens and save to Firestore
+                const { FieldValue } = require('firebase-admin/firestore');
+                for (const item of apnsTokensToConvert) {
+                    const apnsToken = item.token;
+                    const fcmToken = converted[apnsToken];
+                    if (fcmToken) {
+                        console.log(`[FCM] Converted APNs token ${apnsToken.slice(0, 8)}... to FCM token ${fcmToken.slice(0, 8)}...`);
+                        tokensToSend.push(fcmToken);
+                        tokenToUserMap[fcmToken] = item.userId;
+
+                        // Persist FCM token and remove APNs token to avoid repeating conversion next time
+                        try {
+                            await db.collection('users').doc(item.userId).update({
+                                fcmTokens: FieldValue.arrayUnion(fcmToken)
+                            });
+                            await db.collection('users').doc(item.userId).update({
+                                fcmTokens: FieldValue.arrayRemove(apnsToken)
+                            });
+                            console.log(`[FCM] Swapped APNs token with FCM token for user ${item.userId}`);
+                        } catch (dbErr) {
+                            console.error(`[FCM] Failed to update Firestore token mapping for user ${item.userId}:`, dbErr);
+                        }
+                    } else {
+                        console.warn(`[FCM] Could not convert APNs token ${apnsToken.slice(0, 8)}... for user ${item.userId}`);
+                    }
                 }
             }
 
