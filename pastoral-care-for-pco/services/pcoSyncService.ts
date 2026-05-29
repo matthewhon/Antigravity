@@ -1244,23 +1244,35 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
             console.log("Calculating Giving Stats...");
             const donorStats = new Map<string, { weekly: number, monthly: number, quarterly: number, ytd: number }>();
             const now = new Date();
+
+            // Build YYYY-MM-DD boundary strings to avoid UTC/local timezone mismatch.
+            // PCO received_at dates are UTC ISO strings; comparing Date objects against
+            // local-time boundaries shifts results by the timezone offset.
+            const pad2 = (n: number) => String(n).padStart(2, '0');
+            const toDateStr = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+
             const startOfYear = new Date(now.getFullYear(), 0, 1);
             const startOfQuarter = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
             const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
             const startOfWeek = new Date(now);
             startOfWeek.setDate(now.getDate() - now.getDay()); // Sunday
 
+            const startOfYearStr = toDateStr(startOfYear);
+            const startOfQuarterStr = toDateStr(startOfQuarter);
+            const startOfMonthStr = toDateStr(startOfMonth);
+            const startOfWeekStr = toDateStr(startOfWeek);
+
             donations.forEach(d => {
                 if (!d.donorId || d.donorId === 'anonymous') return;
                 
                 const current = donorStats.get(d.donorId) || { weekly: 0, monthly: 0, quarterly: 0, ytd: 0 };
-                const date = new Date(d.date);
+                const dateStr = (d.date || '').slice(0, 10); // "YYYY-MM-DD" from ISO string
                 const amount = d.amount;
 
-                if (date >= startOfWeek) current.weekly += amount;
-                if (date >= startOfMonth) current.monthly += amount;
-                if (date >= startOfQuarter) current.quarterly += amount;
-                if (date >= startOfYear) current.ytd += amount;
+                if (dateStr >= startOfWeekStr) current.weekly += amount;
+                if (dateStr >= startOfMonthStr) current.monthly += amount;
+                if (dateStr >= startOfQuarterStr) current.quarterly += amount;
+                if (dateStr >= startOfYearStr) current.ytd += amount;
 
                 donorStats.set(d.donorId, current);
             });
