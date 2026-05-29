@@ -11,6 +11,7 @@
 import webpush from 'web-push';
 import admin from 'firebase-admin';
 import { getDb } from './firebase';
+import { FieldValue } from 'firebase-admin/firestore';
 
 const VAPID_SUBJECT = 'mailto:support@barnabassoftware.com';
 
@@ -231,7 +232,6 @@ export async function sendPushToChurch(opts: {
                 }
 
                 // Add successfully converted tokens and save to Firestore
-                const { FieldValue } = require('firebase-admin/firestore');
                 for (const item of apnsTokensToConvert) {
                     const apnsToken = item.token;
                     const fcmToken = converted[apnsToken];
@@ -299,7 +299,6 @@ export async function sendPushToChurch(opts: {
                 });
 
                 if (tokensToDelete.length > 0) {
-                    const { FieldValue } = require('firebase-admin/firestore');
                     for (const item of tokensToDelete) {
                         await db.collection('users').doc(item.userId).update({
                             fcmTokens: FieldValue.arrayRemove(item.token)

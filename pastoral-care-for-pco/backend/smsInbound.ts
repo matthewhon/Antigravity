@@ -32,6 +32,7 @@ function validateRequest(signingKey: string, signature: string, webhookUrl: stri
 }
 import { getDb } from './firebase';
 import { createServerLogger } from '../services/logService';
+import { FieldValue } from 'firebase-admin/firestore';
 import { getSignalWireSigningKey, getSmsWebhookBaseUrl } from './signalwireClient';
 import { processExecutiveAiQuery } from './executiveAiAgent';
 
@@ -659,7 +660,6 @@ export const handleInboundSms = async (req: any, res: any) => {
             // Auto-tag the conversation if the keyword has tag IDs configured
             if (Array.isArray(kw.autoTagIds) && kw.autoTagIds.length > 0) {
                 try {
-                    const { FieldValue } = require('firebase-admin/firestore');
                     await convRef.update({
                         tags: FieldValue.arrayUnion(...kw.autoTagIds),
                     });
@@ -671,7 +671,7 @@ export const handleInboundSms = async (req: any, res: any) => {
 
             // Optionally add person to a PCO list
             if (kw.addToListId && personMatch?.personId) {
-                log.info(`[Inbound SMS] Keyword "${kw.keyword}" matched —â€ would add ${personMatch.personId} to list ${kw.addToListId}`, 'system', { churchId, keyword: kw.keyword }, churchId);
+                log.info(`[Inbound SMS] Keyword "${kw.keyword}" matched —â€  would add ${personMatch.personId} to list ${kw.addToListId}`, 'system', { churchId, keyword: kw.keyword }, churchId);
                 // The PCO list add is handled asynchronously; full implementation in Phase 3.
             }
 
@@ -709,9 +709,8 @@ export const handleInboundSms = async (req: any, res: any) => {
                 const prayerFollowUpState = convData?.prayerFollowUpState ?? null;
 
                 if (prayerFollowUpState === 'awaiting_prayer_detail') {
-                    // Ã¢â€â‚¬Ã¢â€â‚¬ Two-step flow: contact just sent their prayer detail Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+                    // ─── Two-step flow: contact just sent their prayer detail ───
                     // Tag "Needs Prayer" immediately and clear the follow-up state.
-                    const { FieldValue } = require('firebase-admin/firestore');
                     const prayerTagId = await getOrCreatePrayerTag(db, churchId, log);
                     await convRef.update({
                         tags: FieldValue.arrayUnion(prayerTagId),
@@ -719,7 +718,7 @@ export const handleInboundSms = async (req: any, res: any) => {
                     });
                     log.info(`[Prayer Detection] Tagged conversation ${convId} "Needs Prayer" (follow-up detail received)`, 'system', { churchId, convId }, churchId);
                 } else {
-                    // Ã¢â€â‚¬Ã¢â€â‚¬ Fresh message —â€ run NLP scanner Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+                    // ─── Fresh message —â€  run NLP scanner ───
                     const prayerType = detectPrayerRequest(body);
 
                     if (prayerType === 'generic') {
@@ -748,16 +747,15 @@ export const handleInboundSms = async (req: any, res: any) => {
                         // Mark conversation as awaiting prayer detail
                         await convRef.update({ prayerFollowUpState: 'awaiting_prayer_detail' });
 
-                        log.info(`[Prayer Detection] Generic prayer ask from ${from} —â€ sent clarifying reply for church ${churchId}`, 'system', { churchId, convId }, churchId);
+                        log.info(`[Prayer Detection] Generic prayer ask from ${from} —â€  sent clarifying reply for church ${churchId}`, 'system', { churchId, convId }, churchId);
 
                     } else if (prayerType === 'specific') {
-                        // Specific request —â€ tag immediately, no clarifying reply needed
-                        const { FieldValue } = require('firebase-admin/firestore');
+                        // Specific request — tag immediately, no clarifying reply needed
                         const prayerTagId = await getOrCreatePrayerTag(db, churchId, log);
                         await convRef.update({
                             tags: FieldValue.arrayUnion(prayerTagId),
                         });
-                        log.info(`[Prayer Detection] Specific prayer request from ${from} —â€ tagged "Needs Prayer" for church ${churchId}`, 'system', { churchId, convId }, churchId);
+                        log.info(`[Prayer Detection] Specific prayer request from ${from} —â€  tagged "Needs Prayer" for church ${churchId}`, 'system', { churchId, convId }, churchId);
                     }
                 }
             }
@@ -772,7 +770,6 @@ export const handleInboundSms = async (req: any, res: any) => {
         const customTagReplies: string[] = [];
         if (!kw && !isWhoIsThis) {
             try {
-                const { FieldValue } = require('firebase-admin/firestore');
                 const freshConvData = convSnap.exists ? convSnap.data() : {} as any;
                 const existingTags: string[] = freshConvData?.tags || [];
                 const tagFollowUpState: string | null = freshConvData?.tagFollowUpState ?? null;

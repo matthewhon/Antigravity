@@ -10,6 +10,7 @@
 // Returns: { success, enrolled, skipped, noPhone }
 
 import { getDb } from './firebase';
+import { createServerLogger } from '../services/logService';
 
 /** Minimal person info needed for an enrollment */
 interface PersonInfo {
@@ -293,8 +294,6 @@ export const workflowForceScan = async (req: any, res: any) => {
     const { churchId } = req.body || {};
     if (!churchId) return res.status(400).json({ error: 'Missing churchId' });
     
-    const { getDb } = require('./firebase.js');
-    const { createServerLogger } = require('../services/logService.js');
     const db = getDb();
     const log = createServerLogger(db);
     

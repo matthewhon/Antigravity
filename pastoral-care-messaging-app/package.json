@@ -9,7 +9,7 @@
     "postbuild": "node postbuild.cjs",
     "lint": "eslint .",
     "preview": "vite preview",
-    "ios:build": "npm run build && npx cap sync ios && xcodebuild -workspace ios/App/App.xcworkspace -scheme App -sdk iphonesimulator -configuration Debug",
+    "ios:build": "npm run build && npx cap sync ios && xcodebuild -workspace ios/App/App.xcworkspace -scheme \"Pastoral Care Messaging\" -sdk iphonesimulator -configuration Debug",
     "ios:run": "npm run build && npx cap run ios --target B8F03C46-BDBF-406A-83F1-BD928AE06139"
   },
   "dependencies": {

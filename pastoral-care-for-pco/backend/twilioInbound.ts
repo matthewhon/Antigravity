@@ -2,6 +2,7 @@ import twilio from 'twilio';
 import http from 'http';
 import { getDb } from './firebase';
 import { createServerLogger } from '../services/logService';
+import { FieldValue } from 'firebase-admin/firestore';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -475,7 +476,6 @@ export const handleInboundSms = async (req: any, res: any) => {
             // Auto-tag the conversation if the keyword has tag IDs configured
             if (Array.isArray(kw.autoTagIds) && kw.autoTagIds.length > 0) {
                 try {
-                    const { FieldValue } = require('firebase-admin/firestore');
                     await convRef.update({
                         tags: FieldValue.arrayUnion(...kw.autoTagIds),
                     });
@@ -527,7 +527,6 @@ export const handleInboundSms = async (req: any, res: any) => {
                 if (prayerFollowUpState === 'awaiting_prayer_detail') {
                     // ── Two-step flow: contact just sent their prayer detail ──────────
                     // Tag "Needs Prayer" immediately and clear the follow-up state.
-                    const { FieldValue } = require('firebase-admin/firestore');
                     const prayerTagId = await getOrCreatePrayerTag(db, churchId, log);
                     await convRef.update({
                         tags:               FieldValue.arrayUnion(prayerTagId),
@@ -568,7 +567,6 @@ export const handleInboundSms = async (req: any, res: any) => {
 
                     } else if (prayerType === 'specific') {
                         // Specific request — tag immediately, no clarifying reply needed
-                        const { FieldValue } = require('firebase-admin/firestore');
                         const prayerTagId = await getOrCreatePrayerTag(db, churchId, log);
                         await convRef.update({
                             tags: FieldValue.arrayUnion(prayerTagId),

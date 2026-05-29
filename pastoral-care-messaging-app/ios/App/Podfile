@@ -14,7 +14,7 @@ def capacitor_pods
   pod 'CapacitorPushNotifications', :path => '../../node_modules/@capacitor/push-notifications'
 end
 
-target 'App' do
+target 'Pastoral Care Messaging' do
   capacitor_pods
   # Add your Pods here
 end

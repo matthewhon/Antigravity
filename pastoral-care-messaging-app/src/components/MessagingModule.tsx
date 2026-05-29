@@ -2156,8 +2156,14 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                     church={church}
                     currentUser={currentUser}
                     twilioNumberId={twilioNumberId}
-                    onClose={() => setShowComposer(false)}
-                    onSent={() => setShowComposer(false)}
+                    onClose={() => {
+                        setShowComposer(false);
+                        window.scrollTo(0, 0);
+                    }}
+                    onSent={() => {
+                        setShowComposer(false);
+                        window.scrollTo(0, 0);
+                    }}
                 />
             )}
 
@@ -8734,7 +8740,7 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                 </div>
             )}
 
-            <div className="flex-1 overflow-hidden">
+            <div className="flex-1 min-h-0 overflow-hidden">
                 {/* Campaigns tab */}
                 {effectiveTab === 'campaigns' && !activeCampaign && (
                     <div className="h-full overflow-y-auto">

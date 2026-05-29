@@ -415,7 +415,7 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
             </header>
 
             {/* ── Main Content ─────────────────────────────────────────────── */}
-            <main className="flex-1 overflow-hidden relative">
+            <main className="flex-1 min-h-0 overflow-hidden relative">
                 <MessagingModule
                     churchId={churchId}
                     church={church}
@@ -563,7 +563,10 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
                     churchId={churchId}
                     church={church}
                     currentUser={currentUser}
-                    onClose={() => setShowEmailModal(false)}
+                    onClose={() => {
+                        setShowEmailModal(false);
+                        window.scrollTo(0, 0);
+                    }}
                     onSendQuickEmail={handleSendQuickEmail}
                 />
             )}
