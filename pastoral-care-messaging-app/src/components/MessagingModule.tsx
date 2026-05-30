@@ -66,8 +66,8 @@ const ALL_MERGE_TAGS: { tag: string; label: string }[] = [
 ];
 
 const COMMON_EMOJIS = [
-    '??', '??', '??', '??', '??', '??', '??', '?', '??', '??',
-    '??', '???', '??', '??', '??', '??', '??', '??', '??', '??',
+    '👋', '🙏', '❤️', '😊', '👍', '🎉', '🙌', '✨', '🔥', '💡',
+    '📆', '🔔', '💬', '📢', '⛪', '✝️', '🕊️', '☕', '🌟', '🤗'
 ];
 
 // --- Tag colour map -----------------------------------------------------------
@@ -107,8 +107,20 @@ const SmsTagChip: React.FC<{ tag: SmsTag; onRemove?: () => void; size?: 'sm' | '
 
 function countSegments(body: string): number {
     if (!body) return 0;
-    if (body.length <= 160) return 1;
-    return Math.ceil(body.length / 153);
+    // Check if the message contains any character outside the standard GSM-7 basic & extension set.
+    const isUnicode = !/^[\n\r a-zA-Z0-9@£$¥èéùìòÇØøÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ!"#¤%&'()*+,\-./:;<=>?¡ÄÖÑÜ§¿äöñüà^{}\[~\]|€]*$/.test(body);
+    if (isUnicode) {
+        if (body.length <= 70) return 1;
+        return Math.ceil(body.length / 67);
+    } else {
+        let gsmLength = 0;
+        const gsmExtensions = '^{}\\[~]|€';
+        for (let i = 0; i < body.length; i++) {
+            gsmLength += gsmExtensions.includes(body[i]) ? 2 : 1;
+        }
+        if (gsmLength <= 160) return 1;
+        return Math.ceil(gsmLength / 153);
+    }
 }
 
 /** Call the Gemini AI proxy to suggest a shorter SMS message. */
@@ -4357,6 +4369,29 @@ const StaffStepEditor: React.FC<{
     const [addName, setAddName] = useState('');
     const [addContact, setAddContact] = useState('');
 
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const [showEmojis, setShowEmojis] = useState(false);
+
+    const insertAtCursor = (text: string, field: 'message' | 'emailBody' = isEmail ? 'emailBody' : 'message') => {
+        const el = textareaRef.current;
+        const currentVal = (step[field] as string) || '';
+        if (!el) {
+            onChange({ [field]: currentVal + text });
+            return;
+        }
+        const start = el.selectionStart ?? currentVal.length;
+        const end = el.selectionEnd ?? start;
+        const before = currentVal.slice(0, start);
+        const after = currentVal.slice(end);
+        const newVal = before + text + after;
+        onChange({ [field]: newVal });
+        requestAnimationFrame(() => {
+            el.focus();
+            const pos = start + text.length;
+            el.setSelectionRange(pos, pos);
+        });
+    };
+
     const addRecipient = () => {
         if (!addName.trim() && !addContact.trim()) return;
         const rec = isEmail
@@ -4428,15 +4463,34 @@ const StaffStepEditor: React.FC<{
             {isEmail ? (
                 <div className='space-y-2'>
                     <input type='text' value={step.emailSubject || ''} onChange={e => onChange({ emailSubject: e.target.value })} placeholder='Subject: Action needed - {contact.firstName} is at Step 3' className='w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-400' />
-                    <textarea rows={5} value={step.emailBody || ''} onChange={e => onChange({ emailBody: e.target.value })} placeholder={'Hi team,\nJust a heads-up: {contact.firstName} ({contact.phone}) is progressing through the workflow.'} className='w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-400 resize-none' />
+                    <textarea ref={textareaRef} rows={5} value={step.emailBody || ''} onChange={e => onChange({ emailBody: e.target.value })} placeholder={'Hi team,\nJust a heads-up: {contact.firstName} ({contact.phone}) is progressing through the workflow.'} className='w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-400 resize-none' />
                 </div>
             ) : (
-                <textarea rows={3} value={step.message} onChange={e => onChange({ message: e.target.value })} placeholder='FYI: {contact.firstName} ({contact.phone}) just hit this workflow step. Please reach out!' className='w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none' />
+                <textarea ref={textareaRef} rows={3} value={step.message} onChange={e => onChange({ message: e.target.value })} placeholder='FYI: {contact.firstName} ({contact.phone}) just hit this workflow step. Please reach out!' className='w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none' />
             )}
-            {/* Contact merge tags */}
-            <div className='flex gap-1.5 flex-wrap'>
+            {/* Contact merge tags & Emoji picker */}
+            <div className='flex gap-1.5 flex-wrap items-center'>
+                <div className="relative">
+                    <button
+                        type="button"
+                        title="Insert emoji"
+                        onClick={() => setShowEmojis(v => !v)}
+                        className={`flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-lg border transition ${isEmail ? 'bg-rose-50 dark:bg-rose-900/20 text-rose-700 border-rose-200 hover:bg-rose-100' : 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 border-amber-200 hover:bg-amber-100'}`}
+                    >
+                        <Smile size={12} /> Emoji
+                    </button>
+                    {showEmojis && (
+                        <div className="absolute left-0 bottom-full mb-1 p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl flex gap-1.5 z-20 flex-wrap max-w-[200px]">
+                            {COMMON_EMOJIS.map(em => (
+                                <button key={em} type="button" onClick={() => { insertAtCursor(em); setShowEmojis(false); }}
+                                    className="text-base hover:scale-125 transition p-1 cursor-pointer"
+                                >{em}</button>
+                            ))}
+                        </div>
+                    )}
+                </div>
                 {['{contact.firstName}', '{contact.lastName}', '{contact.name}', '{contact.phone}', '{contact.email}'].map(t => (
-                    <button key={t} type='button' onClick={() => isEmail ? onChange({ emailBody: (step.emailBody || '') + t }) : onChange({ message: step.message + t })}
+                    <button key={t} type='button' onClick={() => insertAtCursor(t)}
                         className={`px-2 py-0.5 text-[10px] font-mono font-semibold rounded-lg border transition ${isEmail ? 'bg-rose-50 dark:bg-rose-900/20 text-rose-700 border-rose-200 hover:bg-rose-100' : 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 border-amber-200 hover:bg-amber-100'}`}
                     >{t}</button>
                 ))}
@@ -5142,6 +5196,29 @@ const ActionNodeCard: React.FC<{
     const segs = countSegments(step.message);
     const [mmsUrl, setMmsUrl] = React.useState((step.mediaUrls && step.mediaUrls[0]) || '');
 
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const [showEmojis, setShowEmojis] = React.useState(false);
+
+    const insertAtCursor = (text: string, field: 'message' | 'emailBody' = 'message') => {
+        const el = textareaRef.current;
+        const currentVal = (step[field] as string) || '';
+        if (!el) {
+            onChange({ [field]: currentVal + text });
+            return;
+        }
+        const start = el.selectionStart ?? currentVal.length;
+        const end = el.selectionEnd ?? start;
+        const before = currentVal.slice(0, start);
+        const after = currentVal.slice(end);
+        const newVal = before + text + after;
+        onChange({ [field]: newVal });
+        requestAnimationFrame(() => {
+            el.focus();
+            const pos = start + text.length;
+            el.setSelectionRange(pos, pos);
+        });
+    };
+
     // Keep mmsUrl in sync when external step changes (e.g. on first load)
     React.useEffect(() => {
         setMmsUrl((step.mediaUrls && step.mediaUrls[0]) || '');
@@ -5210,15 +5287,35 @@ const ActionNodeCard: React.FC<{
                             }`}>{step.message.length} chars • {segs} seg{segs !== 1 ? 's' : ''}</span>
                     </div>
                     <textarea
+                        ref={textareaRef}
                         rows={3}
                         value={step.message}
                         onChange={e => onChange({ message: e.target.value })}
                         placeholder="Type your message... Use {firstName} for personalisation."
                         className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
                     />
-                    <div className="flex gap-1.5 mt-1.5 flex-wrap">
+                    <div className="flex gap-1.5 mt-1.5 flex-wrap items-center">
+                        <div className="relative">
+                            <button
+                                type="button"
+                                title="Insert emoji"
+                                onClick={() => setShowEmojis(v => !v)}
+                                className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-700 rounded-lg hover:bg-slate-200 transition border border-slate-200 dark:border-slate-600"
+                            >
+                                <Smile size={12} /> Emoji
+                            </button>
+                            {showEmojis && (
+                                <div className="absolute left-0 bottom-full mb-1 p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl flex gap-1.5 z-20 flex-wrap max-w-[200px]">
+                                    {COMMON_EMOJIS.map(em => (
+                                        <button key={em} type="button" onClick={() => { insertAtCursor(em, 'message'); setShowEmojis(false); }}
+                                            className="text-base hover:scale-125 transition p-1 cursor-pointer"
+                                        >{em}</button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                         {ALL_MERGE_TAGS.map(({ tag }) => (
-                            <button key={tag} onClick={() => onChange({ message: step.message + tag })}
+                            <button key={tag} type="button" onClick={() => insertAtCursor(tag, 'message')}
                                 className="px-2 py-0.5 text-[10px] font-mono font-semibold bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 rounded-lg border border-violet-200 dark:border-violet-800 hover:bg-violet-100 transition"
                             >{tag}</button>
                         ))}
@@ -5255,15 +5352,35 @@ const ActionNodeCard: React.FC<{
                                 }`}>{step.message.length} chars • {segs} seg{segs !== 1 ? 's' : ''}</span>
                         </div>
                         <textarea
+                            ref={textareaRef}
                             rows={3}
                             value={step.message}
                             onChange={e => onChange({ message: e.target.value })}
                             placeholder="Caption for the image... Use {firstName} for personalisation."
                             className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                         />
-                        <div className="flex gap-1.5 mt-1.5 flex-wrap">
+                        <div className="flex gap-1.5 mt-1.5 flex-wrap items-center">
+                            <div className="relative">
+                                <button
+                                    type="button"
+                                    title="Insert emoji"
+                                    onClick={() => setShowEmojis(v => !v)}
+                                    className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-700 rounded-lg hover:bg-slate-200 transition border border-slate-200 dark:border-slate-600"
+                                >
+                                    <Smile size={12} /> Emoji
+                                </button>
+                                {showEmojis && (
+                                    <div className="absolute left-0 bottom-full mb-1 p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl flex gap-1.5 z-20 flex-wrap max-w-[200px]">
+                                        {COMMON_EMOJIS.map(em => (
+                                            <button key={em} type="button" onClick={() => { insertAtCursor(em, 'message'); setShowEmojis(false); }}
+                                                className="text-base hover:scale-125 transition p-1 cursor-pointer"
+                                            >{em}</button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
                             {ALL_MERGE_TAGS.map(({ tag }) => (
-                                <button key={tag} onClick={() => onChange({ message: step.message + tag })}
+                                <button key={tag} type="button" onClick={() => insertAtCursor(tag, 'message')}
                                     className="px-2 py-0.5 text-[10px] font-mono font-semibold bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-lg border border-blue-200 dark:border-blue-800 hover:bg-blue-100 transition"
                                 >{tag}</button>
                             ))}
@@ -5300,15 +5417,35 @@ const ActionNodeCard: React.FC<{
                             <span className="text-[10px] text-slate-400">{(step.emailBody || '').length} chars</span>
                         </div>
                         <textarea
+                            ref={textareaRef}
                             rows={6}
                             value={step.emailBody || ''}
                             onChange={e => onChange({ emailBody: e.target.value })}
                             placeholder={`Dear {firstName},\n\nWe're so glad you joined us...`}
                             className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none font-medium leading-relaxed"
                         />
-                        <div className="flex gap-1.5 mt-1.5 flex-wrap">
+                        <div className="flex gap-1.5 mt-1.5 flex-wrap items-center">
+                            <div className="relative">
+                                <button
+                                    type="button"
+                                    title="Insert emoji"
+                                    onClick={() => setShowEmojis(v => !v)}
+                                    className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-700 rounded-lg hover:bg-slate-200 transition border border-slate-200 dark:border-slate-600"
+                                >
+                                    <Smile size={12} /> Emoji
+                                </button>
+                                {showEmojis && (
+                                    <div className="absolute left-0 bottom-full mb-1 p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl flex gap-1.5 z-20 flex-wrap max-w-[200px]">
+                                        {COMMON_EMOJIS.map(em => (
+                                            <button key={em} type="button" onClick={() => { insertAtCursor(em, 'emailBody'); setShowEmojis(false); }}
+                                                className="text-base hover:scale-125 transition p-1 cursor-pointer"
+                                            >{em}</button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
                             {ALL_MERGE_TAGS.map(({ tag }) => (
-                                <button key={tag} onClick={() => onChange({ emailBody: (step.emailBody || '') + tag })}
+                                <button key={tag} type="button" onClick={() => insertAtCursor(tag, 'emailBody')}
                                     className="px-2 py-0.5 text-[10px] font-mono font-semibold bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 rounded-lg border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 transition"
                                 >{tag}</button>
                             ))}
