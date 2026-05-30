@@ -310,8 +310,8 @@ const CampaignListView: React.FC<CampaignListViewProps & { setIsQuickSendOpen: (
   const usage = church?.emailUsage || {};
   const currentUsage = usage[currentMonth] || 0;
   const isStarter = church?.subscription?.planId === 'starter';
-  const planLimit = isStarter ? 500 : 'Unlimited';
-  const usagePercent = isStarter ? Math.min(100, Math.round((currentUsage / 500) * 100)) : 0;
+  const planLimit = isStarter ? 3000 : 'Unlimited';
+  const usagePercent = isStarter ? Math.min(100, Math.round((currentUsage / 3000) * 100)) : 0;
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -470,7 +470,7 @@ const CampaignListView: React.FC<CampaignListViewProps & { setIsQuickSendOpen: (
               {currentUsage.toLocaleString()}
             </div>
             <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">
-              / {isStarter ? '500 limit' : 'Unlimited'}
+              / {isStarter ? '3000 limit' : 'Unlimited'}
             </div>
           </div>
 
@@ -488,7 +488,7 @@ const CampaignListView: React.FC<CampaignListViewProps & { setIsQuickSendOpen: (
                 </p>
               ) : (
                 <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                  You have <strong className="text-slate-700 dark:text-slate-300">{500 - currentUsage}</strong> emails remaining this month.
+                  You have <strong className="text-slate-700 dark:text-slate-300">{3000 - currentUsage}</strong> emails remaining this month.
                 </p>
               )}
             </>

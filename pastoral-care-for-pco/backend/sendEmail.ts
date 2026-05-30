@@ -1087,9 +1087,9 @@ export async function executeSend(
     const currentUsage = usage[currentMonth] || 0;
 
     if (!testEmail && churchData.subscription?.planId === 'starter') {
-        const remaining = 500 - currentUsage;
+        const remaining = 3000 - currentUsage;
         if (recipients.length > remaining) {
-            throw new Error(`Starter plan limit reached: You can only send ${remaining} more emails this month (500 max). You are trying to send ${recipients.length}.`);
+            throw new Error(`Starter plan limit reached: You can only send ${remaining} more emails this month (3000 max). You are trying to send ${recipients.length}.`);
         }
     }
 
@@ -1225,7 +1225,7 @@ export const sendEmail = async (req: any, res: any) => {
             const currentUsage = usage[currentMonth] || 0;
 
             if (churchData.subscription?.planId === 'starter') {
-                const remaining = 500 - currentUsage;
+                const remaining = 3000 - currentUsage;
                 if (toAddresses.length > remaining) {
                     throw new Error(`Starter plan limit reached`);
                 }
