@@ -1474,6 +1474,7 @@ export interface SmsWorkflow {
     completedCount: number;
     createdAt: number;
     updatedAt: number;
+    allowReentry?: boolean;
 }
 
 export interface SmsWorkflowEnrollment {

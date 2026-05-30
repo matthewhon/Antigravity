@@ -5730,6 +5730,7 @@ const WorkflowEditor: React.FC<{
         completedCount: 0,
         createdAt: Date.now(),
         updatedAt: Date.now(),
+        allowReentry: false,
     });
 
     const [wf, setWf] = useState<SmsWorkflow>(initial ?? makeBlank());
@@ -5945,6 +5946,18 @@ const WorkflowEditor: React.FC<{
                                 ))}
                             </select>
                             <p className="text-[10px] text-slate-400 mt-1">If set, all steps in this workflow will be sent from this specific number instead of your church's default number.</p>
+                        </div>
+                        <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-1">
+                            <label className="flex items-center gap-2 cursor-pointer select-none">
+                                <input
+                                    type="checkbox"
+                                    checked={!!wf.allowReentry}
+                                    onChange={e => patch({ allowReentry: e.target.checked })}
+                                    className="w-4 h-4 text-violet-600 border-slate-300 rounded focus:ring-violet-500 bg-white dark:bg-slate-800"
+                                />
+                                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Allow Re-entry (Recurrence)</span>
+                            </label>
+                            <p className="text-[10px] text-slate-400 leading-normal">If enabled, contacts can be enrolled into this workflow multiple times (e.g. on registering for different events or texting a keyword repeatedly). If disabled, they are skipped if already enrolled.</p>
                         </div>
                     </div>
 
@@ -6325,7 +6338,10 @@ const EnrollmentPane: React.FC<{
         setErrMsg('');
         setEnrolling(true);
         try {
-            const enrollId = `${workflow.id}_${e164.replace(/\+/g, '')}`;
+            const baseId = `${workflow.id}_${e164.replace(/\+/g, '')}`;
+            const enrollId = workflow.allowReentry
+                ? `${baseId}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+                : baseId;
             const enrollment: SmsWorkflowEnrollment = {
                 id: enrollId,
                 churchId,

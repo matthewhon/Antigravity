@@ -188,14 +188,19 @@ export async function workflowEnrollList(req: any, res: any): Promise<void> {
             await Promise.all(chunk.map(async (person) => {
                 // Enrollment ID: prefer personId so we avoid double-enrolling the same person
                 // who might have two phone numbers; fall back to phone-based ID.
-                const enrollId = person.personId
+                const baseId = person.personId
                     ? `${workflowId}_${person.personId}`
                     : `${workflowId}_${person.e164.replace(/\+/g, '')}`;
+                const enrollId = wf.allowReentry
+                    ? `${baseId}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+                    : baseId;
 
-                const existing = await db.collection('smsWorkflowEnrollments').doc(enrollId).get();
-                if (existing.exists) {
-                    skipped++;
-                    return;
+                if (!wf.allowReentry) {
+                    const existing = await db.collection('smsWorkflowEnrollments').doc(enrollId).get();
+                    if (existing.exists) {
+                        skipped++;
+                        return;
+                    }
                 }
 
                 // Fire Step 1 immediately (nextSendAt = now)

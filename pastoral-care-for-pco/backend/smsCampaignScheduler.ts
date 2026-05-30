@@ -704,7 +704,9 @@ export async function runEventRegistrationScanner(db: any): Promise<void> {
                     if (!personId) continue; // can't resolve a phone without a person
 
                     // 3. Check for an existing enrollment — skip if already enrolled
-                    const enrollId = `${wfId}_${personId}`;
+                    const enrollId = wf.allowReentry
+                        ? `${wfId}_${personId}_${attDoc.id}`
+                        : `${wfId}_${personId}`;
                     const existing = await db.collection('smsWorkflowEnrollments').doc(enrollId).get();
                     if (existing.exists) continue;
 
