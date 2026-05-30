@@ -39,10 +39,23 @@ function normaliseE164(phone: string): string {
     return `+${digits}`;
 }
 
-/** Count SMS segments (160 chars = 1 segment; 153 chars per segment after that). */
+/** Count SMS segments (GSM-7: 160 limit, 153 multi-segment limit. Unicode: 70 limit, 67 multi-segment limit). */
 function countSegments(body: string): number {
-    if (body.length <= 160) return 1;
-    return Math.ceil(body.length / 153);
+    if (!body) return 0;
+    // Check if the message contains any character outside the standard GSM-7 basic & extension set.
+    const isUnicode = !/^[\n\r a-zA-Z0-9@£$¥èéùìòÇØøÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ!"#¤%&'()*+,\-./:;<=>?¡ÄÖÑÜ§¿äöñüà^{}\[~\]|€]*$/.test(body);
+    if (isUnicode) {
+        if (body.length <= 70) return 1;
+        return Math.ceil(body.length / 67);
+    } else {
+        let gsmLength = 0;
+        const gsmExtensions = '^{}\\[~]|€';
+        for (let i = 0; i < body.length; i++) {
+            gsmLength += gsmExtensions.includes(body[i]) ? 2 : 1;
+        }
+        if (gsmLength <= 160) return 1;
+        return Math.ceil(gsmLength / 153);
+    }
 }
 
 /** All data about a person used for merge-tag resolution. */
