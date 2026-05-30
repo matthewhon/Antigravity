@@ -15,6 +15,9 @@ import { firestore } from '../services/firestoreService';
 
 import { DonationReport } from './DonationReport';
 
+const pad2 = (n: number) => String(n).padStart(2, '0');
+const toDateStr = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+
 interface GivingViewProps {
   analytics: GivingAnalytics | null;
   pcoConnected: boolean;
@@ -373,12 +376,11 @@ export const GivingView: React.FC<GivingViewProps> = ({
       
       if (durationDays <= 7 || gvbFilter === 'Week' || gvbFilter === 'This Week') {
           while (currentDate <= endDate) {
-              const dayEnd = new Date(currentDate);
-              dayEnd.setHours(23, 59, 59, 999);
+              const currentDateStr = toDateStr(currentDate);
               const actual = donations
                   .filter(d => {
-                      const dDate = new Date(d.date);
-                      return d.fundName === gvbFund && dDate >= currentDate && dDate <= dayEnd;
+                      const dDateStr = (d.date || '').slice(0, 10);
+                      return d.fundName === gvbFund && dDateStr === currentDateStr;
                   })
                   .reduce((sum, d) => sum + d.amount, 0);
               const budget = getDailyBudget(currentDate, gvbFund);
@@ -394,11 +396,19 @@ export const GivingView: React.FC<GivingViewProps> = ({
           while (currentDate <= endDate) {
               const bucketStart = new Date(currentDate);
               const bucketEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-              bucketEnd.setHours(23, 59, 59, 999);
+              const bucketStartStr = toDateStr(bucketStart);
+              const bucketEndStr = toDateStr(bucketEnd);
+              const startDateStr = toDateStr(startDate);
+              const endDateStr = toDateStr(endDate);
+              
               const actual = donations
                   .filter(d => {
-                      const dDate = new Date(d.date);
-                      return d.fundName === gvbFund && dDate >= bucketStart && dDate <= bucketEnd && dDate >= startDate && dDate <= endDate;
+                      const dDateStr = (d.date || '').slice(0, 10);
+                      return d.fundName === gvbFund && 
+                             dDateStr >= bucketStartStr && 
+                             dDateStr <= bucketEndStr && 
+                             dDateStr >= startDateStr && 
+                             dDateStr <= endDateStr;
                   })
                   .reduce((sum, d) => sum + d.amount, 0);
               const budgetRecord = budgets.find(b => b.fundName === gvbFund && b.year === bucketStart.getFullYear() && b.isActive);
@@ -428,12 +438,13 @@ export const GivingView: React.FC<GivingViewProps> = ({
       for (let i = 0; i < 12; i++) {
           const monthStart = new Date(budgetYear, i, 1);
           const monthEnd = new Date(budgetYear, i + 1, 0);
-          monthEnd.setHours(23, 59, 59, 999);
+          const monthStartStr = toDateStr(monthStart);
+          const monthEndStr = toDateStr(monthEnd);
           
           const actualInMonth = donations
               .filter(d => {
-                  const dDate = new Date(d.date);
-                  return d.fundName === cumulativeFundFilter && dDate >= monthStart && dDate <= monthEnd;
+                  const dDateStr = (d.date || '').slice(0, 10);
+                  return d.fundName === cumulativeFundFilter && dDateStr >= monthStartStr && dDateStr <= monthEndStr;
               })
               .reduce((sum, d) => sum + d.amount, 0);
           
@@ -472,13 +483,15 @@ export const GivingView: React.FC<GivingViewProps> = ({
     const AGE_COLORS = ['#8b5cf6', '#6366f1', '#06b6d4', '#10b981', '#f59e0b', '#f43f5e'];
 
     const { startDate, endDate } = getDateRangeForFilter(filter);
+    const startDateStr = toDateStr(startDate);
+    const endDateStr = toDateStr(endDate);
     const currentYear = new Date().getFullYear();
 
     // Sum donations per donor in the current period
     const periodTotals = new Map<string, number>();
     donations.forEach(d => {
-      const dDate = new Date(d.date);
-      if (dDate >= startDate && dDate <= endDate) {
+      const dDateStr = (d.date || '').slice(0, 10);
+      if (dDateStr >= startDateStr && dDateStr <= endDateStr) {
         periodTotals.set(d.donorId, (periodTotals.get(d.donorId) || 0) + d.amount);
       }
     });
@@ -524,12 +537,14 @@ export const GivingView: React.FC<GivingViewProps> = ({
   const givingByStatusData = useMemo(() => {
     if (!analytics) return [];
     const { startDate, endDate } = getDateRangeForFilter(filter);
+    const startDateStr = toDateStr(startDate);
+    const endDateStr = toDateStr(endDate);
 
     // Build a map of donorId -> total given in the current period
     const periodTotals = new Map<string, number>();
     donations.forEach(d => {
-      const dDate = new Date(d.date);
-      if (dDate >= startDate && dDate <= endDate) {
+      const dDateStr = (d.date || '').slice(0, 10);
+      if (dDateStr >= startDateStr && dDateStr <= endDateStr) {
         periodTotals.set(d.donorId, (periodTotals.get(d.donorId) || 0) + d.amount);
       }
     });
@@ -570,20 +585,23 @@ export const GivingView: React.FC<GivingViewProps> = ({
       weeks.push({ start: wStart, end: wEnd });
     }
 
-    const windowStart = weeks[0].start;
+    const windowStartStr = toDateStr(weeks[0].start);
+    const nowStr = toDateStr(now);
     const allFundNames = Array.from(
-      new Set(donations.filter(d => { const dd = new Date(d.date); return dd >= windowStart && dd <= now; }).map(d => d.fundName))
+      new Set(donations.filter(d => { const ddStr = (d.date || '').slice(0, 10); return ddStr >= windowStartStr && ddStr <= nowStr; }).map(d => d.fundName))
     ).sort();
 
     const fundData = allFundNames.map((fundName, idx) => {
       const color = COLORS[idx % COLORS.length];
 
       // Weekly totals for all 12 weeks
-      const weeklyTotals = weeks.map(w =>
-        donations
-          .filter(d => { const dd = new Date(d.date); return d.fundName === fundName && dd >= w.start && dd <= w.end; })
-          .reduce((s, d) => s + d.amount, 0)
-      );
+      const weeklyTotals = weeks.map(w => {
+        const wStartStr = toDateStr(w.start);
+        const wEndStr = toDateStr(w.end);
+        return donations
+          .filter(d => { const ddStr = (d.date || '').slice(0, 10); return d.fundName === fundName && ddStr >= wStartStr && ddStr <= wEndStr; })
+          .reduce((s, d) => s + d.amount, 0);
+      });
 
       const totalGiven = weeklyTotals.reduce((s, v) => s + v, 0);
       const avg = totalGiven / 12; // rolling 12-week average $/wk
@@ -600,13 +618,19 @@ export const GivingView: React.FC<GivingViewProps> = ({
 
     const overallAvg = fundData.reduce((s, f) => s + f.avg, 0);
     const recentOverall = fundData.reduce((s, f) => {
-      const wt = weeks.slice(6).reduce((ss, w) =>
-        ss + donations.filter(d => { const dd = new Date(d.date); return d.fundName === f.fundName && dd >= w.start && dd <= w.end; }).reduce((a, d) => a + d.amount, 0), 0) / 6;
+      const wt = weeks.slice(6).reduce((ss, w) => {
+        const wStartStr = toDateStr(w.start);
+        const wEndStr = toDateStr(w.end);
+        return ss + donations.filter(d => { const ddStr = (d.date || '').slice(0, 10); return d.fundName === f.fundName && ddStr >= wStartStr && ddStr <= wEndStr; }).reduce((a, d) => a + d.amount, 0);
+      }, 0) / 6;
       return s + wt;
     }, 0);
     const prevOverall = fundData.reduce((s, f) => {
-      const wt = weeks.slice(0, 6).reduce((ss, w) =>
-        ss + donations.filter(d => { const dd = new Date(d.date); return d.fundName === f.fundName && dd >= w.start && dd <= w.end; }).reduce((a, d) => a + d.amount, 0), 0) / 6;
+      const wt = weeks.slice(0, 6).reduce((ss, w) => {
+        const wStartStr = toDateStr(w.start);
+        const wEndStr = toDateStr(w.end);
+        return ss + donations.filter(d => { const ddStr = (d.date || '').slice(0, 10); return d.fundName === f.fundName && ddStr >= wStartStr && ddStr <= wEndStr; }).reduce((a, d) => a + d.amount, 0);
+      }, 0) / 6;
       return s + wt;
     }, 0);
     const overallTrendPct = prevOverall > 0 ? ((recentOverall - prevOverall) / prevOverall) * 100 : null;
@@ -620,11 +644,11 @@ export const GivingView: React.FC<GivingViewProps> = ({
   }, [donations]);
 
   const acquisitionData = useMemo(() => {
-      const donorFirstGift = new Map<string, number>();
+      const donorFirstGift = new Map<string, string>();
       donations.forEach(d => {
-          const t = new Date(d.date).getTime();
-          if (!donorFirstGift.has(d.donorId) || t < donorFirstGift.get(d.donorId)!) {
-              donorFirstGift.set(d.donorId, t);
+          const dDateStr = (d.date || '').slice(0, 10);
+          if (!donorFirstGift.has(d.donorId) || dDateStr < donorFirstGift.get(d.donorId)!) {
+              donorFirstGift.set(d.donorId, dDateStr);
           }
       });
 
@@ -633,12 +657,13 @@ export const GivingView: React.FC<GivingViewProps> = ({
       return months.map((monthName, index) => {
           const monthStart = new Date(budgetYear, index, 1);
           const monthEnd = new Date(budgetYear, index + 1, 0);
-          monthEnd.setHours(23, 59, 59, 999);
+          const monthStartStr = toDateStr(monthStart);
+          const monthEndStr = toDateStr(monthEnd);
           
           const donorsInMonth = new Set<string>();
           donations.forEach(d => {
-              const dDate = new Date(d.date);
-              if (dDate >= monthStart && dDate <= monthEnd) {
+              const dDateStr = (d.date || '').slice(0, 10);
+              if (dDateStr >= monthStartStr && dDateStr <= monthEndStr) {
                   donorsInMonth.add(d.donorId);
               }
           });
@@ -647,8 +672,8 @@ export const GivingView: React.FC<GivingViewProps> = ({
           let returningGivers = 0;
 
           donorsInMonth.forEach(id => {
-              const firstDate = donorFirstGift.get(id);
-              if (firstDate && firstDate >= monthStart.getTime() && firstDate <= monthEnd.getTime()) {
+              const firstDateStr = donorFirstGift.get(id);
+              if (firstDateStr && firstDateStr >= monthStartStr && firstDateStr <= monthEndStr) {
                   newGivers++;
               } else {
                   returningGivers++;
@@ -681,10 +706,15 @@ export const GivingView: React.FC<GivingViewProps> = ({
             const ytdSum = b.monthlyAmounts.slice(0, ytdMonthIndex + 1).reduce((a, v) => a + v, 0);
             return sum + ytdSum;
         }, 0);
+      const nowStr = toDateStr(now);
+      const endOfYearStr = toDateStr(endOfYear);
+      const boundaryStr = budgetYear === now.getFullYear() ? nowStr : endOfYearStr;
+
       const totalYtdActual = donations
         .filter(d => {
-            const date = new Date(d.date);
-            return date.getFullYear() === budgetYear && date <= (budgetYear === now.getFullYear() ? now : endOfYear);
+            const dateStr = (d.date || '').slice(0, 10);
+            const yearStr = dateStr.slice(0, 4);
+            return yearStr === String(budgetYear) && dateStr <= boundaryStr;
         })
         .reduce((sum, d) => sum + d.amount, 0);
       const percentOfBudget = totalAnnualBudget > 0 ? (totalYtdActual / totalAnnualBudget) * 100 : 0;
@@ -732,11 +762,13 @@ export const GivingView: React.FC<GivingViewProps> = ({
               // Compute per-fund YTD actuals
               const yearStart = new Date(activeYear, 0, 1);
               const yearEnd = activeYear < now.getFullYear() ? new Date(activeYear, 11, 31, 23, 59, 59) : now;
+              const yearStartStr = toDateStr(yearStart);
+              const yearEndStr = toDateStr(yearEnd);
 
               const fundActuals: Record<string, number> = {};
               donations.forEach(d => {
-                  const dDate = new Date(d.date);
-                  if (dDate >= yearStart && dDate <= yearEnd) {
+                  const dDateStr = (d.date || '').slice(0, 10);
+                  if (dDateStr >= yearStartStr && dDateStr <= yearEndStr) {
                       fundActuals[d.fundName] = (fundActuals[d.fundName] || 0) + d.amount;
                   }
               });
@@ -1728,10 +1760,11 @@ export const GivingView: React.FC<GivingViewProps> = ({
                                 // Calculate YTD Actual
                                 const ytdActual = donations
                                     .filter(d => {
-                                        const date = new Date(d.date);
+                                        const dateStr = (d.date || '').slice(0, 10);
+                                        const yearStr = dateStr.slice(0, 4);
                                         return d.fundName === fund.name && 
-                                               date.getFullYear() === budgetYear && 
-                                               date <= new Date(); 
+                                               yearStr === String(budgetYear) && 
+                                               dateStr <= toDateStr(new Date()); 
                                     })
                                     .reduce((sum, d) => sum + d.amount, 0);
 

@@ -254,6 +254,8 @@ export async function processExecutiveAiQuery(
 
         // Perform dynamic context calculations
         const now = new Date();
+        const pad2 = (n: number) => String(n).padStart(2, '0');
+        const toYYYYMMDD = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
         
         // 1. Calculate Last Week's Giving
         const day = now.getDay();
@@ -264,9 +266,12 @@ export async function processExecutiveAiQuery(
         lastWeekStart.setDate(lastWeekEnd.getDate() - 6);
         lastWeekStart.setHours(0, 0, 0, 0);
 
+        const lastWeekStartStr = toYYYYMMDD(lastWeekStart);
+        const lastWeekEndStr = toYYYYMMDD(lastWeekEnd);
+
         const lastWeekDonations = donations.filter(d => {
-            const dDate = new Date(d.date);
-            return dDate >= lastWeekStart && dDate <= lastWeekEnd;
+            const dDateStr = (d.date || '').slice(0, 10);
+            return dDateStr >= lastWeekStartStr && dDateStr <= lastWeekEndStr;
         });
 
         const lastWeekTotal = lastWeekDonations.reduce((sum, d) => sum + d.amount, 0);
@@ -275,7 +280,7 @@ export async function processExecutiveAiQuery(
             lastWeekByFund[d.fundName] = (lastWeekByFund[d.fundName] || 0) + d.amount;
         });
 
-        const lastWeekGivingSummary = `Total giving last week (${lastWeekStart.toISOString().substring(0, 10)} to ${lastWeekEnd.toISOString().substring(0, 10)}): $${lastWeekTotal.toFixed(2)}. ` +
+        const lastWeekGivingSummary = `Total giving last week (${lastWeekStartStr} to ${lastWeekEndStr}): $${lastWeekTotal.toFixed(2)}. ` +
             `Breakdown by fund: ${Object.entries(lastWeekByFund).map(([f, amt]) => `${f}: $${amt.toFixed(2)}`).join(', ') || 'No giving recorded'}.`;
 
         // 2. Calculate Yearly Giving by Fund

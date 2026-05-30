@@ -107,6 +107,9 @@ export async function refreshCampaignBlocks(
  * Mirrors the client-side `fetchWidgetSnapshot` in DataChartSelector.tsx
  * but uses the Firebase Admin SDK via `db` instead of the client SDK.
  */
+const pad2 = (n: number) => String(n).padStart(2, '0');
+const toYYYYMMDD = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+
 async function fetchWidgetData(
     db: any,
     churchId: string,
@@ -123,38 +126,83 @@ async function fetchWidgetData(
         case 'giving_donor_lifecycle':
         case 'giving_donor_acquisition':
         case 'giving_cumulative_ytd': {
-            let donationsSnap = await db.collection('detailed_donations')
-                .where('churchId', '==', churchId)
-                .get();
+            const [donationsSnap, budgetsSnap] = await Promise.all([
+                db.collection('detailed_donations').where('churchId', '==', churchId).get(),
+                widgetId === 'giving_cumulative_ytd'
+                    ? db.collection('budgets').where('churchId', '==', churchId).get()
+                    : Promise.resolve({ docs: [] })
+            ]);
 
             let donations: any[] = donationsSnap.docs.map(d => d.data());
+            const budgets: any[] = budgetsSnap.docs.map(d => d.data());
             if (fundFilter) donations = donations.filter(d => d.fundName === fundFilter);
 
             // Build grouped analytics in-memory
             const now = new Date();
-            const yearStart = new Date(now.getFullYear(), 0, 1);
+            const nowStr = toYYYYMMDD(now);
 
             if (widgetId === 'giving_cumulative_ytd') {
-                const ytd = donations.filter(d => new Date(d.date) >= yearStart);
-                // Group by month
-                const monthMap = new Map<string, number>();
-                ytd.forEach(d => {
-                    const m = d.date.slice(0, 7);
-                    monthMap.set(m, (monthMap.get(m) || 0) + Number(d.amount || 0));
+                const yearNow = now.getFullYear();
+                const currentMonth = now.getMonth(); // 0-indexed
+                const activeBudgets = budgets.filter(
+                    (b: any) => b.year === yearNow && b.isActive && (!fundFilter || b.fundName === fundFilter)
+                );
+
+                const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                let runningActual = 0;
+                let runningBudget = 0;
+                const months = MONTHS.map((label, i) => {
+                    const monthStart = new Date(yearNow, i, 1);
+                    const monthEnd = new Date(yearNow, i + 1, 0, 23, 59, 59, 999);
+                    const monthStartStr = toYYYYMMDD(monthStart);
+                    const monthEndStr = toYYYYMMDD(monthEnd);
+                    const actualInMonth = donations
+                        .filter(d => {
+                            const ddStr = (d.date || '').slice(0, 10);
+                            return ddStr >= monthStartStr && ddStr <= monthEndStr;
+                        })
+                        .reduce((s, d) => s + Number(d.amount || 0), 0);
+                    // Only add actual for months that have passed or are current
+                    if (i <= currentMonth) runningActual += actualInMonth;
+                    const budgetInMonth = activeBudgets.reduce(
+                        (s: number, b: any) => s + (b.monthlyAmounts?.[i] || 0), 0
+                    );
+                    runningBudget += budgetInMonth;
+                    return {
+                        label,
+                        actual: i <= currentMonth ? runningActual : null,
+                        budget: runningBudget,
+                        isPast: i <= currentMonth,
+                    };
                 });
-                const months = Array.from(monthMap.entries()).sort((a, b) => a[0].localeCompare(b[0]));
-                let running = 0;
-                const cumulative = months.map(([date, amount]) => {
-                    running += amount;
-                    return { date, amount: running };
-                });
-                return { cumulative, totalYTD: running, fundFilter: fundFilter || null };
+
+                const totalAnnualBudget = activeBudgets.reduce((s: number, b: any) => s + (b.totalAmount || 0), 0);
+                const pctOfBudget = totalAnnualBudget > 0
+                    ? Math.round((runningActual / totalAnnualBudget) * 100)
+                    : null;
+                const pctOfYtdBudget = runningBudget > 0
+                    ? Math.round((runningActual / runningBudget) * 100)
+                    : null;
+
+                return {
+                    months,
+                    totalYTD: runningActual,
+                    totalAnnualBudget,
+                    pctOfBudget,
+                    pctOfYtdBudget,
+                    hasBudget: activeBudgets.length > 0,
+                    fundFilter: fundFilter || null,
+                };
             }
 
             // For all other giving widgets: last 365 days
             const yearAgo = new Date(now);
             yearAgo.setFullYear(now.getFullYear() - 1);
-            const current = donations.filter(d => new Date(d.date) >= yearAgo);
+            const yearAgoStr = toYYYYMMDD(yearAgo);
+            const current = donations.filter(d => {
+                const ddStr = (d.date || '').slice(0, 10);
+                return ddStr >= yearAgoStr && ddStr <= nowStr;
+            });
 
             const totalGiving = current.reduce((s, d) => s + Number(d.amount || 0), 0);
             const uniqueDonors = new Set(current.map(d => d.donorId)).size;
@@ -165,9 +213,11 @@ async function fetchWidgetData(
                 // Previous period giving
                 const prevYearAgo = new Date(yearAgo);
                 prevYearAgo.setFullYear(prevYearAgo.getFullYear() - 1);
+                const prevYearAgoStr = toYYYYMMDD(prevYearAgo);
                 const prev = donations.filter(d => {
                     const dd = new Date(d.date);
-                    return dd >= prevYearAgo && dd < yearAgo;
+                    const ddStr = (d.date || '').slice(0, 10);
+                    return ddStr >= prevYearAgoStr && ddStr < yearAgoStr;
                 });
                 const previousTotalGiving = prev.reduce((s, d) => s + Number(d.amount || 0), 0);
                 return { totalGiving, previousTotalGiving, contributingPeople: uniqueDonors, recurringGivers, averageGift };
@@ -269,10 +319,13 @@ async function fetchWidgetData(
 
             const weekLabel = `${lwStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${lwEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
 
+            const lwStartStr = toYYYYMMDD(lwStart);
+            const lwEndStr = toYYYYMMDD(lwEnd);
+
             const fundTotals: Record<string, number> = {};
             allDonations.forEach(d => {
-                const dDate = new Date(d.date);
-                if (dDate >= lwStart && dDate <= lwEnd) {
+                const dDateStr = (d.date || '').slice(0, 10);
+                if (dDateStr >= lwStartStr && dDateStr <= lwEndStr) {
                     fundTotals[d.fundName] = (fundTotals[d.fundName] || 0) + Number(d.amount || 0);
                 }
             });
@@ -301,10 +354,14 @@ async function fetchWidgetData(
             const now2 = new Date();
             const yearBudgets = allBudgets.filter((b: any) => b.year === yearNow && b.isActive);
             const yearStart = new Date(yearNow, 0, 1);
+            
+            const yearStartStr = toYYYYMMDD(yearStart);
+            const now2Str = toYYYYMMDD(now2);
+
             const fundActuals: Record<string, number> = {};
             allDonations.forEach((d: any) => {
-                const dDate = new Date(d.date);
-                if (dDate >= yearStart && dDate <= now2) {
+                const dDateStr = (d.date || '').slice(0, 10);
+                if (dDateStr >= yearStartStr && dDateStr <= now2Str) {
                     fundActuals[d.fundName] = (fundActuals[d.fundName] || 0) + Number(d.amount || 0);
                 }
             });
@@ -325,9 +382,9 @@ async function fetchWidgetData(
             const now = new Date();
             const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
             const sixtyDaysAgo  = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
-            const thirtyStr = thirtyDaysAgo.toISOString().split('T')[0];
-            const sixtyStr  = sixtyDaysAgo.toISOString().split('T')[0];
-            const todayStr  = now.toISOString().split('T')[0];
+            const thirtyStr = toYYYYMMDD(thirtyDaysAgo);
+            const sixtyStr  = toYYYYMMDD(sixtyDaysAgo);
+            const todayStr  = toYYYYMMDD(now);
 
             const [donSnap, planSnap, groupSnap] = await Promise.all([
                 db.collection('detailed_donations').where('churchId', '==', churchId).get(),
@@ -336,8 +393,14 @@ async function fetchWidgetData(
             ]);
 
             const donations: any[] = donSnap.docs.map((d: any) => d.data());
-            const givingThis = new Set(donations.filter((d: any) => d.date >= thirtyStr && d.date <= todayStr).map((d: any) => d.donorId)).size;
-            const givingLast = new Set(donations.filter((d: any) => d.date >= sixtyStr && d.date < thirtyStr).map((d: any) => d.donorId)).size;
+            const givingThis = new Set(donations.filter((d: any) => {
+                const dDateStr = (d.date || '').slice(0, 10);
+                return dDateStr >= thirtyStr && dDateStr <= todayStr;
+            }).map((d: any) => d.donorId)).size;
+            const givingLast = new Set(donations.filter((d: any) => {
+                const dDateStr = (d.date || '').slice(0, 10);
+                return dDateStr >= sixtyStr && dDateStr < thirtyStr;
+            }).map((d: any) => d.donorId)).size;
 
             const plans: any[] = planSnap.docs.map((d: any) => d.data());
             const servingThis = new Set<string>();
@@ -623,20 +686,23 @@ async function fetchWidgetData(
                 weeks.push({ start: wStart, end: wEnd, label });
             }
 
-            const windowStart = weeks[0].start;
+            const windowStartStr = toYYYYMMDD(weeks[0].start);
+            const nowStr = toYYYYMMDD(now);
             const fundSet = new Set<string>();
             donations.forEach((d: any) => {
-                const dd = new Date(d.date);
-                if (dd >= windowStart && dd <= now) fundSet.add(d.fundName);
+                const ddStr = (d.date || '').slice(0, 10);
+                if (ddStr >= windowStartStr && ddStr <= nowStr) fundSet.add(d.fundName);
             });
             const fundNames = Array.from(fundSet).sort();
 
             const weekData = weeks.map(w => {
+                const wStartStr = toYYYYMMDD(w.start);
+                const wEndStr = toYYYYMMDD(w.end);
                 const byFund: Record<string, number> = {};
                 fundNames.forEach(f => (byFund[f] = 0));
                 donations.forEach((d: any) => {
-                    const dd = new Date(d.date);
-                    if (dd >= w.start && dd <= w.end) {
+                    const ddStr = (d.date || '').slice(0, 10);
+                    if (ddStr >= wStartStr && ddStr <= wEndStr) {
                         byFund[d.fundName] = (byFund[d.fundName] || 0) + Number(d.amount || 0);
                     }
                 });

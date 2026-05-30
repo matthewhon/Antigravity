@@ -200,6 +200,9 @@ const WIDGET_DEFS: WidgetDef[] = [
 
 // ─── Data Fetchers ────────────────────────────────────────────────────────────
 
+const pad2 = (n: number) => String(n).padStart(2, '0');
+const toDateStr = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+
 async function fetchWidgetSnapshot(
   churchId: string,
   widgetId: AnalyticsWidgetId,
@@ -274,8 +277,13 @@ async function fetchWidgetSnapshot(
       const months = MONTHS.map((label, i) => {
         const monthStart = new Date(yearNow, i, 1);
         const monthEnd = new Date(yearNow, i + 1, 0, 23, 59, 59, 999);
+        const monthStartStr = toDateStr(monthStart);
+        const monthEndStr = toDateStr(monthEnd);
         const actualInMonth = donations
-          .filter(d => { const dd = new Date(d.date); return dd >= monthStart && dd <= monthEnd; })
+          .filter(d => {
+            const ddStr = (d.date || '').slice(0, 10);
+            return ddStr >= monthStartStr && ddStr <= monthEndStr;
+          })
           .reduce((s, d) => s + Number(d.amount || 0), 0);
         // Only add actual for months that have passed or are current
         if (i <= currentMonth) runningActual += actualInMonth;
@@ -321,11 +329,14 @@ async function fetchWidgetSnapshot(
 
       const weekLabel = `${lwStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${lwEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
 
+      const lwStartStr = toDateStr(lwStart);
+      const lwEndStr = toDateStr(lwEnd);
+
       const rawDonations = await firestore.getDetailedDonations(churchId);
       const fundTotals: Record<string, number> = {};
       rawDonations.forEach(d => {
-        const dDate = new Date(d.date);
-        if (dDate >= lwStart && dDate <= lwEnd) {
+        const dDateStr = (d.date || '').slice(0, 10);
+        if (dDateStr >= lwStartStr && dDateStr <= lwEndStr) {
           fundTotals[d.fundName] = (fundTotals[d.fundName] || 0) + Number(d.amount || 0);
         }
       });
@@ -352,10 +363,12 @@ async function fetchWidgetSnapshot(
       ]);
       const yearBudgets = budgets.filter(b => b.year === yearNow && b.isActive);
       const yearStart = new Date(yearNow, 0, 1);
+      const yearStartStr = toDateStr(yearStart);
+      const nowStr = toDateStr(now);
       const fundActuals: Record<string, number> = {};
       rawDonations.forEach(d => {
-        const dDate = new Date(d.date);
-        if (dDate >= yearStart && dDate <= now) {
+        const dDateStr = (d.date || '').slice(0, 10);
+        if (dDateStr >= yearStartStr && dDateStr <= nowStr) {
           fundActuals[d.fundName] = (fundActuals[d.fundName] || 0) + Number(d.amount || 0);
         }
       });
@@ -415,11 +428,14 @@ async function fetchWidgetSnapshot(
       const now = new Date();
       const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
       const sixtyDaysAgo  = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+      const thirtyDaysAgoStr = toDateStr(thirtyDaysAgo);
+      const sixtyDaysAgoStr = toDateStr(sixtyDaysAgo);
+      const nowStr = toDateStr(now);
 
       // Giving — unique donors this month vs last month
       const donations = await firestore.getDetailedDonations(churchId);
-      const givingThis  = new Set(donations.filter(d => new Date(d.date) >= thirtyDaysAgo).map(d => d.donorId)).size;
-      const givingLast  = new Set(donations.filter(d => { const dd = new Date(d.date); return dd >= sixtyDaysAgo && dd < thirtyDaysAgo; }).map(d => d.donorId)).size;
+      const givingThis  = new Set(donations.filter(d => (d.date || '').slice(0, 10) >= thirtyDaysAgoStr && (d.date || '').slice(0, 10) <= nowStr).map(d => d.donorId)).size;
+      const givingLast  = new Set(donations.filter(d => { const ddStr = (d.date || '').slice(0, 10); return ddStr >= sixtyDaysAgoStr && ddStr < thirtyDaysAgoStr; }).map(d => d.donorId)).size;
 
       // Services — volunteers with confirmed status
       const plans = await firestore.getServicePlans(churchId);
@@ -662,9 +678,11 @@ async function fetchWidgetSnapshot(
       const weekData = weeks.map(w => {
         const byFund: Record<string, number> = {};
         fundNames.forEach(f => (byFund[f] = 0));
+        const wStartStr = toDateStr(w.weekStart);
+        const wEndStr = toDateStr(w.weekEnd);
         donations.forEach(d => {
-          const dDate = new Date(d.date);
-          if (dDate >= w.weekStart && dDate <= w.weekEnd) {
+          const dDateStr = (d.date || '').slice(0, 10);
+          if (dDateStr >= wStartStr && dDateStr <= wEndStr) {
             byFund[d.fundName] = (byFund[d.fundName] || 0) + Number(d.amount || 0);
           }
         });

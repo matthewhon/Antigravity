@@ -3,6 +3,9 @@ import { DetailedDonation, PcoPerson, DonorLifecycleSettings, GivingAnalytics, L
 
 const ONE_DAY = 24 * 60 * 60 * 1000;
 
+const pad2 = (n: number) => String(n).padStart(2, '0');
+const toDateStr = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+
 export const DEFAULT_LIFECYCLE_SETTINGS: DonorLifecycleSettings = {
     newDonorDays: 30,
     activeWindowDays: 90,
@@ -83,14 +86,19 @@ export const calculateGivingAnalytics = (
         
     const timePeriodLabel = `${currentLabel} vs. ${previousLabel}`;
 
+    const startDateStr = toDateStr(startDate);
+    const endDateStr = toDateStr(endDate);
+    const previousStartDateStr = toDateStr(previousStartDate);
+    const previousEndDateStr = toDateStr(previousEndDate);
+
     const currentPeriodDonations = donations.filter(d => {
-        const dDate = new Date(d.date);
-        return dDate >= startDate && dDate <= endDate;
+        const dDateStr = (d.date || '').slice(0, 10);
+        return dDateStr >= startDateStr && dDateStr <= endDateStr;
     });
 
     const previousPeriodDonations = donations.filter(d => {
-        const dDate = new Date(d.date);
-        return dDate >= previousStartDate && dDate <= previousEndDate;
+        const dDateStr = (d.date || '').slice(0, 10);
+        return dDateStr >= previousStartDateStr && dDateStr <= previousEndDateStr;
     });
 
     const totalGiving = currentPeriodDonations.reduce((sum, d) => sum + d.amount, 0);
@@ -122,12 +130,12 @@ export const calculateGivingAnalytics = (
 
     const trendsMap = new Map<string, number>();
     currentPeriodDonations.forEach(d => {
-        const dDate = new Date(d.date);
+        const dDateStr = (d.date || '').slice(0, 10);
         let key = '';
         if (filter === 'Year' || filter === 'Quarter' || filter === 'This Year' || filter === 'This Quarter') {
-            key = dDate.toISOString().slice(0, 7); 
+            key = dDateStr.slice(0, 7); 
         } else {
-            key = dDate.toISOString().slice(0, 10); 
+            key = dDateStr; 
         }
         trendsMap.set(key, (trendsMap.get(key) || 0) + d.amount);
     });
@@ -151,11 +159,17 @@ export const calculateGivingAnalytics = (
         numBuckets = Math.ceil(durationDays) + 1;
     }
 
-    const getBucketIndex = (date: Date, start: Date): number => {
-        const diffTime = date.getTime() - start.getTime();
+    const getBucketIndex = (dateStr: string, start: Date): number => {
+        const y = parseInt(dateStr.slice(0, 4), 10);
+        const m = parseInt(dateStr.slice(5, 7), 10) - 1;
+        const d = parseInt(dateStr.slice(8, 10), 10);
+        
+        const localDate = new Date(y, m, d);
+        const localStart = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+        const diffTime = localDate.getTime() - localStart.getTime();
         
         if (bucketType === 'month') {
-            return (date.getFullYear() - start.getFullYear()) * 12 + (date.getMonth() - start.getMonth());
+            return (y - start.getFullYear()) * 12 + (m - start.getMonth());
         } else if (bucketType === 'week') {
             const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
             return Math.floor(diffDays / 7);
@@ -181,14 +195,14 @@ export const calculateGivingAnalytics = (
     }
 
     currentPeriodDonations.forEach(d => {
-        const idx = getBucketIndex(new Date(d.date), startDate);
+        const idx = getBucketIndex((d.date || '').slice(0, 10), startDate);
         if (comparisonMap.has(idx)) {
             comparisonMap.get(idx)!.current += d.amount;
         }
     });
 
     previousPeriodDonations.forEach(d => {
-        const idx = getBucketIndex(new Date(d.date), previousStartDate);
+        const idx = getBucketIndex((d.date || '').slice(0, 10), previousStartDate);
         if (comparisonMap.has(idx)) {
             comparisonMap.get(idx)!.previous += d.amount;
         }
@@ -275,9 +289,10 @@ export const calculateGivingAnalytics = (
 
     const trailingYearStart = new Date();
     trailingYearStart.setFullYear(now.getFullYear() - 1);
+    const trailingYearStartStr = toDateStr(trailingYearStart);
     
     const trailingYearTotals = new Map<string, number>();
-    donations.filter(d => new Date(d.date) >= trailingYearStart).forEach(d => {
+    donations.filter(d => (d.date || '').slice(0, 10) >= trailingYearStartStr).forEach(d => {
         trailingYearTotals.set(d.donorId, (trailingYearTotals.get(d.donorId) || 0) + d.amount);
     });
     
@@ -303,13 +318,17 @@ export const calculateGivingAnalytics = (
 
     const thirtyDaysAgo = new Date(now.getTime() - 30 * ONE_DAY);
     const sixtyDaysAgo = new Date(now.getTime() - 60 * ONE_DAY);
+    const thirtyDaysAgoStr = toDateStr(thirtyDaysAgo);
+    const sixtyDaysAgoStr = toDateStr(sixtyDaysAgo);
+    const nowStr = toDateStr(now);
+
     const givingThisMonth = new Set(donations.filter(d => {
-        const dDate = new Date(d.date);
-        return dDate >= thirtyDaysAgo && dDate <= now;
+        const dDateStr = (d.date || '').slice(0, 10);
+        return dDateStr >= thirtyDaysAgoStr && dDateStr <= nowStr;
     }).map(d => d.donorId)).size;
     const givingLastMonth = new Set(donations.filter(d => {
-        const dDate = new Date(d.date);
-        return dDate >= sixtyDaysAgo && dDate < thirtyDaysAgo;
+        const dDateStr = (d.date || '').slice(0, 10);
+        return dDateStr >= sixtyDaysAgoStr && dDateStr < thirtyDaysAgoStr;
     }).map(d => d.donorId)).size;
 
     return {
@@ -661,8 +680,9 @@ export const calculateAggregatedStats = (
     const now = new Date();
     const twelveWeeksAgo = new Date();
     twelveWeeksAgo.setDate(now.getDate() - 84);
+    const twelveWeeksAgoStr = toDateStr(twelveWeeksAgo);
     
-    const recentDonations = donations.filter(d => new Date(d.date) >= twelveWeeksAgo);
+    const recentDonations = donations.filter(d => (d.date || '').slice(0, 10) >= twelveWeeksAgoStr);
     const totalRecentGiving = recentDonations.reduce((sum, d) => sum + d.amount, 0);
     const avgWeeklyGiving = totalRecentGiving / 12;
 
@@ -726,8 +746,9 @@ export const calculateAggregatedStats = (
 
     const oneYearAgo = new Date();
     oneYearAgo.setFullYear(now.getFullYear() - 1);
+    const oneYearAgoStr = toDateStr(oneYearAgo);
     
-    const yearDonations = donations.filter(d => new Date(d.date) >= oneYearAgo);
+    const yearDonations = donations.filter(d => (d.date || '').slice(0, 10) >= oneYearAgoStr);
     const giftsByAgeGroup: Record<string, { total: number, count: number }> = {
         '18-30': { total: 0, count: 0 },
         '31-50': { total: 0, count: 0 },
