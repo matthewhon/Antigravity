@@ -1830,6 +1830,28 @@ const SmsInbox: React.FC<{
     const [activeConv, setActiveConv] = useState<SmsConversation | null>(null);
     const [messages, setMessages] = useState<SmsMessage[]>([]);
     const [replyBody, setReplyBody] = useState('');
+    const [showReplyEmojis, setShowReplyEmojis] = useState(false);
+    const replyTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+    const insertAtReplyCursor = (text: string) => {
+        const el = replyTextareaRef.current;
+        const currentVal = replyBody;
+        if (!el) {
+            setReplyBody(currentVal + text);
+            return;
+        }
+        const start = el.selectionStart ?? currentVal.length;
+        const end = el.selectionEnd ?? start;
+        const before = currentVal.slice(0, start);
+        const after = currentVal.slice(end);
+        const newVal = before + text + after;
+        setReplyBody(newVal);
+        requestAnimationFrame(() => {
+            el.focus();
+            const pos = start + text.length;
+            el.setSelectionRange(pos, pos);
+        });
+    };
     const [replyMediaUrl, setReplyMediaUrl] = useState('');
     const [replyUploading, setReplyUploading] = useState(false);
     const [replyUploadPct, setReplyUploadPct] = useState(0);
@@ -2581,6 +2603,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                         </button>
                                     )}
                                     <textarea
+                                        ref={replyTextareaRef}
                                         rows={2}
                                         value={replyBody}
                                         onChange={e => setReplyBody(e.target.value)}
@@ -2596,6 +2619,25 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                         }}
                                         className="flex-1 text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
                                     />
+                                    {/* Emoji Picker Button */}
+                                    <div className="relative shrink-0">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowReplyEmojis(v => !v)}
+                                            title="Insert emoji"
+                                            className="flex items-center justify-center w-10 h-10 rounded-xl border bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                                        >
+                                            <Smile size={16} />
+                                        </button>
+                                        {showReplyEmojis && (
+                                            <div className="absolute bottom-full right-0 mb-2 z-50 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-3 grid grid-cols-5 gap-1 min-w-[170px]">
+                                                {COMMON_EMOJIS.map(em => (
+                                                    <button key={em} type="button" onClick={() => { insertAtReplyCursor(em); setShowReplyEmojis(false); }}
+                                                        className="text-xl hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg p-1 transition leading-none" title={em}>{em}</button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
                                     {/* Attach image button */}
                                     <button
                                         onClick={() => replyFileRef.current?.click()}
