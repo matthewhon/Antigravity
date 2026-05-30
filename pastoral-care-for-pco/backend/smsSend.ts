@@ -33,7 +33,7 @@ export interface PersonInfo {
 }
 
 /** Replace merge tags with person-specific values. */
-function resolveMergeTags(body: string, person: PersonInfo): string {
+function resolveMergeTags(body: string, person: PersonInfo, church?: any): string {
     const parts = (person.personName || '').split(' ');
     const firstName = parts[0] || '';
     const lastName  = parts.slice(1).join(' ') || '';
@@ -41,6 +41,11 @@ function resolveMergeTags(body: string, person: PersonInfo): string {
     const formattedPhone = rawPhone.length === 10
         ? `(${rawPhone.slice(0,3)}) ${rawPhone.slice(3,6)}-${rawPhone.slice(6)}`
         : rawPhone;
+
+    const rawChurchPhone = (church?.phone || '').replace(/^\+1/, '');
+    const formattedChurchPhone = rawChurchPhone.length === 10
+        ? `(${rawChurchPhone.slice(0,3)}) ${rawChurchPhone.slice(3,6)}-${rawChurchPhone.slice(6)}`
+        : rawChurchPhone;
 
     return body
         .replace(/\{contact\.firstName\}|\{firstName\}/gi,   firstName)
@@ -51,7 +56,11 @@ function resolveMergeTags(body: string, person: PersonInfo): string {
         .replace(/\{contact\.birthday\}|\{birthday\}/gi,    person.birthday   || '')
         .replace(/\{contact\.anniversary\}|\{anniversary\}/gi, person.anniversary || '')
         .replace(/\{contact\.city\}|\{city\}/gi,        person.city       || '')
-        .replace(/\{contact\.state\}|\{state\}/gi,       person.state      || '');
+        .replace(/\{contact\.state\}|\{state\}/gi,       person.state      || '')
+        .replace(/\{church\.name\}|\{churchName\}/gi,       church?.name || '')
+        .replace(/\{church\.phone\}|\{churchPhone\}/gi,       formattedChurchPhone)
+        .replace(/\{church\.address\}|\{churchAddress\}/gi,   church?.address || '')
+        .replace(/\{church\.website\}|\{churchWebsite\}/gi,   church?.website || '');
 }
 
 async function resolveDefaultNumberId(db: any, churchId: string): Promise<string | null> {
@@ -356,6 +365,9 @@ export async function sendBulkInternal(params: {
     }
     const { client, fromNumber } = await getSmsClient(db, churchId, numberId);
 
+    const churchSnap = await db.collection('churches').doc(churchId).get();
+    const church = churchSnap.exists ? churchSnap.data() : null;
+
     const localMediaUrls = [...mediaUrls];
     if (attachVcard && numberId) {
         const baseUrl = await getSmsWebhookBaseUrl();
@@ -386,7 +398,7 @@ export async function sendBulkInternal(params: {
             const to = normaliseE164(rawPhone);
             if (await isOptedOut(db, churchId, to)) { optedOut++; return; }
 
-            const resolved = resolveMergeTags(body, (personMap as any)[to] || {});
+            const resolved = resolveMergeTags(body, (personMap as any)[to] || {}, church);
             const segments = isMms ? 1 : countSegments(resolved);
 
             try {

@@ -48,6 +48,10 @@ const ALL_MERGE_TAGS: { tag: string; label: string }[] = [
     { tag: '{state}', label: 'State' },
     { tag: '{birthday}', label: 'Birthday' },
     { tag: '{anniversary}', label: 'Anniversary' },
+    { tag: '{church.name}', label: 'Church Name' },
+    { tag: '{church.phone}', label: 'Church Phone' },
+    { tag: '{church.address}', label: 'Church Address' },
+    { tag: '{church.website}', label: 'Church Website' },
 ];
 
 const COMMON_EMOJIS = [
@@ -123,6 +127,7 @@ interface AiWorkflowDraft {
     steps: {
         channelType: 'sms' | 'mms' | 'email';
         delayDays: number;
+        delayHours?: number;
         message?: string;
         emailSubject?: string;
         emailBody?: string;
@@ -141,6 +146,7 @@ You must respond with ONLY a valid JSON object (no markdown, no explanation) mat
     {
       "channelType": "sms" | "mms" | "email",
       "delayDays": number,     // Days to wait after the previous step. Step 0 is always 0.
+      "delayHours": number,    // Optional. Hours to wait after the previous step. Step 0 is always 0.
       "message": string,       // Required for sms and mms steps. Keep SMS under 160 chars. Use {firstName} for personalisation.
       "emailSubject": string,  // Required only for email steps
       "emailBody": string      // Required only for email steps. Use {firstName} for personalisation.
@@ -153,7 +159,7 @@ Guidelines:
 - For SMS steps, keep "message" under 160 characters when possible (1 segment).
 - Include real content (actual Bible verses, actual prayer encouragements, etc.) ... do NOT use placeholders like "[verse here]".
 - Use {firstName} to personalise messages where natural.
-- delayDays for the first step is always 0. For subsequent steps, use the delay the user specified or infer a sensible one (e.g. 1 day between daily texts).
+- delayDays and delayHours for the first step is always 0. For subsequent steps, use the delay the user specified or infer a sensible one (e.g. 4 hours or 1 day).
 - If the user asks for emails, set channelType to "email" and provide both emailSubject and emailBody.
 - If the user asks for texts, set channelType to "sms".
 - If the user asks for picture/image messages, set channelType to "mms" and still write a message caption.
@@ -4419,7 +4425,7 @@ const StaffStepEditor: React.FC<{
             {/* Info */}
             <div className={`flex items-start gap-2 text-xs ${isEmail ? 'text-rose-700 dark:text-rose-300' : 'text-amber-700 dark:text-amber-300'}`}>
                 <Users size={13} className='mt-0.5 shrink-0' />
-                <span><strong>Internal step</strong> ... notifies <strong>staff</strong> only. Use {'{contact.firstName}'}, {'{contact.phone}'}, {'{contact.email}'} for the enrolled person.</span>
+                <span><strong>Internal step</strong> ... notifies <strong>staff</strong> only. Use contact (e.g. {'{contact.firstName}'}) and church (e.g. {'{church.name}'}) tags.</span>
             </div>
             {/* Who to notify */}
             <div>
@@ -4483,7 +4489,7 @@ const StaffStepEditor: React.FC<{
             )}
             {/* Contact merge tags */}
             <div className='flex gap-1.5 flex-wrap'>
-                {['{contact.firstName}', '{contact.lastName}', '{contact.name}', '{contact.phone}', '{contact.email}'].map(t => (
+                {['{contact.firstName}', '{contact.lastName}', '{contact.name}', '{contact.phone}', '{contact.email}', '{church.name}', '{church.phone}', '{church.address}', '{church.website}'].map(t => (
                     <button key={t} type='button' onClick={() => isEmail ? onChange({ emailBody: (step.emailBody || '') + t }) : onChange({ message: step.message + t })}
                         className={`px-2 py-0.5 text-[10px] font-mono font-semibold rounded-lg border transition ${isEmail ? 'bg-rose-50 dark:bg-rose-900/20 text-rose-700 border-rose-200 hover:bg-rose-100' : 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 border-amber-200 hover:bg-amber-100'}`}
                     >{t}</button>
@@ -4535,9 +4541,13 @@ function stepTimingLabel(node: WorkflowDelayNode): string {
         const time = node.scheduleTime ? ` at ${fmt12(node.scheduleTime)}` : '';
         return `every ${days}${time}`;
     }
-    return node.delayDays === 0
-        ? 'immediately'
-        : `after ${node.delayDays} day${node.delayDays !== 1 ? 's' : ''}`;
+    const days = node.delayDays || 0;
+    const hours = node.delayHours || 0;
+    if (days === 0 && hours === 0) return 'immediately';
+    const parts = [];
+    if (days > 0) parts.push(`${days} day${days !== 1 ? 's' : ''}`);
+    if (hours > 0) parts.push(`${hours} hour${hours !== 1 ? 's' : ''}`);
+    return `after ${parts.join(' and ')}`;
 }
 
 // --- Delay Node Card ----------------------------------------------------------
@@ -4596,20 +4606,35 @@ const DelayNodeCard: React.FC<{
                 ))}
             </div>
 
-            {/* Relative: day counter */}
+            {/* Relative: day and hour counter */}
             {schedType === 'relative' && (
-                <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Wait</span>
-                    <input
-                        type="number" min={0} max={365}
-                        value={node.delayDays}
-                        onChange={e => onChange({ delayDays: Math.max(0, parseInt(e.target.value) || 0) })}
-                        title="Delay in days"
-                        className="w-16 text-center text-sm font-black border border-amber-200 dark:border-amber-700 rounded-xl px-2 py-1.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
-                    />
-                    <span className="text-xs text-slate-500 dark:text-slate-400">
-                        {node.delayDays === 0 ? 'days (immediate)' : `day${node.delayDays !== 1 ? 's' : ''}`}
-                    </span>
+                <div className="flex items-center gap-4 flex-wrap">
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Wait</span>
+                        <input
+                            type="number" min={0} max={365}
+                            value={node.delayDays}
+                            onChange={e => onChange({ delayDays: Math.max(0, parseInt(e.target.value) || 0) })}
+                            title="Delay in days"
+                            className="w-16 text-center text-sm font-black border border-amber-200 dark:border-amber-700 rounded-xl px-2 py-1.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+                        />
+                        <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold">
+                            day{node.delayDays !== 1 ? 's' : ''}
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">and</span>
+                        <input
+                            type="number" min={0} max={23}
+                            value={node.delayHours ?? 0}
+                            onChange={e => onChange({ delayHours: Math.max(0, parseInt(e.target.value) || 0) })}
+                            title="Delay in hours"
+                            className="w-16 text-center text-sm font-black border border-amber-200 dark:border-amber-700 rounded-xl px-2 py-1.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+                        />
+                        <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold">
+                            hour{(node.delayHours ?? 0) !== 1 ? 's' : ''}
+                        </span>
+                    </div>
                 </div>
             )}
 
@@ -5262,6 +5287,10 @@ const ActionNodeCard: React.FC<{
                                     .split('{phone}').join('(615) 555-0100').split('{birthday}').join('Jan 15')
                                     .split('{anniversary}').join('Jun 10').split('{city}').join('Nashville')
                                     .split('{state}').join('TN')
+                                    .split('{church.name}').join('Grace Church').split('{churchName}').join('Grace Church')
+                                    .split('{church.phone}').join('(615) 555-0199').split('{churchPhone}').join('(615) 555-0199')
+                                    .split('{church.address}').join('123 Church St, Nashville, TN').split('{churchAddress}').join('123 Church St, Nashville, TN')
+                                    .split('{church.website}').join('https://gracechurch.org').split('{churchWebsite}').join('https://gracechurch.org')
                                 }
                             </div>
                         </div>
@@ -5357,6 +5386,10 @@ const ActionNodeCard: React.FC<{
                                     .split('{phone}').join('(615) 555-0100').split('{birthday}').join('Jan 15')
                                     .split('{anniversary}').join('Jun 10').split('{city}').join('Nashville')
                                     .split('{state}').join('TN')
+                                    .split('{church.name}').join('Grace Church').split('{churchName}').join('Grace Church')
+                                    .split('{church.phone}').join('(615) 555-0199').split('{churchPhone}').join('(615) 555-0199')
+                                    .split('{church.address}').join('123 Church St, Nashville, TN').split('{churchAddress}').join('123 Church St, Nashville, TN')
+                                    .split('{church.website}').join('https://gracechurch.org').split('{churchWebsite}').join('https://gracechurch.org')
                                     || <span className="opacity-40 italic">No body yet</span>}
                             </div>
                         </div>
@@ -5593,10 +5626,11 @@ const WorkflowEditor: React.FC<{
         const nodes: WorkflowNode[] = [];
         steps.forEach((s, i) => {
             // If not the first step and has a delay, add a delay node first
-            if (i > 0 && (s.delayDays > 0 || s.scheduleType !== undefined)) {
+            if (i > 0 && (s.delayDays > 0 || (s.delayHours && s.delayHours > 0) || s.scheduleType !== undefined)) {
                 const delay: WorkflowDelayNode = {
                     nodeType: 'delay', id: uid(), order: nodes.length,
                     delayDays: s.delayDays ?? 1,
+                    delayHours: s.delayHours ?? 0,
                     scheduleType: s.scheduleType,
                     scheduleDayOfWeek: s.scheduleDayOfWeek,
                     scheduleDayOfMonth: s.scheduleDayOfMonth,
@@ -5646,6 +5680,7 @@ const WorkflowEditor: React.FC<{
                 staffGroupId: an.staffGroupId,
                 staffGroupName: an.staffGroupName,
                 delayDays: delay?.delayDays ?? 0,
+                delayHours: delay?.delayHours ?? 0,
                 scheduleType: delay?.scheduleType,
                 scheduleDayOfWeek: delay?.scheduleDayOfWeek,
                 scheduleDayOfMonth: delay?.scheduleDayOfMonth,
@@ -5705,9 +5740,16 @@ const WorkflowEditor: React.FC<{
     const handleApplyAiDraft = (draft: AiWorkflowDraft) => {
         const newNodes: WorkflowNode[] = [];
         draft.steps.forEach((s, i) => {
-            // If not the first step, insert a delay node from the draft's delayDays
-            if (i > 0 && (s.delayDays ?? 1) > 0) {
-                newNodes.push({ nodeType: 'delay', id: uid(), order: newNodes.length, delayDays: s.delayDays ?? 1 });
+            // If not the first step, insert a delay node from the draft's delayDays or delayHours
+            if (i > 0 && ((s.delayDays ?? 1) > 0 || (s.delayHours ?? 0) > 0)) {
+                newNodes.push({
+                    nodeType: 'delay',
+                    id: uid(),
+                    order: newNodes.length,
+                    delayDays: s.delayDays ?? 1,
+                    delayHours: s.delayHours ?? 0,
+                    scheduleType: 'relative'
+                });
             }
             newNodes.push({
                 nodeType: 'action', id: uid(), order: newNodes.length,
@@ -5732,7 +5774,7 @@ const WorkflowEditor: React.FC<{
     }]));
 
     const addDelayNode = () => setNodes(ns => reorder([...ns, {
-        nodeType: 'delay', id: uid(), order: ns.length, delayDays: 1, scheduleType: 'relative'
+        nodeType: 'delay', id: uid(), order: ns.length, delayDays: 1, delayHours: 0, scheduleType: 'relative'
     }]));
 
     const addBranchNode = () => setNodes(ns => reorder([...ns, {
@@ -6925,7 +6967,13 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
                                                                 const st = step.scheduleType ?? 'relative';
                                                                 if (st === 'day_of_week') return DOW_LABELS_SHORT[step.scheduleDayOfWeek ?? 1];
                                                                 if (st === 'day_of_month') return `${step.scheduleDayOfMonth ?? 1}${ORDINAL_SUFFIX(step.scheduleDayOfMonth ?? 1)}`;
-                                                                return step.delayDays === 0 ? 'now' : `+${step.delayDays}d`;
+                                                                const days = step.delayDays || 0;
+                                                                const hours = step.delayHours || 0;
+                                                                if (days === 0 && hours === 0) return 'now';
+                                                                const parts = [];
+                                                                if (days > 0) parts.push(`${days}d`);
+                                                                if (hours > 0) parts.push(`${hours}h`);
+                                                                return `+${parts.join(' ')}`;
                                                             })()}
                                                         </span>
                                                         <div className="h-px w-4 bg-violet-200 dark:bg-violet-800" />

@@ -1398,6 +1398,8 @@ export interface SmsWorkflowStep {
     order: number;
     /** Days to wait after the previous step (0 = send immediately). Only used when scheduleType = 'relative'. */
     delayDays: number;
+    /** Hours to wait after the previous step. Only used when scheduleType = 'relative'. */
+    delayHours?: number;
     /**
      * Timing mode for this step (default = 'relative').
      * - 'relative'     ? fire delayDays after the previous step completes.
@@ -1532,6 +1534,8 @@ export interface WorkflowDelayNode {
     order: number;
     /** Days to wait in 'relative' mode. */
     delayDays: number;
+    /** Hours to wait in 'relative' mode. */
+    delayHours?: number;
     scheduleType?: 'relative' | 'day_of_week' | 'day_of_month';
     /** 0 = Sunday � 6 = Saturday. Used when scheduleType = 'day_of_week'. */
     scheduleDayOfWeek?: number;

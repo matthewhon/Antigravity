@@ -57,10 +57,14 @@ export interface PersonInfo {
 }
 
 /** Replace merge tags with person-specific values. */
-function resolveMergeTags(body: string, person: PersonInfo): string {
+function resolveMergeTags(body: string, person: PersonInfo, church?: any): string {
     const parts = (person.personName || '').split(' ');
     const firstName = parts[0] || '';
     const lastName  = parts.slice(1).join(' ') || '';
+    const rawChurchPhone = (church?.phone || '').replace(/^\+1/, '');
+    const formattedChurchPhone = rawChurchPhone.length === 10
+        ? `(${rawChurchPhone.slice(0,3)}) ${rawChurchPhone.slice(3,6)}-${rawChurchPhone.slice(6)}`
+        : rawChurchPhone;
     return body
         .replace(/\{firstName\}/gi,   firstName)
         .replace(/\{lastName\}/gi,    lastName)
@@ -70,7 +74,11 @@ function resolveMergeTags(body: string, person: PersonInfo): string {
         .replace(/\{birthday\}/gi,    person.birthday   || '')
         .replace(/\{anniversary\}/gi, person.anniversary || '')
         .replace(/\{city\}/gi,        person.city       || '')
-        .replace(/\{state\}/gi,       person.state      || '');
+        .replace(/\{state\}/gi,       person.state      || '')
+        .replace(/\{church\.name\}|\{churchName\}/gi,       church?.name || '')
+        .replace(/\{church\.phone\}|\{churchPhone\}/gi,       formattedChurchPhone)
+        .replace(/\{church\.address\}|\{churchAddress\}/gi,   church?.address || '')
+        .replace(/\{church\.website\}|\{churchWebsite\}/gi,   church?.website || '');
 }
 
 /** Get the public base URL for webhooks from Firestore system settings or env. */
@@ -314,6 +322,9 @@ export async function sendBulkInternal(params: {
     const isMms = (mediaUrls as string[]).length > 0;
     const { client, fromNumber, messagingServiceSid } = await getSubClient(db, churchId, twilioNumberId || null);
 
+    const churchSnap = await db.collection('churches').doc(churchId).get();
+    const church = churchSnap.exists ? churchSnap.data() : null;
+
     let sent = 0, failed = 0, optedOut = 0, skipped = 0;
     const errors: { phone: string; error: string }[] = [];
 
@@ -334,7 +345,7 @@ export async function sendBulkInternal(params: {
 
             if (await isOptedOut(db, churchId, to)) { optedOut++; return; }
 
-            const resolved = resolveMergeTags(body, (personMap as any)[to] || {});
+            const resolved = resolveMergeTags(body, (personMap as any)[to] || {}, church);
             const segments = isMms ? 1 : countSegments(resolved);
 
             try {

@@ -351,7 +351,7 @@ function calcNextSendAt(step: any, fromMs: number): number {
     }
 
     // Default: relative offset
-    return fromMs + (step.delayDays || 0) * 86_400_000;
+    return fromMs + (step.delayDays || 0) * 86_400_000 + (step.delayHours || 0) * 3_600_000;
 }
 
 // ─── Workflow Step Executor ───────────────────────────────────────────────────
@@ -518,6 +518,61 @@ async function runWorkflowStepExecutor(db: any): Promise<void> {
                         log.info(`[WorkflowExecutor] Sent staff_sms to ${staffPhones.length} staff members`, 'system', { enrollId }, churchId);
                     } else {
                         log.warn(`[WorkflowExecutor] staff_sms step skipped - no valid phone numbers found for target staff`, 'system', { enrollId }, churchId);
+                    }
+
+                } else if (channelType === 'staff_email') {
+                    const { sendEmail } = await import('./sendEmail.js');
+                    const staffTargetType = step.staffTargetType || 'individuals';
+                    const staffEmails: string[] = [];
+                    
+                    if (staffTargetType === 'individuals') {
+                        const recs = step.staffRecipients || [];
+                        for (const r of recs) {
+                            if (r.email) {
+                                staffEmails.push(r.email);
+                            }
+                        }
+                    } else if ((staffTargetType === 'list' && step.staffListId) || (staffTargetType === 'group' && step.staffGroupId)) {
+                        const churchSnap = await db.collection('churches').doc(churchId).get();
+                        const token = churchSnap.data()?.pcoAccessToken || '';
+                        if (token) {
+                            const { resolvePcoPersons } = await import('./workflowEnrollEndpoint.js');
+                            const persons = await resolvePcoPersons(
+                                token,
+                                staffTargetType === 'list' ? step.staffListId : null,
+                                staffTargetType === 'group' ? step.staffGroupId : null
+                            );
+                            for (const p of persons) {
+                                if (p.email) {
+                                    staffEmails.push(p.email);
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (staffEmails.length > 0) {
+                        const pMap: any = {};
+                        for (const se of staffEmails) {
+                            pMap[se] = personInfo;
+                        }
+                        const fakeReq = {
+                            body: {
+                                churchId,
+                                campaignId:  `wf_${workflowId}_step${currentStep}_staff`,
+                                subject:     step.emailSubject || '(no subject)',
+                                htmlContent: step.emailBody    || '',
+                                toAddresses: staffEmails,
+                                personData:  pMap,
+                            }
+                        } as any;
+                        const fakeRes = {
+                            json: () => {},
+                            status: () => ({ json: () => {} }),
+                        } as any;
+                        await sendEmail(fakeReq, fakeRes);
+                        log.info(`[WorkflowExecutor] Sent staff_email to ${staffEmails.length} staff members`, 'system', { enrollId }, churchId);
+                    } else {
+                        log.warn(`[WorkflowExecutor] staff_email step skipped - no valid email addresses found for target staff`, 'system', { enrollId }, churchId);
                     }
                 }
 

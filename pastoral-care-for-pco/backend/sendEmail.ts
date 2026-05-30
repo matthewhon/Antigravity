@@ -885,7 +885,7 @@ interface PersonInfo {
     state?:      string;
 }
 
-function resolveMergeTags(body: string, person: PersonInfo): string {
+function resolveMergeTags(body: string, person: PersonInfo, church?: any): string {
     const parts = (person.personName || '').split(' ');
     const firstName = parts[0] || '';
     const lastName  = parts.slice(1).join(' ') || '';
@@ -893,6 +893,11 @@ function resolveMergeTags(body: string, person: PersonInfo): string {
     const formattedPhone = rawPhone.length === 10
         ? `(${rawPhone.slice(0,3)}) ${rawPhone.slice(3,6)}-${rawPhone.slice(6)}`
         : rawPhone;
+
+    const rawChurchPhone = (church?.phone || '').replace(/^\+1/, '');
+    const formattedChurchPhone = rawChurchPhone.length === 10
+        ? `(${rawChurchPhone.slice(0,3)}) ${rawChurchPhone.slice(3,6)}-${rawChurchPhone.slice(6)}`
+        : rawChurchPhone;
 
     return body
         .replace(/\{contact\.firstName\}|\{firstName\}/gi,   firstName)
@@ -903,7 +908,11 @@ function resolveMergeTags(body: string, person: PersonInfo): string {
         .replace(/\{contact\.birthday\}|\{birthday\}/gi,    person.birthday   || '')
         .replace(/\{contact\.anniversary\}|\{anniversary\}/gi, person.anniversary || '')
         .replace(/\{contact\.city\}|\{city\}/gi,        person.city       || '')
-        .replace(/\{contact\.state\}|\{state\}/gi,       person.state      || '');
+        .replace(/\{contact\.state\}|\{state\}/gi,       person.state      || '')
+        .replace(/\{church\.name\}|\{churchName\}/gi,       church?.name || '')
+        .replace(/\{church\.phone\}|\{churchPhone\}/gi,       formattedChurchPhone)
+        .replace(/\{church\.address\}|\{churchAddress\}/gi,   church?.address || '')
+        .replace(/\{church\.website\}|\{churchWebsite\}/gi,   church?.website || '');
 }
 
 export async function executeSend(
@@ -1110,12 +1119,12 @@ export async function executeSend(
             };
 
             // Resolve merge tags on subject, blocks, and content!
-            const resolvedSubject = resolveMergeTags(subject, personInfo);
+            const resolvedSubject = resolveMergeTags(subject, personInfo, churchData);
             const resolvedBlocks = JSON.parse(
-                resolveMergeTags(JSON.stringify(campaign.blocks || []), personInfo)
+                resolveMergeTags(JSON.stringify(campaign.blocks || []), personInfo, churchData)
             );
             const resolvedContent = campaign.content
-                ? resolveMergeTags(campaign.content, personInfo)
+                ? resolveMergeTags(campaign.content, personInfo, churchData)
                 : campaign.content;
 
             const personalizedHtml = renderBlocksToHtml(
@@ -1174,9 +1183,92 @@ export const sendEmail = async (req: any, res: any) => {
         return;
     }
 
-    const { campaignId, churchId, testEmail, collectionName } = req.body || {};
-    if (!campaignId || !churchId) {
-        res.status(400).json({ error: 'Missing campaignId or churchId' });
+    const { campaignId, churchId, testEmail, collectionName, subject, htmlContent, toAddresses, personData } = req.body || {};
+    if (!churchId) {
+        res.status(400).json({ error: 'Missing churchId' });
+        return;
+    }
+
+    // Direct ad-hoc send path (e.g., from scheduler/workflows)
+    if (toAddresses && Array.isArray(toAddresses) && toAddresses.length > 0) {
+        try {
+            const log = createServerLogger(db);
+            const settingsSnap = await db.doc('system/settings').get();
+            const settings = settingsSnap.data() || {};
+            const globalApiKey: string = settings.sendGridApiKey || '';
+            const globalFromEmail: string = settings.sendGridFromEmail || '';
+            const globalFromName: string = settings.sendGridFromName || 'Church';
+
+            if (!globalApiKey || !globalApiKey.startsWith('SG.')) {
+                throw new Error('SendGrid is not configured. Please add your API key in App Config → System Settings.');
+            }
+
+            const churchSnap = await db.collection('churches').doc(churchId).get();
+            if (!churchSnap.exists) throw new Error(`Church ${churchId} not found`);
+            const churchData = churchSnap.data() || {};
+            const tenantEmail = churchData.emailSettings || {};
+            const isCustomDomainMode = tenantEmail.mode === 'custom';
+            const subuserId: string | undefined = tenantEmail.sendGridSubuserId || undefined;
+
+            if (isCustomDomainMode && !tenantEmail.domainVerified) {
+                throw new Error(`Custom domain not verified`);
+            }
+
+            const fromEmail = tenantEmail.fromEmail || globalFromEmail;
+            const fromName  = tenantEmail.fromName  || globalFromName;
+
+            if (!fromEmail) throw new Error('No fromEmail configured');
+
+            const now = new Date();
+            const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            const usage = churchData.emailUsage || {};
+            const currentUsage = usage[currentMonth] || 0;
+
+            if (churchData.subscription?.planId === 'starter') {
+                const remaining = 500 - currentUsage;
+                if (toAddresses.length > remaining) {
+                    throw new Error(`Starter plan limit reached`);
+                }
+            }
+
+            // Resolve merge tags and send to each address
+            for (const email of toAddresses) {
+                const personInfo = (personData && personData[email]) || {};
+                const resolvedSubject = resolveMergeTags(subject || '', personInfo, churchData);
+                const resolvedBody = resolveMergeTags(htmlContent || '', personInfo, churchData);
+
+                const personalizedHtml = `
+                    <div style="font-family:sans-serif;font-size:15px;line-height:1.6;color:#1f2937;max-width:600px;margin:0 auto;padding:20px 0;">
+                        ${resolvedBody.replace(/\n/g, '<br />')}
+                    </div>
+                `;
+
+                await sgSend(
+                    [{ to: email, from: { email: fromEmail, name: fromName }, subject: resolvedSubject, html: personalizedHtml }],
+                    globalApiKey,
+                    subuserId,
+                    campaignId || 'workflow_adhoc'
+                );
+            }
+
+            // Update usage count
+            const emailUsage = churchData.emailUsage || {};
+            emailUsage[currentMonth] = (emailUsage[currentMonth] || 0) + toAddresses.length;
+            await db.collection('churches').doc(churchId).update({ emailUsage });
+
+            res.json({ success: true, recipientCount: toAddresses.length });
+            return;
+        } catch (e: any) {
+            const errMsg = e.message || 'Ad-hoc send failed';
+            const log = createServerLogger(db);
+            log.error(`Email send failed: ${errMsg}`, 'system', { churchId }, churchId);
+            res.status(500).json({ error: `Send failed: ${errMsg}` });
+            return;
+        }
+    }
+
+    if (!campaignId) {
+        res.status(400).json({ error: 'Missing campaignId' });
         return;
     }
 
