@@ -4591,7 +4591,7 @@ const DelayNodeCard: React.FC<{
             {/* Schedule type toggle */}
             <div className="flex rounded-xl overflow-hidden border border-amber-200 dark:border-amber-700">
                 {([
-                    { id: 'relative', label: '? Relative' },
+                    { id: 'relative', label: '⏱️ Relative' },
                     { id: 'day_of_week', label: '📅 Weekday' },
                     { id: 'day_of_month', label: '📆 Month Day' },
                 ] as const).map(({ id, label }) => (
@@ -4666,11 +4666,10 @@ const DelayNodeCard: React.FC<{
                 </div>
             )}
 
-            {/* -- Recurrence toggle --------------------------------------- */}
             <div className="pt-1 border-t border-amber-200 dark:border-amber-700">
                 <div className="flex items-center justify-between mb-2">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-amber-600 dark:text-amber-400">
-                        ?? Recurrence
+                    <span className="text-[10px] font-black uppercase tracking-widest text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                        <RefreshCw size={10} /> Recurrence
                     </span>
                     <div className="flex rounded-lg overflow-hidden border border-amber-200 dark:border-amber-700 text-[10px] font-bold">
                         {(['none', 'weekly', 'monthly'] as const).map(rt => (
@@ -4872,10 +4871,10 @@ const BranchNodeCard: React.FC<{
                         {/* Condition type picker */}
                         <div className="flex rounded-xl overflow-hidden border border-slate-200 dark:border-slate-600">
                             {([
-                                { id: 'replied', label: '? Replied' },
-                                { id: 'email_opened', label: '? Email Opened' },
+                                { id: 'replied', label: '💬 Replied' },
+                                { id: 'email_opened', label: '📧 Email Opened' },
                                 { id: 'tag_applied', label: '🏷️ Tag Applied' },
-                                { id: 'custom', label: '? Custom' },
+                                { id: 'custom', label: '⚙️ Custom' },
                             ] as const).map(({ id, label }) => (
                                 <button key={id} type="button" onClick={() => onChange({ conditionType: id })}
                                     className={`flex-1 py-1.5 text-[10px] font-bold transition border-r last:border-r-0 border-slate-200 dark:border-slate-600 ${condType === id ? 'bg-blue-600 text-white' : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-blue-50 dark:hover:bg-slate-600'
