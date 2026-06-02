@@ -1,10 +1,10 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { User, Church, RiskSettings, ChurchRiskSettings, DonorLifecycleSettings, GroupRiskSettings, CommunityLocation, UserRole } from '../types';
 import { CreateUserModal } from './CreateUserModal';
 import { firestore } from '../services/firestoreService';
 import { auth, db as firebaseDb, storage } from '../services/firebase';
-import { setDoc, doc } from 'firebase/firestore';
+import { setDoc, doc, collection, query, where, getDocs } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import RiskSettingsView from './RiskSettingsView';
 import ChurchRiskSettingsView from './ChurchRiskSettingsView';
@@ -14,6 +14,295 @@ import { SubscriptionSettingsView } from './SubscriptionSettingsView';
 import { ALL_WIDGETS } from '../constants/widgetRegistry';
 import { PLANS } from '../services/stripeService';
 import { pcoService } from '../services/pcoService';
+
+// ─── Pastoral Care Tab Setup Wizard ──────────────────────────────────────────
+//
+// Guides a church admin through the one-time manual steps required to enable
+// the "Pastoral Care" tab in Planning Center People. Polls the PCO API via the
+// backend proxy to detect when each step is complete, updating status badges live.
+//
+const API_BASE = process.env.NODE_ENV === 'production'
+    ? 'https://pastoralcare.barnabassoftware.com'
+    : 'http://localhost:8080';
+
+type StepStatus = 'pending' | 'checking' | 'done' | 'error';
+
+const PastoralCareTabSetupWizard: React.FC<{
+    churchId: string;
+    church: Church;
+    onFieldConfigSaved?: () => void;
+}> = ({ churchId, church, onFieldConfigSaved }) => {
+    const [tabStatus,   setTabStatus]   = React.useState<StepStatus>('pending');
+    const [fieldStatus, setFieldStatus] = React.useState<StepStatus>('pending');
+    const [isExpanded,  setIsExpanded]  = React.useState(false);
+    const [isChecking,  setIsChecking]  = React.useState(false);
+    const [lastChecked, setLastChecked] = React.useState<number | null>(null);
+    const [checkError,  setCheckError]  = React.useState<string | null>(null);
+
+    // Overall status derived from tab + field
+    const isFullyReady = tabStatus === 'done' && fieldStatus === 'done';
+    const isPartiallyDone = tabStatus === 'done' || fieldStatus === 'done';
+
+    // Read previously cached field config from Firestore
+    useEffect(() => {
+        const cfg = (church as any).pcoFieldConfig || {};
+        if (cfg.smsSubscriptionsFieldId) {
+            setTabStatus('done');
+            setFieldStatus('done');
+        }
+    }, [church]);
+
+    const handleCheck = React.useCallback(async () => {
+        if (isChecking) return;
+        setIsChecking(true);
+        setCheckError(null);
+        try {
+            // Call the backend proxy — it has the PCO OAuth token
+            const res = await fetch(`${API_BASE}/api/pco/check-pastoral-care-tab`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ churchId }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || `Status ${res.status}`);
+
+            setTabStatus(data.tabFound   ? 'done' : 'error');
+            setFieldStatus(data.fieldFound ? 'done' : 'error');
+            setLastChecked(Date.now());
+
+            // If both found and field ID returned, persist to Firestore so future checks skip discovery
+            if (data.tabFound && data.fieldFound && data.smsFieldDefId) {
+                await firestore.updateChurch(churchId, {
+                    'pcoFieldConfig.smsSubscriptionsFieldId': data.smsFieldDefId,
+                    ...(data.dateFieldDefId ? { 'pcoFieldConfig.lastKeywordMatchFieldId': data.dateFieldDefId } : {}),
+                } as any);
+                onFieldConfigSaved?.();
+            }
+        } catch (e: any) {
+            setCheckError(e.message || 'Check failed');
+            setTabStatus('error');
+            setFieldStatus('error');
+        } finally {
+            setIsChecking(false);
+        }
+    }, [churchId, isChecking, onFieldConfigSaved]);
+
+    const StatusBadge: React.FC<{ status: StepStatus; label: string }> = ({ status, label }) => {
+        const configs = {
+            pending: { bg: 'bg-slate-100 dark:bg-slate-800', text: 'text-slate-500 dark:text-slate-400', dot: 'bg-slate-300', label: 'Not checked' },
+            checking:{ bg: 'bg-amber-50 dark:bg-amber-900/20', text: 'text-amber-700 dark:text-amber-400', dot: 'bg-amber-400', label: 'Checking…' },
+            done:    { bg: 'bg-emerald-50 dark:bg-emerald-900/20', text: 'text-emerald-700 dark:text-emerald-400', dot: 'bg-emerald-500', label: 'Found ✓' },
+            error:   { bg: 'bg-rose-50 dark:bg-rose-900/20', text: 'text-rose-700 dark:text-rose-400', dot: 'bg-rose-400', label: 'Not found' },
+        };
+        const c = configs[status];
+        return (
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl ${c.bg}`}>
+                <span className={`w-2 h-2 rounded-full shrink-0 ${c.dot} ${status === 'checking' ? 'animate-pulse' : ''}`} />
+                <span className={`text-[10px] font-black uppercase tracking-widest ${c.text}`}>{label}</span>
+                <span className={`text-[10px] font-semibold ${c.text} ml-1`}>{c.label}</span>
+            </div>
+        );
+    };
+
+    return (
+        <div className={`mt-8 rounded-[2rem] border-2 transition-all ${
+            isFullyReady
+                ? 'border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-900/10'
+                : 'border-violet-200 dark:border-violet-800 bg-violet-50/50 dark:bg-violet-900/10'
+        }`}>
+            {/* Header */}
+            <button
+                onClick={() => setIsExpanded(v => !v)}
+                className="w-full flex items-center gap-4 p-6 text-left"
+            >
+                {/* Icon */}
+                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shrink-0 ${
+                    isFullyReady ? 'bg-emerald-100 dark:bg-emerald-900/40' : 'bg-violet-100 dark:bg-violet-900/40'
+                }`}>
+                    {isFullyReady ? '✅' : '🏷️'}
+                </div>
+
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-black text-slate-900 dark:text-white">
+                            Pastoral Care Tab Setup
+                        </p>
+                        {isFullyReady ? (
+                            <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-emerald-600 text-white">
+                                ✓ Ready
+                            </span>
+                        ) : (
+                            <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-violet-600 text-white">
+                                {isPartiallyDone ? '⚠ Partial' : 'Setup Required'}
+                            </span>
+                        )}
+                    </div>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">
+                        {isFullyReady
+                            ? 'SMS keyword subscriptions will automatically update PCO profiles.'
+                            : 'One-time setup in Planning Center — creates the checkbox field for SMS subscriptions.'}
+                    </p>
+                </div>
+
+                <svg
+                    className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+                >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+            </button>
+
+            {/* Expanded content */}
+            {isExpanded && (
+                <div className="px-6 pb-6 border-t border-violet-100 dark:border-violet-900/40">
+
+                    {/* Step list */}
+                    <div className="mt-5 space-y-4">
+
+                        {/* Step 1 */}
+                        <div className="flex gap-4 items-start">
+                            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black shrink-0 mt-0.5 ${
+                                tabStatus === 'done' ? 'bg-emerald-500 text-white' : 'bg-violet-200 dark:bg-violet-800 text-violet-700 dark:text-violet-300'
+                            }`}>{tabStatus === 'done' ? '✓' : '1'}</div>
+                            <div className="flex-1">
+                                <p className="text-sm font-bold text-slate-900 dark:text-white">Create the "Pastoral Care" tab</p>
+                                <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                                    In Planning Center → <strong>People</strong> → click the <strong>⚙ gear icon</strong> (top right) → <strong>Customize Fields</strong> → click <strong>+ Add Tab</strong> and name it exactly:
+                                </p>
+                                <code className="inline-block mt-2 px-3 py-1.5 bg-slate-900 text-emerald-400 text-xs font-mono rounded-xl">Pastoral Care</code>
+                                <div className="mt-2">
+                                    <StatusBadge status={tabStatus} label="Tab" />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Divider */}
+                        <div className="flex items-center gap-3 pl-3.5">
+                            <div className="w-px h-6 bg-violet-200 dark:bg-violet-800 ml-3" />
+                        </div>
+
+                        {/* Step 2 */}
+                        <div className="flex gap-4 items-start">
+                            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black shrink-0 mt-0.5 ${
+                                fieldStatus === 'done' ? 'bg-emerald-500 text-white' : 'bg-violet-200 dark:bg-violet-800 text-violet-700 dark:text-violet-300'
+                            }`}>{fieldStatus === 'done' ? '✓' : '2'}</div>
+                            <div className="flex-1">
+                                <p className="text-sm font-bold text-slate-900 dark:text-white">Add the "SMS Subscriptions" checkbox field</p>
+                                <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                                    Under the <strong>Pastoral Care</strong> tab → click <strong>+ Add Field</strong> → choose type <strong>Checkboxes</strong> → name it exactly:
+                                </p>
+                                <code className="inline-block mt-2 px-3 py-1.5 bg-slate-900 text-emerald-400 text-xs font-mono rounded-xl">SMS Subscriptions</code>
+                                <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-2 leading-relaxed">
+                                    Leave the checkbox options blank — the app creates them automatically when keywords match.
+                                </p>
+                                <div className="mt-2">
+                                    <StatusBadge status={fieldStatus} label="Field" />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Step 3 — Optional date field */}
+                        <div className="flex items-center gap-3 pl-3.5">
+                            <div className="w-px h-6 bg-violet-200 dark:bg-violet-800 ml-3" />
+                        </div>
+                        <div className="flex gap-4 items-start">
+                            <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-black shrink-0 mt-0.5 bg-slate-100 dark:bg-slate-800 text-slate-500">
+                                3
+                            </div>
+                            <div className="flex-1">
+                                <p className="text-sm font-bold text-slate-900 dark:text-white">
+                                    (Optional) Add a "Last Keyword Match" date field
+                                </p>
+                                <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                                    Same tab → <strong>+ Add Field</strong> → type <strong>Date</strong> → name it exactly:
+                                </p>
+                                <code className="inline-block mt-2 px-3 py-1.5 bg-slate-900 text-emerald-400 text-xs font-mono rounded-xl">Last Keyword Match</code>
+                                <p className="text-[10px] text-slate-400 mt-1.5">Tracks when this person last texted a keyword — useful for filtering in PCO.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* PCO deep link */}
+                    <div className="mt-6 p-4 bg-white dark:bg-slate-900 rounded-2xl border border-violet-100 dark:border-violet-800 flex items-center gap-3">
+                        <div className="text-xl">🔗</div>
+                        <div className="flex-1">
+                            <p className="text-[10px] font-bold text-slate-700 dark:text-slate-300">Open Planning Center People Settings</p>
+                            <p className="text-[9px] text-slate-400">Navigate there, then follow Steps 1 and 2 above.</p>
+                        </div>
+                        <a
+                            href="https://people.planningcenteronline.com/field_definitions"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 bg-violet-600 hover:bg-violet-700 text-white text-[10px] font-black rounded-xl transition uppercase tracking-widest"
+                        >
+                            Open PCO
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                        </a>
+                    </div>
+
+                    {/* Check button + feedback */}
+                    <div className="mt-5 flex items-center gap-3 flex-wrap">
+                        <button
+                            onClick={handleCheck}
+                            disabled={isChecking || !church.pcoConnected}
+                            className="inline-flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition"
+                        >
+                            {isChecking ? (
+                                <>
+                                    <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                                    </svg>
+                                    Checking…
+                                </>
+                            ) : (
+                                <>
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    Check Status
+                                </>
+                            )}
+                        </button>
+
+                        {!church.pcoConnected && (
+                            <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold">
+                                ⚠ Connect Planning Center first to verify status.
+                            </span>
+                        )}
+
+                        {lastChecked && !isChecking && (
+                            <span className="text-[10px] text-slate-400">
+                                Last checked: {new Date(lastChecked).toLocaleTimeString()}
+                            </span>
+                        )}
+
+                        {checkError && (
+                            <span className="text-[10px] text-rose-500 font-bold">
+                                ⚠ {checkError}
+                            </span>
+                        )}
+                    </div>
+
+                    {/* Success banner */}
+                    {isFullyReady && (
+                        <div className="mt-5 flex items-center gap-3 p-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-2xl">
+                            <div className="text-2xl">🎉</div>
+                            <div>
+                                <p className="text-sm font-black text-emerald-700 dark:text-emerald-300">All set! Pastoral Care tab is live.</p>
+                                <p className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-0.5">
+                                    SMS keyword matches will now automatically check the box on each person's PCO profile.
+                                </p>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+};
 
 // ─── SMS Terms of Service Modal (Admin settings gate) ────────────────────────
 
@@ -1789,6 +2078,17 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                         </button>
                     </div>
                 </div>
+
+                {/* ─── Pastoral Care Tab Setup Wizard ─── */}
+                {church.pcoConnected && (
+                    <PastoralCareTabSetupWizard
+                        churchId={churchId}
+                        church={church}
+                        onFieldConfigSaved={() => {
+                            // church data will re-render via the parent listener
+                        }}
+                    />
+                )}
             </div>
         )}
 

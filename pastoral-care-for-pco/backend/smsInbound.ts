@@ -35,6 +35,7 @@ import { createServerLogger } from '../services/logService';
 import { FieldValue } from 'firebase-admin/firestore';
 import { getSignalWireSigningKey, getSmsWebhookBaseUrl } from './signalwireClient';
 import { processExecutiveAiQuery } from './executiveAiAgent';
+import { updatePcoSubscriptionField } from './pcoFieldData';
 
 // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Helpers Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
@@ -59,6 +60,49 @@ async function matchPersonByPhone(db: any, churchId: string, phone: string): Pro
         return { personId: p.id, personName: p.name, personAvatar: p.avatar || null };
     } catch {
         return null;
+    }
+}
+
+/**
+ * Add a PCO person to a PCO list via the People API.
+ * Fire-and-forget safe — errors are logged but never thrown.
+ */
+async function addPersonToPcoList(db: any, log: any, churchId: string, personId: string, listId: string): Promise<void> {
+    try {
+        const churchSnap = await db.collection('churches').doc(churchId).get();
+        const token: string = churchSnap.data()?.pcoAccessToken || '';
+        if (!token) {
+            log.warn('[Inbound SMS] No PCO token — cannot add person to list', 'system', { churchId, personId, listId }, churchId);
+            return;
+        }
+        const res = await fetch(
+            `https://api.planningcenteronline.com/people/v2/lists/${listId}/list_members`,
+            {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                    'User-Agent': 'PastoralCareApp/1.0',
+                },
+                body: JSON.stringify({
+                    data: {
+                        type: 'ListMember',
+                        attributes: {},
+                        relationships: {
+                            person: { data: { type: 'Person', id: personId } },
+                        },
+                    },
+                }),
+            }
+        );
+        if (!res.ok) {
+            const err = await res.text().catch(() => '');
+            log.warn(`[Inbound SMS] PCO list add failed (${res.status}): ${err.slice(0, 200)}`, 'system', { churchId, personId, listId }, churchId);
+        } else {
+            log.info(`[Inbound SMS] Added person ${personId} to PCO list ${listId}`, 'system', { churchId, personId, listId }, churchId);
+        }
+    } catch (e: any) {
+        log.warn(`[Inbound SMS] Error adding person to PCO list: ${e.message}`, 'system', { churchId, personId, listId }, churchId);
     }
 }
 
@@ -669,11 +713,61 @@ export const handleInboundSms = async (req: any, res: any) => {
                 }
             }
 
-            // Optionally add person to a PCO list
-            if (kw.addToListId && personMatch?.personId) {
-                log.info(`[Inbound SMS] Keyword "${kw.keyword}" matched —â€  would add ${personMatch.personId} to list ${kw.addToListId}`, 'system', { churchId, keyword: kw.keyword }, churchId);
-                // The PCO list add is handled asynchronously; full implementation in Phase 3.
+            // ─── Pastoral Care: keyword subscription tracking ────────────────
+            // Resolve person ID from the fresh match or from an already-linked conversation.
+            const resolvedPersonId: string | null =
+                personMatch?.personId || convSnap.data()?.personId || null;
+
+            if (resolvedPersonId) {
+                // 1. Upsert Firestore subscription record (idempotent — ignore if already exists)
+                const subId = `${churchId}_${resolvedPersonId}_${kw.id}`;
+                const subRef = db.collection('smsKeywordSubscriptions').doc(subId);
+                const subSnap = await subRef.get().catch(() => null);
+                if (!subSnap?.exists) {
+                    await subRef.set({
+                        id: subId,
+                        churchId,
+                        personId: resolvedPersonId,
+                        personName: personMatch?.personName || convSnap.data()?.personName || null,
+                        phoneNumber: from,
+                        keyword: kw.keyword,
+                        keywordId: kw.id,
+                        subscribedAt: Date.now(),
+                        source: 'sms_inbound',
+                    }).catch((e: any) => {
+                        log.warn(`[Inbound SMS] Failed to save keyword subscription: ${e.message}`, 'system', { churchId, subId }, churchId);
+                    });
+
+                    // 2. Update the PCO "Pastoral Care" tab checkbox (fire-and-forget)
+                    updatePcoSubscriptionField({
+                        db, log, churchId,
+                        personId: resolvedPersonId,
+                        keyword: kw.keyword,
+                    }).catch(() => { /* already logged inside */ });
+                }
+                // else: already subscribed — Q2 decision: ignore duplicates
+
+                // 3. Add to PCO list if configured
+                if (kw.addToListId) {
+                    addPersonToPcoList(db, log, churchId, resolvedPersonId, kw.addToListId)
+                        .catch(() => { /* logged inside */ });
+                }
+            } else {
+                // Person not yet in local `people` collection — queue for backfill after next sync
+                const pendingId = `${churchId}_${from.replace(/\+/g, '')}_${kw.id}`;
+                await db.collection('pendingSmsSubscriptions').doc(pendingId).set({
+                    id: pendingId,
+                    churchId,
+                    phoneNumber: from,
+                    keyword: kw.keyword,
+                    keywordId: kw.id,
+                    matchedAt: Date.now(),
+                }, { merge: true }).catch((e: any) => {
+                    log.warn(`[Inbound SMS] Failed to save pending subscription: ${e.message}`, 'system', { churchId, pendingId }, churchId);
+                });
+                log.info(`[Inbound SMS] Keyword "${kw.keyword}" from unmatched number ${from} — queued in pendingSmsSubscriptions`, 'system', { churchId, keyword: kw.keyword }, churchId);
             }
+            // ────────────────────────────────────────────────────────────────
 
             // Save the keyword auto-reply as an outbound message
             const replyId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;

@@ -161,7 +161,54 @@ async function startServer() {
     });
 
 
-    // Gemini AI Proxy (key stays server-side)
+    // PCO Pastoral Care Tab Checker
+    // Called by the Setup Wizard in Settings -> Planning Center
+    app.post('/api/pco/check-pastoral-care-tab', express.json(), async (req: any, res: any) => {
+      const { churchId } = req.body || {};
+      if (!churchId) return res.status(400).json({ error: 'Missing churchId' });
+      try {
+        const db = getDb();
+        const churchDoc = await db.collection('churches').doc(churchId).get();
+        if (!churchDoc.exists) return res.status(404).json({ error: 'Church not found' });
+        const church = churchDoc.data()!;
+        const token = church.pcoAccessToken;
+        if (!token) return res.status(401).json({ error: 'No PCO access token. Connect Planning Center first.' });
+        const pcoHeaders = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+        // 1. Fetch tabs
+        const tabsRes = await fetch('https://api.planningcenteronline.com/people/v2/tabs?per_page=100', { headers: pcoHeaders });
+        if (!tabsRes.ok) return res.status(502).json({ error: `PCO tabs ${tabsRes.status}` });
+        const tabs: any[] = (await tabsRes.json())?.data || [];
+        const pastoralTab = tabs.find((t: any) => (t.attributes?.name || '').trim().toLowerCase() === 'pastoral care');
+        // 2. Fetch field definitions
+        const fieldsRes = await fetch('https://api.planningcenteronline.com/people/v2/field_definitions?per_page=200', { headers: pcoHeaders });
+        if (!fieldsRes.ok) return res.status(502).json({ error: `PCO fields ${fieldsRes.status}` });
+        const fields: any[] = (await fieldsRes.json())?.data || [];
+        const smsField = fields.find((f: any) => {
+          const name = (f.attributes?.name || '').trim().toLowerCase();
+          const dt = (f.attributes?.data_type || '').toLowerCase();
+          const tid = f.relationships?.tab?.data?.id;
+          return name === 'sms subscriptions' && dt === 'checkboxes' && (!pastoralTab || tid === pastoralTab.id);
+        });
+        const dateField = fields.find((f: any) => {
+          const name = (f.attributes?.name || '').trim().toLowerCase();
+          const dt = (f.attributes?.data_type || '').toLowerCase();
+          const tid = f.relationships?.tab?.data?.id;
+          return name === 'last keyword match' && dt === 'date' && (!pastoralTab || tid === pastoralTab.id);
+        });
+        console.log(`[PastoralCareCheck] churchId=${churchId} tabFound=${!!pastoralTab} fieldFound=${!!smsField}`);
+        return res.json({
+          tabFound: !!pastoralTab, fieldFound: !!smsField,
+          smsFieldDefId: smsField?.id || null,
+          dateFieldDefId: dateField?.id || null,
+          tabId: pastoralTab?.id || null,
+        });
+      } catch (e: any) {
+        console.error('[PastoralCareCheck]', e.message);
+        return res.status(500).json({ error: e.message || 'Check failed' });
+      }
+    });
+
+        // Gemini AI Proxy (key stays server-side)
     app.post('/ai/generate', express.json(), handleGeminiProxy);
 
     // Email (SendGrid)

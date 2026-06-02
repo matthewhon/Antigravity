@@ -18,6 +18,7 @@
  */
 
 import type { Firestore } from 'firebase-admin/firestore';
+import { updatePcoSubscriptionField } from './pcoFieldData';
 
 let schedulerInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -37,6 +38,82 @@ function getCurrentUTCHHMM(): string {
     const hh = String(now.getUTCHours()).padStart(2, '0');
     const mm = String(now.getUTCMinutes()).padStart(2, '0');
     return `${hh}:${mm}`;
+}
+
+/**
+ * After a people sync, attempt to resolve any pending SMS keyword subscriptions
+ * whose phone numbers weren't yet matched to a PCO person.
+ * For each matched record: write smsKeywordSubscriptions + update PCO checkbox + delete pending doc.
+ */
+async function processPendingSubscriptions(churchId: string, db: Firestore): Promise<void> {
+    const snap = await db.collection('pendingSmsSubscriptions')
+        .where('churchId', '==', churchId)
+        .get();
+
+    if (snap.empty) return;
+
+    console.log(`[SyncScheduler] Processing ${snap.size} pending subscription(s) for church ${churchId}`);
+
+    const log = { // Minimal logger compatible with createServerLogger interface
+        info: (msg: string) => console.log(msg),
+        warn: (msg: string) => console.warn(msg),
+    };
+
+    for (const pendingDoc of snap.docs) {
+        const pending = pendingDoc.data();
+        const { phoneNumber, keyword, keywordId, matchedAt } = pending;
+
+        // Look up the person by their E.164 phone number in the freshly-synced people collection
+        const personSnap = await db.collection('people')
+            .where('churchId', '==', churchId)
+            .where('e164Phone', '==', phoneNumber)
+            .limit(1)
+            .get();
+
+        if (personSnap.empty) {
+            // Still unmatched — leave in queue for the next sync
+            continue;
+        }
+
+        const person = personSnap.docs[0].data();
+        const personId: string = person.id;
+        const personName: string | null = person.name || null;
+
+        // Write the resolved subscription to smsKeywordSubscriptions
+        const subId = `${churchId}_${personId}_${keywordId}`;
+        const subRef = db.collection('smsKeywordSubscriptions').doc(subId);
+        const existingSnap = await subRef.get().catch(() => null);
+
+        if (!existingSnap?.exists) {
+            await subRef.set({
+                id: subId,
+                churchId,
+                personId,
+                personName,
+                phoneNumber,
+                keyword,
+                keywordId,
+                subscribedAt: matchedAt || Date.now(),
+                source: 'sms_inbound',
+            }).catch((e: any) => {
+                console.warn(`[SyncScheduler] Failed to write subscription ${subId}:`, e.message);
+            });
+
+            // Update the PCO checkbox
+            await updatePcoSubscriptionField({
+                db,
+                log: { info: (m: string) => console.log(m), warn: (m: string) => console.warn(m) } as any,
+                churchId,
+                personId,
+                keyword,
+            }).catch(() => {});
+
+            console.log(`[SyncScheduler] Resolved pending subscription: ${keyword} → person ${personId} (${personName})`);
+        }
+
+        // Remove the pending doc regardless (resolved or was already subscribed)
+        await pendingDoc.ref.delete().catch(() => {});
+    }
 }
 
 async function triggerSyncForChurch(churchId: string, db: Firestore): Promise<void> {
@@ -66,6 +143,12 @@ async function triggerSyncForChurch(churchId: string, db: Firestore): Promise<vo
         await syncAllData(churchId);
 
         console.log(`[SyncScheduler] Scheduled sync complete for church ${churchId}`);
+
+        // Process any pending SMS keyword subscriptions whose phone numbers may
+        // now be matched to a PCO person after the sync updated the people collection.
+        processPendingSubscriptions(churchId, db).catch((e) => {
+            console.warn(`[SyncScheduler] Pending subscription processor failed for ${churchId}:`, e.message);
+        });
 
         // Log into Firestore
         await db.collection('logs').add({

@@ -6,12 +6,13 @@ import { storage } from '../services/firebase';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import {
     collection, doc, onSnapshot, addDoc, updateDoc, deleteDoc,
-    query, where, orderBy, limit, limitToLast, getDocs, getDoc, setDoc,
+    query, query as firebaseQuery, where, orderBy, limit, limitToLast, getDocs, getDoc, setDoc,
+    startAt, endAt,
     Timestamp, collectionGroup, arrayUnion, arrayRemove
 } from 'firebase/firestore';
 import { pcoService } from '../services/pcoService';
 import { firestore } from '../services/firestoreService';
-import { SmsCampaign, SmsConversation, SmsMessage, SmsKeyword, SmsKeywordAction, SmsOptOut, SmsWorkflow, SmsWorkflowStep, SmsWorkflowEnrollment, SmsTag, Church, User, WorkflowChannelType, WorkflowNode, WorkflowActionNode, WorkflowDelayNode, WorkflowBranchNode, WorkflowBranchConditionType, TwilioPhoneNumber, SmsAgentKnowledge, SmsAiSuggestion, hasBroadcastAccess } from '../types';
+import { SmsCampaign, SmsConversation, SmsMessage, SmsKeyword, SmsKeywordAction, SmsKeywordSubscription, SmsOptOut, SmsWorkflow, SmsWorkflowStep, SmsWorkflowEnrollment, SmsTag, Church, User, WorkflowChannelType, WorkflowNode, WorkflowActionNode, WorkflowDelayNode, WorkflowBranchNode, WorkflowBranchConditionType, TwilioPhoneNumber, SmsAgentKnowledge, SmsAiSuggestion, hasBroadcastAccess } from '../types';
 import {
     MessageSquare, Send, Clock, Users, Plus, ArrowLeft, Trash2,
     Eye, Pencil, ChevronDown, CheckCircle, Circle, Loader2, X,
@@ -19,7 +20,7 @@ import {
     Inbox, BarChart3, Copy, Zap, MessageCircle, TrendingUp, TrendingDown,
     Activity, DollarSign, UserX, Edit3, UserCheck, List, Layers,
     Smile, Image as ImageIcon, Link, Sparkles, ChevronRight, RotateCcw, Contact,
-    Mail, Tag, Filter, Hash, Upload, ExternalLink, GitBranch, Info, ShieldCheck, Shield, Globe2, PlusCircle, Lock, Unlock, ListPlus, Tv2, FileText
+    Mail, Tag, Filter, Hash, Upload, ExternalLink, GitBranch, Info, ShieldCheck, Shield, Globe2, PlusCircle, Lock, Unlock, ListPlus, Tv2, FileText, UserPlus
 } from 'lucide-react';
 import { BroadcastPermissionsTab } from './BroadcastPermissionsTab';
 import { FileManager } from './FileManager';
@@ -2239,6 +2240,39 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
         if ((!hasBody && !hasMedia) || !activeConv || isSending) return;
         setIsSending(true);
         try {
+            // ── Demo-mode intercept ───────────────────────────────────────────
+            // For the Apple review account (test@test.com) we write a fake
+            // outbound message directly to Firestore so it appears in the thread
+            // immediately, without calling the real SMS backend / SignalWire.
+            if (currentUser.email === 'test@test.com') {
+                const now = Date.now();
+                const msgRef = doc(collection(firebaseDb, `smsConversations/${activeConv.id}/messages`));
+                await setDoc(msgRef, {
+                    id: msgRef.id,
+                    conversationId: activeConv.id,
+                    churchId,
+                    direction: 'outbound',
+                    body: replyBody || '',
+                    status: 'delivered',
+                    sentBy: currentUser.id,
+                    sentByName: currentUser.name,
+                    mediaUrls: replyMediaUrl ? [replyMediaUrl] : [],
+                    messageSid: `SM_demo_${msgRef.id}`,
+                    createdAt: now,
+                    deliveredAt: now + 500,
+                });
+                await updateDoc(doc(firebaseDb, 'smsConversations', activeConv.id), {
+                    lastMessageBody: replyBody || '📎 Media',
+                    lastMessageDirection: 'outbound',
+                    lastMessageAt: now,
+                    unreadCount: 0,
+                });
+                setReplyBody('');
+                setReplyMediaUrl('');
+                return;
+            }
+            // ─────────────────────────────────────────────────────────────────
+
             // Resolve the number to send from:
             // 1. Prefer the explicit twilioNumberId prop (active line selected in the UI)
             // 2. Fall back to the number stored on the conversation itself
@@ -3036,6 +3070,160 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingL
     );
 };
 
+// ─── Add Subscriber Modal ────────────────────────────────────────────────────
+// Lets staff manually subscribe a PCO person to a keyword (for verbal opt-ins).
+
+const AddSubscriberModal: React.FC<{
+    keyword: SmsKeyword;
+    churchId: string;
+    onClose: () => void;
+}> = ({ keyword, churchId, onClose }) => {
+    const [query, setQuery] = React.useState('');
+    const [results, setResults] = React.useState<{ id: string; name: string; phone?: string }[]>([]);
+    const [searching, setSearching] = React.useState(false);
+    const [saving, setSaving] = React.useState(false);
+    const [saved, setSaved] = React.useState(false);
+    const [error, setError] = React.useState<string | null>(null);
+
+    // Search people by name in Firestore
+    const handleSearch = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const q = query.trim();
+        if (!q) return;
+        setSearching(true);
+        setError(null);
+        try {
+            const snap = await getDocs(
+                firebaseQuery(
+                    collection(firebaseDb, 'people'),
+                    where('churchId', '==', churchId),
+                    orderBy('name'),
+                    startAt(q),
+                    endAt(q + '\uf8ff'),
+                    limit(10)
+                )
+            );
+            setResults(snap.docs.map(d => {
+                const data = d.data();
+                return { id: data.id || d.id, name: data.name || '', phone: data.phone || data.e164Phone || '' };
+            }));
+        } catch (e: any) {
+            setError('Search failed: ' + (e?.message || String(e)));
+        } finally {
+            setSearching(false);
+        }
+    };
+
+    const handleAdd = async (person: { id: string; name: string; phone?: string }) => {
+        setSaving(true);
+        setError(null);
+        try {
+            const subId = `${churchId}_${person.id}_${keyword.id}`;
+            const subRef = doc(firebaseDb, 'smsKeywordSubscriptions', subId);
+            const existing = await getDoc(subRef);
+            if (existing.exists()) {
+                setError(`${person.name} is already subscribed to ${keyword.keyword}.`);
+                setSaving(false);
+                return;
+            }
+            await setDoc(subRef, {
+                id: subId,
+                churchId,
+                personId: person.id,
+                personName: person.name,
+                phoneNumber: person.phone || '',
+                keyword: keyword.keyword,
+                keywordId: keyword.id,
+                subscribedAt: Date.now(),
+                source: 'manual',
+            });
+            setSaved(true);
+            setTimeout(onClose, 1200);
+        } catch (e: any) {
+            setError('Failed to save: ' + (e?.message || String(e)));
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
+            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center gap-2 mb-4">
+                    <div className="w-8 h-8 rounded-xl bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center">
+                        <UserPlus size={15} className="text-violet-600 dark:text-violet-300" />
+                    </div>
+                    <div>
+                        <p className="text-sm font-black text-slate-900 dark:text-white">Add Subscriber</p>
+                        <p className="text-[10px] text-slate-500">
+                            Manually subscribe someone to{' '}
+                            <span className="font-black text-violet-600 tracking-widest">{keyword.keyword}</span>
+                        </p>
+                    </div>
+                    <button onClick={onClose} className="ml-auto p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+                        <X size={16} />
+                    </button>
+                </div>
+
+                {saved ? (
+                    <div className="flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400 font-semibold py-6 justify-center">
+                        <CheckCircle size={18} /> Subscriber added!
+                    </div>
+                ) : (
+                    <>
+                        <form onSubmit={handleSearch} className="flex gap-2 mb-3">
+                            <input
+                                autoFocus
+                                type="text"
+                                value={query}
+                                onChange={e => setQuery(e.target.value)}
+                                placeholder="Search by name…"
+                                className="flex-1 text-sm border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                            />
+                            <button
+                                type="submit"
+                                disabled={searching || !query.trim()}
+                                className="px-3 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-sm font-bold rounded-xl transition flex items-center gap-1.5"
+                            >
+                                {searching ? <Loader2 size={13} className="animate-spin" /> : <Search size={13} />}
+                                Search
+                            </button>
+                        </form>
+
+                        {error && <p className="text-xs text-red-500 mb-3">{error}</p>}
+
+                        {results.length > 0 && (
+                            <div className="space-y-1.5 max-h-60 overflow-y-auto">
+                                {results.map(person => (
+                                    <button
+                                        key={person.id}
+                                        onClick={() => handleAdd(person)}
+                                        disabled={saving}
+                                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-violet-50 dark:hover:bg-violet-900/20 text-left transition disabled:opacity-50"
+                                    >
+                                        <div className="w-7 h-7 rounded-full bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center text-xs font-black text-violet-600 dark:text-violet-300 shrink-0">
+                                            {person.name.charAt(0).toUpperCase()}
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">{person.name}</p>
+                                            {person.phone && <p className="text-[10px] text-slate-400">{person.phone}</p>}
+                                        </div>
+                                        <Plus size={13} className="ml-auto text-violet-400 shrink-0" />
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+
+                        {!searching && results.length === 0 && query.trim() && (
+                            <p className="text-xs text-slate-400 text-center py-4">No people found matching "{query}".</p>
+                        )}
+                    </>
+                )}
+            </div>
+        </div>
+    );
+};
+
 const SmsKeywordsManager: React.FC<{
     churchId: string;
     church: Church;
@@ -3053,6 +3241,8 @@ const SmsKeywordsManager: React.FC<{
     const [saveError, setSaveError] = useState<string | null>(null);
     const [pcoLists, setPcoLists] = useState<{ id: string; name: string; total_people: number }[]>([]);
     const [loadingLists, setLoadingLists] = useState(false);
+    // Manual subscriber modal
+    const [addSubKw, setAddSubKw] = useState<SmsKeyword | null>(null);
 
     // Tags
     const [tags, setTags] = useState<SmsTag[]>([]);
@@ -3266,6 +3456,14 @@ const SmsKeywordsManager: React.FC<{
 
     return (
         <div className="p-4 max-w-4xl mx-auto">
+            {/* Manual subscriber modal */}
+            {addSubKw && (
+                <AddSubscriberModal
+                    keyword={addSubKw}
+                    churchId={churchId}
+                    onClose={() => setAddSubKw(null)}
+                />
+            )}
             {/* Section toggle */}
             <div className="flex flex-wrap items-center gap-3 mb-5">
                 <div className="flex gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
@@ -3364,6 +3562,14 @@ const SmsKeywordsManager: React.FC<{
                                                                 <p className="text-lg font-black text-violet-600 dark:text-violet-300">{kw.matchCount}</p>
                                                                 <p className="text-[10px] text-slate-400 uppercase tracking-widest">matches</p>
                                                             </div>
+                                                            {/* Add Subscriber button */}
+                                                            <button
+                                                                onClick={() => setAddSubKw(kw)}
+                                                                title="Manually add a subscriber"
+                                                                className="p-1.5 text-slate-400 hover:text-violet-600 rounded-lg hover:bg-violet-50 dark:hover:bg-violet-900/20 transition"
+                                                            >
+                                                                <UserPlus size={14} />
+                                                            </button>
                                                             {/* Active toggle */}
                                                             <button
                                                                 onClick={() => handleToggleActive(kw)}
@@ -8837,6 +9043,29 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
         if (!campaignToSend) return;
         setIsSending(true);
         try {
+            // ── Demo-mode intercept ───────────────────────────────────────────
+            // For the Apple review account (test@test.com) we update the campaign
+            // directly in Firestore with mock sent stats — no real messages sent.
+            if (currentUser.email === 'test@test.com') {
+                const now = Date.now();
+                const mockRecipients = 10;
+                await updateDoc(doc(firebaseDb, 'smsCampaigns', campaignToSend.id), {
+                    status: 'sent',
+                    sentAt: now,
+                    updatedAt: now,
+                    recipientCount: mockRecipients,
+                    deliveredCount: mockRecipients - 1,
+                    failedCount: 1,
+                    optOutCount: 0,
+                    sentBy: currentUser.id,
+                    sentByName: currentUser.name,
+                });
+                showToast(`Campaign sent to ${mockRecipients} recipients`);
+                setActiveCampaign(null);
+                return;
+            }
+            // ─────────────────────────────────────────────────────────────────
+
             if (campaignToSend.channelType === 'email') {
                 const res = await fetch(`${API_BASE}/api/email/send`, {
                     method: 'POST',
