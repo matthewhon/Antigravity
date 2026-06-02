@@ -802,10 +802,11 @@ export const calculatePeopleDashboardData = (
 ): PeopleDashboardData => {
     const total = people.length;
     const members = people.filter(p => p.membership === 'Member').length;
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const newThisMonth = people.filter(p => {
         const d = new Date(p.createdAt);
-        const now = new Date();
-        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+        return d >= thirtyDaysAgo;
     }).length;
     
     const genderData = [

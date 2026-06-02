@@ -105,7 +105,7 @@ function makePerson(index) {
   const bMonth    = rand(1, 12);
   const bDay      = rand(1, 28);
   const gender    = GENDERS[index % GENDERS.length];
-  const createdDaysAgo = rand(30, 1095);
+  const createdDaysAgo = index < 6 ? rand(1, 29) : rand(1, 1095);
   const zip       = pick(['30301','30302','30303','30318','30319']);
   const city      = 'Atlanta';
   const state     = 'GA';
