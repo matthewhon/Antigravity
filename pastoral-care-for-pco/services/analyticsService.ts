@@ -906,10 +906,9 @@ export const calculatePeopleDashboardData = (
         membershipData,
         ageData,
         engagementData: [
-            { name: 'Core', value: people.filter(p => p.checkInCount && p.checkInCount > 8).length },
-            { name: 'Regular', value: people.filter(p => p.checkInCount && p.checkInCount >= 4 && p.checkInCount <= 8).length },
-            { name: 'Sporadic', value: people.filter(p => p.checkInCount && p.checkInCount > 0 && p.checkInCount < 4).length },
-            { name: 'Inactive', value: people.filter(p => !p.checkInCount || p.checkInCount === 0).length }
+            { name: 'Healthy', value: riskEnrichedPeople.filter(p => p.riskProfile?.category === 'Healthy').length },
+            { name: 'At Risk', value: riskEnrichedPeople.filter(p => p.riskProfile?.category === 'At Risk').length },
+            { name: 'Disconnected', value: riskEnrichedPeople.filter(p => p.riskProfile?.category === 'Disconnected').length }
         ],
         upcomingBirthdays: riskEnrichedPeople
             .filter(p => p.birthdate && p.status !== 'inactive')

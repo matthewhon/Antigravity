@@ -516,11 +516,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           
           case 'people_engagement': {
               const ENGAGEMENT_COLORS: Record<string, string> = {
-                  'Core': '#6366f1', 'Regular': '#8b5cf6', 'Sporadic': '#f43f5e', 'Inactive': '#94a3b8'
+                  'Healthy': '#10b981', 'At Risk': '#f59e0b', 'Disconnected': '#f43f5e', 'Unknown': '#94a3b8'
               };
               const engagementChartData = (peopleData?.engagementData || []).filter(d => d.value > 0);
               return peopleData ? (
-                  <WidgetWrapper title="Engagement" onRemove={() => handleRemoveWidget(id)} source="Check-in Activity">
+                  <WidgetWrapper title="Risk Profiles" onRemove={() => handleRemoveWidget(id)} source="Risk Profile Analysis">
                       <div className="h-64">
                           {engagementChartData.length > 0 ? (
                               <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={1}>
@@ -543,8 +543,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           ) : (
                               <div className="h-full flex flex-col items-center justify-center text-center text-slate-400 gap-2">
                                   <span className="text-3xl grayscale opacity-30">📊</span>
-                                  <p className="text-xs font-bold">No check-in data available.</p>
-                                  <p className="text-[10px]">Sync check-in records to populate this widget.</p>
+                                  <p className="text-xs font-bold">No risk profile data available.</p>
                               </div>
                           )}
                       </div>

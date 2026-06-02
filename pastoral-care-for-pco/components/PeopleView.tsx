@@ -275,7 +275,7 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
         case 'people_engagement':
             return (
                 <div key="people_engagement" className="col-span-1">
-                    <WidgetWrapper title="Engagement" onRemove={() => handleRemoveWidget(id)} source="Check-in Activity">
+                    <WidgetWrapper title="Risk Profiles" onRemove={() => handleRemoveWidget(id)} source="Risk Profile Analysis">
                         <div className="h-64">
                             <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={1}>
                                 <PieChart>

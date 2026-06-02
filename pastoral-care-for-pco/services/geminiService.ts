@@ -332,7 +332,7 @@ export const chatWithDemographicAnalyst = async (
     - Gender: ${JSON.stringify(context.genderData)}
     - Membership Status: ${JSON.stringify(context.membershipData)}
     
-    ENGAGEMENT (Check-ins):
+    RISK PROFILES:
     ${JSON.stringify(context.engagementData)}
 
     GEOGRAPHY (Top Cities):

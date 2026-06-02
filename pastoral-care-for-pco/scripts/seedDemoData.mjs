@@ -504,7 +504,191 @@ const METRIC_ENTRIES = MINISTRIES.flatMap((min, mi) =>
   }))
 );
 
+// ─── Calculate actual risk profiles and generate changes based on Risk Profile Configuration ───
+const riskSettings = {
+  weights:    { attendance: 40, groups: 20, serving: 20, giving: 10, membership: 10 },
+  thresholds: { healthyMin: 70, atRiskMin: 40 },
+};
+
+function calculateSeededPersonRisk(person, isDonor, isGroupMember, timesServed, settings) {
+  let score = 0;
+  const factors = [];
+
+  // 1. Attendance (Check-ins)
+  const checkIns = person.checkInCount || 0;
+  let attendanceScore = 0;
+  if (checkIns >= 8) attendanceScore = 1;
+  else if (checkIns >= 3) attendanceScore = 0.7;
+  else if (checkIns >= 1) attendanceScore = 0.3;
+  
+  score += attendanceScore * settings.weights.attendance;
+  if (attendanceScore < 0.3) factors.push('Low Attendance');
+
+  // 2. Groups
+  const groupScore = isGroupMember ? 1 : 0;
+  score += groupScore * settings.weights.groups;
+  if (!isGroupMember) factors.push('Not in Group');
+
+  // 3. Serving
+  const targetServing = 4;
+  let servingScore = 0;
+  if (timesServed >= targetServing) servingScore = 1;
+  else if (timesServed > 0) servingScore = timesServed / targetServing;
+  
+  score += servingScore * settings.weights.serving;
+  if (timesServed === 0) factors.push('Not Serving');
+
+  // 4. Giving
+  const givingScore = isDonor ? 1 : 0;
+  score += givingScore * settings.weights.giving;
+  if (!isDonor) factors.push('No Giving History');
+
+  // 5. Membership
+  const isMember = person.membership === 'Member';
+  score += (isMember ? 1 : 0) * settings.weights.membership;
+
+  // Categorize
+  let category = 'Disconnected';
+  if (score >= settings.thresholds.healthyMin) category = 'Healthy';
+  else if (score >= settings.thresholds.atRiskMin) category = 'At Risk';
+
+  return {
+    score: Math.round(score),
+    category,
+    factors
+  };
+}
+
+const RISK_CHANGES = [];
+const STATUS_CHANGES = [];
+
+// Determine donor status, group membership, and times served for each person
+const donorIds = new Set(DONATIONS.map(d => d.donorId));
+
+const groupMembers = new Set();
+GROUPS.forEach(g => {
+  g.memberIds.forEach(mid => groupMembers.add(mid));
+});
+
+const volunteerCounts = new Map();
+SERVICE_PLANS.forEach(p => {
+  p.teamMembers?.forEach(tm => {
+    const status = tm.status?.toLowerCase() || '';
+    if (tm.personId && (status === 'confirmed' || status === 'c')) {
+      volunteerCounts.set(tm.personId, (volunteerCounts.get(tm.personId) || 0) + 1);
+    }
+  });
+});
+
+// Update each person's riskProfile and simulate changes
+PEOPLE.forEach((person, idx) => {
+  const pcoId = person.id.split('_')[1];
+  const isDonor = donorIds.has(pcoId);
+  const isGroupMember = groupMembers.has(pcoId);
+  const timesServed = volunteerCounts.get(pcoId) || 0;
+
+  // Calculate current risk profile based on configuration
+  const currentRisk = calculateSeededPersonRisk(person, isDonor, isGroupMember, timesServed, riskSettings);
+  
+  person.riskProfile = currentRisk;
+
+  // Simulate historical changes for a subset of the people (e.g., first 30 people)
+  // to populate the Status Changes widget with realistic historical movements
+  if (idx < 30) {
+    let pastDonor = isDonor;
+    let pastGroupMember = isGroupMember;
+    let pastTimesServed = timesServed;
+    let pastCheckInCount = person.checkInCount || 0;
+    
+    // Simulate a different past state
+    if (idx % 3 === 0) {
+      // Improved: they were disconnected or at risk, now they are healthy/at risk (e.g. joined group & started giving)
+      pastDonor = false;
+      pastGroupMember = false;
+      pastTimesServed = 0;
+    } else if (idx % 3 === 1) {
+      // Declined: they were healthy, but recently stopped serving or check-ins dropped
+      pastTimesServed = Math.max(0, timesServed - 4);
+      pastCheckInCount = Math.max(0, (person.checkInCount || 0) - 10);
+    } else {
+      // Dropped to Disconnected: had everything, now nothing
+      pastDonor = true;
+      pastGroupMember = true;
+      pastTimesServed = 4;
+      pastCheckInCount = 15;
+    }
+
+    const pastPersonObj = { ...person, checkInCount: pastCheckInCount };
+    const pastRisk = calculateSeededPersonRisk(pastPersonObj, pastDonor, pastGroupMember, pastTimesServed, riskSettings);
+
+    // If the category was different in the past, log a change record
+    if (pastRisk.category !== currentRisk.category) {
+      const daysAgo = rand(2, 28);
+      const ts = now - daysAgo * 86400_000;
+      const dStr = new Date(ts).toISOString();
+
+      RISK_CHANGES.push({
+        id: `${CHURCH_ID}_${person.id}_${ts}`,
+        churchId: CHURCH_ID,
+        personId: person.id,
+        personName: person.name,
+        date: dStr,
+        oldCategory: pastRisk.category,
+        newCategory: currentRisk.category,
+        oldScore: pastRisk.score,
+        newScore: currentRisk.score,
+        reasons: currentRisk.factors,
+        timestamp: ts
+      });
+
+      // Save historic category on the person document so the sync engine knows their previous state
+      person.historicRiskCategory = pastRisk.category;
+      person.historicRiskScore = pastRisk.score;
+    }
+  }
+
+  // Also simulate Status/Membership changes
+  if (idx < 20) {
+    if (idx % 2 === 0) {
+      // Membership change
+      const daysAgo = rand(2, 60);
+      const ts = now - daysAgo * 86400_000;
+      const dStr = new Date(ts).toISOString();
+      const oldVal = person.membership === 'Member' ? 'Regular Attendee' : 'Occasional Visitor';
+      STATUS_CHANGES.push({
+        id: `${CHURCH_ID}_${person.id}_membership_${ts}`,
+        churchId: CHURCH_ID,
+        personId: person.id,
+        personName: person.name,
+        date: dStr,
+        type: 'membership',
+        oldValue: oldVal,
+        newValue: person.membership,
+        timestamp: ts
+      });
+    } else {
+      // Status change
+      const daysAgo = rand(2, 60);
+      const ts = now - daysAgo * 86400_000;
+      const dStr = new Date(ts).toISOString();
+      STATUS_CHANGES.push({
+        id: `${CHURCH_ID}_${person.id}_status_${ts}`,
+        churchId: CHURCH_ID,
+        personId: person.id,
+        personName: person.name,
+        date: dStr,
+        type: 'status',
+        oldValue: 'active',
+        newValue: 'inactive',
+        timestamp: ts
+      });
+    }
+  }
+});
+
 // ─── Church Document ───────────────────────────────────────────────────────────
+
+
 const CHURCH_DOC = {
   id:                 CHURCH_ID,
   name:               'Grace Baptist Church',
@@ -546,6 +730,7 @@ async function resetDemoData() {
     'people','groups','attendance','detailed_donations','funds','budgets',
     'teams','service_plans','pco_registrations','pco_registration_attendees',
     'pastoral_notes','prayer_requests','ministries','metric_definitions','metric_entries',
+    'risk_changes','status_changes'
   ];
   for (const col of collections) {
     await clearCollection(col);
@@ -608,6 +793,12 @@ async function main() {
   console.log('\nSeeding metric entries...');
   await batchSet('metric_entries', METRIC_ENTRIES);
 
+  console.log('\nSeeding risk changes...');
+  await batchSet('risk_changes', RISK_CHANGES);
+
+  console.log('\nSeeding status changes...');
+  await batchSet('status_changes', STATUS_CHANGES);
+
   console.log(`
 ✅ Done! Grace Baptist Church (${CHURCH_ID}) is fully seeded.
 
@@ -622,6 +813,8 @@ Summary:
   - ${PASTORAL_NOTES.length} pastoral notes
   - ${PRAYER_REQUESTS.length} prayer requests
   - ${MINISTRIES.length} ministry departments + metrics
+  - ${RISK_CHANGES.length} risk status change records
+  - ${STATUS_CHANGES.length} status/membership change records
 
 Open the app and log in as a Grace Baptist admin to see the data.
 `);

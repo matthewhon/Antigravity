@@ -10,7 +10,7 @@ export const DASHBOARD_WIDGETS: WidgetDefinition[] = [
     { id: 'services_timeline', label: 'Church Timeline', icon: '🗓️' },
     { id: 'churchRisk', label: 'Church Health', icon: '🏥' },
     { id: 'church_progress', label: 'Church Progress', icon: '📈' },
-    { id: 'people_engagement', label: 'Engagement', icon: '📊' },
+    { id: 'people_engagement', label: 'Risk Profiles', icon: '📊' },
     { id: 'gender', label: 'Gender', icon: '🚻' },
     { id: 'age', label: 'Age', icon: '🎂' },
     { id: 'trends', label: 'Giving Trends', icon: '📈' },
@@ -19,7 +19,7 @@ export const DASHBOARD_WIDGETS: WidgetDefinition[] = [
 
 export const PEOPLE_OVERVIEW_WIDGETS: WidgetDefinition[] = [
     { id: 'people_stats', label: 'Key Stats', icon: '📊' },
-    { id: 'people_engagement', label: 'Engagement', icon: '📈' },
+    { id: 'people_engagement', label: 'Risk Profiles', icon: '📈' },
     { id: 'gender', label: 'Gender Dist', icon: '🚻' },
     { id: 'age', label: 'Age Dist', icon: '🎂' },
     { id: 'community_age_comparison', label: 'Community Age Gap', icon: '🏘️' },
