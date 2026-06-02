@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Pastoral Care for Planning Center | By Barnabas Software</title>
-  <meta name="description" content="The all-in-one pastoral intelligence platform built for Planning Center churches. Deepen care, grow your congregation, and lead with confidence." />
+  <meta name="description" content="The all-in-one pastoral intelligence platform built for Planning Center. Track attendance, donor lifecycles, send mobile SMS/emails, and sheperd your flock with Pastor AI." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet" />
@@ -167,6 +167,17 @@
       background: rgba(255,255,255,0.95); color: var(--blue-dark);
       padding: 0.25rem 0.7rem; border-radius: 50px; font-size: 0.72rem; font-weight: 700;
     }
+    .hero-floating-card3 {
+      position: absolute; bottom: 30px; right: -40px;
+      background: rgba(170, 59, 255, 0.15); backdrop-filter: blur(20px);
+      border: 1px solid rgba(170, 59, 255, 0.3);
+      border-radius: 14px; padding: 0.8rem 1.2rem;
+      color: white; box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+      animation: float 4s ease-in-out infinite 1s;
+      display: flex; align-items: center; gap: 0.6rem;
+    }
+    .hero-floating-card3 .card-title { font-size: 0.8rem; font-weight: 700; color: #d69eff; line-height: 1.2; text-align: left; }
+    .hero-floating-card3 .card-desc { font-size: 0.72rem; color: rgba(255,255,255,0.85); line-height: 1.2; text-align: left; }
     @keyframes float {
       0%, 100% { transform: translateY(0); }
       50% { transform: translateY(-10px); }
@@ -557,6 +568,13 @@
         <span class="pco-badge">✓ PCO Connected</span>
         <span style="font-size:0.8rem;color:rgba(255,255,255,0.8);">Live Sync Active</span>
       </div>
+      <div class="hero-floating-card3">
+        <span style="font-size:1.3rem;">📱</span>
+        <div>
+          <div class="card-title">Staff SMS Alert</div>
+          <div class="card-desc">"New prayer request received"</div>
+        </div>
+      </div>
     </div>
   </div>
 </section>
@@ -619,9 +637,9 @@
         <p>Integrate US Census data to compare your congregation demographics against your local community — identify where you can grow your reach.</p>
       </div>
       <div class="feature-card fade-up fade-up-delay-2">
-        <div class="feature-icon">🏛️</div>
-        <h3>Services & Volunteer Insights</h3>
-        <p>Track staffing needs, upcoming service plans, volunteer fill rates, and identify understaffed roles before Sunday arrives.</p>
+        <div class="feature-icon">📱</div>
+        <h3>Mobile App & SMS Chat</h3>
+        <p>A full mobile PWA with real-time two-way member SMS, live push notifications for staff care alerts, keywords, and mobile email Quick Send.</p>
       </div>
       <div class="feature-card fade-up fade-up-delay-3">
         <div class="feature-icon">🗓️</div>
@@ -642,6 +660,7 @@
     </div>
     <div class="tour-tabs">
       <button class="tour-tab active" onclick="showTour('dashboard', this)" id="tab-dashboard">📊 Dashboard</button>
+      <button class="tour-tab" onclick="showTour('mobile', this)" id="tab-mobile">📱 Mobile App</button>
       <button class="tour-tab" onclick="showTour('people', this)" id="tab-people">👥 People</button>
       <button class="tour-tab" onclick="showTour('groups', this)" id="tab-groups">🏘️ Groups</button>
       <button class="tour-tab" onclick="showTour('services', this)" id="tab-services">⛪ Services</button>
@@ -653,6 +672,9 @@
     </div>
     <div class="tour-content fade-up">
       <div class="tour-panel active" id="panel-dashboard"><img src="assets/screenshots/dashboard.png" alt="Dashboard" /></div>
+      <div class="tour-panel" id="panel-mobile">
+        <img src="assets/screenshots/mobile.png" alt="Mobile SMS & Chat Layout" style="max-width: 440px; margin: 0 auto; display: block;" />
+      </div>
       <div class="tour-panel" id="panel-people"><img src="assets/screenshots/people.png" alt="People" /></div>
       <div class="tour-panel" id="panel-groups"><img src="assets/screenshots/groups.png" alt="Groups" /></div>
       <div class="tour-panel" id="panel-services"><img src="assets/screenshots/services.png" alt="Services" /></div>
@@ -695,6 +717,24 @@
   <div class="section-inner">
 
     <div class="alt-feature fade-up">
+      <div class="alt-feature-img" style="display: flex; justify-content: center; align-items: center;">
+        <img src="assets/screenshots/mobile.png" alt="Mobile App & SMS Module" style="max-width: 320px; box-shadow: none; border: none; filter: drop-shadow(0 20px 40px rgba(15,37,64,0.15));" />
+      </div>
+      <div class="alt-feature-text">
+        <div class="feature-pill">📱 Mobile-First Shepherding</div>
+        <h3>Shepherd on the Go. Respond in Real-Time.</h3>
+        <p>Your pastoral staff doesn't spend their day sitting behind a desk. The Pastoral Care mobile Progressive Web App (PWA) brings complete congregation shepherding and active SMS communications directly to their fingertips.</p>
+        <ul class="feature-list">
+          <li>Real-time two-way member SMS chat lists and custom status tags</li>
+          <li>Live Web Push notifications to alert staff of urgent incoming needs</li>
+          <li>SMS Keywords (like "Prayer" or "Help") with automated responder flows</li>
+          <li>Mobile Email Builder Quick Send with custom domain integrations</li>
+          <li>Role-based user permissions mapping to specific staff SMS numbers</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="alt-feature reverse fade-up">
       <div class="alt-feature-img">
         <img src="assets/screenshots/giving.png" alt="Giving Module" />
       </div>
@@ -712,7 +752,7 @@
       </div>
     </div>
 
-    <div class="alt-feature reverse fade-up">
+    <div class="alt-feature fade-up">
       <div class="alt-feature-img">
         <img src="assets/screenshots/pastoral.png" alt="Pastoral Care Module" />
       </div>
@@ -730,7 +770,7 @@
       </div>
     </div>
 
-    <div class="alt-feature fade-up">
+    <div class="alt-feature reverse fade-up">
       <div class="alt-feature-img">
         <img src="assets/screenshots/metrics.png" alt="Metrics Module" />
       </div>
@@ -748,7 +788,7 @@
       </div>
     </div>
 
-    <div class="alt-feature reverse fade-up">
+    <div class="alt-feature fade-up">
       <div class="alt-feature-img">
         <img src="assets/screenshots/people.png" alt="People Module" />
       </div>
