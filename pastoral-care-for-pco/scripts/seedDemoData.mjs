@@ -163,7 +163,7 @@ const GROUP_DATA = [
 
 const GROUPS = GROUP_DATA.map((g, i) => {
   const pcoId = `grp${String(i + 1).padStart(4, '0')}`;
-  const memberSample = PEOPLE.slice(i * 5, i * 5 + g.size).map(p => p.id.split('_')[1]);
+  const memberSample = PEOPLE.slice(i * 5, i * 5 + g.size).map(p => p.id);
   return {
     id:            `${CHURCH_ID}_${pcoId}`,
     churchId:      CHURCH_ID,
@@ -232,7 +232,7 @@ function makeDonation(index) {
     amount:      amt,
     date,
     fundName,
-    donorId:     donor.id.split('_')[1],
+    donorId:     donor.id,
     donorName:   donor.name,
     isRecurring: index % 4 === 0,
   };
@@ -266,7 +266,7 @@ const TEAM_DATA = [
 ];
 
 const TEAMS = TEAM_DATA.map((t, i) => {
-  const memberSample = PEOPLE.slice(i * 8, i * 8 + 8).map(p => p.id.split('_')[1]);
+  const memberSample = PEOPLE.slice(i * 8, i * 8 + 8).map(p => p.id);
   return {
     id:               `${CHURCH_ID}_team${i + 1}`,
     churchId:         CHURCH_ID,
@@ -415,7 +415,7 @@ const NOTE_CONTENTS = [
 const PASTORAL_NOTES = PEOPLE.slice(0, 30).map((person, i) => ({
   id:           `${CHURCH_ID}_note${i + 1}`,
   churchId:     CHURCH_ID,
-  personId:     person.id.split('_')[1],
+  personId:     person.id,
   personName:   person.name,
   authorId:     'pastor001',
   authorName:   'Pastor John Williams',
@@ -445,7 +445,7 @@ const PRAYER_REQUESTS_DATA = [
 const PRAYER_REQUESTS = PRAYER_REQUESTS_DATA.map((p, i) => ({
   id:        `${CHURCH_ID}_pr${i + 1}`,
   churchId:  CHURCH_ID,
-  personId:  i < 5 ? PEOPLE[i].id.split('_')[1] : null,
+  personId:  i < 5 ? PEOPLE[i].id : null,
   personName: p.name,
   request:   p.req,
   date:      dateStr(rand(1, 60)),
@@ -582,10 +582,9 @@ SERVICE_PLANS.forEach(p => {
 
 // Update each person's riskProfile and simulate changes
 PEOPLE.forEach((person, idx) => {
-  const pcoId = person.id.split('_')[1];
-  const isDonor = donorIds.has(pcoId);
-  const isGroupMember = groupMembers.has(pcoId);
-  const timesServed = volunteerCounts.get(pcoId) || 0;
+  const isDonor = donorIds.has(person.id);
+  const isGroupMember = groupMembers.has(person.id);
+  const timesServed = volunteerCounts.get(person.id) || 0;
 
   // Calculate current risk profile based on configuration
   const currentRisk = calculateSeededPersonRisk(person, isDonor, isGroupMember, timesServed, riskSettings);
