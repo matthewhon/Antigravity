@@ -515,6 +515,12 @@ export interface SystemSettings {
      * Newly provisioned church numbers are auto-assigned to this campaign for carrier approval.
      */
     signalwireCampaignId?: string;
+    /**
+     * Name of the Planning Center note category to use when logging sent messages.
+     * Must exactly match a category created in PCO: People → Note Categories.
+     * Leave blank to write uncategorized notes.
+     */
+    pcoNoteCategory?: string;
 }
 
 export interface TemplateSettings {
@@ -1226,6 +1232,41 @@ export interface SmsKeyword {
     isActive: boolean;
     matchCount: number;
     createdAt: number;
+}
+
+/**
+ * Tracks a person's subscription to an SMS keyword.
+ * Written to Firestore whenever a keyword matches an inbound SMS (or manually by staff).
+ * Also used to drive the PCO "Pastoral Care" tab checkbox field.
+ *
+ * Document ID: `{churchId}_{pcoPersonId}_{keywordId}`
+ */
+export interface SmsKeywordSubscription {
+    id: string;                 // `{churchId}_{personId}_{keywordId}`
+    churchId: string;
+    personId: string;           // PCO People person ID
+    personName?: string | null;
+    phoneNumber: string;        // E.164 — the number that originally texted in
+    keyword: string;            // Stored uppercase, e.g. "YOUTH"
+    keywordId: string;          // smsKeywords Firestore doc ID
+    subscribedAt: number;       // epoch ms — first subscription
+    source: 'sms_inbound' | 'manual';
+}
+
+/**
+ * Temporary queue record for keyword matches where the sender's phone number
+ * is not yet linked to a PCO person in the local `people` collection.
+ * The sync scheduler processes and resolves these after each PCO people sync.
+ *
+ * Document ID: `{churchId}_{e164phone_no_plus}_{keywordId}`
+ */
+export interface PendingSmsSubscription {
+    id: string;
+    churchId: string;
+    phoneNumber: string;        // E.164
+    keyword: string;
+    keywordId: string;
+    matchedAt: number;          // epoch ms
 }
 
 export interface SmsOptOut {

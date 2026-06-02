@@ -145,6 +145,7 @@ export async function resolvePcoRecipients(
                     anniversary: fmtDate(attrs.anniversary),
                     city:        cityByPersonId.get(personId)   || '',
                     state:       stateByPersonId.get(personId)  || '',
+                    pcoPersonId: personId || null,
                 };
             }
         }

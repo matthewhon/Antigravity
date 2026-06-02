@@ -1,6 +1,7 @@
 import { getDb } from './firebase';
 import { createServerLogger } from '../services/logService';
 import { refreshCampaignBlocks } from './emailScheduler';
+import { fireAndForgetEmailNote } from './pcoNotes';
 
 // ─── SendGrid v3 raw send helper ─────────────────────────────────────────────
 // We use fetch() directly instead of @sendgrid/mail so we can set the
@@ -883,6 +884,8 @@ interface PersonInfo {
     anniversary?: string;
     city?:       string;
     state?:      string;
+    /** PCO People person ID — used to write notes back to Planning Center after send. */
+    pcoPersonId?: string | null;
 }
 
 function resolveMergeTags(body: string, person: PersonInfo, church?: any): string {
@@ -1140,6 +1143,20 @@ export async function executeSend(
                 subuserId,
                 campaignId
             );
+
+            // Write a note to PCO for this recipient (fire-and-forget)
+            const pInfo = personMap[recipientEmail];
+            if (pInfo?.pcoPersonId) {
+                fireAndForgetEmailNote({
+                    db,
+                    churchId,
+                    personId: pInfo.pcoPersonId,
+                    recipientName: pInfo.personName || undefined,
+                    recipientEmail,
+                    subject: resolvedSubject,
+                    htmlBody: personalizedHtml,
+                });
+            }
         }
     }
 

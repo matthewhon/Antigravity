@@ -1,6 +1,8 @@
 import { getDb } from './firebase';
 import { createServerLogger } from '../services/logService';
 import { getSignalWireClient, getSmsWebhookBaseUrl } from './signalwireClient';
+import { fireAndForgetSmsNote } from './pcoNotes';
+
 
 // ─── Segment cost constants (adjust to match SignalWire pricing) ──────────────
 const SMS_COST_PER_SEGMENT = 0.0079;  // USD per outbound SMS segment
@@ -43,6 +45,8 @@ export interface PersonInfo {
     anniversary?: string;
     city?:       string;
     state?:      string;
+    /** PCO People person ID — used to write notes back to Planning Center after send. */
+    pcoPersonId?: string | null;
 }
 
 /** Replace merge tags with person-specific values. */
@@ -214,8 +218,12 @@ export async function sendIndividualInternal(params: {
     twilioNumberId?: string;
     conversationId?: string;
     attachVcard?: boolean;
+    /** PCO People person ID — if provided, a note will be written to this person's PCO profile after send. */
+    personId?: string | null;
+    /** Display name of the recipient (used in the PCO note body). */
+    personName?: string | null;
 }) {
-    const { db, log, churchId, toPhone, body, mediaUrls = [], sentBy, sentByName, smsNumberId, twilioNumberId, conversationId: existingConvId, attachVcard } = params;
+    const { db, log, churchId, toPhone, body, mediaUrls = [], sentBy, sentByName, smsNumberId, twilioNumberId, conversationId: existingConvId, attachVcard, personId, personName } = params;
 
     const to = normaliseE164(toPhone);
 
@@ -303,6 +311,31 @@ export async function sendIndividualInternal(params: {
 
     log.info(`[Send] 1:1 message to ${to} from church ${churchId} (SID: ${msg.sid})`, 'system', { churchId, to }, churchId);
 
+    // Write a note to Planning Center for the recipient (fire-and-forget — never blocks the send).
+    // Prefer the explicitly-supplied personId; fall back to the personId stored on the conversation doc
+    // (set by inbound handler / backfill) so replies in threads also get logged.
+    let resolvedPersonId: string | null = personId || null;
+    let resolvedPersonName: string | undefined = personName || undefined;
+    if (!resolvedPersonId) {
+        try {
+            const convSnap = await db.collection('smsConversations').doc(convId).get();
+            if (convSnap.exists) {
+                const cd = convSnap.data();
+                resolvedPersonId = cd?.personId || null;
+                if (!resolvedPersonName) resolvedPersonName = cd?.personName || undefined;
+            }
+        } catch { /* ignore — fallback is to skip note */ }
+    }
+    fireAndForgetSmsNote({
+        db,
+        churchId,
+        personId: resolvedPersonId,
+        recipientName: resolvedPersonName,
+        recipientPhone: to,
+        senderName: sentByName || undefined,
+        messageBody: body,
+    });
+
     return { messageSid: msg.sid, segments };
 }
 
@@ -316,6 +349,8 @@ export const sendIndividual = async (req: any, res: any) => {
         twilioNumberId,
         conversationId,
         attachVcard,
+        personId,
+        personName,
     } = req.body || {};
 
     if (!churchId || !toPhone || !body) {
@@ -328,7 +363,9 @@ export const sendIndividual = async (req: any, res: any) => {
     try {
         const result = await sendIndividualInternal({
             db, log, churchId, toPhone, body, mediaUrls,
-            sentBy, sentByName, smsNumberId, twilioNumberId, conversationId, attachVcard
+            sentBy, sentByName, smsNumberId, twilioNumberId, conversationId, attachVcard,
+            personId: personId || null,
+            personName: personName || null,
         });
         return res.json({ success: true, ...result });
     } catch (e: any) {
@@ -447,6 +484,21 @@ export async function sendBulkInternal(params: {
                 });
 
                 sent++;
+
+                // Write PCO note for this recipient (fire-and-forget)
+                const pInfo = (personMap as any)[to] as PersonInfo | undefined;
+                if (pInfo?.pcoPersonId) {
+                    fireAndForgetSmsNote({
+                        db,
+                        churchId,
+                        personId: pInfo.pcoPersonId,
+                        recipientName: pInfo.personName || undefined,
+                        recipientPhone: to,
+                        senderName: sentByName || undefined,
+                        messageBody: resolved,
+                    });
+                }
+
             } catch (e: any) {
                 failed++;
                 const errorCode = e.code || e.errorCode || null;

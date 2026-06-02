@@ -355,8 +355,28 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                 <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Client Secret</label>
                                 <input type="password" aria-label="Planning Center Client Secret" placeholder="Enter PCO Client Secret" value={settings.pcoClientSecret || ''} onChange={e => handleChange('pcoClientSecret', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" />
                             </div>
+                            <div className="pt-2 mt-2 border-t border-slate-100 dark:border-slate-800">
+                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Note Category Name</label>
+                                <input
+                                    type="text"
+                                    aria-label="PCO Note Category Name"
+                                    placeholder="e.g. Communication Log"
+                                    value={settings.pcoNoteCategory || ''}
+                                    onChange={e => handleChange('pcoNoteCategory', e.target.value)}
+                                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                />
+                                <p className="text-[9px] text-slate-400 mt-1.5 leading-relaxed">
+                                    When a text or email is sent, a note is automatically logged to each recipient's PCO profile.
+                                    This name must exactly match a category in{' '}
+                                    <a href="https://people.planningcenteronline.com/note_categories" target="_blank" rel="noopener noreferrer" className="underline text-indigo-400 hover:text-indigo-300">
+                                        PCO → People → Note Categories
+                                    </a>.
+                                    Leave blank to write uncategorized notes.
+                                </p>
+                            </div>
                         </div>
                     </div>
+
 
                     {/* External APIs */}
                     <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
