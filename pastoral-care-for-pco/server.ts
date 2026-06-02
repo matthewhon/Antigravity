@@ -81,6 +81,11 @@ async function startServer() {
       const { churchId, area } = req.body || {};
       if (!churchId) return res.status(400).json({ error: 'Missing churchId' });
 
+      if (churchId === 'c1') {
+        await new Promise(resolve => setTimeout(resolve, 1500)); // simulate sync latency
+        return res.json({ success: true, area: area || 'all' });
+      }
+
       try {
         const {
           syncAllData,
@@ -131,6 +136,17 @@ async function startServer() {
     app.post('/pco/diagnose-registrations', express.json(), async (req: any, res: any) => {
       const { churchId } = req.body || {};
       if (!churchId) return res.status(400).json({ error: 'Missing churchId' });
+
+      if (churchId === 'c1') {
+        return res.json({
+          pcoStatus: 200,
+          pcoStatusText: 'OK',
+          hasRegistrationsScope: true,
+          body: { data: [] },
+          tokenPrefix: 'mock_token...',
+          churchId,
+        });
+      }
       try {
         const db = getDb();
         const churchDoc = await db.collection('churches').doc(churchId).get();
@@ -166,6 +182,16 @@ async function startServer() {
     app.post('/api/pco/check-pastoral-care-tab', express.json(), async (req: any, res: any) => {
       const { churchId } = req.body || {};
       if (!churchId) return res.status(400).json({ error: 'Missing churchId' });
+
+      if (churchId === 'c1') {
+        return res.json({
+          tabFound: true,
+          fieldFound: true,
+          smsFieldDefId: 'mock_sms_field',
+          dateFieldDefId: 'mock_date_field',
+          tabId: 'mock_tab',
+        });
+      }
       try {
         const db = getDb();
         const churchDoc = await db.collection('churches').doc(churchId).get();

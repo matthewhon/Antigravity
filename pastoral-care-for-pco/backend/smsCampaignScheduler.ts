@@ -37,6 +37,92 @@ function toMmDd(dateStr?: string | null): string {
     return `${parts[1]}-${parts[2]}`;
 }
 
+/** Helper to resolve mock recipients for the c1 tenant directly from local Firestore collections. */
+async function resolveMockC1Recipients(
+    db: any,
+    listId?: string,
+    groupId?: string,
+    channelType: 'sms' | 'email' | 'mms' = 'sms'
+): Promise<{ destinations: string[]; personMap: Record<string, PersonInfo> }> {
+    const phones: string[] = [];
+    const personMap: Record<string, PersonInfo> = {};
+
+    const fmtDate = (raw?: string): string => {
+        if (!raw) return '';
+        const d = new Date(raw + 'T00:00:00');
+        return isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    };
+
+    if (listId) {
+        // Load people from Firestore c1 tenant
+        const peopleSnap = await db.collection('people').where('churchId', '==', 'c1').get();
+        let peopleDocs = peopleSnap.docs.map((d: any) => d.data());
+
+        // Filter based on listId
+        if (listId === 'pco_list_women') {
+            peopleDocs = peopleDocs.filter((p: any) => p.gender?.toLowerCase() === 'female');
+        } else if (listId === 'pco_list_new_visitors') {
+            peopleDocs = peopleDocs.filter((p: any) => p.membership === 'Occasional Visitor' || p.membership === 'Regular Attendee');
+        } else if (listId === 'pco_list_volunteers') {
+            peopleDocs = peopleDocs.slice(20, 30);
+        }
+
+        for (const p of peopleDocs) {
+            const rawPhone = (p.phone || '').replace(/\D/g, '');
+            const phone = rawPhone.length === 10 ? `+1${rawPhone}` : rawPhone.length === 11 ? `+${rawPhone}` : '';
+            const email = p.email || '';
+            const dest = channelType === 'email' ? email : phone;
+
+            if (dest) {
+                phones.push(dest);
+                personMap[dest] = {
+                    personName: p.name || '',
+                    email,
+                    phone: phone || dest,
+                    birthday: fmtDate(p.birthdate),
+                    anniversary: fmtDate(p.anniversary),
+                    city: p.addresses?.[0]?.city || 'Atlanta',
+                    state: p.addresses?.[0]?.state || 'GA',
+                    pcoPersonId: p.id ? p.id.replace('c1_', '') : null,
+                };
+            }
+        }
+    } else if (groupId) {
+        // Load the group from Firestore
+        const groupDoc = await db.collection('groups').doc(groupId).get();
+        if (groupDoc.exists) {
+            const groupData = groupDoc.data();
+            const memberIds = groupData?.memberIds || [];
+            for (const pid of memberIds) {
+                const pDoc = await db.collection('people').doc(pid).get();
+                if (pDoc.exists) {
+                    const p = pDoc.data();
+                    const rawPhone = (p.phone || '').replace(/\D/g, '');
+                    const phone = rawPhone.length === 10 ? `+1${rawPhone}` : rawPhone.length === 11 ? `+${rawPhone}` : '';
+                    const email = p.email || '';
+                    const dest = channelType === 'email' ? email : phone;
+
+                    if (dest) {
+                        phones.push(dest);
+                        personMap[dest] = {
+                            personName: p.name || '',
+                            email,
+                            phone: phone || dest,
+                            birthday: fmtDate(p.birthdate),
+                            anniversary: fmtDate(p.anniversary),
+                            city: p.addresses?.[0]?.city || 'Atlanta',
+                            state: p.addresses?.[0]?.state || 'GA',
+                            pcoPersonId: p.id ? p.id.replace('c1_', '') : null,
+                        };
+                    }
+                }
+            }
+        }
+    }
+
+    return { destinations: phones, personMap };
+}
+
 /** Resolve phone numbers from a PCO List or Group via the stored PCO access token. */
 export async function resolvePcoRecipients(
     db: any,
@@ -45,6 +131,10 @@ export async function resolvePcoRecipients(
     groupId?: string,
     channelType: 'sms' | 'email' | 'mms' = 'sms'
 ): Promise<{ destinations: string[]; personMap: Record<string, PersonInfo> }> {
+
+    if (churchId === 'c1') {
+        return await resolveMockC1Recipients(db, listId, groupId, channelType);
+    }
 
     const churchSnap = await db.collection('churches').doc(churchId).get();
     const church = churchSnap.data() || {};
