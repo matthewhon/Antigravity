@@ -124,9 +124,9 @@ const NumberSelector: React.FC<{
 
     if (numbers.length === 1) {
         return (
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/30 border border-violet-200 dark:border-violet-700 rounded-full px-3 py-1.5">
-                <Phone size={11} />
-                <span className="truncate max-w-[120px]">{activeNum.friendlyLabel}</span>
+            <div className="flex items-center gap-1 text-xs font-semibold text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/30 border border-violet-200 dark:border-violet-700 rounded-full px-2 py-1 min-[375px]:px-3 min-[375px]:py-1.5">
+                <Phone size={10} />
+                <span className="truncate max-w-[40px] min-[375px]:max-w-[70px] sm:max-w-[120px]">{activeNum.friendlyLabel}</span>
             </div>
         );
     }
@@ -134,11 +134,11 @@ const NumberSelector: React.FC<{
     return (
         <div className="relative flex items-center">
             {/* Styled custom pill overlay (compact and truncates friendly label) */}
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full px-3 py-1.5 pr-6 transition-all duration-150">
-                <Phone size={11} className="text-slate-400" />
-                <span className="truncate max-w-[100px]">{activeNum.friendlyLabel}</span>
-                <div className="absolute right-2 flex items-center pointer-events-none text-slate-400">
-                    <ChevronDown size={11} />
+            <div className="flex items-center gap-1 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full px-2 py-1 pr-5 min-[375px]:px-3 min-[375px]:py-1.5 min-[375px]:pr-6 transition-all duration-150">
+                <Phone size={10} className="text-slate-400" />
+                <span className="truncate max-w-[40px] min-[375px]:max-w-[60px] sm:max-w-[100px]">{activeNum.friendlyLabel}</span>
+                <div className="absolute right-1.5 min-[375px]:right-2 flex items-center pointer-events-none text-slate-400">
+                    <ChevronDown size={10} />
                 </div>
             </div>
             
@@ -355,40 +355,40 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
                 className="shrink-0 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-200/80 dark:border-slate-800"
                 style={{ paddingTop: 'env(safe-area-inset-top)' }}
             >
-                <div className="flex items-center justify-between px-4 py-3 gap-3">
+                <div className="flex items-center justify-between px-3 py-3 min-[375px]:px-4 gap-2 min-[375px]:gap-3">
                     {/* Left: logo */}
-                    <div className="flex items-center gap-2.5 min-w-0">
-                        <img src={logoIconTransparent} alt="Logo" className="w-8 h-8 object-contain shrink-0" />
-                        <h1 className="text-[17px] font-black text-slate-900 dark:text-white leading-tight truncate">
+                    <div className="flex items-center gap-1.5 min-[375px]:gap-2.5 min-w-0">
+                        <img src={logoIconTransparent} alt="Logo" className="w-7 h-7 min-[375px]:w-8 min-[375px]:h-8 object-contain shrink-0" />
+                        <h1 style={{ fontSize: '13px' }} className="font-black text-slate-900 dark:text-white leading-tight truncate sm:!text-[17px]">
                             Pastoral Care
                         </h1>
                     </div>
 
                     {/* Right: notifications + share + number selector */}
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-1.5 min-[375px]:gap-2 shrink-0">
                         {/* Push notification bell */}
                         {'Notification' in window && (
                             <button
                                 onClick={togglePushNotifications}
                                 disabled={pushLoading}
                                 title={pushEnabled ? 'Disable notifications' : 'Enable notifications'}
-                                className="w-8 h-8 flex items-center justify-center rounded-full transition active:opacity-60"
+                                className="w-7 h-7 min-[375px]:w-8 min-[375px]:h-8 flex items-center justify-center rounded-full transition active:opacity-60"
                                 style={{
                                     color: pushEnabled ? 'rgb(124 58 237)' : 'rgb(148 163 184)',
                                     background: pushEnabled ? 'rgb(237 233 254)' : 'transparent',
                                 }}
                             >
                                 {pushLoading
-                                    ? <Loader2 size={16} className="animate-spin" />
+                                    ? <Loader2 className="w-4 h-4 min-[375px]:w-[16px] min-[375px]:h-[16px] animate-spin" />
                                     : pushEnabled
-                                        ? <Bell size={17} strokeWidth={2} />
-                                        : <BellOff size={17} strokeWidth={1.7} />
+                                        ? <Bell className="w-[14px] h-[14px] min-[375px]:w-[17px] min-[375px]:h-[17px]" strokeWidth={2} />
+                                        : <BellOff className="w-[14px] h-[14px] min-[375px]:w-[17px] min-[375px]:h-[17px]" strokeWidth={1.7} />
                                 }
                             </button>
                         )}
 
                         {numbersLoading ? (
-                            <Loader2 size={16} className="animate-spin text-slate-400" />
+                            <Loader2 className="w-4 h-4 min-[375px]:w-[16px] min-[375px]:h-[16px] animate-spin text-slate-400" />
                         ) : (
                             <NumberSelector
                                 numbers={visibleNumbers}
@@ -401,9 +401,9 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
                         <button
                             onClick={onNavigateHome}
                             title="Log Out"
-                            className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 transition active:opacity-60"
+                            className="w-7 h-7 min-[375px]:w-8 min-[375px]:h-8 flex items-center justify-center rounded-full text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 transition active:opacity-60"
                         >
-                            <LogOut size={17} strokeWidth={1.7} />
+                            <LogOut className="w-[14px] h-[14px] min-[375px]:w-[17px] min-[375px]:h-[17px]" strokeWidth={1.7} />
                         </button>
                     </div>
                 </div>
