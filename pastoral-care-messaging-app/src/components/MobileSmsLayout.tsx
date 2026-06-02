@@ -124,9 +124,9 @@ const NumberSelector: React.FC<{
 
     if (numbers.length === 1) {
         return (
-            <div className="flex items-center gap-1 text-xs font-semibold text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/30 border border-violet-200 dark:border-violet-700 rounded-full px-2 py-1 min-[375px]:px-3 min-[375px]:py-1.5">
-                <Phone size={10} />
-                <span className="truncate max-w-[40px] min-[375px]:max-w-[70px] sm:max-w-[120px]">{activeNum.friendlyLabel}</span>
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/30 border border-violet-200 dark:border-violet-700 rounded-full px-3 py-1.5">
+                <Phone size={11} />
+                <span className="truncate max-w-[120px]">{activeNum.friendlyLabel}</span>
             </div>
         );
     }
@@ -134,11 +134,11 @@ const NumberSelector: React.FC<{
     return (
         <div className="relative flex items-center">
             {/* Styled custom pill overlay (compact and truncates friendly label) */}
-            <div className="flex items-center gap-1 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full px-2 py-1 pr-5 min-[375px]:px-3 min-[375px]:py-1.5 min-[375px]:pr-6 transition-all duration-150">
-                <Phone size={10} className="text-slate-400" />
-                <span className="truncate max-w-[40px] min-[375px]:max-w-[60px] sm:max-w-[100px]">{activeNum.friendlyLabel}</span>
-                <div className="absolute right-1.5 min-[375px]:right-2 flex items-center pointer-events-none text-slate-400">
-                    <ChevronDown size={10} />
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full px-3 py-1.5 pr-6 transition-all duration-150">
+                <Phone size={11} className="text-slate-400" />
+                <span className="truncate max-w-[100px]">{activeNum.friendlyLabel}</span>
+                <div className="absolute right-2 flex items-center pointer-events-none text-slate-400">
+                    <ChevronDown size={11} />
                 </div>
             </div>
             

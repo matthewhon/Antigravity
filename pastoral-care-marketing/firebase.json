@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "site": "pastoralwebsite",
+    "site": "pastoral-care-for-pco",
     "public": ".",
     "ignore": [
       "firebase.json",
