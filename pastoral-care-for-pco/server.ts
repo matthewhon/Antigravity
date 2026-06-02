@@ -241,6 +241,9 @@ async function startServer() {
     app.post('/email/send', express.json(), sendEmail);
     app.post('/email/test', express.json(), sendEmail);
     app.post('/email/stats', express.json(), getEmailStats);
+    app.post('/api/email/send', express.json(), sendEmail);
+    app.post('/api/email/test', express.json(), sendEmail);
+    app.post('/api/email/stats', express.json(), getEmailStats);
 
     // Email provisioning — tenant Subuser + domain authentication
     app.post('/email/provision-subuser', express.json(), provisionSubuser);

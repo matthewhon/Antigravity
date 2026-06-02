@@ -936,7 +936,7 @@ export async function executeSend(
     const globalFromEmail: string = settings.sendGridFromEmail || '';
     const globalFromName: string = settings.sendGridFromName || 'Church';
 
-    if (!globalApiKey || !globalApiKey.startsWith('SG.')) {
+    if (churchId !== 'c1' && (!globalApiKey || !globalApiKey.startsWith('SG.'))) {
         throw new Error('SendGrid is not configured. Please add your API key in App Config → System Settings.');
     }
 
@@ -964,7 +964,7 @@ export async function executeSend(
 
     // Guard: if custom domain is configured but not yet DNS-verified, fail early with a
     // clear message rather than letting SendGrid return a cryptic Sender Identity error.
-    if (isCustomDomainMode && !tenantEmail.domainVerified) {
+    if (churchId !== 'c1' && isCustomDomainMode && !tenantEmail.domainVerified) {
         throw new Error(
             `Custom domain "${tenantEmail.customDomain || '(unknown)'}" has not been verified yet. ` +
             `Go to Settings → Mail Settings → Verify DNS before sending.`
@@ -1013,17 +1013,20 @@ export async function executeSend(
     const fromName  = tenantFromName  || campaign.fromName  || globalFromName;
     const subject   = campaign.subject   || campaign.emailSubject || '(No Subject)';
 
-    if (!fromEmail) throw new Error('No "From Email" configured. Set it on the campaign or in App Config → SendGrid.');
+    if (!fromEmail && churchId !== 'c1') throw new Error('No "From Email" configured. Set it on the campaign or in App Config → SendGrid.');
+
+    const resolvedFromEmail = fromEmail || 'simulated-from@grace.church';
+    const resolvedFromName = fromName || 'Simulated Church';
 
     // Extra guard for custom domain: catch from-email domain mismatch early.
     // If someone has a custom domain "grace.org" but the resolved from-email is
     // "pastor@gmail.com" (e.g. from an old campaign field), SendGrid will reject it.
-    if (isCustomDomainMode && tenantEmail.customDomain && fromEmail) {
-        const fromDomain = fromEmail.split('@')[1]?.toLowerCase();
+    if (churchId !== 'c1' && isCustomDomainMode && tenantEmail.customDomain && resolvedFromEmail) {
+        const fromDomain = resolvedFromEmail.split('@')[1]?.toLowerCase();
         const configuredDomain = tenantEmail.customDomain.toLowerCase();
         if (fromDomain && fromDomain !== configuredDomain) {
             throw new Error(
-                `From email "${fromEmail}" does not match the authenticated custom domain "${configuredDomain}". ` +
+                `From email "${resolvedFromEmail}" does not match the authenticated custom domain "${configuredDomain}". ` +
                 `Update the From Email in Settings → Mail Settings.`
             );
         }
@@ -1137,12 +1140,16 @@ export async function executeSend(
                 campaign.contentType,
                 resolvedContent
             );
-            await sgSend(
-                [{ to: recipientEmail, from: { email: fromEmail, name: fromName }, replyTo: campaign.replyTo || undefined, subject: resolvedSubject, html: personalizedHtml }],
-                globalApiKey,
-                subuserId,
-                campaignId
-            );
+            if (churchId === 'c1') {
+                log.info(`[Simulation] Simulated sending email to ${recipientEmail} with subject: ${resolvedSubject}`, 'system', { campaignId, churchId }, churchId);
+            } else {
+                await sgSend(
+                    [{ to: recipientEmail, from: { email: resolvedFromEmail, name: resolvedFromName }, replyTo: campaign.replyTo || undefined, subject: resolvedSubject, html: personalizedHtml }],
+                    globalApiKey,
+                    subuserId,
+                    campaignId
+                );
+            }
 
             // Write a note to PCO for this recipient (fire-and-forget)
             const pInfo = personMap[recipientEmail];
@@ -1216,7 +1223,7 @@ export const sendEmail = async (req: any, res: any) => {
             const globalFromEmail: string = settings.sendGridFromEmail || '';
             const globalFromName: string = settings.sendGridFromName || 'Church';
 
-            if (!globalApiKey || !globalApiKey.startsWith('SG.')) {
+            if (churchId !== 'c1' && (!globalApiKey || !globalApiKey.startsWith('SG.'))) {
                 throw new Error('SendGrid is not configured. Please add your API key in App Config → System Settings.');
             }
 
@@ -1227,14 +1234,16 @@ export const sendEmail = async (req: any, res: any) => {
             const isCustomDomainMode = tenantEmail.mode === 'custom';
             const subuserId: string | undefined = tenantEmail.sendGridSubuserId || undefined;
 
-            if (isCustomDomainMode && !tenantEmail.domainVerified) {
+            if (churchId !== 'c1' && isCustomDomainMode && !tenantEmail.domainVerified) {
                 throw new Error(`Custom domain not verified`);
             }
 
             const fromEmail = tenantEmail.fromEmail || globalFromEmail;
             const fromName  = tenantEmail.fromName  || globalFromName;
 
-            if (!fromEmail) throw new Error('No fromEmail configured');
+            if (!fromEmail && churchId !== 'c1') throw new Error('No fromEmail configured');
+            const resolvedFromEmail = fromEmail || 'simulated-from@grace.church';
+            const resolvedFromName = fromName || 'Simulated Church';
 
             const now = new Date();
             const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -1260,12 +1269,16 @@ export const sendEmail = async (req: any, res: any) => {
                     </div>
                 `;
 
-                await sgSend(
-                    [{ to: email, from: { email: fromEmail, name: fromName }, subject: resolvedSubject, html: personalizedHtml }],
-                    globalApiKey,
-                    subuserId,
-                    campaignId || 'workflow_adhoc'
-                );
+                if (churchId === 'c1') {
+                    log.info(`[Simulation] Simulated sending ad-hoc email to ${email} with subject: ${resolvedSubject}`, 'system', { churchId }, churchId);
+                } else {
+                    await sgSend(
+                        [{ to: email, from: { email: resolvedFromEmail, name: resolvedFromName }, subject: resolvedSubject, html: personalizedHtml }],
+                        globalApiKey,
+                        subuserId,
+                        campaignId || 'workflow_adhoc'
+                    );
+                }
             }
 
             // Update usage count
