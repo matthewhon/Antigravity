@@ -5,7 +5,7 @@ import { useTwilioNumbers, canUserSeeNumber, canUserUseFeature } from '../hooks/
 import {
     Inbox, MessageSquare, Key, BarChart3, Phone, ChevronDown,
     Loader2, Bell, BellOff, Folder,
-    Zap, Sparkles, Shield, Mail
+    Zap, Sparkles, Shield, Mail, LogOut
 } from 'lucide-react';
 import { firestore } from '../services/firestoreService';
 import { QuickSendModal } from './QuickSendModal';
@@ -387,9 +387,6 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
                             </button>
                         )}
 
-
-
-
                         {numbersLoading ? (
                             <Loader2 size={16} className="animate-spin text-slate-400" />
                         ) : (
@@ -399,6 +396,15 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
                                 onChange={handleNumberChange}
                             />
                         )}
+
+                        {/* Logout button */}
+                        <button
+                            onClick={onNavigateHome}
+                            title="Log Out"
+                            className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 transition active:opacity-60"
+                        >
+                            <LogOut size={17} strokeWidth={1.7} />
+                        </button>
                     </div>
                 </div>
 

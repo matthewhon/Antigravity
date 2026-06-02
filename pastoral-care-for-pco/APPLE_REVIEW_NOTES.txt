@@ -1,0 +1,67 @@
+================================================================================
+APPLE APP STORE REVIEW — DEMO ACCOUNT DETAILS
+================================================================================
+
+App Name:  SMS Manager (Pastoral Care)
+Platform:  Progressive Web App (PWA) — runs in Safari on iPhone
+
+--------------------------------------------------------------------------------
+DEMO ACCOUNT CREDENTIALS
+--------------------------------------------------------------------------------
+Email:    test@test.com
+Password: [fill in before submitting]
+
+--------------------------------------------------------------------------------
+HOW TO INSTALL (PWA — not from App Store)
+--------------------------------------------------------------------------------
+1. Open Safari on iPhone
+2. Navigate to:
+   https://pastoralcare.barnabassoftware.com/mobile/sms
+3. Tap the Share button (the box with an arrow pointing up)
+4. Scroll down and tap "Add to Home Screen"
+5. Tap "Add" in the top-right corner
+6. The "SMS Manager" icon will appear on your home screen
+7. Open it — it will launch fullscreen like a native app
+
+--------------------------------------------------------------------------------
+WHAT TO EXPECT
+--------------------------------------------------------------------------------
+After logging in with the demo credentials above you will see:
+
+INBOX TAB (5 pre-loaded conversations):
+• Marcus Thompson — asked about parking, you can reply
+• Lisa Chen — sent a prayer request (tagged: Prayer Request, Needs Follow-Up)
+• James & Ruth Okafor — asked about service times (resolved)
+• Destiny Williams — texted YOUTH keyword (Youth number)
+• Robert Park — expressed interest in volunteering
+
+BROADCAST TAB (3 demo campaigns):
+• "Easter Sunday Reminder" — already sent to 847 recipients (view stats)
+• "Mother's Day Celebration" — scheduled for next week
+• "Summer VBS Announcement" — draft (you can edit and press "Send Now")
+
+KEYWORDS TAB (4 configured keywords):
+• INFO, PRAYER, GIVE, YOUTH — each with auto-reply and usage stats
+
+ANALYTICS TAB:
+• Campaign performance charts, opt-out tracking, conversation volume
+
+AI AGENT TAB:
+• Church knowledge base pre-configured with Grace Community's details
+
+--------------------------------------------------------------------------------
+DEMO BEHAVIOUR NOTES
+--------------------------------------------------------------------------------
+• All SMS sending is FULLY SIMULATED. Pressing "Reply" or "Send Now" in any
+  context writes the message to the app's database immediately and shows it
+  in the thread — no real text messages are delivered to any phone number.
+
+• The demo account (test@test.com) is scoped to "Grace Community Church"
+  (Tenant C1). All data shown is pre-populated demo data.
+
+• Push notification permission can be granted — tapping the bell icon in
+  the header will prompt for notification permission. This is safe to test.
+
+• The app works fully offline once loaded (PWA with service worker caching).
+
+================================================================================
