@@ -294,6 +294,15 @@ export const PeopleDirectoryWidget: React.FC<RiskProps> = ({ people }) => {
     const [engagementFilter, setEngagementFilter] = useState('All');
     const [birthdateFilter, setBirthdateFilter] = useState('');
 
+    // Pagination State
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
+
+    // Reset current page when filters change
+    React.useEffect(() => {
+        setCurrentPage(1);
+    }, [nameFilter, membershipFilter, genderFilter, riskFilter, engagementFilter, birthdateFilter, pageSize]);
+
     // Extract unique values for dropdowns
     const uniqueMemberships = useMemo(() => {
         const memberships = new Set(activePeople.map(p => p.membership).filter(Boolean) as string[]);
@@ -329,6 +338,12 @@ export const PeopleDirectoryWidget: React.FC<RiskProps> = ({ people }) => {
             return matchesName && matchesMembership && matchesGender && matchesRisk && matchesEngagement && matchesBirthdate;
         }).sort((a, b) => (a.riskProfile?.score || 0) - (b.riskProfile?.score || 0)); // Default sort by lowest score (highest risk)
     }, [activePeople, nameFilter, membershipFilter, genderFilter, riskFilter, engagementFilter, birthdateFilter]);
+
+    const totalPages = Math.ceil(filteredPeople.length / pageSize);
+    const paginatedPeople = useMemo(() => {
+        const start = (currentPage - 1) * pageSize;
+        return filteredPeople.slice(start, start + pageSize);
+    }, [filteredPeople, currentPage, pageSize]);
 
     return (
         <div className="bg-white dark:bg-slate-850 p-8 rounded-[3rem] border border-slate-100 dark:border-slate-800 shadow-sm h-full flex flex-col transition-colors min-h-[500px]">
@@ -421,7 +436,7 @@ export const PeopleDirectoryWidget: React.FC<RiskProps> = ({ people }) => {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                        {filteredPeople.slice(0, 50).map(p => (
+                        {paginatedPeople.map(p => (
                             <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                                 <td className="p-3">
                                     <div className="flex items-center gap-3">
@@ -493,10 +508,70 @@ export const PeopleDirectoryWidget: React.FC<RiskProps> = ({ people }) => {
                     </tbody>
                 </table>
             </div>
-            
-            <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 flex justify-between items-center">
-                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">Showing {Math.min(50, filteredPeople.length)} of {filteredPeople.length} people</p>
-                {filteredPeople.length > 50 && <span className="text-[9px] text-indigo-500 font-bold">List truncated for performance</span>}
+
+            {/* Pagination Controls */}
+            <div className="mt-6 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-850 flex flex-col sm:flex-row justify-between items-center gap-4 transition-colors">
+                <div className="flex items-center gap-4">
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">
+                        Showing {filteredPeople.length === 0 ? 0 : (currentPage - 1) * pageSize + 1} to {Math.min(currentPage * pageSize, filteredPeople.length)} of {filteredPeople.length} people
+                    </p>
+                    <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 px-2.5 py-1 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm text-[10px] font-bold text-slate-600 dark:text-slate-400">
+                        <span>Show</span>
+                        <select 
+                            value={pageSize} 
+                            onChange={(e) => setPageSize(Number(e.target.value))}
+                            className="bg-transparent border-none outline-none focus:ring-0 text-slate-950 dark:text-white font-extrabold cursor-pointer pr-1"
+                        >
+                            <option value={10}>10</option>
+                            <option value={25}>25</option>
+                            <option value={50}>50</option>
+                        </select>
+                    </div>
+                </div>
+
+                {totalPages > 1 && (
+                    <div className="flex items-center gap-1">
+                        <button 
+                            disabled={currentPage === 1}
+                            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                            className="w-8 h-8 rounded-xl flex items-center justify-center border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 disabled:opacity-40 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                        >
+                            ◀
+                        </button>
+                        
+                        {Array.from({ length: totalPages }, (_, idx) => idx + 1)
+                            .filter(page => {
+                                return page === 1 || page === totalPages || Math.abs(page - currentPage) <= 1;
+                            })
+                            .map((page, idx, arr) => {
+                                const showEllipsis = idx > 0 && page - arr[idx - 1] > 1;
+                                return (
+                                    <React.Fragment key={page}>
+                                        {showEllipsis && <span className="text-[10px] text-slate-400 px-1 font-bold">...</span>}
+                                        <button 
+                                            onClick={() => setCurrentPage(page)}
+                                            className={`w-8 h-8 rounded-xl text-[10px] font-black transition-all ${
+                                                currentPage === page 
+                                                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200 dark:shadow-none' 
+                                                    : 'border border-slate-100 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                                            }`}
+                                        >
+                                            {page}
+                                        </button>
+                                    </React.Fragment>
+                                );
+                            })
+                        }
+
+                        <button 
+                            disabled={currentPage === totalPages}
+                            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                            className="w-8 h-8 rounded-xl flex items-center justify-center border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 disabled:opacity-40 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                        >
+                            ▶
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     );
