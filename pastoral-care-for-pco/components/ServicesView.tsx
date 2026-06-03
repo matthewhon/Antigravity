@@ -1411,9 +1411,9 @@ const ServicesView: React.FC<ServicesViewProps> = ({
       )}
 
       {/* Attendance Prediction Widget — shown on the Attendance tab when data is available */}
-      {activeTab === 'Attendance' && churchId && data?.checkIns?.trends && data.checkIns.trends.length > 0 && (
+      {activeTab === 'Attendance' && churchId && filteredCheckinTrends.length > 0 && (
           <div className="mt-8">
-              <AttendancePredictionWidget churchId={churchId} attendance={data.checkIns.trends as any} />
+              <AttendancePredictionWidget churchId={churchId} attendance={filteredCheckinTrends as any} />
           </div>
       )}
     </div>
