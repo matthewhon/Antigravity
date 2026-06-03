@@ -70,7 +70,13 @@ export const AttendancePredictionWidget: React.FC<AttendancePredictionWidgetProp
                 const historicalWeather = allWeather.filter(w => w.date <= todayStr);
                 const forecastWeather = allWeather.filter(w => w.date > todayStr);
 
-                const results = predictAttendance(attendance, historicalWeather, forecastWeather);
+                // Normalize: ServicesView passes checkInTrends which uses `total` instead of `count`
+                const normalizedAttendance = attendance.map(a => ({
+                    ...a,
+                    count: a.count ?? (a as any).total ?? 0,
+                }));
+
+                const results = predictAttendance(normalizedAttendance, historicalWeather, forecastWeather);
                 if (!cancelled) {
                     setPredictions(results);
                 }
