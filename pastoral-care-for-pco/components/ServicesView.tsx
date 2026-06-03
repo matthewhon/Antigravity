@@ -1,6 +1,7 @@
 
-import React, { useMemo, useState, useRef } from 'react';
-import { ServicesDashboardData, ServicesFilter, PcoPerson, GlobalStats, ServicePlanSnapshot } from '../types';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
+import { ServicesDashboardData, ServicesFilter, PcoPerson, GlobalStats, ServicePlanSnapshot, WeatherRecord } from '../types';
+import { firestore } from '../services/firestoreService';
 import { 
     ResponsiveContainer,
     PieChart, Pie, Cell, Tooltip,
@@ -50,6 +51,21 @@ const TOOLTIP_STYLE = {
     boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
 };
 
+/** Map Visual Crossing icon keys to weather emojis. */
+function getWeatherEmoji(icon?: string, conditions?: string): string {
+    if (!icon && !conditions) return '🌤️';
+    const key = icon?.toLowerCase() || conditions?.toLowerCase() || '';
+    if (key.includes('clear-day') || key.includes('clear-night')) return '☀️';
+    if (key.includes('partly-cloudy')) return '⛅';
+    if (key.includes('cloudy')) return '☁️';
+    if (key.includes('thunder') || key.includes('lightning')) return '🌩️';
+    if (key.includes('rain') || key.includes('showers')) return '🌧️';
+    if (key.includes('snow') || key.includes('sleet') || key.includes('ice')) return '❄️';
+    if (key.includes('wind')) return '💨';
+    if (key.includes('fog') || key.includes('mist') || key.includes('haze')) return '🌫️';
+    return '🌤️';
+}
+
 const ServicesView: React.FC<ServicesViewProps> = ({ 
   data, 
   isLoading, 
@@ -83,6 +99,20 @@ const ServicesView: React.FC<ServicesViewProps> = ({
   const [isCheckInsSyncing, setIsCheckInsSyncing] = useState(false);
   const [expandedRosterPersonId, setExpandedRosterPersonId] = useState<string | null>(null);
   const [expandedBurnoutPersonId, setExpandedBurnoutPersonId] = useState<string | null>(null);
+  const [weatherByDate, setWeatherByDate] = useState<Map<string, WeatherRecord>>(new Map());
+
+  // Fetch weather data for upcoming plans overlay
+  useEffect(() => {
+      if (!churchId) return;
+      let cancelled = false;
+      firestore.getWeather(churchId).then(records => {
+          if (cancelled || !records) return;
+          const map = new Map<string, WeatherRecord>();
+          records.forEach(r => map.set(r.date, r));
+          setWeatherByDate(map);
+      }).catch(() => {});
+      return () => { cancelled = true; };
+  }, [churchId]);
 
   const availableWidgets = useMemo(() => {
     let widgets: any[] = [];
@@ -646,15 +676,31 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                                 {/* Header Row */}
                                                 <div className="flex items-start justify-between gap-4">
                                                     <div className="flex items-center gap-4">
-                                                        {/* Date Box */}
-                                                        <div className="flex flex-col items-center justify-center w-12 h-12 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm shrink-0">
-                                                            <span className="text-[9px] font-black text-rose-500 uppercase tracking-wider">
-                                                                {displayDate.toLocaleDateString(undefined, { month: 'short' })}
-                                                            </span>
-                                                            <span className="text-lg font-black text-slate-900 dark:text-white leading-none">
-                                                                {displayDate.getDate()}
-                                                            </span>
-                                                        </div>
+                                                        {/* Date Box + Weather */}
+                                                        {(() => {
+                                                            const dateStr = `${displayDate.getFullYear()}-${String(displayDate.getMonth() + 1).padStart(2, '0')}-${String(displayDate.getDate()).padStart(2, '0')}`;
+                                                            const w = weatherByDate.get(dateStr);
+                                                            return (
+                                                                <div className="flex items-center gap-2 shrink-0">
+                                                                    <div className="flex flex-col items-center justify-center w-12 h-12 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm">
+                                                                        <span className="text-[9px] font-black text-rose-500 uppercase tracking-wider">
+                                                                            {displayDate.toLocaleDateString(undefined, { month: 'short' })}
+                                                                        </span>
+                                                                        <span className="text-lg font-black text-slate-900 dark:text-white leading-none">
+                                                                            {displayDate.getDate()}
+                                                                        </span>
+                                                                    </div>
+                                                                    {w && (
+                                                                        <div className="flex flex-col items-center gap-0.5" title={w.conditions || 'Weather forecast'}>
+                                                                            <span className="text-base leading-none">{getWeatherEmoji(w.icon, w.conditions)}</span>
+                                                                            <span className="text-[8px] font-bold text-slate-400 dark:text-slate-500 leading-none whitespace-nowrap">
+                                                                                {Math.round(w.tempHigh)}° / {Math.round(w.tempLow)}°
+                                                                            </span>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })()}
                                                         
                                                         {/* Info */}
                                                         <div>
