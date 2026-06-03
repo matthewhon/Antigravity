@@ -13,6 +13,7 @@ import { WidgetWrapper, StatCard } from './SharedUI';
 import { syncServicesData, syncCheckInsData } from '../services/pcoSyncService'; 
 import ServicesRemindersTab from './ServicesRemindersTab';
 import ServicesPlansTab from './ServicesPlansTab';
+import { AttendancePredictionWidget } from './widgets/AttendancePredictionWidget';
 
 interface ServicesViewProps {
   data: ServicesDashboardData | null;
@@ -1406,6 +1407,13 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                   <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">Use the "Customize Layout" button to add widgets.</p>
               </div>
             )}
+          </div>
+      )}
+
+      {/* Attendance Prediction Widget — shown on the Attendance tab when data is available */}
+      {activeTab === 'Attendance' && churchId && data?.checkIns?.trends && data.checkIns.trends.length > 0 && (
+          <div className="mt-8">
+              <AttendancePredictionWidget churchId={churchId} attendance={data.checkIns.trends as any} />
           </div>
       )}
     </div>

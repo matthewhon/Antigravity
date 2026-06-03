@@ -462,6 +462,48 @@ export interface AttendanceRecord {
     events?: AttendanceEventSummary[];
 }
 
+/** Weather conditions for a specific date and church location */
+export interface WeatherRecord {
+    id: string;              // `${churchId}_${date}`
+    churchId: string;
+    date: string;            // YYYY-MM-DD
+    // Conditions
+    tempHigh: number;        // °F
+    tempLow: number;         // °F
+    feelsLikeHigh?: number;  // °F
+    humidity?: number;       // %
+    precipProb: number;      // 0–100%
+    precipAmount: number;    // inches
+    precipType?: string;     // 'rain' | 'snow' | 'ice' | null
+    snowDepth?: number;      // inches
+    windSpeed?: number;      // mph
+    windGust?: number;       // mph
+    visibility?: number;     // miles
+    cloudCover?: number;     // %
+    uvIndex?: number;
+    conditions: string;      // "Clear", "Rain", "Snow", etc.
+    icon?: string;           // Visual Crossing icon key
+    // Metadata
+    source: 'visual_crossing';
+    fetchedAt: number;       // epoch ms
+}
+
+/** Attendance record enriched with weather correlation data */
+export interface AttendanceWeatherCorrelation {
+    date: string;
+    attendance: number;
+    weather: WeatherRecord | null;
+}
+
+/** Predicted attendance output */
+export interface AttendancePrediction {
+    date: string;
+    predictedAttendance: number;
+    confidenceRange: { low: number; high: number };
+    weatherForecast: WeatherRecord | null;
+    factors: string[];       // e.g., ["Rain expected (-12%)", "Holiday weekend (-8%)"]
+}
+
 export interface GivingRecord {
     id: string;
     churchId: string;
@@ -521,6 +563,9 @@ export interface SystemSettings {
      * Leave blank to write uncategorized notes.
      */
     pcoNoteCategory?: string;
+    // -- Weather (Visual Crossing) -----------------------------------------------
+    /** Visual Crossing Weather API key — used for attendance prediction feature */
+    weatherApiKey?: string;
 }
 
 export interface TemplateSettings {

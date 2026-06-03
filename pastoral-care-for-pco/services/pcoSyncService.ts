@@ -9,6 +9,7 @@ import {
 } from '../types';
 import { initializeWebhooks } from './pcoWebhookService';
 import { calculateBulkRisk, DEFAULT_RISK_SETTINGS } from './riskService';
+import { fetchWeatherRange, fetchWeatherForecast } from '../backend/weatherService.js';
 
 // Server-side logger — only initialised when running in Node.js.
 // In the browser this module is imported (for client-side syncAllData calls that
@@ -1877,4 +1878,117 @@ export const geocodePeopleAddresses = async (churchId: string, force = false): P
         { churchId, geocoded: successCount, failed: failCount, total: toGeocode.length },
         churchId
     );
+};
+
+// ── Weather Data Sync ─────────────────────────────────────────────────────────
+/**
+ * Fetches historical weather for attendance dates that are missing weather
+ * records, plus a 14-day forecast. Writes results to the `weather` collection.
+ *
+ * Non-fatal — errors are logged but never crash the calling sync pipeline.
+ */
+export const syncWeatherData = async (churchId: string): Promise<void> => {
+    try {
+        // Dynamic import to avoid circular deps and client-side bundling issues
+        const { getDb } = await import('../backend/firebase.js');
+        const db = getDb();
+
+        // 1. Read church doc to get ZIP (or fallback city+state)
+        const churchDoc = await db.collection('churches').doc(churchId).get();
+        const churchData = churchDoc.data();
+        const zip: string | undefined = churchData?.zip || undefined;
+        const city: string | undefined = churchData?.city || undefined;
+        const state: string | undefined = churchData?.state || undefined;
+        const location = zip || (city && state ? `${city},${state}` : undefined);
+
+        if (!location) {
+            console.warn(`[WeatherSync] No zip/city+state for church ${churchId} — skipping weather sync`);
+            return;
+        }
+
+        // 2. Read system settings to get weatherApiKey
+        const settingsDoc = await db.doc('system/settings').get();
+        const settings = settingsDoc.data() || {};
+        const apiKey: string | undefined = settings.weatherApiKey || undefined;
+
+        if (!apiKey) {
+            console.warn(`[WeatherSync] No weatherApiKey in system settings — skipping weather sync`);
+            return;
+        }
+
+        // 3. Get all attendance records for this church
+        const attendanceSnap = await db.collection('attendance')
+            .where('churchId', '==', churchId)
+            .get();
+        const attendanceDates = new Set<string>();
+        attendanceSnap.docs.forEach((d: any) => {
+            const data = d.data();
+            if (data.date) attendanceDates.add(data.date);
+        });
+
+        // 4. Get all existing weather records
+        const weatherSnap = await db.collection('weather')
+            .where('churchId', '==', churchId)
+            .get();
+        const existingWeatherDates = new Set<string>();
+        weatherSnap.docs.forEach((d: any) => {
+            const data = d.data();
+            if (data.date) existingWeatherDates.add(data.date);
+        });
+
+        // 5. Find attendance dates missing weather data
+        const missingDates: string[] = [];
+        attendanceDates.forEach(date => {
+            if (!existingWeatherDates.has(date)) missingDates.push(date);
+        });
+
+        let allWeatherRecords: any[] = [];
+
+        // 6. Batch-fetch historical weather for missing dates
+        if (missingDates.length > 0) {
+            missingDates.sort();
+            const minDate = missingDates[0];
+            const maxDate = missingDates[missingDates.length - 1];
+            logger.info(`Fetching historical weather for ${missingDates.length} missing dates (${minDate} → ${maxDate})`, 'sync', { churchId }, churchId);
+
+            try {
+                const historical = await fetchWeatherRange(apiKey, location, minDate, maxDate, churchId);
+                allWeatherRecords.push(...historical);
+            } catch (e: any) {
+                console.warn(`[WeatherSync] Historical weather fetch failed for ${churchId}:`, e.message);
+            }
+        }
+
+        // 7. Fetch 14-day forecast
+        try {
+            const forecast = await fetchWeatherForecast(apiKey, location, 14, churchId);
+            allWeatherRecords.push(...forecast);
+        } catch (e: any) {
+            console.warn(`[WeatherSync] Forecast fetch failed for ${churchId}:`, e.message);
+        }
+
+        // 8. Batch-write to Firestore weather collection (chunks of 400)
+        if (allWeatherRecords.length > 0) {
+            const CHUNK = 400;
+            for (let i = 0; i < allWeatherRecords.length; i += CHUNK) {
+                const batch = db.batch();
+                const chunk = allWeatherRecords.slice(i, i + CHUNK);
+                for (const record of chunk) {
+                    const ref = db.collection('weather').doc(record.id);
+                    // Sanitize: replace undefined with null to prevent Firestore rejection
+                    const safe = JSON.parse(JSON.stringify(record));
+                    batch.set(ref, safe, { merge: true });
+                }
+                await batch.commit();
+            }
+            logger.info(`Weather sync complete — wrote ${allWeatherRecords.length} records`, 'sync', { churchId }, churchId);
+        } else {
+            logger.info('Weather sync complete — no new records to write', 'sync', { churchId }, churchId);
+        }
+
+    } catch (e: any) {
+        // Non-fatal — log and return without crashing the sync pipeline
+        console.error(`[WeatherSync] Weather sync failed for church ${churchId}:`, e.message);
+        logger.warn(`Weather sync failed (non-fatal): ${e.message}`, 'sync', { churchId, error: e.message }, churchId);
+    }
 };

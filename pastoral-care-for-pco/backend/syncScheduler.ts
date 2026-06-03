@@ -144,6 +144,12 @@ async function triggerSyncForChurch(churchId: string, db: Firestore): Promise<vo
 
         console.log(`[SyncScheduler] Scheduled sync complete for church ${churchId}`);
 
+        // Fire-and-forget weather data sync (non-critical — don't block the main pipeline)
+        const { syncWeatherData } = await import('../services/pcoSyncService.js');
+        syncWeatherData(churchId).catch((e: any) => {
+            console.warn(`[SyncScheduler] Weather sync failed for ${churchId} (non-fatal):`, e.message);
+        });
+
         // Process any pending SMS keyword subscriptions whose phone numbers may
         // now be matched to a PCO person after the sync updated the people collection.
         processPendingSubscriptions(churchId, db).catch((e) => {

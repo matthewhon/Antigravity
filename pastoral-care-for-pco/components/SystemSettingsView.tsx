@@ -395,6 +395,11 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                 <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Gemini API Key (AI Features)</label>
                                 <input type="password" aria-label="Gemini API Key" placeholder="AIza..." value={settings.geminiApiKey || ''} onChange={e => handleChange('geminiApiKey', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" />
                             </div>
+                            <div className="pt-2 mt-2 border-t border-slate-100 dark:border-slate-800">
+                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Visual Crossing API Key (Weather)</label>
+                                <input type="password" aria-label="Visual Crossing API Key" placeholder="Enter Visual Crossing API key" value={settings.weatherApiKey || ''} onChange={e => handleChange('weatherApiKey', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" />
+                                <p className="text-[9px] text-slate-400 mt-1.5">Get a free key at <a href="https://www.visualcrossing.com/account" target="_blank" rel="noopener noreferrer" className="underline text-indigo-400 hover:text-indigo-300">visualcrossing.com/account</a>. Powers attendance prediction and weather overlays.</p>
+                            </div>
                         </div>
                     </div>
 

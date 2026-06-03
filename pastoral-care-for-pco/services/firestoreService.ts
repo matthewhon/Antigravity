@@ -22,7 +22,8 @@ import {
     Ministry, MetricDefinition, MetricEntry, AggregatedChurchStats, LogEntry,
     PastoralNote, PrayerRequest, CheckInRecord, EmailCampaign, PcoRegistrationEvent,
     PcoRegistrationAttendee, PcoRegistrationCampus,
-    Poll, PollResponse, RiskChangeRecord, ChurchNote, StatusChangeRecord
+    Poll, PollResponse, RiskChangeRecord, ChurchNote, StatusChangeRecord,
+    WeatherRecord
 } from '../types';
 import { calculateServicesAnalytics, calculateAggregatedStats } from './analyticsService';
 
@@ -152,7 +153,8 @@ class FirestoreService {
             'funds', 
             'teams', 
             'service_plans',
-            'pco_registrations'
+            'pco_registrations',
+            'weather'
         ];
 
         for (const colName of collectionsToPurge) {
@@ -201,7 +203,8 @@ class FirestoreService {
             'users', // Users are also tenant-scoped via churchId
             'metric_entries', 
             'metric_definitions', 
-            'ministries'
+            'ministries',
+            'weather'
         ];
 
         for (const colName of collectionsToPurge) {
@@ -571,6 +574,27 @@ class FirestoreService {
     } catch (e) { return []; }
   }
 
+  async getWeather(churchId: string): Promise<WeatherRecord[]> {
+    try {
+      const q = query(collection(db, 'weather'), where('churchId', '==', churchId));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(d => d.data() as WeatherRecord).sort((a, b) => a.date.localeCompare(b.date));
+    } catch (e) { return []; }
+  }
+
+  async getWeatherForDateRange(churchId: string, start: string, end: string): Promise<WeatherRecord[]> {
+    try {
+      const q = query(
+        collection(db, 'weather'),
+        where('churchId', '==', churchId),
+        where('date', '>=', start),
+        where('date', '<=', end)
+      );
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(d => d.data() as WeatherRecord);
+    } catch (e) { return []; }
+  }
+
   async getDetailedDonations(churchId: string): Promise<DetailedDonation[]> {
     try {
       const q = query(collection(db, 'detailed_donations'), where('churchId', '==', churchId));
@@ -673,6 +697,7 @@ class FirestoreService {
   async upsertRegistrations(records: PcoRegistrationEvent[]) { await this.batchUpsert('pco_registrations', records); }
   async upsertRegistrationAttendees(records: PcoRegistrationAttendee[]) { await this.batchUpsert('pco_registration_attendees', records); }
   async upsertRegistrationCampuses(records: PcoRegistrationCampus[]) { await this.batchUpsert('pco_registration_campuses', records); }
+  async upsertWeather(records: WeatherRecord[]) { await this.batchUpsert('weather', records); }
 
   /**
    * Clears all pco_registrations AND pco_registration_attendees for a tenant.

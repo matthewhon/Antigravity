@@ -132,6 +132,42 @@ async function startServer() {
       }
     });
 
+    // ── Weather Sync & Prediction ─────────────────────────────────────────────
+    app.post('/api/weather/sync', express.json(), async (req: any, res: any) => {
+        const { churchId } = req.body || {};
+        if (!churchId) return res.status(400).json({ error: 'Missing churchId' });
+        try {
+            const { syncWeatherData } = await import('./services/pcoSyncService.js');
+            await syncWeatherData(churchId);
+            res.json({ success: true });
+        } catch (e: any) {
+            res.status(500).json({ error: e.message || 'Weather sync failed' });
+        }
+    });
+
+    app.post('/api/weather/predict', express.json(), async (req: any, res: any) => {
+        const { churchId } = req.body || {};
+        if (!churchId) return res.status(400).json({ error: 'Missing churchId' });
+        try {
+            const db = getDb();
+            // Get attendance records
+            const attendanceSnap = await db.collection('attendance').where('churchId', '==', churchId).get();
+            const attendance = attendanceSnap.docs.map((d: any) => d.data());
+            // Get all weather records
+            const weatherSnap = await db.collection('weather').where('churchId', '==', churchId).get();
+            const allWeather = weatherSnap.docs.map((d: any) => d.data());
+            // Split into historical and forecast
+            const today = new Date().toISOString().split('T')[0];
+            const historicalWeather = allWeather.filter((w: any) => w.date <= today);
+            const forecastWeather = allWeather.filter((w: any) => w.date > today);
+            // Run prediction
+            const { predictAttendance } = await import('./services/attendancePredictionService.js');
+            const predictions = predictAttendance(attendance, historicalWeather, forecastWeather);
+            res.json({ success: true, predictions });
+        } catch (e: any) {
+            res.status(500).json({ error: e.message || 'Prediction failed' });
+        }
+    });
     // PCO Registrations Diagnostic — shows exactly what PCO returns for this church's token
     app.post('/pco/diagnose-registrations', express.json(), async (req: any, res: any) => {
       const { churchId } = req.body || {};

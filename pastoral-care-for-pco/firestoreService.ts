@@ -12,7 +12,7 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import { db } from './services/firebase';
-import { AttendanceRecord, GivingRecord, Church, User, UserRole, DetailedDonation } from './types';
+import { AttendanceRecord, GivingRecord, Church, User, UserRole, DetailedDonation, WeatherRecord } from './types';
 
 class FirestoreService {
   private handleFirestoreError(error: any) {
@@ -61,7 +61,7 @@ class FirestoreService {
       console.log(`Starting deep purge for tenant: ${churchId}`);
       
       // 1. Purge sub-collections (Attendance, Giving, Donations, Users)
-      const collectionsToClear = ['attendance', 'giving', 'detailed_donations', 'users'];
+      const collectionsToClear = ['attendance', 'giving', 'detailed_donations', 'users', 'weather'];
       
       for (const colName of collectionsToClear) {
         const q = query(collection(db, colName), where('churchId', '==', churchId));
@@ -237,6 +237,48 @@ class FirestoreService {
         batch.set(doc(db, 'giving', record.id), record, { merge: true });
       }
       await batch.commit();
+    } catch (e) {
+      this.handleFirestoreError(e);
+    }
+  }
+
+  // --- Weather Data ---
+
+  async getWeather(churchId: string): Promise<WeatherRecord[]> {
+    try {
+      const q = query(collection(db, 'weather'), where('churchId', '==', churchId));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(d => d.data() as WeatherRecord).sort((a, b) => a.date.localeCompare(b.date));
+    } catch (e) { return []; }
+  }
+
+  async getWeatherForDateRange(churchId: string, start: string, end: string): Promise<WeatherRecord[]> {
+    try {
+      const q = query(
+        collection(db, 'weather'),
+        where('churchId', '==', churchId),
+        where('date', '>=', start),
+        where('date', '<=', end)
+      );
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(d => d.data() as WeatherRecord);
+    } catch (e) { return []; }
+  }
+
+  async upsertWeather(records: WeatherRecord[]) {
+    try {
+      let batch = writeBatch(db);
+      let count = 0;
+      for (const record of records) {
+        batch.set(doc(db, 'weather', record.id), record, { merge: true });
+        count++;
+        if (count >= 450) {
+          await batch.commit();
+          batch = writeBatch(db);
+          count = 0;
+        }
+      }
+      if (count > 0) await batch.commit();
     } catch (e) {
       this.handleFirestoreError(e);
     }
