@@ -7,6 +7,8 @@ import { firestore } from '../../services/firestoreService';
 interface AttendancePredictionWidgetProps {
     churchId: string;
     attendance: AttendanceRecord[];
+    /** YYYY-MM-DD dates of future service plans — predictions are filtered to only these dates */
+    serviceDates?: string[];
 }
 
 /** Map Visual Crossing icon keys to weather emojis. */
@@ -44,7 +46,7 @@ function factorBadgeStyle(factor: string): string {
     return 'bg-slate-500/20 text-slate-300 border-slate-500/30';
 }
 
-export const AttendancePredictionWidget: React.FC<AttendancePredictionWidgetProps> = ({ churchId, attendance }) => {
+export const AttendancePredictionWidget: React.FC<AttendancePredictionWidgetProps> = ({ churchId, attendance, serviceDates }) => {
     const [predictions, setPredictions] = useState<AttendancePrediction[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [hasWeatherData, setHasWeatherData] = useState(true);
@@ -76,7 +78,14 @@ export const AttendancePredictionWidget: React.FC<AttendancePredictionWidgetProp
                     count: a.count ?? (a as any).total ?? 0,
                 }));
 
-                const results = predictAttendance(normalizedAttendance, historicalWeather, forecastWeather);
+                let results = predictAttendance(normalizedAttendance, historicalWeather, forecastWeather);
+
+                // Filter predictions to only days with a scheduled service plan
+                if (serviceDates && serviceDates.length > 0) {
+                    const dateSet = new Set(serviceDates);
+                    results = results.filter(p => dateSet.has(p.date));
+                }
+
                 if (!cancelled) {
                     setPredictions(results);
                 }

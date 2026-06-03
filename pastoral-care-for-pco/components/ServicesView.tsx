@@ -1413,7 +1413,14 @@ const ServicesView: React.FC<ServicesViewProps> = ({
       {/* Attendance Prediction Widget — shown on the Attendance tab when data is available */}
       {activeTab === 'Attendance' && churchId && filteredCheckinTrends.length > 0 && (
           <div className="mt-8">
-              <AttendancePredictionWidget churchId={churchId} attendance={filteredCheckinTrends as any} />
+              <AttendancePredictionWidget
+                  churchId={churchId}
+                  attendance={filteredCheckinTrends as any}
+                  serviceDates={(data?.futurePlans || []).map(p => {
+                      const d = p.planTimes?.[0]?.startsAt ? new Date(p.planTimes[0].startsAt) : new Date(p.sortDate);
+                      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                  })}
+              />
           </div>
       )}
     </div>
