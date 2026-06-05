@@ -2308,147 +2308,148 @@ currentUser, onUpdateChurch, activePage, smsTab, mobileSmsUrl, activeNumberId, o
       {/* ─── Emails Tab ───────────────────────────────────────────────── */}
       {effectiveTab === 'emails' && (
         <>
-      {!activeCampaign && church?.emailSettings && (
-        <div className={`shrink-0 flex items-center gap-3 px-5 py-2 border-b text-xs font-medium ${
-          church.emailSettings.mode === 'custom' && church.emailSettings.domainVerified
-            ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400'
-            : church.emailSettings.mode === 'custom'
-            ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400'
-            : 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-400'
-        }`}>
-          <Mail size={13} className="shrink-0" />
-          <span>
-            {church.emailSettings.mode === 'custom' && church.emailSettings.domainVerified
-              ? `Sending from ${church.emailSettings.fromEmail} (custom domain ✓ verified)`
-              : church.emailSettings.mode === 'custom'
-              ? `Custom domain pending DNS verification — currently using ${church.emailSettings.fromEmail}`
-              : `Sending via ${church.emailSettings.fromEmail || 'shared subdomain'}`
-            }
-          </span>
-        </div>
-      )}
-      {!activeCampaign && !church?.emailSettings && (
-        <div className="shrink-0 flex items-center justify-between gap-3 px-5 py-2.5 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800">
-          <div className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400">
-            <Mail size={13} className="shrink-0" />
-            <span className="font-semibold">Email not configured.</span>
-            <span>Go to Settings &amp; Administration → Mail Settings to set up your From address before sending.</span>
-          </div>
-        </div>
-      )}
+          {/* Toast */}
+          {toast && (
+            <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-[100] px-5 py-3 rounded-2xl shadow-xl text-sm font-semibold text-white transition-all ${
+              toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'
+            }`}>
+              {toast.msg}
+            </div>
+          )}
 
-      {/* Toast */}
-      {toast && (
-        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-[100] px-5 py-3 rounded-2xl shadow-xl text-sm font-semibold text-white transition-all ${
-          toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'
-        }`}>
-          {toast.msg}
-        </div>
-      )}
+          {/* Campaign Preview Modal */}
+          {previewCampaign && (
+            <CampaignPreviewModal
+              campaign={previewCampaign}
+              onClose={() => setPreviewCampaign(null)}
+              churchLogoUrl={church?.logoUrl}
+            />
+          )}
 
-      {/* Campaign Preview Modal */}
-      {previewCampaign && (
-        <CampaignPreviewModal
-          campaign={previewCampaign}
-          onClose={() => setPreviewCampaign(null)}
-          churchLogoUrl={church?.logoUrl}
-        />
-      )}
+          {/* Send Test Modal */}
+          {showTestModal && activeCampaign && (
+            <SendTestModal
+              onConfirm={handleSendTest}
+              onCancel={() => setShowTestModal(false)}
+              isSending={isSendingTest}
+            />
+          )}
 
-      {/* Send Test Modal */}
-      {showTestModal && activeCampaign && (
-        <SendTestModal
-          onConfirm={handleSendTest}
-          onCancel={() => setShowTestModal(false)}
-          isSending={isSendingTest}
-        />
-      )}
+          {/* Schedule Modal */}
+          {showScheduleModal && activeCampaign && (
+            <ScheduleModal
+              onConfirm={handleSchedule}
+              onCancel={() => setShowScheduleModal(false)}
+              isScheduling={isScheduling}
+            />
+          )}
 
-      {/* Schedule Modal */}
-      {showScheduleModal && activeCampaign && (
-        <ScheduleModal
-          onConfirm={handleSchedule}
-          onCancel={() => setShowScheduleModal(false)}
-          isScheduling={isScheduling}
-        />
-      )}
+          {/* New campaign modal */}
+          {showNewModal && (
+            <NewCampaignModal onConfirm={handleCreate} onCancel={() => setShowNewModal(false)} />
+          )}
 
-      {/* Scheduled Banner */}
-      {activeCampaign?.status === 'scheduled' && activeCampaign.scheduledAt && (
-        <div className="shrink-0 flex items-center justify-between gap-3 px-5 py-2 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800">
-          <div className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400">
-            <Clock size={13} />
-            <span className="font-semibold">Scheduled:</span>
-            {new Date(activeCampaign.scheduledAt).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
-            {activeCampaign.retryCount ? <span className="ml-2 text-red-500">· Retry {activeCampaign.retryCount}/5{activeCampaign.lastError ? ` (${activeCampaign.lastError})` : ''}</span> : null}
-          </div>
-          <button
-            onClick={handleCancelSchedule}
-            className="text-xs font-semibold text-amber-700 dark:text-amber-400 hover:text-red-600 dark:hover:text-red-400 transition"
-          >
-            Cancel Schedule
-          </button>
-        </div>
-      )}
+          {/* Quick Send Modal */}
+          {showQuickSendModal && currentUser && (
+            <QuickSendModal
+              churchId={churchId}
+              church={church}
+              currentUser={currentUser}
+              onClose={() => setShowQuickSendModal(false)}
+              onSendQuickEmail={handleSendQuickEmail}
+            />
+          )}
 
-      {/* New campaign modal */}
-      {showNewModal && (
-        <NewCampaignModal onConfirm={handleCreate} onCancel={() => setShowNewModal(false)} />
-      )}
+          {/* Duplicate campaign modal */}
+          {duplicateCampaignState && (
+            <NewCampaignModal
+              title="Duplicate Email Campaign"
+              description={`Enter a new name for the copy of "${duplicateCampaignState.name}".`}
+              defaultName={`Copy of ${duplicateCampaignState.name}`}
+              onConfirm={finishDuplicate}
+              onCancel={() => setDuplicateCampaignState(null)}
+            />
+          )}
 
-      {/* Quick Send Modal */}
-      {showQuickSendModal && currentUser && (
-        <QuickSendModal
-          churchId={churchId}
-          church={church}
-          currentUser={currentUser}
-          onClose={() => setShowQuickSendModal(false)}
-          onSendQuickEmail={handleSendQuickEmail}
-        />
-      )}
-
-      {/* Duplicate campaign modal */}
-      {duplicateCampaignState && (
-        <NewCampaignModal
-          title="Duplicate Email Campaign"
-          description={`Enter a new name for the copy of "${duplicateCampaignState.name}".`}
-          defaultName={`Copy of ${duplicateCampaignState.name}`}
-          onConfirm={finishDuplicate}
-          onCancel={() => setDuplicateCampaignState(null)}
-        />
-      )}
-
-      {/* Main Content */}
-      {activeCampaign ? (
-        <EmailEditor
-          key={activeCampaign.id}
-          campaign={activeCampaign}
-          churchId={churchId}
-          church={church}
-          onBack={() => setActiveCampaign(null)}
-          onSave={handleSave}
-          onSend={handleSend}
-          onSendTest={() => setShowTestModal(true)}
-          onSchedule={() => setShowScheduleModal(true)}
-          isSending={isSending}
-          isScheduled={activeCampaign.status === 'scheduled'}
-          onLogoUploaded={logoUrl => onUpdateChurch?.({ logoUrl })}
-          onLogoRemoved={() => onUpdateChurch?.({ logoUrl: undefined })}
-        />
-      ) : (
-        <CampaignListView
-          churchId={churchId}
-          church={church}
-          campaigns={campaigns}
-          isLoading={isLoading}
-          onOpen={c => setActiveCampaign(c)}
-          onPreview={c => setPreviewCampaign(c)}
-          onDelete={handleDelete}
-          onDuplicate={handleDuplicate}
-          onCreate={() => setShowNewModal(true)}
-          setIsQuickSendOpen={setShowQuickSendModal}
-        />
-      )}
+          {activeCampaign ? (
+            <>
+              {/* Scheduled Banner */}
+              {activeCampaign.status === 'scheduled' && activeCampaign.scheduledAt && (
+                <div className="shrink-0 flex items-center justify-between gap-3 px-5 py-2 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800">
+                  <div className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400">
+                    <Clock size={13} />
+                    <span className="font-semibold">Scheduled:</span>
+                    {new Date(activeCampaign.scheduledAt).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                    {activeCampaign.retryCount ? <span className="ml-2 text-red-500">· Retry {activeCampaign.retryCount}/5{activeCampaign.lastError ? ` (${activeCampaign.lastError})` : ''}</span> : null}
+                  </div>
+                  <button
+                    onClick={handleCancelSchedule}
+                    className="text-xs font-semibold text-amber-700 dark:text-amber-400 hover:text-red-600 dark:hover:text-red-400 transition"
+                  >
+                    Cancel Schedule
+                  </button>
+                </div>
+              )}
+              <EmailEditor
+                key={activeCampaign.id}
+                campaign={activeCampaign}
+                churchId={churchId}
+                church={church}
+                onBack={() => setActiveCampaign(null)}
+                onSave={handleSave}
+                onSend={handleSend}
+                onSendTest={() => setShowTestModal(true)}
+                onSchedule={() => setShowScheduleModal(true)}
+                isSending={isSending}
+                isScheduled={activeCampaign.status === 'scheduled'}
+                onLogoUploaded={logoUrl => onUpdateChurch?.({ logoUrl })}
+                onLogoRemoved={() => onUpdateChurch?.({ logoUrl: undefined })}
+              />
+            </>
+          ) : (
+            <div className="flex-1 overflow-y-auto flex flex-col">
+              {church?.emailSettings && (
+                <div className={`shrink-0 flex items-center gap-3 px-5 py-2 border-b text-xs font-medium ${
+                  church.emailSettings.mode === 'custom' && church.emailSettings.domainVerified
+                    ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400'
+                    : church.emailSettings.mode === 'custom'
+                    ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400'
+                    : 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-400'
+                }`}>
+                  <Mail size={13} className="shrink-0" />
+                  <span>
+                    {church.emailSettings.mode === 'custom' && church.emailSettings.domainVerified
+                      ? `Sending from ${church.emailSettings.fromEmail} (custom domain ✓ verified)`
+                      : church.emailSettings.mode === 'custom'
+                      ? `Custom domain pending DNS verification — currently using ${church.emailSettings.fromEmail}`
+                      : `Sending via ${church.emailSettings.fromEmail || 'shared subdomain'}`
+                    }
+                  </span>
+                </div>
+              )}
+              {!church?.emailSettings && (
+                <div className="shrink-0 flex items-center justify-between gap-3 px-5 py-2.5 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800">
+                  <div className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400">
+                    <Mail size={13} className="shrink-0" />
+                    <span className="font-semibold">Email not configured.</span>
+                    <span>Go to Settings &amp; Administration → Mail Settings to set up your From address before sending.</span>
+                  </div>
+                </div>
+              )}
+              <CampaignListView
+                churchId={churchId}
+                church={church}
+                campaigns={campaigns}
+                isLoading={isLoading}
+                onOpen={c => setActiveCampaign(c)}
+                onPreview={c => setPreviewCampaign(c)}
+                onDelete={handleDelete}
+                onDuplicate={handleDuplicate}
+                onCreate={() => setShowNewModal(true)}
+                setIsQuickSendOpen={setShowQuickSendModal}
+              />
+            </div>
+          )}
         </>
       )}
     </div>
