@@ -44,6 +44,7 @@ export async function sgSend(
     const headers: Record<string, string> = {
         Authorization: `Bearer ${masterApiKey}`,
         'Content-Type': 'application/json',
+        'Connection': 'close',
     };
     if (subuserId) {
         headers['on-behalf-of'] = subuserId;
@@ -1357,6 +1358,7 @@ async function fetchCategoryStats(
     const headers: Record<string, string> = {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
+        'Connection': 'close',
     };
     if (subuserId) {
         headers['on-behalf-of'] = subuserId;

@@ -734,7 +734,10 @@ async function fetchWidgetData(
                         let hasMore = true;
                         while (hasMore) {
                             const res = await fetch(`https://api.planningcenteronline.com/people/v2/lists/${config.pcoListId}/people?per_page=100&offset=${(pcoPage - 1) * 100}`, {
-                                headers: { Authorization: `Bearer ${token}` }
+                                headers: { 
+                                    Authorization: `Bearer ${token}`,
+                                    'Connection': 'close'
+                                }
                             });
                             if (!res.ok) break;
                             const data = await res.json();
@@ -887,7 +890,10 @@ export function startEmailScheduler(db: any): void {
                                 // PCO API: POST /people/v2/lists/{id}/run
                                 await fetch(`https://api.planningcenteronline.com/people/v2/lists/${campaign.toListId}/run`, {
                                     method: 'POST',
-                                    headers: { Authorization: `Bearer ${token}` }
+                                    headers: { 
+                                        Authorization: `Bearer ${token}`,
+                                        'Connection': 'close'
+                                    }
                                 });
                                 // Wait 4 seconds for PCO to process the list before fetching members
                                 log.info(`[Scheduler] Waiting 4s for PCO list ${campaign.toListId} to process...`, 'system', { campaignId }, churchId);

@@ -123,7 +123,7 @@ const MAX_RETRIES = 3;
 const RETRY_DELAYS = [1000, 3000, 8000]; // exponential-ish backoff
 
 async function fetchWithRetry(url: string, attempt = 0): Promise<Response> {
-    const res = await fetch(url);
+    const res = await fetch(url, { headers: { 'Connection': 'close' } });
 
     // 429 Too Many Requests — Visual Crossing rate limit
     if (res.status === 429 && attempt < MAX_RETRIES) {

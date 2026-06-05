@@ -319,7 +319,7 @@ async function getOrCreatePrayerTag(db: any, churchId: string, log: any): Promis
     const newTag = {
         churchId,
         name: 'Needs Prayer',
-        emoji: 'Ã°Å¸â„¢Â',
+        emoji: '🙏',
         color: 'violet',
         createdAt: Date.now(),
     };

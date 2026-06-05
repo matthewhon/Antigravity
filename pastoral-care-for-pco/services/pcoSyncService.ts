@@ -60,7 +60,7 @@ const getProxyUrl = async () => {
     if (typeof window === 'undefined') {
         // Running on server — use the actual port (defaults to 8080 matching server.ts)
         const port = process.env.PORT || 8080;
-        return `http://localhost:${port}/pco/proxy`;
+        return `http://127.0.0.1:${port}/pco/proxy`;
     }
     return '/pco/proxy';
 };
@@ -79,7 +79,10 @@ const pcoFetch = async (churchId: string, endpoint: string, retryCount = 0, meth
     try {
         const response = await fetch(proxyUrl, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'Connection': 'close'
+            },
             body: JSON.stringify({
                 churchId,
                 url: fullUrl,

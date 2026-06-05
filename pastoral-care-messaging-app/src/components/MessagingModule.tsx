@@ -2394,6 +2394,19 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                         {activeConv.isOptedOut && (
                             <span className="text-xs font-bold text-red-500 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-full px-2 py-0.5">OPTED OUT</span>
                         )}
+                        {/* Resolve Prayer button — shown when conversation has "Needs Prayer" tag */}
+                        {(() => {
+                            const prayerTag = tags.find(t => t.name === 'Needs Prayer' && (activeConv.tags || []).includes(t.id));
+                            return prayerTag ? (
+                                <button
+                                    onClick={() => handleToggleConvTag(activeConv, prayerTag.id)}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:hover:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-700 rounded-xl text-xs font-bold transition shadow-sm"
+                                    title="Mark this prayer request as resolved"
+                                >
+                                    <CheckCircle size={13} /> Resolve Prayer
+                                </button>
+                            ) : null;
+                        })()}
                         {/* Active tags on conversation */}
                         {tags.filter(t => (activeConv.tags || []).includes(t.id)).map(t => (
                             <SmsTagChip

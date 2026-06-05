@@ -50,7 +50,8 @@ export const pcoProxy = async (req: any, res: any) => {
             const headers: any = {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json',
-                'User-Agent': 'PastoralCareApp/1.0'
+                'User-Agent': 'PastoralCareApp/1.0',
+                'Connection': 'close'
             };
             
             const options: any = { method, headers };
@@ -89,6 +90,7 @@ export const pcoProxy = async (req: any, res: any) => {
 
             const refreshRes = await fetch('https://api.planningcenteronline.com/oauth/token', {
                 method: 'POST',
+                headers: { 'Connection': 'close' },
                 body: refreshParams
             });
 
