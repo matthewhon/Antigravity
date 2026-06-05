@@ -1128,7 +1128,7 @@ export async function executeSend(
             // Resolve merge tags on subject, blocks, and content!
             const resolvedSubject = resolveMergeTags(subject, personInfo, churchData);
             const resolvedBlocks = JSON.parse(
-                resolveMergeTags(JSON.stringify(campaign.blocks || []), personInfo, churchData)
+                resolveMergeTags(JSON.stringify(blocks), personInfo, churchData)
             );
             const resolvedContent = campaign.content
                 ? resolveMergeTags(campaign.content, personInfo, churchData)
