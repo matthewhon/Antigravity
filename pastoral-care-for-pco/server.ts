@@ -19,6 +19,7 @@ import { startBillingScheduler } from './backend/billingScheduler';
 import { getDb } from './backend/firebase';
 import { handleGeminiProxy } from './backend/geminiProxy';
 import { provisionSubuser, authenticateDomain, verifyDomain, diagnoseDomain } from './backend/emailProvisioning';
+import { handlePostmarkWebhook } from './backend/postmarkWebhook';
 import { getPublicGroups, getPublicRegistrations, getPublicEvents, serveWidgetScript, getPublicForms } from './backend/publicApi.js';
 import { getAvailableNumbers, provisionSmsNumber, releaseSpecificNumber, addSmsNumber, updateNumberSettings, setDefaultNumber, registerSmsBrand, registerSmsCampaign, getSmsRegistrationStatus, handleCampaignStatusWebhook, handleAssignmentStatusWebhook } from './backend/smsProvisioning';
 import { handleInboundSms } from './backend/smsInbound';
@@ -286,6 +287,10 @@ async function startServer() {
     app.post('/email/authenticate-domain', express.json(), authenticateDomain);
     app.post('/email/verify-domain', express.json(), verifyDomain);
     app.post('/email/diagnose-domain', express.json(), diagnoseDomain);
+
+    // Postmark inbound webhooks — bounce, spam complaint, unsubscribe suppression
+    // Configure this URL in: Postmark → Server → Webhooks → Bounce, SpamComplaint, SubscriptionChange
+    app.post('/email/webhooks/postmark', express.json(), handlePostmarkWebhook);
 
     // Integrations
     app.post('/api/integrations/grow/daily-email', express.json(), handleGrowDailyEmail);

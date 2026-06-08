@@ -80,7 +80,7 @@ export class PostmarkProvider implements EmailProvider {
     // ─── Send ─────────────────────────────────────────────────────────────────
 
     async send(messages: EmailMessage[], options: SendOptions): Promise<void> {
-        const { apiKey, tenantToken, tag, stream = 'broadcast' } = options;
+        const { apiKey, tenantToken, tag, stream = 'broadcast', churchId, campaignId } = options;
 
         // Use the per-server token if available; fall back to the account token
         // (account token cannot send mail — always prefer the server token)
@@ -107,6 +107,12 @@ export class PostmarkProvider implements EmailProvider {
                 MessageStream: messageStream,
                 TrackOpens: true,
                 TrackLinks: 'HtmlAndText',
+                // Metadata is echoed back in bounce/spam webhooks so we can
+                // identify the tenant and campaign without scanning all churches.
+                Metadata: {
+                    ...(churchId   ? { churchId }   : {}),
+                    ...(campaignId ? { campaignId } : {}),
+                },
             }));
 
             const endpoint = batch.length === 1 ? `${PM_API}/email` : `${PM_API}/email/batch`;

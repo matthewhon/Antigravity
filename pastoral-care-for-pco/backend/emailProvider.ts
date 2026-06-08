@@ -35,7 +35,13 @@ export interface SendOptions {
      *  'broadcast'     → bulk/campaign emails
      *  SendGrid ignores this (same API for both); Postmark routes to the correct message stream. */
     stream?: 'transactional' | 'broadcast';
+    /** Church tenant ID — echoed in Postmark Metadata so bounce webhooks can
+     *  identify which suppression list to update without scanning all churches. */
+    churchId?: string;
+    /** Campaign ID — echoed in Postmark Metadata for bounce analytics. */
+    campaignId?: string;
 }
+
 
 export interface DnsRecord {
     host: string;
