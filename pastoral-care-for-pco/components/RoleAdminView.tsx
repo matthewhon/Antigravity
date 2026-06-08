@@ -2460,7 +2460,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         disabled={isMailSaving}
                                         className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg disabled:opacity-50"
                                     >
-                                        {isMailSaving ? 'Configuring…' : church.emailSettings?.sendGridSubuserId ? 'Update Email Settings' : 'Activate Shared Email'}
+                                        {isMailSaving ? 'Configuring…' : (church.emailSettings?.sendGridSubuserId || church.emailSettings?.postmarkServerToken) ? 'Update Email Settings' : 'Activate Shared Email'}
                                     </button>
                                 </div>
                             </div>
@@ -2534,7 +2534,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             <h4 className="font-bold text-slate-900 dark:text-white text-sm">Add These DNS Records</h4>
                                         </div>
                                         <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
-                                            Add these 3 CNAME records in your DNS provider (GoDaddy, Namecheap, Cloudflare, etc.). DNS changes can take up to 48 hours to propagate.
+                                            Add these DNS records in your DNS provider (GoDaddy, Namecheap, Cloudflare, etc.). DNS changes can take up to 48 hours to propagate.
                                         </p>
 
                                         {mailCnameRecords.length > 0 ? (
@@ -2577,7 +2577,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         ) : (
                                             <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-xs text-amber-600 dark:text-amber-400">
                                                 <p className="font-bold mb-1">⚠ DNS records not cached locally</p>
-                                                <p>Your domain <strong>{church.emailSettings?.customDomain}</strong> is registered in SendGrid (Auth ID: {mailDomainAuthId}), but the CNAME records are not cached here. Click <strong>"Re-fetch DNS Records"</strong> in Step 1 to reload them.</p>
+                                                <p>Your domain <strong>{church.emailSettings?.customDomain}</strong> is registered with the email provider (Auth ID: {mailDomainAuthId}), but the DNS records are not cached here. Click <strong>"Re-fetch DNS Records"</strong> in Step 1 to reload them.</p>
                                             </div>
                                         )}
                                     </div>
@@ -2623,7 +2623,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             <span className="w-6 h-6 rounded-full bg-indigo-600 text-white text-[10px] font-black flex items-center justify-center">4</span>
                                             <div>
                                                 <h4 className="font-bold text-slate-900 dark:text-white text-sm">Diagnose SendGrid Setup & Send Test</h4>
-                                                <p className="text-[10px] text-slate-400 mt-0.5">Checks your full SendGrid configuration and sends a real test email to confirm delivery.</p>
+                                                <p className="text-[10px] text-slate-400 mt-0.5">Checks your full email provider configuration and sends a real test email to confirm delivery.</p>
                                             </div>
                                         </div>
 
