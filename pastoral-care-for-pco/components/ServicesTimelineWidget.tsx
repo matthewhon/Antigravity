@@ -1,5 +1,5 @@
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ServicesDashboardData, DetailedDonation } from '../types';
 
 interface ServicesTimelineWidgetProps {
@@ -7,6 +7,12 @@ interface ServicesTimelineWidgetProps {
     /** All raw donations (unfiltered) — used to build per-day giving totals */
     donations: DetailedDonation[];
     onRemove: () => void;
+}
+
+interface FundEntry {
+    fundName: string;
+    amount: number;
+    donorCount: number;
 }
 
 interface DayEntry {
@@ -23,6 +29,8 @@ interface DayEntry {
     }[];
     totalHeadcount: number;
     givingAmount: number;
+    /** Per-fund breakdown for this day's giving batch */
+    givingByFund: FundEntry[];
     /** True if there are no services — the entry came from a giving batch date */
     isGivingOnly: boolean;
     isToday: boolean;
@@ -36,6 +44,89 @@ const toLocalDateKey = (d: Date): string => {
     return `${y}-${m}-${day}`;
 };
 
+const fmt = (n: number) =>
+    n >= 1000 ? `$${(n / 1000).toFixed(1)}k` : `$${n.toLocaleString()}`;
+
+/** Expandable giving batch section showing per-fund breakdown */
+const GivingBatchBreakdown: React.FC<{
+    givingAmount: number;
+    givingByFund: FundEntry[];
+    isGivingOnly: boolean;
+    isFirst: boolean;
+}> = ({ givingAmount, givingByFund, isGivingOnly, isFirst }) => {
+    const [expanded, setExpanded] = useState(false);
+
+    if (givingAmount === 0) return null;
+
+    const hasFunds = givingByFund.length > 0;
+    const multipleФunds = givingByFund.length > 1;
+
+    return (
+        <div className="mt-2 rounded-xl border border-emerald-100 dark:border-emerald-800/40 bg-emerald-50/60 dark:bg-emerald-900/10 overflow-hidden">
+            {/* Batch header row */}
+            <button
+                onClick={() => hasFunds && setExpanded(e => !e)}
+                className={`w-full flex items-center justify-between px-3 py-2 text-left transition-colors ${
+                    hasFunds ? 'cursor-pointer hover:bg-emerald-100/60 dark:hover:bg-emerald-800/20' : 'cursor-default'
+                }`}
+            >
+                <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-emerald-500 dark:text-emerald-400 text-[11px]">💰</span>
+                    <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
+                        Giving Batch
+                    </span>
+                    {isGivingOnly && (
+                        <span className="text-[9px] text-slate-400 dark:text-slate-500">· no service</span>
+                    )}
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                    <span className="text-[10px] font-black text-emerald-700 dark:text-emerald-300">
+                        {fmt(givingAmount)}
+                    </span>
+                    {hasFunds && (
+                        <span className={`text-[9px] text-emerald-500 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}>
+                            ▾
+                        </span>
+                    )}
+                </div>
+            </button>
+
+            {/* Fund breakdown rows */}
+            {hasFunds && expanded && (
+                <div className="border-t border-emerald-100 dark:border-emerald-800/40 divide-y divide-emerald-100/60 dark:divide-emerald-800/20">
+                    {givingByFund.map(fund => (
+                        <div key={fund.fundName} className="flex items-center justify-between px-3 py-1.5">
+                            <div className="flex items-center gap-2 min-w-0">
+                                <span className="w-1 h-1 rounded-full bg-emerald-400 shrink-0" />
+                                <span className="text-[9px] font-semibold text-emerald-700 dark:text-emerald-400 truncate">
+                                    {fund.fundName}
+                                </span>
+                                <span className="text-[8px] text-slate-400 dark:text-slate-500 whitespace-nowrap shrink-0">
+                                    {fund.donorCount} {fund.donorCount === 1 ? 'gift' : 'gifts'}
+                                </span>
+                            </div>
+                            <span className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 shrink-0 ml-2">
+                                {fmt(fund.amount)}
+                            </span>
+                        </div>
+                    ))}
+                    {/* Total row if multiple funds */}
+                    {multipleФunds && (
+                        <div className="flex items-center justify-between px-3 py-1.5 bg-emerald-100/40 dark:bg-emerald-800/20">
+                            <span className="text-[9px] font-black text-emerald-800 dark:text-emerald-300 uppercase tracking-wider">
+                                Total
+                            </span>
+                            <span className="text-[9px] font-black text-emerald-800 dark:text-emerald-300">
+                                {fmt(givingAmount)}
+                            </span>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+};
+
 export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
     servicesData,
     donations,
@@ -45,14 +136,26 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
         const now = new Date();
         const todayKey = toLocalDateKey(now);
 
-        // ── 1. Build giving totals from raw DetailedDonation[] ──────────────────
+        // ── 1. Build giving totals AND per-fund breakdown by date ────────────────
         // Uses the donation's `date` field (YYYY-MM-DD) which corresponds to the
         // PCO batch creation date / payment received date.
         const givingByDate: Record<string, number> = {};
+        // fundMap: date → fundName → { amount, donorCount }
+        const fundMapByDate: Record<string, Record<string, { amount: number; donorCount: number }>> = {};
+
         donations.forEach(d => {
             const key = (d.date || '').slice(0, 10);
             if (key.length === 10 && key <= todayKey) {
                 givingByDate[key] = (givingByDate[key] || 0) + d.amount;
+
+                // Fund breakdown
+                if (!fundMapByDate[key]) fundMapByDate[key] = {};
+                const fundName = d.fundName || 'General';
+                if (!fundMapByDate[key][fundName]) {
+                    fundMapByDate[key][fundName] = { amount: 0, donorCount: 0 };
+                }
+                fundMapByDate[key][fundName].amount += d.amount;
+                fundMapByDate[key][fundName].donorCount += 1;
             }
         });
 
@@ -115,7 +218,7 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
             ...Object.keys(givingByDate),
         ]);
 
-        // ── 5. 5 most-recent past days, newest first ─────────────────────────────
+        // ── 5. 15 most-recent past days, newest first ─────────────────────────────
         const recentKeys = Array.from(allDateKeys)
             .filter(k => k <= todayKey)
             .sort()
@@ -125,6 +228,12 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
         return recentKeys.map(key => {
             const d = new Date(key + 'T12:00:00'); // noon prevents DST day drift
             const services = plansByDate[key] || [];
+
+            // Build sorted fund array: highest amount first
+            const fundEntries: FundEntry[] = Object.entries(fundMapByDate[key] || {})
+                .map(([fundName, v]) => ({ fundName, amount: v.amount, donorCount: v.donorCount }))
+                .sort((a, b) => b.amount - a.amount);
+
             return {
                 dateKey: key,
                 dayOfWeek: d.toLocaleDateString(undefined, { weekday: 'short' }).toUpperCase(),
@@ -133,6 +242,7 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
                 services,
                 totalHeadcount: headcountByDate[key] || 0,
                 givingAmount: givingByDate[key] || 0,
+                givingByFund: fundEntries,
                 isGivingOnly: services.length === 0,
                 isToday: key === todayKey,
             };
@@ -226,18 +336,10 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
                                                 ? 'bg-emerald-50/60 dark:bg-emerald-900/10 border-emerald-100 dark:border-emerald-900/30'
                                                 : 'bg-slate-50 dark:bg-slate-900/50 border-slate-100 dark:border-slate-800 hover:border-indigo-200 dark:hover:border-indigo-800'
                                     }`}>
-                                        {/* Service rows — or giving-only label */}
-                                        <div className="space-y-1 mb-2.5">
-                                            {day.isGivingOnly ? (
-                                                <div className="flex items-center gap-2">
-                                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
-                                                    <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
-                                                        Giving Batch
-                                                    </span>
-                                                    <span className="text-[9px] text-slate-400 dark:text-slate-500">· no service</span>
-                                                </div>
-                                            ) : (
-                                                day.services.map(svc => (
+                                        {/* Service rows — only shown for service days */}
+                                        {!day.isGivingOnly && (
+                                            <div className="space-y-1 mb-2.5">
+                                                {day.services.map(svc => (
                                                     <div key={svc.id} className="flex items-center justify-between gap-2">
                                                         <div className="flex items-center gap-2 min-w-0">
                                                             <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0" />
@@ -251,15 +353,14 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
                                                             </span>
                                                         )}
                                                     </div>
-                                                ))
-                                            )}
-                                        </div>
+                                                ))}
+                                            </div>
+                                        )}
 
-                                        {/* Stat pills */}
-                                        <div className="flex flex-wrap items-center gap-1.5">
-                                            {/* Headcount — only shown for service days */}
-                                            {!day.isGivingOnly && (
-                                                day.totalHeadcount > 0 ? (
+                                        {/* Stat pills — headcount + volunteers (service days only) */}
+                                        {!day.isGivingOnly && (
+                                            <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                                                {day.totalHeadcount > 0 ? (
                                                     <span className="inline-flex items-center gap-1 bg-violet-50 dark:bg-violet-900/20 border border-violet-100 dark:border-violet-800/30 px-2 py-0.5 rounded-lg text-[9px]">
                                                         <span>👥</span>
                                                         <span className="font-black text-violet-700 dark:text-violet-400">{day.totalHeadcount.toLocaleString()}</span>
@@ -270,32 +371,28 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
                                                         <span>👥</span>
                                                         <span>No headcount</span>
                                                     </span>
-                                                )
-                                            )}
+                                                )}
 
-                                            {/* Giving */}
-                                            {day.givingAmount > 0 && (
-                                                <span className="inline-flex items-center gap-1 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800/30 px-2 py-0.5 rounded-lg text-[9px]">
-                                                    <span>💰</span>
-                                                    <span className="font-black text-emerald-700 dark:text-emerald-400">
-                                                        ${day.givingAmount.toLocaleString()}
-                                                    </span>
-                                                    <span className="text-emerald-400 dark:text-emerald-500 font-medium">giving</span>
-                                                </span>
-                                            )}
+                                                {(() => {
+                                                    const v = day.services.reduce((s, sv) => s + sv.volunteersScheduled, 0);
+                                                    return v > 0 ? (
+                                                        <span className="inline-flex items-center gap-1 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800/30 px-2 py-0.5 rounded-lg text-[9px]">
+                                                            <span>🙋</span>
+                                                            <span className="font-black text-amber-700 dark:text-amber-400">{v}</span>
+                                                            <span className="text-amber-400 dark:text-amber-500 font-medium">volunteers</span>
+                                                        </span>
+                                                    ) : null;
+                                                })()}
+                                            </div>
+                                        )}
 
-                                            {/* Volunteers — only for service days */}
-                                            {!day.isGivingOnly && (() => {
-                                                const v = day.services.reduce((s, sv) => s + sv.volunteersScheduled, 0);
-                                                return v > 0 ? (
-                                                    <span className="inline-flex items-center gap-1 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800/30 px-2 py-0.5 rounded-lg text-[9px]">
-                                                        <span>🙋</span>
-                                                        <span className="font-black text-amber-700 dark:text-amber-400">{v}</span>
-                                                        <span className="text-amber-400 dark:text-amber-500 font-medium">volunteers</span>
-                                                    </span>
-                                                ) : null;
-                                            })()}
-                                        </div>
+                                        {/* Giving batch — grouped by fund */}
+                                        <GivingBatchBreakdown
+                                            givingAmount={day.givingAmount}
+                                            givingByFund={day.givingByFund}
+                                            isGivingOnly={day.isGivingOnly}
+                                            isFirst={isFirst}
+                                        />
                                     </div>
                                 </div>
                             );
