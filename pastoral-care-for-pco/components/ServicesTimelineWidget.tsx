@@ -54,46 +54,27 @@ const toLocalDateKey = (d: Date): string => {
 const fmtAmt = (n: number) =>
     n >= 1000 ? `$${(n / 1000).toFixed(1)}k` : `$${n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
-/** Expandable single-batch card */
-const BatchCard: React.FC<{ batch: BatchEntry; isServiceDay: boolean }> = ({ batch, isServiceDay }) => {
-    const [expanded, setExpanded] = useState(false);
-    const hasFunds = batch.fundBreakdown.length > 0;
+/** Batch card — always shows fund breakdown inline */
+const BatchCard: React.FC<{ batch: BatchEntry; isServiceDay: boolean }> = ({ batch }) => {
     const multiFund = batch.fundBreakdown.length > 1;
 
     return (
         <div className="rounded-xl border border-emerald-100 dark:border-emerald-800/40 bg-emerald-50/60 dark:bg-emerald-900/10 overflow-hidden">
             {/* Batch header */}
-            <button
-                onClick={() => hasFunds && setExpanded(e => !e)}
-                className={`w-full flex items-center justify-between px-3 py-2 text-left transition-colors ${
-                    hasFunds
-                        ? 'cursor-pointer hover:bg-emerald-100/60 dark:hover:bg-emerald-800/20'
-                        : 'cursor-default'
-                }`}
-            >
+            <div className="flex items-center justify-between px-3 py-2">
                 <div className="flex items-center gap-2 min-w-0">
                     <span className="text-[10px]">💰</span>
                     <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 truncate">
                         {batch.batchName}
                     </span>
                 </div>
-                <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                    <span className="text-[10px] font-black text-emerald-700 dark:text-emerald-300">
-                        {fmtAmt(batch.totalAmount)}
-                    </span>
-                    {hasFunds && (
-                        <span
-                            className="text-[9px] text-emerald-500 transition-transform duration-200"
-                            style={{ display: 'inline-block', transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
-                        >
-                            ▾
-                        </span>
-                    )}
-                </div>
-            </button>
+                <span className="text-[10px] font-black text-emerald-700 dark:text-emerald-300 shrink-0 ml-2">
+                    {fmtAmt(batch.totalAmount)}
+                </span>
+            </div>
 
-            {/* Fund breakdown */}
-            {hasFunds && expanded && (
+            {/* Fund breakdown — always visible */}
+            {batch.fundBreakdown.length > 0 && (
                 <div className="border-t border-emerald-100 dark:border-emerald-800/40 divide-y divide-emerald-100/60 dark:divide-emerald-800/20">
                     {batch.fundBreakdown.map(fund => (
                         <div key={fund.fundName} className="flex items-center justify-between px-3 py-1.5">
@@ -137,8 +118,10 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
         const todayKey = toLocalDateKey(now);
 
         // ── 1. Group donations by PCO batch ──────────────────────────────────────
-        // batchKey = batchId when present, otherwise "date_<YYYY-MM-DD>_unbatched"
-        // so same-date donations without a batch still group together per date.
+        // Priority:
+        //   1. batchId  — use the PCO Giving batch ID (populated after next sync)
+        //   2. paymentSource — group by payment method per date (Check / Online / Cash …)
+        //      This gives meaningful separate cards even before batchId is populated.
         const batchMap: Record<string, {
             batchName: string;
             date: string;
@@ -150,17 +133,24 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
             const dateKey = (d.date || '').slice(0, 10);
             if (dateKey.length !== 10 || dateKey > todayKey) return;
 
-            const batchKey = d.batchId
-                ? `batch_${d.batchId}`
-                : `date_${dateKey}_unbatched`;
+            let batchKey: string;
+            let batchName: string;
 
-            const defaultName = d.batchId
-                ? (d.batchName || `Batch ${d.batchId}`)
-                : 'Giving';
+            if (d.batchId) {
+                // Real PCO batch — use batch ID as the key
+                batchKey = `batch_${d.batchId}`;
+                batchName = d.batchName || `Batch ${d.batchId}`;
+            } else {
+                // No batch ID yet — group by paymentSource per date so we get
+                // separate cards for "Check", "Online", "Cash", etc.
+                const src = (d.paymentSource || 'Unknown').trim();
+                batchKey = `date_${dateKey}_src_${src}`;
+                batchName = src;
+            }
 
             if (!batchMap[batchKey]) {
                 batchMap[batchKey] = {
-                    batchName: defaultName,
+                    batchName,
                     date: dateKey,
                     funds: {},
                     totalAmount: 0,
@@ -172,8 +162,8 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
             // Keep the earliest date in case donations span multiple days (rare)
             if (dateKey < entry.date) entry.date = dateKey;
 
-            // Update batch name if we now have a real name
-            if (d.batchName && entry.batchName.startsWith('Batch ')) {
+            // Prefer a real batchName once we have one
+            if (d.batchId && d.batchName && !entry.batchName.startsWith('Batch ')) {
                 entry.batchName = d.batchName;
             }
 
