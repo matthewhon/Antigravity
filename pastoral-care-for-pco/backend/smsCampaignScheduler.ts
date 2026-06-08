@@ -84,6 +84,7 @@ async function resolveMockC1Recipients(
                     city: p.addresses?.[0]?.city || 'Atlanta',
                     state: p.addresses?.[0]?.state || 'GA',
                     pcoPersonId: p.id ? p.id.replace('c1_', '') : null,
+                    avatar: p.avatar || null,
                 };
             }
         }
@@ -113,6 +114,7 @@ async function resolveMockC1Recipients(
                             city: p.addresses?.[0]?.city || 'Atlanta',
                             state: p.addresses?.[0]?.state || 'GA',
                             pcoPersonId: p.id ? p.id.replace('c1_', '') : null,
+                            avatar: p.avatar || null,
                         };
                     }
                 }
@@ -256,6 +258,7 @@ export async function resolvePcoRecipients(
                     city:        cityByPersonId.get(personId)   || pAttrs.city || '',
                     state:       stateByPersonId.get(personId)  || pAttrs.state || '',
                     pcoPersonId: personId || null,
+                    avatar:      pAttrs.avatar || null,
                 };
             }
         }

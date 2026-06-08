@@ -47,6 +47,7 @@ export interface PersonInfo {
     state?:      string;
     /** PCO People person ID — used to write notes back to Planning Center after send. */
     pcoPersonId?: string | null;
+    avatar?:      string | null;
 }
 
 /** Replace merge tags with person-specific values. */
@@ -285,6 +286,49 @@ export async function sendIndividualInternal(params: {
     const convRef = db.collection('smsConversations').doc(convId);
     const now     = Date.now();
 
+    // Resolve person details (ID, Name, Avatar)
+    let resolvedPersonId: string | null = personId || null;
+    let resolvedPersonName: string | null = personName || null;
+    let resolvedPersonAvatar: string | null = null;
+
+    if (resolvedPersonId) {
+        try {
+            let personDoc = await db.collection('people').doc(resolvedPersonId).get();
+            if (!personDoc.exists && churchId === 'c1' && !resolvedPersonId.startsWith('c1_')) {
+                personDoc = await db.collection('people').doc(`c1_${resolvedPersonId}`).get();
+            }
+            if (personDoc.exists) {
+                const pData = personDoc.data();
+                if (!resolvedPersonName) resolvedPersonName = pData.name || null;
+                resolvedPersonAvatar = pData.avatar || null;
+                resolvedPersonId = churchId === 'c1' ? personDoc.id.replace('c1_', '') : personDoc.id;
+            }
+        } catch (e: any) {
+            log.warn(`Failed to fetch person doc by ID ${resolvedPersonId}: ${e.message}`, 'system', { churchId, resolvedPersonId }, churchId);
+        }
+    }
+
+    if (!resolvedPersonId || !resolvedPersonName || !resolvedPersonAvatar) {
+        try {
+            const peopleSnap = await db.collection('people')
+                .where('churchId', '==', churchId)
+                .where('e164Phone', '==', to)
+                .limit(1)
+                .get();
+            if (!peopleSnap.empty) {
+                const p = peopleSnap.docs[0].data();
+                const docId = peopleSnap.docs[0].id;
+                if (!resolvedPersonId) {
+                    resolvedPersonId = churchId === 'c1' ? docId.replace('c1_', '') : docId;
+                }
+                if (!resolvedPersonName) resolvedPersonName = p.name || null;
+                if (!resolvedPersonAvatar) resolvedPersonAvatar = p.avatar || null;
+            }
+        } catch (e: any) {
+            log.warn(`Failed to match person by phone ${to}: ${e.message}`, 'system', { churchId, to }, churchId);
+        }
+    }
+
     const convPatch: any = {
         id: convId, churchId, phoneNumber: to,
         lastMessageAt: now, lastMessageBody: body,
@@ -297,6 +341,10 @@ export async function sendIndividualInternal(params: {
         convPatch.inboxId       = resolvedNumberId;
         convPatch.toPhoneNumber = fromNumber;
     }
+    if (resolvedPersonId) convPatch.personId = resolvedPersonId;
+    if (resolvedPersonName) convPatch.personName = resolvedPersonName;
+    if (resolvedPersonAvatar) convPatch.personAvatar = resolvedPersonAvatar;
+
     await convRef.set(convPatch, { merge: true });
 
     const messageId = `msg_${now}_${Math.random().toString(36).slice(2, 8)}`;
@@ -312,25 +360,11 @@ export async function sendIndividualInternal(params: {
     log.info(`[Send] 1:1 message to ${to} from church ${churchId} (SID: ${msg.sid})`, 'system', { churchId, to }, churchId);
 
     // Write a note to Planning Center for the recipient (fire-and-forget — never blocks the send).
-    // Prefer the explicitly-supplied personId; fall back to the personId stored on the conversation doc
-    // (set by inbound handler / backfill) so replies in threads also get logged.
-    let resolvedPersonId: string | null = personId || null;
-    let resolvedPersonName: string | undefined = personName || undefined;
-    if (!resolvedPersonId) {
-        try {
-            const convSnap = await db.collection('smsConversations').doc(convId).get();
-            if (convSnap.exists) {
-                const cd = convSnap.data();
-                resolvedPersonId = cd?.personId || null;
-                if (!resolvedPersonName) resolvedPersonName = cd?.personName || undefined;
-            }
-        } catch { /* ignore — fallback is to skip note */ }
-    }
     fireAndForgetSmsNote({
         db,
         churchId,
         personId: resolvedPersonId,
-        recipientName: resolvedPersonName,
+        recipientName: resolvedPersonName || undefined,
         recipientPhone: to,
         senderName: sentByName || undefined,
         messageBody: body,
@@ -466,12 +500,26 @@ export async function sendBulkInternal(params: {
                 const convId  = `${churchId}_${to.replace(/\+/g, '')}`;
                 const convRef = db.collection('smsConversations').doc(convId);
                 const now     = Date.now();
+                const pInfo = (personMap as any)[to] as PersonInfo | undefined;
 
-                await convRef.set({
+                const convPatch: any = {
                     id: convId, churchId, phoneNumber: to,
                     lastMessageAt: now, lastMessageBody: resolved,
                     lastMessageDirection: 'outbound', isOptedOut: false,
-                }, { merge: true });
+                };
+                if (numberId) {
+                    convPatch.smsNumberId = numberId;
+                    convPatch.twilioNumberId = numberId;
+                    convPatch.inboxId = numberId;
+                    convPatch.toPhoneNumber = fromNumber;
+                }
+                if (pInfo) {
+                    if (pInfo.pcoPersonId) convPatch.personId = pInfo.pcoPersonId;
+                    if (pInfo.personName) convPatch.personName = pInfo.personName;
+                    if (pInfo.avatar) convPatch.personAvatar = pInfo.avatar;
+                }
+
+                await convRef.set(convPatch, { merge: true });
 
                 const messageId = `msg_${now}_${Math.random().toString(36).slice(2, 8)}`;
                 await convRef.collection('messages').doc(messageId).set({
@@ -486,7 +534,6 @@ export async function sendBulkInternal(params: {
                 sent++;
 
                 // Write PCO note for this recipient (fire-and-forget)
-                const pInfo = (personMap as any)[to] as PersonInfo | undefined;
                 if (pInfo?.pcoPersonId) {
                     fireAndForgetSmsNote({
                         db,

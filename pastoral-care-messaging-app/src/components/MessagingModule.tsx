@@ -376,12 +376,15 @@ interface ComposerProps {
     onSchedule: (campaign: SmsCampaign, scheduledAt: number, freq?: 'daily' | 'weekly' | 'monthly') => void;
     onCancelSchedule?: () => void;
     isSending: boolean;
+    activeNumberId?: string | null;
+    activeNumber?: TwilioPhoneNumber | null;
 }
 
 import { SimpleRichTextEditor } from './SimpleRichTextEditor';
 
 const CampaignComposer: React.FC<ComposerProps> = ({
     campaign, churchId, church, currentUser, onBack, onSave, onSend, onSchedule, onCancelSchedule, isSending,
+    activeNumberId, activeNumber,
 }) => {
     const [local, setLocal] = useState<SmsCampaign>(campaign);
     const [pcoLists, setPcoLists] = useState<{ id: string; name: string; total_people: number }[]>([]);
@@ -411,6 +414,12 @@ const CampaignComposer: React.FC<ComposerProps> = ({
         setLocal(prev => ({ ...prev, ...patch }));
         onSave(patch).then(() => setLastSaved(Date.now()));
     }, [onSave]);
+
+    useEffect(() => {
+        if (activeNumberId && local.twilioNumberId !== activeNumberId) {
+            update({ twilioNumberId: activeNumberId });
+        }
+    }, [activeNumberId, local.twilioNumberId, update]);
  
     /** Insert text at cursor position in the textarea */
     const insertAtCursor = (text: string) => {
@@ -580,6 +589,26 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                             </button>
                         </div>
                     </div>
+
+                    {/* Sending From (for SMS campaigns) */}
+                    {(!local.channelType || local.channelType === 'sms') && activeNumber && (
+                        <div>
+                            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">Sending Phone Number</label>
+                            <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl">
+                                <div className="p-1.5 rounded-lg bg-violet-50 dark:bg-violet-950/40 text-violet-600 dark:text-violet-400 shrink-0">
+                                    <Phone size={14} />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                                        {activeNumber.friendlyLabel || 'Main Line'}
+                                    </p>
+                                    <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">
+                                        {formatPhone(activeNumber.phoneNumber)}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Recipients */}
                     <div>
@@ -9000,6 +9029,8 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
                                 onSchedule={handleSchedule}
                                 onCancelSchedule={handleCancelSchedule}
                                 isSending={isSending}
+                                activeNumberId={activeNumberId}
+                                activeNumber={activeNumber}
                             />
                         )}
                     </div>

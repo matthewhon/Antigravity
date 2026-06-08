@@ -447,6 +447,22 @@ async function startServer() {
     app.get('/api/admin/backfill-sms', async (req: any, res: any) => {
         try {
             const db = getDb();
+            
+            // Load all SMS numbers to map churchId to default/first number
+            const numbersSnap = await db.collection('smsNumbers').get();
+            const churchNumbersMap = new Map(); // churchId -> { id, phoneNumber }
+            for (const doc of numbersSnap.docs) {
+                const numData = doc.data();
+                const churchId = numData.churchId;
+                if (!churchId) continue;
+                
+                const existing = churchNumbersMap.get(churchId);
+                // Prefer default number, or store if none yet
+                if (!existing || numData.isDefault) {
+                    churchNumbersMap.set(churchId, { id: doc.id, phoneNumber: numData.phoneNumber });
+                }
+            }
+
             const peopleSnap = await db.collection('people').get();
             const peopleMap = new Map(); // e164 -> person data
             
@@ -472,18 +488,37 @@ async function startServer() {
             
             for (const convDoc of convsSnap.docs) {
                 const conv = convDoc.data();
-                if (conv.personName) continue; // Already mapped
+                let needsUpdate = false;
+                const updatePatch: any = {};
                 
-                const phone = conv.phoneNumber;
-                if (!phone) continue;
+                // 1. Backfill Name and Avatar if missing
+                if (!conv.personName) {
+                    const phone = conv.phoneNumber;
+                    if (phone) {
+                        const match = peopleMap.get(`${conv.churchId}_${phone}`);
+                        if (match) {
+                            updatePatch.personId = match.id;
+                            updatePatch.personName = match.name || null;
+                            updatePatch.personAvatar = match.avatar || null;
+                            needsUpdate = true;
+                        }
+                    }
+                }
                 
-                const match = peopleMap.get(`${conv.churchId}_${phone}`);
-                if (match) {
-                    await convDoc.ref.update({
-                        personId: match.id,
-                        personName: match.name || null,
-                        personAvatar: match.avatar || null
-                    });
+                // 2. Backfill Routing / Line ID fields if missing
+                if (!conv.smsNumberId || !conv.inboxId) {
+                    const numInfo = churchNumbersMap.get(conv.churchId);
+                    if (numInfo) {
+                        updatePatch.smsNumberId = numInfo.id;
+                        updatePatch.twilioNumberId = numInfo.id;
+                        updatePatch.inboxId = numInfo.id;
+                        updatePatch.toPhoneNumber = numInfo.phoneNumber || null;
+                        needsUpdate = true;
+                    }
+                }
+                
+                if (needsUpdate) {
+                    await convDoc.ref.update(updatePatch);
                     convUpdates++;
                 }
             }
