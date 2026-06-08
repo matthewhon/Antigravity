@@ -430,6 +430,10 @@ export interface DetailedDonation {
     isRecurring: boolean;
     labels?: string[];
     paymentSource?: string;
+    /** PCO Batch ID this donation belongs to (from giving/v2/batches) */
+    batchId?: string;
+    /** Human-readable PCO batch name, e.g. "Sunday Offering 6/8" */
+    batchName?: string;
 }
 
 export interface AttendanceEventSummary {

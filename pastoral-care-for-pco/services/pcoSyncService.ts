@@ -1154,8 +1154,9 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
     // 2. Fetch Donations
     let donations: DetailedDonation[] = [];
     try {
-        // We still include designations to get the amounts and fund IDs
-        donations = await fetchAllPages(churchId, `giving/v2/donations?where[received_at][gte]=${since}&include=designations,labels,payment_source`, (d: any, included: any[] = []) => {
+        // We still include designations to get the amounts and fund IDs.
+        // batch is included so we can group donations by PCO batch in the timeline.
+        donations = await fetchAllPages(churchId, `giving/v2/donations?where[received_at][gte]=${since}&include=designations,labels,payment_source,batch`, (d: any, included: any[] = []) => {
             const donationDate = d.attributes.received_at;
             const donorId = d.relationships?.person?.data?.id || 'anonymous';
             const isRecurring = !!d.relationships?.recurring_donation?.data;
@@ -1167,6 +1168,18 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
                 const ps = included.find(i => i.type === 'PaymentSource' && String(i.id) === String(paymentSourceRef.id));
                 if (ps) {
                     paymentSource = ps.attributes?.name || ps.attributes?.method || 'Unknown';
+                }
+            }
+
+            // Resolve Batch
+            let batchId: string | undefined;
+            let batchName: string | undefined;
+            const batchRef = d.relationships?.batch?.data;
+            if (batchRef) {
+                batchId = String(batchRef.id);
+                const batchObj = included.find(i => i.type === 'Batch' && String(i.id) === batchId);
+                if (batchObj) {
+                    batchName = batchObj.attributes?.description || batchObj.attributes?.name || undefined;
                 }
             }
 
@@ -1199,7 +1212,9 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
                     donorName: 'Donor',
                     isRecurring,
                     labels,
-                    paymentSource
+                    paymentSource,
+                    batchId,
+                    batchName
                 }] as DetailedDonation[];
             }
 
@@ -1233,7 +1248,9 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
                         donorName: 'Donor', 
                         isRecurring,
                         labels,
-                        paymentSource
+                        paymentSource,
+                        batchId,
+                        batchName
                     });
                 }
             });

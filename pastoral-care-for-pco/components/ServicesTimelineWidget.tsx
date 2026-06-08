@@ -4,7 +4,7 @@ import { ServicesDashboardData, DetailedDonation } from '../types';
 
 interface ServicesTimelineWidgetProps {
     servicesData: ServicesDashboardData | null;
-    /** All raw donations (unfiltered) — used to build per-day giving totals */
+    /** All raw donations (unfiltered) — used to build per-batch giving totals */
     donations: DetailedDonation[];
     onRemove: () => void;
 }
@@ -15,12 +15,21 @@ interface FundEntry {
     donorCount: number;
 }
 
+/** A single PCO giving batch (or a synthetic "unbatched" grouping per date) */
+interface BatchEntry {
+    batchKey: string;   // batchId, or "date_<YYYY-MM-DD>_unbatched"
+    batchName: string;  // e.g. "Sunday Offering 6/8", or "Online Giving"
+    date: string;       // YYYY-MM-DD — the earliest received_at in this batch
+    totalAmount: number;
+    fundBreakdown: FundEntry[]; // sorted by amount desc
+}
+
 interface DayEntry {
+    /** Calendar date key — used purely for aligning with service plans */
     dateKey: string;
-    dayOfWeek: string;    // "SUN"
-    dayNum: string;       // "13"
-    monthAbbr: string;    // "APR"
-    /** Service plans on this day (empty if it's a giving-only day) */
+    dayOfWeek: string;
+    dayNum: string;
+    monthAbbr: string;
     services: {
         id: string;
         name: string;
@@ -28,10 +37,8 @@ interface DayEntry {
         volunteersScheduled: number;
     }[];
     totalHeadcount: number;
-    givingAmount: number;
-    /** Per-fund breakdown for this day's giving batch */
-    givingByFund: FundEntry[];
-    /** True if there are no services — the entry came from a giving batch date */
+    /** Batches that fall on this calendar date */
+    batches: BatchEntry[];
     isGivingOnly: boolean;
     isToday: boolean;
 }
@@ -44,57 +51,51 @@ const toLocalDateKey = (d: Date): string => {
     return `${y}-${m}-${day}`;
 };
 
-const fmt = (n: number) =>
-    n >= 1000 ? `$${(n / 1000).toFixed(1)}k` : `$${n.toLocaleString()}`;
+const fmtAmt = (n: number) =>
+    n >= 1000 ? `$${(n / 1000).toFixed(1)}k` : `$${n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
-/** Expandable giving batch section showing per-fund breakdown */
-const GivingBatchBreakdown: React.FC<{
-    givingAmount: number;
-    givingByFund: FundEntry[];
-    isGivingOnly: boolean;
-    isFirst: boolean;
-}> = ({ givingAmount, givingByFund, isGivingOnly, isFirst }) => {
+/** Expandable single-batch card */
+const BatchCard: React.FC<{ batch: BatchEntry; isServiceDay: boolean }> = ({ batch, isServiceDay }) => {
     const [expanded, setExpanded] = useState(false);
-
-    if (givingAmount === 0) return null;
-
-    const hasFunds = givingByFund.length > 0;
-    const multipleФunds = givingByFund.length > 1;
+    const hasFunds = batch.fundBreakdown.length > 0;
+    const multiFund = batch.fundBreakdown.length > 1;
 
     return (
-        <div className="mt-2 rounded-xl border border-emerald-100 dark:border-emerald-800/40 bg-emerald-50/60 dark:bg-emerald-900/10 overflow-hidden">
-            {/* Batch header row */}
+        <div className="rounded-xl border border-emerald-100 dark:border-emerald-800/40 bg-emerald-50/60 dark:bg-emerald-900/10 overflow-hidden">
+            {/* Batch header */}
             <button
                 onClick={() => hasFunds && setExpanded(e => !e)}
                 className={`w-full flex items-center justify-between px-3 py-2 text-left transition-colors ${
-                    hasFunds ? 'cursor-pointer hover:bg-emerald-100/60 dark:hover:bg-emerald-800/20' : 'cursor-default'
+                    hasFunds
+                        ? 'cursor-pointer hover:bg-emerald-100/60 dark:hover:bg-emerald-800/20'
+                        : 'cursor-default'
                 }`}
             >
                 <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-emerald-500 dark:text-emerald-400 text-[11px]">💰</span>
-                    <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
-                        Giving Batch
+                    <span className="text-[10px]">💰</span>
+                    <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 truncate">
+                        {batch.batchName}
                     </span>
-                    {isGivingOnly && (
-                        <span className="text-[9px] text-slate-400 dark:text-slate-500">· no service</span>
-                    )}
                 </div>
-                <div className="flex items-center gap-1.5 shrink-0">
+                <div className="flex items-center gap-1.5 shrink-0 ml-2">
                     <span className="text-[10px] font-black text-emerald-700 dark:text-emerald-300">
-                        {fmt(givingAmount)}
+                        {fmtAmt(batch.totalAmount)}
                     </span>
                     {hasFunds && (
-                        <span className={`text-[9px] text-emerald-500 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}>
+                        <span
+                            className="text-[9px] text-emerald-500 transition-transform duration-200"
+                            style={{ display: 'inline-block', transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                        >
                             ▾
                         </span>
                     )}
                 </div>
             </button>
 
-            {/* Fund breakdown rows */}
+            {/* Fund breakdown */}
             {hasFunds && expanded && (
                 <div className="border-t border-emerald-100 dark:border-emerald-800/40 divide-y divide-emerald-100/60 dark:divide-emerald-800/20">
-                    {givingByFund.map(fund => (
+                    {batch.fundBreakdown.map(fund => (
                         <div key={fund.fundName} className="flex items-center justify-between px-3 py-1.5">
                             <div className="flex items-center gap-2 min-w-0">
                                 <span className="w-1 h-1 rounded-full bg-emerald-400 shrink-0" />
@@ -106,18 +107,17 @@ const GivingBatchBreakdown: React.FC<{
                                 </span>
                             </div>
                             <span className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 shrink-0 ml-2">
-                                {fmt(fund.amount)}
+                                {fmtAmt(fund.amount)}
                             </span>
                         </div>
                     ))}
-                    {/* Total row if multiple funds */}
-                    {multipleФunds && (
+                    {multiFund && (
                         <div className="flex items-center justify-between px-3 py-1.5 bg-emerald-100/40 dark:bg-emerald-800/20">
                             <span className="text-[9px] font-black text-emerald-800 dark:text-emerald-300 uppercase tracking-wider">
                                 Total
                             </span>
                             <span className="text-[9px] font-black text-emerald-800 dark:text-emerald-300">
-                                {fmt(givingAmount)}
+                                {fmtAmt(batch.totalAmount)}
                             </span>
                         </div>
                     )}
@@ -136,28 +136,75 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
         const now = new Date();
         const todayKey = toLocalDateKey(now);
 
-        // ── 1. Build giving totals AND per-fund breakdown by date ────────────────
-        // Uses the donation's `date` field (YYYY-MM-DD) which corresponds to the
-        // PCO batch creation date / payment received date.
-        const givingByDate: Record<string, number> = {};
-        // fundMap: date → fundName → { amount, donorCount }
-        const fundMapByDate: Record<string, Record<string, { amount: number; donorCount: number }>> = {};
+        // ── 1. Group donations by PCO batch ──────────────────────────────────────
+        // batchKey = batchId when present, otherwise "date_<YYYY-MM-DD>_unbatched"
+        // so same-date donations without a batch still group together per date.
+        const batchMap: Record<string, {
+            batchName: string;
+            date: string;
+            funds: Record<string, { amount: number; donorCount: number }>;
+            totalAmount: number;
+        }> = {};
 
         donations.forEach(d => {
-            const key = (d.date || '').slice(0, 10);
-            if (key.length === 10 && key <= todayKey) {
-                givingByDate[key] = (givingByDate[key] || 0) + d.amount;
+            const dateKey = (d.date || '').slice(0, 10);
+            if (dateKey.length !== 10 || dateKey > todayKey) return;
 
-                // Fund breakdown
-                if (!fundMapByDate[key]) fundMapByDate[key] = {};
-                const fundName = d.fundName || 'General';
-                if (!fundMapByDate[key][fundName]) {
-                    fundMapByDate[key][fundName] = { amount: 0, donorCount: 0 };
-                }
-                fundMapByDate[key][fundName].amount += d.amount;
-                fundMapByDate[key][fundName].donorCount += 1;
+            const batchKey = d.batchId
+                ? `batch_${d.batchId}`
+                : `date_${dateKey}_unbatched`;
+
+            const defaultName = d.batchId
+                ? (d.batchName || `Batch ${d.batchId}`)
+                : 'Giving';
+
+            if (!batchMap[batchKey]) {
+                batchMap[batchKey] = {
+                    batchName: defaultName,
+                    date: dateKey,
+                    funds: {},
+                    totalAmount: 0,
+                };
             }
+
+            const entry = batchMap[batchKey];
+
+            // Keep the earliest date in case donations span multiple days (rare)
+            if (dateKey < entry.date) entry.date = dateKey;
+
+            // Update batch name if we now have a real name
+            if (d.batchName && entry.batchName.startsWith('Batch ')) {
+                entry.batchName = d.batchName;
+            }
+
+            entry.totalAmount += d.amount;
+
+            const fundName = d.fundName || 'General';
+            if (!entry.funds[fundName]) entry.funds[fundName] = { amount: 0, donorCount: 0 };
+            entry.funds[fundName].amount += d.amount;
+            entry.funds[fundName].donorCount += 1;
         });
+
+        // Convert batchMap → BatchEntry[], grouped by date
+        const batchesByDate: Record<string, BatchEntry[]> = {};
+        Object.entries(batchMap).forEach(([batchKey, v]) => {
+            const be: BatchEntry = {
+                batchKey,
+                batchName: v.batchName,
+                date: v.date,
+                totalAmount: v.totalAmount,
+                fundBreakdown: Object.entries(v.funds)
+                    .map(([fundName, fv]) => ({ fundName, amount: fv.amount, donorCount: fv.donorCount }))
+                    .sort((a, b) => b.amount - a.amount),
+            };
+            if (!batchesByDate[v.date]) batchesByDate[v.date] = [];
+            batchesByDate[v.date].push(be);
+        });
+
+        // Sort batches within each date by totalAmount desc
+        Object.values(batchesByDate).forEach(arr =>
+            arr.sort((a, b) => b.totalAmount - a.totalAmount)
+        );
 
         // ── 2. Headcount from checkIns.trends ───────────────────────────────────
         const headcountByDate: Record<string, number> = {};
@@ -185,7 +232,7 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
                     : new Date(plan.sortDate);
 
             const key = toLocalDateKey(planDate);
-            if (key > todayKey) return; // skip future
+            if (key > todayKey) return;
 
             if (!plansByDate[key]) plansByDate[key] = [];
 
@@ -211,14 +258,13 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
             });
         });
 
-        // ── 4. Merge service dates + giving-batch-only dates ─────────────────────
-        // Any date that has giving but no corresponding service still gets a row.
+        // ── 4. Merge all dates from plans + batches ──────────────────────────────
         const allDateKeys = new Set<string>([
             ...Object.keys(plansByDate),
-            ...Object.keys(givingByDate),
+            ...Object.keys(batchesByDate),
         ]);
 
-        // ── 5. 15 most-recent past days, newest first ─────────────────────────────
+        // ── 5. 15 most-recent past days, newest first ────────────────────────────
         const recentKeys = Array.from(allDateKeys)
             .filter(k => k <= todayKey)
             .sort()
@@ -226,13 +272,9 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
             .slice(0, 15);
 
         return recentKeys.map(key => {
-            const d = new Date(key + 'T12:00:00'); // noon prevents DST day drift
+            const d = new Date(key + 'T12:00:00');
             const services = plansByDate[key] || [];
-
-            // Build sorted fund array: highest amount first
-            const fundEntries: FundEntry[] = Object.entries(fundMapByDate[key] || {})
-                .map(([fundName, v]) => ({ fundName, amount: v.amount, donorCount: v.donorCount }))
-                .sort((a, b) => b.amount - a.amount);
+            const batches = batchesByDate[key] || [];
 
             return {
                 dateKey: key,
@@ -241,8 +283,7 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
                 monthAbbr: d.toLocaleDateString(undefined, { month: 'short' }).toUpperCase(),
                 services,
                 totalHeadcount: headcountByDate[key] || 0,
-                givingAmount: givingByDate[key] || 0,
-                givingByFund: fundEntries,
+                batches,
                 isGivingOnly: services.length === 0,
                 isToday: key === todayKey,
             };
@@ -272,7 +313,7 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
                         Church Timeline
                     </h4>
                     <p className="text-[9px] font-bold text-indigo-400 uppercase tracking-widest mt-0.5">
-                        Last 15 Days · Services &amp; Giving · Most Recent First
+                        Last 15 Days · Services &amp; Giving Batches · Most Recent First
                     </p>
                 </div>
                 <span className="text-lg">🗓️</span>
@@ -293,7 +334,8 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
 
                     <div className="space-y-4">
                         {days.map((day, idx) => {
-                            const isFirst = idx === 0; // most recent
+                            const isFirst = idx === 0;
+                            const hasBatches = day.batches.length > 0;
                             const dotCls = isFirst
                                 ? 'bg-indigo-500 ring-2 ring-indigo-200 dark:ring-indigo-800 shadow shadow-indigo-300 dark:shadow-indigo-700'
                                 : day.isGivingOnly
@@ -336,7 +378,7 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
                                                 ? 'bg-emerald-50/60 dark:bg-emerald-900/10 border-emerald-100 dark:border-emerald-900/30'
                                                 : 'bg-slate-50 dark:bg-slate-900/50 border-slate-100 dark:border-slate-800 hover:border-indigo-200 dark:hover:border-indigo-800'
                                     }`}>
-                                        {/* Service rows — only shown for service days */}
+                                        {/* Service rows */}
                                         {!day.isGivingOnly && (
                                             <div className="space-y-1 mb-2.5">
                                                 {day.services.map(svc => (
@@ -357,9 +399,9 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
                                             </div>
                                         )}
 
-                                        {/* Stat pills — headcount + volunteers (service days only) */}
+                                        {/* Headcount + volunteer stat pills */}
                                         {!day.isGivingOnly && (
-                                            <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                                            <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
                                                 {day.totalHeadcount > 0 ? (
                                                     <span className="inline-flex items-center gap-1 bg-violet-50 dark:bg-violet-900/20 border border-violet-100 dark:border-violet-800/30 px-2 py-0.5 rounded-lg text-[9px]">
                                                         <span>👥</span>
@@ -372,7 +414,6 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
                                                         <span>No headcount</span>
                                                     </span>
                                                 )}
-
                                                 {(() => {
                                                     const v = day.services.reduce((s, sv) => s + sv.volunteersScheduled, 0);
                                                     return v > 0 ? (
@@ -386,13 +427,18 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
                                             </div>
                                         )}
 
-                                        {/* Giving batch — grouped by fund */}
-                                        <GivingBatchBreakdown
-                                            givingAmount={day.givingAmount}
-                                            givingByFund={day.givingByFund}
-                                            isGivingOnly={day.isGivingOnly}
-                                            isFirst={isFirst}
-                                        />
+                                        {/* Giving batches — one card per batch */}
+                                        {hasBatches && (
+                                            <div className="space-y-1.5">
+                                                {day.batches.map(batch => (
+                                                    <BatchCard
+                                                        key={batch.batchKey}
+                                                        batch={batch}
+                                                        isServiceDay={!day.isGivingOnly}
+                                                    />
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             );
