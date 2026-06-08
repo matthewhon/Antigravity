@@ -122,6 +122,15 @@ export interface Church {
         sendGridSubuserId?: string;
         /** SendGrid API key scoped to this church's Subuser */
         sendGridSubuserApiKey?: string;
+        // Postmark Server isolation
+        /** Postmark Server API token — used as X-Postmark-Server-Token for all sends */
+        postmarkServerToken?: string;
+        /** Postmark Server ID — used for server management via Account API */
+        postmarkServerId?: number;
+        /** Postmark Domain ID — used for domain verification and management */
+        postmarkDomainId?: number;
+        /** DNS records to display to the admin (provider-agnostic: CNAME or TXT records) */
+        dnsRecords?: { host: string; type: 'CNAME' | 'TXT'; data: string; label?: string }[];
     };
     /** PCO sync & display preferences */
     pcoSettings?: {
@@ -527,10 +536,22 @@ export interface SystemSettings {
     scheduledSyncTime?: string;
     // AI Features
     geminiApiKey?: string;
+    // Email Delivery — provider-agnostic fields
+    /** Which email provider is active. Defaults to 'sendgrid' if not set. Change this flag
+     *  in Firestore (system/settings.emailProvider) to switch providers live without a deploy. */
+    emailProvider?: 'sendgrid' | 'postmark';
     // SendGrid Email Delivery
     sendGridApiKey?: string;
     sendGridFromEmail?: string; // Must be a verified sender in SendGrid (e.g. hello@mychurch.org)
     sendGridFromName?: string;  // Default "From Name" if campaign doesn't specify one
+    // Postmark Email Delivery
+    /** Postmark Account API token — used for Server provisioning and domain management.
+     *  Find in postmarkapp.com → Account → API Tokens. NOT the server token. */
+    postmarkApiKey?: string;
+    /** Default From email when sending via Postmark (must be on a verified domain or the shared domain). */
+    postmarkFromEmail?: string;
+    /** Default From name when sending via Postmark. */
+    postmarkFromName?: string;
     // -- SignalWire SMS ---------------------------------------------------------
     /** SignalWire Project ID (UUID) � from Dashboard ? API ? API Tokens */
     signalwireProjectId?: string;

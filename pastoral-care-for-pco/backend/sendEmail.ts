@@ -2,6 +2,7 @@ import { getDb } from './firebase';
 import { createServerLogger } from '../services/logService';
 import { refreshCampaignBlocks } from './emailScheduler';
 import { fireAndForgetEmailNote } from './pcoNotes';
+import { resolveEmailProvider } from './emailProvider.js';
 
 // ─── SendGrid v3 raw send helper ─────────────────────────────────────────────
 // We use fetch() directly instead of @sendgrid/mail so we can set the
@@ -933,12 +934,23 @@ export async function executeSend(
     // 1. Load system settings (global/fallback)
     const settingsSnap = await db.doc('system/settings').get();
     const settings = settingsSnap.data() || {};
-    const globalApiKey: string = settings.sendGridApiKey || '';
-    const globalFromEmail: string = settings.sendGridFromEmail || '';
-    const globalFromName: string = settings.sendGridFromName || 'Church';
+    const emailProvider = settings.emailProvider || 'sendgrid';
+    const globalApiKey: string =
+        emailProvider === 'postmark'
+            ? (settings.postmarkApiKey || '')
+            : (settings.sendGridApiKey || '');
+    const globalFromEmail: string =
+        emailProvider === 'postmark'
+            ? (settings.postmarkFromEmail || '')
+            : (settings.sendGridFromEmail || '');
+    const globalFromName: string =
+        emailProvider === 'postmark'
+            ? (settings.postmarkFromName || 'Church')
+            : (settings.sendGridFromName || 'Church');
 
-    if (churchId !== 'c1' && (!globalApiKey || !globalApiKey.startsWith('SG.'))) {
-        throw new Error('SendGrid is not configured. Please add your API key in App Config → System Settings.');
+    if (churchId !== 'c1' && !globalApiKey) {
+        const label = emailProvider === 'postmark' ? 'Postmark' : 'SendGrid';
+        throw new Error(`${label} is not configured. Please add your API key in App Config → System Settings → Email.`);
     }
 
     // 2. Load church to check for tenant-specific email configuration
@@ -961,7 +973,10 @@ export async function executeSend(
     // NOTE: Our pre-send guard (domainVerified check above) ensures we never reach this
     // point for unverified custom domains, so the association is guaranteed to have run.
     const isCustomDomainMode = tenantEmail.mode === 'custom';
-    const subuserId: string | undefined = tenantEmail.sendGridSubuserId || undefined;
+    // Resolve the per-church tenant token: Postmark server token takes precedence over
+    // SendGrid subuser ID so the correct one is used after the provider switch.
+    const subuserId: string | undefined =
+        tenantEmail.postmarkServerToken || tenantEmail.sendGridSubuserId || undefined;
 
     // Guard: if custom domain is configured but not yet DNS-verified, fail early with a
     // clear message rather than letting SendGrid return a cryptic Sender Identity error.
@@ -1100,7 +1115,7 @@ export async function executeSend(
         }
     }
 
-    // 7. Send via SendGrid — each recipient gets a personalised unsubscribe link,
+    // 7. Send — each recipient gets a personalised unsubscribe link,
     //    so we build per-recipient HTML and send in batches of individual messages.
     const BATCH = 50; // smaller batches since each message has unique HTML
     for (let i = 0; i < recipients.length; i += BATCH) {
@@ -1144,11 +1159,10 @@ export async function executeSend(
             if (churchId === 'c1') {
                 log.info(`[Simulation] Simulated sending email to ${recipientEmail} with subject: ${resolvedSubject}`, 'system', { campaignId, churchId }, churchId);
             } else {
-                await sgSend(
+                const provider = await resolveEmailProvider(db);
+                await provider.send(
                     [{ to: recipientEmail, from: { email: resolvedFromEmail, name: resolvedFromName }, replyTo: campaign.replyTo || undefined, subject: resolvedSubject, html: personalizedHtml }],
-                    globalApiKey,
-                    subuserId,
-                    campaignId
+                    { apiKey: globalApiKey, tenantToken: subuserId, tag: campaignId, stream: 'broadcast' }
                 );
             }
 
@@ -1220,12 +1234,22 @@ export const sendEmail = async (req: any, res: any) => {
             const log = createServerLogger(db);
             const settingsSnap = await db.doc('system/settings').get();
             const settings = settingsSnap.data() || {};
-            const globalApiKey: string = settings.sendGridApiKey || '';
-            const globalFromEmail: string = settings.sendGridFromEmail || '';
-            const globalFromName: string = settings.sendGridFromName || 'Church';
+            const globalApiKey: string =
+                (settings.emailProvider === 'postmark')
+                    ? (settings.postmarkApiKey || '')
+                    : (settings.sendGridApiKey || '');
+            const globalFromEmail: string =
+                settings.emailProvider === 'postmark'
+                    ? (settings.postmarkFromEmail || '')
+                    : (settings.sendGridFromEmail || '');
+            const globalFromName: string =
+                settings.emailProvider === 'postmark'
+                    ? (settings.postmarkFromName || 'Church')
+                    : (settings.sendGridFromName || 'Church');
 
-            if (churchId !== 'c1' && (!globalApiKey || !globalApiKey.startsWith('SG.'))) {
-                throw new Error('SendGrid is not configured. Please add your API key in App Config → System Settings.');
+            if (churchId !== 'c1' && !globalApiKey) {
+                const label = settings.emailProvider === 'postmark' ? 'Postmark' : 'SendGrid';
+                throw new Error(`${label} is not configured. Please add your API key in App Config → System Settings.`);
             }
 
             const churchSnap = await db.collection('churches').doc(churchId).get();
@@ -1233,7 +1257,8 @@ export const sendEmail = async (req: any, res: any) => {
             const churchData = churchSnap.data() || {};
             const tenantEmail = churchData.emailSettings || {};
             const isCustomDomainMode = tenantEmail.mode === 'custom';
-            const subuserId: string | undefined = tenantEmail.sendGridSubuserId || undefined;
+            const subuserId: string | undefined =
+                tenantEmail.postmarkServerToken || tenantEmail.sendGridSubuserId || undefined;
 
             if (churchId !== 'c1' && isCustomDomainMode && !tenantEmail.domainVerified) {
                 throw new Error(`Custom domain not verified`);
@@ -1273,11 +1298,10 @@ export const sendEmail = async (req: any, res: any) => {
                 if (churchId === 'c1') {
                     log.info(`[Simulation] Simulated sending ad-hoc email to ${email} with subject: ${resolvedSubject}`, 'system', { churchId }, churchId);
                 } else {
-                    await sgSend(
+                    const provider = await resolveEmailProvider(db);
+                    await provider.send(
                         [{ to: email, from: { email: resolvedFromEmail, name: resolvedFromName }, subject: resolvedSubject, html: personalizedHtml }],
-                        globalApiKey,
-                        subuserId,
-                        campaignId || 'workflow_adhoc'
+                        { apiKey: globalApiKey, tenantToken: subuserId, tag: campaignId || 'workflow_adhoc', stream: 'broadcast' }
                     );
                 }
             }

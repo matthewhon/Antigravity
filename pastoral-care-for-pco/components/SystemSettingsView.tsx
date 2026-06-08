@@ -403,35 +403,100 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                         </div>
                     </div>
 
-                    {/* SendGrid */}
+                    {/* Email Delivery — Provider Switch */}
                     <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
                         <div className="flex items-center justify-between mb-1">
-                            <h3 className="text-sm font-black text-slate-900 dark:text-white">SendGrid</h3>
-                            {settings.sendGridApiKey?.startsWith('SG.') ? (
-                                <span className="text-[9px] font-black bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">ACTIVE</span>
+                            <h3 className="text-sm font-black text-slate-900 dark:text-white">Email Delivery</h3>
+                            {settings.emailProvider === 'postmark' ? (
+                                settings.postmarkApiKey ? (
+                                    <span className="text-[9px] font-black bg-violet-500/20 text-violet-600 dark:text-violet-400 px-2 py-0.5 rounded-full border border-violet-500/30">POSTMARK ✓</span>
+                                ) : (
+                                    <span className="text-[9px] font-black bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/30">POSTMARK — INCOMPLETE</span>
+                                )
                             ) : (
-                                <span className="text-[9px] font-black bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/30">INCOMPLETE</span>
+                                settings.sendGridApiKey?.startsWith('SG.') ? (
+                                    <span className="text-[9px] font-black bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">SENDGRID ✓</span>
+                                ) : (
+                                    <span className="text-[9px] font-black bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/30">SENDGRID — INCOMPLETE</span>
+                                )
                             )}
                         </div>
-                        <p className="text-[10px] text-slate-400 mb-5 leading-relaxed">Master account — each tenant gets an isolated Subuser for reputation separation.</p>
+
+                        {/* Provider Toggle */}
+                        <div className="mb-4">
+                            <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Active Provider</label>
+                            <div className="flex gap-2">
+                                <button
+                                    id="email-provider-sendgrid"
+                                    onClick={() => handleChange('emailProvider', 'sendgrid')}
+                                    className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${(!settings.emailProvider || settings.emailProvider === 'sendgrid') ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-300 dark:border-emerald-700' : 'bg-slate-50 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:border-slate-300'}`}
+                                >
+                                    SendGrid
+                                </button>
+                                <button
+                                    id="email-provider-postmark"
+                                    onClick={() => handleChange('emailProvider', 'postmark')}
+                                    className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${settings.emailProvider === 'postmark' ? 'bg-violet-50 dark:bg-violet-900/20 text-violet-600 dark:text-violet-400 border-violet-300 dark:border-violet-700' : 'bg-slate-50 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:border-slate-300'}`}
+                                >
+                                    Postmark
+                                </button>
+                            </div>
+                            <p className="text-[9px] text-slate-400 mt-1.5">
+                                Switching is instant — both sets of credentials are saved. No code deploy needed.
+                            </p>
+                        </div>
+
                         <div className="space-y-3">
-                            <div>
-                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Master API Key</label>
-                                <input type="password" value={settings.sendGridApiKey || ''} onChange={e => handleChange('sendGridApiKey', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="SG.xxxxxxxxxxxxxxxx" />
-                                <p className="text-[9px] text-slate-400 mt-1.5">Find in <a href="https://app.sendgrid.com/settings/api_keys" target="_blank" rel="noopener noreferrer" className="underline text-indigo-400 hover:text-indigo-300">SendGrid → Settings → API Keys</a>. Requires Full Access.</p>
-                            </div>
-                            <div>
-                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Shared Subdomain</label>
-                                <div className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-600 dark:text-slate-400 select-all">pastoralcare.barnabassoftware.com</div>
-                            </div>
-                            <div>
-                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Fallback From Email</label>
-                                <input type="email" value={settings.sendGridFromEmail || ''} onChange={e => handleChange('sendGridFromEmail', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="noreply@pastoralcare.barnabassoftware.com" />
-                            </div>
-                            <div>
-                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Fallback From Name</label>
-                                <input type="text" value={settings.sendGridFromName || ''} onChange={e => handleChange('sendGridFromName', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Pastoral Care" />
-                            </div>
+                            {/* SendGrid Fields */}
+                            {(!settings.emailProvider || settings.emailProvider === 'sendgrid') && (
+                                <>
+                                    <div>
+                                        <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Master API Key</label>
+                                        <input type="password" value={settings.sendGridApiKey || ''} onChange={e => handleChange('sendGridApiKey', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="SG.xxxxxxxxxxxxxxxx" />
+                                        <p className="text-[9px] text-slate-400 mt-1.5">Find in <a href="https://app.sendgrid.com/settings/api_keys" target="_blank" rel="noopener noreferrer" className="underline text-indigo-400 hover:text-indigo-300">SendGrid → Settings → API Keys</a>. Requires Full Access.</p>
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Shared Subdomain</label>
+                                        <div className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-600 dark:text-slate-400 select-all">pastoralcare.barnabassoftware.com</div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Fallback From Email</label>
+                                        <input type="email" value={settings.sendGridFromEmail || ''} onChange={e => handleChange('sendGridFromEmail', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="noreply@pastoralcare.barnabassoftware.com" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Fallback From Name</label>
+                                        <input type="text" value={settings.sendGridFromName || ''} onChange={e => handleChange('sendGridFromName', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Pastoral Care" />
+                                    </div>
+                                </>
+                            )}
+
+                            {/* Postmark Fields */}
+                            {settings.emailProvider === 'postmark' && (
+                                <>
+                                    <div>
+                                        <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Account API Token</label>
+                                        <input type="password" id="postmark-api-key" value={settings.postmarkApiKey || ''} onChange={e => handleChange('postmarkApiKey', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-violet-500" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
+                                        <p className="text-[9px] text-slate-400 mt-1.5">Find in <a href="https://account.postmarkapp.com/account/edit" target="_blank" rel="noopener noreferrer" className="underline text-violet-400 hover:text-violet-300">Postmark → Account → API Tokens</a>. This is the Account token, not a Server token.</p>
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Shared Subdomain</label>
+                                        <div className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-600 dark:text-slate-400 select-all">pastoralcare.barnabassoftware.com</div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Fallback From Email</label>
+                                        <input type="email" id="postmark-from-email" value={settings.postmarkFromEmail || ''} onChange={e => handleChange('postmarkFromEmail', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-violet-500" placeholder="noreply@pastoralcare.barnabassoftware.com" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Fallback From Name</label>
+                                        <input type="text" id="postmark-from-name" value={settings.postmarkFromName || ''} onChange={e => handleChange('postmarkFromName', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-violet-500" placeholder="Pastoral Care" />
+                                    </div>
+                                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                                        <p className="text-[9px] text-slate-500 leading-relaxed">
+                                            💡 <strong>Plan required:</strong> Use the <strong>Platform plan</strong> ($18/mo) for unlimited custom sending domains — required for multi-tenant use. <a href="https://postmarkapp.com/pricing" target="_blank" rel="noopener noreferrer" className="underline text-violet-400 hover:text-violet-300">See pricing →</a>
+                                        </p>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </div>
 

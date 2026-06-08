@@ -1,5 +1,6 @@
 import { getDb } from './firebase.js';
 import { sgSend } from './sendEmail.js';
+import { resolveEmailProvider } from './emailProvider.js';
 import { createServerLogger } from '../services/logService.js';
 
 /** Helper: generate a cryptographically-random 32-byte hex string */
@@ -185,15 +186,25 @@ export async function handleGrowDailyEmail(req: any, res: any) {
     const log = createServerLogger(db as any);
 
     try {
-        // 1. Fetch global SendGrid API key
+        // 1. Fetch global email API key (provider-aware)
         const settingsSnap = await db.doc('system/settings').get();
         const settings = settingsSnap.data() || {};
-        const globalApiKey: string = settings.sendGridApiKey || '';
-        const globalFromEmail: string = settings.sendGridFromEmail || '';
-        const globalFromName: string = settings.sendGridFromName || 'Church';
+        const emailProvider = settings.emailProvider || 'sendgrid';
+        const globalApiKey: string =
+            emailProvider === 'postmark'
+                ? (settings.postmarkApiKey || '')
+                : (settings.sendGridApiKey || '');
+        const globalFromEmail: string =
+            emailProvider === 'postmark'
+                ? (settings.postmarkFromEmail || '')
+                : (settings.sendGridFromEmail || '');
+        const globalFromName: string =
+            emailProvider === 'postmark'
+                ? (settings.postmarkFromName || 'Church')
+                : (settings.sendGridFromName || 'Church');
 
         if (!globalApiKey) {
-            return res.status(500).json({ error: 'SendGrid is not configured globally.' });
+            return res.status(500).json({ error: 'Email provider is not configured globally.' });
         }
 
         // 2. Fetch Church/Tenant specific email settings
@@ -215,7 +226,8 @@ export async function handleGrowDailyEmail(req: any, res: any) {
 
         const tenantEmail = churchData.emailSettings || {};
         const isCustomDomainMode = tenantEmail.mode === 'custom';
-        const subuserId: string | undefined = tenantEmail.sendGridSubuserId || undefined;
+        const subuserId: string | undefined =
+            tenantEmail.postmarkServerToken || tenantEmail.sendGridSubuserId || undefined;
 
         // Guard against unverified custom domains
         if (isCustomDomainMode && !tenantEmail.domainVerified) {
@@ -253,7 +265,8 @@ export async function handleGrowDailyEmail(req: any, res: any) {
 
             try {
                 // Send individually to allow full HTML personalization for reading plans, etc.
-                await sgSend([msg], globalApiKey, subuserId, 'grow_daily_email');
+                const provider = await resolveEmailProvider(db);
+                await provider.send([msg], { apiKey: globalApiKey, tenantToken: subuserId, tag: 'grow_daily_email', stream: 'broadcast' });
                 successCount++;
             } catch (err: any) {
                 errors.push(`Failed to send to ${email}: ${err.message}`);

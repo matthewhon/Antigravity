@@ -2,6 +2,7 @@
 import Stripe from 'stripe';
 import { getDb } from './firebase';
 import { sgSend } from './sendEmail';
+import { resolveEmailProvider } from './emailProvider.js';
 
 // ─── Stripe Plan metadata ──────────────────────────────────────────────────────
 const PLAN_NAMES: Record<string, string> = {
@@ -272,13 +273,23 @@ export const handleStripeWebhook = async (req: any, res: any) => {
                 const planName  = PLAN_NAMES[planId]  || 'Premium';
                 const planPrice = PLAN_PRICES[planId] || '';
 
-                // Get SendGrid config from system settings
-                const sgKey      = (settings.sendGridApiKey || '').trim();
-                const fromEmail  = (settings.sendGridFromEmail || 'noreply@barnabassoftware.com').trim();
-                const fromName   = (settings.sendGridFromName  || 'Pastoral Care for PCO').trim();
+                // Get email config from system settings (provider-aware)
+                const emailProvider = settings.emailProvider || 'sendgrid';
+                const sgKey      =
+                    emailProvider === 'postmark'
+                        ? (settings.postmarkApiKey || '').trim()
+                        : (settings.sendGridApiKey || '').trim();
+                const fromEmail  =
+                    emailProvider === 'postmark'
+                        ? (settings.postmarkFromEmail || 'noreply@barnabassoftware.com').trim()
+                        : (settings.sendGridFromEmail || 'noreply@barnabassoftware.com').trim();
+                const fromName   =
+                    emailProvider === 'postmark'
+                        ? (settings.postmarkFromName  || 'Pastoral Care for PCO').trim()
+                        : (settings.sendGridFromName  || 'Pastoral Care for PCO').trim();
 
                 if (!sgKey) {
-                    console.warn('[StripeWebhook] invoice.paid: SendGrid not configured, skipping receipt email');
+                    console.warn('[StripeWebhook] invoice.paid: Email provider not configured, skipping receipt email');
                     break;
                 }
 
@@ -290,12 +301,18 @@ export const handleStripeWebhook = async (req: any, res: any) => {
                     invoiceUrl,
                 });
 
-                await sgSend([{
+                const provider = await resolveEmailProvider(db);
+                await provider.send([{
                     to:      toEmail,
                     from:    { email: fromEmail, name: fromName },
                     subject: `✅ Receipt: ${planName} Plan — ${amountPaid} – Pastoral Care for PCO`,
                     html,
-                }], sgKey);
+                }], {
+                    // Receipt emails are system-level (no per-church tenant token)
+                    // and must use the transactional stream for reliable delivery.
+                    apiKey: sgKey,
+                    stream: 'transactional',
+                });
 
                 console.log(`[StripeWebhook] Receipt sent to ${toEmail} for church ${churchDoc.id} (${planName}, ${amountPaid})`);
 
