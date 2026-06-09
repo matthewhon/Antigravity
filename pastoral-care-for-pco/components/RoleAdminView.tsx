@@ -2349,6 +2349,9 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
 
             const activeRecords = mailWizardProvider === 'postmark' ? mailDnsRecords : mailCnameRecords;
             const hasRecords = activeRecords.length > 0;
+            const activeDomainId = mailWizardProvider === 'postmark' 
+                ? (church.emailSettings?.postmarkDomainId ? String(church.emailSettings.postmarkDomainId) : '') 
+                : (church.emailSettings?.domainAuthId || mailDomainAuthId);
 
             return (
                 <div className="space-y-8 animate-in fade-in">
@@ -2575,13 +2578,13 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             disabled={isMailSaving || !mailCustomDomain.trim()}
                                             className="bg-violet-600 hover:bg-violet-700 text-white px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg disabled:opacity-40"
                                         >
-                                            {isMailSaving ? 'Requesting…' : (hasRecords || mailDomainAuthId) ? 'Re-fetch DNS Records' : 'Get DNS Records'}
+                                            {isMailSaving ? 'Requesting…' : (hasRecords || activeDomainId) ? 'Re-fetch DNS Records' : 'Get DNS Records'}
                                         </button>
                                     </div>
                                 </div>
 
                                 {/* Step 2: CNAME / DNS Records */}
-                                {(hasRecords || mailDomainAuthId) && (
+                                {(hasRecords || activeDomainId) && (
                                     <div className="p-6 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
                                         <div className="flex items-center gap-2 mb-4">
                                             <span className="w-6 h-6 rounded-full bg-indigo-600 text-white text-[10px] font-black flex items-center justify-center">2</span>
@@ -2640,7 +2643,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 )}
 
                                 {/* Step 3: Verify */}
-                                {(hasRecords || mailDomainAuthId) && (
+                                {(hasRecords || activeDomainId) && (
                                     <div className="p-6 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-2">
@@ -2673,7 +2676,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 )}
 
                                 {/* Step 4: Diagnose & Test */}
-                                {(hasRecords || mailDomainAuthId) && (
+                                {(hasRecords || activeDomainId) && (
                                     <div className="p-6 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
                                         <div className="flex items-center gap-2 mb-4">
                                             <span className="w-6 h-6 rounded-full bg-indigo-600 text-white text-[10px] font-black flex items-center justify-center">4</span>
