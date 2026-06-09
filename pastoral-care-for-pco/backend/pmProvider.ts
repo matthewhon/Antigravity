@@ -51,21 +51,26 @@ function extractDnsRecords(data: any): DnsRecord[] {
     const records: DnsRecord[] = [];
 
     // DKIM: Postmark returns DKIMHost (hostname) + DKIMTextValue (the TXT value)
-    if (data.DKIMHost && data.DKIMTextValue) {
+    // or DKIMPendingHost + DKIMPendingTextValue if pending/rotating.
+    const dkimHost = data.DKIMPendingHost || data.DKIMHost;
+    const dkimText = data.DKIMPendingTextValue || data.DKIMTextValue;
+    if (dkimHost && dkimText) {
         records.push({
-            host: data.DKIMHost,
+            host: dkimHost,
             type: 'TXT',
-            data: data.DKIMTextValue,
+            data: dkimText,
             label: 'DKIM',
         });
     }
 
-    // Return-Path: Postmark returns ReturnPathDomain (host) + ReturnPathCNAMEValue (target)
-    if (data.ReturnPathDomain && data.ReturnPathCNAMEValue) {
+    // Return-Path: Postmark returns ReturnPathDomain (host) + ReturnPathDomainCNAMEValue (target) or ReturnPathCNAMEValue
+    const rpHost = data.ReturnPathDomain;
+    const rpValue = data.ReturnPathDomainCNAMEValue || data.ReturnPathCNAMEValue;
+    if (rpHost && rpValue) {
         records.push({
-            host: data.ReturnPathDomain,
+            host: rpHost,
             type: 'CNAME',
-            data: data.ReturnPathCNAMEValue,
+            data: rpValue,
             label: 'Return-Path',
         });
     }
