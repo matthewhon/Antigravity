@@ -217,6 +217,45 @@ export class PostmarkProvider implements EmailProvider {
         const church = churchSnap.data() || {};
         const existingSettings = church.emailSettings || {};
 
+        // Auto-provision a dedicated Postmark Server for this tenant if one does not exist yet
+        let serverToken = existingSettings.postmarkServerToken;
+        let serverId = existingSettings.postmarkServerId;
+
+        if (!serverToken) {
+            log.info(`No Postmark Server found for ${churchId} during domain authentication. Auto-provisioning server...`, 'system', { churchId }, churchId);
+            const serverName = `pco_${churchId.replace(/[^a-z0-9]/gi, '').substring(0, 20).toLowerCase()}`;
+            try {
+                const createRes = await fetch(`${PM_API}/servers`, {
+                    method: 'POST',
+                    headers: pmAccountHeaders(accountToken),
+                    body: JSON.stringify({
+                        Name: serverName,
+                        Color: 'Blue',
+                        SmtpApiActivated: false,
+                    }),
+                });
+
+                if (!createRes.ok) {
+                    const errBody = await createRes.json().catch(() => ({}));
+                    const errMsg = (errBody as any)?.Message || `Postmark returned ${createRes.status}`;
+                    throw new Error(`Auto-provisioning Server failed: ${errMsg}`);
+                }
+
+                const serverData = await createRes.json();
+                serverId = serverData.ID;
+                serverToken = serverData.ApiTokens?.[0]?.Token;
+
+                if (!serverToken) {
+                    throw new Error('Postmark Server created but no API token returned.');
+                }
+                
+                log.info(`Auto-created Postmark Server "${serverName}" (ID: ${serverId}) for ${churchId}`, 'system', { churchId, serverId }, churchId);
+            } catch (serverErr: any) {
+                log.error(`Failed to auto-create Postmark Server: ${serverErr.message}`, 'system', { churchId }, churchId);
+                throw new Error(`Postmark Server creation is required before domain setup: ${serverErr.message}`);
+            }
+        }
+
         // Check if domain is already registered in Postmark
         if (existingSettings.postmarkDomainId) {
             // Fetch fresh DNS records from the existing domain registration
@@ -235,6 +274,8 @@ export class PostmarkProvider implements EmailProvider {
                         fromName: fromName || existingSettings.fromName || church.name || 'Church',
                         dnsRecords,
                         domainVerified: false,
+                        ...(serverToken ? { postmarkServerToken: serverToken } : {}),
+                        ...(serverId ? { postmarkServerId: serverId } : {}),
                     },
                 });
                 log.info(`Reusing existing Postmark domain registration for ${domain}`, 'system', { churchId }, churchId);
@@ -269,6 +310,8 @@ export class PostmarkProvider implements EmailProvider {
                 postmarkDomainId: domainId,
                 dnsRecords,
                 domainVerified: false,
+                ...(serverToken ? { postmarkServerToken: serverToken } : {}),
+                ...(serverId ? { postmarkServerId: serverId } : {}),
             },
         });
 
