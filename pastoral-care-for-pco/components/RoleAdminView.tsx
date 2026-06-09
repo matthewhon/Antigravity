@@ -577,12 +577,14 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Mail Settings state
+  const [mailWizardProvider, setMailWizardProvider] = useState<'sendgrid' | 'postmark'>(church.emailSettings?.postmarkServerToken ? 'postmark' : 'sendgrid');
   const [mailMode, setMailMode] = useState<'shared' | 'custom'>(church.emailSettings?.mode || 'shared');
   const [mailPrefix, setMailPrefix] = useState(church.emailSettings?.sharedPrefix || '');
   const [mailFromName, setMailFromName] = useState(church.emailSettings?.fromName || church.name || '');
   const [mailCustomDomain, setMailCustomDomain] = useState(church.emailSettings?.customDomain || '');
   const [mailCustomFromEmail, setMailCustomFromEmail] = useState(church.emailSettings?.fromEmail || '');
   const [mailCnameRecords, setMailCnameRecords] = useState<{ host: string; type: 'CNAME'; data: string }[]>(church.emailSettings?.cnameRecords || []);
+  const [mailDnsRecords, setMailDnsRecords] = useState<{ host: string; type: 'CNAME' | 'TXT'; data: string; label?: string }[]>(church.emailSettings?.dnsRecords || []);
   const [mailDomainAuthId, setMailDomainAuthId] = useState<string>(church.emailSettings?.domainAuthId || '');
   const [mailDomainVerified, setMailDomainVerified] = useState(church.emailSettings?.domainVerified || false);
   const [mailAdditionalSenders, setMailAdditionalSenders] = useState<{name: string, email: string}[]>(church.emailSettings?.additionalSenders || []);
@@ -775,6 +777,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
           setMailCustomDomain(es.customDomain || '');
           setMailCustomFromEmail(es.fromEmail || '');
           setMailCnameRecords(es.cnameRecords || []);
+          setMailDnsRecords(es.dnsRecords || []);
           setMailDomainAuthId(es.domainAuthId || '');
           setMailDomainVerified(es.domainVerified || false);
           setMailAdditionalSenders(es.additionalSenders || []);
@@ -2225,7 +2228,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                     const res = await fetch(`${apiBase}/email/provision-subuser`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ churchId, prefix: mailPrefix.trim(), fromName: mailFromName.trim() }),
+                        body: JSON.stringify({ churchId, prefix: mailPrefix.trim(), fromName: mailFromName.trim(), provider: mailWizardProvider }),
                     });
                     const data = await res.json();
                     if (!res.ok) throw new Error(data.error || 'Provisioning failed');
@@ -2255,11 +2258,13 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                             domain: mailCustomDomain.trim().toLowerCase(),
                             fromEmail: mailCustomFromEmail.trim() || undefined,
                             fromName: mailFromName.trim() || undefined,
+                            provider: mailWizardProvider,
                         }),
                     });
                     const data = await res.json();
                     if (!res.ok) throw new Error(data.error || 'Domain auth failed');
                     setMailCnameRecords(data.cnameRecords || []);
+                    setMailDnsRecords(data.dnsRecords || data.cnameRecords || []);
                     if (data.domainAuthId) setMailDomainAuthId(String(data.domainAuthId));
                     setMailMessage({ type: 'success', text: data.message });
                     if (onUpdateChurch) {
@@ -2281,14 +2286,16 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                     const res = await fetch(`${apiBase}/email/verify-domain`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ churchId }),
+                        body: JSON.stringify({ churchId, provider: mailWizardProvider }),
                     });
                     const data = await res.json();
                     if (!res.ok) throw new Error(data.error || 'Verification failed');
                     setMailDomainVerified(data.verified);
-                    // Also refresh CNAME records if backend returned them
                     if (data.cnameRecords && data.cnameRecords.length > 0) {
                         setMailCnameRecords(data.cnameRecords);
+                    }
+                    if (data.dnsRecords && data.dnsRecords.length > 0) {
+                        setMailDnsRecords(data.dnsRecords);
                     }
                     setMailMessage({ type: data.verified ? 'success' : 'error', text: data.message });
                     if (onUpdateChurch) {
@@ -2315,7 +2322,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                     const res = await fetch(`${apiBase}/email/diagnose-domain`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ churchId, testEmailAddress: mailDiagEmail.trim() }),
+                        body: JSON.stringify({ churchId, testEmailAddress: mailDiagEmail.trim(), provider: mailWizardProvider }),
                     });
                     const data = await res.json();
                     if (!res.ok) throw new Error(data.error || 'Diagnosis failed');
@@ -2340,6 +2347,9 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
 
             const copyToClipboard = (text: string) => navigator.clipboard.writeText(text);
 
+            const activeRecords = mailWizardProvider === 'postmark' ? mailDnsRecords : mailCnameRecords;
+            const hasRecords = activeRecords.length > 0;
+
             return (
                 <div className="space-y-8 animate-in fade-in">
 
@@ -2355,6 +2365,44 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                     Configure how your church appears in outgoing emails. Choose between a shared address on our domain, or verify your own domain for full brand control.
                                 </p>
                             </div>
+                        </div>
+
+                        {/* Provider Toggle */}
+                        <div className="flex border-b border-slate-100 dark:border-slate-800 mb-8 pb-4 gap-6">
+                            <button
+                                onClick={() => {
+                                    setMailWizardProvider('sendgrid');
+                                    setMailMessage(null);
+                                    setMailDiagChecks(null);
+                                }}
+                                className={`pb-2 text-xs font-bold transition-all relative ${
+                                    mailWizardProvider === 'sendgrid'
+                                        ? 'text-indigo-600 dark:text-indigo-400 font-black'
+                                        : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-350'
+                                }`}
+                            >
+                                Twilio SendGrid
+                                {mailWizardProvider === 'sendgrid' && (
+                                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 dark:bg-indigo-400 rounded-full" />
+                                )}
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setMailWizardProvider('postmark');
+                                    setMailMessage(null);
+                                    setMailDiagChecks(null);
+                                }}
+                                className={`pb-2 text-xs font-bold transition-all relative ${
+                                    mailWizardProvider === 'postmark'
+                                        ? 'text-indigo-600 dark:text-indigo-400 font-black'
+                                        : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-350'
+                                }`}
+                            >
+                                Postmark
+                                {mailWizardProvider === 'postmark' && (
+                                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 dark:bg-indigo-400 rounded-full" />
+                                )}
+                            </button>
                         </div>
 
                         {mailMessage && (
@@ -2406,7 +2454,10 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                     <span className="text-[9px] font-black bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 px-1.5 py-0.5 rounded-full">Full Brand Control</span>
                                 </div>
                                 <p className="text-xs text-slate-500 dark:text-slate-400 ml-8 leading-relaxed">
-                                    Send from your own domain (e.g. <code className="font-mono bg-slate-100 dark:bg-slate-800 px-1 rounded">contact@mychurch.org</code>). Requires adding 3 CNAME records to your DNS.
+                                    {mailWizardProvider === 'postmark'
+                                        ? <>Send from your own domain (e.g. <code className="font-mono bg-slate-100 dark:bg-slate-800 px-1 rounded">contact@mychurch.org</code>). Requires adding 2 DNS records (DKIM TXT + Return-Path CNAME) to your DNS.</>
+                                        : <>Send from your own domain (e.g. <code className="font-mono bg-slate-100 dark:bg-slate-800 px-1 rounded">contact@mychurch.org</code>). Requires adding 3 CNAME records to your DNS.</>
+                                    }
                                 </p>
                             </button>
                         </div>
@@ -2478,7 +2529,10 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         {church.emailSettings?.customDomain && (
                                             <span className="ml-auto text-[10px] font-bold text-slate-500 dark:text-slate-400 font-mono bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded-lg">
                                                 Currently: {church.emailSettings.customDomain}
-                                                {church.emailSettings.domainAuthId ? ` · Auth #${church.emailSettings.domainAuthId}` : ''}
+                                                {mailWizardProvider === 'postmark'
+                                                    ? (church.emailSettings.postmarkDomainId ? ` · Postmark ID #${church.emailSettings.postmarkDomainId}` : '')
+                                                    : (church.emailSettings.domainAuthId ? ` · SendGrid ID #${church.emailSettings.domainAuthId}` : '')
+                                                }
                                             </span>
                                         )}
                                     </div>
@@ -2521,13 +2575,13 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             disabled={isMailSaving || !mailCustomDomain.trim()}
                                             className="bg-violet-600 hover:bg-violet-700 text-white px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg disabled:opacity-40"
                                         >
-                                            {isMailSaving ? 'Requesting…' : (mailCnameRecords.length > 0 || mailDomainAuthId) ? 'Re-fetch DNS Records' : 'Get DNS Records'}
+                                            {isMailSaving ? 'Requesting…' : (hasRecords || mailDomainAuthId) ? 'Re-fetch DNS Records' : 'Get DNS Records'}
                                         </button>
                                     </div>
                                 </div>
 
-                                {/* Step 2: CNAME Records */}
-                                {(mailCnameRecords.length > 0 || mailDomainAuthId) && (
+                                {/* Step 2: CNAME / DNS Records */}
+                                {(hasRecords || mailDomainAuthId) && (
                                     <div className="p-6 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
                                         <div className="flex items-center gap-2 mb-4">
                                             <span className="w-6 h-6 rounded-full bg-indigo-600 text-white text-[10px] font-black flex items-center justify-center">2</span>
@@ -2537,7 +2591,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             Add these DNS records in your DNS provider (GoDaddy, Namecheap, Cloudflare, etc.). DNS changes can take up to 48 hours to propagate.
                                         </p>
 
-                                        {mailCnameRecords.length > 0 ? (
+                                        {hasRecords ? (
                                             <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
                                                 <table className="w-full text-xs">
                                                     <thead className="bg-slate-100 dark:bg-slate-800">
@@ -2549,10 +2603,12 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                         </tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
-                                                        {mailCnameRecords.map((r, i) => (
+                                                        {activeRecords.map((r, i) => (
                                                             <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                                                                 <td className="px-4 py-3">
-                                                                    <span className="font-black text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/20 px-2 py-0.5 rounded text-[10px]">{r.type}</span>
+                                                                    <span className="font-black text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/20 px-2 py-0.5 rounded text-[10px]">
+                                                                        {r.type}{r.label ? ` (${r.label})` : ''}
+                                                                    </span>
                                                                 </td>
                                                                 <td className="px-4 py-3">
                                                                     <code className="font-mono text-slate-700 dark:text-slate-300 text-[11px] break-all">{r.host}</code>
@@ -2577,14 +2633,14 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         ) : (
                                             <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-xs text-amber-600 dark:text-amber-400">
                                                 <p className="font-bold mb-1">⚠ DNS records not cached locally</p>
-                                                <p>Your domain <strong>{church.emailSettings?.customDomain}</strong> is registered with the email provider (Auth ID: {mailDomainAuthId}), but the DNS records are not cached here. Click <strong>"Re-fetch DNS Records"</strong> in Step 1 to reload them.</p>
+                                                <p>Your domain <strong>{church.emailSettings?.customDomain}</strong> is registered with the email provider, but the DNS records are not cached here. Click <strong>"Re-fetch DNS Records"</strong> in Step 1 to reload them.</p>
                                             </div>
                                         )}
                                     </div>
                                 )}
 
                                 {/* Step 3: Verify */}
-                                {(mailCnameRecords.length > 0 || mailDomainAuthId) && (
+                                {(hasRecords || mailDomainAuthId) && (
                                     <div className="p-6 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-2">
@@ -2617,12 +2673,12 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 )}
 
                                 {/* Step 4: Diagnose & Test */}
-                                {(mailCnameRecords.length > 0 || mailDomainAuthId) && (
+                                {(hasRecords || mailDomainAuthId) && (
                                     <div className="p-6 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
                                         <div className="flex items-center gap-2 mb-4">
                                             <span className="w-6 h-6 rounded-full bg-indigo-600 text-white text-[10px] font-black flex items-center justify-center">4</span>
                                             <div>
-                                                <h4 className="font-bold text-slate-900 dark:text-white text-sm">Diagnose SendGrid Setup & Send Test</h4>
+                                                <h4 className="font-bold text-slate-900 dark:text-white text-sm">Diagnose {mailWizardProvider === 'postmark' ? 'Postmark' : 'SendGrid'} Setup & Send Test</h4>
                                                 <p className="text-[10px] text-slate-400 mt-0.5">Checks your full email provider configuration and sends a real test email to confirm delivery.</p>
                                             </div>
                                         </div>
@@ -2776,12 +2832,21 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                     {/* Info card */}
                     <div className="bg-indigo-900/10 dark:bg-indigo-900/20 p-6 rounded-2xl border border-indigo-500/20">
                         <h4 className="font-bold text-indigo-400 mb-2 text-sm">📬 How Email Delivery Works</h4>
-                        <ul className="text-xs text-slate-400 space-y-1.5 list-disc list-inside leading-relaxed">
-                            <li>Each church gets an isolated SendGrid account (Subuser), so your reputation is separate from other tenants.</li>
-                            <li>The <strong>Shared Subdomain</strong> option lets you start sending immediately — no DNS changes required.</li>
-                            <li>The <strong>Custom Domain</strong> option improves deliverability by authenticating your brand with DKIM/SPF through SendGrid's domain authentication.</li>
-                            <li>Individual email campaigns can still override the From name and address on a per-campaign basis.</li>
-                        </ul>
+                        {mailWizardProvider === 'postmark' ? (
+                            <ul className="text-xs text-slate-400 space-y-1.5 list-disc list-inside leading-relaxed">
+                                <li>Each church gets an isolated Postmark Server, so your reputation is separate from other tenants.</li>
+                                <li>The <strong>Shared Subdomain</strong> option lets you start sending immediately — no DNS changes required.</li>
+                                <li>The <strong>Custom Domain</strong> option improves deliverability by authenticating your brand with DKIM/Return-Path through Postmark's domain authentication.</li>
+                                <li>Individual email campaigns can still override the From name and address on a per-campaign basis.</li>
+                            </ul>
+                        ) : (
+                            <ul className="text-xs text-slate-400 space-y-1.5 list-disc list-inside leading-relaxed">
+                                <li>Each church gets an isolated SendGrid account (Subuser), so your reputation is separate from other tenants.</li>
+                                <li>The <strong>Shared Subdomain</strong> option lets you start sending immediately — no DNS changes required.</li>
+                                <li>The <strong>Custom Domain</strong> option improves deliverability by authenticating your brand with DKIM/SPF through SendGrid's domain authentication.</li>
+                                <li>Individual email campaigns can still override the From name and address on a per-campaign basis.</li>
+                            </ul>
+                        )}
                     </div>
                 </div>
             );

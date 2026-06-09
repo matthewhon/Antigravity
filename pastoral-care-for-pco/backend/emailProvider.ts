@@ -91,9 +91,10 @@ export interface EmailProvider {
  *   const provider = await resolveEmailProvider(db);
  *   await provider.send(messages, options);
  */
-export async function resolveEmailProvider(db: any): Promise<EmailProvider> {
-    const snap = await db.doc('system/settings').get();
-    const providerName: string = snap.data()?.emailProvider || 'sendgrid';
+export async function resolveEmailProvider(db: any, overrideName?: string): Promise<EmailProvider> {
+    const providerName = (overrideName === 'postmark' || overrideName === 'sendgrid')
+        ? overrideName
+        : (await db.doc('system/settings').get()).data()?.emailProvider || 'sendgrid';
 
     if (providerName === 'postmark') {
         return new PostmarkProvider();

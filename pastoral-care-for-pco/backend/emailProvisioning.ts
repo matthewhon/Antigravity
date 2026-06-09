@@ -23,7 +23,7 @@ function handleCors(req: any, res: any, method = 'POST'): boolean {
 export const provisionSubuser = async (req: any, res: any) => {
     if (handleCors(req, res)) return;
 
-    const { churchId, prefix, fromName } = req.body || {};
+    const { churchId, prefix, fromName, provider: providerName } = req.body || {};
     if (!churchId || !prefix) {
         return res.status(400).json({ error: 'Missing churchId or prefix' });
     }
@@ -37,7 +37,7 @@ export const provisionSubuser = async (req: any, res: any) => {
     const log = createServerLogger(db);
 
     try {
-        const provider = await resolveEmailProvider(db);
+        const provider = await resolveEmailProvider(db, providerName);
         const result = await provider.provisionTenant(db, churchId, cleanPrefix, fromName || '');
 
         log.info(`Email provisioned for ${churchId}: ${result.fromEmail}`, 'system', { churchId }, churchId);
@@ -62,7 +62,7 @@ export const provisionSubuser = async (req: any, res: any) => {
 export const authenticateDomain = async (req: any, res: any) => {
     if (handleCors(req, res)) return;
 
-    const { churchId, domain, fromEmail, fromName } = req.body || {};
+    const { churchId, domain, fromEmail, fromName, provider: providerName } = req.body || {};
     if (!churchId || !domain) {
         return res.status(400).json({ error: 'Missing churchId or domain' });
     }
@@ -71,7 +71,7 @@ export const authenticateDomain = async (req: any, res: any) => {
     const log = createServerLogger(db);
 
     try {
-        const provider = await resolveEmailProvider(db);
+        const provider = await resolveEmailProvider(db, providerName);
         const dnsRecords = await provider.authenticateDomain(db, churchId, domain, fromEmail, fromName);
 
         log.info(`Domain auth configured for ${churchId}: ${domain}`, 'system', { churchId, domain }, churchId);
@@ -96,7 +96,7 @@ export const authenticateDomain = async (req: any, res: any) => {
 export const verifyDomain = async (req: any, res: any) => {
     if (handleCors(req, res)) return;
 
-    const { churchId } = req.body || {};
+    const { churchId, provider: providerName } = req.body || {};
     if (!churchId) {
         return res.status(400).json({ error: 'Missing churchId' });
     }
@@ -105,7 +105,7 @@ export const verifyDomain = async (req: any, res: any) => {
     const log = createServerLogger(db);
 
     try {
-        const provider = await resolveEmailProvider(db);
+        const provider = await resolveEmailProvider(db, providerName);
         const result = await provider.verifyDomain(db, churchId);
 
         log.info(`Domain verification for ${churchId}: ${result.verified ? 'VERIFIED' : 'PENDING'}`, 'system', { churchId }, churchId);
@@ -132,7 +132,7 @@ export const verifyDomain = async (req: any, res: any) => {
 export const diagnoseDomain = async (req: any, res: any) => {
     if (handleCors(req, res)) return;
 
-    const { churchId, testEmailAddress } = req.body || {};
+    const { churchId, testEmailAddress, provider: providerName } = req.body || {};
     if (!churchId) return res.status(400).json({ error: 'Missing churchId' });
     if (!testEmailAddress || !testEmailAddress.includes('@')) {
         return res.status(400).json({ error: 'Missing or invalid testEmailAddress' });
@@ -142,7 +142,7 @@ export const diagnoseDomain = async (req: any, res: any) => {
     const log = createServerLogger(db);
 
     try {
-        const provider = await resolveEmailProvider(db);
+        const provider = await resolveEmailProvider(db, providerName);
         const result = await provider.diagnoseDomain(db, churchId, testEmailAddress);
 
         const allPassed = result.checks.every(c => c.status !== 'fail');
