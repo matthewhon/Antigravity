@@ -604,7 +604,8 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                         />
                     </div>
 
-                    {/* Channel Toggle */}
+                    {/* Channel Toggle - Temporarily Hidden per user request */}
+                    {/*
                     <div>
                         <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">Broadcast Type</label>
                         <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
@@ -622,6 +623,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                             </button>
                         </div>
                     </div>
+                    */}
 
                     {/* Sending From (for SMS campaigns) */}
                     {(!local.channelType || local.channelType === 'sms') && activeNumber && (
