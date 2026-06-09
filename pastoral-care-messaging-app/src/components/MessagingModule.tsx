@@ -415,6 +415,15 @@ const CampaignComposer: React.FC<ComposerProps> = ({
         onSave(patch).then(() => setLastSaved(Date.now()));
     }, [onSave]);
 
+    const [step, setStep] = useState<1|2|3|4>(1);
+    const [isDesktop, setIsDesktop] = useState(() => window.innerWidth >= 768);
+
+    useEffect(() => {
+        const handler = () => setIsDesktop(window.innerWidth >= 768);
+        window.addEventListener('resize', handler);
+        return () => window.removeEventListener('resize', handler);
+    }, []);
+
     useEffect(() => {
         if (activeNumberId && local.twilioNumberId !== activeNumberId) {
             update({ twilioNumberId: activeNumberId });
@@ -504,14 +513,25 @@ const CampaignComposer: React.FC<ComposerProps> = ({
 
     const recipientLabel = local.toGroupName ? `Group: ${local.toGroupName}` : local.toListName || '';
 
+    const showStep1 = isDesktop || step === 1;
+    const showStep2 = isDesktop || step === 2;
+    const showStep3 = isDesktop || step === 3;
+    const showStep4 = isDesktop || step === 4;
+
     return (
         <div className="flex flex-col h-full w-full max-w-full overflow-x-hidden">
             {/* Header */}
             <div className="flex flex-wrap items-center gap-2 px-3 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shrink-0">
                 <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <button onClick={onBack} title="Back to campaigns" className="p-1.5 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition shrink-0">
-                        <ArrowLeft size={18} />
-                    </button>
+                    {!isDesktop && step > 1 ? (
+                        <button onClick={() => setStep(s => (s - 1) as 1|2|3|4)} title="Back step" className="p-1.5 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition shrink-0">
+                            <ArrowLeft size={18} />
+                        </button>
+                    ) : (
+                        <button onClick={onBack} title="Back to campaigns" className="p-1.5 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition shrink-0">
+                            <ArrowLeft size={18} />
+                        </button>
+                    )}
                     <div className="flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400 min-w-0">
                         <span className="cursor-pointer hover:text-violet-600 font-medium hidden sm:inline" onClick={onBack}>Campaigns</span>
                         <ChevronDown size={14} className="-rotate-90 hidden sm:block" />
@@ -524,32 +544,43 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                     )}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                    {local.status === 'scheduled' && onCancelSchedule && (
+                    {(!isDesktop && step < 4) ? (
                         <button
-                            onClick={onCancelSchedule}
-                            disabled={isSending}
-                            className="flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-xl transition border border-rose-200 dark:border-rose-800 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20"
+                            onClick={() => setStep(s => (s + 1) as 1|2|3|4)}
+                            className="flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-xl transition bg-violet-600 hover:bg-violet-700 text-white shadow-md shadow-violet-200 dark:shadow-violet-900/40"
                         >
-                            <X size={14} /> Cancel Schedule
+                            Next <ChevronRight size={14} />
                         </button>
-                    )}
-                    {local.status !== 'scheduled' && (
-                        <button
-                            onClick={() => setShowSchedule(true)}
-                            disabled={!canSend || isSending}
-                            className={`flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-xl transition border ${canSend && !isSending ? 'border-amber-400 text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100' : 'border-slate-200 dark:border-slate-700 text-slate-400 cursor-not-allowed'}`}
-                        >
-                            <Clock size={14} /> Schedule
-                        </button>
-                    )}
-                    {local.status !== 'scheduled' && (
-                        <button
-                            onClick={() => onSend(local)}
-                            disabled={!canSend || isSending}
-                            className={`flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-xl transition ${canSend && !isSending ? 'bg-violet-600 hover:bg-violet-700 text-white shadow-md shadow-violet-200 dark:shadow-violet-900/40' : 'bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed'}`}
-                        >
-                            {isSending ? <><Loader2 size={14} className="animate-spin" />Sending...</> : <><Send size={14} />Send Now</>}
-                        </button>
+                    ) : (
+                        <>
+                            {local.status === 'scheduled' && onCancelSchedule && (
+                                <button
+                                    onClick={onCancelSchedule}
+                                    disabled={isSending}
+                                    className="flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-xl transition border border-rose-200 dark:border-rose-800 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20"
+                                >
+                                    <X size={14} /> Cancel Schedule
+                                </button>
+                            )}
+                            {local.status !== 'scheduled' && (
+                                <button
+                                    onClick={() => setShowSchedule(true)}
+                                    disabled={!canSend || isSending}
+                                    className={`flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-xl transition border ${canSend && !isSending ? 'border-amber-400 text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100' : 'border-slate-200 dark:border-slate-700 text-slate-400 cursor-not-allowed'}`}
+                                >
+                                    <Clock size={14} /> Schedule
+                                </button>
+                            )}
+                            {local.status !== 'scheduled' && (
+                                <button
+                                    onClick={() => onSend(local)}
+                                    disabled={!canSend || isSending}
+                                    className={`flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-xl transition ${canSend && !isSending ? 'bg-violet-600 hover:bg-violet-700 text-white shadow-md shadow-violet-200 dark:shadow-violet-900/40' : 'bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed'}`}
+                                >
+                                    {isSending ? <><Loader2 size={14} className="animate-spin" />Sending...</> : <><Send size={14} />Send Now</>}
+                                </button>
+                            )}
+                        </>
                     )}
                 </div>
             </div>
@@ -557,8 +588,10 @@ const CampaignComposer: React.FC<ComposerProps> = ({
             {/* Body ... stacked on mobile, side-by-side on desktop */}
             <div className="flex flex-col md:flex-row flex-1 overflow-hidden overflow-y-auto md:overflow-hidden max-w-full overflow-x-hidden">
                 {/* Config column */}
-                <div className="w-full md:w-[380px] md:shrink-0 md:overflow-y-auto md:border-r border-b md:border-b-0 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 p-4 space-y-4 max-w-full overflow-x-hidden">
+                <div className={`w-full md:w-[380px] md:shrink-0 md:overflow-y-auto md:border-r border-b md:border-b-0 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 p-4 space-y-4 max-w-full overflow-x-hidden ${isDesktop || step !== 3 ? 'block' : 'hidden'}`}>
 
+                    {showStep1 && (
+                        <>
                     {/* Campaign name */}
                     <div>
                         <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">Campaign Name</label>
@@ -609,9 +642,13 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                             </div>
                         </div>
                     )}
+                        </>
+                    )}
 
-                    {/* Recipients */}
-                    <div>
+                    {showStep2 && (
+                        <>
+                            {/* Recipients */}
+                            <div>
                         <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">Recipients</label>
                         {/* Tab toggle */}
                         <div className="flex rounded-xl overflow-hidden border border-slate-200 dark:border-slate-600 mb-3">
@@ -682,7 +719,40 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                             </div>
                         )}
                     </div>
+                        </>
+                    )}
 
+                    {showStep4 && (
+                        <>
+                            {!isDesktop && (
+                                <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 space-y-3 mb-4 shadow-sm animate-in fade-in duration-300">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Review Summary</p>
+                                    <div className="space-y-3 text-sm">
+                                        <div>
+                                            <span className="text-slate-500 block text-[10px] font-bold uppercase tracking-wider mb-0.5">Campaign Name</span>
+                                            <span className="font-medium text-slate-900 dark:text-white">{local.name || 'Unnamed'}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-slate-500 block text-[10px] font-bold uppercase tracking-wider mb-0.5">Type</span>
+                                            <span className="font-medium text-slate-900 dark:text-white capitalize">{local.channelType || 'sms'}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-slate-500 block text-[10px] font-bold uppercase tracking-wider mb-0.5">Audience</span>
+                                            <span className="font-medium text-slate-900 dark:text-white">{recipientLabel || 'None selected'}</span>
+                                        </div>
+                                        {local.channelType === 'email' && (
+                                            <div>
+                                                <span className="text-slate-500 block text-[10px] font-bold uppercase tracking-wider mb-0.5">Subject</span>
+                                                <span className="font-medium text-slate-900 dark:text-white">{local.emailSubject || 'No subject'}</span>
+                                            </div>
+                                        )}
+                                        <div>
+                                            <span className="text-slate-500 block text-[10px] font-bold uppercase tracking-wider mb-0.5">Message snippet</span>
+                                            <span className="font-medium text-slate-900 dark:text-white line-clamp-2 italic">"{local.body || 'Empty message'}"</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                     {/* Analytics (readonly for sent campaigns) */}
                     {local.status === 'sent' && (
                         <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 space-y-3">
@@ -702,11 +772,13 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                             </div>
                         </div>
                     )}
+                        </>
+                    )}
                 </div>
 
                 {/* Message composer */}
-                <div className="flex-1 md:overflow-y-auto p-4 max-w-full overflow-x-hidden">
-                    <div className="max-w-xl mx-auto space-y-4">
+                <div className={`flex-1 md:overflow-y-auto p-4 max-w-full overflow-x-hidden ${isDesktop || step === 3 ? 'block' : 'hidden'}`}>
+                    <div className="max-w-xl mx-auto space-y-4 animate-in fade-in duration-300">
 
                         {/* Message body */}
                         <div>

@@ -87,8 +87,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, church }) => {
                 )}
                 
                 {activeTab === 'broadcast' && activeNumber && (
-                    <BroadcastView church={church} twilioNumber={activeNumber} />
-
+                    <BroadcastView church={church} twilioNumber={activeNumber} currentUser={user} />
                 )}
             </main>
 
