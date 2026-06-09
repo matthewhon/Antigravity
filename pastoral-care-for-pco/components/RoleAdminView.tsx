@@ -784,6 +784,51 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
       }
   }, [church.emailSettings]);
 
+  // Auto-fetch Postmark DNS records if they are missing but domain is registered
+  useEffect(() => {
+      const es = church.emailSettings;
+      if (
+          es &&
+          es.mode === 'custom' &&
+          es.postmarkDomainId &&
+          (!es.dnsRecords || es.dnsRecords.length === 0) &&
+          es.customDomain &&
+          !isMailSaving
+      ) {
+          const autoFetch = async () => {
+              setIsMailSaving(true);
+              try {
+                  const s = await firestore.getSystemSettings();
+                  const apiBase = s.apiBaseUrl || 'https://pastoralcare.barnabassoftware.com';
+                  const res = await fetch(`${apiBase}/email/authenticate-domain`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                          churchId,
+                          domain: es.customDomain.trim().toLowerCase(),
+                          fromEmail: es.fromEmail?.trim() || undefined,
+                          fromName: es.fromName?.trim() || undefined,
+                          provider: 'postmark',
+                      }),
+                  });
+                  const data = await res.json();
+                  if (res.ok) {
+                      setMailDnsRecords(data.dnsRecords || data.cnameRecords || []);
+                      if (onUpdateChurch) {
+                          const fresh = await firestore.getChurch(churchId);
+                          if (fresh) onUpdateChurch(fresh);
+                      }
+                  }
+              } catch (e) {
+                  console.error('Auto-fetching Postmark DNS records failed:', e);
+              } finally {
+                  setIsMailSaving(false);
+              }
+          };
+          autoFetch();
+      }
+  }, [church.emailSettings, churchId, isMailSaving, onUpdateChurch]);
+
   // Clear save message automatically
   useEffect(() => {
       let timer: ReturnType<typeof setTimeout>;
