@@ -777,7 +777,8 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                 </div>
 
                 {/* Message composer */}
-                <div className={`flex-1 md:overflow-y-auto p-4 max-w-full overflow-x-hidden ${isDesktop || step === 3 ? 'block' : 'hidden'}`}>
+                {showStep3 && (
+                <div className="flex-1 md:overflow-y-auto p-4 max-w-full overflow-x-hidden">
                     <div className="max-w-xl mx-auto space-y-4 animate-in fade-in duration-300">
 
                         {/* Message body */}
