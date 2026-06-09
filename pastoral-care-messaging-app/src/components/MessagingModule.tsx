@@ -1009,6 +1009,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                         </div>
                     </div>
                 </div>
+                )}
             </div>
 
             {/* Schedule modal */}
