@@ -577,7 +577,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Mail Settings state
-  const [mailWizardProvider, setMailWizardProvider] = useState<'sendgrid' | 'postmark'>(church.emailSettings?.postmarkServerToken ? 'postmark' : 'sendgrid');
+  const [mailWizardProvider, setMailWizardProvider] = useState<'sendgrid' | 'postmark'>('postmark');
   const [mailMode, setMailMode] = useState<'shared' | 'custom'>(church.emailSettings?.mode || 'shared');
   const [mailPrefix, setMailPrefix] = useState(church.emailSettings?.sharedPrefix || '');
   const [mailFromName, setMailFromName] = useState(church.emailSettings?.fromName || church.name || '');
@@ -2415,43 +2415,6 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                             </div>
                         </div>
 
-                        {/* Provider Toggle */}
-                        <div className="flex border-b border-slate-100 dark:border-slate-800 mb-8 pb-4 gap-6">
-                            <button
-                                onClick={() => {
-                                    setMailWizardProvider('sendgrid');
-                                    setMailMessage(null);
-                                    setMailDiagChecks(null);
-                                }}
-                                className={`pb-2 text-xs font-bold transition-all relative ${
-                                    mailWizardProvider === 'sendgrid'
-                                        ? 'text-indigo-600 dark:text-indigo-400 font-black'
-                                        : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-350'
-                                }`}
-                            >
-                                Twilio SendGrid
-                                {mailWizardProvider === 'sendgrid' && (
-                                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 dark:bg-indigo-400 rounded-full" />
-                                )}
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setMailWizardProvider('postmark');
-                                    setMailMessage(null);
-                                    setMailDiagChecks(null);
-                                }}
-                                className={`pb-2 text-xs font-bold transition-all relative ${
-                                    mailWizardProvider === 'postmark'
-                                        ? 'text-indigo-600 dark:text-indigo-400 font-black'
-                                        : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-350'
-                                }`}
-                            >
-                                Postmark
-                                {mailWizardProvider === 'postmark' && (
-                                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 dark:bg-indigo-400 rounded-full" />
-                                )}
-                            </button>
-                        </div>
 
                         {mailMessage && (
                             <div className={`mb-6 p-4 rounded-xl text-xs font-bold flex items-start gap-2 ${mailMessage.type === 'success' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800' : 'bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-800'}`}>

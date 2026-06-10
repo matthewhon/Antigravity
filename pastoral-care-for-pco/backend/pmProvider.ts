@@ -235,8 +235,10 @@ export class PostmarkProvider implements EmailProvider {
         const fromEmail = `${prefix}@${SHARED_DOMAIN}`;
         const resolvedFromName = fromName || church.name || 'Church';
 
+        const existingSettings = church.emailSettings || {};
         await db.collection('churches').doc(churchId).update({
             emailSettings: {
+                ...existingSettings,
                 mode: 'shared',
                 sharedPrefix: prefix,
                 fromEmail,
