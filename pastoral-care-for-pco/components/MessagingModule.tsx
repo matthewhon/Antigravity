@@ -20,7 +20,7 @@ import {
     Inbox, BarChart3, Copy, Zap, MessageCircle, TrendingUp, TrendingDown,
     Activity, DollarSign, UserX, Edit3, UserCheck, List, Layers,
     Smile, Image as ImageIcon, Link, Sparkles, ChevronRight, RotateCcw, Contact,
-    Mail, Tag, Filter, Hash, Upload, ExternalLink, GitBranch, Info, ShieldCheck, Shield, Globe2, PlusCircle, Lock, Unlock, ListPlus, Tv2, FileText, UserPlus
+    Mail, Tag, Filter, Hash, Upload, ExternalLink, GitBranch, Info, ShieldCheck, Shield, Globe2, PlusCircle, Lock, Unlock, ListPlus, Tv2, FileText, UserPlus, Play, Beaker
 } from 'lucide-react';
 import { BroadcastPermissionsTab } from './BroadcastPermissionsTab';
 import { FileManager } from './FileManager';
@@ -6134,6 +6134,7 @@ const WorkflowEditor: React.FC<{
     const [nodes, setNodes] = useState<WorkflowNode[]>(buildInitialNodes);
     const [error, setError] = useState('');
     const [showAiBuilder, setShowAiBuilder] = useState(false);
+    const [showTestDrawer, setShowTestDrawer] = useState(false);
 
     const handleApplyAiDraft = (draft: AiWorkflowDraft) => {
         const newNodes: WorkflowNode[] = [];
@@ -6273,6 +6274,14 @@ const WorkflowEditor: React.FC<{
                         className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl border border-violet-300 dark:border-violet-600 bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 hover:bg-violet-100 dark:hover:bg-violet-900/40 transition"
                     >
                         <Sparkles size={12} /> AI Build
+                    </button>
+                    {/* Test simulator button */}
+                    <button
+                        onClick={() => setShowTestDrawer(true)}
+                        title="Simulate / Test this workflow"
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                    >
+                        <Beaker size={12} /> Test Simulator
                     </button>
                     {/* Active toggle */}
                     <button
@@ -6696,6 +6705,486 @@ const WorkflowEditor: React.FC<{
                     )}
                 </div>
             </div>
+            {showTestDrawer && (
+                <WorkflowTestDrawer
+                    workflow={{ ...wf, steps: nodesToSteps(nodes) }}
+                    churchId={churchId}
+                    pcoLists={pcoLists}
+                    pcoGroups={pcoGroups}
+                    pcoRegistrationEvents={pcoRegistrationEvents}
+                    onClose={() => setShowTestDrawer(false)}
+                />
+            )}
+        </div>
+    );
+};
+
+// --- Workflow Test Drawer ----------------------------------------------------
+
+interface WorkflowTestDrawerProps {
+    workflow: SmsWorkflow;
+    churchId: string;
+    pcoLists?: { id: string; name: string }[];
+    pcoGroups?: { id: string; name: string }[];
+    pcoRegistrationEvents?: { id: string; pcoId: string; name: string; startsAt?: string | null }[];
+    onClose: () => void;
+}
+
+const WorkflowTestDrawer: React.FC<WorkflowTestDrawerProps> = ({
+    workflow,
+    churchId,
+    pcoLists = [],
+    pcoGroups = [],
+    pcoRegistrationEvents = [],
+    onClose
+}) => {
+    // Defaults
+    const todayStr = new Date().toISOString().split('T')[0];
+    const defaultBirthdayStr = `${new Date().getFullYear()}-06-15`;
+    const defaultAnniversaryStr = `${new Date().getFullYear()}-10-20`;
+    
+    // States for Mocking Input
+    const [simDate, setSimDate] = useState(todayStr);
+    const [simTime, setSimTime] = useState('09:00');
+    const [mockName, setMockName] = useState('Jane Doe');
+    const [mockPhone, setMockPhone] = useState('(555) 019-2834');
+    const [mockEmail, setMockEmail] = useState('jane.doe@example.com');
+    const [mockCity, setMockCity] = useState('Atlanta');
+    const [mockState, setMockState] = useState('GA');
+    
+    const [mockBirthday, setMockBirthday] = useState(defaultBirthdayStr);
+    const [mockAnniversary, setMockAnniversary] = useState(defaultAnniversaryStr);
+    const [mockEventStartsAt, setMockEventStartsAt] = useState(`${todayStr}T18:00`);
+
+    // Resolve trigger info
+    const triggerEventName = workflow.triggerEventName || 
+        pcoRegistrationEvents.find(e => e.pcoId === workflow.triggerEventId)?.name || 
+        'Sunday Worship Service';
+        
+    const triggerListName = workflow.triggerListName || 
+        pcoLists.find(l => l.id === workflow.triggerListId)?.name || 
+        pcoGroups.find(g => g.id === workflow.triggerGroupId)?.name || 
+        'PCO List';
+
+    // Helper to format dates nicely
+    const formatSimDate = (ms: number) => {
+        const d = new Date(ms);
+        return d.toLocaleDateString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+        }) + ' at ' + d.toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    };
+
+    // Calculate Step schedule times
+    const steps = workflow.steps || [];
+    
+    // Base enrollment time
+    let baseMs = new Date(`${simDate}T${simTime}`).getTime();
+    if (isNaN(baseMs)) {
+        baseMs = Date.now();
+    }
+
+    const calculateStepNextSendAt = (step: any, fromMs: number): number => {
+        const scheduleType = step.scheduleType || 'relative';
+        const timeParts = (step.scheduleTime || '09:00').split(':').map(Number);
+        const schedHours = timeParts[0] ?? 9;
+        const schedMinutes = timeParts[1] ?? 0;
+
+        if (scheduleType === 'day_of_week') {
+            const targetDay = step.scheduleDayOfWeek ?? 1; // Mon
+            const candidate = new Date(fromMs);
+            candidate.setHours(schedHours, schedMinutes, 0, 0);
+            for (let i = 0; i <= 7; i++) {
+                if (candidate.getDay() === targetDay && candidate.getTime() > fromMs) {
+                    return candidate.getTime();
+                }
+                candidate.setDate(candidate.getDate() + 1);
+            }
+        }
+        if (scheduleType === 'day_of_month') {
+            const targetDate = step.scheduleDayOfMonth ?? 1;
+            const ref = new Date(fromMs);
+            let year = ref.getFullYear();
+            let month = ref.getMonth();
+            while (true) {
+                const daysInMonth = new Date(year, month + 1, 0).getDate();
+                if (targetDate <= daysInMonth) {
+                    const candidate = new Date(year, month, targetDate, schedHours, schedMinutes, 0, 0);
+                    if (candidate.getTime() > fromMs) return candidate.getTime();
+                }
+                month++;
+                if (month > 11) { month = 0; year++; }
+            }
+        }
+        // relative
+        return fromMs + (step.delayDays || 0) * 86_400_000 + (step.delayHours || 0) * 3_600_000;
+    };
+
+    // Interpolate merge tags
+    const resolveMessage = (msg: string | undefined) => {
+        if (!msg) return '';
+        let text = msg;
+        const replacements: Record<string, string> = {
+            'name': mockName,
+            'first_name': mockName.split(' ')[0] || '',
+            'last_name': mockName.split(' ').slice(1).join(' ') || '',
+            'phone': mockPhone,
+            'email': mockEmail,
+            'city': mockCity,
+            'state': mockState,
+            'eventname': triggerEventName,
+            'birthday': mockBirthday ? new Date(mockBirthday + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Jun 15',
+            'anniversary': mockAnniversary ? new Date(mockAnniversary + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Oct 20',
+        };
+        
+        // Match [tag] and {{tag}} format
+        Object.entries(replacements).forEach(([tag, val]) => {
+            const escapedTag = tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex1 = new RegExp(`\\[${escapedTag}\\]`, 'gi');
+            const regex2 = new RegExp(`\\{\\{${escapedTag}\\}\\}`, 'gi');
+            text = text.replace(regex1, val).replace(regex2, val);
+        });
+        return text;
+    };
+
+    // Build timeline
+    const timeline: {
+        stepIndex: number;
+        scheduledMs: number;
+        step: SmsWorkflowStep;
+        delayText: string;
+        resolvedMessage: string;
+        resolvedEmailBody?: string;
+    }[] = [];
+
+    let currentMs = baseMs;
+
+    // Adjust enrollment date for birthday/anniversary
+    if (workflow.trigger === 'birthday' && mockBirthday) {
+        const offset = workflow.triggerDayOffset || 0;
+        const parts = (workflow.triggerTime || '09:00').split(':').map(Number);
+        const bday = new Date(mockBirthday + 'T00:00:00');
+        bday.setDate(bday.getDate() - offset);
+        bday.setHours(parts[0] ?? 9, parts[1] ?? 0, 0, 0);
+        currentMs = bday.getTime();
+    } else if (workflow.trigger === 'anniversary' && mockAnniversary) {
+        const offset = workflow.triggerDayOffset || 0;
+        const parts = (workflow.triggerTime || '09:00').split(':').map(Number);
+        const ann = new Date(mockAnniversary + 'T00:00:00');
+        ann.setDate(ann.getDate() - offset);
+        ann.setHours(parts[0] ?? 9, parts[1] ?? 0, 0, 0);
+        currentMs = ann.getTime();
+    }
+
+    steps.forEach((step, idx) => {
+        if (idx > 0) {
+            currentMs = calculateStepNextSendAt(step, currentMs);
+        } else {
+            // Step 1 delay is evaluated relative to enrollment
+            currentMs = calculateStepNextSendAt(step, currentMs);
+        }
+
+        // Get delay text description
+        let delayText = 'Immediately upon enrollment';
+        const st = step.scheduleType || 'relative';
+        if (idx > 0 || step.delayDays > 0 || (step.delayHours && step.delayHours > 0) || step.scheduleType) {
+            if (st === 'day_of_week') {
+                const dow = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][step.scheduleDayOfWeek ?? 1];
+                delayText = `On the next ${dow} at ${step.scheduleTime || '09:00'}`;
+            } else if (st === 'day_of_month') {
+                const day = step.scheduleDayOfMonth ?? 1;
+                delayText = `On the next ${day}${day === 1 ? 'st' : day === 2 ? 'nd' : day === 3 ? 'rd' : 'th'} of the month at ${step.scheduleTime || '09:00'}`;
+            } else {
+                const days = step.delayDays || 0;
+                const hours = step.delayHours || 0;
+                const parts = [];
+                if (days > 0) parts.push(`${days} day${days !== 1 ? 's' : ''}`);
+                if (hours > 0) parts.push(`${hours} hour${hours !== 1 ? 's' : ''}`);
+                delayText = parts.length > 0 ? `Delayed by ${parts.join(' and ')}` : 'Immediately';
+            }
+        }
+
+        timeline.push({
+            stepIndex: idx,
+            scheduledMs: currentMs,
+            step,
+            delayText,
+            resolvedMessage: resolveMessage(step.message),
+            resolvedEmailBody: resolveMessage(step.emailBody),
+        });
+    });
+
+    const getChannelBadgeColor = (ch?: string) => {
+        switch (ch) {
+            case 'email': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300';
+            case 'staff_sms': return 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300';
+            case 'staff_email': return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300';
+            default: return 'bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300'; // sms/mms
+        }
+    };
+
+    const getChannelLabel = (ch?: string) => {
+        switch (ch) {
+            case 'email': return 'Email to Contact';
+            case 'staff_sms': return 'SMS to Staff';
+            case 'staff_email': return 'Email to Staff';
+            default: return 'SMS to Contact';
+        }
+    };
+
+    const getTargetText = (step: SmsWorkflowStep) => {
+        const ch = step.channelType || 'sms';
+        if (ch === 'staff_sms' || ch === 'staff_email') {
+            const targetType = step.staffTargetType || 'individuals';
+            if (targetType === 'individuals') {
+                const count = step.staffRecipients?.length || 0;
+                return `Staff: ${count} individual${count !== 1 ? 's' : ''}`;
+            }
+            if (targetType === 'list') {
+                return `Staff List: ${step.staffListName || 'Selected List'}`;
+            }
+            if (targetType === 'group') {
+                return `Staff Group: ${step.staffGroupName || 'Selected Group'}`;
+            }
+        }
+        return `${mockName} (${mockPhone})`;
+    };
+
+    return (
+        <div className="fixed inset-0 z-[120] flex justify-end bg-black/55 backdrop-blur-xs" onClick={onClose}>
+            <div className="w-full max-w-xl bg-slate-50 dark:bg-slate-900 h-full shadow-2xl flex flex-col border-l border-slate-200 dark:border-slate-800" onClick={e => e.stopPropagation()}>
+                
+                {/* Header */}
+                <div className="px-6 py-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center">
+                            <Beaker size={20} className="text-violet-600 dark:text-violet-300" />
+                        </div>
+                        <div>
+                            <h3 className="text-base font-black text-slate-900 dark:text-white">Workflow Simulator</h3>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">Trigger: {workflow.trigger === 'birthday' ? '🎂 Birthday' : workflow.trigger === 'anniversary' ? '💍 Anniversary' : workflow.trigger === 'keyword' ? `💬 Keyword ("${workflow.triggerKeywordWord || 'hello'}")` : workflow.trigger === 'list_add' ? `📋 List Add (${triggerListName})` : workflow.trigger === 'event_registration' ? `🎟️ Event Registration (${triggerEventName})` : '✋ Manual'}</p>
+                        </div>
+                    </div>
+                    <button onClick={onClose} title="Close" className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition"><X size={18} /></button>
+                </div>
+
+                {/* Main Scrollable Body */}
+                <div className="flex-1 overflow-y-auto p-5 space-y-6">
+                    
+                    {/* Mock inputs section */}
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-slate-200 dark:border-slate-700 space-y-3">
+                        <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                            <Settings size={12} /> Simulation Inputs
+                        </h4>
+                        
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="block text-[10px] font-bold text-slate-500 mb-1">Start Date</label>
+                                <input
+                                    type="date"
+                                    value={simDate}
+                                    onChange={e => setSimDate(e.target.value)}
+                                    className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-bold text-slate-500 mb-1">Start Time</label>
+                                <input
+                                    type="time"
+                                    value={simTime}
+                                    onChange={e => setSimTime(e.target.value)}
+                                    className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="border-t border-slate-100 dark:border-slate-700/50 my-2" />
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="block text-[10px] font-bold text-slate-500 mb-1">Mock Contact Name</label>
+                                <input
+                                    type="text"
+                                    value={mockName}
+                                    onChange={e => setMockName(e.target.value)}
+                                    className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-bold text-slate-500 mb-1">Mock Contact Phone</label>
+                                <input
+                                    type="text"
+                                    value={mockPhone}
+                                    onChange={e => setMockPhone(e.target.value)}
+                                    className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-bold text-slate-500 mb-1">Mock Contact Email</label>
+                                <input
+                                    type="text"
+                                    value={mockEmail}
+                                    onChange={e => setMockEmail(e.target.value)}
+                                    className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className="block text-[10px] font-bold text-slate-500 mb-1">City</label>
+                                    <input
+                                        type="text"
+                                        value={mockCity}
+                                        onChange={e => setMockCity(e.target.value)}
+                                        className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-bold text-slate-500 mb-1">State</label>
+                                    <input
+                                        type="text"
+                                        value={mockState}
+                                        onChange={e => setMockState(e.target.value)}
+                                        className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Trigger-specific inputs */}
+                        {(workflow.trigger === 'birthday' || workflow.trigger === 'anniversary' || workflow.trigger === 'event_registration') && (
+                            <>
+                                <div className="border-t border-slate-100 dark:border-slate-700/50 my-2" />
+                                <div>
+                                    {workflow.trigger === 'birthday' && (
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-slate-500 mb-1">Mock Contact Birthday Date</label>
+                                            <input
+                                                type="date"
+                                                value={mockBirthday}
+                                                onChange={e => setMockBirthday(e.target.value)}
+                                                className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
+                                            />
+                                        </div>
+                                    )}
+                                    {workflow.trigger === 'anniversary' && (
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-slate-500 mb-1">Mock Contact Anniversary Date</label>
+                                            <input
+                                                type="date"
+                                                value={mockAnniversary}
+                                                onChange={e => setMockAnniversary(e.target.value)}
+                                                className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
+                                            />
+                                        </div>
+                                    )}
+                                    {workflow.trigger === 'event_registration' && (
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-slate-500 mb-1">Mock Event Start Date & Time</label>
+                                            <input
+                                                type="datetime-local"
+                                                value={mockEventStartsAt}
+                                                onChange={e => setMockEventStartsAt(e.target.value)}
+                                                className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            </>
+                        )}
+                    </div>
+
+                    {/* Timeline visualization */}
+                    <div className="space-y-4">
+                        <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                            <Clock size={12} /> Simulated Flow Timeline
+                        </h4>
+
+                        {timeline.length === 0 ? (
+                            <div className="text-center py-10 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 text-slate-400 text-sm">
+                                No steps added to this workflow yet.
+                            </div>
+                        ) : (
+                            <div className="relative border-l-2 border-violet-100 dark:border-violet-900/60 ml-3.5 pl-6 space-y-6">
+                                {timeline.map((item, index) => {
+                                    const ch = item.step.channelType || 'sms';
+                                    const isEmail = ch === 'email' || ch === 'staff_email';
+                                    return (
+                                        <div key={item.step.id} className="relative group">
+                                            {/* Bullet icon */}
+                                            <div className="absolute -left-[35px] top-1.5 w-6.5 h-6.5 rounded-full bg-violet-600 text-white text-[11px] font-bold flex items-center justify-center ring-4 ring-slate-50 dark:ring-slate-900 shadow">
+                                                {index + 1}
+                                            </div>
+
+                                            {/* Step Card */}
+                                            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 shadow-xs hover:border-violet-300 dark:hover:border-violet-800 transition">
+                                                
+                                                {/* Meta Info */}
+                                                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                                                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${getChannelBadgeColor(ch)}`}>
+                                                        {getChannelLabel(ch)}
+                                                    </span>
+                                                    <span className="text-[10px] text-slate-400 italic">
+                                                        {item.delayText}
+                                                    </span>
+                                                </div>
+
+                                                <h5 className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                                                    Scheduled Time
+                                                </h5>
+                                                <p className="text-xs font-bold text-slate-700 dark:text-slate-200 mb-3 flex items-center gap-1.5">
+                                                    <Calendar size={12} className="text-violet-500" />
+                                                    {formatSimDate(item.scheduledMs)}
+                                                </p>
+
+                                                <h5 className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                                                    To Recipient
+                                                </h5>
+                                                <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-3">
+                                                    {getTargetText(item.step)}
+                                                </p>
+
+                                                {/* Content block */}
+                                                <div className="border border-slate-100 dark:border-slate-700/60 rounded-xl bg-slate-50/50 dark:bg-slate-900/30 p-3">
+                                                    {isEmail ? (
+                                                        <div className="space-y-1.5 text-xs text-slate-700 dark:text-slate-300">
+                                                            <div className="flex gap-2 pb-1.5 border-b border-slate-100 dark:border-slate-700/50">
+                                                                <span className="font-bold text-slate-400">Subject:</span>
+                                                                <span className="font-semibold">{resolveMessage(item.step.emailSubject || '(no subject)')}</span>
+                                                            </div>
+                                                            <div className="pt-1.5 max-h-40 overflow-y-auto font-mono text-[11px] whitespace-pre-wrap leading-relaxed">
+                                                                {item.resolvedEmailBody || <span className="text-slate-400 italic">(no email content)</span>}
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="text-xs font-mono text-slate-800 dark:text-slate-200 whitespace-pre-wrap leading-relaxed">
+                                                            {item.resolvedMessage || <span className="text-slate-400 italic">(no message text)</span>}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+							</div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Footer close */}
+                <div className="p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shrink-0">
+                    <button
+                        onClick={onClose}
+                        className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold rounded-xl transition text-sm flex items-center justify-center gap-1.5"
+                    >
+                        <X size={15} /> Close Simulator
+                    </button>
+                </div>
+            </div>
         </div>
     );
 };
@@ -7093,6 +7582,7 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
     const [saveError, setSaveError] = useState<string | null>(null);
     const [enrollTarget, setEnrollTarget] = useState<SmsWorkflow | null>(null);
     const [listEnrollTarget, setListEnrollTarget] = useState<SmsWorkflow | null>(null);
+    const [testTarget, setTestTarget] = useState<SmsWorkflow | null>(null);
 
     // Live listener
     useEffect(() => {
@@ -7344,6 +7834,14 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
 
                                         {/* Actions on hover */}
                                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                                            {/* Test simulator button */}
+                                            <button
+                                                onClick={() => setTestTarget(wf)}
+                                                className="p-1.5 text-slate-400 hover:text-violet-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                                                title="Test / Simulate Workflow"
+                                            >
+                                                <Beaker size={14} />
+                                            </button>
                                             {/* Bulk-enroll from PCO list — available on all workflows */}
                                             <button
                                                 onClick={() => setListEnrollTarget(wf)}
@@ -7418,6 +7916,18 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
                     workflow={listEnrollTarget}
                     churchId={churchId}
                     onClose={() => setListEnrollTarget(null)}
+                />
+            )}
+
+            {/* Simulation Drawer */}
+            {testTarget && (
+                <WorkflowTestDrawer
+                    workflow={testTarget}
+                    churchId={churchId}
+                    pcoLists={pcoLists}
+                    pcoGroups={pcoGroups}
+                    pcoRegistrationEvents={pcoRegistrationEvents}
+                    onClose={() => setTestTarget(null)}
                 />
             )}
         </div>
