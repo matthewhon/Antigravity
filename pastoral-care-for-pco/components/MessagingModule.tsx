@@ -6756,6 +6756,34 @@ const WorkflowTestDrawer: React.FC<WorkflowTestDrawerProps> = ({
     const [mockAnniversary, setMockAnniversary] = useState(defaultAnniversaryStr);
     const [mockEventStartsAt, setMockEventStartsAt] = useState(`${todayStr}T18:00`);
 
+    // Playback state
+    const [isSimulating, setIsSimulating] = useState(false);
+    const [revealedCount, setRevealedCount] = useState(workflow.steps?.length || 0);
+
+    // Reset simulator when workflow changes
+    useEffect(() => {
+        setRevealedCount(workflow.steps?.length || 0);
+        setIsSimulating(false);
+    }, [workflow.steps?.length]);
+
+    // Playback loop with 2-second delay
+    useEffect(() => {
+        if (!isSimulating) return;
+        if (revealedCount >= (workflow.steps?.length || 0)) {
+            setIsSimulating(false);
+            return;
+        }
+        const timer = setTimeout(() => {
+            setRevealedCount(prev => prev + 1);
+        }, 2000);
+        return () => clearTimeout(timer);
+    }, [isSimulating, revealedCount, workflow.steps?.length]);
+
+    const startSimulation = () => {
+        setRevealedCount(0);
+        setIsSimulating(true);
+    };
+
     // Resolve trigger info
     const triggerEventName = workflow.triggerEventName || 
         pcoRegistrationEvents.find(e => e.pcoId === workflow.triggerEventId)?.name || 
@@ -6829,26 +6857,52 @@ const WorkflowTestDrawer: React.FC<WorkflowTestDrawerProps> = ({
     const resolveMessage = (msg: string | undefined) => {
         if (!msg) return '';
         let text = msg;
-        const replacements: Record<string, string> = {
+        
+        const firstName = mockName.split(' ')[0] || '';
+        const lastName = mockName.split(' ').slice(1).join(' ') || '';
+        const formattedBday = mockBirthday ? new Date(mockBirthday + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+        const formattedAnn = mockAnniversary ? new Date(mockAnniversary + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+
+        // Let's replace {tagName}, {contact.tagName}, {{tagName}}, [tagName] formats matching the backend
+        const rules = [
+            { regex: /\{contact\.firstName\}|\{firstName\}|\{\{firstName\}\}|\[firstName\]/gi, value: firstName },
+            { regex: /\{contact\.lastName\}|\{lastName\}|\{\{lastName\}\}|\[lastName\]/gi, value: lastName },
+            { regex: /\{contact\.fullName\}|\{contact\.name\}|\{fullName\}|\{\{fullName\}\}|\[fullName\]/gi, value: mockName },
+            { regex: /\{contact\.email\}|\{email\}|\{\{email\}\}|\[email\]/gi, value: mockEmail },
+            { regex: /\{contact\.phone\}|\{phone\}|\{\{phone\}\}|\[phone\]/gi, value: mockPhone },
+            { regex: /\{contact\.birthday\}|\{birthday\}|\{\{birthday\}\}|\[birthday\]/gi, value: formattedBday },
+            { regex: /\{contact\.anniversary\}|\{anniversary\}|\{\{anniversary\}\}|\[anniversary\]/gi, value: formattedAnn },
+            { regex: /\{contact\.city\}|\{city\}|\{\{city\}\}|\[city\]/gi, value: mockCity },
+            { regex: /\{contact\.state\}|\{state\}|\{\{state\}\}|\[state\]/gi, value: mockState },
+            { regex: /\{eventName\}|\{event_name\}|\{\{eventName\}\}|\[eventName\]/gi, value: triggerEventName },
+            { regex: /\{churchName\}|\{church\.name\}|\{\{churchName\}\}|\[churchName\]/gi, value: 'Our Church' },
+        ];
+
+        rules.forEach(rule => {
+            text = text.replace(rule.regex, rule.value);
+        });
+
+        // Simple fallback replacements
+        const simpleReplacements: Record<string, string> = {
             'name': mockName,
-            'first_name': mockName.split(' ')[0] || '',
-            'last_name': mockName.split(' ').slice(1).join(' ') || '',
+            'first_name': firstName,
+            'last_name': lastName,
             'phone': mockPhone,
             'email': mockEmail,
             'city': mockCity,
             'state': mockState,
             'eventname': triggerEventName,
-            'birthday': mockBirthday ? new Date(mockBirthday + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Jun 15',
-            'anniversary': mockAnniversary ? new Date(mockAnniversary + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Oct 20',
+            'birthday': formattedBday || 'Jun 15',
+            'anniversary': formattedAnn || 'Oct 20',
         };
-        
-        // Match [tag] and {{tag}} format
-        Object.entries(replacements).forEach(([tag, val]) => {
+        Object.entries(simpleReplacements).forEach(([tag, val]) => {
             const escapedTag = tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             const regex1 = new RegExp(`\\[${escapedTag}\\]`, 'gi');
             const regex2 = new RegExp(`\\{\\{${escapedTag}\\}\\}`, 'gi');
-            text = text.replace(regex1, val).replace(regex2, val);
+            const regex3 = new RegExp(`\\{${escapedTag}\\}`, 'gi');
+            text = text.replace(regex1, val).replace(regex2, val).replace(regex3, val);
         });
+
         return text;
     };
 
@@ -7100,37 +7154,95 @@ const WorkflowTestDrawer: React.FC<WorkflowTestDrawerProps> = ({
 
                     {/* Timeline visualization */}
                     <div className="space-y-4">
-                        <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                            <Clock size={12} /> Simulated Flow Timeline
-                        </h4>
+                        <div className="flex items-center justify-between">
+                            <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                                <Clock size={12} /> Simulated Flow Timeline
+                            </h4>
+                            {timeline.length > 0 && (
+                                <button
+                                    onClick={isSimulating ? () => setIsSimulating(false) : startSimulation}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl transition ${
+                                        isSimulating
+                                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
+                                            : 'bg-violet-600 text-white hover:bg-violet-700 shadow-md shadow-violet-200 dark:shadow-none'
+                                    }`}
+                                >
+                                    {isSimulating ? (
+                                        <>
+                                            <Loader2 size={11} className="animate-spin" />
+                                            Stop Playback
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Play size={11} />
+                                            Play Simulation
+                                        </>
+                                    )}
+                                </button>
+                            )}
+                        </div>
 
                         {timeline.length === 0 ? (
                             <div className="text-center py-10 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 text-slate-400 text-sm">
                                 No steps added to this workflow yet.
                             </div>
                         ) : (
-                            <div className="relative border-l-2 border-violet-100 dark:border-violet-900/60 ml-3.5 pl-6 space-y-6">
+                            <div className="relative border-l-2 border-slate-200 dark:border-slate-800 ml-3.5 pl-6 space-y-6">
                                 {timeline.map((item, index) => {
                                     const ch = item.step.channelType || 'sms';
                                     const isEmail = ch === 'email' || ch === 'staff_email';
+                                    
+                                    // Step states
+                                    const isSent = index < revealedCount;
+                                    const isCurrent = index === revealedCount;
+                                    const isQueued = index > revealedCount;
+
+                                    let bulletClass = 'bg-slate-200 text-slate-400 dark:bg-slate-700 dark:text-slate-500';
+                                    if (isSent) bulletClass = 'bg-emerald-500 text-white';
+                                    else if (isCurrent) bulletClass = 'bg-violet-600 text-white animate-pulse ring-4 ring-violet-200 dark:ring-violet-900';
+
+                                    let cardClass = 'bg-white dark:bg-slate-800 border rounded-2xl p-4 shadow-xs transition duration-300';
+                                    if (isSent) cardClass += ' border-slate-200 dark:border-slate-700';
+                                    else if (isCurrent) cardClass += ' border-violet-500 dark:border-violet-500 shadow-md ring-1 ring-violet-500 scale-[1.01]';
+                                    else if (isQueued) cardClass += ' opacity-35 select-none pointer-events-none border-dashed border-slate-200 dark:border-slate-700';
+
                                     return (
                                         <div key={item.step.id} className="relative group">
                                             {/* Bullet icon */}
-                                            <div className="absolute -left-[35px] top-1.5 w-6.5 h-6.5 rounded-full bg-violet-600 text-white text-[11px] font-bold flex items-center justify-center ring-4 ring-slate-50 dark:ring-slate-900 shadow">
+                                            <div className={`absolute -left-[35px] top-1.5 w-6.5 h-6.5 rounded-full text-[11px] font-bold flex items-center justify-center ring-4 ring-slate-50 dark:ring-slate-900 shadow ${bulletClass}`}>
                                                 {index + 1}
                                             </div>
 
                                             {/* Step Card */}
-                                            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 shadow-xs hover:border-violet-300 dark:hover:border-violet-800 transition">
+                                            <div className={cardClass}>
                                                 
                                                 {/* Meta Info */}
-                                                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-                                                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${getChannelBadgeColor(ch)}`}>
-                                                        {getChannelLabel(ch)}
-                                                    </span>
-                                                    <span className="text-[10px] text-slate-400 italic">
-                                                        {item.delayText}
-                                                    </span>
+                                                <div className="flex items-center justify-between gap-2 mb-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${getChannelBadgeColor(ch)}`}>
+                                                            {getChannelLabel(ch)}
+                                                        </span>
+                                                        <span className="text-[10px] text-slate-400 italic">
+                                                            {item.delayText}
+                                                        </span>
+                                                    </div>
+                                                    
+                                                    {/* Status Badge */}
+                                                    {isSent && (
+                                                        <span className="flex items-center gap-1 text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-0.5 rounded-full shrink-0">
+                                                            <CheckCircle size={10} /> Dispatched
+                                                        </span>
+                                                    )}
+                                                    {isCurrent && (
+                                                        <span className="flex items-center gap-1 text-[9px] font-bold text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/30 px-2 py-0.5 rounded-full shrink-0 animate-pulse">
+                                                            <Loader2 size={10} className="animate-spin" /> Simulating...
+                                                        </span>
+                                                    )}
+                                                    {isQueued && (
+                                                        <span className="flex items-center gap-1 text-[9px] font-bold text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-900/30 px-2 py-0.5 rounded-full shrink-0">
+                                                            <Clock size={10} /> Queued
+                                                        </span>
+                                                    )}
                                                 </div>
 
                                                 <h5 className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
@@ -7170,7 +7282,7 @@ const WorkflowTestDrawer: React.FC<WorkflowTestDrawerProps> = ({
                                         </div>
                                     );
                                 })}
-							</div>
+                            </div>
                         )}
                     </div>
                 </div>
