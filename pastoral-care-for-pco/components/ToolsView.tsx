@@ -589,6 +589,20 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
   const isSharedMode = church?.emailSettings?.mode === 'shared' && isLockedMode;
   const lockedFromEmail = church?.emailSettings?.fromEmail || '';
 
+  const senders = React.useMemo(() => {
+    const list = [];
+    if (church?.emailSettings?.fromEmail) {
+      list.push({
+        name: church.emailSettings.fromName || church.name || '',
+        email: church.emailSettings.fromEmail
+      });
+    }
+    (church?.emailSettings?.additionalSenders || []).forEach(s => {
+      if (s.name && s.email) list.push(s);
+    });
+    return list;
+  }, [church]);
+
   // If a configured From email exists and the campaign doesn't have it set yet, pre-apply it
   const initialCampaign: EmailCampaign = React.useMemo(() => {
     if (isLockedMode) {
@@ -965,13 +979,34 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
                     </label>
                     {isLockedMode ? (
                       <>
-                        <div className={`w-full text-sm border rounded-lg px-3 py-2 font-mono select-all ${
-                          isCustomMode
-                            ? 'border-emerald-200 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 text-slate-700 dark:text-emerald-300'
-                            : 'border-indigo-200 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900/20 text-slate-700 dark:text-indigo-300'
-                        }`}>
-                          {lockedFromEmail}
-                        </div>
+                        {senders.length > 1 ? (
+                          <select
+                            className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+                            value={localCampaign.fromEmail || lockedFromEmail}
+                            title="From Email"
+                            onChange={e => {
+                              const val = e.target.value;
+                              const found = senders.find(s => s.email === val);
+                              if (found) {
+                                update({ fromEmail: found.email, fromName: found.name });
+                              } else {
+                                update({ fromEmail: val });
+                              }
+                            }}
+                          >
+                            {senders.map((s, idx) => (
+                              <option key={idx} value={s.email}>{s.name} &lt;{s.email}&gt;</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <div className={`w-full text-sm border rounded-lg px-3 py-2 font-mono select-all ${
+                            isCustomMode
+                              ? 'border-emerald-200 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 text-slate-700 dark:text-emerald-300'
+                              : 'border-indigo-200 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900/20 text-slate-700 dark:text-indigo-300'
+                          }`}>
+                            {lockedFromEmail}
+                          </div>
+                        )}
                         <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1.5">
                           Set in <strong>Settings &amp; Administration &rarr; Mail Settings</strong>. Change it there to update this address.
                         </p>
