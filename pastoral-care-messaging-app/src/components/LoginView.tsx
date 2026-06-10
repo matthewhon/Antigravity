@@ -132,10 +132,12 @@ export const LoginView: React.FC<LoginViewProps> = ({ onRegister }) => {
         <div className="mt-8 text-center border-t border-slate-100 dark:border-slate-800 pt-6">
             <p className="text-xs font-medium text-slate-400">Don't have an account?</p>
             <a 
-                href="/register"
+                href={onRegister ? "/register" : "https://pastoralcare.barnabassoftware.com/register"}
+                target={onRegister ? undefined : "_blank"}
+                rel={onRegister ? undefined : "noopener noreferrer"}
                 onClick={(e) => {
-                    e.preventDefault();
                     if (onRegister) {
+                        e.preventDefault();
                         onRegister();
                     }
                 }}
