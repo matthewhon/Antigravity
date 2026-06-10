@@ -18,7 +18,7 @@ import { createServerLogger } from '../services/logService.js';
 import type { EmailProvider, EmailMessage, SendOptions, DnsRecord, DiagnosticCheck } from './emailProvider.js';
 
 const PM_API = 'https://api.postmarkapp.com';
-const SHARED_DOMAIN = 'pastoralcare.barnabassoftware.com';
+const SHARED_DOMAIN = 'barnabassoftware.com';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

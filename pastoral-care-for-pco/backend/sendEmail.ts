@@ -322,10 +322,15 @@ function buildUnsubscribeHtml(
     churchId: string,
     recipientEmail: string,
     fontFamily: string,
-    appBaseUrl: string
+    appBaseUrl: string,
+    emailProvider: string
 ): string {
     const token = Buffer.from(`${churchId}:${recipientEmail.toLowerCase()}`).toString('base64url');
-    const link = `${appBaseUrl}/unsubscribe?token=${token}`;
+    // If Postmark, we use their mandated unsubscribe tag so they intercept it.
+    const link = emailProvider === 'postmark' 
+        ? '{{{pm:unsubscribe}}}' 
+        : `${appBaseUrl}/unsubscribe?token=${token}`;
+        
     return `<div style="text-align:center;padding:12px 32px 20px;">
         <p style="margin:0;font-family:${fontFamily};font-size:11px;color:#9ca3af;">
           Don't want these emails?
@@ -1035,8 +1040,23 @@ export async function executeSend(
         }
     }
 
-    const fromEmail = tenantFromEmail || campaign.fromEmail || globalFromEmail;
-    const fromName  = tenantFromName  || campaign.fromName  || globalFromName;
+    let fromEmail = tenantFromEmail || globalFromEmail;
+    let fromName = tenantFromName || globalFromName;
+
+    // Check if campaign has a custom fromEmail
+    if (campaign.fromEmail) {
+        if (campaign.fromEmail === tenantFromEmail) {
+            fromEmail = campaign.fromEmail;
+            fromName = campaign.fromName || tenantFromName;
+        } else {
+            const additionalSenders = tenantEmail.additionalSenders || [];
+            const matchedSender = additionalSenders.find((s: any) => s.email === campaign.fromEmail);
+            if (matchedSender) {
+                fromEmail = matchedSender.email;
+                fromName = matchedSender.name || campaign.fromName;
+            }
+        }
+    }
     const subject   = campaign.subject   || campaign.emailSubject || '(No Subject)';
 
     if (!fromEmail && churchId !== 'c1') throw new Error('No "From Email" configured. Set it on the campaign or in App Config → SendGrid.');
@@ -1134,7 +1154,7 @@ export async function executeSend(
             // Always include the unsubscribe footer — on test sends we use the test
             // email address so the link renders correctly, but append a note so the
             // sender knows it's a preview rather than a live unsubscribe token.
-            const unsubHtml = buildUnsubscribeHtml(churchId, recipientEmail, fontFamily, appBaseUrl)
+            const unsubHtml = buildUnsubscribeHtml(churchId, recipientEmail, fontFamily, appBaseUrl, emailProvider)
                 + (testEmail
                     ? `<div style="text-align:center;padding:0 32px 8px;"><p style="margin:0;font-family:${fontFamily};font-size:10px;color:#d1d5db;">(TEST SEND — unsubscribe link not active)</p></div>`
                     : '');
@@ -1466,22 +1486,13 @@ export const getEmailStats = async (req: any, res: any) => {
         // 2. Load system settings (global API key)
         const settingsSnap = await db.doc('system/settings').get();
         const settings = settingsSnap.data() || {};
-        const globalApiKey: string = settings.sendGridApiKey || '';
+        const emailProvider = settings.emailProvider || 'sendgrid';
 
-        if (!globalApiKey || !globalApiKey.startsWith('SG.')) {
-            return res.status(500).json({ error: 'SendGrid is not configured globally' });
-        }
-
-        // 3. Subuser check
+        // 3. Load church settings
         const churchSnap = await db.collection('churches').doc(churchId).get();
         const churchData = churchSnap.data() || {};
         const tenantEmail = churchData.emailSettings || {};
-        const subuserId: string | undefined = tenantEmail.sendGridSubuserId || undefined;
 
-        // 4. Fetch Stats from SendGrid — try BOTH subuser and parent account
-        //    Emails are sent with on-behalf-of (subuser), so category stats should live
-        //    on the subuser. However, some API key configurations only allow parent-level
-        //    access to category stats. We try the subuser first, then fall back to parent.
         let statsSource = 'none';
         let aggregated = {
             requests: 0, delivered: 0, opens: 0, unique_opens: 0,
@@ -1489,56 +1500,98 @@ export const getEmailStats = async (req: any, res: any) => {
             unsubscribes: 0, drops: 0
         };
 
-        // Attempt 1: Query as subuser (where categories should be registered)
-        if (subuserId) {
-            const subuserResult = await fetchCategoryStats(globalApiKey, campaignId, startDate, subuserId);
-            log.info(
-                `[SendGrid Stats] Subuser query (${subuserId}) for ${campaignId}: status=${subuserResult.status}, ` +
-                `records=${subuserResult.data.length}, raw=${JSON.stringify(subuserResult.data).substring(0, 500)}`,
-                'system', { campaignId, subuserId }, churchId
-            );
-
-            if (subuserResult.ok && subuserResult.data.length > 0) {
-                aggregated = aggregateCategoryStats(subuserResult.data, campaignId);
-                const hasData = aggregated.requests > 0 || aggregated.delivered > 0;
-                if (hasData) {
-                    statsSource = 'subuser';
-                }
-            }
-        }
-
-        // Attempt 2: Query as parent account (fallback if subuser had no data)
-        if (statsSource === 'none') {
-            const parentResult = await fetchCategoryStats(globalApiKey, campaignId, startDate);
-            log.info(
-                `[SendGrid Stats] Parent query for ${campaignId}: status=${parentResult.status}, ` +
-                `records=${parentResult.data.length}, raw=${JSON.stringify(parentResult.data).substring(0, 500)}`,
-                'system', { campaignId }, churchId
-            );
-
-            if (parentResult.ok && parentResult.data.length > 0) {
-                aggregated = aggregateCategoryStats(parentResult.data, campaignId);
-                const hasData = aggregated.requests > 0 || aggregated.delivered > 0;
-                if (hasData) {
-                    statsSource = 'parent';
-                }
+        if (emailProvider === 'postmark') {
+            const serverToken = tenantEmail.postmarkServerToken || settings.postmarkApiKey;
+            if (!serverToken) {
+                return res.status(500).json({ error: 'Postmark is not configured for this church' });
             }
 
-            // If parent also returned an error, log it
-            if (!parentResult.ok) {
-                log.warn(
-                    `[SendGrid Stats] Both subuser and parent queries failed for ${campaignId}. ` +
-                    `Parent error: ${parentResult.status} - ${parentResult.error?.substring(0, 300)}`,
+            const url = new URL('https://api.postmarkapp.com/stats/outbound');
+            url.searchParams.set('tag', campaignId);
+
+            const pmRes = await fetch(url.toString(), {
+                headers: {
+                    'X-Postmark-Server-Token': serverToken,
+                    'Accept': 'application/json'
+                }
+            });
+
+            log.info(`[Postmark Stats] Query for ${campaignId}: status=${pmRes.status}`, 'system', { campaignId }, churchId);
+
+            if (pmRes.ok) {
+                const postmarkStats = await pmRes.json();
+                statsSource = 'postmark';
+                
+                aggregated.requests = Number(postmarkStats.Sent) || 0;
+                aggregated.bounces = Number(postmarkStats.Bounced) || 0;
+                aggregated.delivered = aggregated.requests - aggregated.bounces;
+                aggregated.opens = Number(postmarkStats.Opens) || 0;
+                aggregated.unique_opens = Number(postmarkStats.UniqueOpens) || 0;
+                aggregated.clicks = Number(postmarkStats.TotalClicks) || 0;
+                aggregated.unique_clicks = Number(postmarkStats.UniqueLinksClicked) || 0;
+                aggregated.spam_reports = Number(postmarkStats.SpamComplaints) || 0;
+            } else {
+                const errText = await pmRes.text();
+                log.warn(`[Postmark Stats] Error fetching stats for ${campaignId}: ${pmRes.status} ${errText}`, 'system', { campaignId }, churchId);
+            }
+        } else {
+            // --- SendGrid Stats ---
+            const globalApiKey: string = settings.sendGridApiKey || '';
+            if (!globalApiKey || !globalApiKey.startsWith('SG.')) {
+                return res.status(500).json({ error: 'SendGrid is not configured globally' });
+            }
+            const subuserId: string | undefined = tenantEmail.sendGridSubuserId || undefined;
+
+            // Attempt 1: Query as subuser (where categories should be registered)
+            if (subuserId) {
+                const subuserResult = await fetchCategoryStats(globalApiKey, campaignId, startDate, subuserId);
+                log.info(
+                    `[SendGrid Stats] Subuser query (${subuserId}) for ${campaignId}: status=${subuserResult.status}, ` +
+                    `records=${subuserResult.data.length}, raw=${JSON.stringify(subuserResult.data).substring(0, 500)}`,
+                    'system', { campaignId, subuserId }, churchId
+                );
+
+                if (subuserResult.ok && subuserResult.data.length > 0) {
+                    aggregated = aggregateCategoryStats(subuserResult.data, campaignId);
+                    const hasData = aggregated.requests > 0 || aggregated.delivered > 0;
+                    if (hasData) {
+                        statsSource = 'subuser';
+                    }
+                }
+            }
+
+            // Attempt 2: Query as parent account (fallback if subuser had no data)
+            if (statsSource === 'none') {
+                const parentResult = await fetchCategoryStats(globalApiKey, campaignId, startDate);
+                log.info(
+                    `[SendGrid Stats] Parent query for ${campaignId}: status=${parentResult.status}, ` +
+                    `records=${parentResult.data.length}, raw=${JSON.stringify(parentResult.data).substring(0, 500)}`,
                     'system', { campaignId }, churchId
                 );
-            }
-        }
 
-        log.info(
-            `[SendGrid Stats] Final result for ${campaignId}: source=${statsSource}, ` +
-            `delivered=${aggregated.delivered}, opens=${aggregated.opens}, clicks=${aggregated.clicks}`,
-            'system', { campaignId, statsSource }, churchId
-        );
+                if (parentResult.ok && parentResult.data.length > 0) {
+                    aggregated = aggregateCategoryStats(parentResult.data, campaignId);
+                    const hasData = aggregated.requests > 0 || aggregated.delivered > 0;
+                    if (hasData) {
+                        statsSource = 'parent';
+                    }
+                }
+
+                if (!parentResult.ok) {
+                    log.warn(
+                        `[SendGrid Stats] Both subuser and parent queries failed for ${campaignId}. ` +
+                        `Parent error: ${parentResult.status} - ${parentResult.error?.substring(0, 300)}`,
+                        'system', { campaignId }, churchId
+                    );
+                }
+            }
+
+            log.info(
+                `[SendGrid Stats] Final result for ${campaignId}: source=${statsSource}, ` +
+                `delivered=${aggregated.delivered}, opens=${aggregated.opens}, clicks=${aggregated.clicks}`,
+                'system', { campaignId, statsSource }, churchId
+            );
+        }
 
         // 5. Return stats + diagnostic info
         //    If SendGrid has no category data yet (empty array = processing delay),

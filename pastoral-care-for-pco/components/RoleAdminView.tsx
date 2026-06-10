@@ -2246,7 +2246,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
         )}
 
         {activeTab === 'Mail Settings' && (() => {
-            const SHARED_DOMAIN = 'pastoralcare.barnabassoftware.com';
+            const SHARED_DOMAIN = mailWizardProvider === 'postmark' ? 'barnabassoftware.com' : 'pastoralcare.barnabassoftware.com';
             const sysApiUrl = (church as any)._apiBaseUrl || 'https://pastoralcare.barnabassoftware.com';
 
             const getApiBase = async () => {
