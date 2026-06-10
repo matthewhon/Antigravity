@@ -302,15 +302,53 @@ export const handleStripeWebhook = async (req: any, res: any) => {
                 });
 
                 const provider = await resolveEmailProvider(db);
+
+                // For Postmark, system-level emails need a Server token (the Account
+                // token cannot send mail). Use the church's tenant token if available,
+                // or fetch the first server's token from the Postmark account.
+                let systemTenantToken: string | undefined;
+                if (emailProvider === 'postmark') {
+                    // Try using the church's existing server token
+                    systemTenantToken = church.emailSettings?.postmarkServerToken;
+                    if (!systemTenantToken) {
+                        // Fallback: fetch the first server from the Postmark account
+                        try {
+                            const listRes = await fetch('https://api.postmarkapp.com/servers?count=1&offset=0', {
+                                headers: {
+                                    'X-Postmark-Account-Token': sgKey,
+                                    Accept: 'application/json',
+                                },
+                            });
+                            if (listRes.ok) {
+                                const listData = await listRes.json();
+                                const firstServer = listData.Servers?.[0];
+                                if (firstServer) {
+                                    const detailRes = await fetch(`https://api.postmarkapp.com/servers/${firstServer.ID}`, {
+                                        headers: {
+                                            'X-Postmark-Account-Token': sgKey,
+                                            Accept: 'application/json',
+                                        },
+                                    });
+                                    if (detailRes.ok) {
+                                        const detail = await detailRes.json();
+                                        systemTenantToken = detail.ApiTokens?.[0] || undefined;
+                                    }
+                                }
+                            }
+                        } catch (e) {
+                            console.warn('[StripeWebhook] Could not fetch Postmark server token for receipt:', e);
+                        }
+                    }
+                }
+
                 await provider.send([{
                     to:      toEmail,
                     from:    { email: fromEmail, name: fromName },
                     subject: `✅ Receipt: ${planName} Plan — ${amountPaid} – Pastoral Care for PCO`,
                     html,
                 }], {
-                    // Receipt emails are system-level (no per-church tenant token)
-                    // and must use the transactional stream for reliable delivery.
                     apiKey: sgKey,
+                    tenantToken: systemTenantToken,
                     stream: 'transactional',
                 });
 

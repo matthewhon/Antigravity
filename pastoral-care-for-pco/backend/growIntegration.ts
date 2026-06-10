@@ -226,8 +226,22 @@ export async function handleGrowDailyEmail(req: any, res: any) {
 
         const tenantEmail = churchData.emailSettings || {};
         const isCustomDomainMode = tenantEmail.mode === 'custom';
-        const subuserId: string | undefined =
+        let subuserId: string | undefined =
             tenantEmail.postmarkServerToken || tenantEmail.sendGridSubuserId || undefined;
+
+        // Auto-provision Postmark Server if needed
+        if (emailProvider === 'postmark' && !tenantEmail.postmarkServerToken) {
+            try {
+                const provider = await resolveEmailProvider(db);
+                if (provider.provisionTenant) {
+                    const prefix = churchData.slug || churchId.replace(/[^a-z0-9]/gi, '').substring(0, 8).toLowerCase();
+                    const { tenantToken } = await provider.provisionTenant(db, churchId, prefix, churchData.name || 'Church');
+                    subuserId = tenantToken;
+                }
+            } catch (provErr: any) {
+                log.error(`[GrowIntegration] Postmark auto-provisioning failed: ${provErr.message}`, 'system', { churchId }, churchId);
+            }
+        }
 
         // Guard against unverified custom domains
         if (isCustomDomainMode && !tenantEmail.domainVerified) {

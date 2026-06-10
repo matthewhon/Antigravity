@@ -78,6 +78,75 @@ function extractDnsRecords(data: any): DnsRecord[] {
     return records;
 }
 
+/**
+ * Find an existing Postmark Server by name, or create one if it doesn't exist.
+ * The Postmark /servers list API does NOT support a name filter parameter,
+ * so we must fetch all servers and search client-side.
+ */
+async function findOrCreateServer(
+    accountToken: string,
+    serverName: string,
+    log: any,
+    churchId: string
+): Promise<{ serverId: number; serverToken: string }> {
+    // Step 1: List ALL servers and look for an existing match
+    const listRes = await fetch(`${PM_API}/servers?count=500&offset=0`, {
+        headers: pmAccountHeaders(accountToken),
+    });
+
+    if (listRes.ok) {
+        const listData = await listRes.json();
+        const match = (listData.Servers || []).find(
+            (s: any) => s.Name.toLowerCase() === serverName.toLowerCase()
+        );
+        if (match) {
+            // Existing server found — fetch its full details to get the API token
+            // (the list endpoint may not include ApiTokens)
+            const detailRes = await fetch(`${PM_API}/servers/${match.ID}`, {
+                headers: pmAccountHeaders(accountToken),
+            });
+            if (detailRes.ok) {
+                const detail = await detailRes.json();
+                const token = detail.ApiTokens?.[0] || '';
+                if (token) {
+                    log.info(`Recovered existing Postmark Server "${serverName}" (ID: ${match.ID})`, 'system', { churchId, serverId: match.ID }, churchId);
+                    return { serverId: match.ID, serverToken: token };
+                }
+            }
+        }
+    }
+
+    // Step 2: No existing server found — create a new one
+    const createRes = await fetch(`${PM_API}/servers`, {
+        method: 'POST',
+        headers: pmAccountHeaders(accountToken),
+        body: JSON.stringify({
+            Name: serverName,
+            Color: 'Blue',
+            SmtpApiActivated: false,
+        }),
+    });
+
+    if (!createRes.ok) {
+        const errBody = await createRes.json().catch(() => ({}));
+        const errMsg = (errBody as any)?.Message || `Postmark returned ${createRes.status}`;
+        throw new Error(`Postmark Server creation failed: ${errMsg}`);
+    }
+
+    const serverData = await createRes.json();
+    const serverId = serverData.ID;
+    // Postmark ApiTokens may be plain strings or objects with .Token — handle both
+    const rawToken = serverData.ApiTokens?.[0];
+    const serverToken = typeof rawToken === 'string' ? rawToken : rawToken?.Token;
+
+    if (!serverToken) {
+        throw new Error('Postmark Server created but no API token returned. Check Postmark account permissions.');
+    }
+
+    log.info(`Created new Postmark Server "${serverName}" (ID: ${serverId}) for ${churchId}`, 'system', { churchId, serverId }, churchId);
+    return { serverId, serverToken };
+}
+
 // ─── Provider class ───────────────────────────────────────────────────────────
 
 export class PostmarkProvider implements EmailProvider {
@@ -157,55 +226,10 @@ export class PostmarkProvider implements EmailProvider {
             serverId = church.emailSettings?.postmarkServerId;
             log.info(`Reusing existing Postmark Server for ${churchId}`, 'system', { churchId }, churchId);
         } else {
-            // Create a new Postmark Server for this church tenant
             const serverName = `pco_${churchId.replace(/[^a-z0-9]/gi, '').substring(0, 20).toLowerCase()}`;
-
-            const createRes = await fetch(`${PM_API}/servers`, {
-                method: 'POST',
-                headers: pmAccountHeaders(accountToken),
-                body: JSON.stringify({
-                    Name: serverName,
-                    Color: 'Blue',
-                    SmtpApiActivated: false,
-                }),
-            });
-
-            if (!createRes.ok) {
-                const errBody = await createRes.json().catch(() => ({}));
-                const errMsg = (errBody as any)?.Message || `Postmark returned ${createRes.status}`;
-                
-                if (createRes.status === 422 && errMsg.toLowerCase().includes('already exists')) {
-                    log.info(`Server "${serverName}" already exists. Fetching from Postmark...`, 'system', { churchId }, churchId);
-                    const listRes = await fetch(`${PM_API}/servers?count=100&offset=0&name=${serverName}`, {
-                        headers: pmAccountHeaders(accountToken),
-                    });
-                    if (listRes.ok) {
-                        const listData = await listRes.json();
-                        const existingServer = listData.Servers?.find((s: any) => s.Name.toLowerCase() === serverName.toLowerCase());
-                        if (existingServer) {
-                            serverId = existingServer.ID;
-                            serverToken = existingServer.ApiTokens?.[0]?.Token;
-                            log.info(`Recovered existing Postmark Server "${serverName}" (ID: ${serverId})`, 'system', { churchId, serverId }, churchId);
-                        }
-                    }
-                }
-                
-                if (!serverToken) {
-                    throw new Error(`Postmark Server creation failed: ${errMsg}`);
-                }
-            } else {
-                const serverData = await createRes.json();
-                serverId = serverData.ID;
-                serverToken = serverData.ApiTokens?.[0]?.Token;
-            }
-
-            if (!serverToken) {
-                throw new Error('Postmark Server created/recovered but no API token returned. Check Postmark account permissions.');
-            }
-
-            if (createRes.ok) {
-                log.info(`Created Postmark Server "${serverName}" (ID: ${serverId}) for ${churchId}`, 'system', { churchId, serverId }, churchId);
-            }
+            const result = await findOrCreateServer(accountToken, serverName, log, churchId);
+            serverId = result.serverId;
+            serverToken = result.serverToken;
         }
 
         const fromEmail = `${prefix}@${SHARED_DOMAIN}`;
@@ -246,52 +270,9 @@ export class PostmarkProvider implements EmailProvider {
             log.info(`No Postmark Server found for ${churchId} during domain authentication. Auto-provisioning server...`, 'system', { churchId }, churchId);
             const serverName = `pco_${churchId.replace(/[^a-z0-9]/gi, '').substring(0, 20).toLowerCase()}`;
             try {
-                const createRes = await fetch(`${PM_API}/servers`, {
-                    method: 'POST',
-                    headers: pmAccountHeaders(accountToken),
-                    body: JSON.stringify({
-                        Name: serverName,
-                        Color: 'Blue',
-                        SmtpApiActivated: false,
-                    }),
-                });
-
-                if (!createRes.ok) {
-                    const errBody = await createRes.json().catch(() => ({}));
-                    const errMsg = (errBody as any)?.Message || `Postmark returned ${createRes.status}`;
-                    
-                    if (createRes.status === 422 && errMsg.toLowerCase().includes('already exists')) {
-                        log.info(`Server "${serverName}" already exists. Fetching from Postmark...`, 'system', { churchId }, churchId);
-                        const listRes = await fetch(`${PM_API}/servers?count=100&offset=0&name=${serverName}`, {
-                            headers: pmAccountHeaders(accountToken),
-                        });
-                        if (listRes.ok) {
-                            const listData = await listRes.json();
-                            const existingServer = listData.Servers?.find((s: any) => s.Name.toLowerCase() === serverName.toLowerCase());
-                            if (existingServer) {
-                                serverId = existingServer.ID;
-                                serverToken = existingServer.ApiTokens?.[0]?.Token;
-                                log.info(`Recovered existing Postmark Server "${serverName}" (ID: ${serverId})`, 'system', { churchId, serverId }, churchId);
-                            }
-                        }
-                    }
-
-                    if (!serverToken) {
-                        throw new Error(`Auto-provisioning Server failed: ${errMsg}`);
-                    }
-                } else {
-                    const serverData = await createRes.json();
-                    serverId = serverData.ID;
-                    serverToken = serverData.ApiTokens?.[0]?.Token;
-                }
-
-                if (!serverToken) {
-                    throw new Error('Postmark Server created/recovered but no API token returned.');
-                }
-                
-                if (createRes.ok) {
-                    log.info(`Auto-created Postmark Server "${serverName}" (ID: ${serverId}) for ${churchId}`, 'system', { churchId, serverId }, churchId);
-                }
+                const result = await findOrCreateServer(accountToken, serverName, log, churchId);
+                serverId = result.serverId;
+                serverToken = result.serverToken;
             } catch (serverErr: any) {
                 log.error(`Failed to auto-create Postmark Server: ${serverErr.message}`, 'system', { churchId }, churchId);
                 throw new Error(`Postmark Server creation is required before domain setup: ${serverErr.message}`);
