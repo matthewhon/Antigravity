@@ -2238,7 +2238,8 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
             }
         }
         return new Promise((resolve, reject) => {
-            const path = `sms-media/${churchId}/${Date.now()}_${file.name}`;
+            const cleanName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+            const path = `sms-media/${churchId}/${Date.now()}_${cleanName}`;
             const fileRef = storageRef(storage, path);
             const task = uploadBytesResumable(fileRef, uploadData);
             task.on('state_changed',
@@ -5163,7 +5164,8 @@ const WorkflowMmsUploader: React.FC<{
         setUploading(true);
         setUploadPct(0);
         try {
-            const path = `sms-media/${churchId}/workflow/${Date.now()}_${file.name}`;
+            const cleanName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+            const path = `sms-media/${churchId}/workflow/${Date.now()}_${cleanName}`;
             const fileRef = storageRef(storage, path);
             let uploadData: Blob | File = file;
             if (Capacitor.isNativePlatform()) {
@@ -5273,7 +5275,8 @@ const WorkflowSmsImageAttachment: React.FC<{
         setUploading(true);
         setUploadPct(0);
         try {
-            const path = `sms-media/${churchId}/workflow/${Date.now()}_${file.name}`;
+            const cleanName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+            const path = `sms-media/${churchId}/workflow/${Date.now()}_${cleanName}`;
             const fileRef = storageRef(storage, path);
             let uploadData: Blob | File = file;
             if (Capacitor.isNativePlatform()) {

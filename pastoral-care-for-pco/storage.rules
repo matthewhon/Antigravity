@@ -32,6 +32,12 @@ service firebase.storage {
       allow write: if request.auth != null;
     }
 
+    // ─── SMS Inbox/Workflow Media Uploads ─────────────────────────────────────
+    match /sms-media/{churchId}/{allPaths=**} {
+      allow read: if true; // Public read so Twilio can download the attachment
+      allow write: if request.auth != null;
+    }
+
     // ─── All other paths blocked by default ──────────────────────────────────
     match /{allPaths=**} {
       allow read, write: if false;
