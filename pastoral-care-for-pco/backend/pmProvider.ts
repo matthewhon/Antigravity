@@ -176,7 +176,7 @@ export class PostmarkProvider implements EmailProvider {
                 
                 if (createRes.status === 422 && errMsg.toLowerCase().includes('already exists')) {
                     log.info(`Server "${serverName}" already exists. Fetching from Postmark...`, 'system', { churchId }, churchId);
-                    const listRes = await fetch(`${PM_API}/servers?count=100&name=${serverName}`, {
+                    const listRes = await fetch(`${PM_API}/servers?count=100&offset=0&name=${serverName}`, {
                         headers: pmAccountHeaders(accountToken),
                     });
                     if (listRes.ok) {
@@ -262,7 +262,7 @@ export class PostmarkProvider implements EmailProvider {
                     
                     if (createRes.status === 422 && errMsg.toLowerCase().includes('already exists')) {
                         log.info(`Server "${serverName}" already exists. Fetching from Postmark...`, 'system', { churchId }, churchId);
-                        const listRes = await fetch(`${PM_API}/servers?count=100&name=${serverName}`, {
+                        const listRes = await fetch(`${PM_API}/servers?count=100&offset=0&name=${serverName}`, {
                             headers: pmAccountHeaders(accountToken),
                         });
                         if (listRes.ok) {
