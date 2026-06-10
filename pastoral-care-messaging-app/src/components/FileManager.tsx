@@ -83,7 +83,12 @@ export const FileManager: React.FC<FileManagerProps> = ({ churchId, currentUser,
       let uploadData: Blob | File = file;
       if (Capacitor.isNativePlatform()) {
         try {
-          const buffer = await file.arrayBuffer();
+          const buffer = await new Promise<ArrayBuffer>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as ArrayBuffer);
+            reader.onerror = reject;
+            reader.readAsArrayBuffer(file);
+          });
           uploadData = new Blob([buffer], { type: file.type || 'application/octet-stream' });
         } catch (err) {
           console.error('[UploadHelper] Failed to convert file to Blob', err);
