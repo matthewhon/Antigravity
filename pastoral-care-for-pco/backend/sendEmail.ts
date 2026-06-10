@@ -975,8 +975,18 @@ export async function executeSend(
     const isCustomDomainMode = tenantEmail.mode === 'custom';
     // Resolve the per-church tenant token: Postmark server token takes precedence over
     // SendGrid subuser ID so the correct one is used after the provider switch.
-    const subuserId: string | undefined =
+    let subuserId: string | undefined =
         tenantEmail.postmarkServerToken || tenantEmail.sendGridSubuserId || undefined;
+
+    if (emailProvider === 'postmark' && !tenantEmail.postmarkServerToken) {
+        log.info(`[SendEmail] Auto-provisioning Postmark Server for ${churchId}...`, 'system', {}, churchId);
+        const provider = await resolveEmailProvider(db);
+        if (provider.provisionTenant) {
+            const prefix = churchData.slug || churchId.replace(/[^a-z0-9]/gi, '').substring(0, 8).toLowerCase();
+            const { tenantToken } = await provider.provisionTenant(db, churchId, prefix, churchData.name || 'Church');
+            subuserId = tenantToken;
+        }
+    }
 
     // Guard: if custom domain is configured but not yet DNS-verified, fail early with a
     // clear message rather than letting SendGrid return a cryptic Sender Identity error.
@@ -1257,8 +1267,18 @@ export const sendEmail = async (req: any, res: any) => {
             const churchData = churchSnap.data() || {};
             const tenantEmail = churchData.emailSettings || {};
             const isCustomDomainMode = tenantEmail.mode === 'custom';
-            const subuserId: string | undefined =
+            let subuserId: string | undefined =
                 tenantEmail.postmarkServerToken || tenantEmail.sendGridSubuserId || undefined;
+
+            if (settings.emailProvider === 'postmark' && !tenantEmail.postmarkServerToken) {
+                log.info(`[SendEmail] Auto-provisioning Postmark Server for ${churchId} (Ad-hoc)...`, 'system', {}, churchId);
+                const provider = await resolveEmailProvider(db);
+                if (provider.provisionTenant) {
+                    const prefix = churchData.slug || churchId.replace(/[^a-z0-9]/gi, '').substring(0, 8).toLowerCase();
+                    const { tenantToken } = await provider.provisionTenant(db, churchId, prefix, churchData.name || 'Church');
+                    subuserId = tenantToken;
+                }
+            }
 
             if (churchId !== 'c1' && isCustomDomainMode && !tenantEmail.domainVerified) {
                 throw new Error(`Custom domain not verified`);
