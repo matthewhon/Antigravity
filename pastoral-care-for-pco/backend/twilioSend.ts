@@ -220,7 +220,9 @@ export const sendIndividual = async (req: any, res: any) => {
         twilioNumberId,     // optional: override which number to send from
         conversationId: existingConvId,
     } = req.body || {};
-    if (!churchId || !toPhone || !body) {
+    const hasBody = !!(body && body.trim());
+    const hasMedia = Array.isArray(mediaUrls) && mediaUrls.length > 0;
+    if (!churchId || !toPhone || (!hasBody && !hasMedia)) {
         return res.status(400).json({ error: 'Missing churchId, toPhone, or body' });
     }
 
@@ -254,8 +256,8 @@ export const sendIndividual = async (req: any, res: any) => {
         // Send via Twilio — prefer messagingServiceSid (A2P compliance) over bare from:
         const statusCallbackUrl = await getStatusCallbackUrl(db);
         const msgParams: any = messagingServiceSid
-            ? { messagingServiceSid, to, body }
-            : { from: fromNumber, to, body };
+            ? { messagingServiceSid, to, body: body || '' }
+            : { from: fromNumber, to, body: body || '' };
         if (isMms) msgParams.mediaUrl = mediaUrls;
         if (statusCallbackUrl) {
             msgParams.statusCallback       = statusCallbackUrl;

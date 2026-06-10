@@ -271,7 +271,7 @@ export async function sendIndividualInternal(params: {
     const baseUrl = await getSmsWebhookBaseUrl();
     const statusCallbackUrl = baseUrl ? `${baseUrl}/api/messaging/status` : null;
 
-    const msgParams: any = { from: fromNumber, to, body };
+    const msgParams: any = { from: fromNumber, to, body: body || '' };
     if (isMms) msgParams.mediaUrl = localMediaUrls;
     if (statusCallbackUrl) {
         msgParams.statusCallback       = statusCallbackUrl;
@@ -387,7 +387,9 @@ export const sendIndividual = async (req: any, res: any) => {
         personName,
     } = req.body || {};
 
-    if (!churchId || !toPhone || !body) {
+    const hasBody = !!(body && body.trim());
+    const hasMedia = Array.isArray(mediaUrls) && mediaUrls.length > 0;
+    if (!churchId || !toPhone || (!hasBody && !hasMedia)) {
         return res.status(400).json({ error: 'Missing churchId, toPhone, or body' });
     }
 
