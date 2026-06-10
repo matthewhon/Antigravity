@@ -223,11 +223,10 @@ async function handleDonationEvent(eventName: string, data: any, included: any[]
             fundName = fundResource.attributes.name;
         } else {
             // Fall back to Firestore cache
-            const fundDoc = await db.collection('giving_funds')
-                .where('churchId', '==', churchId)
-                .where('pcoId', '==', fundId)
-                .limit(1).get();
-            if (!fundDoc.empty) fundName = fundDoc.docs[0].data().name || 'General';
+            const fundDoc = await db.collection('funds').doc(fundId).get();
+            if (fundDoc.exists) {
+                fundName = fundDoc.data()?.name || 'General';
+            }
         }
     }
 
@@ -307,18 +306,15 @@ async function handleFundEvent(eventName: string, data: any, churchId: string) {
     const attrs = data.attributes;
 
     if (eventName.endsWith('.destroyed')) {
-        await db.collection('giving_funds').doc(`${churchId}_${fundId}`).delete();
+        await db.collection('funds').doc(fundId).delete();
         log.info(`Fund destroyed via webhook`, 'webhook', { fundId, churchId }, churchId);
         return;
     }
 
-    await db.collection('giving_funds').doc(`${churchId}_${fundId}`).set({
-        id: `${churchId}_${fundId}`,
-        pcoId: fundId,
+    await db.collection('funds').doc(fundId).set({
+        id: fundId,
         churchId,
         name: attrs.name || 'Unknown Fund',
-        isDefault: attrs.default || false,
-        isVisible: attrs.visible || true,
         lastUpdated: Date.now(),
     }, { merge: true });
 
