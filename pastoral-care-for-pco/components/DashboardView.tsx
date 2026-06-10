@@ -116,26 +116,30 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   };
 
   // --- Drag-and-Drop reordering ---
-  const dragItem = useRef<number | null>(null);
-  const dragOverItem = useRef<number | null>(null);
+  const dragItem = useRef<string | null>(null);
+  const dragOverItem = useRef<string | null>(null);
 
-  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, position: number) => {
-    dragItem.current = position;
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, id: string) => {
+    dragItem.current = id;
     e.currentTarget.style.opacity = '0.5';
   };
 
-  const handleDragEnter = (_e: React.DragEvent<HTMLDivElement>, position: number) => {
-    dragOverItem.current = position;
+  const handleDragEnter = (_e: React.DragEvent<HTMLDivElement>, id: string) => {
+    dragOverItem.current = id;
   };
 
   const handleDragEnd = (e: React.DragEvent<HTMLDivElement>) => {
     e.currentTarget.style.opacity = '1';
     if (dragItem.current !== null && dragOverItem.current !== null && dragItem.current !== dragOverItem.current) {
       const copy = [...safeVisibleWidgets];
-      const dragged = copy[dragItem.current];
-      copy.splice(dragItem.current, 1);
-      copy.splice(dragOverItem.current, 0, dragged);
-      onUpdateWidgets(copy);
+      const dragIndex = copy.indexOf(dragItem.current);
+      const hoverIndex = copy.indexOf(dragOverItem.current);
+      if (dragIndex !== -1 && hoverIndex !== -1) {
+        const dragged = copy[dragIndex];
+        copy.splice(dragIndex, 1);
+        copy.splice(hoverIndex, 0, dragged);
+        onUpdateWidgets(copy);
+      }
     }
     dragItem.current = null;
     dragOverItem.current = null;
@@ -164,6 +168,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           groupRiskSettings
       );
   }, [groupRiskSettings, groupsData?.allGroups, peopleData?.allPeople]);
+
+  const fixedWidgetsConfig = ['people_stats', 'services_timeline'];
+  const activeFixedWidgets = safeVisibleWidgets.filter(w => fixedWidgetsConfig.includes(w));
+  const safeVisibleDraggableWidgets = safeVisibleWidgets.filter(w => !fixedWidgetsConfig.includes(w));
 
   const renderWidget = (id: string) => {
       const currentTheme = user.theme;
@@ -681,28 +689,42 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 grid-flow-row-dense">
-            {safeVisibleWidgets.map((id, index) => {
-                return (
-                    <div
-                        key={id}
-                        className="break-inside-avoid mb-6 cursor-grab active:cursor-grabbing transition-opacity w-full inline-block"
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, index)}
-                        onDragEnter={(e) => handleDragEnter(e, index)}
-                        onDragEnd={handleDragEnd}
-                        onDragOver={handleDragOver}
-                    >
-                        {renderWidget(id)}
-                    </div>
-                );
-            })}
-            {safeVisibleWidgets.length === 0 && (
-                <div className="py-20 text-center bg-slate-50 dark:bg-slate-900 rounded-3xl border border-dashed border-slate-200 dark:border-slate-700 break-inside-avoid w-full inline-block">
-                    <p className="text-slate-400 dark:text-slate-500 font-bold">Dashboard is empty.</p>
-                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">Use the "Customize Layout" button to add widgets.</p>
+        <div className="flex flex-col lg:flex-row gap-6 items-start">
+            {/* Fixed Column */}
+            {activeFixedWidgets.length > 0 && (
+                <div className="w-full lg:w-1/3 flex flex-col gap-6">
+                    {activeFixedWidgets.map(id => (
+                        <div key={id} className="w-full">
+                            {renderWidget(id)}
+                        </div>
+                    ))}
                 </div>
             )}
+
+            {/* Draggable Grid */}
+            <div className={`w-full ${activeFixedWidgets.length > 0 ? 'lg:w-2/3' : ''} grid grid-cols-1 md:grid-cols-2 gap-6 grid-flow-row-dense content-start`}>
+                {safeVisibleDraggableWidgets.map((id) => {
+                    return (
+                        <div
+                            key={id}
+                            className="break-inside-avoid cursor-grab active:cursor-grabbing transition-opacity w-full inline-block"
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, id)}
+                            onDragEnter={(e) => handleDragEnter(e, id)}
+                            onDragEnd={handleDragEnd}
+                            onDragOver={handleDragOver}
+                        >
+                            {renderWidget(id)}
+                        </div>
+                    );
+                })}
+                {safeVisibleWidgets.length === 0 && (
+                    <div className="col-span-1 md:col-span-2 py-20 text-center bg-slate-50 dark:bg-slate-900 rounded-3xl border border-dashed border-slate-200 dark:border-slate-700 break-inside-avoid w-full inline-block">
+                        <p className="text-slate-400 dark:text-slate-500 font-bold">Dashboard is empty.</p>
+                        <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">Use the "Customize Layout" button to add widgets.</p>
+                    </div>
+                )}
+            </div>
         </div>
       </div>
 
