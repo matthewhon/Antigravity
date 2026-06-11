@@ -4,8 +4,10 @@ import { arrayMove, SortableContext, verticalListSortingStrategy, useSortable } 
 import { CSS } from '@dnd-kit/utilities';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import { storage } from '../services/firebase';
+import { storage, db } from '../services/firebase';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL, listAll } from 'firebase/storage';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { firestore } from '../services/firestoreService';
 import { pcoService } from '../services/pcoService';
 import { generateEmailContent } from '../services/geminiService';
 import { AnalyticsWidgetBlock, AnalyticsWidgetId } from './DataChartSelector';
@@ -258,6 +260,215 @@ const MediaLibraryPicker: React.FC<{
   );
 };
 
+const InsertResourceModal: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  churchId: string;
+  onConfirm: (url: string, text: string) => void;
+}> = ({ isOpen, onClose, churchId, onConfirm }) => {
+  const [activeTab, setActiveTab] = useState<'forms' | 'polls' | 'notes'>('forms');
+  const [search, setSearch] = useState('');
+  const [linkText, setLinkText] = useState('');
+  const [selectedItem, setSelectedItem] = useState<{ id: string; title: string; url: string } | null>(null);
+  
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [forms, setForms] = useState<any[]>([]);
+  const [polls, setPolls] = useState<Poll[]>([]);
+  const [notes, setNotes] = useState<ChurchNote[]>([]);
+
+  useEffect(() => {
+    if (!isOpen || !churchId) return;
+    
+    const fetchResources = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const [formsSnap, pollsList, notesList] = await Promise.all([
+          getDocs(query(collection(db, 'pco_forms'), where('churchId', '==', churchId))),
+          firestore.getPolls(churchId),
+          firestore.getNotes(churchId)
+        ]);
+        
+        setForms(formsSnap.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            title: data.name || data.title || 'Untitled Form',
+            url: `${window.location.origin}/form/${churchId}/${doc.id}`
+          };
+        }));
+        
+        setPolls((pollsList || []).map(p => ({
+          id: p.id,
+          title: p.title || 'Untitled Poll',
+          url: `${window.location.origin}/poll/${p.id}`
+        })) as any);
+
+        setNotes((notesList || []).map(n => ({
+          id: n.id,
+          title: n.title || 'Untitled Note',
+          url: `${window.location.origin}/note/${n.id}`
+        })) as any);
+      } catch (err: any) {
+        console.error('Error fetching resources:', err);
+        setError('Failed to load resources. Please check your connection.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchResources();
+    setSelectedItem(null);
+    setLinkText('');
+    setSearch('');
+  }, [isOpen, churchId]);
+
+  if (!isOpen) return null;
+
+  const getFilteredItems = () => {
+    const list = activeTab === 'forms' ? forms : activeTab === 'polls' ? polls : notes;
+    return list.filter(item => 
+      item.title.toLowerCase().includes(search.toLowerCase())
+    );
+  };
+
+  const handleSelect = (item: { id: string; title: string; url: string }) => {
+    setSelectedItem(item);
+    setLinkText(item.title);
+  };
+
+  const handleConfirm = () => {
+    if (!selectedItem) return;
+    onConfirm(selectedItem.url, linkText || selectedItem.title);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div 
+        className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-[500px] max-h-[80vh] flex flex-col overflow-hidden border border-slate-200 dark:border-slate-800"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
+          <h3 className="font-bold text-slate-900 dark:text-white text-sm flex items-center gap-2">
+            <ClipboardList size={16} className="text-indigo-500" />
+            Insert Resource Link
+          </h3>
+          <button onClick={onClose} title="Close" className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition">
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 px-4">
+          {(['forms', 'polls', 'notes'] as const).map(tab => (
+            <button
+              key={tab}
+              onClick={() => {
+                setActiveTab(tab);
+                setSelectedItem(null);
+                setSearch('');
+              }}
+              className={`px-4 py-2.5 text-xs font-semibold border-b-2 capitalize transition ${
+                activeTab === tab
+                  ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
+                  : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+
+        {/* Search */}
+        <div className="p-4 border-b border-slate-100 dark:border-slate-800">
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder={`Search ${activeTab}…`}
+              title={`Search ${activeTab}`}
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+            />
+          </div>
+        </div>
+
+        {/* List Content */}
+        <div className="flex-1 overflow-y-auto p-4 min-h-[200px] max-h-[300px]">
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-10 text-slate-400 gap-2 text-xs">
+              <Loader2 size={20} className="animate-spin text-indigo-500" />
+              <span>Loading resources…</span>
+            </div>
+          ) : error ? (
+            <div className="text-center py-10 text-red-500 text-xs font-medium">{error}</div>
+          ) : getFilteredItems().length === 0 ? (
+            <div className="text-center py-10 text-slate-400 text-xs">No {activeTab} found.</div>
+          ) : (
+            <div className="space-y-1">
+              {getFilteredItems().map(item => {
+                const isSelected = selectedItem?.id === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => handleSelect(item)}
+                    className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-left text-xs font-medium transition ${
+                      isSelected
+                        ? 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/60'
+                        : 'hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-300 border border-transparent'
+                    }`}
+                  >
+                    <span className="truncate pr-4">{item.title}</span>
+                    {isSelected && <Check size={14} className="text-indigo-500 shrink-0" />}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Link customization & actions */}
+        <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/30 space-y-3">
+          <div>
+            <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5">
+              Link Text
+            </label>
+            <input
+              type="text"
+              placeholder={selectedItem ? "Enter customized link text…" : "Select a resource first"}
+              title="Link Text"
+              value={linkText}
+              onChange={e => setLinkText(e.target.value)}
+              disabled={!selectedItem}
+              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 disabled:opacity-60 transition"
+            />
+          </div>
+
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleConfirm}
+              disabled={!selectedItem}
+              className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 transition"
+            >
+              Insert Link
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── Inline text editor (embedded Tiptap) ─────────────────────────────────────
 
 const ALL_MERGE_TAGS = [
@@ -275,8 +486,10 @@ const ALL_MERGE_TAGS = [
 const InlineTextEditor: React.FC<{
   block: EmailBlock;
   onUpdate: (content: any) => void;
-}> = ({ block, onUpdate }) => {
+  churchId?: string;
+}> = ({ block, onUpdate, churchId }) => {
   const [showLinkInput, setShowLinkInput] = useState(false);
+  const [showResourceModal, setShowResourceModal] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
   const [align, setAlign] = useState<'left' | 'center' | 'right'>(
     block.content?.align || 'left'
@@ -321,6 +534,12 @@ const InlineTextEditor: React.FC<{
     onUpdate({ ...block.content, text: editor.getHTML(), html: editor.getHTML(), align });
   };
 
+  const handleInsertResourceLink = (url: string, text: string) => {
+    if (!editor) return;
+    editor.chain().focus().insertContent(`<a href="${url}" target="_blank" style="color: #6366f1; text-decoration: underline; font-weight: 600;">${text}</a>`).run();
+    onUpdate({ ...block.content, text: editor.getHTML(), html: editor.getHTML(), align });
+  };
+
   const btn = (active: boolean) =>
     `p-1 rounded transition text-xs ${
       active ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300'
@@ -348,7 +567,25 @@ const InlineTextEditor: React.FC<{
         <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-0.5" />
         {/* Link */}
         <button onClick={() => setShowLinkInput(v => !v)} className={btn(showLinkInput)} title="Insert link"><Link size={12} /></button>
+        {churchId && (
+          <button 
+            onClick={() => setShowResourceModal(true)} 
+            className={btn(showResourceModal)} 
+            title="Insert Link to Form, Poll, or Note"
+          >
+            <ClipboardList size={12} />
+          </button>
+        )}
       </div>
+      {/* Insert Resource Modal */}
+      {churchId && (
+        <InsertResourceModal
+          isOpen={showResourceModal}
+          onClose={() => setShowResourceModal(false)}
+          churchId={churchId}
+          onConfirm={handleInsertResourceLink}
+        />
+      )}
       {/* Link input row */}
       {showLinkInput && (
         <div className="flex items-center gap-1.5 px-2 py-1.5 bg-indigo-50 dark:bg-indigo-900/20 border-b border-indigo-100 dark:border-indigo-800">
@@ -677,7 +914,8 @@ const SortableCanvasBlock: React.FC<{
   onDelete: () => void;
   onDuplicate: () => void;
   onUpdate: (content: any) => void;
-}> = ({ block, isSelected, onSelect, onDelete, onDuplicate, onUpdate }) => {
+  churchId?: string;
+}> = ({ block, isSelected, onSelect, onDelete, onDuplicate, onUpdate, churchId }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: block.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 };
   const isEditable = INLINE_EDITABLE.has(block.type);
@@ -709,15 +947,15 @@ const SortableCanvasBlock: React.FC<{
         {isSelected && isEditable ? (
           <div className="p-3">
             {isTextBlock ? (
-              <InlineTextEditor block={block} onUpdate={onUpdate} />
+              <InlineTextEditor block={block} onUpdate={onUpdate} churchId={churchId} />
             ) : (
-              <InlineMediaEditor block={block} onUpdate={onUpdate} />
+              <InlineMediaEditor block={block} onUpdate={onUpdate} churchId={churchId} />
             )}
           </div>
         ) : (
           <div className="p-4">
             {block.type === 'columns' ? (
-              <ColumnBlockRenderer block={block} onChange={content => onUpdate(content)} />
+              <ColumnBlockRenderer block={block} onChange={content => onUpdate(content)} churchId={churchId} />
             ) : (
               <BlockThumbnail block={block} />
             )}
@@ -799,7 +1037,8 @@ const MiniBlockView: React.FC<{ b: { id: string; type: string; content: any } }>
 const ColumnBlockRenderer: React.FC<{
   block: EmailBlock;
   onChange: (newContent: any) => void;
-}> = ({ block, onChange }) => {
+  churchId?: string;
+}> = ({ block, onChange, churchId }) => {
   const layout: ColumnLayout = block.content?.layout || '2';
   const cells: ColumnCell[] = block.content?.cells || [];
   const [addingInCell, setAddingInCell] = useState<string | null>(null);
@@ -861,6 +1100,7 @@ const ColumnBlockRenderer: React.FC<{
                       <InlineTextEditor
                         block={asMiniBlock}
                         onUpdate={(content) => updateMiniBlock(cell.id, mb.id, content)}
+                        churchId={churchId}
                       />
                     </div>
                   )}
@@ -869,6 +1109,7 @@ const ColumnBlockRenderer: React.FC<{
                       <InlineMediaEditor
                         block={asMiniBlock}
                         onUpdate={(content) => updateMiniBlock(cell.id, mb.id, content)}
+                        churchId={churchId}
                       />
                     </div>
                   )}
@@ -1680,6 +1921,7 @@ export const EmailBuilder: React.FC<EmailBuilderProps> = ({
                         onDelete={() => deleteBlock(block.id)}
                         onDuplicate={() => duplicateBlock(block.id)}
                         onUpdate={content => setBlocks(prev => prev.map(b => b.id === block.id ? { ...b, content } : b))}
+                        churchId={churchId}
                       />
                       {/* "+ Add block" between rows — visible on hover */}
                       <div className="flex items-center gap-2 opacity-0 hover:opacity-100 transition h-4 group/add">
