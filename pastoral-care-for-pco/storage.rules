@@ -38,6 +38,19 @@ service firebase.storage {
       allow write: if request.auth != null;
     }
 
+    // ─── Church Logos ────────────────────────────────────────────────────────
+    match /church_logos/{churchId}/{fileName} {
+      allow read: if true; // Public read so logos display on forms
+      allow write: if request.auth != null;
+    }
+
+    // ─── Public Form File Uploads ────────────────────────────────────────────
+    match /form_uploads/{churchId}/{formId}/{fileName} {
+      allow read: if true; // Allow reading form uploads
+      allow write: if true // Allow public write for form submissions
+                   && request.resource.size < 25 * 1024 * 1024; // Max 25 MB
+    }
+
     // ─── All other paths blocked by default ──────────────────────────────────
     match /{allPaths=**} {
       allow read, write: if false;

@@ -507,7 +507,11 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
         createdAt: activeForm?.createdAt || Date.now()
       };
 
-      await setDoc(docRef, payload, { merge: true });
+      // Firestore rejects 'undefined' values anywhere in the document tree.
+      // Stringifying and parsing is a quick and safe way to strip all 'undefined' properties from the POJO.
+      const cleanPayload = JSON.parse(JSON.stringify(payload));
+
+      await setDoc(docRef, cleanPayload, { merge: true });
       syncQrCodeToLocalStorage(formId, formName.trim());
       await loadForms();
       setIsEditing(false);
