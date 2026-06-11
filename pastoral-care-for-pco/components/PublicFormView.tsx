@@ -198,8 +198,8 @@ export const PublicFormView: React.FC<PublicFormViewProps> = ({ churchId, formId
       style={{ backgroundColor: themeStyles.backgroundColor + '1A', color: themeStyles.textColor }}
     >
       <div 
-        className="w-full max-w-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-8 lg:p-10 shadow-xl relative overflow-hidden transition-colors"
-        style={{ color: themeStyles.textColor }}
+        className="w-full max-w-2xl border border-slate-200/80 dark:border-slate-800 rounded-3xl p-8 lg:p-10 shadow-xl relative overflow-hidden transition-colors"
+        style={{ backgroundColor: themeStyles.backgroundColor, color: themeStyles.textColor }}
       >
         {/* Dynamic Theme Color Top Border Accent */}
         <div className="absolute top-0 left-0 right-0 h-1.5" style={{ backgroundColor: themeStyles.primaryColor }} />
