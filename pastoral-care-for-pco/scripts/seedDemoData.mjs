@@ -685,6 +685,209 @@ PEOPLE.forEach((person, idx) => {
   }
 });
 
+// ─── Users ────────────────────────────────────────────────────────────────────
+const USERS = [
+  {
+    id: 'demo_admin_1',
+    churchId: CHURCH_ID,
+    name: 'Demo Admin',
+    email: 'admin@gracebaptist.church',
+    roles: ['Church Admin', 'Pastor', 'People', 'Services', 'Groups', 'Giving', 'Metrics', 'Messaging', 'Email', 'Workflows', 'Polls'],
+    lastLogin: now,
+    theme: 'dark'
+  }
+];
+
+// ─── Twilio Numbers ────────────────────────────────────────────────────────────
+const TWILIO_NUMBERS = [
+  {
+    id: `${CHURCH_ID}_+14045550199`,
+    churchId: CHURCH_ID,
+    phoneNumber: '+14045550199',
+    friendlyName: 'Grace Baptist Main',
+    isDefault: true,
+    capabilities: { sms: true, mms: true, voice: false },
+    status: 'active',
+    createdAt: now - 365 * 86400_000,
+    updatedAt: now
+  }
+];
+
+// ─── SMS Campaigns ────────────────────────────────────────────────────────────
+const SMS_CAMPAIGNS = [
+  {
+    id: `${CHURCH_ID}_smsCamp1`,
+    churchId: CHURCH_ID,
+    name: 'Easter Service Reminder',
+    status: 'sent',
+    content: "Hi [Name], we can't wait to celebrate Easter with you tomorrow at 9am and 11am! See you there. - Grace Baptist",
+    scheduledAt: now - 30 * 86400_000,
+    sentAt: now - 30 * 86400_000,
+    createdAt: now - 32 * 86400_000,
+    updatedAt: now - 30 * 86400_000,
+    toListName: 'All Members',
+    recipientCount: 150,
+    metrics: { sent: 150, delivered: 148, failed: 2 }
+  },
+  {
+    id: `${CHURCH_ID}_smsCamp2`,
+    churchId: CHURCH_ID,
+    name: 'Youth Group Cancellation',
+    status: 'sent',
+    content: 'Important: Youth group is cancelled tonight due to the weather. Stay safe!',
+    scheduledAt: now - 5 * 86400_000,
+    sentAt: now - 5 * 86400_000,
+    createdAt: now - 5 * 86400_000,
+    updatedAt: now - 5 * 86400_000,
+    toGroupName: 'Youth Group (6th–12th)',
+    recipientCount: 25,
+    metrics: { sent: 25, delivered: 25, failed: 0 }
+  }
+];
+
+// ─── SMS Workflows ────────────────────────────────────────────────────────────
+const SMS_WORKFLOWS = [
+  {
+    id: `${CHURCH_ID}_wf1`,
+    churchId: CHURCH_ID,
+    name: 'First Time Guest Follow-up',
+    isActive: true,
+    trigger: 'keyword',
+    keywordId: 'guest_keyword_id',
+    steps: [
+      { type: 'delay', delayMinutes: 10, channelType: 'sms' },
+      { type: 'message', content: 'Thanks for joining us today! We have a small gift for you at the Welcome Desk.', channelType: 'sms' }
+    ],
+    createdAt: now - 60 * 86400_000,
+    updatedAt: now - 60 * 86400_000
+  }
+];
+
+// ─── SMS Conversations & Messages ──────────────────────────────────────────────
+const SMS_CONVERSATIONS = [];
+const SMS_MESSAGES = [];
+PEOPLE.slice(0, 5).forEach((p, i) => {
+  const convId = `${CHURCH_ID}_${p.phone.replace(/\\D/g, '')}`;
+  SMS_CONVERSATIONS.push({
+    id: convId,
+    churchId: CHURCH_ID,
+    personId: p.id,
+    personName: p.name,
+    twilioNumberId: `${CHURCH_ID}_+14045550199`,
+    twilioPhoneNumber: '+14045550199',
+    contactPhoneNumber: p.phone,
+    lastMessageAt: now - (i * 86400_000),
+    lastMessageBody: i % 2 === 0 ? 'Thanks, Pastor!' : 'Looking forward to Sunday.',
+    lastMessageDirection: 'inbound',
+    unreadCount: i % 2 === 0 ? 1 : 0,
+    status: 'active'
+  });
+  
+  SMS_MESSAGES.push({
+    id: `${convId}_msg1`,
+    churchId: CHURCH_ID,
+    conversationId: convId,
+    body: 'Hi, just a reminder about the volunteer meeting tomorrow at 7 PM.',
+    direction: 'outbound',
+    status: 'delivered',
+    createdAt: now - (i * 86400_000) - 3600_000
+  });
+  SMS_MESSAGES.push({
+    id: `${convId}_msg2`,
+    churchId: CHURCH_ID,
+    conversationId: convId,
+    body: i % 2 === 0 ? 'Thanks, Pastor!' : 'Looking forward to Sunday.',
+    direction: 'inbound',
+    status: 'received',
+    createdAt: now - (i * 86400_000)
+  });
+});
+
+// ─── Email Campaigns ──────────────────────────────────────────────────────────
+const EMAIL_CAMPAIGNS = [
+  {
+    id: `${CHURCH_ID}_email1`,
+    churchId: CHURCH_ID,
+    name: 'Weekly Newsletter',
+    status: 'sent',
+    subject: "What's happening this week at Grace Baptist",
+    fromName: 'Grace Baptist Church',
+    fromEmail: 'office@gracebaptist.church',
+    scheduledAt: now - 3 * 86400_000,
+    sentAt: now - 3 * 86400_000,
+    createdAt: now - 5 * 86400_000,
+    updatedAt: now - 3 * 86400_000,
+    toListName: 'All Members',
+    contentType: 'html',
+    content: '<h1>Weekly Update</h1><p>Here is what is happening...</p>',
+    sentHistory: [{ sentAt: now - 3 * 86400_000, recipientCount: 150 }]
+  },
+  {
+    id: `${CHURCH_ID}_email2`,
+    churchId: CHURCH_ID,
+    name: 'Upcoming Draft Newsletter',
+    status: 'draft',
+    subject: 'Important Update from Pastor John',
+    fromName: 'Pastor John Williams',
+    fromEmail: 'office@gracebaptist.church',
+    createdAt: now - 86400_000,
+    updatedAt: now - 3600_000,
+    contentType: 'html',
+    content: '<h1>Pastor Update</h1><p>Draft content...</p>'
+  }
+];
+
+// ─── Polls ────────────────────────────────────────────────────────────────────
+const POLLS = [
+  {
+    id: `${CHURCH_ID}_poll1`,
+    churchId: CHURCH_ID,
+    title: 'Sermon Series Feedback',
+    description: 'Let us know your thoughts on the recent Fresh Start series.',
+    status: 'active',
+    createdAt: now - 2 * 86400_000,
+    updatedAt: now,
+    questions: [
+      { id: 'q1', type: 'single_choice', text: 'How helpful was the series?', options: ['Very Helpful', 'Somewhat Helpful', 'Not Helpful'], required: true },
+      { id: 'q2', type: 'text', text: 'Any other comments?', required: false }
+    ],
+    responseCount: 12
+  }
+];
+
+// ─── Check-Ins & Weather ──────────────────────────────────────────────────────
+const CHECK_INS = [];
+const WEATHER_RECORDS = [];
+ATTENDANCE.forEach((att) => {
+  WEATHER_RECORDS.push({
+    id: `${CHURCH_ID}_${att.date}`,
+    churchId: CHURCH_ID,
+    date: att.date,
+    tempHigh: rand(50, 90),
+    tempLow: rand(30, 70),
+    precipProb: rand(0, 100),
+    precipAmount: rand(0, 2),
+    conditions: pick(['Clear', 'Rain', 'Cloudy', 'Partly Cloudy']),
+    source: 'visual_crossing',
+    fetchedAt: now
+  });
+
+  if (now - new Date(att.date).getTime() < 30 * 86400_000) {
+    PEOPLE.slice(0, 10).forEach(p => {
+      CHECK_INS.push({
+        id: `${CHURCH_ID}_${p.id}_${att.date}`,
+        churchId: CHURCH_ID,
+        personId: p.id,
+        eventId: `${CHURCH_ID}_evt_${att.date}`,
+        date: att.date,
+        createdAt: new Date(new Date(att.date).getTime() + 8 * 3600_000).toISOString(),
+        checkedInAt: new Date(new Date(att.date).getTime() + 8.5 * 3600_000).toISOString(),
+        kind: 'Regular'
+      });
+    });
+  }
+});
+
 // ─── Church Document ───────────────────────────────────────────────────────────
 
 
@@ -724,23 +927,25 @@ const CHURCH_DOC = {
 
 // ─── Reset ────────────────────────────────────────────────────────────────────
 async function resetDemoData() {
-  console.log('\n🗑  Resetting demo data for tenant:', CHURCH_ID);
+  console.log('\\n🗑  Resetting demo data for tenant:', CHURCH_ID);
   const collections = [
     'people','groups','attendance','detailed_donations','funds','budgets',
     'teams','service_plans','pco_registrations','pco_registration_attendees',
     'pastoral_notes','prayer_requests','ministries','metric_definitions','metric_entries',
-    'risk_changes','status_changes'
+    'risk_changes','status_changes',
+    'users', 'twilioNumbers', 'smsCampaigns', 'smsWorkflows', 'smsConversations',
+    'messages', 'email_campaigns', 'polls', 'check_ins', 'weather'
   ];
   for (const col of collections) {
     await clearCollection(col);
   }
-  console.log('\nReset complete.\n');
+  console.log('\\nReset complete.\\n');
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 async function main() {
-  console.log('\n=== Grace Baptist Church Demo Data Seeder ===');
-  console.log(`Target: ${PROJECT_ID} / ${DATABASE_ID} / tenant: ${CHURCH_ID}\n`);
+  console.log('\\n=== Grace Baptist Church Demo Data Seeder ===');
+  console.log(`Target: ${PROJECT_ID} / ${DATABASE_ID} / tenant: ${CHURCH_ID}\\n`);
 
   if (RESET) {
     await resetDemoData();
@@ -750,53 +955,83 @@ async function main() {
   await db.collection('churches').doc(CHURCH_ID).set(CHURCH_DOC, { merge: true });
   console.log('  ✓ churches/' + CHURCH_ID);
 
-  console.log('\nSeeding people...');
+  console.log('\\nSeeding users...');
+  await batchSet('users', USERS);
+
+  console.log('\\nSeeding Twilio numbers...');
+  await batchSet('twilioNumbers', TWILIO_NUMBERS);
+
+  console.log('\\nSeeding people...');
   await batchSet('people', PEOPLE);
 
-  console.log('\nSeeding groups...');
+  console.log('\\nSeeding groups...');
   await batchSet('groups', GROUPS);
 
-  console.log('\nSeeding attendance (52 weeks)...');
+  console.log('\\nSeeding attendance (52 weeks)...');
   await batchSet('attendance', ATTENDANCE);
 
-  console.log('\nSeeding funds...');
+  console.log('\\nSeeding check-ins...');
+  await batchSet('check_ins', CHECK_INS);
+
+  console.log('\\nSeeding weather records...');
+  await batchSet('weather', WEATHER_RECORDS);
+
+  console.log('\\nSeeding funds...');
   await batchSet('funds', FUNDS);
 
-  console.log('\nSeeding donations (600 records)...');
+  console.log('\\nSeeding donations (600 records)...');
   await batchSet('detailed_donations', DONATIONS);
 
-  console.log('\nSeeding budgets...');
+  console.log('\\nSeeding budgets...');
   await batchSet('budgets', BUDGETS);
 
-  console.log('\nSeeding service teams...');
+  console.log('\\nSeeding service teams...');
   await batchSet('teams', TEAMS);
 
-  console.log('\nSeeding service plans...');
+  console.log('\\nSeeding service plans...');
   await batchSet('service_plans', SERVICE_PLANS);
 
-  console.log('\nSeeding PCO registration events...');
+  console.log('\\nSeeding PCO registration events...');
   await batchSet('pco_registrations', PCOREGISTRATIONS);
 
-  console.log('\nSeeding pastoral notes...');
+  console.log('\\nSeeding pastoral notes...');
   await batchSet('pastoral_notes', PASTORAL_NOTES);
 
-  console.log('\nSeeding prayer requests...');
+  console.log('\\nSeeding prayer requests...');
   await batchSet('prayer_requests', PRAYER_REQUESTS);
 
-  console.log('\nSeeding ministries...');
+  console.log('\\nSeeding ministries...');
   await batchSet('ministries', MINISTRIES);
 
-  console.log('\nSeeding metric definitions...');
+  console.log('\\nSeeding metric definitions...');
   await batchSet('metric_definitions', METRIC_DEFINITIONS);
 
-  console.log('\nSeeding metric entries...');
+  console.log('\\nSeeding metric entries...');
   await batchSet('metric_entries', METRIC_ENTRIES);
 
-  console.log('\nSeeding risk changes...');
+  console.log('\\nSeeding risk changes...');
   await batchSet('risk_changes', RISK_CHANGES);
 
-  console.log('\nSeeding status changes...');
+  console.log('\\nSeeding status changes...');
   await batchSet('status_changes', STATUS_CHANGES);
+
+  console.log('\\nSeeding SMS campaigns...');
+  await batchSet('smsCampaigns', SMS_CAMPAIGNS);
+
+  console.log('\\nSeeding SMS workflows...');
+  await batchSet('smsWorkflows', SMS_WORKFLOWS);
+
+  console.log('\\nSeeding SMS conversations...');
+  await batchSet('smsConversations', SMS_CONVERSATIONS);
+
+  console.log('\\nSeeding SMS messages...');
+  await batchSet('messages', SMS_MESSAGES);
+
+  console.log('\\nSeeding Email campaigns...');
+  await batchSet('email_campaigns', EMAIL_CAMPAIGNS);
+
+  console.log('\\nSeeding Polls...');
+  await batchSet('polls', POLLS);
 
   console.log(`
 ✅ Done! Grace Baptist Church (${CHURCH_ID}) is fully seeded.
@@ -814,12 +1049,19 @@ Summary:
   - ${MINISTRIES.length} ministry departments + metrics
   - ${RISK_CHANGES.length} risk status change records
   - ${STATUS_CHANGES.length} status/membership change records
+  - ${SMS_CAMPAIGNS.length} SMS campaigns
+  - ${EMAIL_CAMPAIGNS.length} Email campaigns
+  - ${SMS_WORKFLOWS.length} SMS workflows
+  - ${SMS_CONVERSATIONS.length} SMS conversations
+  - ${POLLS.length} polls
+  - ${CHECK_INS.length} check-ins
+  - ${WEATHER_RECORDS.length} weather records
 
 Open the app and log in as a Grace Baptist admin to see the data.
 `);
 }
 
 main().catch(e => {
-  console.error('\n✗ Seeder failed:', e.message);
+  console.error('\\n✗ Seeder failed:', e.message);
   process.exit(1);
 });
