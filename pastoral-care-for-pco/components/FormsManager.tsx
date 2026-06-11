@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { db } from '../services/firebase';
+import { db, storage } from '../services/firebase';
 import { collection, query, where, getDocs, doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { firestore } from '../services/firestoreService';
 import { pcoService } from '../services/pcoService';
 import QRCode from 'qrcode';
 import { 
@@ -44,6 +46,7 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
   const [isSubmissionsView, setIsSubmissionsView] = useState(false);
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [loadingSubmissions, setLoadingSubmissions] = useState(false);
+  const [church, setChurch] = useState<any | null>(null);
 
   // Form Editor State
   const [formName, setFormName] = useState('');
@@ -51,6 +54,8 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
   const [customFields, setCustomFields] = useState<any[]>([]);
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'toolbox' | 'pco' | 'settings' | 'themes'>('toolbox');
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
   const [fields, setFields] = useState<any>({
     firstName: { label: 'First Name', required: true, enabled: true },
     middleName: { label: 'Middle Name', required: false, enabled: false },
@@ -191,7 +196,8 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
     primaryColor: '#4F46E5',
     backgroundColor: '#FFFFFF',
     textColor: '#1F2937',
-    buttonTextColor: '#FFFFFF'
+    buttonTextColor: '#FFFFFF',
+    inputBgColor: '#F8FAFC'
   });
   const [actions, setActions] = useState({
     addToGroupId: '',
@@ -216,6 +222,7 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
   useEffect(() => {
     loadForms();
     loadPcoOptions();
+    firestore.getChurch(churchId).then(setChurch).catch(console.error);
   }, [churchId]);
 
   const loadForms = async () => {
@@ -373,6 +380,26 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
     }
   };
 
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingLogo(true);
+    try {
+      const path = `church_logos/${churchId}/${Date.now()}_${file.name}`;
+      const sRef = storageRef(storage, path);
+      const task = uploadBytesResumable(sRef, file);
+      await new Promise<void>((resolve, reject) => {
+        task.on('state_changed', null, reject, () => resolve());
+      });
+      const url = await getDownloadURL(sRef);
+      setStyles(prev => ({ ...prev, logoUrl: url, showLogo: true }));
+    } catch (err: any) {
+      alert(`Logo upload failed: ${err.message}`);
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
   useEffect(() => {
     if (activeForm && qrCanvasRef.current) {
       const link = getPublicLink(activeForm.id);
@@ -440,7 +467,8 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
       primaryColor: '#4F46E5',
       backgroundColor: '#FFFFFF',
       textColor: '#1F2937',
-      buttonTextColor: '#FFFFFF'
+      buttonTextColor: '#FFFFFF',
+      inputBgColor: '#F8FAFC'
     });
     setActions({
       addToGroupId: '',
@@ -937,6 +965,11 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
             
             {/* LEFT CANVAS PANEL (Live Form Preview) */}
             <div className="flex-1 w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 min-h-[600px] flex flex-col transition-all">
+              {styles.showLogo && (styles.logoUrl || church?.logoUrl) && (
+                <div className="mb-4 flex justify-center">
+                  <img src={styles.logoUrl || church?.logoUrl} alt="Church Logo" className="max-h-16 object-contain" />
+                </div>
+              )}
               <div className="mb-6 pb-4 border-b border-slate-200 dark:border-slate-800">
                 <input
                   type="text"
@@ -1043,7 +1076,8 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
                                   type="text"
                                   disabled
                                   placeholder={field.placeholder || 'Enter text...'}
-                                  className="w-full text-xs border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 bg-slate-50 dark:bg-slate-950"
+                                  className="w-full text-xs border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2"
+                                  style={{ backgroundColor: styles.inputBgColor || '#F8FAFC', color: styles.textColor || 'inherit' }}
                                 />
                               )}
 
@@ -1052,7 +1086,8 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
                                   disabled
                                   rows={2}
                                   placeholder={field.placeholder || 'Enter notes or comments...'}
-                                  className="w-full text-xs border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 bg-slate-50 dark:bg-slate-950"
+                                  className="w-full text-xs border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2"
+                                  style={{ backgroundColor: styles.inputBgColor || '#F8FAFC', color: styles.textColor || 'inherit' }}
                                 />
                               )}
 
@@ -1060,23 +1095,24 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
                                 <div className="relative">
                                   <select
                                     disabled
-                                    className="w-full text-xs border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 bg-slate-50 dark:bg-slate-950 text-slate-500 appearance-none"
+                                    className="w-full text-xs border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 appearance-none"
+                                    style={{ backgroundColor: styles.inputBgColor || '#F8FAFC', color: styles.textColor || 'inherit' }}
                                   >
                                     <option>{field.placeholder || 'Select Option...'}</option>
                                     {(field.options || []).map((o: string, oi: number) => (
                                       <option key={oi}>{o}</option>
                                     ))}
                                   </select>
-                                  <ChevronDown size={12} className="absolute right-3 top-2.5 text-slate-400" />
+                                  <ChevronDown size={12} className="absolute right-3 top-2.5 opacity-50" style={{ color: styles.textColor || 'inherit' }} />
                                 </div>
                               )}
 
                               {field.type === 'checkboxes' && (
-                                <div className="flex flex-wrap gap-2.5 p-2 bg-slate-50 dark:bg-slate-950 rounded-lg border border-slate-100 dark:border-slate-900">
+                                <div className="flex flex-wrap gap-2.5 p-2 rounded-lg border border-slate-100 dark:border-slate-900" style={{ backgroundColor: styles.inputBgColor || '#F8FAFC' }}>
                                   {(field.options || []).map((o: string, oi: number) => (
                                     <div key={oi} className="flex items-center gap-1.5">
-                                      <input type="checkbox" disabled className="w-3 h-3 text-indigo-600 rounded" />
-                                      <span className="text-[11px] font-medium text-slate-600 dark:text-slate-400">{o}</span>
+                                      <input type="checkbox" disabled className="w-3 h-3 rounded" style={{ accentColor: styles.primaryColor || '#4F46E5' }} />
+                                      <span className="text-[11px] font-medium" style={{ color: styles.textColor || 'inherit' }}>{o}</span>
                                     </div>
                                   ))}
                                 </div>
@@ -1084,8 +1120,8 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
 
                               {field.type === 'checkbox_single' && (
                                 <div className="flex items-center gap-2 pt-1">
-                                  <input type="checkbox" disabled className="w-3.5 h-3.5 text-indigo-600 rounded" />
-                                  <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-350">{field.label || 'Check option'}</span>
+                                  <input type="checkbox" disabled className="w-3.5 h-3.5 rounded" style={{ accentColor: styles.primaryColor || '#4F46E5' }} />
+                                  <span className="text-[11px] font-semibold" style={{ color: styles.textColor || 'inherit' }}>{field.label || 'Check option'}</span>
                                 </div>
                               )}
 
@@ -1093,7 +1129,8 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
                                 <input
                                   type="date"
                                   disabled
-                                  className="w-full text-xs border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 bg-slate-50 dark:bg-slate-950 text-slate-400"
+                                  className="w-full text-xs border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2"
+                                  style={{ backgroundColor: styles.inputBgColor || '#F8FAFC', color: styles.textColor || 'inherit' }}
                                 />
                               )}
 
@@ -1380,9 +1417,9 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
               {/* TAB 3: THEMES & AUTOMATIONS */}
               {activeTab === 'themes' && (
                 <div className="space-y-6">
-                  {/* Styling Colors */}
+                  {/* Styling Colors & Logo */}
                   <div className="bg-slate-50 dark:bg-slate-950 rounded-2xl p-5 border border-slate-200 dark:border-slate-850 space-y-4">
-                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-500 border-b border-slate-150 pb-1.5">Form Themes</h4>
+                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-500 border-b border-slate-150 pb-1.5">Form Themes & Logo</h4>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-[10px] font-bold text-slate-650 uppercase mb-1">Accent Color</label>
@@ -1412,6 +1449,74 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
                           <input type="text" value={styles.buttonTextColor} onChange={e => setStyles({ ...styles, buttonTextColor: e.target.value })} className="text-[10px] font-mono w-16 border border-slate-250 dark:border-slate-800 rounded px-1.5 py-1.5 bg-white dark:bg-slate-900" />
                         </div>
                       </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-650 uppercase mb-1">Text Box</label>
+                        <div className="flex items-center gap-1.5">
+                          <input type="color" value={styles.inputBgColor || '#F8FAFC'} onChange={e => setStyles({ ...styles, inputBgColor: e.target.value })} className="w-7 h-7 rounded border-0 cursor-pointer p-0 bg-transparent" />
+                          <input type="text" value={styles.inputBgColor || '#F8FAFC'} onChange={e => setStyles({ ...styles, inputBgColor: e.target.value })} className="text-[10px] font-mono w-16 border border-slate-250 dark:border-slate-800 rounded px-1.5 py-1.5 bg-white dark:bg-slate-900" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3 pt-3 border-t border-slate-200 dark:border-slate-800">
+                      <div className="flex items-center justify-between">
+                        <label htmlFor="show-logo-checkbox" className="text-xs font-bold text-slate-650 uppercase cursor-pointer select-none">Show Church Logo?</label>
+                        <input
+                          type="checkbox"
+                          id="show-logo-checkbox"
+                          className="w-4 h-4 rounded text-indigo-600 cursor-pointer"
+                          checked={!!styles.showLogo}
+                          onChange={e => setStyles({ ...styles, showLogo: e.target.checked })}
+                        />
+                      </div>
+                      
+                      {styles.showLogo && (
+                        <div className="space-y-2">
+                          <label className="block text-[10px] font-bold text-slate-650 uppercase">Logo Image</label>
+                          <div className="flex gap-2">
+                            <input
+                              type="file"
+                              ref={logoInputRef}
+                              accept="image/*"
+                              className="hidden"
+                              onChange={handleLogoUpload}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => logoInputRef.current?.click()}
+                              disabled={uploadingLogo}
+                              className="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-lg py-2 hover:border-indigo-400 hover:text-indigo-600 text-slate-500 transition disabled:opacity-50"
+                            >
+                              {uploadingLogo ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
+                              {uploadingLogo ? 'Uploading...' : 'Upload Logo'}
+                            </button>
+                            {church?.logoUrl && styles.logoUrl !== church.logoUrl && (
+                              <button
+                                type="button"
+                                onClick={() => setStyles({ ...styles, logoUrl: church.logoUrl, showLogo: true })}
+                                className="px-3 py-2 text-xs font-semibold bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition"
+                              >
+                                Use Default
+                              </button>
+                            )}
+                          </div>
+                          {(styles.logoUrl || church?.logoUrl) && (
+                            <div className="relative w-full h-16 bg-slate-100 dark:bg-slate-950 rounded-xl flex items-center justify-center border border-slate-200 dark:border-slate-800 p-2 overflow-hidden">
+                              <img src={styles.logoUrl || church?.logoUrl} alt="Church Logo" className="max-h-full object-contain" />
+                              {styles.logoUrl && (
+                                <button
+                                  type="button"
+                                  onClick={() => setStyles({ ...styles, logoUrl: '' })}
+                                  className="absolute top-1 right-1 p-1 bg-black/50 text-white rounded-full hover:bg-black/75 transition"
+                                  title="Remove logo override"
+                                >
+                                  <X size={10} />
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
 

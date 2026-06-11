@@ -179,6 +179,9 @@ export const PublicFormView: React.FC<PublicFormViewProps> = ({ churchId, formId
       }
       
       setConfig(data);
+      if (data.name) {
+        document.title = data.name;
+      }
       
       const initialInputs: any = {};
       fieldsToProcess.forEach((f: any) => {
@@ -350,6 +353,16 @@ export const PublicFormView: React.FC<PublicFormViewProps> = ({ churchId, formId
       >
         <div className="absolute top-0 left-0 right-0 h-1.5" style={{ backgroundColor: themeStyles.primaryColor }} />
 
+        {themeStyles.showLogo && (themeStyles.logoUrl || config?.churchLogoUrl) && (
+          <div className="flex justify-center mt-4 mb-6">
+            <img 
+              src={themeStyles.logoUrl || config?.churchLogoUrl} 
+              alt="Logo" 
+              className="max-h-16 object-contain" 
+            />
+          </div>
+        )}
+
         {submitted ? (
           <div className="text-center py-10 space-y-6">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900">
@@ -430,8 +443,8 @@ export const PublicFormView: React.FC<PublicFormViewProps> = ({ churchId, formId
                         name={field.id}
                         value={value || ''}
                         onChange={handleChange}
-                        className="w-full text-sm border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 bg-slate-50/50 dark:bg-slate-850 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-opacity-40 transition-all"
-                        style={{ '--tw-ring-color': themeStyles.primaryColor } as any}
+                        className="w-full text-sm border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-opacity-40 transition-all"
+                        style={{ '--tw-ring-color': themeStyles.primaryColor, backgroundColor: themeStyles.inputBgColor || '#F8FAFC', color: themeStyles.textColor || 'inherit' } as any}
                       />
                     )}
 
@@ -443,8 +456,8 @@ export const PublicFormView: React.FC<PublicFormViewProps> = ({ churchId, formId
                         value={value || ''}
                         onChange={handleChange}
                         rows={4}
-                        className="w-full text-sm border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 bg-slate-50/50 dark:bg-slate-850 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-opacity-40 transition-all"
-                        style={{ '--tw-ring-color': themeStyles.primaryColor } as any}
+                        className="w-full text-sm border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-opacity-40 transition-all"
+                        style={{ '--tw-ring-color': themeStyles.primaryColor, backgroundColor: themeStyles.inputBgColor || '#F8FAFC', color: themeStyles.textColor || 'inherit' } as any}
                       />
                     )}
 
@@ -455,20 +468,20 @@ export const PublicFormView: React.FC<PublicFormViewProps> = ({ churchId, formId
                           name={field.id}
                           value={value || ''}
                           onChange={handleChange}
-                          className="w-full text-sm border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 bg-slate-50/50 dark:bg-slate-850 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-opacity-40 transition-all cursor-pointer appearance-none"
-                          style={{ '--tw-ring-color': themeStyles.primaryColor } as any}
+                          className="w-full text-sm border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-opacity-40 transition-all cursor-pointer appearance-none"
+                          style={{ '--tw-ring-color': themeStyles.primaryColor, backgroundColor: themeStyles.inputBgColor || '#F8FAFC', color: themeStyles.textColor || 'inherit' } as any}
                         >
                           <option value="">{field.placeholder || '— Select Option —'}</option>
                           {(field.options || []).map((o: string, oi: number) => (
                             <option key={oi} value={o}>{o}</option>
                           ))}
                         </select>
-                        <ChevronDown size={14} className="absolute right-4 top-3.5 text-slate-400 pointer-events-none" />
+                        <ChevronDown size={14} className="absolute right-4 top-3.5 opacity-50 pointer-events-none" style={{ color: themeStyles.textColor || 'inherit' }} />
                       </div>
                     )}
 
                     {field.type === 'checkboxes' && (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50/50 dark:bg-slate-850 border border-slate-100 dark:border-slate-850 rounded-2xl p-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border border-slate-100 dark:border-slate-850 rounded-2xl p-4" style={{ backgroundColor: themeStyles.inputBgColor || '#F8FAFC' }}>
                         {(field.options || []).map((opt: string, oi: number) => {
                           const isChecked = Array.isArray(value) && value.includes(opt);
                           return (
@@ -487,10 +500,10 @@ export const PublicFormView: React.FC<PublicFormViewProps> = ({ churchId, formId
                                     return { ...prev, [field.id]: updated };
                                   });
                                 }}
-                                className="w-3.5 h-3.5 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                                style={{ '--tw-ring-color': themeStyles.primaryColor } as any}
+                                className="w-3.5 h-3.5 rounded cursor-pointer"
+                                style={{ '--tw-ring-color': themeStyles.primaryColor, accentColor: themeStyles.primaryColor } as any}
                               />
-                              <label htmlFor={`${field.id}-${opt}`} className="text-xs font-semibold text-slate-700 dark:text-slate-350 cursor-pointer select-none">
+                              <label htmlFor={`${field.id}-${opt}`} className="text-xs font-semibold cursor-pointer select-none" style={{ color: themeStyles.textColor || 'inherit' }}>
                                 {opt}
                               </label>
                             </div>
@@ -507,10 +520,10 @@ export const PublicFormView: React.FC<PublicFormViewProps> = ({ churchId, formId
                           name={field.id}
                           checked={!!value}
                           onChange={handleChange}
-                          className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                          style={{ '--tw-ring-color': themeStyles.primaryColor } as any}
+                          className="w-4 h-4 rounded cursor-pointer"
+                          style={{ '--tw-ring-color': themeStyles.primaryColor, accentColor: themeStyles.primaryColor } as any}
                         />
-                        <label htmlFor={field.id} className="text-xs font-semibold text-slate-700 dark:text-slate-350 cursor-pointer select-none">
+                        <label htmlFor={field.id} className="text-xs font-semibold cursor-pointer select-none" style={{ color: themeStyles.textColor || 'inherit' }}>
                           {field.label}
                         </label>
                       </div>
@@ -523,8 +536,8 @@ export const PublicFormView: React.FC<PublicFormViewProps> = ({ churchId, formId
                         name={field.id}
                         value={value || ''}
                         onChange={handleChange}
-                        className="w-full text-sm border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 bg-slate-50/50 dark:bg-slate-850 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-opacity-40 transition-all"
-                        style={{ '--tw-ring-color': themeStyles.primaryColor } as any}
+                        className="w-full text-sm border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-opacity-40 transition-all"
+                        style={{ '--tw-ring-color': themeStyles.primaryColor, backgroundColor: themeStyles.inputBgColor || '#F8FAFC', color: themeStyles.textColor || 'inherit' } as any}
                       />
                     )}
 

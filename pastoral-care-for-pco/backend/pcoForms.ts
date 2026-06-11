@@ -142,13 +142,27 @@ export async function getPublicForm(req: any, res: any) {
     }
 
     const data = docSnap.data()!;
+    
+    // Fetch default church logo if needed
+    let churchLogoUrl = null;
+    try {
+      const churchSnap = await db.collection('churches').doc(churchId).get();
+      if (churchSnap.exists) {
+        churchLogoUrl = churchSnap.data()?.logoUrl || null;
+      }
+    } catch (err) {
+      console.error("Failed to fetch church logo in getPublicForm:", err);
+    }
+
     // Return a safe subset for public view
     res.json({
       id: data.id,
       churchId: data.churchId,
       name: data.name,
       description: data.description || null,
+      customFields: data.customFields || null,
       fields: data.fields,
+      churchLogoUrl,
       styles: data.styles || {
         primaryColor: '#4F46E5',
         backgroundColor: '#FFFFFF',
