@@ -23,7 +23,7 @@ import {
 
 export type BlockType =
   | 'text' | 'header' | 'image' | 'button' | 'file' | 'divider' | 'video' | 'html'
-  | 'pco_group' | 'pco_registration' | 'pco_event'
+  | 'pco_group' | 'pco_registration' | 'pco_event' | 'pco_service_plan'
   | 'pco_groups_widget' | 'pco_registrations_widget'
   | 'pastoral_care_chart' | 'data_chart'
   | 'columns';
@@ -152,6 +152,39 @@ const BlockThumbnail: React.FC<{ block: EmailBlock }> = ({ block }) => {
                 Learn More →
               </a>
             )}
+          </div>
+        </div>
+      );
+    }
+    case 'pco_service_plan': {
+      const plan = c.rawPlan;
+      if (!plan) return <div className="text-xs text-slate-400 p-3">Service Plan details unavailable</div>;
+      return (
+        <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden bg-white dark:bg-slate-800 p-4 space-y-3 text-left">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[9px] font-black uppercase bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 px-1.5 py-0.5 rounded border border-indigo-100 dark:border-indigo-900/30">
+              {plan.serviceTypeName || 'Service Plan'}
+            </span>
+            {plan.seriesTitle && (
+              <span className="text-[9px] font-black uppercase bg-rose-50 dark:bg-rose-900/10 text-rose-500 px-1.5 py-0.5 rounded border border-rose-100/50 dark:border-rose-900/20">
+                Series: {plan.seriesTitle}
+              </span>
+            )}
+          </div>
+          <div className="text-sm font-semibold text-slate-900 dark:text-white">{plan.title || 'Service Plan'}</div>
+          {c.date && <div className="text-xs text-indigo-600 dark:text-indigo-400 font-medium">{c.date}</div>}
+          
+          <div className="text-[10px] text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-700/60 pt-2 space-y-1">
+            <div className="font-bold uppercase tracking-wider text-[8px] text-slate-400">Order of Service ({plan.items?.length || 0} items)</div>
+            <div className="truncate text-[9px] font-mono text-slate-600 dark:text-slate-400">
+              {plan.items?.slice(0, 3).map((item: any) => item.title).join(' → ') || 'No items'}
+              {(plan.items?.length || 0) > 3 && '...'}
+            </div>
+            
+            <div className="font-bold uppercase tracking-wider text-[8px] text-slate-400 mt-2">Open Positions ({plan.positionsNeeded || 0} needed)</div>
+            <div className="truncate text-[9px] font-mono text-rose-500">
+              {plan.neededPositions?.slice(0, 2).map((np: any) => `${np.quantity} ${np.teamName}`).join(', ') || (plan.positionsNeeded > 0 ? `${plan.positionsNeeded} positions` : 'Fully Staffed')}
+            </div>
           </div>
         </div>
       );
@@ -1215,13 +1248,13 @@ const SidebarSection: React.FC<{ title: string; icon: React.ReactNode; children:
 
 // ─── PCO Quick Picker (inline, single-item) ──────────────────────────────────
 
-type PcoPickType = 'pco_registration' | 'pco_group' | 'pco_event';
+type PcoPickType = 'pco_registration' | 'pco_group' | 'pco_event' | 'pco_service_plan';
 
 const PCO_PICK_CONFIG: Record<PcoPickType, {
   label: string;
   icon: React.ReactNode;
   fetch: (churchId: string) => Promise<any[]>;
-  map: (item: any) => { id: string; name: string; date?: string; imageUrl?: string; description?: string; meta?: string; url?: string };
+  map: (item: any) => { id: string; name: string; date?: string; imageUrl?: string; description?: string; meta?: string; url?: string; rawPlan?: any };
 }> = {
   pco_registration: {
     label: 'Registration',
@@ -1273,6 +1306,36 @@ const PCO_PICK_CONFIG: Record<PcoPickType, {
       meta: item.attributes?.location || '',
       url: item.attributes?.registration_url || item.attributes?.app_info?.desktop_url
     })
+  },
+  pco_service_plan: {
+    label: 'Service Plan',
+    icon: <Calendar size={14} />,
+    fetch: async (churchId) => {
+      const allPlans = await firestore.getServicePlans(churchId);
+      const now = new Date();
+      now.setHours(0,0,0,0);
+      return allPlans.filter(plan => {
+        const planDate = plan.planTimes && plan.planTimes.length > 0
+          ? new Date(plan.planTimes[0].startsAt)
+          : new Date(plan.sortDate);
+        return planDate >= now;
+      });
+    },
+    map: (item) => {
+      const planDate = item.planTimes && item.planTimes.length > 0
+        ? new Date(item.planTimes[0].startsAt)
+        : new Date(item.sortDate);
+      const dateStr = planDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+      return {
+        id: item.id,
+        name: item.serviceTypeName ? `${item.serviceTypeName}: ${item.title || 'Service Plan'}` : (item.title || 'Service Plan'),
+        date: dateStr,
+        imageUrl: undefined,
+        description: item.seriesTitle ? `Series: ${item.seriesTitle}` : undefined,
+        meta: `${item.items?.length || 0} items • ${item.positionsNeeded || 0} open positions`,
+        rawPlan: item
+      };
+    }
   }
 };
 
@@ -1736,7 +1799,8 @@ export const EmailBuilder: React.FC<EmailBuilderProps> = ({
         imageUrl: item.imageUrl,
         meta: item.meta,
         url: item.url,
-        pcoId: item.id
+        pcoId: item.id,
+        rawPlan: item.rawPlan
       }
     };
     setBlocks(prev => [...prev, newBlock]);
@@ -1842,7 +1906,7 @@ export const EmailBuilder: React.FC<EmailBuilderProps> = ({
             <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Planning Center</span>
           </div>
           <div className="space-y-1.5">
-            {(['pco_registration', 'pco_group', 'pco_event'] as PcoPickType[]).map(type => {
+            {(['pco_registration', 'pco_group', 'pco_event', 'pco_service_plan'] as PcoPickType[]).map(type => {
               const cfg = PCO_PICK_CONFIG[type];
               const isOpen = quickPickType === type;
               return (

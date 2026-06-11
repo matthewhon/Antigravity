@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { EmailBlock, ColumnLayout } from './EmailBuilder';
-import { TemplateSettings } from '../types';
+import { TemplateSettings, ServicePlanSnapshot } from '../types';
 import { AnalyticsWidgetBlock, AnalyticsWidgetId } from './DataChartSelector';
 import { CalendarDays, Users, ClipboardList, Image as ImageIcon } from 'lucide-react';
 
@@ -160,6 +160,254 @@ const MiniBlockPreview: React.FC<{ b: { id: string; type: string; content: any }
   return null;
 };
 
+
+
+// Rich card rendering for PCO Service Plan block
+const PcoServicePlanCard = ({ block, primaryColor, textColor }: { block: EmailBlock; primaryColor: string; textColor: string }) => {
+  const plan: ServicePlanSnapshot = block.content?.rawPlan;
+  if (!plan) return <div style={{ padding: 12, border: '1px solid #e2e8f0', borderRadius: 12, color: '#94a3b8', fontSize: 13, fontFamily: 'sans-serif' }}>Service plan details unavailable</div>;
+
+  const planDate = plan.planTimes && plan.planTimes.length > 0
+    ? new Date(plan.planTimes[0].startsAt)
+    : new Date(plan.sortDate);
+
+  const formattedDate = planDate.toLocaleDateString(undefined, { 
+    weekday: 'long', 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit'
+  });
+
+  return (
+    <div style={{ border: '1px solid #e2e8f0', borderRadius: 16, overflow: 'hidden', backgroundColor: '#ffffff', marginBottom: 16, fontFamily: 'sans-serif' }}>
+      {/* Header */}
+      <div style={{ padding: '16px 20px', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+        <table width="100%" cellpadding="0" cellspacing="0" border={0}>
+          <tr>
+            <td>
+              <div style={{ marginBottom: 6 }}>
+                <span style={{ fontSize: 9, fontWeight: 900, textTransform: 'uppercase', backgroundColor: '#e0e7ff', color: '#4338ca', padding: '2px 6px', borderRadius: 4, border: '1px solid #c7d2fe', marginRight: 6 }}>
+                  {plan.serviceTypeName || 'Service Plan'}
+                </span>
+                {plan.seriesTitle && (
+                  <span style={{ fontSize: 9, fontWeight: 900, textTransform: 'uppercase', backgroundColor: '#fef2f2', color: '#ef4444', padding: '2px 6px', borderRadius: 4, border: '1px solid #fee2e2' }}>
+                    Series: {plan.seriesTitle}
+                  </span>
+                )}
+              </div>
+              <h4 style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', margin: '4px 0', letterSpacing: '-0.5px' }}>
+                {plan.title || 'Service Plan'}
+              </h4>
+              <p style={{ fontSize: 11, color: '#64748b', margin: 0, fontWeight: 600 }}>
+                🗓️ {formattedDate}
+              </p>
+            </td>
+          </tr>
+        </table>
+      </div>
+
+      <div style={{ padding: '20px' }}>
+        {/* 1. ORDER OF SERVICE */}
+        <div style={{ marginBottom: 20 }}>
+          <h5 style={{ fontSize: 11, fontWeight: 900, textTransform: 'uppercase', color: '#64748b', letterSpacing: '0.5px', margin: '0 0 10px 0', borderBottom: '2px solid #f1f5f9', paddingBottom: 4 }}>
+            📝 Order of Service
+          </h5>
+          {plan.items && plan.items.length > 0 ? (
+            <table width="100%" cellpadding="0" cellspacing="0" border={0} style={{ borderCollapse: 'collapse' }}>
+              {plan.items.map((item, idx) => {
+                const isSong = item.type === 'song';
+                const isHeader = item.type === 'header';
+                
+                if (isHeader) {
+                  return (
+                    <tr key={idx}>
+                      <td style={{ padding: '12px 0 6px 0' }}>
+                        <span style={{ fontSize: 11, fontWeight: 900, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                          {item.title}
+                        </span>
+                        {item.description && (
+                          <div style={{ fontSize: 9, color: '#94a3b8', marginTop: 2, fontWeight: 600 }}>
+                            {item.description}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                }
+
+                return (
+                  <tr key={idx}>
+                    <td style={{ padding: '6px 0' }}>
+                      <div style={{ 
+                        padding: '10px 12px', 
+                        borderRadius: 8, 
+                        border: isSong ? '1px solid #e0e7ff' : '1px solid #f1f5f9',
+                        backgroundColor: isSong ? '#f8faff' : '#fafafa' 
+                      }}>
+                        <table width="100%" cellpadding="0" cellspacing="0" border={0}>
+                          <tr>
+                            <td>
+                              <div style={{ display: 'inline-block', fontSize: 8, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginRight: 6 }}>
+                                Item {idx + 1}
+                              </div>
+                              <div style={{ 
+                                display: 'inline-block',
+                                fontSize: 8, 
+                                fontWeight: 900, 
+                                textTransform: 'uppercase', 
+                                padding: '1px 4px', 
+                                borderRadius: 3,
+                                backgroundColor: isSong ? '#e0e7ff' : '#e2e8f0',
+                                color: isSong ? '#4338ca' : '#475569'
+                              }}>
+                                {item.type}
+                              </div>
+                              <div style={{ fontSize: 12, fontWeight: 700, color: '#1e293b', marginTop: 4 }}>{item.title}</div>
+                              {isSong && item.author && (
+                                <div style={{ fontSize: 9, color: '#6366f1', fontWeight: 600, marginTop: 2 }}>by {item.author}</div>
+                              )}
+                              {item.description && (
+                                <div style={{ fontSize: 10, color: '#64748b', marginTop: 6, paddingLeft: 6, borderLeft: '2px solid #cbd5e1', lineHeight: 1.4 }}>
+                                  {item.description}
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        </table>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </table>
+          ) : (
+            <div style={{ fontSize: 11, color: '#94a3b8', fontStyle: 'italic' }}>No order of service items synced.</div>
+          )}
+        </div>
+
+        {/* 2. SCHEDULED ROSTER */}
+        <div style={{ marginBottom: 20 }}>
+          <h5 style={{ fontSize: 11, fontWeight: 900, textTransform: 'uppercase', color: '#64748b', letterSpacing: '0.5px', margin: '0 0 10px 0', borderBottom: '2px solid #f1f5f9', paddingBottom: 4 }}>
+            👥 Scheduled Roster
+          </h5>
+          {plan.teamMembers && plan.teamMembers.length > 0 ? (
+            (() => {
+              const teamsMap: Record<string, typeof plan.teamMembers> = {};
+              plan.teamMembers.forEach(m => {
+                const tName = m.teamName || 'Other Staff';
+                if (!teamsMap[tName]) teamsMap[tName] = [];
+                teamsMap[tName].push(m);
+              });
+
+              return (
+                <table width="100%" cellpadding="0" cellspacing="0" border={0} style={{ borderCollapse: 'collapse' }}>
+                  {Object.entries(teamsMap).map(([teamName, members]) => (
+                    <tr key={teamName}>
+                      <td style={{ padding: '8px 0' }}>
+                        <div style={{ fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6 }}>
+                          📁 {teamName}
+                        </div>
+                        <table width="100%" cellpadding="0" cellspacing="0" border={0}>
+                          {members.map((m, idx) => {
+                            const status = m.status || 'Pending';
+                            const isConfirmed = status === 'Confirmed' || status === 'C';
+                            const isDeclined = status === 'Declined' || status === 'D';
+                            const statusColor = isConfirmed ? '#059669' : isDeclined ? '#dc2626' : '#d97706';
+                            const statusBg = isConfirmed ? '#ecfdf5' : isDeclined ? '#fef2f2' : '#fffbeb';
+                            const statusBorder = isConfirmed ? '#a7f3d0' : isDeclined ? '#fecaca' : '#fef3c7';
+                            return (
+                              <tr key={idx}>
+                                <td style={{ padding: '3px 0' }}>
+                                  <table width="100%" cellpadding="0" cellspacing="0" border={0} style={{ backgroundColor: '#f8fafc', border: '1px solid #f1f5f9', borderRadius: 8 }}>
+                                    <tr>
+                                      <td style={{ padding: '6px 10px', verticalAlign: 'middle' }}>
+                                        <div style={{ fontSize: 11, fontWeight: 750, color: '#334155' }}>{m.name}</div>
+                                        <div style={{ fontSize: 9, color: '#64748b', marginTop: 1 }}>{m.teamPositionName || 'Volunteer'}</div>
+                                      </td>
+                                      <td align="right" style={{ padding: '6px 10px', verticalAlign: 'middle' }}>
+                                        <span style={{ 
+                                          fontSize: 8, 
+                                          fontWeight: 800, 
+                                          color: statusColor, 
+                                          textTransform: 'uppercase',
+                                          border: `1px solid ${statusBorder}`,
+                                          padding: '2px 6px',
+                                          borderRadius: 4,
+                                          backgroundColor: statusBg
+                                        }}>
+                                          {isConfirmed ? 'Confirmed' : isDeclined ? 'Declined' : 'Pending'}
+                                        </span>
+                                      </td>
+                                    </tr>
+                                  </table>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </table>
+                      </td>
+                    </tr>
+                  ))}
+                </table>
+              );
+            })()
+          ) : (
+            <div style={{ fontSize: 11, color: '#94a3b8', fontStyle: 'italic' }}>No roster members scheduled.</div>
+          )}
+        </div>
+
+        {/* 3. OPEN POSITIONS */}
+        <div>
+          <h5 style={{ fontSize: 11, fontWeight: 900, textTransform: 'uppercase', color: '#64748b', letterSpacing: '0.5px', margin: '0 0 10px 0', borderBottom: '2px solid #f1f5f9', paddingBottom: 4 }}>
+            ⚠️ Open Positions
+          </h5>
+          {plan.neededPositions && plan.neededPositions.length > 0 ? (
+            <table width="100%" cellpadding="0" cellspacing="0" border={0} style={{ borderCollapse: 'collapse' }}>
+              <tr>
+                <td style={{ padding: '4px 0' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 8 }}>
+                    {plan.neededPositions.map((np, idx) => (
+                      <div key={idx} style={{ 
+                        padding: '10px 12px', 
+                        backgroundColor: '#fff5f5', 
+                        border: '1px solid #fee2e2', 
+                        borderRadius: 8,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'between'
+                      }}>
+                        <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                          <div style={{ fontSize: 10, fontWeight: 800, color: '#991b1b' }}>{np.teamName}</div>
+                          <div style={{ fontSize: 8, color: '#ef4444', fontWeight: 600, marginTop: 1 }}>Unfilled Slot</div>
+                        </div>
+                        <span style={{ fontSize: 9, fontWeight: 900, backgroundColor: '#fee2e2', color: '#991b1b', padding: '2px 6px', borderRadius: 4 }}>
+                          {np.quantity} Needed
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </td>
+              </tr>
+            </table>
+          ) : (
+            <table width="100%" cellpadding="0" cellspacing="0" border={0}>
+              <tr>
+                <td>
+                  <div style={{ padding: '10px 12px', borderRadius: 8, backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', color: '#15803d', fontSize: 10, fontWeight: 700 }}>
+                    🎉 Fully Staffed! All positions confirmed.
+                  </div>
+                </td>
+              </tr>
+            </table>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Rich card for PCO Registration / Group / Calendar event blocks
 const PcoContentCard = ({ block, primaryColor }: { block: EmailBlock; primaryColor: string }) => {
   const c = block.content || {};
@@ -311,6 +559,10 @@ export const EmailPreview: React.FC<Props> = ({ blocks, settings, churchLogoUrl,
 
             {(block.type === 'pco_registration' || block.type === 'pco_group' || block.type === 'pco_event') && (
               <PcoContentCard block={block} primaryColor={settings.primaryColor} />
+            )}
+
+            {block.type === 'pco_service_plan' && (
+              <PcoServicePlanCard block={block} primaryColor={settings.primaryColor} textColor={settings.textColor} />
             )}
 
             {block.type === 'pco_groups_widget' && (

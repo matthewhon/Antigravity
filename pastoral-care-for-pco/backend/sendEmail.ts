@@ -243,6 +243,225 @@ export function renderBlocksToHtml(blocks: any[], templateSettings: any, unsubsc
                     </div>
                   </div>`;
             }
+            case 'pco_service_plan': {
+                const plan = block.content?.rawPlan;
+                if (!plan) return `<div style="padding:12px;border:1px solid #e2e8f0;border-radius:12px;color:#94a3b8;font-size:13px;font-family:${fontFamily};">Service plan details unavailable</div>`;
+
+                const planDate = plan.planTimes && plan.planTimes.length > 0
+                    ? new Date(plan.planTimes[0].startsAt)
+                    : new Date(plan.sortDate);
+
+                const formattedDate = planDate.toLocaleDateString(undefined, { 
+                    weekday: 'long', 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit'
+                });
+
+                // Generate Order of Service rows
+                let itemsHtml = '';
+                if (plan.items && plan.items.length > 0) {
+                    itemsHtml = `<table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">`;
+                    plan.items.forEach((item: any, idx: number) => {
+                        const isSong = item.type === 'song';
+                        const isHeader = item.type === 'header';
+                        
+                        if (isHeader) {
+                            itemsHtml += `
+                                <tr>
+                                    <td style="padding:12px 0 6px 0;">
+                                        <span style="font-size:11px;font-weight:900;color:#475569;text-transform:uppercase;letter-spacing:0.5px;font-family:${fontFamily};">
+                                            ${item.title || ''}
+                                        </span>
+                                        ${item.description ? `<div style="font-size:9px;color:#94a3b8;margin-top:2px;font-weight:600;font-family:${fontFamily};">${item.description}</div>` : ''}
+                                    </td>
+                                </tr>`;
+                        } else {
+                            itemsHtml += `
+                                <tr>
+                                    <td style="padding:6px 0;">
+                                        <div style="padding:10px 12px;border-radius:8px;border:${isSong ? '1px solid #e0e7ff' : '1px solid #f1f5f9'};background-color:${isSong ? '#f8faff' : '#fafafa'};font-family:${fontFamily};">
+                                            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                                                <tr>
+                                                    <td>
+                                                        <div style="display:inline-block;font-size:8px;font-weight:800;color:#94a3b8;text-transform:uppercase;margin-right:6px;font-family:${fontFamily};">
+                                                            Item ${idx + 1}
+                                                        </div>
+                                                        <div style="display:inline-block;font-size:8px;font-weight:900;text-transform:uppercase;padding:1px 4px;border-radius:3px;background-color:${isSong ? '#e0e7ff' : '#e2e8f0'};color:${isSong ? '#4338ca' : '#475569'};font-family:${fontFamily};">
+                                                            ${item.type || ''}
+                                                        </div>
+                                                        <div style="font-size:12px;font-weight:700;color:#1e293b;margin-top:4px;font-family:${fontFamily};">${item.title || ''}</div>
+                                                        ${isSong && item.author ? `<div style="font-size:9px;color:#6366f1;font-weight:600;margin-top:2px;font-family:${fontFamily};">by ${item.author}</div>` : ''}
+                                                        ${item.description ? `<div style="font-size:10px;color:#64748b;margin-top:6px;padding-left:6px;border-left:2px solid #cbd5e1;line-height:1.4;font-family:${fontFamily};">${item.description}</div>` : ''}
+                                                    </td>
+                                                </tr>
+                                            </table>
+                                        </div>
+                                    </td>
+                                </tr>`;
+                        }
+                    });
+                    itemsHtml += `</table>`;
+                } else {
+                    itemsHtml = `<div style="font-size:11px;color:#94a3b8;font-style:italic;font-family:${fontFamily};">No order of service items synced.</div>`;
+                }
+
+                // Generate Scheduled Roster HTML
+                let rosterHtml = '';
+                if (plan.teamMembers && plan.teamMembers.length > 0) {
+                    const teamsMap: Record<string, any[]> = {};
+                    plan.teamMembers.forEach((m: any) => {
+                        const tName = m.teamName || 'Other Staff';
+                        if (!teamsMap[tName]) teamsMap[tName] = [];
+                        teamsMap[tName].push(m);
+                    });
+
+                    rosterHtml = `<table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">`;
+                    Object.entries(teamsMap).forEach(([teamName, members]) => {
+                        rosterHtml += `
+                            <tr>
+                                <td style="padding:8px 0;">
+                                    <div style="font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;margin-bottom:6px;font-family:${fontFamily};">
+                                        📁 ${teamName}
+                                    </div>
+                                    <table width="100%" cellpadding="0" cellspacing="0" border="0">`;
+                        members.forEach((m: any, idx: number) => {
+                            const status = m.status || 'Pending';
+                            const isConfirmed = status === 'Confirmed' || status === 'C';
+                            const isDeclined = status === 'Declined' || status === 'D';
+                            const statusColor = isConfirmed ? '#059669' : isDeclined ? '#dc2626' : '#d97706';
+                            const statusBg = isConfirmed ? '#ecfdf5' : isDeclined ? '#fef2f2' : '#fffbeb';
+                            const statusBorder = isConfirmed ? '#a7f3d0' : isDeclined ? '#fecaca' : '#fef3c7';
+                            rosterHtml += `
+                                <tr>
+                                    <td style="padding:3px 0;">
+                                        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f8fafc;border:1px solid #f1f5f9;border-radius:8px;">
+                                            <tr>
+                                                <td style="padding:6px 10px;vertical-align:middle;font-family:${fontFamily};">
+                                                    <div style="font-size:11px;font-weight:bold;color:#334155;">${m.name || ''}</div>
+                                                    <div style="font-size:9px;color:#64748b;margin-top:1px;">${m.teamPositionName || 'Volunteer'}</div>
+                                                </td>
+                                                <td align="right" style="padding:6px 10px;vertical-align:middle;font-family:${fontFamily};">
+                                                    <span style="font-size:8px;font-weight:800;color:${statusColor};text-transform:uppercase;border:1px solid ${statusBorder};padding:2px 6px;border-radius:4px;background-color:${statusBg}; font-family:${fontFamily};">
+                                                        ${isConfirmed ? 'Confirmed' : isDeclined ? 'Declined' : 'Pending'}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>`;
+                        });
+                        rosterHtml += `
+                                    </table>
+                                </td>
+                            </tr>`;
+                    });
+                    rosterHtml += `</table>`;
+                } else {
+                    rosterHtml = `<div style="font-size:11px;color:#94a3b8;font-style:italic;font-family:${fontFamily};">No roster members scheduled.</div>`;
+                }
+
+                // Generate Open Positions HTML
+                let openHtml = '';
+                if (plan.neededPositions && plan.neededPositions.length > 0) {
+                    openHtml = `
+                        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+                            <tr>
+                                <td style="padding:4px 0;">
+                                    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                                        <tr>
+                                            <td>`;
+                    plan.neededPositions.forEach((np: any, idx: number) => {
+                        openHtml += `
+                            <div style="display:inline-block;width:48%;margin-right:2%;margin-bottom:8px;padding:10px 12px;background-color:#fff5f5;border:1px solid #fee2e2;border-radius:8px;box-sizing:border-box;font-family:${fontFamily};vertical-align:top;">
+                                <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                                    <tr>
+                                        <td align="left">
+                                            <div style="font-size:10px;font-weight:800;color:#991b1b;font-family:${fontFamily};">${np.teamName || ''}</div>
+                                            <div style="font-size:8px;color:#ef4444;font-weight:600;margin-top:1px;font-family:${fontFamily};">Unfilled Slot</div>
+                                        </td>
+                                        <td align="right">
+                                            <span style="font-size:9px;font-weight:900;background-color:#fee2e2;color:#991b1b;padding:2px 6px;border-radius:4px;font-family:${fontFamily};">
+                                                ${np.quantity || 1} Needed
+                                            </span>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>`;
+                    });
+                    openHtml += `
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>`;
+                } else {
+                    openHtml = `
+                        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                            <tr>
+                                <td>
+                                    <div style="padding:10px 12px;border-radius:8px;background-color:#f0fdf4;border:1px solid #bbf7d0;color:#15803d;font-size:10px;font-weight:700;font-family:${fontFamily};">
+                                        🎉 Fully Staffed! All positions confirmed.
+                                    </div>
+                                </td>
+                            </tr>
+                        </table>`;
+                }
+
+                return `
+                  <div style="border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;background-color:#ffffff;margin-bottom:16px;font-family:${fontFamily};text-align:left;">
+                    <!-- Header -->
+                    <div style="padding:16px 20px;background-color:#f8fafc;border-bottom:1px solid #e2e8f0;">
+                      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                        <tr>
+                          <td>
+                            <div style="margin-bottom:6px;">
+                              <span style="font-size:9px;font-weight:900;text-transform:uppercase;background-color:#e0e7ff;color:#4338ca;padding:2px 6px;border-radius:4px;border:1px solid #c7d2fe;margin-right:6px;font-family:${fontFamily};">
+                                ${plan.serviceTypeName || 'Service Plan'}
+                              </span>
+                              ${plan.seriesTitle ? `<span style="font-size:9px;font-weight:900;text-transform:uppercase;background-color:#fef2f2;color:#ef4444;padding:2px 6px;border-radius:4px;border:1px solid #fee2e2;font-family:${fontFamily};">Series: ${plan.seriesTitle}</span>` : ''}
+                            </div>
+                            <h4 style="font-size:18px;font-weight:800;color:#0f172a;margin:4px 0;letter-spacing:-0.5px;font-family:${fontFamily};">
+                              ${plan.title || 'Service Plan'}
+                            </h4>
+                            <p style="font-size:11px;color:#64748b;margin:0;font-weight:600;font-family:${fontFamily};">
+                              🗓️ ${formattedDate}
+                            </p>
+                          </td>
+                        </tr>
+                      </table>
+                    </div>
+
+                    <div style="padding:20px;">
+                      <!-- 1. ORDER OF SERVICE -->
+                      <div style="margin-bottom:20px;">
+                        <h5 style="font-size:11px;font-weight:900;text-transform:uppercase;color:#64748b;letter-spacing:0.5px;margin:0 0 10px 0;border-bottom:2px solid #f1f5f9;padding-bottom:4px;font-family:${fontFamily};">
+                          📝 Order of Service
+                        </h5>
+                        ${itemsHtml}
+                      </div>
+
+                      <!-- 2. SCHEDULED ROSTER -->
+                      <div style="margin-bottom:20px;">
+                        <h5 style="font-size:11px;font-weight:900;text-transform:uppercase;color:#64748b;letter-spacing:0.5px;margin:0 0 10px 0;border-bottom:2px solid #f1f5f9;padding-bottom:4px;font-family:${fontFamily};">
+                          👥 Scheduled Roster
+                        </h5>
+                        ${rosterHtml}
+                      </div>
+
+                      <!-- 3. OPEN POSITIONS -->
+                      <div>
+                        <h5 style="font-size:11px;font-weight:900;text-transform:uppercase;color:#64748b;letter-spacing:0.5px;margin:0 0 10px 0;border-bottom:2px solid #f1f5f9;padding-bottom:4px;font-family:${fontFamily};">
+                          ⚠️ Open Positions
+                        </h5>
+                        ${openHtml}
+                      </div>
+                    </div>
+                  </div>`;
+            }
             case 'columns': {
                 const cells: { id: string; blocks: { id: string; type: string; content: any }[] }[] = block.content?.cells || [];
                 const layout: string = block.content?.layout || '2';
