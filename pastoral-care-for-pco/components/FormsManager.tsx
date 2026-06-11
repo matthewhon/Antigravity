@@ -10,7 +10,7 @@ import {
   Settings, Eye, FormInput, Palette, ArrowLeft, Calendar, User, Check,
   Globe, FileText, QrCode, Download, MoveUp, MoveDown, Grab, 
   AlignLeft, CheckSquare, Square, FileUp, ChevronDown, Heading, 
-  TextCursorInput, List
+  TextCursorInput, List, X
 } from 'lucide-react';
 
 interface FormsManagerProps {
