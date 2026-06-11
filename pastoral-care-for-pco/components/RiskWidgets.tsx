@@ -444,7 +444,12 @@ export const PeopleDirectoryWidget: React.FC<RiskProps> = ({ people }) => {
                                             {p.avatar ? <img src={p.avatar} className="w-full h-full object-cover" alt={p.name}/> : p.name.charAt(0)}
                                         </div>
                                         <div>
-                                            <p className="text-xs font-bold text-slate-900 dark:text-white">{p.name}</p>
+                                            <button 
+                                                onClick={() => window.dispatchEvent(new CustomEvent('openPersonProfile', { detail: p.id }))}
+                                                className="text-xs font-bold text-slate-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 text-left transition-colors cursor-pointer"
+                                            >
+                                                {p.name}
+                                            </button>
                                         </div>
                                     </div>
                                 </td>
