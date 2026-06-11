@@ -32,6 +32,7 @@ import { handleGrowDailyEmail, setupGrowIntegration, requestGrowAccess, getGrowS
 import { getVapidPublicKey, savePushSubscription, removePushSubscription } from './backend/webPushService';
 import { handleFileProxy } from './backend/fileProxy';
 import { videoProcessingQueue } from './services/jobQueue.js';
+import { listForms, saveForm, deleteForm, getPublicForm, submitForm } from './backend/pcoForms.js';
 
 // Fix for bundled CJS environment
 const __dirname = process.cwd();
@@ -305,6 +306,13 @@ async function startServer() {
     app.get('/api/public/events/:churchId', getPublicEvents);
     app.get('/api/public/forms/:churchId', getPublicForms);
     app.get('/widget.js', serveWidgetScript);
+
+    // ─── PCO Web Forms Endpoints ─────────────────────────────────────
+    app.get('/api/forms/:churchId', listForms);
+    app.post('/api/forms/:churchId', express.json(), saveForm);
+    app.delete('/api/forms/:churchId/:formId', deleteForm);
+    app.get('/api/public/form/:churchId/:formId', getPublicForm);
+    app.post('/api/public/form/:churchId/:formId/submit', express.json(), submitForm);
 
     // ─── File Proxy & Egress Tracking ───────────────────────────────
     app.get('/f/:fileId', handleFileProxy);

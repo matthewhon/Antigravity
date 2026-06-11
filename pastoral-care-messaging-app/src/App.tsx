@@ -20,6 +20,18 @@ const App: React.FC = () => {
   usePushNotifications(user);
 
   useEffect(() => {
+    import('@capacitor/text-zoom').then(({ TextZoom }) => {
+      import('@capacitor/core').then(({ Capacitor }) => {
+        if (Capacitor.isNativePlatform()) {
+          TextZoom.getPreferred().then(({ value }) => {
+            TextZoom.set({ value });
+          }).catch(e => console.error("TextZoom error:", e));
+        }
+      });
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
     console.log("App useEffect mounted, registering onAuthStateChanged");
     const unsubscribe = onAuthStateChanged(auth, async (authUser) => {
       console.log("onAuthStateChanged triggered, authUser:", authUser ? authUser.uid : "null");

@@ -201,6 +201,29 @@ export const pcoService = {
         });
     },
     
+    async getWorkflows(churchId: string): Promise<any[]> {
+        if (isSimulated(churchId)) {
+            return [
+                { id: 'wf_1', type: 'Workflow', attributes: { name: 'New Visitor Connect' } },
+                { id: 'wf_2', type: 'Workflow', attributes: { name: 'Volunteer Onboarding' } }
+            ];
+        }
+        const data = await pcoFetch(churchId, `https://api.planningcenteronline.com/people/v2/workflows?per_page=100`);
+        return safeData(data);
+    },
+    
+    async getNoteCategories(churchId: string): Promise<any[]> {
+        if (isSimulated(churchId)) {
+            return [
+                { id: 'nc_1', type: 'NoteCategory', attributes: { name: 'General' } },
+                { id: 'nc_2', type: 'NoteCategory', attributes: { name: 'Prayer Request' } },
+                { id: 'nc_3', type: 'NoteCategory', attributes: { name: 'Visitor Connect' } }
+            ];
+        }
+        const data = await pcoFetch(churchId, `https://api.planningcenteronline.com/people/v2/note_categories?per_page=100`);
+        return safeData(data);
+    },
+    
     async getPerson(churchId: string, personId: string): Promise<PcoPerson> {
         if (isSimulated(churchId)) {
             try {

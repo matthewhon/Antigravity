@@ -17,6 +17,7 @@ import { PcoImportModal } from './PcoImportModal';
 import MessagingModule from './MessagingModule';
 import QrCodeGenerator from './QrCodeGenerator';
 import { FileManager } from './FileManager';
+import { FormsManager } from './FormsManager';
 import { EmailCampaign, TemplateSettings, PcoList, Church, User, EmailUnsubscribe, SmsOptOut, hasBroadcastAccess, TenantFile } from '../types';
 import { 
   Trash2, Eye, Pencil, Loader2, X, List, UserMinus, Search, Copy, Globe, BarChart2, MessageSquare, Phone,
@@ -1734,7 +1735,7 @@ export const QuickSendModal: React.FC<{
 export const ToolsView: React.FC<{ churchId: string; church?: Church;
 currentUserId?: string; currentUser?: User; onUpdateChurch?: (updates: Partial<Church>) => void;
 /** When provided by a parent route, controls which tab is shown and hides the internal tab bar */
-activePage?: 'website' | 'emails' | 'polls' | 'messaging' | 'unsubscribers' | 'qrcodes' | 'notes' | 'files';
+activePage?: 'website' | 'emails' | 'polls' | 'messaging' | 'unsubscribers' | 'qrcodes' | 'notes' | 'files' | 'forms';
 /** When activePage='messaging', this controls the active SMS sub-tab */
 smsTab?: 'campaigns' | 'inbox' | 'keywords' | 'analytics' | 'workflows' | 'agent' | 'permissions';
 /** When provided, shows an "Open Mobile App" banner in the SMS tab */
@@ -1743,7 +1744,7 @@ activeNumberId?: string | null;
 onActiveNumberIdChange?: (id: string | null) => void;
 }> = ({ churchId, church, currentUserId,
 currentUser, onUpdateChurch, activePage, smsTab, mobileSmsUrl, activeNumberId, onActiveNumberIdChange }) => {
-  const [activeTab, setActiveTab] = useState<'website' | 'emails' | 'polls' | 'unsubscribers' | 'messaging' | 'qrcodes' | 'notes' | 'files'>('emails');
+  const [activeTab, setActiveTab] = useState<'website' | 'emails' | 'polls' | 'unsubscribers' | 'messaging' | 'qrcodes' | 'notes' | 'files' | 'forms'>('emails');
   const effectiveTab = activePage ?? activeTab;
   const [campaigns, setCampaigns] = useState<EmailCampaign[]>([]);
   const [activeCampaign, setActiveCampaign] = useState<EmailCampaign | null>(null);
@@ -2121,6 +2122,16 @@ currentUser, onUpdateChurch, activePage, smsTab, mobileSmsUrl, activeNumberId, o
             </span>
           )}
         </button>
+        <button
+          onClick={() => setActiveTab('forms')}
+          className={`flex items-center gap-2 px-4 py-2 -mb-px text-sm font-semibold border-b-2 transition shrink-0 ${
+            effectiveTab === 'forms'
+              ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400'
+              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
+          }`}
+        >
+          <FileText size={14} /> Forms
+        </button>
       </div>
       )}
 
@@ -2330,6 +2341,13 @@ currentUser, onUpdateChurch, activePage, smsTab, mobileSmsUrl, activeNumberId, o
             isLoading={filesLoading}
             loadFiles={loadToolsFiles}
           />
+        </div>
+      )}
+
+      {/* ─── Forms Tab ────────────────────────────────────────────────── */}
+      {effectiveTab === 'forms' && (
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <FormsManager churchId={churchId} currentUser={currentUser!} />
         </div>
       )}
 
