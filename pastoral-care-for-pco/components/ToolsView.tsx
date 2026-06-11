@@ -1236,7 +1236,7 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
                 <div>
                   <h2 className="text-xl font-bold text-slate-900 dark:text-white">Email Statistics</h2>
                   <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                    SendGrid engagement data for Campaign: {localCampaign.subject || localCampaign.name}
+                    {statsMetadata?.source === 'postmark' ? 'Postmark' : 'SendGrid'} engagement data for Campaign: {localCampaign.subject || localCampaign.name}
                   </p>
                 </div>
                 <button
@@ -1256,7 +1256,7 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
               ) : loadingStats ? (
                 <div className="bg-white dark:bg-slate-800 rounded-xl p-12 flex flex-col items-center border border-slate-200 dark:border-slate-700 shadow-sm">
                   <Loader2 size={32} className="animate-spin text-indigo-600 mb-4" />
-                  <p className="text-slate-600 dark:text-slate-400 font-medium">Fetching statistics from SendGrid...</p>
+                  <p className="text-slate-600 dark:text-slate-400 font-medium">Fetching email statistics...</p>
                 </div>
               ) : statsError ? (
                 <div className="bg-red-50 dark:bg-red-900/20 rounded-xl p-6 border border-red-200 dark:border-red-900 text-red-700 dark:text-red-400 flex flex-col items-center text-center">
@@ -1312,12 +1312,12 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
                         {statsMetadata.campaign.sentAgo ? ` (${statsMetadata.campaign.sentAgo})` : ''}.
                       </p>
                       <p className="text-xs text-slate-400 max-w-md mx-auto">
-                        SendGrid category statistics can take up to 48 hours to process. Open & click tracking data will appear here once SendGrid has finished processing.
+                        Statistics can take some time to process. Open & click tracking data will appear here once the provider has finished processing.
                       </p>
                     </div>
                   ) : (
                     <p className="text-sm mt-1 max-w-sm mx-auto">
-                      SendGrid category statistics can take up to 48 hours to process after an email is sent. Check back later.
+                      Statistics can take some time to process after an email is sent. Check back later.
                     </p>
                   )}
                   <button
