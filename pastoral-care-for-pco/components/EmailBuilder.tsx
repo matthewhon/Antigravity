@@ -4,7 +4,7 @@ import { arrayMove, SortableContext, verticalListSortingStrategy, useSortable } 
 import { CSS } from '@dnd-kit/utilities';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import { storage, db } from '../services/firebase';
+import { storage, db, auth } from '../services/firebase';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL, listAll } from 'firebase/storage';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { firestore } from '../services/firestoreService';
@@ -188,10 +188,13 @@ const BlockThumbnail: React.FC<{ block: EmailBlock }> = ({ block }) => {
 function useUpload(folder: string) {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
-  const upload = useCallback(async (file: File): Promise<string> => {
+  const upload = useCallback(async (file: File, churchId?: string): Promise<string> => {
     setUploading(true);
     setProgress(0);
-    const path = `${folder}/${Date.now()}_${file.name}`;
+    const fileId = `file_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const path = churchId
+      ? `tenants/${churchId}/uploads/${fileId}_${file.name}`
+      : `${folder}/${Date.now()}_${file.name}`;
     const sRef = storageRef(storage, path);
     await new Promise<void>((resolve, reject) => {
       const task = uploadBytesResumable(sRef, file);
@@ -202,6 +205,29 @@ function useUpload(folder: string) {
       );
     });
     const url = await getDownloadURL(sRef);
+
+    if (churchId) {
+      try {
+        const uploaderUid = auth.currentUser?.uid || 'system';
+        const tenantFile = {
+          id: fileId,
+          churchId,
+          uploaderUid,
+          originalName: file.name,
+          mimeType: file.type || 'application/octet-stream',
+          sizeBytes: file.size,
+          publicUrl: url,
+          gcsPath: path,
+          createdAt: Date.now(),
+          folder: 'email picture gallery',
+          tags: ['email']
+        };
+        await firestore.saveTenantFile(tenantFile);
+      } catch (err) {
+        console.error('Failed to save tenant file metadata:', err);
+      }
+    }
+
     setUploading(false);
     return url;
   }, [folder]);
@@ -655,7 +681,7 @@ const InlineMediaEditor: React.FC<{
             const file = e.target.files?.[0];
             if (!file) return;
             try {
-              const url = await imageUpload.upload(file);
+              const url = await imageUpload.upload(file, churchId);
               onUpdate({ ...c, src: url });
             } catch { alert('Upload failed. Please try again.'); }
           }} />
@@ -867,7 +893,7 @@ const InlineMediaEditor: React.FC<{
           const file = e.target.files?.[0];
           if (!file) return;
           try {
-            const url = await fileUpload.upload(file);
+            const url = await fileUpload.upload(file, churchId);
             onUpdate({ ...c, name: file.name, url });
           } catch { alert('Upload failed. Please try again.'); }
         }} />

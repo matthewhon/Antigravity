@@ -16,6 +16,26 @@ interface FormsManagerProps {
   currentUser: any;
 }
 
+const PCO_FIELDS_DEFS: Record<string, { type: string; label: string; mapToPco: string; options?: string[] }> = {
+  firstName: { type: 'text', label: 'First Name', mapToPco: 'firstName' },
+  middleName: { type: 'text', label: 'Middle Name', mapToPco: 'middleName' },
+  lastName: { type: 'text', label: 'Last Name', mapToPco: 'lastName' },
+  nickname: { type: 'text', label: 'Nickname', mapToPco: 'nickname' },
+  email: { type: 'text', label: 'Email', mapToPco: 'email' },
+  phone: { type: 'text', label: 'Phone Number', mapToPco: 'phone' },
+  street: { type: 'text', label: 'Street Address', mapToPco: 'street' },
+  city: { type: 'text', label: 'City', mapToPco: 'city' },
+  state: { type: 'text', label: 'State', mapToPco: 'state' },
+  zip: { type: 'text', label: 'ZIP Code', mapToPco: 'zip' },
+  birthday: { type: 'date', label: 'Birthday', mapToPco: 'birthday' },
+  gender: { type: 'select', label: 'Gender', mapToPco: 'gender', options: ['Male', 'Female', 'Other'] },
+  maritalStatus: { type: 'select', label: 'Marital Status', mapToPco: 'maritalStatus', options: ['Single', 'Married', 'Divorced', 'Widowed'] },
+  anniversary: { type: 'date', label: 'Anniversary Date', mapToPco: 'anniversary' },
+  grade: { type: 'select', label: 'School Grade', mapToPco: 'grade', options: ['Pre-K', 'Kindergarten', '1st Grade', '2nd Grade', '3rd Grade', '4th Grade', '5th Grade', '6th Grade', '7th Grade', '8th Grade', '9th Grade', '10th Grade', '11th Grade', '12th Grade'] },
+  medicalNotes: { type: 'paragraph', label: 'Medical Notes & Allergies', mapToPco: 'medicalNotes' },
+  notes: { type: 'paragraph', label: 'Comments / Prayer Requests', mapToPco: 'notes' }
+};
+
 export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUser }) => {
   const [forms, setForms] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,7 +50,7 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
   const [formDesc, setFormDesc] = useState('');
   const [customFields, setCustomFields] = useState<any[]>([]);
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'toolbox' | 'settings' | 'themes'>('toolbox');
+  const [activeTab, setActiveTab] = useState<'toolbox' | 'pco' | 'settings' | 'themes'>('toolbox');
   const [fields, setFields] = useState<any>({
     firstName: { label: 'First Name', required: true, enabled: true },
     middleName: { label: 'Middle Name', required: false, enabled: false },
@@ -316,6 +336,43 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
     document.body.removeChild(link);
   };
 
+  const syncQrCodeToLocalStorage = (formId: string, nameOfForm: string) => {
+    try {
+      const LOCAL_KEY = 'qr_generator_saved';
+      const savedQrs: any[] = JSON.parse(localStorage.getItem(LOCAL_KEY) || '[]');
+      const qrId = `form_qr_${formId}`;
+      const publicLink = getPublicLink(formId);
+      
+      const newQr = {
+        id: qrId,
+        label: `${nameOfForm} (Form Link)`,
+        type: 'url',
+        value: publicLink,
+        fgColor: '#1E293B',
+        bgColor: '#FFFFFF',
+        size: 300,
+        createdAt: Date.now()
+      };
+
+      const existingIndex = savedQrs.findIndex(q => q.id === qrId);
+      if (existingIndex >= 0) {
+        savedQrs[existingIndex] = {
+          ...newQr,
+          fgColor: savedQrs[existingIndex].fgColor || newQr.fgColor,
+          bgColor: savedQrs[existingIndex].bgColor || newQr.bgColor,
+          size: savedQrs[existingIndex].size || newQr.size,
+          label: `${nameOfForm} (Form Link)`
+        };
+      } else {
+        savedQrs.unshift(newQr);
+      }
+
+      localStorage.setItem(LOCAL_KEY, JSON.stringify(savedQrs));
+    } catch (err) {
+      console.error('Failed to sync QR code to local storage:', err);
+    }
+  };
+
   useEffect(() => {
     if (activeForm && qrCanvasRef.current) {
       const link = getPublicLink(activeForm.id);
@@ -330,7 +387,7 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
         console.error('Failed to generate QR Code:', err);
       });
     }
-  }, [activeForm, activeForm?.id, isEditing]);
+  }, [activeForm, activeForm?.id, isEditing, activeTab]);
 
   const handleDownloadQr = () => {
     if (!activeForm || !qrCanvasRef.current) return;
@@ -366,6 +423,7 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
     setSyncToPco(form.settings?.syncToPco !== false);
     setIsEditing(true);
     setIsSubmissionsView(false);
+    syncQrCodeToLocalStorage(form.id, form.name);
   };
 
   const handleCreateClick = () => {
@@ -422,6 +480,7 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
       };
 
       await setDoc(docRef, payload, { merge: true });
+      syncQrCodeToLocalStorage(formId, formName.trim());
       await loadForms();
       setIsEditing(false);
       setActiveForm(null);
@@ -434,8 +493,34 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
 
   const handleDelete = async (formId: string) => {
     if (!confirm('Are you sure you want to delete this form? This cannot be undone.')) return;
+    
+    const LOCAL_KEY = 'qr_generator_saved';
+    let deleteQr = false;
+    try {
+      const savedQrs: any[] = JSON.parse(localStorage.getItem(LOCAL_KEY) || '[]');
+      const qrId = `form_qr_${formId}`;
+      const hasQr = savedQrs.some(q => q.id === qrId);
+      if (hasQr) {
+        deleteQr = confirm('⚠️ Warning: A QR Code for this form is saved in your QR Codes area. Do you want to delete the QR Code as well?');
+      }
+    } catch (e) {
+      console.error(e);
+    }
+
     try {
       await deleteDoc(doc(db, 'pco_forms', formId));
+      
+      if (deleteQr) {
+        try {
+          const savedQrs: any[] = JSON.parse(localStorage.getItem(LOCAL_KEY) || '[]');
+          const qrId = `form_qr_${formId}`;
+          const next = savedQrs.filter(q => q.id !== qrId);
+          localStorage.setItem(LOCAL_KEY, JSON.stringify(next));
+        } catch (err) {
+          console.error(err);
+        }
+      }
+      
       await loadForms();
     } catch (e: any) {
       alert(`Delete failed: ${e.message}`);
@@ -464,6 +549,20 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
     e.preventDefault();
   };
 
+  const getPcoFieldObject = (pcoKey: string) => {
+    const def = PCO_FIELDS_DEFS[pcoKey];
+    if (!def) return null;
+    return {
+      id: `field_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+      type: def.type,
+      label: def.label,
+      required: false,
+      mapToPco: def.mapToPco,
+      placeholder: '',
+      ...(def.options ? { options: [...def.options] } : {})
+    };
+  };
+
   const handleCanvasDrop = (e: React.DragEvent, index: number) => {
     e.preventDefault();
     const data = e.dataTransfer.getData('text/plain');
@@ -471,24 +570,31 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
 
     const [source, val] = data.split(':');
 
-    if (source === 'toolbox') {
-      const type = val;
-      const newField: any = {
-        id: `field_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
-        type,
-        label: getFieldDefaultLabel(type),
-        required: false,
-        mapToPco: 'none',
-        placeholder: ''
-      };
-      if (type === 'select' || type === 'checkboxes') {
-        newField.options = ['Option 1', 'Option 2', 'Option 3'];
+    if (source === 'toolbox' || source === 'pcoField') {
+      let newField: any;
+      if (source === 'pcoField') {
+        newField = getPcoFieldObject(val);
+      } else {
+        const type = val;
+        newField = {
+          id: `field_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+          type,
+          label: getFieldDefaultLabel(type),
+          required: false,
+          mapToPco: 'none',
+          placeholder: ''
+        };
+        if (type === 'select' || type === 'checkboxes') {
+          newField.options = ['Option 1', 'Option 2', 'Option 3'];
+        }
       }
-      const updated = [...customFields];
-      updated.splice(index, 0, newField);
-      setCustomFields(updated);
-      setSelectedFieldId(newField.id);
-      setActiveTab('settings');
+      if (newField) {
+        const updated = [...customFields];
+        updated.splice(index, 0, newField);
+        setCustomFields(updated);
+        setSelectedFieldId(newField.id);
+        setActiveTab('settings');
+      }
     } else if (source === 'canvas') {
       const fromIndex = parseInt(val, 10);
       if (isNaN(fromIndex) || fromIndex === index) return;
@@ -511,22 +617,29 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
 
     const [source, val] = data.split(':');
 
-    if (source === 'toolbox') {
-      const type = val;
-      const newField: any = {
-        id: `field_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
-        type,
-        label: getFieldDefaultLabel(type),
-        required: false,
-        mapToPco: 'none',
-        placeholder: ''
-      };
-      if (type === 'select' || type === 'checkboxes') {
-        newField.options = ['Option 1', 'Option 2', 'Option 3'];
+    if (source === 'toolbox' || source === 'pcoField') {
+      let newField: any;
+      if (source === 'pcoField') {
+        newField = getPcoFieldObject(val);
+      } else {
+        const type = val;
+        newField = {
+          id: `field_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+          type,
+          label: getFieldDefaultLabel(type),
+          required: false,
+          mapToPco: 'none',
+          placeholder: ''
+        };
+        if (type === 'select' || type === 'checkboxes') {
+          newField.options = ['Option 1', 'Option 2', 'Option 3'];
+        }
       }
-      setCustomFields([...customFields, newField]);
-      setSelectedFieldId(newField.id);
-      setActiveTab('settings');
+      if (newField) {
+        setCustomFields([...customFields, newField]);
+        setSelectedFieldId(newField.id);
+        setActiveTab('settings');
+      }
     } else if (source === 'canvas') {
       const fromIndex = parseInt(val, 10);
       if (isNaN(fromIndex)) return;
@@ -1019,6 +1132,17 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
                 </button>
                 <button
                   type="button"
+                  onClick={() => setActiveTab('pco')}
+                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
+                    activeTab === 'pco'
+                      ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-white shadow-sm border border-slate-200/50 dark:border-slate-800'
+                      : 'text-slate-500 hover:text-slate-800 dark:hover:text-white'
+                  }`}
+                >
+                  PCO Fields
+                </button>
+                <button
+                  type="button"
                   onClick={() => setActiveTab('settings')}
                   className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
                     activeTab === 'settings'
@@ -1085,6 +1209,40 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
                       >
                         {getFieldIcon(item.type)}
                         <span>{item.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 1.5: PCO FIELDS */}
+              {activeTab === 'pco' && (
+                <div className="bg-slate-50 dark:bg-slate-950 rounded-2xl p-5 border border-slate-200 dark:border-slate-850 space-y-4">
+                  <div>
+                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-500">Planning Center Fields</h4>
+                    <p className="text-[11px] text-slate-400 mt-0.5">Drag fields to the canvas or click to insert a pre-mapped field.</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3.5 max-h-[450px] overflow-y-auto pr-1 bg-slate-50 dark:bg-slate-950 scrollbar-thin">
+                    {Object.entries(PCO_FIELDS_DEFS).map(([key, item]) => (
+                      <div
+                        key={key}
+                        draggable
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData('text/plain', `pcoField:${key}`);
+                        }}
+                        onClick={() => {
+                          const newField = getPcoFieldObject(key);
+                          if (newField) {
+                            setCustomFields([...customFields, newField]);
+                            setSelectedFieldId(newField.id);
+                            setActiveTab('settings');
+                          }
+                        }}
+                        className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-xs font-semibold text-slate-700 dark:text-slate-350 hover:border-indigo-400 hover:shadow-sm cursor-grab active:cursor-grabbing transition"
+                      >
+                        {getFieldIcon(item.type)}
+                        <span>{item.label}</span>
                       </div>
                     ))}
                   </div>
