@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { Loader2, CheckCircle, AlertCircle, FileUp, ChevronDown } from 'lucide-react';
+import { storage } from '../services/firebase';
+import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
 interface PublicFormViewProps {
   churchId: string;
@@ -14,30 +16,9 @@ export const PublicFormView: React.FC<PublicFormViewProps> = ({ churchId, formId
   const [submitting, setSubmitting] = useState(false);
 
   // Form inputs state
-  const [inputs, setInputs] = useState<any>({
-    firstName: '',
-    middleName: '',
-    lastName: '',
-    nickname: '',
-    email: '',
-    phone: '',
-    street: '',
-    city: '',
-    state: '',
-    zip: '',
-    birthday: '',
-    gender: '',
-    maritalStatus: '',
-    anniversary: '',
-    grade: '',
-    medicalNotes: '',
-    firstTimeVisitor: false,
-    howHeard: '',
-    interests: [],
-    customQuestion1: '',
-    customQuestion2: '',
-    notes: ''
-  });
+  const [inputs, setInputs] = useState<any>({});
+  const [uploadingFields, setUploadingFields] = useState<Record<string, boolean>>({});
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
 
   useEffect(() => {
     fetchConfig();
@@ -63,11 +44,125 @@ export const PublicFormView: React.FC<PublicFormViewProps> = ({ churchId, formId
     };
   }, []);
 
+  const migrateLegacyFields = (fieldsObj: any): any[] => {
+    const result: any[] = [];
+    const order = [
+      'firstName', 'middleName', 'lastName', 'nickname',
+      'email', 'phone', 'address', 'birthday', 'gender',
+      'maritalStatus', 'anniversary', 'grade', 'medicalNotes',
+      'firstTimeVisitor', 'howHeard', 'interests',
+      'customQuestion1', 'customQuestion2', 'notes'
+    ];
+
+    order.forEach(key => {
+      const f = fieldsObj[key];
+      if (f && f.enabled) {
+        let type: any = 'text';
+        let options: string[] | undefined = undefined;
+        
+        if (key === 'interests') {
+          type = 'checkboxes';
+          options = ['Connect Group', 'Serving / Volunteer', 'Baptism', 'Membership', 'Child Dedication', 'Other'];
+        } else if (key === 'firstTimeVisitor') {
+          type = 'checkbox_single';
+        } else if (key === 'medicalNotes' || key === 'notes') {
+          type = 'paragraph';
+        } else if (key === 'birthday' || key === 'anniversary') {
+          type = 'date';
+        } else if (key === 'gender') {
+          type = 'select';
+          options = ['Male', 'Female'];
+        } else if (key === 'maritalStatus') {
+          type = 'select';
+          options = ['Single', 'Married', 'Divorced', 'Widowed', 'Separated'];
+        } else if (key === 'grade') {
+          type = 'select';
+          options = ['Kindergarten', '1st Grade', '2nd Grade', '3rd Grade', '4th Grade', '5th Grade', '6th Grade', '7th Grade', '8th Grade', '9th Grade', '10th Grade', '11th Grade', '12th Grade'];
+        }
+
+        if (key === 'address') {
+          result.push({
+            id: 'heading_address',
+            type: 'section_heading',
+            label: 'Home Address',
+            required: false,
+            mapToPco: 'none'
+          });
+          result.push({
+            id: 'street',
+            type: 'text',
+            label: 'Street Address',
+            placeholder: '123 Main St',
+            required: !!f.required,
+            mapToPco: 'street'
+          });
+          result.push({
+            id: 'city',
+            type: 'text',
+            label: 'City',
+            required: !!f.required,
+            mapToPco: 'city'
+          });
+          result.push({
+            id: 'state',
+            type: 'text',
+            label: 'State',
+            placeholder: 'TX',
+            required: !!f.required,
+            mapToPco: 'state'
+          });
+          result.push({
+            id: 'zip',
+            type: 'text',
+            label: 'ZIP Code',
+            required: !!f.required,
+            mapToPco: 'zip'
+          });
+        } else {
+          result.push({
+            id: key,
+            type,
+            label: f.customLabel || f.label || key,
+            placeholder: '',
+            required: !!f.required,
+            options,
+            mapToPco: key
+          });
+        }
+      }
+    });
+
+    const hasFirstName = result.some(r => r.mapToPco === 'firstName');
+    if (!hasFirstName) {
+      result.unshift({
+        id: 'firstName',
+        type: 'text',
+        label: 'First Name',
+        required: true,
+        mapToPco: 'firstName',
+        placeholder: ''
+      });
+    }
+    const hasLastName = result.some(r => r.mapToPco === 'lastName');
+    if (!hasLastName) {
+      const fnIndex = result.findIndex(r => r.mapToPco === 'firstName');
+      result.splice(fnIndex + 1, 0, {
+        id: 'lastName',
+        type: 'text',
+        label: 'Last Name',
+        required: true,
+        mapToPco: 'lastName',
+        placeholder: ''
+      });
+    }
+
+    return result;
+  };
+
   const fetchConfig = async () => {
     setLoading(true);
     setError(null);
     try {
-      // Fetch public configuration (no authentication required)
       const res = await fetch(`/api/public/form/${churchId}/${formId}`);
       if (!res.ok) {
         if (res.status === 404) {
@@ -76,7 +171,27 @@ export const PublicFormView: React.FC<PublicFormViewProps> = ({ churchId, formId
         throw new Error(`Failed to load form (${res.status})`);
       }
       const data = await res.json();
+      
+      let fieldsToProcess = data.customFields || [];
+      if (fieldsToProcess.length === 0 && data.fields) {
+        fieldsToProcess = migrateLegacyFields(data.fields);
+        data.customFields = fieldsToProcess;
+      }
+      
       setConfig(data);
+      
+      const initialInputs: any = {};
+      fieldsToProcess.forEach((f: any) => {
+        if (f.type === 'section_heading' || f.type === 'text_block') return;
+        if (f.type === 'checkboxes') {
+          initialInputs[f.id] = [];
+        } else if (f.type === 'checkbox_single') {
+          initialInputs[f.id] = false;
+        } else {
+          initialInputs[f.id] = '';
+        }
+      });
+      setInputs(initialInputs);
     } catch (e: any) {
       setError(e.message || 'Failed to fetch form.');
     } finally {
@@ -94,34 +209,72 @@ export const PublicFormView: React.FC<PublicFormViewProps> = ({ churchId, formId
     }
   };
 
-  const handleInterestChange = (interest: string, checked: boolean) => {
-    setInputs((prev: any) => {
-      const current = prev.interests || [];
-      const updated = checked 
-        ? [...current, interest] 
-        : current.filter((i: string) => i !== interest);
-      return { ...prev, interests: updated };
-    });
+  const handleFileUpload = async (fieldId: string, file: File) => {
+    if (!file) return;
+    setUploadingFields(prev => ({ ...prev, [fieldId]: true }));
+    setUploadProgress(prev => ({ ...prev, [fieldId]: 0 }));
+    
+    try {
+      const path = `form_uploads/${churchId}/${formId}/${Date.now()}_${file.name}`;
+      const sRef = storageRef(storage, path);
+      const uploadTask = uploadBytesResumable(sRef, file);
+      
+      uploadTask.on('state_changed', 
+        (snapshot) => {
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          setUploadProgress(prev => ({ ...prev, [fieldId]: Math.round(progress) }));
+        }, 
+        (error) => {
+          console.error("File upload failed:", error);
+          setError(`File upload failed: ${error.message}`);
+          setUploadingFields(prev => ({ ...prev, [fieldId]: false }));
+        }, 
+        async () => {
+          const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
+          setInputs(prev => ({ ...prev, [fieldId]: downloadUrl }));
+          setUploadingFields(prev => ({ ...prev, [fieldId]: false }));
+        }
+      );
+    } catch (e: any) {
+      console.error(e);
+      setError(`File upload error: ${e.message}`);
+      setUploadingFields(prev => ({ ...prev, [fieldId]: false }));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
-    // Validate enabled & required fields
     const missing: string[] = [];
-    if (config?.fields) {
-      Object.entries(config.fields).forEach(([key, f]: any) => {
-        if (f.enabled && f.required) {
-          if (key === 'address') {
-            if (!inputs.street || !inputs.city || !inputs.state || !inputs.zip) {
-              missing.push('Full Address (Street, City, State, ZIP)');
-            }
-          } else if (!inputs[key]?.trim()) {
+    const fieldsToValidate = config?.customFields || [];
+    
+    fieldsToValidate.forEach((f: any) => {
+      if (f.type === 'section_heading' || f.type === 'text_block') return;
+      if (f.required) {
+        const val = inputs[f.id];
+        if (f.type === 'checkboxes') {
+          if (!val || val.length === 0) {
+            missing.push(f.label);
+          }
+        } else if (f.type === 'checkbox_single') {
+          if (!val) {
+            missing.push(f.label);
+          }
+        } else {
+          if (typeof val === 'string' && !val.trim()) {
+            missing.push(f.label);
+          } else if (val === undefined || val === null) {
             missing.push(f.label);
           }
         }
-      });
+      }
+    });
+
+    const uploadsInProgress = Object.values(uploadingFields).some(Boolean);
+    if (uploadsInProgress) {
+      setError("Please wait for all file uploads to complete before submitting.");
+      return;
     }
 
     if (missing.length > 0) {
@@ -155,7 +308,7 @@ export const PublicFormView: React.FC<PublicFormViewProps> = ({ churchId, formId
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
         <div className="text-center space-y-2">
           <Loader2 className="animate-spin mx-auto text-indigo-600 dark:text-indigo-400" size={32} />
-          <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">Loading connect form...</p>
+          <p className="text-sm font-semibold text-slate-550 dark:text-slate-400">Loading connect form...</p>
         </div>
       </div>
     );
@@ -179,18 +332,12 @@ export const PublicFormView: React.FC<PublicFormViewProps> = ({ churchId, formId
     );
   }
 
-  // Styles configuration
   const themeStyles = config?.styles || {
     primaryColor: '#4F46E5',
     backgroundColor: '#FFFFFF',
     textColor: '#1F2937',
     buttonTextColor: '#FFFFFF'
   };
-
-
-  // Safe checks for field visibility
-  const isEnabled = (fieldName: string) => !!config?.fields?.[fieldName]?.enabled;
-  const isRequired = (fieldName: string) => !!config?.fields?.[fieldName]?.required;
 
   return (
     <div 
@@ -201,62 +348,43 @@ export const PublicFormView: React.FC<PublicFormViewProps> = ({ churchId, formId
         className="w-full max-w-2xl border border-slate-200/80 dark:border-slate-800 rounded-3xl p-8 lg:p-10 shadow-xl relative overflow-hidden transition-colors"
         style={{ backgroundColor: themeStyles.backgroundColor, color: themeStyles.textColor }}
       >
-        {/* Dynamic Theme Color Top Border Accent */}
         <div className="absolute top-0 left-0 right-0 h-1.5" style={{ backgroundColor: themeStyles.primaryColor }} />
 
         {submitted ? (
-          /* SUCCESS VIEW */
           <div className="text-center py-10 space-y-6">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900">
               <CheckCircle size={32} className="text-emerald-500" />
             </div>
             <div className="space-y-2">
               <h2 className="text-2xl font-black tracking-wide uppercase">Thank you!</h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto leading-relaxed">
-                Your information has been successfully received and submitted to Planning Center Online. We appreciate your connection!
+              <p className="text-sm text-slate-500 dark:text-slate-450 max-w-md mx-auto leading-relaxed">
+                Your information has been successfully received. We appreciate your connection!
               </p>
             </div>
             <button
               onClick={() => {
-                setInputs({
-                  firstName: '',
-                  middleName: '',
-                  lastName: '',
-                  nickname: '',
-                  email: '',
-                  phone: '',
-                  street: '',
-                  city: '',
-                  state: '',
-                  zip: '',
-                  birthday: '',
-                  gender: '',
-                  maritalStatus: '',
-                  anniversary: '',
-                  grade: '',
-                  medicalNotes: '',
-                  firstTimeVisitor: false,
-                  howHeard: '',
-                  interests: [],
-                  customQuestion1: '',
-                  customQuestion2: '',
-                  notes: ''
+                const cleared: any = {};
+                (config.customFields || []).forEach((f: any) => {
+                  if (f.type === 'section_heading' || f.type === 'text_block') return;
+                  if (f.type === 'checkboxes') cleared[f.id] = [];
+                  else if (f.type === 'checkbox_single') cleared[f.id] = false;
+                  else cleared[f.id] = '';
                 });
+                setInputs(cleared);
                 setSubmitted(false);
               }}
               style={{ backgroundColor: themeStyles.primaryColor, color: themeStyles.buttonTextColor }}
-              className="px-6 py-2.5 rounded-xl font-bold text-sm hover:opacity-90 transition shadow-lg shadow-indigo-600/10"
+              className="px-6 py-2.5 rounded-xl font-bold text-sm hover:opacity-90 transition shadow-lg"
             >
               Submit Another Response
             </button>
           </div>
         ) : (
-          /* FORM SUBMISSION VIEW */
           <div>
             <div className="mb-8">
               <h1 className="text-2xl font-black uppercase tracking-wide mb-2" style={{ color: themeStyles.textColor }}>{config.name}</h1>
               {config.description && (
-                <p className="text-sm text-slate-500 dark:text-slate-450 leading-relaxed">{config.description}</p>
+                <p className="text-sm text-slate-550 dark:text-slate-450 leading-relaxed">{config.description}</p>
               )}
             </div>
 
@@ -268,427 +396,187 @@ export const PublicFormView: React.FC<PublicFormViewProps> = ({ churchId, formId
             )}
 
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Names grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                <div>
-                  <label className="block text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">First Name <span className="text-red-500">*</span></label>
-                  <input
-                    type="text"
-                    required
-                    name="firstName"
-                    value={inputs.firstName}
-                    onChange={handleChange}
-                    className="w-full text-sm border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 bg-slate-50/50 dark:bg-slate-850 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-opacity-40 transition-all"
-                    style={{ '--tw-ring-color': themeStyles.primaryColor } as any}
-                  />
-                </div>
-                {isEnabled('middleName') && (
-                  <div>
-                    <label className="block text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Middle Name {isRequired('middleName') && <span className="text-red-500">*</span>}</label>
-                    <input
-                      type="text"
-                      required={isRequired('middleName')}
-                      name="middleName"
-                      value={inputs.middleName}
-                      onChange={handleChange}
-                      className="w-full text-sm border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 bg-slate-50/50 dark:bg-slate-850 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-opacity-40 transition-all"
-                      style={{ '--tw-ring-color': themeStyles.primaryColor } as any}
-                    />
-                  </div>
-                )}
-                <div>
-                  <label className="block text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Last Name <span className="text-red-500">*</span></label>
-                  <input
-                    type="text"
-                    required
-                    name="lastName"
-                    value={inputs.lastName}
-                    onChange={handleChange}
-                    className="w-full text-sm border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 bg-slate-50/50 dark:bg-slate-850 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-opacity-40 transition-all"
-                    style={{ '--tw-ring-color': themeStyles.primaryColor } as any}
-                  />
-                </div>
-                {isEnabled('nickname') && (
-                  <div>
-                    <label className="block text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Nickname {isRequired('nickname') && <span className="text-red-500">*</span>}</label>
-                    <input
-                      type="text"
-                      required={isRequired('nickname')}
-                      name="nickname"
-                      value={inputs.nickname}
-                      onChange={handleChange}
-                      className="w-full text-sm border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 bg-slate-50/50 dark:bg-slate-850 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-opacity-40 transition-all"
-                      style={{ '--tw-ring-color': themeStyles.primaryColor } as any}
-                    />
-                  </div>
-                )}
-              </div>
+              {(config.customFields || []).map((field: any) => {
+                const isRequired = field.required;
+                const value = inputs[field.id];
 
-              {/* Email & Phone */}
-              {(isEnabled('email') || isEnabled('phone')) && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                  {isEnabled('email') && (
-                    <div>
-                      <label className="block text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                        Email Address {isRequired('email') && <span className="text-red-500">*</span>}
-                      </label>
-                      <input
-                        type="email"
-                        required={isRequired('email')}
-                        name="email"
-                        value={inputs.email}
-                        onChange={handleChange}
-                        className="w-full text-sm border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 bg-slate-50/50 dark:bg-slate-850 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-opacity-40 transition-all"
-                        style={{ '--tw-ring-color': themeStyles.primaryColor } as any}
-                      />
+                if (field.type === 'section_heading') {
+                  return (
+                    <div key={field.id} className="border-b border-slate-200 dark:border-slate-800 pb-2 pt-4">
+                      <h2 className="text-base font-bold uppercase tracking-wider">{field.label}</h2>
                     </div>
-                  )}
-                  {isEnabled('phone') && (
-                    <div>
-                      <label className="block text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                        Phone Number {isRequired('phone') && <span className="text-red-500">*</span>}
-                      </label>
-                      <input
-                        type="tel"
-                        required={isRequired('phone')}
-                        name="phone"
-                        value={inputs.phone}
-                        onChange={handleChange}
-                        className="w-full text-sm border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 bg-slate-50/50 dark:bg-slate-850 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-opacity-40 transition-all"
-                        style={{ '--tw-ring-color': themeStyles.primaryColor } as any}
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
+                  );
+                }
 
-              {/* Home Address fields group */}
-              {isEnabled('address') && (
-                <div className="space-y-4 pt-1.5">
-                  <div className="border-b border-slate-100 dark:border-slate-850 pb-1">
-                    <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Home Address</h3>
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Street Address {isRequired('address') && <span className="text-red-500">*</span>}</label>
-                    <input
-                      type="text"
-                      required={isRequired('address')}
-                      name="street"
-                      value={inputs.street}
-                      onChange={handleChange}
-                      placeholder="123 Main St"
-                      className="w-full text-sm border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 bg-slate-50/50 dark:bg-slate-850 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-opacity-40 transition-all"
-                      style={{ '--tw-ring-color': themeStyles.primaryColor } as any}
-                    />
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="sm:col-span-1">
-                      <label className="block text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">City {isRequired('address') && <span className="text-red-500">*</span>}</label>
+                if (field.type === 'text_block') {
+                  return (
+                    <div key={field.id} className="py-2">
+                      <p className="text-sm text-slate-500 dark:text-slate-400 whitespace-pre-line leading-relaxed">{field.label}</p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div key={field.id} className="space-y-1.5">
+                    <label className="block text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      {field.label} {isRequired && <span className="text-red-500">*</span>}
+                    </label>
+
+                    {field.type === 'text' && (
                       <input
                         type="text"
-                        required={isRequired('address')}
-                        name="city"
-                        value={inputs.city}
+                        required={isRequired}
+                        placeholder={field.placeholder || ''}
+                        name={field.id}
+                        value={value || ''}
                         onChange={handleChange}
                         className="w-full text-sm border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 bg-slate-50/50 dark:bg-slate-850 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-opacity-40 transition-all"
                         style={{ '--tw-ring-color': themeStyles.primaryColor } as any}
                       />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">State {isRequired('address') && <span className="text-red-500">*</span>}</label>
-                      <input
-                        type="text"
-                        required={isRequired('address')}
-                        name="state"
-                        value={inputs.state}
-                        onChange={handleChange}
-                        placeholder="e.g. TX"
-                        className="w-full text-sm border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 bg-slate-50/50 dark:bg-slate-850 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-opacity-40 transition-all"
-                        style={{ '--tw-ring-color': themeStyles.primaryColor } as any}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">ZIP Code {isRequired('address') && <span className="text-red-500">*</span>}</label>
-                      <input
-                        type="text"
-                        required={isRequired('address')}
-                        name="zip"
-                        value={inputs.zip}
-                        onChange={handleChange}
-                        className="w-full text-sm border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 bg-slate-50/50 dark:bg-slate-850 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-opacity-40 transition-all"
-                        style={{ '--tw-ring-color': themeStyles.primaryColor } as any}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
+                    )}
 
-              {/* Birthday & Gender */}
-              {(isEnabled('birthday') || isEnabled('gender')) && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 pt-1.5">
-                  {isEnabled('birthday') && (
-                    <div>
-                      <label className="block text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                        Birthday {isRequired('birthday') && <span className="text-red-500">*</span>}
-                      </label>
-                      <input
-                        type="date"
-                        required={isRequired('birthday')}
-                        name="birthday"
-                        value={inputs.birthday}
-                        onChange={handleChange}
-                        className="w-full text-sm border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 bg-slate-50/50 dark:bg-slate-850 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-opacity-40 transition-all"
-                        style={{ '--tw-ring-color': themeStyles.primaryColor } as any}
-                      />
-                    </div>
-                  )}
-                  {isEnabled('gender') && (
-                    <div>
-                      <label className="block text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                        Gender {isRequired('gender') && <span className="text-red-500">*</span>}
-                      </label>
-                      <select
-                        required={isRequired('gender')}
-                        name="gender"
-                        value={inputs.gender}
-                        onChange={handleChange}
-                        className="w-full text-sm border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 bg-slate-50/50 dark:bg-slate-850 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-opacity-40 transition-all cursor-pointer"
-                        style={{ '--tw-ring-color': themeStyles.primaryColor } as any}
-                      >
-                        <option value="">— Select Gender —</option>
-                        <option value="Male">Male</option>
-                        <option value="Female">Female</option>
-                      </select>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Marital Status & Anniversary */}
-              {(isEnabled('maritalStatus') || isEnabled('anniversary')) && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 pt-1.5">
-                  {isEnabled('maritalStatus') && (
-                    <div>
-                      <label className="block text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                        Marital Status {isRequired('maritalStatus') && <span className="text-red-500">*</span>}
-                      </label>
-                      <select
-                        required={isRequired('maritalStatus')}
-                        name="maritalStatus"
-                        value={inputs.maritalStatus}
-                        onChange={handleChange}
-                        className="w-full text-sm border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 bg-slate-50/50 dark:bg-slate-850 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-opacity-40 transition-all cursor-pointer"
-                        style={{ '--tw-ring-color': themeStyles.primaryColor } as any}
-                      >
-                        <option value="">— Select Status —</option>
-                        <option value="Single">Single</option>
-                        <option value="Married">Married</option>
-                        <option value="Divorced">Divorced</option>
-                        <option value="Widowed">Widowed</option>
-                        <option value="Separated">Separated</option>
-                      </select>
-                    </div>
-                  )}
-                  {isEnabled('anniversary') && (
-                    <div>
-                      <label className="block text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                        Anniversary {isRequired('anniversary') && <span className="text-red-500">*</span>}
-                      </label>
-                      <input
-                        type="date"
-                        required={isRequired('anniversary')}
-                        name="anniversary"
-                        value={inputs.anniversary}
-                        onChange={handleChange}
-                        className="w-full text-sm border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 bg-slate-50/50 dark:bg-slate-850 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-opacity-40 transition-all"
-                        style={{ '--tw-ring-color': themeStyles.primaryColor } as any}
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* School Grade & Medical Notes */}
-              {(isEnabled('grade') || isEnabled('medicalNotes')) && (
-                <div className="space-y-4 pt-1.5">
-                  {isEnabled('grade') && (
-                    <div>
-                      <label className="block text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                        School Grade {isRequired('grade') && <span className="text-red-500">*</span>}
-                      </label>
-                      <select
-                        required={isRequired('grade')}
-                        name="grade"
-                        value={inputs.grade}
-                        onChange={handleChange}
-                        className="w-full text-sm border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 bg-slate-50/50 dark:bg-slate-850 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-opacity-40 transition-all cursor-pointer"
-                        style={{ '--tw-ring-color': themeStyles.primaryColor } as any}
-                      >
-                        <option value="">— Select Grade —</option>
-                        <option value="0">Kindergarten</option>
-                        <option value="1">1st Grade</option>
-                        <option value="2">2nd Grade</option>
-                        <option value="3">3rd Grade</option>
-                        <option value="4">4th Grade</option>
-                        <option value="5">5th Grade</option>
-                        <option value="6">6th Grade</option>
-                        <option value="7">7th Grade</option>
-                        <option value="8">8th Grade</option>
-                        <option value="9">9th Grade</option>
-                        <option value="10">10th Grade</option>
-                        <option value="11">11th Grade</option>
-                        <option value="12">12th Grade</option>
-                      </select>
-                    </div>
-                  )}
-                  {isEnabled('medicalNotes') && (
-                    <div>
-                      <label className="block text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                        Medical Notes / Allergies / Special Instructions {isRequired('medicalNotes') && <span className="text-red-500">*</span>}
-                      </label>
+                    {field.type === 'paragraph' && (
                       <textarea
-                        required={isRequired('medicalNotes')}
-                        name="medicalNotes"
-                        value={inputs.medicalNotes}
-                        onChange={handleChange as any}
-                        placeholder="Please detail any allergies or medical notices here..."
-                        rows={3}
+                        required={isRequired}
+                        placeholder={field.placeholder || ''}
+                        name={field.id}
+                        value={value || ''}
+                        onChange={handleChange}
+                        rows={4}
                         className="w-full text-sm border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 bg-slate-50/50 dark:bg-slate-850 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-opacity-40 transition-all"
                         style={{ '--tw-ring-color': themeStyles.primaryColor } as any}
                       />
-                    </div>
-                  )}
-                </div>
-              )}
+                    )}
 
-              {/* First Time Visitor & Referral Source */}
-              {(isEnabled('firstTimeVisitor') || isEnabled('howHeard')) && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 pt-1.5">
-                  {isEnabled('firstTimeVisitor') && (
-                    <div className="flex items-center gap-3 pt-4">
+                    {field.type === 'select' && (
+                      <div className="relative">
+                        <select
+                          required={isRequired}
+                          name={field.id}
+                          value={value || ''}
+                          onChange={handleChange}
+                          className="w-full text-sm border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 bg-slate-50/50 dark:bg-slate-850 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-opacity-40 transition-all cursor-pointer appearance-none"
+                          style={{ '--tw-ring-color': themeStyles.primaryColor } as any}
+                        >
+                          <option value="">{field.placeholder || '— Select Option —'}</option>
+                          {(field.options || []).map((o: string, oi: number) => (
+                            <option key={oi} value={o}>{o}</option>
+                          ))}
+                        </select>
+                        <ChevronDown size={14} className="absolute right-4 top-3.5 text-slate-400 pointer-events-none" />
+                      </div>
+                    )}
+
+                    {field.type === 'checkboxes' && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50/50 dark:bg-slate-850 border border-slate-100 dark:border-slate-850 rounded-2xl p-4">
+                        {(field.options || []).map((opt: string, oi: number) => {
+                          const isChecked = Array.isArray(value) && value.includes(opt);
+                          return (
+                            <div key={oi} className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                id={`${field.id}-${opt}`}
+                                checked={!!isChecked}
+                                onChange={(e) => {
+                                  const checked = e.target.checked;
+                                  setInputs((prev: any) => {
+                                    const current = prev[field.id] || [];
+                                    const updated = checked
+                                      ? [...current, opt]
+                                      : current.filter((i: string) => i !== opt);
+                                    return { ...prev, [field.id]: updated };
+                                  });
+                                }}
+                                className="w-3.5 h-3.5 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                style={{ '--tw-ring-color': themeStyles.primaryColor } as any}
+                              />
+                              <label htmlFor={`${field.id}-${opt}`} className="text-xs font-semibold text-slate-700 dark:text-slate-350 cursor-pointer select-none">
+                                {opt}
+                              </label>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {field.type === 'checkbox_single' && (
+                      <div className="flex items-center gap-3 pt-2">
+                        <input
+                          type="checkbox"
+                          id={field.id}
+                          name={field.id}
+                          checked={!!value}
+                          onChange={handleChange}
+                          className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                          style={{ '--tw-ring-color': themeStyles.primaryColor } as any}
+                        />
+                        <label htmlFor={field.id} className="text-xs font-semibold text-slate-700 dark:text-slate-350 cursor-pointer select-none">
+                          {field.label}
+                        </label>
+                      </div>
+                    )}
+
+                    {field.type === 'date' && (
                       <input
-                        type="checkbox"
-                        id="firstTimeVisitor"
-                        name="firstTimeVisitor"
-                        checked={!!inputs.firstTimeVisitor}
-                        onChange={handleChange as any}
-                        className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                        style={{ '--tw-ring-color': themeStyles.primaryColor } as any}
-                      />
-                      <label htmlFor="firstTimeVisitor" className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 cursor-pointer">
-                        First Time Visitor?
-                      </label>
-                    </div>
-                  )}
-                  {isEnabled('howHeard') && (
-                    <div>
-                      <label className="block text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                        How did you hear about us? {isRequired('howHeard') && <span className="text-red-500">*</span>}
-                      </label>
-                      <input
-                        type="text"
-                        required={isRequired('howHeard')}
-                        name="howHeard"
-                        value={inputs.howHeard}
+                        type="date"
+                        required={isRequired}
+                        name={field.id}
+                        value={value || ''}
                         onChange={handleChange}
                         className="w-full text-sm border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 bg-slate-50/50 dark:bg-slate-850 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-opacity-40 transition-all"
                         style={{ '--tw-ring-color': themeStyles.primaryColor } as any}
                       />
-                    </div>
-                  )}
-                </div>
-              )}
+                    )}
 
-              {/* Next Steps / Interests Checkboxes */}
-              {isEnabled('interests') && (
-                <div className="space-y-2.5 pt-1.5">
-                  <label className="block text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
-                    Next Steps & Interests {isRequired('interests') && <span className="text-red-500">*</span>}
-                  </label>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-slate-50/50 dark:bg-slate-850 border border-slate-100 dark:border-slate-850 rounded-2xl p-4">
-                    {['Connect Group', 'Serving / Volunteer', 'Baptism', 'Membership', 'Child Dedication', 'Other'].map(interest => {
-                      const isChecked = inputs.interests?.includes(interest);
-                      return (
-                        <div key={interest} className="flex items-center gap-2">
+                    {field.type === 'file' && (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-3">
                           <input
-                            type="checkbox"
-                            id={`interest-${interest}`}
-                            checked={!!isChecked}
-                            onChange={e => handleInterestChange(interest, e.target.checked)}
-                            className="w-3.5 h-3.5 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                            style={{ '--tw-ring-color': themeStyles.primaryColor } as any}
+                            type="file"
+                            id={field.id}
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleFileUpload(field.id, file);
+                            }}
                           />
-                          <label htmlFor={`interest-${interest}`} className="text-xs font-semibold text-slate-700 dark:text-slate-350 cursor-pointer select-none">
-                            {interest}
+                          <label
+                            htmlFor={field.id}
+                            style={{ borderColor: themeStyles.primaryColor }}
+                            className="px-4 py-2 border border-dashed rounded-xl text-xs font-bold cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 transition flex items-center gap-1.5"
+                          >
+                            <FileUp size={14} style={{ color: themeStyles.primaryColor }} /> Choose File
                           </label>
+                          <span className="text-xs text-slate-400 truncate max-w-xs">
+                            {value ? "✓ Uploaded" : "No file selected"}
+                          </span>
                         </div>
-                      );
-                    })}
+                        {uploadingFields[field.id] && (
+                          <div className="flex items-center gap-2 text-xs text-slate-400">
+                            <Loader2 className="animate-spin text-indigo-500" size={12} />
+                            Uploading... {uploadProgress[field.id]}%
+                          </div>
+                        )}
+                        {value && (
+                          <div className="text-xs">
+                            <a href={value} target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline flex items-center gap-1 font-semibold">
+                              View Uploaded File
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                   </div>
-                </div>
-              )}
+                );
+              })}
 
-              {/* Custom Questions 1 & 2 */}
-              {isEnabled('customQuestion1') && (
-                <div>
-                  <label className="block text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                    {config.fields.customQuestion1.customLabel || 'Custom Question 1'} {isRequired('customQuestion1') && <span className="text-red-500">*</span>}
-                  </label>
-                  <input
-                    type="text"
-                    required={isRequired('customQuestion1')}
-                    name="customQuestion1"
-                    value={inputs.customQuestion1}
-                    onChange={handleChange}
-                    className="w-full text-sm border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 bg-slate-50/50 dark:bg-slate-850 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-opacity-40 transition-all"
-                    style={{ '--tw-ring-color': themeStyles.primaryColor } as any}
-                  />
-                </div>
-              )}
-
-              {isEnabled('customQuestion2') && (
-                <div>
-                  <label className="block text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                    {config.fields.customQuestion2.customLabel || 'Custom Question 2'} {isRequired('customQuestion2') && <span className="text-red-500">*</span>}
-                  </label>
-                  <input
-                    type="text"
-                    required={isRequired('customQuestion2')}
-                    name="customQuestion2"
-                    value={inputs.customQuestion2}
-                    onChange={handleChange}
-                    className="w-full text-sm border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 bg-slate-50/50 dark:bg-slate-850 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-opacity-40 transition-all"
-                    style={{ '--tw-ring-color': themeStyles.primaryColor } as any}
-                  />
-                </div>
-              )}
-
-              {/* Comments & Prayer Requests */}
-              {isEnabled('notes') && (
-                <div>
-                  <label className="block text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                    Comments / Prayer Requests {isRequired('notes') && <span className="text-red-500">*</span>}
-                  </label>
-                  <textarea
-                    required={isRequired('notes')}
-                    name="notes"
-                    value={inputs.notes}
-                    onChange={handleChange as any}
-                    placeholder="How can we help or pray for you?"
-                    rows={4}
-                    className="w-full text-sm border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 bg-slate-50/50 dark:bg-slate-850 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-opacity-40 transition-all"
-                    style={{ '--tw-ring-color': themeStyles.primaryColor } as any}
-                  />
-                </div>
-              )}
-
-              {/* Submit button */}
               <div className="pt-4">
                 <button
                   type="submit"
                   disabled={submitting}
                   style={{ backgroundColor: themeStyles.primaryColor, color: themeStyles.buttonTextColor }}
-                  className="w-full py-3 rounded-xl font-bold hover:opacity-90 disabled:opacity-50 transition flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/10"
+                  className="w-full py-3 rounded-xl font-bold hover:opacity-90 disabled:opacity-50 transition flex items-center justify-center gap-2 shadow-lg"
                 >
                   {submitting ? (
                     <>

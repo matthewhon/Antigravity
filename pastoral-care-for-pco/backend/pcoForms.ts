@@ -198,19 +198,86 @@ export async function submitForm(req: any, res: any) {
     }
 
     // 2. Search PCO to find matching person (by email first, then phone)
+    let customFields = formConfig.customFields || [];
+    if (customFields.length === 0 && formConfig.fields) {
+      // Legacy fields migration in-memory
+      Object.entries(formConfig.fields).forEach(([key, f]: any) => {
+        if (f.enabled) {
+          customFields.push({
+            id: key,
+            type: key === 'interests' ? 'checkboxes' : key === 'firstTimeVisitor' ? 'checkbox_single' : key === 'medicalNotes' || key === 'notes' ? 'paragraph' : 'text',
+            label: f.customLabel || f.label,
+            required: !!f.required,
+            mapToPco: key,
+            options: key === 'interests' ? ['Connect Group', 'Serving / Volunteer', 'Baptism', 'Membership', 'Child Dedication', 'Other'] : undefined
+          });
+        }
+      });
+    }
+
+    let firstName = '';
+    let lastName = '';
+    let email = '';
+    let phone = '';
+    let middleName = '';
+    let nickname = '';
+    let gender = '';
+    let birthday = '';
+    let anniversary = '';
+    let maritalStatus = '';
+    let medicalNotes = '';
+    let grade = '';
+    let street = '';
+    let city = '';
+    let state = '';
+    let zip = '';
+    
+    const noteLines: string[] = [];
+    let generalNotes = '';
+
+    customFields.forEach((field: any) => {
+      const val = submissionsData[field.id];
+      if (val === undefined || val === null || val === '') return;
+
+      const displayVal = Array.isArray(val) ? val.join(', ') : (typeof val === 'boolean' ? (val ? 'Yes' : 'No') : String(val));
+
+      if (field.mapToPco === 'firstName') firstName = String(val).trim();
+      else if (field.mapToPco === 'lastName') lastName = String(val).trim();
+      else if (field.mapToPco === 'email') email = String(val).trim();
+      else if (field.mapToPco === 'phone') phone = String(val).trim();
+      else if (field.mapToPco === 'middleName') middleName = String(val).trim();
+      else if (field.mapToPco === 'nickname') nickname = String(val).trim();
+      else if (field.mapToPco === 'gender') gender = String(val).trim();
+      else if (field.mapToPco === 'birthday') birthday = String(val).trim();
+      else if (field.mapToPco === 'anniversary') anniversary = String(val).trim();
+      else if (field.mapToPco === 'maritalStatus') maritalStatus = String(val).trim();
+      else if (field.mapToPco === 'medicalNotes') medicalNotes = String(val).trim();
+      else if (field.mapToPco === 'grade') grade = String(val).trim();
+      else if (field.mapToPco === 'street') street = String(val).trim();
+      else if (field.mapToPco === 'city') city = String(val).trim();
+      else if (field.mapToPco === 'state') state = String(val).trim();
+      else if (field.mapToPco === 'zip') zip = String(val).trim();
+      else if (field.mapToPco === 'notes') {
+        generalNotes = String(val).trim();
+      } else {
+        if (field.type !== 'section_heading' && field.type !== 'text_block') {
+          noteLines.push(`• ${field.label}: ${displayVal}`);
+        }
+      }
+    });
+
     let matchedPersonId: string | null = null;
 
-    if (submissionsData.email) {
-      const emailQuery = `https://api.planningcenteronline.com/people/v2/emails?where[address]=${encodeURIComponent(submissionsData.email.trim())}`;
+    if (email) {
+      const emailQuery = `https://api.planningcenteronline.com/people/v2/emails?where[address]=${encodeURIComponent(email)}`;
       const searchRes = await pcoRequest(churchId, emailQuery, 'GET');
       if (searchRes.data && searchRes.data.length > 0) {
         matchedPersonId = searchRes.data[0].relationships?.person?.data?.id || null;
       }
     }
 
-    if (!matchedPersonId && submissionsData.phone) {
-      // Strip formatting to search numbers
-      const digitsOnly = submissionsData.phone.replace(/\D/g, '');
+    if (!matchedPersonId && phone) {
+      const digitsOnly = phone.replace(/\D/g, '');
       const phoneQuery = `https://api.planningcenteronline.com/people/v2/phone_numbers?where[number]=${digitsOnly}`;
       const searchRes = await pcoRequest(churchId, phoneQuery, 'GET');
       if (searchRes.data && searchRes.data.length > 0) {
@@ -221,23 +288,21 @@ export async function submitForm(req: any, res: any) {
     let isNewPerson = false;
     let personId = matchedPersonId;
 
-    // Build standard attributes mapping
     const personAttributes: any = {};
-    if (submissionsData.firstName) personAttributes.first_name = submissionsData.firstName;
-    if (submissionsData.lastName) personAttributes.last_name = submissionsData.lastName;
-    if (submissionsData.middleName) personAttributes.middle_name = submissionsData.middleName;
-    if (submissionsData.nickname) personAttributes.nickname = submissionsData.nickname;
-    if (submissionsData.gender) personAttributes.gender = submissionsData.gender;
-    if (submissionsData.birthday) personAttributes.birthdate = submissionsData.birthday;
-    if (submissionsData.anniversary) personAttributes.anniversary = submissionsData.anniversary;
-    if (submissionsData.maritalStatus) personAttributes.marital_status = submissionsData.maritalStatus;
-    if (submissionsData.medicalNotes) personAttributes.medical_notes = submissionsData.medicalNotes;
-    if (submissionsData.grade !== undefined && submissionsData.grade !== null && submissionsData.grade !== '') {
-      personAttributes.grade = parseInt(submissionsData.grade, 10);
+    if (firstName) personAttributes.first_name = firstName;
+    if (lastName) personAttributes.last_name = lastName;
+    if (middleName) personAttributes.middle_name = middleName;
+    if (nickname) personAttributes.nickname = nickname;
+    if (gender) personAttributes.gender = gender;
+    if (birthday) personAttributes.birthdate = birthday;
+    if (anniversary) personAttributes.anniversary = anniversary;
+    if (maritalStatus) personAttributes.marital_status = maritalStatus;
+    if (medicalNotes) personAttributes.medical_notes = medicalNotes;
+    if (grade !== undefined && grade !== null && grade !== '') {
+      personAttributes.grade = parseInt(grade, 10);
     }
 
     if (personId) {
-      // Overwrite existing person attributes
       log.info(`Matching PCO user found: ${personId}. Overwriting profile.`, 'forms', { personId }, churchId);
       await pcoRequest(
         churchId,
@@ -246,7 +311,6 @@ export async function submitForm(req: any, res: any) {
         { data: { type: 'Person', id: personId, attributes: personAttributes } }
       );
     } else {
-      // Create new PCO person
       isNewPerson = true;
       log.info(`No matching PCO user found. Creating new profile.`, 'forms', {}, churchId);
       const createRes = await pcoRequest(
@@ -259,42 +323,36 @@ export async function submitForm(req: any, res: any) {
       if (!personId) throw new Error('Failed to create person in PCO');
     }
 
-    // 3. Add/Overwrite contact info (Email, Phone, Address)
-    if (submissionsData.email && personId) {
-      // Check if this person already has this email
+    if (email && personId) {
       const checkEmails = await pcoRequest(churchId, `https://api.planningcenteronline.com/people/v2/people/${personId}/emails`, 'GET');
-      const existingEmail = checkEmails.data?.find((e: any) => e.attributes?.address?.toLowerCase() === submissionsData.email.trim().toLowerCase());
+      const existingEmail = checkEmails.data?.find((e: any) => e.attributes?.address?.toLowerCase() === email.toLowerCase());
       
       if (!existingEmail) {
-        // Create new email entry
         await pcoRequest(churchId, `https://api.planningcenteronline.com/people/v2/people/${personId}/emails`, 'POST', {
           data: {
             type: 'Email',
-            attributes: { address: submissionsData.email.trim(), location: 'Home' }
+            attributes: { address: email, location: 'Home' }
           }
         });
       }
     }
 
-    if (submissionsData.phone && personId) {
-      // Check if this person already has this phone number
+    if (phone && personId) {
       const checkPhones = await pcoRequest(churchId, `https://api.planningcenteronline.com/people/v2/people/${personId}/phone_numbers`, 'GET');
-      const normalizedNewPhone = submissionsData.phone.replace(/\D/g, '');
+      const normalizedNewPhone = phone.replace(/\D/g, '');
       const existingPhone = checkPhones.data?.find((p: any) => (p.attributes?.number || '').replace(/\D/g, '') === normalizedNewPhone);
 
       if (!existingPhone) {
-        // Create new phone entry
         await pcoRequest(churchId, `https://api.planningcenteronline.com/people/v2/people/${personId}/phone_numbers`, 'POST', {
           data: {
             type: 'PhoneNumber',
-            attributes: { number: submissionsData.phone.trim(), location: 'Mobile' }
+            attributes: { number: phone, location: 'Mobile' }
           }
         });
       }
     }
 
-    if ((submissionsData.street || submissionsData.city || submissionsData.state || submissionsData.zip) && personId) {
-      // For address: fetch existing addresses and overwrite primary, or create new
+    if ((street || city || state || zip) && personId) {
       const checkAddresses = await pcoRequest(churchId, `https://api.planningcenteronline.com/people/v2/people/${personId}/addresses`, 'GET');
       const existingAddress = checkAddresses.data?.find((a: any) => a.attributes?.location === 'Home' || a.attributes?.primary);
 
@@ -302,10 +360,10 @@ export async function submitForm(req: any, res: any) {
         data: {
           type: 'Address',
           attributes: {
-            street: submissionsData.street || '',
-            city: submissionsData.city || '',
-            state: submissionsData.state || '',
-            zip: submissionsData.zip || '',
+            street: street || '',
+            city: city || '',
+            state: state || '',
+            zip: zip || '',
             location: 'Home',
             primary: true
           }
@@ -313,15 +371,12 @@ export async function submitForm(req: any, res: any) {
       };
 
       if (existingAddress) {
-        // Overwrite the existing address
         await pcoRequest(churchId, `https://api.planningcenteronline.com/people/v2/addresses/${existingAddress.id}`, 'PATCH', addressPayload);
       } else {
-        // Create new address
         await pcoRequest(churchId, `https://api.planningcenteronline.com/people/v2/people/${personId}/addresses`, 'POST', addressPayload);
       }
     }
 
-    // 4. Run post-submission automations
     if (formConfig.actions?.addToGroupId && personId) {
       try {
         const groupId = formConfig.actions.addToGroupId;
@@ -356,67 +411,15 @@ export async function submitForm(req: any, res: any) {
       }
     }
 
-    // 5. Save Comments/Notes to Planning Center profile notes
-    const noteLines: string[] = [];
-    
-    if (submissionsData.firstTimeVisitor !== undefined && submissionsData.firstTimeVisitor !== '') {
-      const isFirstTime = submissionsData.firstTimeVisitor === 'true' || submissionsData.firstTimeVisitor === true;
-      noteLines.push(`• First Time Visitor: ${isFirstTime ? 'Yes' : 'No'}`);
+    if (medicalNotes) {
+      noteLines.push(`• Medical Notes & Allergies: ${medicalNotes}`);
     }
-    if (submissionsData.howHeard) {
-      noteLines.push(`• How they heard about us: ${submissionsData.howHeard}`);
-    }
-    if (submissionsData.interests) {
-      const parsedInterests = Array.isArray(submissionsData.interests) 
-        ? submissionsData.interests.join(', ') 
-        : submissionsData.interests;
-      noteLines.push(`• Next Steps Interests: ${parsedInterests}`);
-    }
-    
-    // Custom Questions
-    if (formConfig.fields?.customQuestion1?.enabled && submissionsData.customQuestion1) {
-      const q1Label = formConfig.fields.customQuestion1.customLabel || 'Custom Question 1';
-      noteLines.push(`• ${q1Label}: ${submissionsData.customQuestion1}`);
-    }
-    if (formConfig.fields?.customQuestion2?.enabled && submissionsData.customQuestion2) {
-      const q2Label = formConfig.fields.customQuestion2.customLabel || 'Custom Question 2';
-      noteLines.push(`• ${q2Label}: ${submissionsData.customQuestion2}`);
-    }
-
-    // Include other standard profile fields in the note for visibility if enabled/submitted
-    if (submissionsData.birthday) {
-      noteLines.push(`• Birthday: ${submissionsData.birthday}`);
-    }
-    if (submissionsData.gender) {
-      noteLines.push(`• Gender: ${submissionsData.gender}`);
-    }
-    if (submissionsData.maritalStatus) {
-      noteLines.push(`• Marital Status: ${submissionsData.maritalStatus}`);
-    }
-    if (submissionsData.anniversary) {
-      noteLines.push(`• Anniversary: ${submissionsData.anniversary}`);
-    }
-    if (submissionsData.grade !== undefined && submissionsData.grade !== '') {
-      const gradeNames: Record<string, string> = {
-        '0': 'Kindergarten', '1': '1st Grade', '2': '2nd Grade', '3': '3rd Grade',
-        '4': '4th Grade', '5': '5th Grade', '6': '6th Grade', '7': '7th Grade',
-        '8': '8th Grade', '9': '9th Grade', '10': '10th Grade', '11': '11th Grade',
-        '12': '12th Grade'
-      };
-      const gradeVal = submissionsData.grade.toString();
-      noteLines.push(`• School Grade: ${gradeNames[gradeVal] || gradeVal}`);
-    }
-    if (submissionsData.medicalNotes) {
-      noteLines.push(`• Medical Notes & Allergies: ${submissionsData.medicalNotes}`);
-    }
-
-    // Add comments/prayer request notes at the end
-    if (submissionsData.notes) {
+    if (generalNotes) {
       noteLines.push('\nComments / Prayer Requests:');
-      noteLines.push(submissionsData.notes);
+      noteLines.push(generalNotes);
     }
 
-    if ((noteLines.length > 0 || submissionsData.notes) && personId) {
+    if ((noteLines.length > 0 || generalNotes) && personId) {
       try {
         const noteBody = `Form Submission: ${formConfig.name}\n\n${noteLines.join('\n')}`;
         const notePayload: any = {
