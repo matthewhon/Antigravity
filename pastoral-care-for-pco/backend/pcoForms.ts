@@ -373,7 +373,7 @@ export async function submitForm(req: any, res: any) {
         data: {
           type: 'Address',
           attributes: {
-            street: street || '',
+            street_line_1: street || '',
             city: city || '',
             state: state || '',
             zip: zip || '',
