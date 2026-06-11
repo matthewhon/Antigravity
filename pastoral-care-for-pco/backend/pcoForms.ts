@@ -310,7 +310,6 @@ export async function submitForm(req: any, res: any) {
     if (gender) personAttributes.gender = gender;
     if (birthday) personAttributes.birthdate = birthday;
     if (anniversary) personAttributes.anniversary = anniversary;
-    if (maritalStatus) personAttributes.marital_status = maritalStatus;
     if (medicalNotes) personAttributes.medical_notes = medicalNotes;
     if (grade !== undefined && grade !== null && grade !== '') {
       personAttributes.grade = parseInt(grade, 10);
@@ -427,6 +426,9 @@ export async function submitForm(req: any, res: any) {
 
     if (medicalNotes) {
       noteLines.push(`• Medical Notes & Allergies: ${medicalNotes}`);
+    }
+    if (maritalStatus) {
+      noteLines.push(`• Marital Status: ${maritalStatus}`);
     }
     if (generalNotes) {
       noteLines.push('\nComments / Prayer Requests:');
