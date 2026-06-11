@@ -43,6 +43,26 @@ export const PublicFormView: React.FC<PublicFormViewProps> = ({ churchId, formId
     fetchConfig();
   }, [churchId, formId]);
 
+  useEffect(() => {
+    // Force allow scroll on document body when mounting standalone form
+    const prevBodyOverflow = document.body.style.overflow;
+    const prevBodyHeight = document.body.style.height;
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+    const prevHtmlHeight = document.documentElement.style.height;
+
+    document.body.style.overflow = 'auto';
+    document.body.style.height = 'auto';
+    document.documentElement.style.overflow = 'auto';
+    document.documentElement.style.height = 'auto';
+
+    return () => {
+      document.body.style.overflow = prevBodyOverflow;
+      document.body.style.height = prevBodyHeight;
+      document.documentElement.style.overflow = prevHtmlOverflow;
+      document.documentElement.style.height = prevHtmlHeight;
+    };
+  }, []);
+
   const fetchConfig = async () => {
     setLoading(true);
     setError(null);
@@ -167,13 +187,14 @@ export const PublicFormView: React.FC<PublicFormViewProps> = ({ churchId, formId
     buttonTextColor: '#FFFFFF'
   };
 
+
   // Safe checks for field visibility
   const isEnabled = (fieldName: string) => !!config?.fields?.[fieldName]?.enabled;
   const isRequired = (fieldName: string) => !!config?.fields?.[fieldName]?.required;
 
   return (
     <div 
-      className="min-h-screen flex items-center justify-center py-12 px-6 transition-all duration-300"
+      className="min-h-screen w-full overflow-y-auto flex items-center justify-center py-12 px-6 transition-all duration-300"
       style={{ backgroundColor: themeStyles.backgroundColor + '1A', color: themeStyles.textColor }}
     >
       <div 
