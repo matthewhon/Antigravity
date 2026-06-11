@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../services/firebase';
 import { collection, query, where, getDocs, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { pcoService } from '../services/pcoService';
+import QRCode from 'qrcode';
 import { 
   Plus, Trash2, Pencil, Copy, ExternalLink, Loader2, CheckCircle, 
   Settings, Eye, FormInput, Palette, ArrowLeft, Calendar, User, Check,
-  Globe, FileText
+  Globe, FileText, QrCode
 } from 'lucide-react';
 
 interface FormsManagerProps {
@@ -69,6 +70,7 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
   // UI state helpers
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const qrCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   // Load forms on mount
   useEffect(() => {
@@ -181,6 +183,35 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  useEffect(() => {
+    if (activeForm && qrCanvasRef.current) {
+      const link = getPublicLink(activeForm.id);
+      QRCode.toCanvas(qrCanvasRef.current, link, {
+        width: 140,
+        margin: 2,
+        color: {
+          dark: '#1E293B',
+          light: '#FFFFFF'
+        }
+      }).catch(err => {
+        console.error('Failed to generate QR Code:', err);
+      });
+    }
+  }, [activeForm, activeForm?.id, isEditing]);
+
+  const handleDownloadQr = () => {
+    if (!activeForm || !qrCanvasRef.current) return;
+    try {
+      const url = qrCanvasRef.current.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${activeForm.name.toLowerCase().replace(/\s+/g, '_')}_qr.png`;
+      a.click();
+    } catch (err) {
+      console.error('Download QR failed:', err);
+    }
   };
 
   const handleEditClick = (form: any) => {
@@ -754,52 +785,72 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
 
                 {activeForm && (
                   <div className="bg-slate-50 dark:bg-slate-850/50 border border-slate-100 dark:border-slate-800 rounded-2xl p-5 space-y-4">
-                    <h4 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                      <Globe size={14} className="text-indigo-500" /> Direct Link & Website Embed
+                    <h4 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5 border-b border-slate-150 dark:border-slate-850 pb-2">
+                      <Globe size={14} className="text-indigo-500" /> Share & Embed Options
                     </h4>
                     
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Direct Public Link</label>
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          readOnly
-                          value={getPublicLink(activeForm.id)}
-                          className="flex-1 text-xs border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleCopy(getPublicLink(activeForm.id), 'url')}
-                          className="px-3 py-2 text-xs font-bold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-xl transition"
-                        >
-                          {copiedId === `url-${getPublicLink(activeForm.id)}` ? 'Copied!' : 'Copy'}
-                        </button>
-                        <a
-                          href={getPublicLink(activeForm.id)}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="px-3 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition flex items-center gap-1"
-                        >
-                          <ExternalLink size={12} /> Preview
-                        </a>
-                      </div>
-                    </div>
+                    <div className="flex flex-col md:flex-row gap-6">
+                      {/* Left: Link & Embed Code */}
+                      <div className="flex-1 space-y-4">
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Direct Public Link</label>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              readOnly
+                              value={getPublicLink(activeForm.id)}
+                              className="flex-1 text-xs border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleCopy(getPublicLink(activeForm.id), 'url')}
+                              className="px-3 py-2 text-xs font-bold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-xl transition"
+                            >
+                              {copiedId === `url-${getPublicLink(activeForm.id)}` ? 'Copied!' : 'Copy'}
+                            </button>
+                            <a
+                              href={getPublicLink(activeForm.id)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="px-3 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition flex items-center gap-1"
+                            >
+                              <ExternalLink size={12} /> Preview
+                            </a>
+                          </div>
+                        </div>
 
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Website Embed Code (iframe)</label>
-                      <div className="space-y-2">
-                        <textarea
-                          readOnly
-                          rows={3}
-                          value={getEmbedCode(activeForm.id)}
-                          className="w-full text-[11px] font-mono border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none"
-                        />
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Website Embed Code (iframe)</label>
+                          <div className="space-y-2">
+                            <textarea
+                              readOnly
+                              rows={2}
+                              value={getEmbedCode(activeForm.id)}
+                              className="w-full text-[11px] font-mono border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleCopy(getEmbedCode(activeForm.id), 'embed')}
+                              className="w-full py-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-xl transition"
+                            >
+                              {copiedId === `embed-${getEmbedCode(activeForm.id)}` ? 'Copied Embed Code!' : 'Copy Embed Code'}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Right: QR Code generator */}
+                      <div className="w-full md:w-44 shrink-0 flex flex-col items-center justify-center p-4 bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800 rounded-2xl text-center space-y-3">
+                        <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Form QR Code</label>
+                        <div className="bg-white p-1.5 rounded-xl border border-slate-100 shadow-sm flex items-center justify-center">
+                          <canvas ref={qrCanvasRef} className="w-28 h-28 block" />
+                        </div>
                         <button
                           type="button"
-                          onClick={() => handleCopy(getEmbedCode(activeForm.id), 'embed')}
-                          className="w-full py-2 text-xs font-bold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-xl transition"
+                          onClick={handleDownloadQr}
+                          className="w-full py-1.5 text-[11px] font-bold text-white bg-indigo-650 hover:bg-indigo-700 rounded-lg transition flex items-center justify-center gap-1 shrink-0 shadow-sm"
                         >
-                          {copiedId === `embed-${getEmbedCode(activeForm.id)}` ? 'Copied Embed Code!' : 'Copy Embed Code'}
+                          <Download size={12} /> Download PNG
                         </button>
                       </div>
                     </div>
