@@ -516,19 +516,79 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
 
     // ── CSV Export ──────────────────────────────────────────────────────────────
     const handleExport = () => {
-        const header = ['Donor Name', 'Primary Email', 'Total Given', 'Last Gift Date', ...buckets];
-        const rows = aggregatedData.map(d => [
-            `"${d.name}"`, `"${d.email}"`,
-            d.totalAmount.toFixed(2),
-            d.lastGiftDate,
-            ...buckets.map(b => (d.buckets[b] || 0).toFixed(2)),
-        ].join(','));
-        const csv = [header.join(','), ...rows].join('\n');
+        const escapeCsv = (str: string) => {
+            if (!str) return '""';
+            return `"${String(str).replace(/"/g, '""')}"`;
+        };
+
+        let csv = "";
+        let filename = "";
+
+        if (activeTab === 'donors') {
+            const header = ['Donor Name', 'Primary Email', 'Total Given', 'Last Gift Date', ...buckets];
+            const rows = aggregatedData.map(d => [
+                escapeCsv(d.name), escapeCsv(d.email),
+                d.totalAmount.toFixed(2),
+                d.lastGiftDate,
+                ...buckets.map(b => (d.buckets[b] || 0).toFixed(2)),
+            ].join(','));
+            csv = [header.join(','), ...rows].join('\n');
+            filename = `donor_report_${format(new Date(), 'yyyy-MM-dd')}.csv`;
+        } else if (activeTab === 'age_trends') {
+            const header = ['Period', 'Under 18', '18-25', '26-35', '36-50', '51-65', '65+', 'Unknown Age'];
+            const rows = ageTrendData.map(d => [
+                escapeCsv(d.bucket),
+                d['Under 18']?.toFixed(2) || '0.00',
+                d['18–25']?.toFixed(2) || '0.00',
+                d['26–35']?.toFixed(2) || '0.00',
+                d['36–50']?.toFixed(2) || '0.00',
+                d['51–65']?.toFixed(2) || '0.00',
+                d['65+']?.toFixed(2) || '0.00',
+                d['Unknown Age']?.toFixed(2) || '0.00'
+            ].join(','));
+            csv = [header.join(','), ...rows].join('\n');
+            filename = `age_demographics_${format(new Date(), 'yyyy-MM-dd')}.csv`;
+        } else if (activeTab === 'status_trends') {
+            const header = ['Period', 'Active', 'New', 'Occasional', 'Recovered', 'Second Time'];
+            const rows = statusTrendData.map(d => [
+                escapeCsv(d.bucket),
+                d['Active']?.toFixed(2) || '0.00',
+                d['New']?.toFixed(2) || '0.00',
+                d['Occasional']?.toFixed(2) || '0.00',
+                d['Recovered']?.toFixed(2) || '0.00',
+                d['Second Time']?.toFixed(2) || '0.00'
+            ].join(','));
+            csv = [header.join(','), ...rows].join('\n');
+            filename = `giving_by_status_${format(new Date(), 'yyyy-MM-dd')}.csv`;
+        } else if (activeTab === 'avg_giving') {
+            const header = ['Fund Name', 'Total Given', 'Avg Per Week', 'Trend %', 'Trend'];
+            const rows = avgGivingByQuarter.fundData.map(d => [
+                escapeCsv(d.fundName),
+                d.totalGiven.toFixed(2),
+                d.avgPerWeek.toFixed(2),
+                d.trendPct !== null ? d.trendPct.toFixed(2) : '',
+                d.trend
+            ].join(','));
+            csv = [header.join(','), ...rows].join('\n');
+            filename = `avg_giving_by_fund_${format(new Date(), 'yyyy-MM-dd')}.csv`;
+        } else if (activeTab === 'giving_by_label') {
+            const header = ['Label', 'Total Given', 'Funds Breakdown'];
+            const rows = givingByLabelData.labelData.map(d => [
+                escapeCsv(d.labelName),
+                d.totalGiven.toFixed(2),
+                escapeCsv(d.funds.map(f => `${f.fundName}: ${f.amount.toFixed(2)}`).join(' | '))
+            ].join(','));
+            csv = [header.join(','), ...rows].join('\n');
+            filename = `giving_by_label_${format(new Date(), 'yyyy-MM-dd')}.csv`;
+        }
+
+        if (!csv) return;
+
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const url  = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `donation_report_${format(new Date(), 'yyyy-MM-dd')}.csv`;
+        link.download = filename;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -668,17 +728,15 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                     </div>
                 )}
 
-                {activeTab === 'donors' && (
-                    <div className="ml-auto">
-                        <button
-                            onClick={handleExport}
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-xl font-bold text-xs uppercase tracking-widest transition-colors flex items-center gap-2"
-                        >
-                            <span>Download CSV</span>
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                        </button>
-                    </div>
-                )}
+                <div className="ml-auto">
+                    <button
+                        onClick={handleExport}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-xl font-bold text-xs uppercase tracking-widest transition-colors flex items-center gap-2"
+                    >
+                        <span>Download CSV</span>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    </button>
+                </div>
             </div>
 
             {/* ── Tab Bar ────────────────────────────────────────────────────── */}

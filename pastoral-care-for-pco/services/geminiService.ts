@@ -902,6 +902,7 @@ Rules:
 - For views that are not relevant to the user's roles, still return a short sensible default (2–3 widgets).
 - Prioritize widgets that match the user's primary responsibilities.
 - Keep each view to 4–8 widgets maximum.
+- Order the widgets in each array to optimize the page layout and look/feel (e.g., place high-level overview or stat widgets first, followed by wider charts, and ending with detailed lists).
 `;
 
     try {

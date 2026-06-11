@@ -56,7 +56,22 @@ const getWidgetLabel = (viewKey: string, widgetId: string): string => {
 };
 
 // Prioritized views to show in the preview (skip empty/trivial views)
-const PREVIEW_VIEWS = ['dashboard', 'giving_overview', 'services_overview', 'people', 'groups', 'pastoral_care'];
+const PREVIEW_VIEWS = [
+    'dashboard',
+    'people',
+    'people_households',
+    'people_risk',
+    'groups',
+    'services_overview',
+    'services_attendance',
+    'services_teams',
+    'giving_overview',
+    'giving_donors',
+    'pastoral_church',
+    'pastoral_membership',
+    'pastoral_community',
+    'pastoral_care'
+];
 
 const WelcomeLayoutModal: React.FC<WelcomeLayoutModalProps> = ({
     user,

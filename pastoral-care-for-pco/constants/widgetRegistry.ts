@@ -173,6 +173,8 @@ export const ALL_WIDGETS: Record<string, WidgetDefinition[]> = {
     services_attendance: SERVICES_ATTENDANCE_WIDGETS,
     services_teams: SERVICES_TEAMS_WIDGETS,
     giving: GIVING_WIDGETS,
+    giving_overview: GIVING_WIDGETS,
+    giving_donors: GIVING_WIDGETS,
     pastoral_church: PASTORAL_CHURCH_WIDGETS,
     pastoral_membership: PASTORAL_MEMBERSHIP_WIDGETS,
     pastoral_community: PASTORAL_COMMUNITY_WIDGETS,
