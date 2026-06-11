@@ -29,6 +29,53 @@ import { FileManager } from './FileManager';
 
 const API_BASE = ''; // Relative ... same origin
 
+const compressSmsImage = (file: File): Promise<Blob | File> => {
+    return new Promise((resolve) => {
+        if (!file.type.startsWith('image/') || file.type === 'image/gif') {
+            resolve(file);
+            return;
+        }
+        const img = new Image();
+        img.src = URL.createObjectURL(file);
+        img.onload = () => {
+            URL.revokeObjectURL(img.src);
+            const MAX_DIM = 1024;
+            let width = img.width;
+            let height = img.height;
+            if (width > MAX_DIM || height > MAX_DIM) {
+                if (width > height) {
+                    height = Math.round((height * MAX_DIM) / width);
+                    width = MAX_DIM;
+                } else {
+                    width = Math.round((width * MAX_DIM) / height);
+                    height = MAX_DIM;
+                }
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                resolve(file);
+                return;
+            }
+            ctx.drawImage(img, 0, 0, width, height);
+            canvas.toBlob((blob) => {
+                if (blob) {
+                    const name = file.name.replace(/\.[^/.]+$/, "") + ".jpg";
+                    const compressedFile = new File([blob], name, { type: 'image/jpeg' });
+                    resolve(compressedFile);
+                } else {
+                    resolve(file);
+                }
+            }, 'image/jpeg', 0.85);
+        };
+        img.onerror = () => {
+            resolve(file);
+        };
+    });
+};
+
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
     draft: { label: 'Draft', color: 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300' },
     scheduled: { label: 'Scheduled', color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' },
@@ -1141,20 +1188,22 @@ const NewMessageComposer: React.FC<{
     };
 
     /** Upload a File to Firebase Storage and set imageUrlNM on completion. */
-    const handleImageFileUpload = (file: File) => {
+    const handleImageFileUpload = async (file: File) => {
         if (!file.type.startsWith('image/')) {
             setImageUploadError('Please select an image file (JPG, PNG, GIF, WebP).');
             return;
         }
-        if (file.size > 5 * 1024 * 1024) {
-            setImageUploadError('Image must be under 5 MB.');
-            return;
-        }
         setImageUploadError('');
         setImageUploadProgress(0);
-        const path = `mms/${churchId}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+        let compressedFile = file;
+        try {
+            compressedFile = await compressSmsImage(file) as File;
+        } catch (err) {
+            console.warn('[ImageCompress] Compression failed, uploading original', err);
+        }
+        const path = `mms/${churchId}/${Date.now()}_${compressedFile.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
         const sRef = storageRef(storage, path);
-        const task = uploadBytesResumable(sRef, file);
+        const task = uploadBytesResumable(sRef, compressedFile);
         task.on(
             'state_changed',
             snap => setImageUploadProgress(Math.round((snap.bytesTransferred / snap.totalBytes) * 100)),
@@ -2224,7 +2273,8 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
         setReplyUploading(true);
         setReplyUploadPct(0);
         try {
-            const url = await uploadReplyImage(file);
+            const compressedFile = await compressSmsImage(file) as File;
+            const url = await uploadReplyImage(compressedFile);
             setReplyMediaUrl(url);
         } catch {
             showInboxToast('Image upload failed. Please try again.', 'error');
@@ -5325,10 +5375,11 @@ const WorkflowMmsUploader: React.FC<{
         setUploading(true);
         setUploadPct(0);
         try {
-            const cleanName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+            const compressedFile = await compressSmsImage(file) as File;
+            const cleanName = compressedFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
             const path = `sms-media/${churchId}/workflow/${Date.now()}_${cleanName}`;
             const fileRef = storageRef(storage, path);
-            const task = uploadBytesResumable(fileRef, file);
+            const task = uploadBytesResumable(fileRef, compressedFile);
             await new Promise<void>((resolve, reject) => {
                 task.on('state_changed',
                     snap => setUploadPct(Math.round((snap.bytesTransferred / snap.totalBytes) * 100)),
@@ -5427,10 +5478,11 @@ const WorkflowSmsImageAttachment: React.FC<{
         setUploading(true);
         setUploadPct(0);
         try {
-            const cleanName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+            const compressedFile = await compressSmsImage(file) as File;
+            const cleanName = compressedFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
             const path = `sms-media/${churchId}/workflow/${Date.now()}_${cleanName}`;
             const fileRef = storageRef(storage, path);
-            const task = uploadBytesResumable(fileRef, file);
+            const task = uploadBytesResumable(fileRef, compressedFile);
             await new Promise<void>((resolve, reject) => {
                 task.on('state_changed',
                     snap => setUploadPct(Math.round((snap.bytesTransferred / snap.totalBytes) * 100)),
