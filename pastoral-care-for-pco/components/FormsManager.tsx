@@ -4,7 +4,8 @@ import { collection, query, where, getDocs, doc, setDoc, deleteDoc } from 'fireb
 import { pcoService } from '../services/pcoService';
 import { 
   Plus, Trash2, Pencil, Copy, ExternalLink, Loader2, CheckCircle, 
-  Settings, Eye, FormInput, Palette, ArrowLeft, Calendar, User, Check
+  Settings, Eye, FormInput, Palette, ArrowLeft, Calendar, User, Check,
+  Globe, FileText
 } from 'lucide-react';
 
 interface FormsManagerProps {
@@ -57,6 +58,7 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
     noteCategoryId: ''
   });
   const [isActive, setIsActive] = useState(true);
+  const [syncToPco, setSyncToPco] = useState(true);
 
   // PCO integration options
   const [pcoGroups, setPcoGroups] = useState<any[]>([]);
@@ -126,6 +128,61 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
     }
   };
 
+  const handleDownloadCsv = () => {
+    if (!activeForm || submissions.length === 0) return;
+    
+    const formFields = activeForm.fields || {};
+    const enabledFields = Object.entries(formFields)
+      .filter(([_, f]: any) => f.enabled)
+      .map(([key, _]) => key);
+
+    const headers = ['Submitted At', 'Status', ...enabledFields.map(key => {
+      if (key === 'customQuestion1') return formFields.customQuestion1?.customLabel || 'Custom Question 1';
+      if (key === 'customQuestion2') return formFields.customQuestion2?.customLabel || 'Custom Question 2';
+      return formFields[key]?.label || key;
+    })];
+
+    const escapeCsvCell = (val: any) => {
+      if (val === null || val === undefined) return '';
+      let str = typeof val === 'object' ? JSON.stringify(val) : String(val);
+      str = str.replace(/"/g, '""');
+      if (str.includes(',') || str.includes('\n') || str.includes('"')) {
+        return `"${str}"`;
+      }
+      return str;
+    };
+
+    const rows = submissions.map((sub: any) => {
+      const submittedAt = new Date(sub.submittedAt).toISOString();
+      const status = sub.status || 'success';
+      const data = sub.data || {};
+
+      const fieldValues = enabledFields.map(key => {
+        const value = data[key];
+        if (key === 'interests' && Array.isArray(value)) {
+          return value.join(', ');
+        }
+        if (typeof value === 'boolean') {
+          return value ? 'Yes' : 'No';
+        }
+        return value;
+      });
+
+      return [submittedAt, status, ...fieldValues].map(escapeCsvCell).join(',');
+    });
+
+    const csvContent = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `${activeForm.name.toLowerCase().replace(/\s+/g, '_')}_submissions.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const handleEditClick = (form: any) => {
     setActiveForm(form);
     setFormName(form.name);
@@ -134,6 +191,7 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
     setStyles(form.styles || styles);
     setActions(form.actions || actions);
     setIsActive(form.isActive !== false);
+    setSyncToPco(form.settings?.syncToPco !== false);
     setIsEditing(true);
     setIsSubmissionsView(false);
   };
@@ -175,6 +233,7 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
       noteCategoryId: ''
     });
     setIsActive(true);
+    setSyncToPco(true);
     setIsEditing(true);
     setIsSubmissionsView(false);
   };
@@ -197,6 +256,9 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
         styles,
         actions,
         isActive,
+        settings: {
+          syncToPco
+        },
         updatedAt: Date.now(),
         createdAt: activeForm?.createdAt || Date.now()
       };
@@ -440,6 +502,18 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
                       onChange={e => setFormDesc(e.target.value)}
                     />
                   </div>
+                  <div className="flex items-center gap-3 pt-2">
+                    <input
+                      type="checkbox"
+                      id="sync-pco"
+                      className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                      checked={syncToPco}
+                      onChange={e => setSyncToPco(e.target.checked)}
+                    />
+                    <label htmlFor="sync-pco" className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-350 cursor-pointer select-none">
+                      Sync submissions to Planning Center Online (PCO)
+                    </label>
+                  </div>
                 </div>
               </div>
 
@@ -591,67 +665,77 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
               </div>
 
               {/* AUTOMATIONS */}
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-800 pb-2 mb-4 flex items-center gap-1.5">
-                  <Settings size={16} /> Planning Center Automations
-                </h3>
-                
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-750 dark:text-slate-350 uppercase tracking-wide mb-1.5">Auto-Add to Group</label>
-                    {loadingPcoData ? (
-                      <div className="text-xs text-slate-400 py-2 flex items-center"><Loader2 size={12} className="animate-spin mr-1" /> Loading groups...</div>
-                    ) : (
-                      <select
-                        className="w-full text-sm border border-slate-250 dark:border-slate-700 rounded-xl px-3 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                        value={actions.addToGroupId}
-                        onChange={e => setActions({ ...actions, addToGroupId: e.target.value })}
-                      >
-                        <option value="">— Choose a Group (Optional) —</option>
-                        {pcoGroups.map(g => (
-                          <option key={g.id} value={g.id}>{g.attributes?.name}</option>
-                        ))}
-                      </select>
-                    )}
-                  </div>
+              {syncToPco ? (
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-800 pb-2 mb-4 flex items-center gap-1.5">
+                    <Settings size={16} /> Planning Center Automations
+                  </h3>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-750 dark:text-slate-350 uppercase tracking-wide mb-1.5">Auto-Add to Group</label>
+                      {loadingPcoData ? (
+                        <div className="text-xs text-slate-400 py-2 flex items-center"><Loader2 size={12} className="animate-spin mr-1" /> Loading groups...</div>
+                      ) : (
+                        <select
+                          className="w-full text-sm border border-slate-250 dark:border-slate-700 rounded-xl px-3 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                          value={actions.addToGroupId}
+                          onChange={e => setActions({ ...actions, addToGroupId: e.target.value })}
+                        >
+                          <option value="">— Choose a Group (Optional) —</option>
+                          {pcoGroups.map(g => (
+                            <option key={g.id} value={g.id}>{g.attributes?.name}</option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-slate-750 dark:text-slate-350 uppercase tracking-wide mb-1.5">Auto-Enroll in Workflow</label>
-                    {loadingPcoData ? (
-                      <div className="text-xs text-slate-400 py-2 flex items-center"><Loader2 size={12} className="animate-spin mr-1" /> Loading workflows...</div>
-                    ) : (
-                      <select
-                        className="w-full text-sm border border-slate-250 dark:border-slate-700 rounded-xl px-3 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                        value={actions.enrollInWorkflowId}
-                        onChange={e => setActions({ ...actions, enrollInWorkflowId: e.target.value })}
-                      >
-                        <option value="">— Choose a Workflow (Optional) —</option>
-                        {pcoWorkflows.map(w => (
-                          <option key={w.id} value={w.id}>{w.attributes?.name}</option>
-                        ))}
-                      </select>
-                    )}
-                  </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-750 dark:text-slate-350 uppercase tracking-wide mb-1.5">Auto-Enroll in Workflow</label>
+                      {loadingPcoData ? (
+                        <div className="text-xs text-slate-400 py-2 flex items-center"><Loader2 size={12} className="animate-spin mr-1" /> Loading workflows...</div>
+                      ) : (
+                        <select
+                          className="w-full text-sm border border-slate-250 dark:border-slate-700 rounded-xl px-3 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                          value={actions.enrollInWorkflowId}
+                          onChange={e => setActions({ ...actions, enrollInWorkflowId: e.target.value })}
+                        >
+                          <option value="">— Choose a Workflow (Optional) —</option>
+                          {pcoWorkflows.map(w => (
+                            <option key={w.id} value={w.id}>{w.attributes?.name}</option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-slate-750 dark:text-slate-350 uppercase tracking-wide mb-1.5">PCO Note Category</label>
-                    {loadingPcoData ? (
-                      <div className="text-xs text-slate-400 py-2 flex items-center"><Loader2 size={12} className="animate-spin mr-1" /> Loading categories...</div>
-                    ) : (
-                      <select
-                        className="w-full text-sm border border-slate-250 dark:border-slate-700 rounded-xl px-3 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                        value={actions.noteCategoryId || ''}
-                        onChange={e => setActions({ ...actions, noteCategoryId: e.target.value })}
-                      >
-                        <option value="">— Choose a Category (Optional) —</option>
-                        {pcoNoteCategories.map(nc => (
-                          <option key={nc.id} value={nc.id}>{nc.attributes?.name}</option>
-                        ))}
-                      </select>
-                    )}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-750 dark:text-slate-350 uppercase tracking-wide mb-1.5">PCO Note Category</label>
+                      {loadingPcoData ? (
+                        <div className="text-xs text-slate-400 py-2 flex items-center"><Loader2 size={12} className="animate-spin mr-1" /> Loading categories...</div>
+                      ) : (
+                        <select
+                          className="w-full text-sm border border-slate-250 dark:border-slate-700 rounded-xl px-3 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                          value={actions.noteCategoryId || ''}
+                          onChange={e => setActions({ ...actions, noteCategoryId: e.target.value })}
+                        >
+                          <option value="">— Choose a Category (Optional) —</option>
+                          {pcoNoteCategories.map(nc => (
+                            <option key={nc.id} value={nc.id}>{nc.attributes?.name}</option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
+              ) : (
+                <div className="bg-slate-50 dark:bg-slate-850/50 border border-slate-100 dark:border-slate-800 rounded-2xl p-5 text-center space-y-2">
+                  <Settings size={24} className="mx-auto text-indigo-500/80" />
+                  <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">Local Database Mode</h4>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed max-w-sm mx-auto">
+                    This form is stored strictly in your local database. Submissions will not be sent to Planning Center Online.
+                  </p>
+                </div>
+              )}
 
               {/* Status Toggle & Share/Embed Section */}
               <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
@@ -759,9 +843,19 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
                 Submissions: <span className="font-medium text-slate-600 dark:text-slate-400">{activeForm.name}</span>
               </h2>
             </div>
-            <span className="text-sm font-bold text-slate-500 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-100 dark:border-slate-800">
-              {submissions.length} Total Submissions
-            </span>
+            <div className="flex items-center gap-3">
+              {submissions.length > 0 && (
+                <button
+                  onClick={handleDownloadCsv}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-indigo-50 hover:bg-indigo-105 dark:bg-indigo-950/20 dark:hover:bg-indigo-900/35 border border-indigo-150 dark:border-indigo-900/50 text-indigo-600 dark:text-indigo-400 text-xs font-bold rounded-xl transition"
+                >
+                  <FileText size={14} /> Download CSV
+                </button>
+              )}
+              <span className="text-sm font-bold text-slate-500 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-100 dark:border-slate-800">
+                {submissions.length} Total Submissions
+              </span>
+            </div>
           </div>
 
           {loadingSubmissions ? (

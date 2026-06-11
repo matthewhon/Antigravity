@@ -188,6 +188,15 @@ export async function submitForm(req: any, res: any) {
       status: 'pending'
     });
 
+    // Check if PCO syncing is bypassed (database-only form)
+    if (formConfig.settings?.syncToPco === false) {
+      log.info(`Database-only form submission received for form ${formId}. Bypassing PCO sync.`, 'forms', { formId }, churchId);
+      await db.collection('pco_form_submissions').doc(submissionId).update({
+        status: 'success'
+      });
+      return res.json({ success: true, dbOnly: true });
+    }
+
     // 2. Search PCO to find matching person (by email first, then phone)
     let matchedPersonId: string | null = null;
 
