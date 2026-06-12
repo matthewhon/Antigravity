@@ -6,6 +6,26 @@ import { FieldValue } from 'firebase-admin/firestore';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
+/**
+ * Strips quoted history from an incoming SMS/email reply to isolate the latest message.
+ */
+export function extractLatestMessage(body: string): string {
+    let text = body;
+    const splitters = [
+        /\n\s*On\s+.*wrote:/i,
+        /\n\s*-+\s*Original Message\s*-+/i,
+        /\n\s*_{10,}/,
+        /\n\s*From:\s/i
+    ];
+    for (const regex of splitters) {
+        const match = text.match(regex);
+        if (match && match.index !== undefined) {
+            text = text.substring(0, match.index);
+        }
+    }
+    return text.trim() || body.trim();
+}
+
 /** Normalise an E.164 phone number to a consistent key (strip all non-digits, prefix +1 for US). */
 function normaliseE164(phone: string): string {
     const digits = phone.replace(/\D/g, '');
@@ -311,6 +331,7 @@ export const handleInboundSms = async (req: any, res: any) => {
 
         // 2. Handle STOP / HELP / START (carrier compliance)
         const upperBody = body.trim().toUpperCase();
+        const latestBody = extractLatestMessage(body);
         if (upperBody === 'STOP' || upperBody === 'STOPALL' || upperBody === 'UNSUBSCRIBE' || upperBody === 'CANCEL' || upperBody === 'END' || upperBody === 'QUIT') {
             // Carrier handles STOP automatically; we mirror it in Firestore for UI awareness
             const optOutId = `${churchId}_${from.replace(/\+/g, '')}`;
@@ -348,7 +369,7 @@ export const handleInboundSms = async (req: any, res: any) => {
                 churchId,
                 phoneNumber:         from,
                 lastMessageAt:       now,
-                lastMessageBody:     body,
+                lastMessageBody:     latestBody,
                 lastMessageDirection:'inbound',
                 unreadCount:         1,
                 isOptedOut:          false,
@@ -365,7 +386,7 @@ export const handleInboundSms = async (req: any, res: any) => {
         } else {
             const updateData: any = {
                 lastMessageAt:       now,
-                lastMessageBody:     body,
+                lastMessageBody:     latestBody,
                 lastMessageDirection:'inbound',
                 unreadCount:         (convSnap.data()?.unreadCount || 0) + 1,
             };
@@ -392,7 +413,7 @@ export const handleInboundSms = async (req: any, res: any) => {
                 conversationId: convId,
                 churchId,
                 direction:      'inbound',
-                body,
+                body:           latestBody,
                 mediaUrls:      mediaUrls.length > 0 ? mediaUrls : [],
                 status:         'received',
                 twilioSid:      smsSid || null,
@@ -405,12 +426,12 @@ export const handleInboundSms = async (req: any, res: any) => {
             const churchSnap = await db.collection('churches').doc(churchId).get();
             const churchName = churchSnap.data()?.name || 'Church';
             // Non-blocking: do not await so TwiML response is never delayed
-            generateAiSuggestion(db, log, churchId, convId, messageId, body, churchName)
+            generateAiSuggestion(db, log, churchId, convId, messageId, latestBody, churchName)
                 .catch(() => { /* already logged inside */ });
         }
 
         // 5. Check for keyword matches
-        const kw = await matchKeyword(db, churchId, body);
+        const kw = await matchKeyword(db, churchId, latestBody);
         let keywordReplyMessage: string | null = null;
 
         if (kw) {
@@ -535,7 +556,7 @@ export const handleInboundSms = async (req: any, res: any) => {
                     log.info(`[Prayer Detection] Tagged conversation ${convId} "Needs Prayer" (follow-up detail received)`, 'system', { churchId, convId }, churchId);
                 } else {
                     // ── Fresh message — run NLP scanner ──────────────────────────────
-                    const prayerType = detectPrayerRequest(body);
+                    const prayerType = detectPrayerRequest(latestBody);
 
                     if (prayerType === 'generic') {
                         // Send clarifying reply and set follow-up state
@@ -625,7 +646,7 @@ export const handleInboundSms = async (req: any, res: any) => {
         let pollVoteReplyMessage: string | null = null;
 
         try {
-            const trimmedBody = body.trim();
+            const trimmedBody = latestBody.trim();
             const voteNumber = /^[1-9]$/.test(trimmedBody) ? parseInt(trimmedBody, 10) : null;
 
             if (!kw && !prayerClarifyingReplyMessage && voteNumber !== null) {

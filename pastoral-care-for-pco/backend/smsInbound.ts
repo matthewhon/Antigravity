@@ -39,6 +39,26 @@ import { updatePcoSubscriptionField } from './pcoFieldData';
 
 // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Helpers Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
+/**
+ * Strips quoted history from an incoming SMS/email reply to isolate the latest message.
+ */
+export function extractLatestMessage(body: string): string {
+    let text = body;
+    const splitters = [
+        /\n\s*On\s+.*wrote:/i,
+        /\n\s*-+\s*Original Message\s*-+/i,
+        /\n\s*_{10,}/,
+        /\n\s*From:\s/i
+    ];
+    for (const regex of splitters) {
+        const match = text.match(regex);
+        if (match && match.index !== undefined) {
+            text = text.substring(0, match.index);
+        }
+    }
+    return text.trim() || body.trim();
+}
+
 /** Normalise an E.164 phone number to a consistent key (strip all non-digits, prefix +1 for US). */
 function normaliseE164(phone: string): string {
     const digits = phone.replace(/\D/g, '');
@@ -443,6 +463,7 @@ export const handleInboundSms = async (req: any, res: any) => {
 
         // 2. Handle STOP / HELP / START (carrier compliance)
         const upperBody = body.trim().toUpperCase();
+        const latestBody = extractLatestMessage(body);
         const convIdKeyword = `${churchId}_${from.replace(/\+/g, '')}`;
 
         if (upperBody === 'STOP' || upperBody === 'STOPALL' || upperBody === 'UNSUBSCRIBE' || upperBody === 'CANCEL' || upperBody === 'END' || upperBody === 'QUIT') {
@@ -496,7 +517,7 @@ export const handleInboundSms = async (req: any, res: any) => {
                 churchId,
                 phoneNumber: from,
                 lastMessageAt: now,
-                lastMessageBody: body,
+                lastMessageBody: latestBody,
                 lastMessageDirection: 'inbound',
                 unreadCount: 1,
                 isOptedOut: false,
@@ -514,7 +535,7 @@ export const handleInboundSms = async (req: any, res: any) => {
         } else {
             const updateData: any = {
                 lastMessageAt: now,
-                lastMessageBody: body,
+                lastMessageBody: latestBody,
                 lastMessageDirection: 'inbound',
                 unreadCount: (convSnap.data()?.unreadCount || 0) + 1,
             };
@@ -542,7 +563,7 @@ export const handleInboundSms = async (req: any, res: any) => {
                 conversationId: convId,
                 churchId,
                 direction: 'inbound',
-                body,
+                body: latestBody,
                 mediaUrls: mediaUrls.length > 0 ? mediaUrls : [],
                 status: 'received',
                 messageSid: smsSid || null,
@@ -562,7 +583,7 @@ export const handleInboundSms = async (req: any, res: any) => {
         }).catch(() => { });
 
         // 4-B. Executive AI Auto-Responder
-        const bodyTrimmed = body.trim();
+        const bodyTrimmed = latestBody.trim();
         const aiAgentPrefix = resolvedExecutiveAiAgentKeyword.toLowerCase();
         const isAiAgentTrigger = bodyTrimmed.toLowerCase().startsWith(aiAgentPrefix);
 
@@ -589,12 +610,12 @@ export const handleInboundSms = async (req: any, res: any) => {
             const churchSnap = await db.collection('churches').doc(churchId).get();
             const churchName = churchSnap.data()?.name || 'Church';
             // Non-blocking: do not await so TwiML response is never delayed
-            generateAiSuggestion(db, log, churchId, convId, messageId, body, churchName)
+            generateAiSuggestion(db, log, churchId, convId, messageId, latestBody, churchName)
                 .catch(() => { /* already logged inside */ });
         }
 
         // 5. Check for "Who Is This" contact card request
-        const isWhoIsThis = /^WHO IS THIS\??$/i.test(body.trim());
+        const isWhoIsThis = /^WHO IS THIS\??$/i.test(latestBody.trim());
         let whoIsThisReplyMessage: string | null = null;
         let whoIsThisMediaUrl: string | null = null;
 
@@ -638,7 +659,7 @@ export const handleInboundSms = async (req: any, res: any) => {
         }
 
         // 6. Check for keyword matches
-        const kw = await matchKeyword(db, churchId, body, smsNumberId);
+        const kw = await matchKeyword(db, churchId, latestBody, smsNumberId);
         let keywordReplyMessage: string | null = null;
 
         if (kw) {
@@ -813,7 +834,7 @@ export const handleInboundSms = async (req: any, res: any) => {
                     log.info(`[Prayer Detection] Tagged conversation ${convId} "Needs Prayer" (follow-up detail received)`, 'system', { churchId, convId }, churchId);
                 } else {
                     // ─── Fresh message —â€  run NLP scanner ───
-                    const prayerType = detectPrayerRequest(body);
+                    const prayerType = detectPrayerRequest(latestBody);
 
                     if (prayerType === 'generic') {
                         // Send clarifying reply and set follow-up state
@@ -874,7 +895,7 @@ export const handleInboundSms = async (req: any, res: any) => {
                     .get();
 
                 if (!detectionTagsSnap.empty) {
-                    const lowerBody = body.toLowerCase();
+                    const lowerBody = latestBody.toLowerCase();
 
                     for (const tagDoc of detectionTagsSnap.docs) {
                         const tag = tagDoc.data();
@@ -977,7 +998,7 @@ export const handleInboundSms = async (req: any, res: any) => {
         let pollVoteReplyMessage: string | null = null;
 
         try {
-            const trimmedBody = body.trim();
+            const trimmedBody = latestBody.trim();
             const voteNumber = /^[1-9]$/.test(trimmedBody) ? parseInt(trimmedBody, 10) : null;
 
             if (!isWhoIsThis && !kw && !prayerClarifyingReplyMessage && voteNumber !== null) {
