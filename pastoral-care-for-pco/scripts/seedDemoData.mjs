@@ -958,8 +958,8 @@ async function main() {
   console.log('\\nSeeding users...');
   await batchSet('users', USERS);
 
-  console.log('\\nSeeding Twilio numbers...');
-  await batchSet('twilioNumbers', TWILIO_NUMBERS);
+  console.log('\nSeeding Signalwire/Twilio numbers...');
+  await batchSet('smsNumbers', TWILIO_NUMBERS);
 
   console.log('\\nSeeding people...');
   await batchSet('people', PEOPLE);

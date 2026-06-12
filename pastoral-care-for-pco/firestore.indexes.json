@@ -139,7 +139,7 @@
       ]
     },
     {
-      "collectionGroup": "twilioNumbers",
+      "collectionGroup": "smsNumbers",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "churchId",   "order": "ASCENDING" },
@@ -148,7 +148,7 @@
       ]
     },
     {
-      "collectionGroup": "twilioNumbers",
+      "collectionGroup": "smsNumbers",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "churchId",  "order": "ASCENDING" },
