@@ -13,7 +13,7 @@ export function useTwilioNumbers(churchId: string) {
 
     useEffect(() => {
         const q = query(
-            collection(firebaseDb, 'twilioNumbers'),
+            collection(firebaseDb, 'smsNumbers'),
             where('churchId', '==', churchId),
             orderBy('createdAt', 'asc')
         );
