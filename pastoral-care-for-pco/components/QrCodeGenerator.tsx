@@ -134,12 +134,12 @@ const QR_TYPES: QrTypeOption[] = [
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const LOCAL_KEY = 'qr_generator_saved';
-const loadSaved = (): SavedQr[] => {
-  try { return JSON.parse(localStorage.getItem(LOCAL_KEY) || '[]'); } catch { return []; }
+const getLocalKey = (churchId?: string) => `qr_generator_saved_${churchId || 'default'}`;
+const loadSaved = (churchId?: string): SavedQr[] => {
+  try { return JSON.parse(localStorage.getItem(getLocalKey(churchId)) || '[]'); } catch { return []; }
 };
-const persistSaved = (list: SavedQr[]) => {
-  try { localStorage.setItem(LOCAL_KEY, JSON.stringify(list)); } catch { /* ignore */ }
+const persistSaved = (churchId: string | undefined, list: SavedQr[]) => {
+  try { localStorage.setItem(getLocalKey(churchId), JSON.stringify(list)); } catch { /* ignore */ }
 };
 
 const shortLabel = (q: SavedQr) => q.label || q.value.slice(0, 40);
@@ -194,9 +194,15 @@ const QrPreview: React.FC<{
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-const QrCodeGenerator: React.FC<{ churchId?: string }> = ({ churchId: _churchId }) => {
+const QrCodeGenerator: React.FC<{ churchId?: string }> = ({ churchId }) => {
   // ── State ──────────────────────────────────────────────────────────────────
-  const [saved, setSaved] = useState<SavedQr[]>(loadSaved);
+  const [saved, setSaved] = useState<SavedQr[]>(() => loadSaved(churchId));
+
+  useEffect(() => {
+    setSaved(loadSaved(churchId));
+    setActiveId(null);
+    setIsCreating(false);
+  }, [churchId]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
 
@@ -265,7 +271,7 @@ const QrCodeGenerator: React.FC<{ churchId?: string }> = ({ churchId: _churchId 
       } else {
         next = [entry, ...prev];
       }
-      persistSaved(next);
+      persistSaved(churchId, next);
       return next;
     });
     setActiveId(entry.id);
@@ -287,7 +293,7 @@ const QrCodeGenerator: React.FC<{ churchId?: string }> = ({ churchId: _churchId 
     if (!confirm('Delete this QR code?')) return;
     setSaved(prev => {
       const next = prev.filter(q => q.id !== id);
-      persistSaved(next);
+      persistSaved(churchId, next);
       return next;
     });
     if (activeId === id) {

@@ -4306,6 +4306,14 @@ const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[]; smsNu
                         <BarChart3 size={26} className="text-violet-500" /> Analytics
                     </h1>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Message performance, delivery rates, and usage overview</p>
+                    <a 
+                        href="https://pastoralcare.barnabassoftware.com" 
+                        target="_blank" 
+                        rel="noreferrer" 
+                        className="inline-flex items-center gap-1 text-sm font-medium text-violet-600 dark:text-violet-400 hover:text-violet-700 hover:underline mt-1 transition-colors"
+                    >
+                        View Full Church Analytics Dashboard &rarr;
+                    </a>
                 </div>
                 {/* Period selector */}
                 <div className="flex gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">

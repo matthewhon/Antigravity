@@ -73,6 +73,11 @@ export const FileManager: React.FC<FileManagerProps> = ({
     }
   }, [propFiles, loadFiles]);
 
+  useEffect(() => {
+    setCurrentFolder('');
+    setEditingFile(null);
+  }, [churchId]);
+
   const handleFileUpload = async (file: File) => {
     if (!file) return;
     setIsUploading(true);

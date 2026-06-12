@@ -1793,6 +1793,11 @@ currentUser, onUpdateChurch, activePage, smsTab, mobileSmsUrl, activeNumberId, o
     }
   }, [effectiveTab, filesLoaded, loadToolsFiles]);
 
+  useEffect(() => {
+    setFiles([]);
+    setFilesLoaded(false);
+  }, [churchId]);
+
   const formatSize = (bytes?: number) => {
     if (!bytes || bytes === 0) return '0 B';
     const k = 1024;
