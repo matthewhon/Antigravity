@@ -589,6 +589,18 @@ export const syncGroupsData = async (churchId: string) => {
 
     logger.info(`Found ${groups.length} groups — starting deep scan`, 'sync', { churchId, count: groups.length }, churchId);
 
+    // Fetch existing local groups to detect any that were archived or deleted in PCO
+    // (PCO's API may omit archived groups by default, so we must mark missing ones as archived)
+    const localGroups = await firestore.getGroups(churchId);
+    const fetchedGroupIds = new Set(groups.map(g => g.id));
+    
+    const missingLocalGroups = localGroups
+        .filter(lg => !fetchedGroupIds.has(lg.id))
+        .map(lg => ({
+            ...lg,
+            archivedAt: lg.archivedAt || new Date().toISOString() // Ensure it's marked as archived
+        }));
+
     const activeGroups = groups.filter(g => !g.archivedAt);
     const archivedGroups = groups.filter(g => g.archivedAt);
     const enrichedGroups: PcoGroup[] = [];
@@ -715,7 +727,7 @@ export const syncGroupsData = async (churchId: string) => {
         }
     }
 
-    const finalGroups = [...enrichedGroups, ...archivedGroups];
+    const finalGroups = [...enrichedGroups, ...archivedGroups, ...missingLocalGroups];
 
     if (finalGroups.length > 0) {
         await firestore.upsertGroups(finalGroups);
