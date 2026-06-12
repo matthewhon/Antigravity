@@ -32,6 +32,7 @@ import { PublicPollView } from './components/PublicPollView';
 import { PollProjectorView } from './components/PollProjectorView';
 import { PublicNoteView } from './components/PublicNoteView';
 import { PublicFormView } from './components/PublicFormView';
+import { PublicCalendarView } from './components/PublicCalendarView';
 import { ToolsView } from './components/ToolsView';
 import { SmsWorkflowsManager } from './components/MessagingModule';
 import MobileSmsLayout from './components/MobileSmsLayout';
@@ -784,6 +785,12 @@ const App: React.FC = () => {
   const formMatch = window.location.pathname.match(/^\/form\/([^/]+)\/([^/]+)/);
   if (formMatch) {
     return <PublicFormView churchId={formMatch[1]} formId={formMatch[2]} />;
+  }
+
+  // ─── Public Calendar Route (no auth required) ──────────────────────────────────
+  const calendarMatch = window.location.pathname.match(/^\/embed\/calendar\/([^/]+)/);
+  if (calendarMatch) {
+    return <PublicCalendarView churchId={calendarMatch[1]} />;
   }
 
   if (loading) {

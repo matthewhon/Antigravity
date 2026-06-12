@@ -21,7 +21,7 @@ const toDateStr = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${p
 interface GivingViewProps {
   analytics: GivingAnalytics | null;
   pcoConnected: boolean;
-  activePage?: 'overview' | 'donor' | 'budgets' | 'donations' | 'reports';
+  activePage?: 'overview' | 'donor' | 'budgets' | 'reports';
   filter: GivingFilter;
   onFilterChange: (filter: GivingFilter) => void;
   dateRange?: { start: string, end: string };
@@ -169,11 +169,6 @@ export const GivingView: React.FC<GivingViewProps> = ({
                   .reduce((sum, d) => sum + d.amount, 0);
               
               csvContent += `${escapeCsv(fund.name)},${totalAmount},${ytdBudget},${ytdActual}\n`;
-          });
-      } else if (activeTab === 'donations') {
-          csvContent += "Date,Donor,Fund,Amount,Payment Method\n";
-          donations.forEach(d => {
-              csvContent += `${(d.date || '').slice(0, 10)},${escapeCsv(d.donorName || '')},${escapeCsv(d.fundName || '')},${d.amount},${escapeCsv(d.paymentMethod || '')}\n`;
           });
       } else {
           return;
@@ -1171,53 +1166,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
                   </WidgetWrapper>
               );
           }
-          case 'givingVsBudget':
-              return (
-                  <WidgetWrapper 
-                      title={`Giving vs Budget (${gvbFilter})`} 
-                      onRemove={() => handleRemoveWidget(id)} 
-                      source="PCO & Budgets"
-                      headerControl={
-                          <div className="flex gap-2">
-                              <select 
-                                  aria-label="Budget fund"
-                                  value={gvbFund} 
-                                  onChange={(e) => setGvbFund(e.target.value)} 
-                                  className="bg-slate-100 dark:bg-slate-800 border-none text-[10px] font-bold uppercase rounded-lg py-1 px-2 outline-none text-slate-600 dark:text-slate-300"
-                              >
-                                  {availableBudgetFunds.map(f => <option key={f.id} value={f.name}>{f.name}</option>)}
-                              </select>
-                              <select 
-                                  aria-label="Time filter"
-                                  value={gvbFilter} 
-                                  onChange={(e) => setGvbFilter(e.target.value as GivingFilter)}
-                                  className="bg-slate-100 dark:bg-slate-800 border-none text-[10px] font-bold uppercase rounded-lg py-1 px-2 outline-none text-slate-600 dark:text-slate-300"
-                              >
-                                  <option value="Week">Week</option>
-                                  <option value="Month">Month</option>
-                                  <option value="Quarter">Quarter</option>
-                                  <option value="This Quarter">This Quarter</option>
-                                  <option value="Year">Year</option>
-                                  <option value="This Year">This Year</option>
-                              </select>
-                          </div>
-                      }
-                  >
-                      <div className="h-64">
-                          <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={1}>
-                              <ComposedChart data={gvbData}>
-                                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
-                                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: axisColor}} />
-                                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: axisColor}} />
-                                  <Tooltip contentStyle={TOOLTIP_STYLE} itemStyle={{ color: '#fff' }} cursor={{fill: currentTheme === 'dark' ? '#334155' : '#f8fafc'}} />
-                                  <Legend verticalAlign="top" iconType="circle" wrapperStyle={{fontSize: '10px'}} />
-                                  <Bar dataKey="Given" fill="#10b981" radius={[4, 4, 0, 0]} barSize={20} />
-                                  <Line type="monotone" dataKey="Budget" stroke="#6366f1" strokeWidth={3} dot={false} />
-                              </ComposedChart>
-                          </ResponsiveContainer>
-                      </div>
-                  </WidgetWrapper>
-              );
+
           case 'cumulativeYTD':
               return (
                   <WidgetWrapper 
@@ -1885,37 +1834,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
             </div>
         )}
 
-        {activeTab === 'donations' && (
-            <div className="space-y-8 animate-in slide-in-from-right-4 fade-in no-print">
-                <div className="flex justify-end mb-4">
-                        <div className="flex items-center gap-2 bg-white dark:bg-slate-800 p-2 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm">
-                        <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest pl-2">Fiscal Year</span>
-                        <select 
-                            aria-label="Fiscal year"
-                            value={budgetYear} 
-                            onChange={(e) => setBudgetYear(parseInt(e.target.value))}
-                            className="bg-slate-50 dark:bg-slate-700 border-none text-xs font-bold text-slate-700 dark:text-slate-300 rounded-lg py-1 px-3 outline-none cursor-pointer"
-                        >
-                            {Array.from({length: 5}, (_, i) => new Date().getFullYear() - 2 + i).map(y => (
-                                <option key={y} value={y}>{y}</option>
-                            ))}
-                        </select>
-                        </div>
-                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div className="col-span-1 md:col-span-2">
-                        {renderWidget('fundPerformance')}
-                    </div>
-                    <div className="col-span-1">
-                        {renderWidget('cumulativeYTD')}
-                    </div>
-                    <div className="col-span-1">
-                        {renderWidget('donorAcquisition')}
-                    </div>
-                </div>
-            </div>
-        )}
 
         {activeTab === 'reports' && (
             <div className="space-y-8 animate-in slide-in-from-right-4 fade-in no-print">

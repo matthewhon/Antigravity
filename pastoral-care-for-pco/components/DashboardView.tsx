@@ -245,6 +245,36 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       )}
                   </div>
               );
+          case 'censusHero':
+              if (!censusData) return null;
+              return (
+                  <div className="bg-slate-900 text-white p-8 rounded-[2.5rem] border border-slate-800 shadow-xl relative overflow-hidden h-full flex flex-col justify-between group">
+                      <button onClick={() => handleRemoveWidget(id)} className="absolute top-6 right-6 text-slate-500 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100 z-20">✕</button>
+                      <div className="relative z-10">
+                          <div className="flex items-center gap-3 mb-6">
+                              <span className="text-3xl">🏛️</span>
+                              <div>
+                                  <div className="flex items-center gap-2">
+                                      <h3 className="text-xl font-black">{churchName || censusData.locationName}</h3>
+                                  </div>
+                                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Primary Ministry Context</p>
+                              </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-8">
+                              <div>
+                                  <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-1">Population</p>
+                                  <p className="text-3xl font-black">{censusData.totalPopulation.toLocaleString()}</p>
+                              </div>
+                              <div>
+                                  <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-1">Median Income</p>
+                                  <p className="text-3xl font-black text-emerald-400">${censusData.economics?.medianHouseholdIncome?.toLocaleString() || 'N/A'}</p>
+                              </div>
+                          </div>
+                      </div>
+                      {/* Decorative */}
+                      <div className="absolute -right-10 -top-10 w-64 h-64 bg-white/5 rounded-full blur-3xl pointer-events-none"></div>
+                  </div>
+              );
           case 'people_stats':
               return peopleData ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 h-full">

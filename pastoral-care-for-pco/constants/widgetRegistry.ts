@@ -3,6 +3,7 @@ import { WidgetDefinition } from '../types';
 
 export const DASHBOARD_WIDGETS: WidgetDefinition[] = [
     { id: 'onboarding_tasks', label: 'Setup Guide', icon: '🚀' },
+    { id: 'censusHero', label: 'Census Hero', icon: '🏛️' },
     { id: 'ai_insights', label: 'AI Insights', icon: '✨' },
     { id: 'people_stats', label: 'People Stats', icon: '👥' },
     { id: 'keyMetrics', label: 'Giving Metrics', icon: '💰' },
@@ -61,8 +62,6 @@ export const GROUPS_WIDGETS: WidgetDefinition[] = [
     { id: 'groups_gender', label: 'Gender Breakdown', icon: '🚻' },
     { id: 'types', label: 'Group Types', icon: '🏷️' },
     { id: 'recent_groups', label: 'New Groups', icon: '✨' },
-    { id: 'group_leaders', label: 'Leaders', icon: '👑' },
-    { id: 'group_leader_age', label: 'Leader Avg Age', icon: '🎂' },
     { id: 'group_info', label: 'Group Info', icon: 'ℹ️' },
     { id: 'benchmark_group_att', label: 'Size Benchmark', icon: '⚖️' },
 ];
@@ -97,7 +96,6 @@ export const GIVING_WIDGETS: WidgetDefinition[] = [
     { id: 'benchmark_giving_avg', label: 'Giving Avg Benchmark', icon: '⚖️' },
     { id: 'benchmark_giving_age', label: 'Giving Age Benchmark', icon: '⚖️' },
     { id: 'currentVsPrevious', label: 'Current vs Prev', icon: '🆚' },
-    { id: 'givingVsBudget', label: 'Giving vs Budget', icon: '🎯' },
     { id: 'trends', label: 'Trends', icon: '📈' },
     { id: 'fundPerformance', label: 'Fund Perf', icon: '📊' },
     { id: 'cumulativeYTD', label: 'Cumulative YTD', icon: '🗓️' },
@@ -211,7 +209,7 @@ export const getRoleBasedDefaults = (roles: string[]): Record<string, string[]> 
             : ['riskDistribution', 'atRiskList'],
         // Groups
         groups: isGroups || isPastor
-            ? ['groups_ai_agent', 'groups_health', 'groups_stats', 'event_attendance', 'groups_gender', 'group_leaders']
+            ? ['groups_ai_agent', 'groups_health', 'groups_stats', 'event_attendance', 'groups_gender']
             : ['groups_health', 'groups_stats', 'event_attendance'],
         // Services
         services_overview: isServices || isPastor

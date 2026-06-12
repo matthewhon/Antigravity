@@ -332,6 +332,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
   const [locationErrorMap, setLocationErrorMap] = useState<Record<string, string>>({});
   const [isFetchingAllCensus, setIsFetchingAllCensus] = useState(false);
   const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
+  const [isEmbedModalOpen, setIsEmbedModalOpen] = useState(false);
   const mapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -1663,7 +1664,15 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
       )}
 
       {activeTab === 'Calendar' ? (
-          <div className="h-[calc(100vh-250px)] min-h-[600px]">
+          <div className="h-[calc(100vh-250px)] min-h-[600px] relative">
+              <div className="absolute top-4 right-4 z-10">
+                  <button 
+                      onClick={() => setIsEmbedModalOpen(true)}
+                      className="bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 px-4 py-2 rounded-xl text-xs font-black tracking-widest shadow-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors flex items-center gap-2 border border-slate-200 dark:border-slate-700 uppercase"
+                  >
+                      <span>🔗</span> Embed
+                  </button>
+              </div>
               <PastoralCalendar people={peopleData?.allPeople || []} />
           </div>
       ) : (
@@ -1869,6 +1878,39 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
               </div>
           </div>
       )}
+      {isEmbedModalOpen && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-white dark:bg-slate-850 w-full max-w-lg rounded-[3rem] p-8 shadow-2xl animate-in zoom-in duration-300">
+                  <div className="flex justify-between items-center mb-6">
+                      <h4 className="text-xl font-black tracking-tight dark:text-white">Embed Calendar</h4>
+                      <button onClick={() => setIsEmbedModalOpen(false)} className="text-slate-400 hover:text-rose-500">✕</button>
+                  </div>
+                  
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+                      Copy the code below to embed your pastoral calendar on any public website.
+                  </p>
+                  
+                  <div className="relative">
+                      <pre className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-4 text-xs text-slate-600 dark:text-slate-300 overflow-x-auto whitespace-pre-wrap">
+                          {`<iframe src="https://pastoralcare.barnabassoftware.com/embed/calendar/${church.id}" width="100%" height="800px" frameborder="0" style="border:none; border-radius: 12px; overflow:hidden;" scrolling="no"></iframe>`}
+                      </pre>
+                  </div>
+
+                  <div className="mt-6 flex justify-end">
+                      <button 
+                          onClick={() => {
+                              navigator.clipboard.writeText(`<iframe src="https://pastoralcare.barnabassoftware.com/embed/calendar/${church.id}" width="100%" height="800px" frameborder="0" style="border:none; border-radius: 12px; overflow:hidden;" scrolling="no"></iframe>`);
+                              alert('Copied to clipboard!');
+                          }}
+                          className="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-indigo-200 dark:shadow-none hover:bg-indigo-700 transition-all"
+                      >
+                          Copy Code
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
+
     </div>
   );
 };

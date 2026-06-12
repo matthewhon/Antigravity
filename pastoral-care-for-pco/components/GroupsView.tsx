@@ -499,7 +499,22 @@ const GroupsView: React.FC<GroupsViewProps> = ({
                       </WidgetWrapper>
                   </div>
               );
-          case 'groups_health':
+          case 'groups_health': {
+              const uniqueLeaderIds = Array.from(new Set(data.allGroups.flatMap(g => g.leaderIds || []))) as string[];
+              const leadersWithAge = uniqueLeaderIds.map(id => getPersonDetails(id)).filter(p => p && p.birthdate);
+              
+              let totalLeaderAge = 0;
+              const currentYearHealth = new Date().getFullYear();
+              
+              leadersWithAge.forEach(p => {
+                  if (p && p.birthdate) {
+                      const birthYear = parseInt(p.birthdate.split('-')[0]);
+                      totalLeaderAge += (currentYearHealth - birthYear);
+                  }
+              });
+              
+              const avgLeaderAge = leadersWithAge.length > 0 ? (totalLeaderAge / leadersWithAge.length).toFixed(1) : 'N/A';
+
               return data ? (
                   <div key="groups_health" className="col-span-1 lg:col-span-2">
                       <div className="bg-white dark:bg-slate-800 p-8 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm h-full flex flex-col justify-between relative">
@@ -508,14 +523,18 @@ const GroupsView: React.FC<GroupsViewProps> = ({
                                 <button onClick={() => handleRemoveWidget(id)} className="absolute top-6 right-6 text-slate-300 dark:text-slate-600 hover:text-rose-500 transition-colors z-20">✕</button>
                             </div>
                             
-                            <div className="grid grid-cols-2 gap-8 mb-8">
+                            <div className="grid grid-cols-3 gap-4 mb-8">
                                 <div>
                                     <p className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter">{data.stats.totalGroups}</p>
-                                    <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1">Active Groups</p>
+                                    <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1">Active</p>
                                 </div>
-                                <div className="text-right">
+                                <div className="text-center">
                                     <p className="text-4xl font-black text-indigo-600 dark:text-indigo-400 tracking-tighter">{data.stats.totalEnrollment}</p>
                                     <p className="text-[10px] font-bold text-indigo-300 dark:text-indigo-700 uppercase tracking-widest mt-1">Enrolled</p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-4xl font-black text-cyan-600 dark:text-cyan-400 tracking-tighter">{avgLeaderAge}</p>
+                                    <p className="text-[10px] font-bold text-cyan-300 dark:text-cyan-700 uppercase tracking-widest mt-1">Avg Leader Age</p>
                                 </div>
                             </div>
 
@@ -536,6 +555,7 @@ const GroupsView: React.FC<GroupsViewProps> = ({
                       </div>
                   </div>
               ) : null;
+          }
           case 'groups_stats':
               return (
                   <div key="groups_stats" className="col-span-1 md:col-span-2 lg:col-span-4">
@@ -693,111 +713,7 @@ const GroupsView: React.FC<GroupsViewProps> = ({
                       </WidgetWrapper>
                   </div>
               );
-          case 'group_leader_age':
-              const uniqueLeaderIds = Array.from(new Set(data.allGroups.flatMap(g => g.leaderIds || []))) as string[];
-              const leadersWithAge = uniqueLeaderIds.map(id => getPersonDetails(id)).filter(p => p && p.birthdate);
-              
-              let totalLeaderAge = 0;
-              const currentYear = new Date().getFullYear();
-              
-              leadersWithAge.forEach(p => {
-                  if (p && p.birthdate) {
-                      const birthYear = parseInt(p.birthdate.split('-')[0]);
-                      totalLeaderAge += (currentYear - birthYear);
-                  }
-              });
-              
-              const avgLeaderAge = leadersWithAge.length > 0 ? (totalLeaderAge / leadersWithAge.length).toFixed(1) : 'N/A';
 
-              return (
-                  <div key="group_leader_age" className="col-span-1">
-                      <WidgetWrapper title="Leader Avg Age" onRemove={() => handleRemoveWidget(id)} source="Group Leaders">
-                          <div className="h-full flex flex-col justify-center items-center pb-6">
-                              <span className="text-5xl font-black text-cyan-600 dark:text-cyan-400">{avgLeaderAge}</span>
-                              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-2">Years Old</span>
-                          </div>
-                      </WidgetWrapper>
-                  </div>
-              );
-          case 'group_leaders':
-              return (
-                  <div key="group_leaders" className="col-span-1 lg:col-span-2">
-                      <WidgetWrapper title="Group Leaders" onRemove={() => handleRemoveWidget(id)} source="Group Memberships">
-                          <div className="overflow-x-auto max-h-96 custom-scrollbar">
-                              <table className="w-full text-left">
-                                  <thead className="bg-slate-50 dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 sticky top-0 z-10">
-                                      <tr>
-                                          <th className="p-3 text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest w-1/2">Group Details</th>
-                                          <th className="p-3 text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">Leaders</th>
-                                      </tr>
-                                  </thead>
-                                  <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                                      {enrichedGroups.slice(0, 50).map(group => {
-                                          const leaders = (group.leaderIds || [])
-                                              .map(id => getPersonDetails(id))
-                                              .filter((p): p is PcoPerson => !!p);
-
-                                          return (
-                                              <tr key={group.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                                                  <td className="p-3">
-                                                      <div className="flex justify-between items-start">
-                                                          <p className="text-xs font-bold text-slate-900 dark:text-white">{group.name}</p>
-                                                          <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded tracking-wider ${
-                                                              group.health.status === 'Thriving' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400' :
-                                                              group.health.status === 'Warning' ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' :
-                                                              'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400'
-                                                          }`}>
-                                                              {group.health.status}
-                                                          </span>
-                                                      </div>
-                                                      <div className="flex flex-wrap gap-1.5 mt-1.5">
-                                                          <span className="text-[9px] font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-600">
-                                                              {group.groupTypeName}
-                                                          </span>
-                                                          <span className="text-[9px] font-bold text-indigo-600 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-0.5 rounded border border-indigo-100 dark:border-indigo-800 flex items-center gap-1" title="Total Members (includes leaders)">
-                                                              <span className="text-[8px]">👥</span>
-                                                              {group.membersCount} Members
-                                                          </span>
-                                                      </div>
-                                                  </td>
-                                                  <td className="p-3">
-                                                      {leaders.length > 0 ? (
-                                                          <div className="flex flex-col gap-1.5">
-                                                              {leaders.map(p => (
-                                                                  <div key={p.id} className="flex items-center gap-2">
-                                                                      <div className="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-[8px] font-black overflow-hidden flex-shrink-0">
-                                                                          {p.avatar ? (
-                                                                              <img src={p.avatar} alt={p.name} className="w-full h-full object-cover" />
-                                                                          ) : (
-                                                                              <span>{p.name.charAt(0)}</span>
-                                                                          )}
-                                                                      </div>
-                                                                      <span className="text-[10px] font-medium text-slate-700 dark:text-slate-300 truncate max-w-[150px]">
-                                                                          {p.name}
-                                                                      </span>
-                                                                  </div>
-                                                              ))}
-                                                          </div>
-                                                      ) : (
-                                                          <span className="text-[9px] text-slate-400 italic">No Leaders Assigned</span>
-                                                      )}
-                                                  </td>
-                                              </tr>
-                                          );
-                                      })}
-                                      {data.allGroups.length === 0 && (
-                                          <tr>
-                                              <td colSpan={2} className="p-6 text-center text-slate-400 text-xs italic">
-                                                  No active groups found.
-                                              </td>
-                                          </tr>
-                                      )}
-                                  </tbody>
-                              </table>
-                          </div>
-                      </WidgetWrapper>
-                  </div>
-              );
           case 'group_info':
               const ranges = (() => {
                   const now = new Date();
@@ -880,15 +796,16 @@ const GroupsView: React.FC<GroupsViewProps> = ({
                       : 0;
 
                   const leaderId = g.leaderIds?.[0];
-                  const leaderName = leaderId 
-                      ? getPersonDetails(leaderId)?.name || 'Multiple' 
-                      : 'No Leader';
+                  const leaderPerson = leaderId ? getPersonDetails(leaderId) : null;
+                  const leaderName = leaderPerson?.name || (leaderId ? 'Multiple' : 'No Leader');
+                  const leaderAvatar = leaderPerson?.avatar || null;
 
                   return {
                       id: g.id,
                       name: g.name,
                       members: g.membersCount,
                       leader: leaderName,
+                      leaderAvatar: leaderAvatar,
                       avg: currAvg,
                       prevAvg: prevAvg,
                       trend: currAvg - prevAvg,
@@ -934,7 +851,16 @@ const GroupsView: React.FC<GroupsViewProps> = ({
                                                       <span className="text-xs font-bold text-slate-900 dark:text-white">{group.name}</span>
                                                   </td>
                                                   <td className="p-3">
-                                                      <span className="text-xs font-medium text-slate-600 dark:text-slate-400">{group.leader}</span>
+                                                      <div className="flex items-center gap-2">
+                                                          <div className="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-[8px] font-black overflow-hidden flex-shrink-0">
+                                                              {group.leaderAvatar ? (
+                                                                  <img src={group.leaderAvatar} alt={group.leader} className="w-full h-full object-cover" />
+                                                              ) : (
+                                                                  <span>{group.leader.charAt(0)}</span>
+                                                              )}
+                                                          </div>
+                                                          <span className="text-xs font-medium text-slate-600 dark:text-slate-400">{group.leader}</span>
+                                                      </div>
                                                   </td>
                                                   <td className="p-3 text-center">
                                                       <span className="text-xs font-black text-slate-900 dark:text-white">{group.members ?? 0}</span>
@@ -1045,7 +971,7 @@ const GroupsView: React.FC<GroupsViewProps> = ({
               if (id === 'groups_stats') return null;
               let spanClass = "col-span-1";
               if (id === 'groups_stats') spanClass = "col-span-1 md:col-span-2 lg:col-span-4";
-              if (id === 'groups_ai_agent' || id === 'groups_risk_agent' || id === 'event_attendance' || id === 'group_leaders' || id === 'groups_age_demographics') spanClass = "col-span-1 lg:col-span-2";
+              if (id === 'groups_ai_agent' || id === 'groups_risk_agent' || id === 'event_attendance' || id === 'groups_age_demographics') spanClass = "col-span-1 lg:col-span-2";
               if (id === 'group_info') spanClass = "col-span-1 lg:col-span-4";
               
               return (

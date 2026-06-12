@@ -505,7 +505,6 @@ const Layout: React.FC<LayoutProps> = ({
                         { view: 'giving',            icon: '📊', label: 'Overview'   },
                         { view: 'giving-donor',      icon: '👥', label: 'Donors'     },
                         { view: 'giving-budgets',    icon: '💼', label: 'Budgets'    },
-                        { view: 'giving-donations',  icon: '📝', label: 'Donations'  },
                         { view: 'giving-reports',    icon: '📄', label: 'Reports'    },
                       ].map(item => (
                         <button

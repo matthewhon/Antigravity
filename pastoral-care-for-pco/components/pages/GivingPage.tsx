@@ -29,7 +29,6 @@ export const GivingPage: React.FC<GivingPageProps> = ({
     const activePage = 
         subpath === 'donor'     ? 'donor'     :
         subpath === 'budgets'   ? 'budgets'   :
-        subpath === 'donations' ? 'donations' :
         subpath === 'reports'   ? 'reports'   :
         'overview';
 
