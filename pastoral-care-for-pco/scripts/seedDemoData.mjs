@@ -1019,18 +1019,24 @@ async function main() {
   await batchSet('smsCampaigns', SMS_CAMPAIGNS);
 
   console.log('\\nSeeding SMS workflows...');
+  console.log('\nSeeding SMS workflows...');
   await batchSet('smsWorkflows', SMS_WORKFLOWS);
 
-  console.log('\\nSeeding SMS conversations...');
+  console.log('\nSeeding SMS conversations...');
   await batchSet('smsConversations', SMS_CONVERSATIONS);
 
-  console.log('\\nSeeding SMS messages...');
-  await batchSet('messages', SMS_MESSAGES);
+  console.log('\nSeeding SMS messages...');
+  const msgBatch = db.batch();
+  for (const m of SMS_MESSAGES) {
+    const ref = db.collection('smsConversations').doc(m.conversationId).collection('messages').doc(m.id);
+    msgBatch.set(ref, m, { merge: true });
+  }
+  await msgBatch.commit();
 
-  console.log('\\nSeeding Email campaigns...');
+  console.log('\nSeeding Email campaigns...');
   await batchSet('email_campaigns', EMAIL_CAMPAIGNS);
 
-  console.log('\\nSeeding Polls...');
+  console.log('\nSeeding Polls...');
   await batchSet('polls', POLLS);
 
   console.log(`
