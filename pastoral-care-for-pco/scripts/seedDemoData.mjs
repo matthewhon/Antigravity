@@ -775,6 +775,7 @@ PEOPLE.slice(0, 5).forEach((p, i) => {
     personName: p.name,
     twilioNumberId: `${CHURCH_ID}_+14045550199`,
     twilioPhoneNumber: '+14045550199',
+    phoneNumber: p.phone,
     contactPhoneNumber: p.phone,
     lastMessageAt: now - (i * 86400_000),
     lastMessageBody: i % 2 === 0 ? 'Thanks, Pastor!' : 'Looking forward to Sunday.',
