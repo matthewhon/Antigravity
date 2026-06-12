@@ -636,35 +636,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   </WidgetWrapper>
               ) : null;
 
-          case 'trends':
-              return givingAnalytics ? (
-                  <WidgetWrapper title="Giving Trends" onRemove={() => handleRemoveWidget(id)} source="Giving">
-                      <div className="h-64">
-                          <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={1}>
-                              <BarChart data={givingAnalytics.trends}>
-                                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
-                                  <XAxis 
-                                    dataKey="date" 
-                                    axisLine={false} 
-                                    tickLine={false} 
-                                    tick={{fontSize: 10, fill: axisColor}}
-                                    tickFormatter={(val) => new Date(val).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                  />
-                                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: axisColor}} />
-                                  <Tooltip 
-                                    contentStyle={tooltipStyle} 
-                                    itemStyle={tooltipItemStyle}
-                                    labelStyle={tooltipLabelStyle}
-                                    labelFormatter={(val) => new Date(val).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                    formatter={(value: number) => `$${value.toLocaleString()}`}
-                                    cursor={{fill: currentTheme === 'dark' ? '#334155' : '#f8fafc'}}
-                                  />
-                                  <Bar dataKey="amount" fill="#10b981" radius={[4, 4, 0, 0]} />
-                              </BarChart>
-                          </ResponsiveContainer>
-                      </div>
-                  </WidgetWrapper>
-              ) : null;
 
           case 'services_timeline':
               return (

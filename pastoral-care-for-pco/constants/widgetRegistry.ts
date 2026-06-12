@@ -15,7 +15,6 @@ export const DASHBOARD_WIDGETS: WidgetDefinition[] = [
     { id: 'people_engagement', label: 'Risk Profiles', icon: '📊' },
     { id: 'gender', label: 'Gender', icon: '🚻' },
     { id: 'age', label: 'Age', icon: '🎂' },
-    { id: 'trends', label: 'Giving Trends', icon: '📈' },
     { id: 'last_week_stats', label: 'Last Week Stats', icon: '📅' },
 ];
 
@@ -96,7 +95,6 @@ export const GIVING_WIDGETS: WidgetDefinition[] = [
     { id: 'benchmark_giving_avg', label: 'Giving Avg Benchmark', icon: '⚖️' },
     { id: 'benchmark_giving_age', label: 'Giving Age Benchmark', icon: '⚖️' },
     { id: 'currentVsPrevious', label: 'Current vs Prev', icon: '🆚' },
-    { id: 'trends', label: 'Trends', icon: '📈' },
     { id: 'fundPerformance', label: 'Fund Perf', icon: '📊' },
     { id: 'cumulativeYTD', label: 'Cumulative YTD', icon: '🗓️' },
     { id: 'donorAcquisition', label: 'Acquisition', icon: '🤝' },

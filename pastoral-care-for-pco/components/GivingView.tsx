@@ -1010,29 +1010,6 @@ export const GivingView: React.FC<GivingViewProps> = ({
                       </div>
                   </WidgetWrapper>
               );
-          case 'trends':
-              return (
-                  <WidgetWrapper title="Giving Trends" onRemove={() => handleRemoveWidget(id)} source="PCO Giving">
-                      <div className="h-64">
-                          <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={1}>
-                              <BarChart data={analytics.trends}>
-                                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
-                                  <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: axisColor}} tickFormatter={(val: string) => {
-                                        // Handles both "2026-03" and "2026_03" formats
-                                        const normalized = val.replace('_', '-');
-                                        const [year, month] = normalized.split('-');
-                                        if (!year || !month) return val;
-                                        const d = new Date(Number(year), Number(month) - 1, 1);
-                                        return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-                                    }} />
-                                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: axisColor}} />
-                                  <Tooltip contentStyle={TOOLTIP_STYLE} itemStyle={{ color: '#fff' }} cursor={{fill: currentTheme === 'dark' ? '#334155' : '#f8fafc'}} formatter={(value: number) => `$${value.toLocaleString()}`} />
-                                  <Bar dataKey="amount" fill="#10b981" radius={[4, 4, 0, 0]} />
-                              </BarChart>
-                          </ResponsiveContainer>
-                      </div>
-                  </WidgetWrapper>
-              );
           case 'trendsComparison': {
               const currentTotal = analytics.comparisonTrends.reduce((s, t) => s + (t.current || 0), 0);
               const previousTotal = analytics.comparisonTrends.reduce((s, t) => s + (t.previous || 0), 0);
