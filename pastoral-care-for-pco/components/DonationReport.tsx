@@ -572,12 +572,22 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
             csv = [header.join(','), ...rows].join('\n');
             filename = `avg_giving_by_fund_${format(new Date(), 'yyyy-MM-dd')}.csv`;
         } else if (activeTab === 'giving_by_label') {
-            const header = ['Label', 'Total Given', 'Funds Breakdown'];
-            const rows = givingByLabelData.labelData.map(d => [
-                escapeCsv(d.labelName),
-                d.totalGiven.toFixed(2),
-                escapeCsv(d.funds.map(f => `${f.fundName}: ${f.amount.toFixed(2)}`).join(' | '))
-            ].join(','));
+            const allFunds = new Set<string>();
+            givingByLabelData.labelData.forEach(d => {
+                d.funds.forEach(f => allFunds.add(f.fundName));
+            });
+            const fundNames = Array.from(allFunds).sort();
+
+            const header = ['Label', 'Total Given', ...fundNames.map(escapeCsv)];
+            const rows = givingByLabelData.labelData.map(d => {
+                const fundMap = new Map<string, number>(d.funds.map(f => [f.fundName, f.amount]));
+                const fundAmounts = fundNames.map(fn => (fundMap.get(fn) || 0).toFixed(2));
+                return [
+                    escapeCsv(d.labelName),
+                    d.totalGiven.toFixed(2),
+                    ...fundAmounts
+                ].join(',');
+            });
             csv = [header.join(','), ...rows].join('\n');
             filename = `giving_by_label_${format(new Date(), 'yyyy-MM-dd')}.csv`;
         }
