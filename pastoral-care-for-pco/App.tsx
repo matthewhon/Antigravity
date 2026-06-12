@@ -905,6 +905,7 @@ const App: React.FC = () => {
                         onGenerateInsights={handleGenerateAIInsights}
                         givingFilter={givingFilter}
                         givingDateRange={givingDateRange}
+                        censusData={censusData}
                     />
                 } />
                 <Route path="/people/*" element={

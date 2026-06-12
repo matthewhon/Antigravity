@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import GroupsView from '../GroupsView';
 import { GroupAbsenteesReport } from '../GroupAbsenteesReport';
@@ -25,7 +25,14 @@ export const GroupsPage: React.FC<GroupsPageProps> = ({
         servicesData, recentRiskChanges, recentStatusChanges
     } = useTenantData();
 
-    const groupsDashboardData = useGroupsDashboardData(groups, people);
+    const [hideArchived, setHideArchived] = useState(true);
+
+    const activeGroups = useMemo(() => {
+        if (!groups) return [];
+        return hideArchived ? groups.filter(g => !g.archivedAt) : groups;
+    }, [groups, hideArchived]);
+
+    const groupsDashboardData = useGroupsDashboardData(activeGroups, people);
     const riskEnrichedPeople = useRiskEnrichedPeople(people, groups, donations, servicesData, teams, church?.riskSettings);
     const peopleDashboardData = usePeopleDashboardData(people, riskEnrichedPeople, recentRiskChanges, recentStatusChanges);
 
@@ -47,6 +54,8 @@ export const GroupsPage: React.FC<GroupsPageProps> = ({
                     onUpdateTheme={onUpdateTheme}
                     currentTheme={user.theme}
                     groupRiskSettings={church.groupRiskSettings}
+                    hideArchived={hideArchived}
+                    onToggleHideArchived={setHideArchived}
                 />
             )}
 

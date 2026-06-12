@@ -25,6 +25,8 @@ interface GroupsViewProps {
   globalStats?: GlobalStats | null;
   peopleData?: PeopleDashboardData | null;
   groupRiskSettings?: GroupRiskSettings;
+  hideArchived?: boolean;
+  onToggleHideArchived?: (val: boolean) => void;
 }
 
 type EventAttendanceFilterType = 'This Week' | 'Last Week' | 'This Month' | 'Last Month' | 'Last Quarter';
@@ -58,7 +60,9 @@ const GroupsView: React.FC<GroupsViewProps> = ({
   currentTheme,
   globalStats,
   peopleData,
-  groupRiskSettings
+  groupRiskSettings,
+  hideArchived,
+  onToggleHideArchived
 }) => {
   const [eventAttendanceFilter, setEventAttendanceFilter] = useState<EventAttendanceFilterType>('Last Month');
   const [groupInfoFilter, setGroupInfoFilter] = useState<GroupInfoFilterType>('Last Month');
@@ -944,6 +948,20 @@ const GroupsView: React.FC<GroupsViewProps> = ({
         </div>
         
         <div className="flex gap-4 items-center">
+            {onToggleHideArchived && (
+                <button
+                    onClick={() => onToggleHideArchived(!hideArchived)}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-colors ${
+                        hideArchived
+                            ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400'
+                            : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                    }`}
+                >
+                    <div className={`w-3 h-3 rounded-full ${hideArchived ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`}></div>
+                    <span>{hideArchived ? 'Active Only' : 'Include Archived'}</span>
+                </button>
+            )}
+            
             {pcoConnected && onSyncGroups && (
                 <button 
                     onClick={onSyncGroups}

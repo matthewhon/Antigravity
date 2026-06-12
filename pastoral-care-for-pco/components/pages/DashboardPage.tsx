@@ -19,11 +19,12 @@ interface DashboardPageProps {
     onGenerateInsights: () => void;
     givingFilter: any;
     givingDateRange: any;
+    censusData: any;
 }
 
 export const DashboardPage: React.FC<DashboardPageProps> = ({
     onUpdateWidgets, onConnectPco, allowedWidgetIds, globalInsights,
-    isGeneratingInsights, onUpdateTheme, onGenerateInsights, givingFilter, givingDateRange
+    isGeneratingInsights, onUpdateTheme, onGenerateInsights, givingFilter, givingDateRange, censusData
 }) => {
     const { 
         user, church, widgets, people, groups, attendance, donations, 
@@ -46,7 +47,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             groupsData={groupsDashboardData}
             servicesData={servicesData}
             attendanceData={attendanceChartData}
-            censusData={null} // Pass census data if needed later
+            censusData={censusData}
             visibleWidgets={widgets}
             onUpdateWidgets={onUpdateWidgets}
             budgets={budgets}
