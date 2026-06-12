@@ -8668,7 +8668,7 @@ function useTwilioNumbers(churchId: string) {
     const [loading, setLoading] = useState(true);
     useEffect(() => {
         const q = query(
-            collection(firebaseDb, 'smsNumbers'),
+            collection(firebaseDb, 'twilioNumbers'),
             where('churchId', '==', churchId),
             orderBy('createdAt', 'asc')
         );
