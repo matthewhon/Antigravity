@@ -63,6 +63,7 @@ export const GroupsPage: React.FC<GroupsPageProps> = ({
                 <GroupAbsenteesReport
                     groups={groups}
                     people={people}
+                    churchId={church.id}
                 />
             )}
         </div>

@@ -1,10 +1,12 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { PcoGroup, PcoPerson } from '../types';
-import { Search, Download, Users, Calendar, AlertTriangle, ChevronDown } from 'lucide-react';
+import { Search, Download, Users, Calendar, AlertTriangle, ChevronDown, Loader2 } from 'lucide-react';
+import { pcoService } from '../services/pcoService';
 
 interface GroupAbsenteesReportProps {
     groups: PcoGroup[];
     people: PcoPerson[];
+    churchId?: string;
 }
 
 const TOOLTIP_STYLE = {
@@ -53,12 +55,44 @@ function getDateRange(preset: string, customFrom: string, customTo: string): { s
     return { start: new Date(now.getFullYear(), now.getMonth(), 1), end: today, label: 'This Month' };
 }
 
-export const GroupAbsenteesReport: React.FC<GroupAbsenteesReportProps> = ({ groups, people }) => {
+export const GroupAbsenteesReport: React.FC<GroupAbsenteesReportProps> = ({ groups, people, churchId }) => {
     const [selectedGroupId, setSelectedGroupId] = useState<string>('all');
     const [datePreset, setDatePreset] = useState('last_30');
     const [customFrom, setCustomFrom] = useState('');
     const [customTo, setCustomTo] = useState('');
     const [search, setSearch] = useState('');
+
+    const [pcoLists, setPcoLists] = useState<{ id: string; name: string }[]>([]);
+    const [selectedListId, setSelectedListId] = useState<string>('all');
+    const [listMemberIds, setListMemberIds] = useState<Set<string> | null>(null);
+    const [isLoadingList, setIsLoadingList] = useState(false);
+
+    useEffect(() => {
+        if (!churchId) return;
+        pcoService.getPeopleLists(churchId)
+            .then(raw => {
+                const lists = (raw || []).map((item: any) => ({
+                    id: item.id,
+                    name: item.attributes?.name || 'Unnamed List'
+                })).sort((a: any, b: any) => a.name.localeCompare(b.name));
+                setPcoLists(lists);
+            })
+            .catch(console.error);
+    }, [churchId]);
+
+    useEffect(() => {
+        if (selectedListId === 'all' || !churchId) {
+            setListMemberIds(null);
+            return;
+        }
+        setIsLoadingList(true);
+        pcoService.getListPeopleIds(churchId, selectedListId)
+            .then(ids => {
+                setListMemberIds(new Set(ids));
+            })
+            .catch(console.error)
+            .finally(() => setIsLoadingList(false));
+    }, [selectedListId, churchId]);
 
     const activeGroups = useMemo(() =>
         groups.filter(g => !g.archivedAt).sort((a, b) => a.name.localeCompare(b.name)),
@@ -112,6 +146,8 @@ export const GroupAbsenteesReport: React.FC<GroupAbsenteesReportProps> = ({ grou
 
             // For each member, count attended vs absent
             memberIds.forEach(memberId => {
+                if (listMemberIds && !listMemberIds.has(memberId)) return;
+
                 const attended = eventsInRange.filter(e =>
                     Array.isArray(e.attendeeIds) && e.attendeeIds.includes(memberId)
                 );
@@ -145,7 +181,7 @@ export const GroupAbsenteesReport: React.FC<GroupAbsenteesReportProps> = ({ grou
         });
 
         return rows.sort((a, b) => b.absenceRate - a.absenceRate);
-    }, [activeGroups, selectedGroupId, start, end, peopleMap]);
+    }, [activeGroups, selectedGroupId, start, end, peopleMap, listMemberIds]);
 
     const filtered = useMemo(() => {
         if (!search.trim()) return reportRows;
@@ -201,7 +237,7 @@ export const GroupAbsenteesReport: React.FC<GroupAbsenteesReportProps> = ({ grou
 
             {/* Filters */}
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     {/* Group filter */}
                     <div>
                         <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">
@@ -219,6 +255,31 @@ export const GroupAbsenteesReport: React.FC<GroupAbsenteesReportProps> = ({ grou
                                 ))}
                             </select>
                             <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                        </div>
+                    </div>
+
+                    {/* PCO List filter */}
+                    <div>
+                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">
+                            PCO List Filter
+                        </label>
+                        <div className="relative">
+                            <select
+                                value={selectedListId}
+                                onChange={e => setSelectedListId(e.target.value)}
+                                disabled={pcoLists.length === 0}
+                                className="w-full appearance-none bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm font-medium rounded-xl px-4 py-2.5 pr-8 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer disabled:opacity-50"
+                            >
+                                <option value="all">All People</option>
+                                {pcoLists.map(l => (
+                                    <option key={l.id} value={l.id}>{l.name}</option>
+                                ))}
+                            </select>
+                            {isLoadingList ? (
+                                <Loader2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 animate-spin pointer-events-none" />
+                            ) : (
+                                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                            )}
                         </div>
                     </div>
 
