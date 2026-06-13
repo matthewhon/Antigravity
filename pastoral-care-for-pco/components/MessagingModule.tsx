@@ -7910,7 +7910,8 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
 
     // List view
     return (
-        <div className="p-6 max-w-4xl mx-auto">
+        <div className="h-full overflow-y-auto w-full">
+            <div className="p-6 max-w-4xl mx-auto">
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
                 <div>
@@ -8116,6 +8117,7 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
                     onClose={() => setTestTarget(null)}
                 />
             )}
+        </div>
         </div>
     );
 };
