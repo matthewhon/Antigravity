@@ -4892,6 +4892,11 @@ function stepTimingLabel(node: WorkflowDelayNode): string {
         }
         return `next ${day}${time}`;
     }
+    if (sType === 'specific_date') {
+        const d = node.scheduleDate || 'No date set';
+        const time = node.scheduleTime ? ` at ${fmt12(node.scheduleTime)}` : '';
+        return `on ${d}${time}`;
+    }
     if (sType === 'day_of_month') {
         const d = node.scheduleDayOfMonth ?? 1;
         const time = node.scheduleTime ? ` at ${fmt12(node.scheduleTime)}` : '';
@@ -4964,6 +4969,7 @@ const DelayNodeCard: React.FC<{
                     { id: 'relative', label: '⏱️ Relative' },
                     { id: 'day_of_week', label: '📅 Weekday' },
                     { id: 'day_of_month', label: '📆 Month Day' },
+                    { id: 'specific_date', label: '📅 Specific Date' },
                 ] as const).map(({ id, label }) => (
                     <button key={id} type="button" onClick={() => onChange({ scheduleType: id, repeatType: 'none', repeatDays: [] })}
                         className={`flex-1 py-1.5 text-[10px] font-bold transition border-r last:border-r-0 border-amber-200 dark:border-amber-700 ${schedType === id ? 'bg-amber-500 text-white' : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-amber-50 dark:hover:bg-slate-600'
@@ -5034,6 +5040,18 @@ const DelayNodeCard: React.FC<{
                             <option key={d} value={d}>{d}{ORDINAL_SUFFIX(d)} of the month</option>
                         ))}
                     </select>
+                </div>
+            )}
+
+            {/* Specific date: single select (used when not recurring) */}
+            {schedType === 'specific_date' && !isRepeating && (
+                <div className="space-y-1.5">
+                    <p className="text-[10px] text-slate-400">Fire on this specific date:</p>
+                    <input type="date" value={node.scheduleDate || ''}
+                        onChange={e => onChange({ scheduleDate: e.target.value })}
+                        title="Specific Date"
+                        className="w-full text-sm border border-amber-200 dark:border-amber-700 rounded-xl px-3 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    />
                 </div>
             )}
 
@@ -6136,6 +6154,7 @@ const WorkflowEditor: React.FC<{
                 scheduleType: delay?.scheduleType,
                 scheduleDayOfWeek: delay?.scheduleDayOfWeek,
                 scheduleDayOfMonth: delay?.scheduleDayOfMonth,
+                scheduleDate: delay?.scheduleDate,
                 scheduleTime: delay?.scheduleTime,
             });
         };

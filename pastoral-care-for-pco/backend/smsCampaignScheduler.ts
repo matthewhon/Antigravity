@@ -446,6 +446,17 @@ function calcNextSendAt(step: any, fromMs: number): number {
         }
     }
 
+    if (scheduleType === 'specific_date') {
+        if (step.scheduleDate) {
+            const parts = step.scheduleDate.split('-').map(Number);
+            if (parts.length === 3) {
+                const candidate = new Date(parts[0], parts[1] - 1, parts[2], schedHours, schedMinutes, 0, 0);
+                return candidate.getTime();
+            }
+        }
+        // Fallback if no valid date
+        return fromMs;
+    }
     if (scheduleType === 'day_of_month') {
         const targetDate: number = step.scheduleDayOfMonth ?? 1; // 1–31
         // Try the target day in the current month first; if already past, advance month by month.
