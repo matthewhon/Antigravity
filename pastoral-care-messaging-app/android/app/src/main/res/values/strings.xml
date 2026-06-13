@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Pastoral Care Messaging</string>
+    <string name="title_activity_main">Pastoral Care Messaging</string>
+    <string name="package_name">com.barnabassoftware.pcmessaging</string>
+    <string name="custom_url_scheme">com.barnabassoftware.pcmessaging</string>
+</resources>

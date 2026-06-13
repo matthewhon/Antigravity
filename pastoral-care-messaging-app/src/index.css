@@ -82,6 +82,11 @@ body {
   box-sizing: border-box;
 }
 
+html.platform-android #root {
+  width: 100% !important;
+  border-inline: none !important;
+}
+
 @media (min-width: 1024px) {
   #root {
     border-inline: 1px solid var(--border);

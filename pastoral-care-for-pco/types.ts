@@ -1517,12 +1517,14 @@ export interface SmsWorkflowStep {
      * - 'day_of_week'  ? fire on the next occurrence of scheduleDayOfWeek after the previous step.
      * - 'day_of_month' ? fire on the next calendar date matching scheduleDayOfMonth.
      */
-    scheduleType?: 'relative' | 'day_of_week' | 'day_of_month';
+    scheduleType?: 'relative' | 'day_of_week' | 'day_of_month' | 'specific_date';
     /** 0 = Sunday  6 = Saturday. Used when scheduleType = 'day_of_week'. Default: 1 (Monday). */
     scheduleDayOfWeek?: number;
     /** 131. Used when scheduleType = 'day_of_month'. */
     scheduleDayOfMonth?: number;
-    /** Send time in 'HH:MM' 24-hour format. Used for day_of_week and day_of_month modes. Default '09:00'. */
+    /** YYYY-MM-DD. Used when scheduleType = 'specific_date'. */
+    scheduleDate?: string;
+    /** Send time in 'HH:MM' 24-hour format. Used for day_of_week, day_of_month, and specific_date modes. Default '09:00'. */
     scheduleTime?: string;
     /** Channel type for this step. Defaults to 'sms'. */
     channelType: WorkflowChannelType;
@@ -1648,12 +1650,14 @@ export interface WorkflowDelayNode {
     delayDays: number;
     /** Hours to wait in 'relative' mode. */
     delayHours?: number;
-    scheduleType?: 'relative' | 'day_of_week' | 'day_of_month';
-    /** 0 = Sunday � 6 = Saturday. Used when scheduleType = 'day_of_week'. */
+    scheduleType?: 'relative' | 'day_of_week' | 'day_of_month' | 'specific_date';
+    /** 0 = Sunday  6 = Saturday. Used when scheduleType = 'day_of_week'. */
     scheduleDayOfWeek?: number;
-    /** 1�31. Used when scheduleType = 'day_of_month'. */
+    /** 131. Used when scheduleType = 'day_of_month'. */
     scheduleDayOfMonth?: number;
-    /** 'HH:MM' 24-hour send time for day_of_week / day_of_month modes. */
+    /** YYYY-MM-DD. Used when scheduleType = 'specific_date'. */
+    scheduleDate?: string;
+    /** 'HH:MM' 24-hour send time for day_of_week / day_of_month / specific_date modes. */
     scheduleTime?: string;
     // -- Recurrence ---------------------------------------------------------
     /** 'none' = fire once; 'weekly' = repeat on selected days of week; 'monthly' = repeat on selected dates */

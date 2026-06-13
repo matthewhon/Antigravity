@@ -10,9 +10,12 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "ios:build": "npm run build && npx cap sync ios && xcodebuild -workspace ios/App/App.xcworkspace -scheme \"Pastoral Care Messaging\" -sdk iphonesimulator -configuration Debug",
-    "ios:run": "npm run build && npx cap run ios --scheme \"Pastoral Care Messaging\" --target B8F03C46-BDBF-406A-83F1-BD928AE06139"
+    "ios:run": "npm run build && npx cap run ios --scheme \"Pastoral Care Messaging\" --target B8F03C46-BDBF-406A-83F1-BD928AE06139",
+    "android:build": "npm run build && npx cap sync android",
+    "android:run": "npm run build && npx cap run android"
   },
   "dependencies": {
+    "@capacitor/android": "^8.4.0",
     "@capacitor/core": "^8.3.1",
     "@capacitor/ios": "^8.3.1",
     "@capacitor/push-notifications": "^8.0.3",

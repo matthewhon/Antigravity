@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "420611303326",
+    "project_id": "pastoral-care-for-pco",
+    "storage_bucket": "pastoral-care-for-pco.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:420611303326:android:b3e9c0253e632508b8988f",
+        "android_client_info": {
+          "package_name": "com.barnabassoftware.pcmessaging"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBn0EbGKG6cyvA3G-VtudSW1F1FYhydY_E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

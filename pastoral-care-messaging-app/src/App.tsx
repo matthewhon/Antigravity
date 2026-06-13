@@ -22,6 +22,7 @@ const App: React.FC = () => {
   useEffect(() => {
     import('@capacitor/text-zoom').then(({ TextZoom }) => {
       import('@capacitor/core').then(({ Capacitor }) => {
+        document.documentElement.classList.add(`platform-${Capacitor.getPlatform()}`);
         if (Capacitor.isNativePlatform()) {
           TextZoom.getPreferred().then(({ value }) => {
             TextZoom.set({ value });
