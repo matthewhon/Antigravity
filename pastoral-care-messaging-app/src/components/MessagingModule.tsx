@@ -4306,14 +4306,16 @@ const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[]; smsNu
                         <BarChart3 size={26} className="text-violet-500" /> Analytics
                     </h1>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Message performance, delivery rates, and usage overview</p>
-                    <a 
-                        href="https://pastoralcare.barnabassoftware.com" 
-                        target="_blank" 
-                        rel="noreferrer" 
-                        className="inline-flex items-center gap-1 text-sm font-medium text-violet-600 dark:text-violet-400 hover:text-violet-700 hover:underline mt-1 transition-colors"
-                    >
-                        View Full Church Analytics Dashboard &rarr;
-                    </a>
+                    {!Capacitor.isNativePlatform() && (
+                        <a 
+                            href="https://pastoralcare.barnabassoftware.com" 
+                            target="_blank" 
+                            rel="noreferrer" 
+                            className="inline-flex items-center gap-1 text-sm font-medium text-violet-600 dark:text-violet-400 hover:text-violet-700 hover:underline mt-1 transition-colors"
+                        >
+                            View Full Church Analytics Dashboard &rarr;
+                        </a>
+                    )}
                 </div>
                 {/* Period selector */}
                 <div className="flex gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
@@ -4366,10 +4368,10 @@ const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[]; smsNu
                 </div>
             )}
 
-            {/* Two-column: Bar chart + cost */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* One-column: Bar chart */}
+            <div className="grid grid-cols-1 gap-4">
                 {/* Monthly volume bars */}
-                <div className="lg:col-span-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
+                <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
                     <p className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4">Monthly Volume (last 6 months)</p>
                     {monthlyData.every(m => m.sent === 0) ? (
                         <div className="flex flex-col items-center justify-center h-40 text-slate-400">
@@ -4420,32 +4422,6 @@ const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[]; smsNu
                         <span className="flex items-center gap-1.5 text-[10px] text-slate-500">
                             <span className="w-3 h-3 rounded-sm bg-violet-600" /> Delivered
                         </span>
-                    </div>
-                </div>
-
-                {/* Cost card */}
-                <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 flex flex-col">
-                    <p className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4">Estimated Cost</p>
-                    <div className="flex-1 flex flex-col items-center justify-center">
-                        <div className="w-16 h-16 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center mb-3">
-                            <DollarSign size={28} className="text-emerald-600 dark:text-emerald-400" />
-                        </div>
-                        <p className="text-3xl font-black text-slate-900 dark:text-white">
-                            ${(summary?.estimatedCostUsd ?? 0).toFixed(2)}
-                        </p>
-                        <p className="text-xs text-slate-400 text-center mt-2">
-                            Based on tracked usage records at ~$0.0075/segment. Actual billing is in your Twilio Console.
-                        </p>
-                    </div>
-                    <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl">
-                        <div className="flex justify-between text-xs mb-1">
-                            <span className="text-slate-500">Failed messages</span>
-                            <span className="font-bold text-slate-700 dark:text-slate-300">{summary?.totalFailed ?? 0}</span>
-                        </div>
-                        <div className="flex justify-between text-xs">
-                            <span className="text-slate-500">Opt-outs (total)</span>
-                            <span className="font-bold text-red-500">{summary?.totalOptOuts ?? 0}</span>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -4560,7 +4536,6 @@ const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[]; smsNu
                             { label: 'Total 2-way conversations', value: summary?.totalReplies.toLocaleString() ?? '—' },
                             { label: 'Total opt-outs (all time)', value: summary?.totalOptOuts.toLocaleString() ?? '—' },
                             { label: 'Campaigns sent', value: summary?.totalBulk.toLocaleString() ?? '—' },
-                            { label: 'Est. cost per delivered msg', value: summary && summary.totalDelivered > 0 ? `$${((summary.estimatedCostUsd / summary.totalDelivered)).toFixed(4)}` : '...' },
                         ].map(row => (
                             <div key={row.label} className="flex items-center justify-between py-1.5 border-b border-slate-100 dark:border-slate-700 last:border-0">
                                 <span className="text-xs text-slate-500 dark:text-slate-400">{row.label}</span>

@@ -53,5 +53,7 @@
 	<string>We need access to your photo library to attach existing photos to messages.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>We need access to save photos to your library.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>We need access to your microphone to record audio for videos.</string>
 </dict>
 </plist>

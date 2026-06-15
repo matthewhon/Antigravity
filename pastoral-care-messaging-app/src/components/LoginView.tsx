@@ -129,23 +129,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onRegister }) => {
             </button>
         </form>
 
-        <div className="mt-8 text-center border-t border-slate-100 dark:border-slate-800 pt-6">
-            <p className="text-xs font-medium text-slate-400">Don't have an account?</p>
-            <a 
-                href={onRegister ? "/register" : "https://pastoralcare.barnabassoftware.com/register"}
-                target={onRegister ? undefined : "_blank"}
-                rel={onRegister ? undefined : "noopener noreferrer"}
-                onClick={(e) => {
-                    if (onRegister) {
-                        e.preventDefault();
-                        onRegister();
-                    }
-                }}
-                className="mt-2 inline-block text-xs font-black text-indigo-600 hover:text-indigo-800 transition-colors uppercase tracking-widest"
-            >
-                Create Organization
-            </a>
-        </div>
       </div>
     </div>
   );
