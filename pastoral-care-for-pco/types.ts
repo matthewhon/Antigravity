@@ -1781,3 +1781,29 @@ export function hasBroadcastAccess(currentUser: User | undefined, targetId: stri
     
     return false;
 }
+
+// --- Cohort Tracking & Retention Curves ---
+
+export interface PcoCheckInRecord {
+    id: string; // `${churchId}_${pcoCheckInId}`
+    pcoId: string;
+    churchId: string;
+    personId: string;
+    createdAt: string; // YYYY-MM-DD
+}
+
+export interface CohortRetentionPoint {
+    monthIndex: number; // 0 = first month, 1 = second month, etc.
+    activeCount: number;
+    percentage: number;
+    monthLabel: string;
+}
+
+export interface CohortData {
+    cohortName: string; // e.g. "Jan 2026"
+    startDate: string; // YYYY-MM
+    cohortSize: number;
+    retention: CohortRetentionPoint[];
+    peopleIds: string[];
+}
+

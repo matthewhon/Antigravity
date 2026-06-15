@@ -28,7 +28,7 @@ export const CarePage: React.FC<CarePageProps> = ({
     const { 
         user, church, people, groups, attendance, donations, 
         teams, recentRiskChanges, recentStatusChanges, servicesData,
-        systemSettings
+        systemSettings, checkIns
     } = useTenantData();
     const { '*': subpath } = useParams();
 
@@ -60,6 +60,9 @@ export const CarePage: React.FC<CarePageProps> = ({
             churchConfig={{ city: church.city, state: church.state }}
             censusError={censusError}
             activePage={activePage as any}
+            donations={donations}
+            servicesData={servicesData}
+            checkIns={checkIns}
             churchWidgets={user.widgetPreferences?.['pastoral_church'] || []}
             membershipWidgets={user.widgetPreferences?.['pastoral_membership'] || []}
             communityWidgets={user.widgetPreferences?.['pastoral_community'] || []}

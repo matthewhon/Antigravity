@@ -23,7 +23,7 @@ import {
     PastoralNote, PrayerRequest, CheckInRecord, EmailCampaign, PcoRegistrationEvent,
     PcoRegistrationAttendee, PcoRegistrationCampus,
     Poll, PollResponse, RiskChangeRecord, ChurchNote, StatusChangeRecord,
-    WeatherRecord
+    WeatherRecord, PcoCheckInRecord
 } from '../types';
 import { calculateServicesAnalytics, calculateAggregatedStats } from './analyticsService';
 
@@ -1234,6 +1234,38 @@ class FirestoreService {
   async deleteTenantFile(fileId: string): Promise<void> {
     try {
       await deleteDoc(doc(db, 'tenantFiles', fileId));
+    } catch (e) {
+      this.handleFirestoreError(e);
+      throw e;
+    }
+  }
+
+  // --- Check-Ins ---
+
+  async getCheckIns(churchId: string): Promise<PcoCheckInRecord[]> {
+    try {
+      const q = query(collection(db, 'check_ins'), where('churchId', '==', churchId));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(d => d.data() as PcoCheckInRecord);
+    } catch (e) {
+      this.handleFirestoreError(e);
+      return [];
+    }
+  }
+
+  async saveCheckIns(churchId: string, checkIns: PcoCheckInRecord[]): Promise<void> {
+    try {
+      const CHUNK_SIZE = 500;
+      for (let i = 0; i < checkIns.length; i += CHUNK_SIZE) {
+        const chunk = checkIns.slice(i, i + CHUNK_SIZE);
+        const batch = writeBatch(db);
+        for (const ci of chunk) {
+          const docRef = doc(db, 'check_ins', ci.id);
+          const safe = JSON.parse(JSON.stringify(ci));
+          batch.set(docRef, safe, { merge: true });
+        }
+        await batch.commit();
+      }
     } catch (e) {
       this.handleFirestoreError(e);
       throw e;

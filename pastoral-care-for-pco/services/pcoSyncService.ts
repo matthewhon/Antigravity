@@ -5,7 +5,7 @@ import {
     PcoPerson, PcoGroup, DetailedDonation, PcoFund, AttendanceRecord, 
     ServicePlanSnapshot, ServicesTeam, CheckInRecord,
     PcoRegistrationEvent, PcoRegistrationAttendee, PcoRegistrationCampus,
-    RiskChangeRecord, StatusChangeRecord
+    RiskChangeRecord, StatusChangeRecord, PcoCheckInRecord
 } from '../types';
 import { initializeWebhooks } from './pcoWebhookService';
 import { calculateBulkRisk, DEFAULT_RISK_SETTINGS } from './riskService';
@@ -452,9 +452,25 @@ export const syncCheckInCounts = async (churchId: string) => {
             `check-ins/v2/check_ins?where[created_at][gte]=${sinceStr}&per_page=100`,
 
             (ci: any) => ({
+                id: ci.id,
                 personId: ci.attributes?.person_id || ci.relationships?.person?.data?.id || null,
+                createdAt: ci.attributes?.created_at ? ci.attributes.created_at.split('T')[0] : null
             })
         );
+
+        const validCheckIns: PcoCheckInRecord[] = checkIns
+            .filter((ci: any) => ci.personId && ci.createdAt)
+            .map((ci: any) => ({
+                id: `${churchId}_${ci.id}`,
+                pcoId: ci.id,
+                churchId,
+                personId: ci.personId,
+                createdAt: ci.createdAt
+            }));
+
+        if (validCheckIns.length > 0) {
+            await firestore.saveCheckIns(churchId, validCheckIns);
+        }
 
         for (const ci of checkIns) {
             if (!ci.personId) continue;

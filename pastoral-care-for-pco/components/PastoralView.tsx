@@ -2,7 +2,8 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
     AttendanceData, PeopleDashboardData, GivingAnalytics, GroupsDashboardData, 
-    CensusStats, PcoPerson, User, Church, PastoralNote, PrayerRequest 
+    CensusStats, PcoPerson, User, Church, PastoralNote, PrayerRequest,
+    DetailedDonation, ServicesDashboardData, PcoCheckInRecord
 } from '../types';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -22,6 +23,7 @@ import {
 import { CommunityComparison } from './CommunityComparison';
 import { PastoralCalendar } from './PastoralCalendar';
 import { CarePeopleListWidget } from './CarePeopleListWidget';
+import { CohortAnalytics } from './CohortAnalytics';
 import { DEFAULT_RISK_SETTINGS } from '../services/riskService';
 import { fetchCensusDataForTenant } from '../services/censusService';
 import { generateCommunityStrategy, generateCareAdvice } from '../services/geminiService';
@@ -53,6 +55,11 @@ interface PastoralViewProps {
   allowedWidgetIds?: string[];
   googleMapsApiKey?: string;
   onUpdateTheme?: (theme: 'traditional' | 'dark') => void;
+  
+  // Cohort Tracking Raw Data
+  donations?: DetailedDonation[];
+  servicesData?: ServicesDashboardData | null;
+  checkIns?: PcoCheckInRecord[];
 }
 
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316', '#10b981'];
@@ -325,7 +332,10 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
   activePage,
   allowedWidgetIds,
   googleMapsApiKey,
-  onUpdateTheme
+  onUpdateTheme,
+  donations = [],
+  servicesData = null,
+  checkIns = []
 }) => {
   const activeTab = activePage ?? 'Church';
   const [locationCensusMap, setLocationCensusMap] = useState<Record<string, CensusStats>>({});
@@ -1200,11 +1210,14 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
               );
           case 'member_attrition_chart':
               return (
-                  <WidgetWrapper title="Attrition Rate" onRemove={() => handleRemoveWidget(id)} source="Inactive Status">
-                      <div className="h-full flex flex-col justify-center items-center text-center p-6 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700">
-                          <p className="text-2xl mb-2">📉</p>
-                          <p className="text-xs font-bold text-slate-400">Attrition analysis coming soon.</p>
-                      </div>
+                  <WidgetWrapper title="Cohort Retention Analysis" onRemove={() => handleRemoveWidget(id)} source="Check-ins & Activity">
+                      <CohortAnalytics 
+                          people={peopleData?.people || []}
+                          donations={donations}
+                          groups={groupsData?.groups || []}
+                          services={servicesData}
+                          checkIns={checkIns}
+                      />
                   </WidgetWrapper>
               );
 

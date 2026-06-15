@@ -2,7 +2,7 @@ import React, { createContext, useContext, ReactNode } from 'react';
 import { 
   PcoPerson, PcoGroup, AttendanceRecord, DetailedDonation, PcoFund, 
   BudgetRecord, ServicesTeam, RiskChangeRecord, StatusChangeRecord, ServicesDashboardData,
-  User, Church, SystemSettings
+  User, Church, SystemSettings, PcoCheckInRecord
 } from '../types';
 
 interface TenantDataState {
@@ -22,6 +22,7 @@ interface TenantDataState {
   recentRiskChanges: RiskChangeRecord[];
   recentStatusChanges: StatusChangeRecord[];
   servicesData: ServicesDashboardData | null;
+  checkIns: PcoCheckInRecord[];
   
   // Also pass the setters if components need to update raw data locally before a sync
   setPeople: (data: PcoPerson[]) => void;
@@ -34,6 +35,7 @@ interface TenantDataState {
   setRecentRiskChanges: (data: RiskChangeRecord[]) => void;
   setRecentStatusChanges: (data: StatusChangeRecord[]) => void;
   setServicesData: (data: ServicesDashboardData | null) => void;
+  setCheckIns: (data: PcoCheckInRecord[]) => void;
 }
 
 const TenantDataContext = createContext<TenantDataState | undefined>(undefined);
@@ -45,6 +47,7 @@ export function TenantDataProvider({ children, value }: { children: ReactNode; v
     </TenantDataContext.Provider>
   );
 }
+
 
 export function useTenantData() {
   const context = useContext(TenantDataContext);

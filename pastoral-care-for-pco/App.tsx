@@ -42,7 +42,7 @@ import {
   User, Church, PeopleDashboardData, GivingAnalytics, GroupsDashboardData, 
   ServicesDashboardData, AttendanceData, CensusStats, BudgetRecord, PcoFund, 
   DetailedDonation, PcoPerson, ServicesFilter, GivingFilter, GeoInsight,
-  PcoGroup, AttendanceRecord, ServicesTeam, RiskSettings, SystemSettings, RiskChangeRecord, StatusChangeRecord
+  PcoGroup, AttendanceRecord, ServicesTeam, RiskSettings, SystemSettings, RiskChangeRecord, StatusChangeRecord, PcoCheckInRecord
 } from './types';
 import { getDefaultWidgets } from './constants/widgetRegistry';
 import { calculateGivingAnalytics, DEFAULT_LIFECYCLE_SETTINGS } from './services/analyticsService';
@@ -121,6 +121,7 @@ const App: React.FC = () => {
   const [teams, setTeams] = useState<ServicesTeam[]>([]);
   const [recentRiskChanges, setRecentRiskChanges] = useState<RiskChangeRecord[]>([]);
   const [recentStatusChanges, setRecentStatusChanges] = useState<StatusChangeRecord[]>([]);
+  const [checkIns, setCheckIns] = useState<PcoCheckInRecord[]>([]);
   
   // Dashboard Aggregates
   const [servicesData, setServicesData] = useState<ServicesDashboardData | null>(null);
@@ -433,7 +434,7 @@ const App: React.FC = () => {
   }, [church?.city, church?.state, church?.communityLocations]);
 
   const loadTenantData = async (churchId: string) => {
-      const [p, g, a, d, f, b, t, rc, sc] = await Promise.all([
+      const [p, g, a, d, f, b, t, rc, sc, ci] = await Promise.all([
           firestore.getPeople(churchId),
           firestore.getGroups(churchId),
           firestore.getAttendance(churchId),
@@ -442,7 +443,8 @@ const App: React.FC = () => {
           firestore.getBudgets(churchId),
           firestore.getServicesTeams(churchId),
           firestore.getRecentRiskChanges(churchId),
-          firestore.getRecentStatusChanges(churchId)
+          firestore.getRecentStatusChanges(churchId),
+          firestore.getCheckIns(churchId)
       ]);
       setPeople(p);
       setGroups(g);
@@ -453,6 +455,7 @@ const App: React.FC = () => {
       setTeams(t);
       setRecentRiskChanges(rc);
       setRecentStatusChanges(sc);
+      setCheckIns(ci);
   };
 
   const loadServicesData = async (churchId: string, filter: ServicesFilter) => {
@@ -867,9 +870,9 @@ const App: React.FC = () => {
         <TenantDataProvider value={{
             user, church, allChurches, systemSettings, widgets,
             people: visiblePeople, groups: visibleGroups, attendance, donations, funds, budgets, teams,
-            recentRiskChanges, recentStatusChanges, servicesData,
+            recentRiskChanges, recentStatusChanges, servicesData, checkIns,
             setPeople, setGroups, setAttendance, setDonations, setFunds, setBudgets,
-            setTeams, setRecentRiskChanges, setRecentStatusChanges, setServicesData
+            setTeams, setRecentRiskChanges, setRecentStatusChanges, setServicesData, setCheckIns
         }}>
             <div inert={isOverlayOpen ? true : undefined} className="flex flex-col min-h-screen">
                 <Layout 
