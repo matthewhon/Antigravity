@@ -903,6 +903,7 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                                     {buckets.map(b => (
                                         <th key={b} className="p-4 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right whitespace-nowrap">{b}</th>
                                     ))}
+                                    <th className="p-4 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right whitespace-nowrap">% of Total</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
@@ -920,11 +921,14 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                                                 {donor.buckets[b] ? `$${donor.buckets[b].toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
                                             </td>
                                         ))}
+                                        <td className="p-4 text-xs text-indigo-600 dark:text-indigo-400 text-right font-mono font-bold">
+                                            {donorConcentration.total > 0 ? ((donor.totalAmount / donorConcentration.total) * 100).toFixed(1) + '%' : '0.0%'}
+                                        </td>
                                     </tr>
                                 ))}
                                 {aggregatedData.length === 0 && (
                                     <tr>
-                                        <td colSpan={3 + buckets.length} className="p-8 text-center text-slate-400 text-xs italic">
+                                        <td colSpan={4 + buckets.length} className="p-8 text-center text-slate-400 text-xs italic">
                                             No donations found matching the selected criteria.
                                         </td>
                                     </tr>
