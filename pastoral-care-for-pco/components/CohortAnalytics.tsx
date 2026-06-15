@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { PcoPerson, DetailedDonation, PcoGroup, ServicesDashboardData, PcoCheckInRecord } from '../types';
 import { calculateCohorts, CohortFilterConfig } from '../services/cohortService';
-import { 
-    LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
+import {
+    LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
 
 interface CohortAnalyticsProps {
@@ -13,6 +13,67 @@ interface CohortAnalyticsProps {
     checkIns: PcoCheckInRecord[];
 }
 
+// ─── Colour helpers ──────────────────────────────────────────────────────────
+const LINE_COLORS = [
+    '#6366f1', '#10b981', '#ec4899', '#f59e0b',
+    '#3b82f6', '#8b5cf6', '#ef4444', '#14b8a6'
+];
+
+function heatmapBg(pct: number): string {
+    // Gradient from slate-100 → indigo-600 based on retention percentage
+    const alpha = Math.min(1, pct / 100);
+    return `rgba(99, 102, 241, ${(alpha * 0.85).toFixed(2)})`;
+}
+
+function heatmapText(pct: number): string {
+    return pct > 45 ? '#ffffff' : '';
+}
+
+// ─── Metric Card ─────────────────────────────────────────────────────────────
+const MetricCard: React.FC<{
+    label: string;
+    value: string;
+    valueColor?: string;
+    sub?: string;
+}> = ({ label, value, valueColor = 'text-slate-900 dark:text-white', sub }) => (
+    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-5 flex flex-col gap-3 shadow-sm">
+        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</span>
+        <span className={`text-4xl font-black leading-none ${valueColor}`}>{value}</span>
+        {sub && <span className="text-[10px] text-slate-400 font-semibold">{sub}</span>}
+    </div>
+);
+
+// ─── Signal Toggle (checkbox pill) ───────────────────────────────────────────
+const SignalToggle: React.FC<{
+    label: string;
+    checked: boolean;
+    onChange: (v: boolean) => void;
+}> = ({ label, checked, onChange }) => (
+    <label className={`flex items-center gap-2.5 px-4 py-2 rounded-xl border cursor-pointer transition-all select-none text-xs font-bold ${
+        checked
+            ? 'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-950/30 dark:border-indigo-800/50 dark:text-indigo-300'
+            : 'bg-white border-slate-200 text-slate-400 dark:bg-slate-900 dark:border-slate-800'
+    }`}>
+        <input
+            type="checkbox"
+            checked={checked}
+            onChange={e => onChange(e.target.checked)}
+            className="sr-only"
+        />
+        <span className={`w-3.5 h-3.5 rounded-sm border-2 flex items-center justify-center transition-colors ${
+            checked ? 'bg-indigo-500 border-indigo-500' : 'border-slate-300 dark:border-slate-700'
+        }`}>
+            {checked && (
+                <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 10 10" fill="none">
+                    <path d="M2 5l2.5 2.5L8 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+            )}
+        </span>
+        {label}
+    </label>
+);
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 export const CohortAnalytics: React.FC<CohortAnalyticsProps> = ({
     people,
     donations,
@@ -20,7 +81,6 @@ export const CohortAnalytics: React.FC<CohortAnalyticsProps> = ({
     services,
     checkIns
 }) => {
-    // Config filters
     const [config, setConfig] = useState<CohortFilterConfig>({
         includeCheckIns: true,
         includeGiving: true,
@@ -28,307 +88,251 @@ export const CohortAnalytics: React.FC<CohortAnalyticsProps> = ({
         includeServing: true
     });
 
-    // Drill-down selected cohort
     const [selectedCohortName, setSelectedCohortName] = useState<string | null>(null);
-
-    // Calculate cohorts based on active configuration
-    const cohorts = useMemo(() => {
-        return calculateCohorts(people, donations, groups, services, checkIns, config);
-    }, [people, donations, groups, services, checkIns, config]);
-
-    // Default visible lines (show most recent 5 active cohorts in the line chart)
     const [visibleLineCohorts, setVisibleLineCohorts] = useState<Record<string, boolean>>({});
 
-    const toggleLineCohort = (name: string) => {
-        setVisibleLineCohorts(prev => ({
-            ...prev,
-            [name]: !prev[name]
-        }));
-    };
+    const cohorts = useMemo(
+        () => calculateCohorts(people, donations, groups, services, checkIns, config),
+        [people, donations, groups, services, checkIns, config]
+    );
 
-    // Calculate aggregated metrics
+    const toggleLineCohort = (name: string) =>
+        setVisibleLineCohorts(prev => ({ ...prev, [name]: !(prev[name] ?? true) }));
+
+    // ── Aggregate metrics ──────────────────────────────────────────────────
     const metrics = useMemo(() => {
         if (cohorts.length === 0) return { avgSize: 0, m1: 0, m3: 0, m6: 0 };
-        
-        let totalSize = 0;
-        let sumM1 = 0;
-        let sumM3 = 0;
-        let sumM6 = 0;
-        let countM1 = 0;
-        let countM3 = 0;
-        let countM6 = 0;
-
+        let totalSize = 0, sumM1 = 0, sumM3 = 0, sumM6 = 0;
+        let cM1 = 0, cM3 = 0, cM6 = 0;
         cohorts.forEach(c => {
             totalSize += c.cohortSize;
-            
-            // Month 1
-            const m1Pt = c.retention.find(p => p.monthIndex === 1);
-            if (m1Pt) {
-                sumM1 += m1Pt.percentage;
-                countM1++;
-            }
-            // Month 3
-            const m3Pt = c.retention.find(p => p.monthIndex === 3);
-            if (m3Pt) {
-                sumM3 += m3Pt.percentage;
-                countM3++;
-            }
-            // Month 6
-            const m6Pt = c.retention.find(p => p.monthIndex === 6);
-            if (m6Pt) {
-                sumM6 += m6Pt.percentage;
-                countM6++;
-            }
+            const at = (idx: number) => c.retention.find(p => p.monthIndex === idx);
+            const p1 = at(1); if (p1) { sumM1 += p1.percentage; cM1++; }
+            const p3 = at(3); if (p3) { sumM3 += p3.percentage; cM3++; }
+            const p6 = at(6); if (p6) { sumM6 += p6.percentage; cM6++; }
         });
-
         return {
             avgSize: Math.round(totalSize / cohorts.length),
-            m1: countM1 > 0 ? Math.round(sumM1 / countM1) : 0,
-            m3: countM3 > 0 ? Math.round(sumM3 / countM3) : 0,
-            m6: countM6 > 0 ? Math.round(sumM6 / countM6) : 0
+            m1: cM1 > 0 ? Math.round(sumM1 / cM1) : 0,
+            m3: cM3 > 0 ? Math.round(sumM3 / cM3) : 0,
+            m6: cM6 > 0 ? Math.round(sumM6 / cM6) : 0
         };
     }, [cohorts]);
 
-    // Prepare line chart data: Month index vs percentage for selected cohorts
+    // ── Chart data ─────────────────────────────────────────────────────────
     const chartData = useMemo(() => {
-        const points = [];
-        for (let m = 0; m <= 12; m++) {
-            const dataPoint: any = { monthIndex: m, name: `Month ${m}` };
+        return Array.from({ length: 13 }, (_, m) => {
+            const pt: Record<string, number | string> = { monthIndex: m, name: `M${m}` };
             cohorts.forEach(c => {
-                const isVisible = visibleLineCohorts[c.cohortName] ?? true;
-                if (isVisible) {
-                    const pt = c.retention.find(p => p.monthIndex === m);
-                    if (pt) {
-                        dataPoint[c.cohortName] = pt.percentage;
-                    }
-                }
+                if (visibleLineCohorts[c.cohortName] === false) return;
+                const found = c.retention.find(p => p.monthIndex === m);
+                if (found) pt[c.cohortName] = found.percentage;
             });
-            points.push(dataPoint);
-        }
-        return points;
+            return pt;
+        });
     }, [cohorts, visibleLineCohorts]);
 
-    // Colors for Recharts lines
-    const lineColors = ['#6366f1', '#10b981', '#ec4899', '#f59e0b', '#3b82f6', '#8b5cf6', '#ef4444', '#14b8a6'];
-
-    // Retrieve selected cohort details
+    // ── Drill-down people ──────────────────────────────────────────────────
     const activeCohortDetails = useMemo(() => {
         if (!selectedCohortName) return null;
         const cohort = cohorts.find(c => c.cohortName === selectedCohortName);
         if (!cohort) return null;
-
-        const cohortPeople = people
-            .filter(p => cohort.peopleIds.includes(p.id))
-            .map(p => {
-                // Determine current status or activity indicators
-                return {
+        return {
+            name: cohort.cohortName,
+            size: cohort.cohortSize,
+            people: people
+                .filter(p => cohort.peopleIds.includes(p.id))
+                .map(p => ({
                     id: p.id,
                     name: p.name,
                     membership: p.membership || 'Visitor',
                     riskCategory: p.riskProfile?.category || 'Disconnected',
-                    riskScore: p.riskProfile?.score || 0,
                     checkIns: p.checkInCount || 0
-                };
-            });
-
-        return {
-            name: cohort.cohortName,
-            size: cohort.cohortSize,
-            people: cohortPeople
+                }))
         };
     }, [selectedCohortName, cohorts, people]);
 
+    const riskBadge = (cat: string) => {
+        if (['Healthy', 'Thriving'].includes(cat))
+            return 'bg-emerald-50 text-emerald-700 border border-emerald-100 dark:bg-emerald-950/20 dark:border-emerald-900/30';
+        if (['At Risk', 'Warning'].includes(cat))
+            return 'bg-amber-50 text-amber-700 border border-amber-100 dark:bg-amber-950/20 dark:border-amber-900/30';
+        return 'bg-rose-50 text-rose-700 border border-rose-100 dark:bg-rose-950/20 dark:border-rose-900/30';
+    };
+
+    // ── Empty state ────────────────────────────────────────────────────────
+    if (cohorts.length === 0) {
+        return (
+            <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
+                <div className="w-16 h-16 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-2">
+                    <svg className="w-7 h-7 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" />
+                    </svg>
+                </div>
+                <p className="text-base font-black text-slate-700 dark:text-slate-300">No cohort data yet</p>
+                <p className="text-xs text-slate-400 max-w-xs">Sync your check-ins and giving data to generate retention cohorts.</p>
+            </div>
+        );
+    }
+
     return (
-        <div className="space-y-6">
-            {/* Control Filters */}
-            <div className="bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 rounded-3xl p-5 flex flex-wrap gap-6 items-center justify-between shadow-sm">
-                <div className="space-y-1">
-                    <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">Cohort Activity Signals</h4>
-                    <p className="text-[10px] text-slate-500">Select which interactions mark a member as &quot;active&quot; during a month.</p>
-                </div>
-                <div className="flex flex-wrap gap-4">
-                    <label className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300 cursor-pointer">
-                        <input
-                            type="checkbox"
-                            checked={config.includeCheckIns}
-                            onChange={(e) => setConfig(prev => ({ ...prev, includeCheckIns: e.target.checked }))}
-                            className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950"
-                        />
-                        Check-ins
-                    </label>
-                    <label className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300 cursor-pointer">
-                        <input
-                            type="checkbox"
-                            checked={config.includeGiving}
-                            onChange={(e) => setConfig(prev => ({ ...prev, includeGiving: e.target.checked }))}
-                            className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950"
-                        />
-                        Giving
-                    </label>
-                    <label className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300 cursor-pointer">
-                        <input
-                            type="checkbox"
-                            checked={config.includeGroups}
-                            onChange={(e) => setConfig(prev => ({ ...prev, includeGroups: e.target.checked }))}
-                            className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950"
-                        />
-                        Small Groups
-                    </label>
-                    <label className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300 cursor-pointer">
-                        <input
-                            type="checkbox"
-                            checked={config.includeServing}
-                            onChange={(e) => setConfig(prev => ({ ...prev, includeServing: e.target.checked }))}
-                            className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950"
-                        />
-                        Serving
-                    </label>
-                </div>
-            </div>
+        <div className="space-y-8">
 
-            {/* Overview Stats */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col justify-between">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Cohorts</span>
-                    <span className="text-3xl font-black text-slate-900 dark:text-white mt-2">{cohorts.length}</span>
-                </div>
-                <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col justify-between">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Avg Month 1 Retention</span>
-                    <span className="text-3xl font-black text-rose-500 mt-2">{metrics.m1}%</span>
-                </div>
-                <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col justify-between">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Avg Month 3 Retention</span>
-                    <span className="text-3xl font-black text-amber-500 mt-2">{metrics.m3}%</span>
-                </div>
-                <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col justify-between">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Avg Month 6 Retention</span>
-                    <span className="text-3xl font-black text-emerald-500 mt-2">{metrics.m6}%</span>
-                </div>
-            </div>
-
-            {/* Heatmap Grid & Line Chart Tabs */}
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                
-                {/* Cohort Heatmap table */}
-                <div className="xl:col-span-2 bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 p-6 shadow-sm overflow-hidden flex flex-col">
-                    <div className="flex items-center justify-between mb-4">
-                        <div>
-                            <h3 className="text-base font-black text-slate-900 dark:text-white tracking-tight">Retention Heatmap</h3>
-                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Click a cohort row to view the members list</p>
-                        </div>
+            {/* ── 1. Activity Signal Filters ─────────────────────────────────────── */}
+            <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
+                <div className="flex flex-wrap gap-y-4 gap-x-8 items-start justify-between">
+                    <div>
+                        <h4 className="text-sm font-black text-slate-800 dark:text-white mb-1">Activity Signals</h4>
+                        <p className="text-xs text-slate-400">Choose which interactions count as "active" for a given month.</p>
                     </div>
-                    <div className="overflow-x-auto no-scrollbar">
-                        <table className="w-full text-left border-collapse text-xs">
-                            <thead>
-                                <tr className="border-b border-slate-100 dark:border-slate-850">
-                                    <th className="py-2.5 font-black uppercase text-slate-400 text-[10px] min-w-[100px]">Cohort</th>
-                                    <th className="py-2.5 font-black uppercase text-slate-400 text-[10px] text-center min-w-[50px]">Size</th>
-                                    {Array.from({ length: 13 }).map((_, i) => (
-                                        <th key={i} className="py-2.5 font-black uppercase text-slate-400 text-[10px] text-center min-w-[42px]">M{i}</th>
+                    <div className="flex flex-wrap gap-3">
+                        <SignalToggle label="Check-ins" checked={config.includeCheckIns}   onChange={v => setConfig(p => ({ ...p, includeCheckIns: v }))} />
+                        <SignalToggle label="Giving"    checked={config.includeGiving}      onChange={v => setConfig(p => ({ ...p, includeGiving: v }))} />
+                        <SignalToggle label="Groups"    checked={config.includeGroups}      onChange={v => setConfig(p => ({ ...p, includeGroups: v }))} />
+                        <SignalToggle label="Serving"   checked={config.includeServing}     onChange={v => setConfig(p => ({ ...p, includeServing: v }))} />
+                    </div>
+                </div>
+            </div>
+
+            {/* ── 2. Metric Summary Row ──────────────────────────────────────────── */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <MetricCard label="Total Cohorts"       value={String(cohorts.length)}  valueColor="text-slate-900 dark:text-white" />
+                <MetricCard label="Avg Month 1 Retention" value={`${metrics.m1}%`}      valueColor="text-rose-500"    sub="30-day engagement" />
+                <MetricCard label="Avg Month 3 Retention" value={`${metrics.m3}%`}      valueColor="text-amber-500"   sub="90-day engagement" />
+                <MetricCard label="Avg Month 6 Retention" value={`${metrics.m6}%`}      valueColor="text-emerald-500" sub="180-day engagement" />
+            </div>
+
+            {/* ── 3. Retention Heatmap (full width, horizontal scroll) ───────────── */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
+                <div className="px-6 pt-6 pb-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-4">
+                    <div>
+                        <h3 className="text-base font-black text-slate-900 dark:text-white tracking-tight">Retention Heatmap</h3>
+                        <p className="text-xs text-slate-400 mt-0.5">Click any cohort row to inspect its members below.</p>
+                    </div>
+                    {/* Colour legend */}
+                    <div className="hidden sm:flex items-center gap-2 shrink-0">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Low</span>
+                        <div className="flex gap-0.5">
+                            {[0.08, 0.22, 0.38, 0.55, 0.72, 0.88].map((a, i) => (
+                                <div key={i} className="w-5 h-4 rounded" style={{ backgroundColor: `rgba(99,102,241,${a})` }} />
+                            ))}
+                        </div>
+                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">High</span>
+                    </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                    <table className="w-full border-collapse" style={{ minWidth: '720px' }}>
+                        <thead>
+                            <tr className="bg-slate-50 dark:bg-slate-850">
+                                <th className="sticky left-0 bg-slate-50 dark:bg-slate-850 z-10 px-6 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400 whitespace-nowrap">Cohort</th>
+                                <th className="px-4 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400 whitespace-nowrap">Size</th>
+                                {Array.from({ length: 13 }, (_, i) => (
+                                    <th key={i} className="px-3 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400 whitespace-nowrap">
+                                        {i === 0 ? 'M0' : `M${i}`}
+                                    </th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
+                            {cohorts.map((cohort) => (
+                                <tr
+                                    key={cohort.startDate}
+                                    onClick={() => setSelectedCohortName(
+                                        selectedCohortName === cohort.cohortName ? null : cohort.cohortName
+                                    )}
+                                    className={`cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40 ${
+                                        selectedCohortName === cohort.cohortName
+                                            ? 'bg-indigo-50/60 dark:bg-indigo-950/20'
+                                            : ''
+                                    }`}
+                                >
+                                    <td className="sticky left-0 bg-inherit z-10 px-6 py-4 whitespace-nowrap">
+                                        <div className="flex items-center gap-2.5">
+                                            {selectedCohortName === cohort.cohortName && (
+                                                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0" />
+                                            )}
+                                            <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{cohort.cohortName}</span>
+                                        </div>
+                                    </td>
+                                    <td className="px-4 py-4 text-center text-sm font-bold text-slate-500">{cohort.cohortSize}</td>
+                                    {cohort.retention.map(point => (
+                                        <td
+                                            key={point.monthIndex}
+                                            style={{
+                                                backgroundColor: point.percentage > 0 ? heatmapBg(point.percentage) : undefined,
+                                                color: heatmapText(point.percentage) || undefined
+                                            }}
+                                            className="px-3 py-4 text-center text-xs font-black tabular-nums whitespace-nowrap"
+                                        >
+                                            {point.percentage > 0 ? `${point.percentage}%` : (
+                                                <span className="text-slate-300 dark:text-slate-700">—</span>
+                                            )}
+                                        </td>
                                     ))}
                                 </tr>
-                            </thead>
-                            <tbody>
-                                {cohorts.map((cohort) => (
-                                    <tr 
-                                        key={cohort.startDate}
-                                        onClick={() => setSelectedCohortName(cohort.cohortName)}
-                                        className={`border-b border-slate-50 dark:border-slate-850 hover:bg-slate-50 dark:hover:bg-slate-900/50 cursor-pointer transition-colors ${
-                                            selectedCohortName === cohort.cohortName ? 'bg-indigo-50/30 dark:bg-indigo-950/20' : ''
-                                        }`}
-                                    >
-                                        <td className="py-3 font-bold text-slate-700 dark:text-slate-300">{cohort.cohortName}</td>
-                                        <td className="py-3 font-bold text-slate-500 text-center">{cohort.cohortSize}</td>
-                                        {cohort.retention.map((point) => {
-                                            const bgOpacity = point.percentage / 100;
-                                            const textDark = point.percentage > 45;
-                                            return (
-                                                <td 
-                                                    key={point.monthIndex} 
-                                                    style={{ 
-                                                        backgroundColor: `rgba(99, 102, 241, ${bgOpacity})`,
-                                                        color: textDark ? '#ffffff' : 'inherit'
-                                                    }}
-                                                    className={`py-3 text-center font-black rounded-lg transition-all ${
-                                                        textDark ? 'shadow-sm font-black' : 'text-slate-600 dark:text-slate-450'
-                                                    }`}
-                                                >
-                                                    {point.percentage}%
-                                                </td>
-                                            );
-                                        })}
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                {/* Legend & Toggles for chart */}
-                <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 p-6 shadow-sm flex flex-col justify-between">
-                    <div>
-                        <h3 className="text-base font-black text-slate-900 dark:text-white tracking-tight mb-1">Visual Curves</h3>
-                        <p className="text-[10px] text-slate-450 mb-4 uppercase tracking-wider font-bold">Toggle cohorts to display in chart</p>
-                        <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 no-scrollbar">
-                            {cohorts.map((c, i) => {
-                                const isVisible = visibleLineCohorts[c.cohortName] ?? true;
-                                const color = lineColors[i % lineColors.length];
-                                return (
-                                    <button
-                                        key={c.cohortName}
-                                        onClick={() => toggleLineCohort(c.cohortName)}
-                                        className={`w-full flex items-center justify-between p-2.5 rounded-2xl border text-xs font-bold transition-all ${
-                                            isVisible 
-                                                ? 'bg-slate-50/50 border-slate-100 dark:bg-slate-850/50 dark:border-slate-800' 
-                                                : 'bg-white border-dashed border-slate-200 opacity-40 text-slate-400 dark:bg-slate-950 dark:border-slate-900'
-                                        }`}
-                                    >
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }}></div>
-                                            <span>{c.cohortName}</span>
-                                        </div>
-                                        <span className="text-[10px] font-black text-slate-400">{c.cohortSize} members</span>
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
-            {/* Line Chart Visualizer */}
-            {cohorts.length > 0 && (
-                <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 p-6 shadow-sm">
-                    <h3 className="text-base font-black text-slate-900 dark:text-white tracking-tight mb-4">Retention Curves (Month 0 to Month 12)</h3>
-                    <div className="h-[300px] w-full">
+            {/* ── 4. Retention Curves ────────────────────────────────────────────── */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
+                <div className="px-6 pt-6 pb-4 border-b border-slate-100 dark:border-slate-800">
+                    <h3 className="text-base font-black text-slate-900 dark:text-white tracking-tight">Retention Curves</h3>
+                    <p className="text-xs text-slate-400 mt-0.5">Month 0 → 12 retention by cohort. Toggle cohorts in the legend below.</p>
+                </div>
+
+                {/* Chart area */}
+                <div className="p-6 pb-4">
+                    <div style={{ height: 360 }}>
                         <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={chartData} margin={{ left: -20, right: 10, top: 10, bottom: 0 }}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                                <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} fontWeight="bold" />
-                                <YAxis stroke="#94a3b8" fontSize={10} fontWeight="bold" domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
-                                <Tooltip 
-                                    contentStyle={{ 
+                            <LineChart data={chartData} margin={{ left: 0, right: 24, top: 8, bottom: 0 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.15)" />
+                                <XAxis
+                                    dataKey="name"
+                                    stroke="#94a3b8"
+                                    fontSize={11}
+                                    fontWeight="700"
+                                    tickLine={false}
+                                    axisLine={false}
+                                />
+                                <YAxis
+                                    stroke="#94a3b8"
+                                    fontSize={11}
+                                    fontWeight="700"
+                                    domain={[0, 100]}
+                                    tickFormatter={v => `${v}%`}
+                                    tickLine={false}
+                                    axisLine={false}
+                                    width={40}
+                                />
+                                <Tooltip
+                                    contentStyle={{
                                         borderRadius: '12px',
                                         backgroundColor: '#1e293b',
                                         border: 'none',
                                         color: '#fff',
                                         fontSize: '11px',
                                         fontWeight: 'bold',
-                                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                                        padding: '10px 14px',
+                                        boxShadow: '0 10px 25px -5px rgba(0,0,0,0.3)'
                                     }}
+                                    formatter={(val: number) => [`${val}%`]}
                                 />
                                 {cohorts.map((c, i) => {
-                                    const isVisible = visibleLineCohorts[c.cohortName] ?? true;
-                                    if (!isVisible) return null;
+                                    if (visibleLineCohorts[c.cohortName] === false) return null;
                                     return (
                                         <Line
                                             key={c.cohortName}
                                             type="monotone"
                                             dataKey={c.cohortName}
-                                            stroke={lineColors[i % lineColors.length]}
-                                            strokeWidth={3}
-                                            dot={{ r: 4, strokeWidth: 1 }}
-                                            activeDot={{ r: 6 }}
+                                            stroke={LINE_COLORS[i % LINE_COLORS.length]}
+                                            strokeWidth={2.5}
+                                            dot={{ r: 3.5, strokeWidth: 0 }}
+                                            activeDot={{ r: 6, strokeWidth: 0 }}
+                                            connectNulls={false}
                                         />
                                     );
                                 })}
@@ -336,53 +340,86 @@ export const CohortAnalytics: React.FC<CohortAnalyticsProps> = ({
                         </ResponsiveContainer>
                     </div>
                 </div>
-            )}
 
-            {/* Drill-down Drawer/Panel */}
+                {/* Cohort toggles as pills inside the same card */}
+                <div className="px-6 pb-6 flex flex-wrap gap-2 border-t border-slate-50 dark:border-slate-800 pt-4">
+                    {cohorts.map((c, i) => {
+                        const visible = visibleLineCohorts[c.cohortName] !== false;
+                        const color = LINE_COLORS[i % LINE_COLORS.length];
+                        return (
+                            <button
+                                key={c.cohortName}
+                                onClick={() => toggleLineCohort(c.cohortName)}
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all ${
+                                    visible
+                                        ? 'bg-slate-50 border-slate-200 text-slate-700 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200'
+                                        : 'bg-white border-dashed border-slate-200 text-slate-400 opacity-50 dark:bg-slate-900 dark:border-slate-800'
+                                }`}
+                            >
+                                <span
+                                    className="w-2.5 h-2.5 rounded-full shrink-0"
+                                    style={{ backgroundColor: visible ? color : '#94a3b8' }}
+                                />
+                                {c.cohortName}
+                                <span className="text-[10px] text-slate-400 font-semibold ml-0.5">({c.cohortSize})</span>
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+
+            {/* ── 5. Drill-down Panel ────────────────────────────────────────────── */}
             {activeCohortDetails && (
-                <div className="bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 rounded-3xl p-6 shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-300">
-                    <div className="flex items-center justify-between mb-4 border-b border-slate-100 dark:border-slate-800 pb-3">
+                <div className="bg-white dark:bg-slate-900 border border-indigo-100 dark:border-indigo-900/30 rounded-2xl shadow-sm overflow-hidden">
+                    {/* Panel header */}
+                    <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-4">
                         <div>
-                            <h3 className="text-base font-black text-slate-900 dark:text-white">Cohort Details: {activeCohortDetails.name}</h3>
-                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{activeCohortDetails.size} Total Profiles Registered</p>
+                            <h3 className="text-base font-black text-slate-900 dark:text-white">
+                                {activeCohortDetails.name}
+                                <span className="ml-2 text-xs font-bold text-slate-400">· {activeCohortDetails.size} members</span>
+                            </h3>
+                            <p className="text-xs text-slate-400 mt-0.5">Individual retention profiles for this cohort.</p>
                         </div>
-                        <button 
+                        <button
                             onClick={() => setSelectedCohortName(null)}
-                            className="px-3 py-1.5 bg-white border border-slate-200 dark:bg-slate-950 dark:border-slate-800 rounded-xl text-[10px] font-bold text-slate-500 hover:text-slate-700 transition-all"
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-500 hover:text-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
                         >
-                            Close Details
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                            </svg>
+                            Close
                         </button>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[350px] overflow-y-auto pr-2 no-scrollbar">
-                        {activeCohortDetails.people.map(person => {
-                            let riskBadgeColor = 'bg-slate-100 text-slate-650';
-                            if (person.riskCategory === 'Healthy' || person.riskCategory === 'Thriving') {
-                                riskBadgeColor = 'bg-emerald-50 text-emerald-600 border border-emerald-100 dark:bg-emerald-950/20 dark:border-emerald-900/30';
-                            } else if (person.riskCategory === 'At Risk' || person.riskCategory === 'Warning') {
-                                riskBadgeColor = 'bg-amber-50 text-amber-600 border border-amber-100 dark:bg-amber-950/20 dark:border-amber-900/30';
-                            } else if (person.riskCategory === 'Disconnected' || person.riskCategory === 'Critical') {
-                                riskBadgeColor = 'bg-rose-50 text-rose-600 border border-rose-100 dark:bg-rose-950/20 dark:border-rose-900/30';
-                            }
-
-                            return (
-                                <div 
+                    {/* People grid */}
+                    <div className="p-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 max-h-[480px] overflow-y-auto pr-1">
+                            {activeCohortDetails.people.map(person => (
+                                <div
                                     key={person.id}
-                                    className="bg-white dark:bg-slate-950 p-4 rounded-2xl border border-slate-100 dark:border-slate-850 shadow-sm flex items-center justify-between"
+                                    className="bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800 p-4 flex flex-col gap-3"
                                 >
-                                    <div className="space-y-1">
-                                        <p className="text-xs font-black text-slate-800 dark:text-slate-200">{person.name}</p>
-                                        <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">{person.membership}</p>
-                                    </div>
-                                    <div className="text-right space-y-1.5">
-                                        <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest ${riskBadgeColor}`}>
+                                    <div className="flex items-start justify-between gap-2">
+                                        <div className="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-950/40 flex items-center justify-center text-xs font-black text-indigo-600 dark:text-indigo-400 shrink-0">
+                                            {person.name.charAt(0).toUpperCase()}
+                                        </div>
+                                        <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest ${riskBadge(person.riskCategory)}`}>
                                             {person.riskCategory}
                                         </span>
-                                        <p className="text-[9px] text-slate-450 font-bold">Total Check-ins: {person.checkIns}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-black text-slate-800 dark:text-slate-200 leading-snug">{person.name}</p>
+                                        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mt-0.5">{person.membership}</p>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 mt-auto">
+                                        <svg className="w-3 h-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                                        </svg>
+                                        <span className="text-[10px] font-bold text-slate-500">{person.checkIns} check-ins</span>
                                     </div>
                                 </div>
-                            );
-                        })}
+                            ))}
+                        </div>
                     </div>
                 </div>
             )}
