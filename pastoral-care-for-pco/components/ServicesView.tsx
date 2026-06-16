@@ -980,8 +980,29 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                         <div className="h-64">
                             {filteredCheckinTrends.length > 0 ? (
                                 <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={1}>
-                                    <BarChart data={checkinData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                                        <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: axisColor}} />
+                                    <BarChart data={checkinData} margin={{ top: 10, right: 30, left: 0, bottom: 30 }}>
+                                        <XAxis
+                                            dataKey="date"
+                                            axisLine={false}
+                                            tickLine={false}
+                                            tick={(props: any) => {
+                                                const { x, y, payload } = props;
+                                                const dateVal: string = payload.value || '';
+                                                // dateVal may be a display string like "Jun 1" or an ISO date
+                                                // Try to match against weatherByDate (keyed as YYYY-MM-DD)
+                                                const w = weatherByDate.get(dateVal);
+                                                const emoji = w ? getWeatherEmoji(w.icon, w.conditions) : null;
+                                                const temp = w ? `${Math.round(w.tempHigh)}°/${Math.round(w.tempLow)}°` : null;
+                                                return (
+                                                    <g transform={`translate(${x},${y})`}>
+                                                        <text x={0} y={0} dy={12} textAnchor="middle" fill={axisColor} fontSize={10}>{dateVal}</text>
+                                                        {emoji && <text x={0} y={0} dy={24} textAnchor="middle" fontSize={11}>{emoji}</text>}
+                                                        {temp && <text x={0} y={0} dy={36} textAnchor="middle" fill={axisColor} fontSize={8} fontWeight="bold">{temp}</text>}
+                                                    </g>
+                                                );
+                                            }}
+                                            height={50}
+                                        />
                                         <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: axisColor}} />
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
                                         <Tooltip 
@@ -1052,6 +1073,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                     <tr>
                                         <th className="p-3 text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">Event Name</th>
                                         <th className="p-3 text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">Time</th>
+                                        <th className="p-3 text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest text-center text-sky-500 dark:text-sky-400">Weather</th>
                                         <th className="p-3 text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest text-right text-indigo-600 dark:text-indigo-400">Check-Ins</th>
                                         <th className="p-3 text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest text-right text-violet-600 dark:text-violet-400">Headcount</th>
                                         <th className="p-3 text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest text-right">Total</th>
@@ -1062,6 +1084,8 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                         eventHeadcountsData.map((evt, idx) => {
                                             const checkinsCount = (evt.guests || 0) + (evt.regulars || 0) + (evt.volunteers || 0);
                                             const displayDate = new Date(evt.startsAt);
+                                            const evtDateStr = `${displayDate.getFullYear()}-${String(displayDate.getMonth() + 1).padStart(2, '0')}-${String(displayDate.getDate()).padStart(2, '0')}`;
+                                            const evtWeather = weatherByDate.get(evtDateStr);
                                             const dateStr = displayDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
                                             const timeStr = displayDate.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 
@@ -1072,6 +1096,18 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                                     </td>
                                                     <td className="p-3">
                                                         <p className="text-[10px] font-mono text-slate-500 dark:text-slate-400">{dateStr} <span className="mx-1">•</span> {timeStr}</p>
+                                                    </td>
+                                                    <td className="p-3 text-center">
+                                                        {evtWeather ? (
+                                                            <div className="flex flex-col items-center gap-0.5" title={evtWeather.conditions || 'Weather'}>
+                                                                <span className="text-base leading-none">{getWeatherEmoji(evtWeather.icon, evtWeather.conditions)}</span>
+                                                                <span className="text-[8px] font-bold text-slate-400 dark:text-slate-500 leading-none whitespace-nowrap">
+                                                                    {Math.round(evtWeather.tempHigh)}° / {Math.round(evtWeather.tempLow)}°
+                                                                </span>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-slate-300 dark:text-slate-700 text-xs">—</span>
+                                                        )}
                                                     </td>
                                                     <td className="p-3 text-right">
                                                         <span className="text-xs font-medium text-slate-600 dark:text-slate-300">{checkinsCount}</span>
@@ -1087,7 +1123,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                         })
                                     ) : (
                                         <tr>
-                                            <td colSpan={5} className="p-8 text-center text-slate-400 text-xs font-bold">
+                                            <td colSpan={6} className="p-8 text-center text-slate-400 text-xs font-bold">
                                                 No events found for {checkinFilter.toLowerCase()}.
                                             </td>
                                         </tr>
