@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Church, User, TwilioPhoneNumber } from '../types';
 import MessagingModule from './MessagingModule';
 import { useTwilioNumbers, canUserSeeNumber, canUserUseFeature } from '../hooks/useTwilioNumbers';
 import {
     Inbox, MessageSquare, Key, BarChart3, Phone, ChevronDown,
     Loader2, Bell, BellOff, Folder,
-    Zap, Sparkles, Shield, Mail, LogOut
+    Zap, Sparkles, Shield, Mail,
+    Settings2,
 } from 'lucide-react';
 import { firestore } from '../services/firestoreService';
 import { QuickSendModal } from './QuickSendModal';
@@ -48,6 +50,10 @@ interface MobileSmsLayoutProps {
     currentUser: User;
     onUpdateChurch: (updates: Partial<Church>) => Promise<void>;
     onNavigateHome: () => void;
+    onLogout?: () => void;
+    onUpdateTheme?: (theme: 'traditional' | 'dark') => void;
+    onSyncPeople?: () => Promise<void>;
+    isSyncing?: boolean;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -173,6 +179,10 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
     currentUser,
     onUpdateChurch,
     onNavigateHome,
+    onLogout,
+    onUpdateTheme,
+    onSyncPeople,
+    isSyncing = false,
 }) => {
     // ── Deep-link: read tab and number from URL query params ──────────────────
     const params   = new URLSearchParams(window.location.search);
@@ -190,6 +200,7 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
     // Responsive states
     const [isTablet, setIsTablet] = useState(() => window.innerWidth >= 640);
     const [showEmailModal, setShowEmailModal] = useState(false);
+    const navigate = useNavigate();
 
     useEffect(() => {
         const handleResize = () => {
@@ -397,13 +408,14 @@ const MobileSmsLayout: React.FC<MobileSmsLayoutProps> = ({
                             />
                         )}
 
-                        {/* Logout button */}
+                        {/* Settings gear button */}
                         <button
-                            onClick={onNavigateHome}
-                            title="Log Out"
-                            className="w-7 h-7 min-[375px]:w-8 min-[375px]:h-8 flex items-center justify-center rounded-full text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 transition active:opacity-60"
+                            id="mobile-settings-btn"
+                            onClick={() => navigate('/settings')}
+                            title="Settings"
+                            className="w-7 h-7 min-[375px]:w-8 min-[375px]:h-8 flex items-center justify-center rounded-full text-slate-400 dark:text-slate-500 hover:text-violet-600 dark:hover:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-950/20 transition active:opacity-60"
                         >
-                            <LogOut className="w-[14px] h-[14px] min-[375px]:w-[17px] min-[375px]:h-[17px]" strokeWidth={1.7} />
+                            <Settings2 className="w-[14px] h-[14px] min-[375px]:w-[17px] min-[375px]:h-[17px]" strokeWidth={1.8} />
                         </button>
                     </div>
                 </div>

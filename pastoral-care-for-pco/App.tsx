@@ -831,6 +831,10 @@ const App: React.FC = () => {
                   // Standard back navigation out of the mobile standalone app
                   window.location.href = '/';
               }}
+              onLogout={() => auth.signOut()}
+              onUpdateTheme={handleUpdateUserTheme}
+              onSyncPeople={handleSync}
+              isSyncing={isSyncing}
           />
       );
   }
