@@ -1212,9 +1212,9 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
               return (
                   <WidgetWrapper title="Cohort Retention Analysis" onRemove={() => handleRemoveWidget(id)} source="Check-ins & Activity">
                       <CohortAnalytics 
-                          people={peopleData?.people || []}
+                          people={peopleData?.allPeople || []}
                           donations={donations}
-                          groups={groupsData?.groups || []}
+                          groups={groupsData?.allGroups || []}
                           services={servicesData}
                           checkIns={checkIns}
                       />
