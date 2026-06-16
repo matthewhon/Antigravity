@@ -457,6 +457,156 @@
     }
     .btn-pricing-gold:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(246,173,28,0.5); }
 
+    /* ── APPLE APP STORE BUTTON ──────────────────── */
+    .app-store-btn {
+      display: inline-flex; align-items: center; gap: 0.75rem;
+      background: #000; color: #fff;
+      border-radius: 12px; padding: 0.6rem 1.4rem;
+      text-decoration: none;
+      border: 1.5px solid rgba(255,255,255,0.15);
+      transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.35);
+    }
+    .app-store-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,0,0,0.5); background: #1a1a1a; }
+    .app-store-btn .asb-icon { font-size: 1.8rem; line-height: 1; }
+    .app-store-btn .asb-text { display: flex; flex-direction: column; text-align: left; }
+    .app-store-btn .asb-sub { font-size: 0.62rem; font-weight: 400; color: rgba(255,255,255,0.75); letter-spacing: 0.02em; text-transform: uppercase; }
+    .app-store-btn .asb-main { font-size: 1.05rem; font-weight: 700; letter-spacing: -0.01em; }
+
+    /* ── IPHONE APP SECTION ──────────────────────── */
+    .iphone-section {
+      background: linear-gradient(160deg, var(--navy) 0%, #1a2c4a 60%, var(--blue-deeper) 100%);
+      padding: 100px 2rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .iphone-section::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse 60% 70% at 20% 50%, rgba(74,143,204,0.12) 0%, transparent 65%),
+                  radial-gradient(ellipse 40% 50% at 90% 20%, rgba(246,173,28,0.07) 0%, transparent 60%);
+    }
+    .iphone-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 5rem;
+      align-items: center; position: relative; z-index: 1;
+    }
+    .iphone-content .section-title { color: var(--white); }
+    .iphone-content .section-label { color: var(--gold); }
+    .iphone-content .section-sub { color: rgba(255,255,255,0.7); margin-bottom: 2.5rem; }
+    .iphone-feature-list { list-style: none; display: flex; flex-direction: column; gap: 0.8rem; margin-bottom: 2.5rem; }
+    .iphone-feature-list li {
+      display: flex; align-items: flex-start; gap: 0.75rem;
+      color: rgba(255,255,255,0.8); font-size: 0.92rem; line-height: 1.5;
+    }
+    .iphone-feature-list li .ifl-icon {
+      width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0;
+      background: rgba(246,173,28,0.18); border: 1px solid rgba(246,173,28,0.3);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.9rem; margin-top: 1px;
+    }
+    .iphone-visual {
+      display: flex; justify-content: center; align-items: flex-start;
+      position: relative;
+    }
+
+    /* Screenshot carousel */
+    .screenshot-carousel {
+      position: relative;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.2rem;
+    }
+    .carousel-viewport {
+      position: relative;
+      width: 240px;
+      overflow: hidden;
+      border-radius: 32px;
+      box-shadow: 0 40px 100px rgba(0,0,0,0.75), 0 0 0 1px rgba(255,255,255,0.08);
+      filter: drop-shadow(0 16px 48px rgba(74,143,204,0.35));
+      flex-shrink: 0;
+    }
+    .carousel-track {
+      display: flex;
+      transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .carousel-track img {
+      width: 240px;
+      flex-shrink: 0;
+      display: block;
+      border-radius: 0;
+    }
+    .iphone-badge {
+      display: inline-block;
+      background: linear-gradient(135deg, var(--gold) 0%, var(--gold-dark) 100%);
+      color: var(--navy); font-size: 0.72rem; font-weight: 800;
+      padding: 0.4rem 1rem; border-radius: 50px;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      box-shadow: 0 4px 16px rgba(246,173,28,0.5);
+      white-space: nowrap;
+    }
+    .carousel-controls {
+      display: flex; align-items: center; gap: 0.8rem;
+    }
+    .carousel-btn {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+      color: white; cursor: pointer; font-size: 0.9rem;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s;
+      flex-shrink: 0;
+    }
+    .carousel-btn:hover { background: rgba(255,255,255,0.2); }
+    .carousel-dots {
+      display: flex; gap: 0.4rem; align-items: center;
+    }
+    .carousel-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: rgba(255,255,255,0.3);
+      cursor: pointer; transition: all 0.3s;
+      border: none; padding: 0;
+    }
+    .carousel-dot.active {
+      background: var(--gold);
+      width: 20px; border-radius: 3px;
+    }
+
+    /* iPad showcase */
+    .ipad-showcase {
+      margin-top: 3rem;
+      padding-top: 3rem;
+      border-top: 1px solid rgba(255,255,255,0.08);
+      position: relative; z-index: 1;
+    }
+    .ipad-showcase-label {
+      display: flex; align-items: center; gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+    .ipad-showcase-label span {
+      font-size: 0.78rem; font-weight: 700; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--gold);
+    }
+    .ipad-showcase-label::after {
+      content: ''; flex: 1; height: 1px;
+      background: rgba(255,255,255,0.08);
+    }
+    .ipad-img {
+      width: 100%;
+      border-radius: 16px;
+      box-shadow: 0 30px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.07);
+      filter: drop-shadow(0 10px 40px rgba(74,143,204,0.25));
+      display: block;
+    }
+
+    .iphone-store-actions { display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+    @media (max-width: 900px) {
+      .iphone-grid { grid-template-columns: 1fr; gap: 3rem; }
+      .iphone-visual { order: -1; }
+      .carousel-viewport { width: 200px; }
+      .carousel-track img { width: 200px; }
+    }
+
     /* ── CTA SECTION ────────────────────────────── */
     .cta-section {
       background: linear-gradient(160deg, var(--navy) 0%, var(--blue-deeper) 100%);
@@ -533,6 +683,7 @@
   <div class="nav-links">
     <a href="#features">Features</a>
     <a href="#tour">Product Tour</a>
+    <a href="#iphone-app">📱 iPhone App</a>
     <a href="#pricing">Pricing</a>
     <a href="#testimonials">Testimonials</a>
     <a href="https://pastoralcare.barnabassoftware.com" class="nav-cta" target="_blank">Sign In →</a>
@@ -552,6 +703,15 @@
         </a>
         <a href="#tour" class="btn-secondary">
           ▶ See It In Action
+        </a>
+      </div>
+      <div style="margin-top: 1.5rem;">
+        <a href="https://apps.apple.com/us/app/pastoral-care-messaging/id6773807604" class="app-store-btn" target="_blank" rel="noopener">
+          <span class="asb-icon"></span>
+          <span class="asb-text">
+            <span class="asb-sub">Download on the</span>
+            <span class="asb-main">App Store</span>
+          </span>
         </a>
       </div>
     </div>
@@ -809,6 +969,80 @@
   </div>
 </section>
 
+<!-- IPHONE APP SECTION -->
+<section class="iphone-section" id="iphone-app">
+  <div class="section-inner">
+    <div class="iphone-grid">
+      <div class="iphone-content fade-up">
+        <div class="section-label">📱 Now on iPhone</div>
+        <h2 class="section-title">Pastoral Care Messaging<br /><span style="color:var(--gold)">— Now on iPhone</span></h2>
+        <p class="section-sub">The Pastoral Care Messaging app brings real-time two-way SMS conversations, staff alerts, and mobile shepherding tools directly to your iPhone. Available free on the App Store.</p>
+        <ul class="iphone-feature-list">
+          <li>
+            <span class="ifl-icon">💬</span>
+            <span>Real-time two-way SMS conversations with congregation members</span>
+          </li>
+          <li>
+            <span class="ifl-icon">🔔</span>
+            <span>Live push notifications for urgent care alerts and prayer requests</span>
+          </li>
+          <li>
+            <span class="ifl-icon">🔑</span>
+            <span>SMS keyword responders — reply "Prayer", "Help", and more</span>
+          </li>
+          <li>
+            <span class="ifl-icon">👥</span>
+            <span>Role-based staff access with dedicated SMS numbers per role</span>
+          </li>
+          <li>
+            <span class="ifl-icon">✉️</span>
+            <span>Quick-send emails to PCO-segmented lists from your phone</span>
+          </li>
+        </ul>
+        <div class="iphone-store-actions">
+          <a href="https://apps.apple.com/us/app/pastoral-care-messaging/id6773807604" class="app-store-btn" target="_blank" rel="noopener">
+            <span class="asb-icon"></span>
+            <span class="asb-text">
+              <span class="asb-sub">Download on the</span>
+              <span class="asb-main">App Store</span>
+            </span>
+          </a>
+        </div>
+      </div>
+      <div class="iphone-visual fade-up fade-up-delay-2">
+        <div class="screenshot-carousel" id="appCarousel">
+          <div class="iphone-badge">Free on App Store</div>
+          <div class="carousel-viewport">
+            <div class="carousel-track" id="carouselTrack">
+              <img src="assets/app-screenshots/Simulator Screenshot - iPhone 17 - 2026-06-16 at 15.43.41.png" alt="Pastoral Care Messaging - Screen 1" />
+              <img src="assets/app-screenshots/Simulator Screenshot - iPhone 17 - 2026-06-16 at 15.43.49.png" alt="Pastoral Care Messaging - Screen 2" />
+              <img src="assets/app-screenshots/Simulator Screenshot - iPhone 17 - 2026-06-16 at 15.43.57.png" alt="Pastoral Care Messaging - Screen 3" />
+              <img src="assets/app-screenshots/Simulator Screenshot - iPhone 17 Pro - 2026-06-05 at 13.42.53.png" alt="Pastoral Care Messaging - Screen 4" />
+              <img src="assets/app-screenshots/Simulator Screenshot - iPhone 17 Pro - 2026-06-05 at 13.43.00.png" alt="Pastoral Care Messaging - Screen 5" />
+              <img src="assets/app-screenshots/Simulator Screenshot - iPhone 17 Pro - 2026-06-05 at 13.43.51.png" alt="Pastoral Care Messaging - Screen 6" />
+              <img src="assets/app-screenshots/Simulator Screenshot - iPhone 17 Pro - 2026-06-05 at 13.43.58.png" alt="Pastoral Care Messaging - Screen 7" />
+            </div>
+          </div>
+          <div class="carousel-controls">
+            <button class="carousel-btn" onclick="carouselMove(-1)" aria-label="Previous">&#8592;</button>
+            <div class="carousel-dots" id="carouselDots"></div>
+            <button class="carousel-btn" onclick="carouselMove(1)" aria-label="Next">&#8594;</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- iPad Showcase -->
+    <div class="ipad-showcase fade-up">
+      <div class="ipad-showcase-label">
+        <span>&#x229E; Also available on iPad</span>
+      </div>
+      <img src="assets/app-screenshots/Simulator Screenshot - iPad Air 11-inch (M4) - 2026-06-16 at 15.51.49.png" alt="Pastoral Care Messaging on iPad" class="ipad-img" />
+    </div>
+
+  </div>
+</section>
+
 <!-- STATS -->
 <section class="stats-section">
   <div class="stats-grid fade-up">
@@ -945,6 +1179,13 @@
       <div class="cta-actions">
         <a href="https://pastoralcare.barnabassoftware.com" class="btn-primary" target="_blank">Get Started Free →</a>
         <a href="mailto:hello@barnabassoftware.com" class="btn-secondary">Request a Demo</a>
+        <a href="https://apps.apple.com/us/app/pastoral-care-messaging/id6773807604" class="app-store-btn" target="_blank" rel="noopener" style="border-color:rgba(255,255,255,0.25);">
+          <span class="asb-icon"></span>
+          <span class="asb-text">
+            <span class="asb-sub">Download on the</span>
+            <span class="asb-main">App Store</span>
+          </span>
+        </a>
       </div>
     </div>
   </div>
@@ -968,8 +1209,10 @@
         <h4>Product</h4>
         <a href="#features">Features</a>
         <a href="#tour">Product Tour</a>
+        <a href="#iphone-app">📱 iPhone App</a>
         <a href="#pricing">Pricing</a>
         <a href="https://pastoralcare.barnabassoftware.com" target="_blank">Sign In</a>
+        <a href="https://apps.apple.com/us/app/pastoral-care-messaging/id6773807604" target="_blank" rel="noopener" style="color:var(--gold);"> App Store →</a>
       </div>
       <div class="footer-col">
         <h4>Company</h4>
@@ -1011,6 +1254,68 @@
     entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
   }, { threshold: 0.12 });
   document.querySelectorAll('.fade-up').forEach(el => observer.observe(el));
+
+  // Screenshot Carousel
+  (function() {
+    const track = document.getElementById('carouselTrack');
+    const dotsContainer = document.getElementById('carouselDots');
+    if (!track) return;
+
+    const slides = track.querySelectorAll('img');
+    const total = slides.length;
+    let current = 0;
+    let autoTimer = null;
+
+    // Build dots
+    slides.forEach((_, i) => {
+      const dot = document.createElement('button');
+      dot.className = 'carousel-dot' + (i === 0 ? ' active' : '');
+      dot.setAttribute('aria-label', 'Go to slide ' + (i + 1));
+      dot.addEventListener('click', () => goTo(i));
+      dotsContainer.appendChild(dot);
+    });
+
+    function updateDots() {
+      dotsContainer.querySelectorAll('.carousel-dot').forEach((d, i) => {
+        d.classList.toggle('active', i === current);
+      });
+    }
+
+    function goTo(index) {
+      current = (index + total) % total;
+      const slideWidth = track.querySelector('img').offsetWidth;
+      track.style.transform = 'translateX(-' + (current * slideWidth) + 'px)';
+      updateDots();
+    }
+
+    window.carouselMove = function(dir) {
+      goTo(current + dir);
+      resetTimer();
+    };
+
+    function startTimer() {
+      autoTimer = setInterval(() => goTo(current + 1), 3500);
+    }
+    function resetTimer() {
+      clearInterval(autoTimer);
+      startTimer();
+    }
+
+    // Pause on hover
+    const carousel = document.getElementById('appCarousel');
+    carousel.addEventListener('mouseenter', () => clearInterval(autoTimer));
+    carousel.addEventListener('mouseleave', startTimer);
+
+    // Touch swipe
+    let touchStartX = 0;
+    track.addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; }, { passive: true });
+    track.addEventListener('touchend', e => {
+      const dx = e.changedTouches[0].clientX - touchStartX;
+      if (Math.abs(dx) > 40) { carouselMove(dx < 0 ? 1 : -1); }
+    });
+
+    startTimer();
+  })();
 </script>
 </body>
 </html>

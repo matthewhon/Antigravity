@@ -1,7 +1,7 @@
 {
   "name": "pastoral-care-messaging-app",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -30,7 +30,7 @@
     "react-router-dom": "^7.14.2"
   },
   "devDependencies": {
-    "@capacitor/cli": "^7.6.2",
+    "@capacitor/cli": "^8.4.0",
     "@eslint/js": "^10.0.1",
     "@tailwindcss/vite": "^4.2.4",
     "@types/node": "^24.12.2",
