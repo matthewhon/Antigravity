@@ -1,10 +1,10 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { User, Church, RiskSettings, ChurchRiskSettings, DonorLifecycleSettings, GroupRiskSettings, CommunityLocation, UserRole } from '../types';
+import { User, Church, RiskSettings, ChurchRiskSettings, DonorLifecycleSettings, GroupRiskSettings, CommunityLocation, UserRole, PortingRequest } from '../types';
 import { CreateUserModal } from './CreateUserModal';
 import { firestore } from '../services/firestoreService';
 import { auth, db as firebaseDb, storage } from '../services/firebase';
-import { setDoc, doc, collection, query, where, getDocs } from 'firebase/firestore';
+import { setDoc, doc, collection, query, where, getDocs, addDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import RiskSettingsView from './RiskSettingsView';
 import ChurchRiskSettingsView from './ChurchRiskSettingsView';
@@ -543,6 +543,417 @@ const SyncAreaButtons: React.FC<{ churchId: string; onSyncComplete: () => void }
     );
 };
 
+// ─── Port-In Request Modal ────────────────────────────────────────────────────
+
+type PortInFormData = Omit<PortingRequest, 'id' | 'churchId' | 'submittedByUserId' | 'submittedByName' | 'submittedAt' | 'status' | 'destinationProjectId' | 'attachmentUrls'>;
+
+const EMPTY_FORM: PortInFormData = {
+    contactName: '',
+    contactEmail: '',
+    numbersToPort: '',
+    servicesToPort: 'voice_and_messaging',
+    providerName: '',
+    providerAccountNumber: '',
+    accountType: 'Business',
+    campaignId: '',
+    authorizedName: '',
+    billingPhone: '',
+    endUserName: '',
+    serviceAddress: '',
+    pin: '',
+};
+
+const PortInRequestModal: React.FC<{
+    churchId: string;
+    church: Church;
+    currentUser: User;
+    onClose: () => void;
+}> = ({ churchId, church, currentUser, onClose }) => {
+    const [step, setStep]                         = useState<1 | 2 | 3 | 4>(1);
+    const [form, setForm]                         = useState<PortInFormData>(EMPTY_FORM);
+    const [files, setFiles]                       = useState<File[]>([]);
+    const [destProjectId, setDestProjectId]       = useState('');
+    const [submitting, setSubmitting]             = useState(false);
+    const [submitted, setSubmitted]               = useState(false);
+    const [error, setError]                       = useState<string | null>(null);
+    const [uploadProgress, setUploadProgress]     = useState<number>(0);
+    const fileInputRef                            = useRef<HTMLInputElement>(null);
+
+    // Auto-load SignalWire project ID from system settings
+    useEffect(() => {
+        firestore.getSystemSettings().then(s => {
+            setDestProjectId((s as any).signalwireProjectId || '');
+        }).catch(() => {});
+    }, []);
+
+    const set = (key: keyof PortInFormData, value: string) =>
+        setForm(prev => ({ ...prev, [key]: value }));
+
+    const addFiles = (incoming: FileList | null) => {
+        if (!incoming) return;
+        const allowed = ['application/pdf', 'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'image/jpeg', 'image/jpg', 'image/png'];
+        const valid = Array.from(incoming).filter(f => {
+            if (f.size > 20 * 1024 * 1024) { alert(`"${f.name}" exceeds the 20 MB limit.`); return false; }
+            if (!allowed.includes(f.type))  { alert(`"${f.name}" is not a supported format. Use PDF, DOC, DOCX, JPG, or PNG.`); return false; }
+            return true;
+        });
+        setFiles(prev => [...prev, ...valid]);
+    };
+
+    const removeFile = (idx: number) => setFiles(prev => prev.filter((_, i) => i !== idx));
+
+    // Step validation
+    const step1Valid = form.contactName.trim() && form.contactEmail.trim() && form.numbersToPort.trim();
+    const step2Valid = form.providerName.trim() && form.providerAccountNumber.trim() && form.accountType && form.campaignId.trim();
+    const step3Valid = form.authorizedName.trim() && form.billingPhone.trim() && form.endUserName.trim() && form.serviceAddress.trim() && form.pin.trim();
+    const step4Valid = files.length > 0;
+
+    const handleSubmit = async () => {
+        if (!step4Valid) { setError('Please upload at least one document (LOA and/or recent bill copy).'); return; }
+        setSubmitting(true);
+        setError(null);
+        try {
+            const requestId = `${churchId}_${Date.now()}`;
+
+            // Upload files to Firebase Storage
+            const attachmentUrls: string[] = [];
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const filePath = `porting-requests/${churchId}/${requestId}/${file.name}`;
+                const storageRef = ref(storage, filePath);
+                await uploadBytes(storageRef, file);
+                const url = await getDownloadURL(storageRef);
+                attachmentUrls.push(url);
+                setUploadProgress(Math.round(((i + 1) / files.length) * 100));
+            }
+
+            // Write Firestore document
+            const payload: Omit<PortingRequest, 'id'> = {
+                churchId,
+                submittedByUserId: currentUser.id,
+                submittedByName: currentUser.name || currentUser.email || 'Unknown',
+                submittedAt: Date.now(),
+                status: 'pending',
+                ...form,
+                destinationProjectId: destProjectId,
+                attachmentUrls,
+            };
+            await addDoc(collection(firebaseDb, 'portingRequests'), payload);
+            setSubmitted(true);
+        } catch (e: any) {
+            setError(e.message || 'Submission failed. Please try again.');
+        } finally {
+            setSubmitting(false);
+            setUploadProgress(0);
+        }
+    };
+
+    // Shared styles
+    const inputCn  = 'w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-colors';
+    const labelCn  = 'block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-1.5';
+    const sectionCn = 'space-y-5';
+
+    const STEPS = ['Contact & Numbers', 'Current Provider', 'Account Details', 'Documents & Submit'];
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh]">
+
+                {/* Header */}
+                <div className="flex items-center justify-between px-8 pt-8 pb-4 border-b border-slate-100 dark:border-slate-800 shrink-0">
+                    <div>
+                        <h2 className="text-xl font-black text-slate-900 dark:text-white">📲 Port a Phone Number</h2>
+                        <p className="text-[11px] text-slate-400 mt-1">Submit a porting request to transfer your existing number to our service.</p>
+                    </div>
+                    {!submitting && (
+                        <button onClick={onClose} title="Close" className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 transition">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                    )}
+                </div>
+
+                {/* Progress steps */}
+                {!submitted && (
+                    <div className="px-8 py-4 flex items-center gap-1 shrink-0">
+                        {STEPS.map((label, i) => {
+                            const n = i + 1;
+                            const isActive = n === step;
+                            const isDone   = n < step;
+                            return (
+                                <React.Fragment key={n}>
+                                    <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black transition-all ${
+                                        isActive ? 'bg-indigo-600 text-white' :
+                                        isDone   ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-300' :
+                                                   'bg-slate-100 dark:bg-slate-800 text-slate-400'
+                                    }`}>
+                                        <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black ${
+                                            isActive ? 'bg-white/30 text-white' :
+                                            isDone   ? 'bg-indigo-200 dark:bg-indigo-800 text-indigo-700 dark:text-indigo-200' :
+                                                       'bg-slate-200 dark:bg-slate-700 text-slate-500'
+                                        }`}>{isDone ? '✓' : n}</span>
+                                        <span className="hidden sm:inline">{label}</span>
+                                    </div>
+                                    {i < STEPS.length - 1 && <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />}
+                                </React.Fragment>
+                            );
+                        })}
+                    </div>
+                )}
+
+                {/* Body */}
+                <div className="flex-1 overflow-y-auto px-8 py-4">
+
+                    {/* ── Success screen ── */}
+                    {submitted && (
+                        <div className="flex flex-col items-center justify-center py-16 text-center gap-4">
+                            <div className="w-20 h-20 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-4xl">✅</div>
+                            <h3 className="text-xl font-black text-slate-900 dark:text-white">Request Submitted!</h3>
+                            <p className="text-sm text-slate-500 max-w-md">Your number porting request has been received. Our team will review it and follow up with you by email within 2–5 business days.</p>
+                            <button onClick={onClose} className="mt-4 px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-black rounded-2xl transition">Done</button>
+                        </div>
+                    )}
+
+                    {/* ── Step 1: Contact & Numbers ── */}
+                    {!submitted && step === 1 && (
+                        <div className={sectionCn}>
+                            <div>
+                                <label className={labelCn}>Contact Name <span className="text-rose-500">*</span></label>
+                                <input type="text" value={form.contactName} onChange={e => set('contactName', e.target.value)}
+                                    className={inputCn} placeholder="Jane Smith" />
+                                <p className="text-[10px] text-slate-400 mt-1.5">Person at your church requesting this port-in.</p>
+                            </div>
+                            <div>
+                                <label className={labelCn}>Contact Email <span className="text-rose-500">*</span></label>
+                                <input type="email" value={form.contactEmail} onChange={e => set('contactEmail', e.target.value)}
+                                    className={inputCn} placeholder="jane@church.org" />
+                            </div>
+                            <div>
+                                <label className={labelCn}>Numbers to Port <span className="text-rose-500">*</span></label>
+                                <textarea value={form.numbersToPort} onChange={e => set('numbersToPort', e.target.value)}
+                                    rows={4} className={inputCn} placeholder="+15551234567&#10;+15559876543" />
+                                <p className="text-[10px] text-slate-400 mt-1.5">Enter one number per line or separate with commas. Include the country code (+1 for US).</p>
+                            </div>
+                            <div>
+                                <label className={labelCn}>Services to Port <span className="text-rose-500">*</span></label>
+                                <select value={form.servicesToPort} onChange={e => set('servicesToPort', e.target.value as any)} className={inputCn} title="Services to port">
+                                    <option value="voice_and_messaging">Voice &amp; Messaging</option>
+                                    <option value="messaging_only">Messaging Only</option>
+                                    <option value="voice_only">Voice Only</option>
+                                </select>
+                                <p className="text-[10px] text-slate-400 mt-1.5">⚠ Toll-free numbers default to Voice Only unless messaging verification is provided. Mobile numbers cannot have messaging split from their carrier.</p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── Step 2: Current Provider ── */}
+                    {!submitted && step === 2 && (
+                        <div className={sectionCn}>
+                            {/* TextInChurch tip — always shown */}
+                            <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-2xl p-5">
+                                <div className="flex items-start gap-3">
+                                    <span className="text-xl shrink-0">📋</span>
+                                    <div className="space-y-2">
+                                        <p className="text-[11px] font-black text-amber-900 dark:text-amber-200 uppercase tracking-widest">Coming from TextInChurch?</p>
+                                        <p className="text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed">
+                                            TextInChurch uses Twilio as their carrier backend. To port your number, you'll need to <strong>contact TextInChurch support</strong> and request your <strong>Customer Service Record (CSR)</strong>. They can provide your Account Number, PIN, and the service address on file.
+                                        </p>
+                                        <p className="text-[10px] text-amber-700 dark:text-amber-400 leading-relaxed">
+                                            <strong>Twilio's address on file (for reference):</strong><br />
+                                            Twilio Inc · 548 Market St #14510 · San Francisco, CA 94104<br />
+                                            PIN: 4-digit number set on your Twilio sub-account
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className={labelCn}>Current Provider Name <span className="text-rose-500">*</span></label>
+                                <input type="text" value={form.providerName} onChange={e => set('providerName', e.target.value)}
+                                    className={inputCn} placeholder="e.g. TextInChurch, Verizon, AT&T" />
+                            </div>
+                            <div>
+                                <label className={labelCn}>Current Provider Account Number <span className="text-rose-500">*</span></label>
+                                <input type="text" value={form.providerAccountNumber} onChange={e => set('providerAccountNumber', e.target.value)}
+                                    className={inputCn} placeholder="Enter account number or N/A" />
+                                <p className="text-[10px] text-slate-400 mt-1.5">Some carriers require the account number when accepting port requests. Enter "N/A" if not available.</p>
+                            </div>
+                            <div>
+                                <label className={labelCn}>Account Type <span className="text-rose-500">*</span></label>
+                                <select value={form.accountType} onChange={e => set('accountType', e.target.value as any)} className={inputCn} title="Account type">
+                                    <option value="Business">Business</option>
+                                    <option value="Residential">Residential</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className={labelCn}>10DLC Campaign ID <span className="text-rose-500">*</span></label>
+                                <input type="text" value={form.campaignId} onChange={e => set('campaignId', e.target.value)}
+                                    className={inputCn} placeholder="e.g. CXXXXXX or N/A" />
+                                <p className="text-[10px] text-slate-400 mt-1.5">Required for messaging services. Enter "N/A" if not applicable.</p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── Step 3: Account Details ── */}
+                    {!submitted && step === 3 && (
+                        <div className={sectionCn}>
+                            <div>
+                                <label className={labelCn}>Authorized Name on Account <span className="text-rose-500">*</span></label>
+                                <input type="text" value={form.authorizedName} onChange={e => set('authorizedName', e.target.value)}
+                                    className={inputCn} placeholder="Legal first and last name" />
+                                <p className="text-[10px] text-slate-400 mt-1.5">Must be the legal first and last name — not a business or corporation name.</p>
+                            </div>
+                            <div>
+                                <label className={labelCn}>Billing Phone Number <span className="text-rose-500">*</span></label>
+                                <input type="text" value={form.billingPhone} onChange={e => set('billingPhone', e.target.value)}
+                                    className={inputCn} placeholder="+15551234567" />
+                                <p className="text-[10px] text-slate-400 mt-1.5">Primary contact phone on record with your current provider.</p>
+                            </div>
+                            <div>
+                                <label className={labelCn}>End User / Business Name <span className="text-rose-500">*</span></label>
+                                <input type="text" value={form.endUserName} onChange={e => set('endUserName', e.target.value)}
+                                    className={inputCn} placeholder="Grace Community Church" />
+                                <p className="text-[10px] text-slate-400 mt-1.5">The business name associated with this number at your current provider.</p>
+                            </div>
+                            <div>
+                                <label className={labelCn}>Phone Service Address <span className="text-rose-500">*</span></label>
+                                <textarea value={form.serviceAddress} onChange={e => set('serviceAddress', e.target.value)}
+                                    rows={3} className={inputCn} placeholder="123 Main St, City, State, ZIP" />
+                                <p className="text-[10px] text-slate-400 mt-1.5">Location where phone calls take place — may differ from your billing address. If unsure, request a CSR from your provider. Only one service address per port order.</p>
+                            </div>
+                            <div>
+                                <label className={labelCn}>PIN <span className="text-rose-500">*</span></label>
+                                <input type="text" value={form.pin} onChange={e => set('pin', e.target.value)}
+                                    className={inputCn} placeholder="4-digit PIN or N/A" maxLength={20} />
+                                <p className="text-[10px] text-slate-400 mt-1.5">Required for Twilio, Verizon Wireless, MagicJack, and other carriers. Enter "N/A" if not applicable.</p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── Step 4: Documents & Submit ── */}
+                    {!submitted && step === 4 && (
+                        <div className={sectionCn}>
+                            {/* Destination Project ID (read-only) */}
+                            <div className="bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 rounded-2xl p-5">
+                                <label className={labelCn + ' text-indigo-600 dark:text-indigo-400'}>Destination Project ID (auto-filled)</label>
+                                <div className="flex items-center gap-2">
+                                    <input type="text" readOnly value={destProjectId || 'Loading…'}
+                                        className="flex-1 bg-white dark:bg-slate-800 border border-indigo-200 dark:border-indigo-700 rounded-xl px-4 py-2.5 text-sm font-mono text-slate-700 dark:text-slate-300 outline-none cursor-default select-all"
+                                        title="SignalWire Destination Project ID" />
+                                    <button
+                                        type="button"
+                                        title="Copy project ID"
+                                        onClick={() => { if (destProjectId) navigator.clipboard.writeText(destProjectId); }}
+                                        className="p-2.5 rounded-xl bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-200 dark:hover:bg-indigo-900/60 transition"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                                    </button>
+                                </div>
+                                <p className="text-[10px] text-indigo-600/70 dark:text-indigo-400/70 mt-1.5">This is your shared SignalWire project — automatically included in your request.</p>
+                            </div>
+
+                            {/* LOA / Bill Upload */}
+                            <div>
+                                <label className={labelCn}>Upload LOA &amp; Recent Bill Copy <span className="text-rose-500">*</span></label>
+                                <p className="text-[11px] text-slate-500 mb-3 leading-relaxed">
+                                    A signed <strong>Letter of Authorization (LOA)</strong> dated within the past 30 days is required. A <strong>recent bill copy</strong> from your current provider is also required to prevent unauthorized porting.
+                                </p>
+
+                                {/* Drop zone */}
+                                <div
+                                    className="border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-2xl p-8 flex flex-col items-center gap-3 text-center cursor-pointer hover:border-indigo-400 dark:hover:border-indigo-500 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/20 transition-all"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    onDragOver={e => e.preventDefault()}
+                                    onDrop={e => { e.preventDefault(); addFiles(e.dataTransfer.files); }}
+                                >
+                                    <svg className="w-10 h-10 text-slate-300 dark:text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                                    <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">Click to upload or drag &amp; drop</p>
+                                    <p className="text-[10px] text-slate-400">PDF, DOC, DOCX, JPG, PNG — max 20 MB per file</p>
+                                </div>
+                                <input ref={fileInputRef} type="file" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" className="hidden"
+                                    onChange={e => addFiles(e.target.files)} />
+
+                                {/* File list */}
+                                {files.length > 0 && (
+                                    <div className="mt-3 space-y-2">
+                                        {files.map((f, i) => (
+                                            <div key={i} className="flex items-center gap-3 px-4 py-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+                                                <svg className="w-4 h-4 text-indigo-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                                <span className="flex-1 text-[11px] text-slate-700 dark:text-slate-300 truncate">{f.name} <span className="text-slate-400">({(f.size / 1024 / 1024).toFixed(1)} MB)</span></span>
+                                                <button type="button" onClick={() => removeFile(i)} title="Remove file" className="text-slate-400 hover:text-rose-500 transition">
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {/* Upload progress */}
+                                {submitting && uploadProgress > 0 && (
+                                    <div className="mt-3">
+                                        <div className="flex justify-between text-[10px] text-slate-400 mb-1">
+                                            <span>Uploading files…</span>
+                                            <span>{uploadProgress}%</span>
+                                        </div>
+                                        <div className="h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                                            <div className="h-full bg-indigo-500 rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Error message */}
+                            {error && (
+                                <div className="p-4 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-xl text-[11px] font-semibold text-rose-700 dark:text-rose-400 flex items-start gap-2">
+                                    <span className="shrink-0">⚠️</span> {error}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                {/* Footer */}
+                {!submitted && (
+                    <div className="px-8 py-5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0">
+                        <button
+                            onClick={() => step > 1 ? setStep((step - 1) as any) : onClose()}
+                            disabled={submitting}
+                            className="px-6 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-sm font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition disabled:opacity-50"
+                        >
+                            {step === 1 ? 'Cancel' : '← Back'}
+                        </button>
+
+                        {step < 4 ? (
+                            <button
+                                onClick={() => setStep((step + 1) as any)}
+                                disabled={
+                                    (step === 1 && !step1Valid) ||
+                                    (step === 2 && !step2Valid) ||
+                                    (step === 3 && !step3Valid)
+                                }
+                                className="px-8 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-black transition"
+                            >
+                                Next →
+                            </button>
+                        ) : (
+                            <button
+                                onClick={handleSubmit}
+                                disabled={submitting || !step4Valid}
+                                className="px-8 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-black transition flex items-center gap-2"
+                            >
+                                {submitting ? (
+                                    <><svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg> Submitting…</>
+                                ) : '✓ Submit Request'}
+                            </button>
+                        )}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
 interface RoleAdminViewProps {
   currentUser: User;
   churchId: string;
@@ -556,6 +967,7 @@ interface RoleAdminViewProps {
   rawTeams?: any[];
   onSync?: () => void;
 }
+
 
 const RoleAdminView: React.FC<RoleAdminViewProps> = ({ 
     currentUser, 
@@ -596,6 +1008,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
 
   // SMS Settings state
   const [smsSubTab, setSmsSubTab] = useState<'setup' | 'compliance' | 'numbers'>('setup');
+  const [showPortInModal, setShowPortInModal] = useState(false);
   const [showRep2, setShowRep2] = useState(false);
   const [expandedSteps, setExpandedSteps] = useState<Set<number>>(new Set([1]));
   const toggleStep = (n: number) => setExpandedSteps(prev => {
@@ -3060,6 +3473,28 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 </div>
                             </div>
 
+
+                            {/* ── Port a Number card (Church Admin only) ─────────────────────── */}
+                            {isChurchAdmin && (
+                                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2rem] p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                                    <div className="flex items-start gap-4">
+                                        <div className="w-10 h-10 rounded-2xl bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center text-xl shrink-0">📲</div>
+                                        <div>
+                                            <h4 className="text-sm font-black text-slate-900 dark:text-white">Port Your Existing Number</h4>
+                                            <p className="text-[11px] text-slate-400 mt-1 max-w-md leading-relaxed">
+                                                Already have a phone number with another provider? Submit a porting request to bring it to our service. Porting typically takes 5–10 business days.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() => setShowPortInModal(true)}
+                                        className="shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-violet-600 hover:bg-violet-700 text-white text-[11px] font-black uppercase tracking-widest transition-all shadow-lg shadow-violet-200 dark:shadow-violet-900/30 whitespace-nowrap"
+                                    >
+                                        Request Number Port →
+                                    </button>
+                                </div>
+                            )}
+
                             {/* Save button */}
                             {smsMessage && (
                                 <div className={`p-4 rounded-xl text-xs font-bold flex items-center gap-2 ${
@@ -4344,6 +4779,16 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                             </div>
                         );
                     })()}
+
+                    {/* ── Port-In Request Modal overlay ───────────────────── */}
+                    {showPortInModal && (
+                        <PortInRequestModal
+                            churchId={churchId}
+                            church={church}
+                            currentUser={currentUser}
+                            onClose={() => setShowPortInModal(false)}
+                        />
+                    )}
 
                 </div>
             );

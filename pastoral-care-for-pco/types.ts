@@ -1118,6 +1118,40 @@ export interface SmsSettings {
 
 }
 
+// ─── Port-In Request ──────────────────────────────────────────────────────────
+/** Firestore document shape for a number porting request (`portingRequests` collection) */
+export interface PortingRequest {
+    id: string;
+    churchId: string;
+    submittedByUserId: string;
+    submittedByName: string;
+    submittedAt: number;                   // epoch ms
+    status: 'pending' | 'in_review' | 'approved' | 'rejected';
+
+    // Step 1 — Contact & Numbers
+    contactName: string;
+    contactEmail: string;
+    numbersToPort: string;                 // raw textarea; one per line or comma-separated
+    servicesToPort: 'voice_and_messaging' | 'messaging_only' | 'voice_only';
+
+    // Step 2 — Current Provider
+    providerName: string;
+    providerAccountNumber: string;         // or 'N/A'
+    accountType: 'Business' | 'Residential';
+    campaignId: string;                    // 10DLC Campaign ID or 'N/A'
+
+    // Step 3 — Account details on record with current provider
+    authorizedName: string;
+    billingPhone: string;
+    endUserName: string;
+    serviceAddress: string;
+    pin: string;                           // or 'N/A'
+
+    // Step 4 — Documents & destination
+    destinationProjectId: string;          // auto-set from system/settings.signalwireProjectId
+    attachmentUrls: string[];              // Firebase Storage download URLs
+}
+
 export type SmsDirection = 'inbound' | 'outbound';
 export type SmsStatus =
     | 'queued'
