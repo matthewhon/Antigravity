@@ -377,3 +377,36 @@
   transform: translateX(-50%);
 }
 /* Mobile SMS Share Sheet */@keyframes slide-up { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }.animate-slide-up { animation: slide-up 0.28s cubic-bezier(0.34,1.56,0.64,1) both; }
+
+/* ── Notes Module — Dark Mode Overrides ──────────────────────────────────── */
+
+/* Note card hover — darker glow in dark mode */
+.dark .nm-card-hover:hover {
+  border-color: #4f46e5;
+  box-shadow: 0 4px 20px rgba(79, 70, 229, 0.20);
+}
+
+/* Action buttons in dark mode */
+.dark .nm-action-btn:hover {
+  background: #334155;
+  color: #f1f5f9;
+  border-color: #6366f1;
+}
+.dark .nm-action-btn-danger:hover {
+  background: #450a0a;
+  border-color: #7f1d1d;
+}
+
+/* Toolbar buttons in dark mode */
+.dark .nm-toolbar-btn:hover {
+  background: #334155;
+  border-color: #6366f1;
+  color: #818cf8;
+}
+
+/* Copy-link button in dark mode */
+.dark .nm-btn-copy-link {
+  background: #1e1b4b;
+  border-color: #4338ca;
+  color: #a5b4fc;
+}

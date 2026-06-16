@@ -325,7 +325,7 @@ const NoteCard: React.FC<{
   return (
     <div
       onClick={onEdit}
-      className="nm-card-hover bg-white border border-slate-200 rounded-2xl px-[22px] py-5 cursor-pointer relative overflow-hidden"
+      className="nm-card-hover bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl px-[22px] py-5 cursor-pointer relative overflow-hidden"
     >
       {/* Coloured left accent */}
       <div className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-2xl ${isPublished ? 'nm-card-accent-published' : 'nm-card-accent-draft'}`} />
@@ -336,31 +336,31 @@ const NoteCard: React.FC<{
           <div className="flex items-center gap-2 mb-2">
             <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border ${
               isPublished
-                ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
-                : 'bg-slate-100 text-slate-500 border-slate-200'
+                ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-700'
+                : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-600'
             }`}>
               {isPublished ? <Globe size={9} /> : <Lock size={9} />}
               {isPublished ? 'Published' : 'Draft'}
             </span>
-            <span className="text-[11px] text-slate-400">
+            <span className="text-[11px] text-slate-400 dark:text-slate-500">
               {formatRelative(note.updatedAt || note.createdAt)}
             </span>
           </div>
 
           {/* Title */}
-          <h3 className="text-base font-bold text-slate-900 mb-1.5 leading-snug truncate">
+          <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1.5 leading-snug truncate">
             {note.title || 'Untitled Note'}
           </h3>
 
           {/* Preview */}
           {preview && (
-            <p className="text-[13px] text-slate-500 leading-relaxed line-clamp-2 mb-2.5">
+            <p className="text-[13px] text-slate-500 dark:text-slate-400 leading-relaxed line-clamp-2 mb-2.5">
               {preview}
             </p>
           )}
 
           {/* Author */}
-          <div className="flex items-center gap-1.5 text-xs text-slate-400">
+          <div className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-500">
             <div className="nm-avatar w-[18px] h-[18px] rounded-full flex items-center justify-center text-white text-[8px] font-extrabold shrink-0">
               {(note.authorName || 'A').charAt(0).toUpperCase()}
             </div>
@@ -390,8 +390,8 @@ const ActionBtn: React.FC<{
   <button
     onClick={onClick}
     title={title}
-    className={`nm-action-btn w-[30px] h-[30px] rounded-lg flex items-center justify-center border border-slate-200 bg-white cursor-pointer ${
-      danger ? 'text-red-500 nm-action-btn-danger' : 'text-slate-500'
+    className={`nm-action-btn w-[30px] h-[30px] rounded-lg flex items-center justify-center border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 cursor-pointer ${
+      danger ? 'text-red-500 nm-action-btn-danger' : 'text-slate-500 dark:text-slate-400'
     }`}
   >
     {icon}
@@ -434,15 +434,15 @@ const EditorToolbar: React.FC<ToolbarProps> = ({ churchId, onImageInsert, onPcoI
 
   return (
     <>
-      <div className="flex items-center gap-1.5 px-4 py-2 bg-slate-50 border-b border-slate-200 shrink-0">
-        <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mr-1">Insert</span>
+      <div className="flex items-center gap-1.5 px-4 py-2 bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 shrink-0">
+        <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wide mr-1">Insert</span>
 
         {/* Image upload */}
         <button
           onClick={() => imgInputRef.current?.click()}
           disabled={isUploading}
           title="Upload and insert image"
-          className="nm-toolbar-btn flex items-center gap-1.5 px-3 py-[5px] rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 disabled:opacity-60 disabled:cursor-wait cursor-pointer"
+          className="nm-toolbar-btn flex items-center gap-1.5 px-3 py-[5px] rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300 disabled:opacity-60 disabled:cursor-wait cursor-pointer"
         >
           {isUploading
             ? <Loader2 size={13} className="nm-spin" />
@@ -467,13 +467,13 @@ const EditorToolbar: React.FC<ToolbarProps> = ({ churchId, onImageInsert, onPcoI
         <button
           onClick={() => setShowPco(true)}
           title="Insert Planning Center event, group, or registration"
-          className="nm-toolbar-btn flex items-center gap-1.5 px-3 py-[5px] rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 cursor-pointer"
+          className="nm-toolbar-btn flex items-center gap-1.5 px-3 py-[5px] rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300 cursor-pointer"
         >
           <img src="https://planningcenter.com/favicon.ico" alt="PCO" className="w-[13px] h-[13px]" />
           Planning Center
         </button>
 
-        <div className="ml-auto text-[11px] text-slate-400">
+        <div className="ml-auto text-[11px] text-slate-400 dark:text-slate-500">
           Plain text or HTML · images supported
         </div>
       </div>
@@ -577,22 +577,22 @@ const NoteEditor: React.FC<{
     <div className="flex flex-col h-full">
 
       {/* ── Editor Header ── */}
-      <div className="flex items-center justify-between px-6 py-3.5 bg-white border-b border-slate-200 shrink-0 flex-wrap gap-3">
+      <div className="flex items-center justify-between px-6 py-3.5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 shrink-0 flex-wrap gap-3">
         <div className="flex items-center gap-2.5">
           <button
             onClick={onBack}
             title="Back to notes"
-            className="w-8 h-8 rounded-lg border border-slate-200 bg-white flex items-center justify-center cursor-pointer text-slate-500 hover:bg-slate-50 transition"
+            className="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center justify-center cursor-pointer text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 transition"
           >
             <ArrowLeft size={16} />
           </button>
-          <div className="text-[13px] text-slate-500">
-            <span className="cursor-pointer font-medium hover:text-slate-700 transition" onClick={onBack}>Notes</span>
+          <div className="text-[13px] text-slate-500 dark:text-slate-400">
+            <span className="cursor-pointer font-medium hover:text-slate-700 dark:hover:text-slate-200 transition" onClick={onBack}>Notes</span>
             <span className="mx-1.5">›</span>
-            <span className="font-bold text-slate-800">{note.title || 'New Note'}</span>
+            <span className="font-bold text-slate-800 dark:text-slate-100">{note.title || 'New Note'}</span>
           </div>
           {lastSaved && (
-            <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
+            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
               <CheckCircle size={10} /> Saved
             </span>
           )}
@@ -602,8 +602,8 @@ const NoteEditor: React.FC<{
           {/* Status pill */}
           <div className={`flex items-center gap-1 text-[11px] font-bold px-3 py-1 rounded-full border ${
             isPublished
-              ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
-              : 'bg-slate-100 text-slate-500 border-slate-200'
+              ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-700'
+              : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-600'
           }`}>
             {isPublished ? <Globe size={11} /> : <Lock size={11} />}
             {isPublished ? 'Published' : 'Draft'}
@@ -623,7 +623,7 @@ const NoteEditor: React.FC<{
           <button
             onClick={() => save('draft')}
             disabled={isSaving}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-[10px] border border-slate-200 bg-white text-slate-600 text-xs font-semibold cursor-pointer disabled:opacity-70 hover:bg-slate-50 transition"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-[10px] border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold cursor-pointer disabled:opacity-70 hover:bg-slate-50 dark:hover:bg-slate-700 transition"
           >
             {isSaving ? <Loader2 size={13} className="nm-spin" /> : <Clock size={13} />}
             Save Draft
@@ -641,14 +641,14 @@ const NoteEditor: React.FC<{
       </div>
 
       {/* ── Edit / Preview Toggle + Toolbar ── */}
-      <div className="flex items-center bg-slate-50 border-b border-slate-200 shrink-0">
-        <div className="flex gap-0.5 p-1.5 bg-slate-100 rounded-lg mx-4 my-2">
+      <div className="flex items-center bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 shrink-0">
+        <div className="flex gap-0.5 p-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg mx-4 my-2">
           <button
             onClick={() => setEditorMode('edit')}
             className={`px-3 py-1 rounded-md text-xs font-semibold transition ${
               editorMode === 'edit'
-                ? 'bg-white text-slate-800 shadow-sm'
-                : 'text-slate-500 hover:text-slate-700'
+                ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-white shadow-sm'
+                : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
             }`}
           >
             Edit
@@ -657,8 +657,8 @@ const NoteEditor: React.FC<{
             onClick={() => setEditorMode('preview')}
             className={`px-3 py-1 rounded-md text-xs font-semibold transition ${
               editorMode === 'preview'
-                ? 'bg-white text-slate-800 shadow-sm'
-                : 'text-slate-500 hover:text-slate-700'
+                ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-white shadow-sm'
+                : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
             }`}
           >
             <Eye size={11} className="inline mr-1 -mt-0.5" />
@@ -675,11 +675,11 @@ const NoteEditor: React.FC<{
       </div>
 
       {/* ── Editor Body ── */}
-      <div className="flex-1 overflow-y-auto bg-slate-50 flex justify-center px-4 py-8">
+      <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-950 flex justify-center px-4 py-8">
         <div className="w-full max-w-[720px]">
 
           {/* Church/author strip */}
-          <div className="flex items-center gap-3 mb-5 px-4 py-2.5 bg-white rounded-xl border border-slate-200 text-[13px] text-slate-500">
+          <div className="flex items-center gap-3 mb-5 px-4 py-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-[13px] text-slate-500 dark:text-slate-400">
             <div className="nm-avatar w-8 h-8 rounded-full flex items-center justify-center text-white text-[11px] font-extrabold shrink-0">
               {(note.authorName || 'A').charAt(0).toUpperCase()}
             </div>
@@ -690,9 +690,9 @@ const NoteEditor: React.FC<{
                 onChange={e => update({ authorName: e.target.value })}
                 placeholder="Author name…"
                 title="Author name"
-                className="border-none outline-none text-[13px] font-bold text-slate-800 bg-transparent w-full"
+                className="border-none outline-none text-[13px] font-bold text-slate-800 dark:text-slate-100 bg-transparent w-full"
               />
-              <div className="text-[11px] text-slate-400 mt-px">
+              <div className="text-[11px] text-slate-400 dark:text-slate-500 mt-px">
                 {church?.name || 'Your Church'}
               </div>
             </div>
@@ -701,7 +701,7 @@ const NoteEditor: React.FC<{
               target="_blank"
               rel="noopener noreferrer"
               title="Preview public view"
-              className="flex items-center gap-1 text-[11px] text-indigo-600 font-semibold no-underline shrink-0 hover:underline"
+              className="flex items-center gap-1 text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold no-underline shrink-0 hover:underline"
             >
               <Eye size={12} /> Preview
             </a>
@@ -714,7 +714,7 @@ const NoteEditor: React.FC<{
             placeholder="Note title…"
             title="Note title"
             rows={2}
-            className="w-full box-border text-[clamp(24px,4vw,34px)] font-extrabold text-slate-900 border-none outline-none bg-transparent resize-none leading-snug tracking-tight mb-5 font-[inherit]"
+            className="w-full box-border text-[clamp(24px,4vw,34px)] font-extrabold text-slate-900 dark:text-white border-none outline-none bg-transparent resize-none leading-snug tracking-tight mb-5 font-[inherit] placeholder:text-slate-300 dark:placeholder:text-slate-600"
           />
 
           {/* Divider */}
@@ -733,14 +733,14 @@ const NoteEditor: React.FC<{
             </div>
           ) : (
             <div
-              className="w-full min-h-[360px] text-base leading-[1.8] text-slate-600"
+              className="w-full min-h-[360px] text-base leading-[1.8] text-slate-600 dark:text-slate-300"
               dangerouslySetInnerHTML={{ __html: note.content || '<p style="color:#94a3b8;">Nothing to preview yet.</p>' }}
             />
           )}
 
           {/* Tip */}
           {editorMode === 'edit' && (
-            <div className="mt-5 px-3.5 py-2.5 bg-blue-50 rounded-[10px] border border-blue-200 text-xs text-blue-500 flex items-start gap-2">
+            <div className="mt-5 px-3.5 py-2.5 bg-blue-50 dark:bg-blue-950/40 rounded-[10px] border border-blue-200 dark:border-blue-800 text-xs text-blue-500 dark:text-blue-400 flex items-start gap-2">
               <span className="shrink-0">💡</span>
               <span>
                 Click <strong>Publish &amp; Copy Link</strong> to make this note public and copy the URL for SMS.
@@ -872,15 +872,15 @@ export const NotesManager: React.FC<NotesManagerProps> = ({ churchId, currentUse
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 p-1 bg-slate-100 rounded-xl mb-5 w-fit">
+        <div className="flex gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl mb-5 w-fit">
           {(['all', 'draft', 'published'] as const).map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
               className={`flex items-center gap-1.5 px-4 py-[7px] rounded-[10px] border-none cursor-pointer text-xs font-semibold transition-all ${
                 tab === t
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'bg-transparent text-slate-500 hover:text-slate-700'
+                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
+                  : 'bg-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
               }`}
             >
               {t === 'all' && <FileText size={12} />}
@@ -888,7 +888,7 @@ export const NotesManager: React.FC<NotesManagerProps> = ({ churchId, currentUse
               {t === 'published' && <Globe size={12} />}
               {t === 'all' ? 'All' : t === 'draft' ? 'Drafts' : 'Published'}
               <span className={`text-[10px] px-1.5 py-px rounded-full font-bold ${
-                tab === t ? 'bg-indigo-50 text-indigo-600' : 'bg-slate-200 text-slate-400'
+                tab === t ? 'bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400' : 'bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-500'
               }`}>
                 {counts[t]}
               </span>
@@ -898,17 +898,17 @@ export const NotesManager: React.FC<NotesManagerProps> = ({ churchId, currentUse
 
         {/* Content */}
         {isLoading ? (
-          <div className="text-center py-16 text-slate-400">
+          <div className="text-center py-16 text-slate-400 dark:text-slate-500">
             <Loader2 size={28} className="nm-spin mx-auto mb-3 block" />
             <p className="text-[13px]">Loading notes…</p>
           </div>
         ) : filtered.length === 0 ? (
-          <div className="text-center py-16 px-10 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50">
+          <div className="text-center py-16 px-10 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl bg-slate-50 dark:bg-slate-800/50">
             <div className="text-5xl mb-4">📝</div>
-            <p className="text-base font-bold text-slate-900 mb-1.5">
+            <p className="text-base font-bold text-slate-900 dark:text-white mb-1.5">
               {tab === 'published' ? 'No published notes yet' : tab === 'draft' ? 'No drafts' : 'No notes yet'}
             </p>
-            <p className="text-[13px] text-slate-400 mb-5">
+            <p className="text-[13px] text-slate-400 dark:text-slate-500 mb-5">
               Create your first note to start sharing with your congregation
             </p>
             {tab !== 'published' && (
