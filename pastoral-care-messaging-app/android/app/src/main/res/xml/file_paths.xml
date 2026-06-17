@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
-    <external-path name="my_images" path="Android/data/com.barnabassoftware.pcmessaging/files/" />
+    <external-path name="my_images" path="Android/data/com.pastoralcaremessaging/files/" />
     <cache-path name="my_cache_images" path="." />
 </paths>

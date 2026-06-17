@@ -3,7 +3,7 @@
 # ──────────────────────────────────────────────────────────────────────────────
 -keep class com.getcapacitor.** { *; }
 -keep @com.getcapacitor.annotation.CapacitorPlugin class * { *; }
--keep class com.barnabassoftware.pcmessaging.** { *; }
+-keep class com.pastoralcaremessaging.** { *; }
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Firebase & Google Play Services

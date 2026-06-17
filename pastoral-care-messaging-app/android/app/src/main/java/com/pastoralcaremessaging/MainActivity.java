@@ -1,4 +1,4 @@
-package com.barnabassoftware.pcmessaging;
+package com.pastoralcaremessaging;
 
 import android.os.Bundle;
 import androidx.core.splashscreen.SplashScreen;

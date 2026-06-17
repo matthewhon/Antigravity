@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.barnabassoftware.pcmessaging',
+  appId: 'com.pastoralcaremessaging',
   appName: 'Pastoral Care Messaging',
   webDir: 'dist',
   server: {
