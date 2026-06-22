@@ -1542,6 +1542,27 @@ class FirestoreService {
       throw e;
     }
   }
+
+  /**
+   * Fetch all completed slots across every session for a church.
+   * Used to show per-person contact history over time in the admin queue view.
+   * Only returns 'contacted' and 'no-answer' statuses (excludes pending/released).
+   */
+  async getChurchOutreachSlots(churchId: string): Promise<OutreachSlot[]> {
+    try {
+      const q = query(
+        collection(db, 'outreach_slots'),
+        where('churchId', '==', churchId),
+        where('status', 'in', ['contacted', 'no-answer']),
+        orderBy('completedAt', 'desc')
+      );
+      const snap = await getDocs(q);
+      return snap.docs.map(d => d.data() as OutreachSlot);
+    } catch (e) {
+      console.warn('getChurchOutreachSlots error:', e);
+      return [];
+    }
+  }
 }
 
 export interface SermonVerseRecord {

@@ -196,6 +196,15 @@
         { "fieldPath": "volunteerPhone",  "order": "ASCENDING" },
         { "fieldPath": "status",          "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "outreach_slots",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "churchId",      "order": "ASCENDING" },
+        { "fieldPath": "status",        "order": "ASCENDING" },
+        { "fieldPath": "completedAt",   "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [

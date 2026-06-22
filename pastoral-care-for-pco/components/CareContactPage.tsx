@@ -324,14 +324,19 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
     const [countdown, setCountdown]       = useState(60);
     // Real-time slots for selected session (used by left counter + queue sort)
     const [liveSlots, setLiveSlots]       = useState<OutreachSlot[]>([]);
+    // All completed slots across all sessions for this church (for history view)
+    const [allTimeSlots, setAllTimeSlots] = useState<OutreachSlot[]>([]);
+    // Which person row is expanded to show history
+    const [expandedPersonId, setExpandedPersonId] = useState<string | null>(null);
 
-    // Load sessions
+    // Load sessions and all-time slot history
     useEffect(() => {
         firestore.getOutreachSessions(church.id).then(data => {
             setSessions(data);
             if (data.length > 0 && !selectedId) setSelectedId(data[0].id);
             setIsLoading(false);
         });
+        firestore.getChurchOutreachSlots(church.id).then(setAllTimeSlots);
     }, [church.id]);
 
     // Subscribe to slots for selected session (live counter + queue sort)
@@ -494,6 +499,27 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
             return (a.riskProfile?.score ?? 0) - (b.riskProfile?.score ?? 0);
         });
     }, [selectedSession, people, liveSlots]);
+
+    // All-time per-person contact history (across all sessions).
+    // Merges the persistent allTimeSlots with any freshly completed liveSlots
+    // so the history updates in real-time within the current session too.
+    const personHistory = useMemo(() => {
+        const map = new Map<string, OutreachSlot[]>();
+        const addSlot = (slot: OutreachSlot) => {
+            if (slot.status !== 'contacted' && slot.status !== 'no-answer') return;
+            const list = map.get(slot.assignedPersonId) ?? [];
+            // Avoid duplicates (same slotId)
+            if (!list.some(s => s.id === slot.id)) list.push(slot);
+            map.set(slot.assignedPersonId, list);
+        };
+        allTimeSlots.forEach(addSlot);
+        liveSlots.forEach(addSlot);   // real-time current session
+        // Sort each person's list newest first
+        map.forEach((list, id) => {
+            map.set(id, list.sort((a, b) => (b.completedAt ?? b.assignedAt) - (a.completedAt ?? a.assignedAt)));
+        });
+        return map;
+    }, [allTimeSlots, liveSlots]);
 
     const handleCreateSession = async (draft: Pick<OutreachSession, 'name' | 'filters'>) => {
         const id = `os_${church.id}_${Date.now()}`;
@@ -853,7 +879,7 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                                     const catColor = cat === 'Healthy' ? 'text-emerald-600' : cat === 'At Risk' ? 'text-amber-600' : 'text-rose-600';
                                                     const now = Date.now();
 
-                                                    // Find latest slot for this person
+                                                    // Current-session slot (for status badge & row colour)
                                                     const slot = liveSlots
                                                         .filter(sl => sl.assignedPersonId === person.id)
                                                         .sort((a, b) => b.assignedAt - a.assignedAt)[0];
@@ -863,7 +889,6 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                                     const isNoAnswer   = slot?.status === 'no-answer';
                                                     const onCooldown   = isNoAnswer && slot?.noAnswerUntil && slot.noAnswerUntil > now;
                                                     const reQueued     = isNoAnswer && (!slot?.noAnswerUntil || slot.noAnswerUntil <= now);
-                                                    const neverContact = !slot;
 
                                                     const rowBg =
                                                         isContacted ? 'bg-emerald-50/60 dark:bg-emerald-900/10 opacity-60' :
@@ -894,8 +919,17 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                                         </span>
                                                     );
 
+                                                    // All-time history for this person
+                                                    const history = personHistory.get(person.id) ?? [];
+                                                    const mostRecent = history[0];
+                                                    const isExpanded = expandedPersonId === person.id;
+
                                                     return (
-                                                        <tr key={person.id} className={`border-b border-slate-50 dark:border-slate-800/50 ${rowBg}`}>
+                                                        <React.Fragment key={person.id}>
+                                                        <tr
+                                                            className={`border-b border-slate-50 dark:border-slate-800/50 ${rowBg} ${history.length > 0 ? 'cursor-pointer hover:bg-indigo-50/30 dark:hover:bg-indigo-900/10' : ''} transition-colors`}
+                                                            onClick={() => history.length > 0 && setExpandedPersonId(isExpanded ? null : person.id)}
+                                                        >
                                                             <td className="p-2.5 text-[10px] text-slate-400 font-bold">{idx + 1}</td>
                                                             <td className="p-2.5">
                                                                 <div className="flex items-center gap-2">
@@ -916,16 +950,18 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                                                 <span className={`text-[10px] font-black uppercase ${catColor}`}>{cat}</span>
                                                                 <span className="text-[9px] text-slate-400 ml-1">({person.riskProfile?.score ?? 0})</span>
                                                             </td>
+                                                            {/* Last Contact — all-time */}
                                                             <td className="p-2.5 text-[10px] font-medium whitespace-nowrap">
-                                                                {slot ? (
-                                                                    <span className={`${
-                                                                        isContacted ? 'text-emerald-600' :
-                                                                        isNoAnswer  ? 'text-rose-500' :
-                                                                        isPending   ? 'text-blue-500' :
-                                                                        'text-slate-400'
-                                                                    }`}>
-                                                                        {timeSince(slot.completedAt ?? slot.assignedAt)}
-                                                                    </span>
+                                                                {mostRecent ? (
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <span className={`${mostRecent.status === 'contacted' ? 'text-emerald-600' : 'text-rose-500'}`}>
+                                                                            {timeSince(mostRecent.completedAt ?? mostRecent.assignedAt)}
+                                                                        </span>
+                                                                        <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 text-[8px] font-black" title={`${history.length} total contact attempt${history.length !== 1 ? 's' : ''}`}>
+                                                                            {history.length}
+                                                                        </span>
+                                                                        <ChevronDown size={10} className={`text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                                                                    </div>
                                                                 ) : (
                                                                     <span className="text-slate-300 dark:text-slate-600">—</span>
                                                                 )}
@@ -934,6 +970,34 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                                             <td className="p-2.5 text-[10px] text-slate-500 dark:text-slate-400 font-medium truncate max-w-[140px]">{person.email || '—'}</td>
                                                             <td className="p-2.5 text-[10px] text-slate-500 dark:text-slate-400 font-medium">{person.membership || 'None'}</td>
                                                         </tr>
+                                                        {/* History accordion */}
+                                                        {isExpanded && history.length > 0 && (
+                                                            <tr className="border-b border-slate-100 dark:border-slate-800">
+                                                                <td colSpan={8} className="p-0">
+                                                                    <div className="bg-slate-50 dark:bg-slate-800/40 px-6 py-3 space-y-2">
+                                                                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2">Contact History ({history.length} attempt{history.length !== 1 ? 's' : ''})</p>
+                                                                        {history.map(h => (
+                                                                            <div key={h.id} className="flex items-start gap-3 text-[10px]">
+                                                                                <span className={`shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full font-black ${h.status === 'contacted' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400'}`}>
+                                                                                    {h.status === 'contacted' ? <Check size={7} /> : <PhoneOff size={7} />}
+                                                                                    {h.status === 'contacted' ? 'Reached' : 'No Answer'}
+                                                                                </span>
+                                                                                <span className="text-slate-500 dark:text-slate-400 shrink-0">
+                                                                                    {formatDateTime(h.completedAt ?? h.assignedAt)}
+                                                                                </span>
+                                                                                {h.volunteerName && (
+                                                                                    <span className="text-slate-400 shrink-0">by <span className="font-bold text-slate-600 dark:text-slate-300">{h.volunteerName}</span></span>
+                                                                                )}
+                                                                                {h.notes?.trim() && (
+                                                                                    <span className="text-slate-500 dark:text-slate-400 italic truncate">— {h.notes.trim()}</span>
+                                                                                )}
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        )}
+                                                        </React.Fragment>
                                                     );
                                                 })}
                                             </tbody>
