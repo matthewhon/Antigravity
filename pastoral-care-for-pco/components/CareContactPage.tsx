@@ -320,6 +320,8 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
     const [copied, setCopied]             = useState(false);
     const [isLoading, setIsLoading]       = useState(true);
     const [qrDataUrl, setQrDataUrl]       = useState('');
+    const [refreshInterval, setRefreshInterval] = useState(60); // seconds
+    const [countdown, setCountdown]       = useState(60);
 
     // Load sessions
     useEffect(() => {
@@ -329,6 +331,27 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
             setIsLoading(false);
         });
     }, [church.id]);
+
+    // Auto-refresh countdown — fires handleRefreshQueue via ref to avoid stale closure
+    const refreshHandlerRef = useRef<() => void>(() => {});
+    useEffect(() => {
+        refreshHandlerRef.current = handleRefreshQueue;
+    });
+
+    useEffect(() => {
+        if (!selectedId) return;
+        setCountdown(refreshInterval);
+        const tick = setInterval(() => {
+            setCountdown(prev => {
+                if (prev <= 1) {
+                    refreshHandlerRef.current();
+                    return refreshInterval;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+        return () => clearInterval(tick);
+    }, [selectedId, refreshInterval]);
 
     const selectedSession = useMemo(
         () => sessions.find(s => s.id === selectedId) ?? null,
@@ -365,6 +388,8 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
         return allPeople
             .filter(p => {
                 if (p.status?.toLowerCase() === 'inactive') return false;
+                // Must have at least a phone or email to be contactable
+                if (!p.phone && !p.email) return false;
                 if (riskCategories.length > 0 && !riskCategories.includes(p.riskProfile?.category as any)) return false;
                 if (membershipStatuses.length > 0 && !membershipStatuses.includes(p.membership || 'None')) return false;
                 return true;
@@ -379,12 +404,14 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
             }));
     }, []);
 
-    // Filter people per selected session
+    // Filter people per selected session (for the admin preview table)
     const filteredPeople = useMemo(() => {
         if (!selectedSession) return [];
         const { riskCategories, membershipStatuses } = selectedSession.filters;
         return people.filter(p => {
             if (p.status?.toLowerCase() === 'inactive') return false;
+            // Must have at least a phone or email to be contactable
+            if (!p.phone && !p.email) return false;
             if (riskCategories.length > 0 && !riskCategories.includes(p.riskProfile?.category as any)) return false;
             if (membershipStatuses.length > 0 && !membershipStatuses.includes(p.membership || 'None')) return false;
             return true;
@@ -621,24 +648,59 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
 
                             {/* People Queue Preview */}
                             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 overflow-hidden">
-                                <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800">
+                                <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex-wrap gap-2">
                                     <div className="flex items-center gap-2">
                                         <Users size={14} className="text-indigo-500" />
                                         <p className="text-xs font-black uppercase tracking-widest text-slate-600 dark:text-slate-300">
                                             Queue Preview ({filteredPeople.length} people)
                                         </p>
                                     </div>
-                                    <div className="flex flex-wrap gap-1">
-                                        {selectedSession.filters.riskCategories.map(cat => (
-                                            <span key={cat} className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
-                                                {cat}
-                                            </span>
-                                        ))}
-                                        {selectedSession.filters.membershipStatuses.map(s => (
-                                            <span key={s} className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                                                {s}
-                                            </span>
-                                        ))}
+                                    <div className="flex items-center gap-3">
+                                        {/* Filter tags */}
+                                        <div className="flex flex-wrap gap-1">
+                                            {selectedSession.filters.riskCategories.map(cat => (
+                                                <span key={cat} className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
+                                                    {cat}
+                                                </span>
+                                            ))}
+                                            {selectedSession.filters.membershipStatuses.map(s => (
+                                                <span key={s} className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                                                    {s}
+                                                </span>
+                                            ))}
+                                        </div>
+                                        {/* Auto-refresh control */}
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                            {/* Countdown ring */}
+                                            <div className="relative w-6 h-6">
+                                                <svg className="w-6 h-6 -rotate-90" viewBox="0 0 24 24">
+                                                    <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2" className="text-slate-100 dark:text-slate-800" />
+                                                    <circle
+                                                        cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2"
+                                                        className="text-indigo-500 transition-all"
+                                                        strokeDasharray={`${2 * Math.PI * 10}`}
+                                                        strokeDashoffset={`${2 * Math.PI * 10 * (1 - countdown / refreshInterval)}`}
+                                                        strokeLinecap="round"
+                                                    />
+                                                </svg>
+                                                <span className="absolute inset-0 flex items-center justify-center text-[7px] font-black text-slate-500 dark:text-slate-400">
+                                                    {countdown}
+                                                </span>
+                                            </div>
+                                            <label className="text-[9px] font-black uppercase tracking-wide text-slate-400 whitespace-nowrap">Refresh every</label>
+                                            <input
+                                                type="number"
+                                                min={10}
+                                                max={3600}
+                                                value={refreshInterval}
+                                                onChange={e => {
+                                                    const v = Math.max(10, parseInt(e.target.value) || 60);
+                                                    setRefreshInterval(v);
+                                                }}
+                                                className="w-14 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-[10px] font-black text-center text-slate-700 dark:text-slate-200 outline-none focus:ring-1 focus:ring-indigo-400"
+                                            />
+                                            <label className="text-[9px] font-black uppercase tracking-wide text-slate-400">sec</label>
+                                        </div>
                                     </div>
                                 </div>
                                 <div className="max-h-[300px] overflow-y-auto">

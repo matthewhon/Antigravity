@@ -577,6 +577,34 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
       setNewNote({ type: 'Note', content: '', date: new Date().toISOString().split('T')[0], isCompleted: false });
   };
 
+  /** Add a care note directly from the Reports page for a given person. */
+  const handleAddNoteForPerson = async (
+      personId: string,
+      type: PastoralNote['type'],
+      content: string
+  ) => {
+      if (!church.id || !content.trim()) return;
+      const person = peopleData?.allPeople.find(p => p.id === personId);
+      const note: PastoralNote = {
+          id: `note_${Date.now()}`,
+          churchId: church.id,
+          personId,
+          personName: person?.name || 'Unknown',
+          authorId: user.id || 'system',
+          authorName: user.name || 'Unknown',
+          date: new Date().toISOString().split('T')[0],
+          type,
+          content: content.trim(),
+          followUpDate: null,
+          isCompleted: false,
+          tags: [],
+      } as any;
+      await firestore.savePastoralNote(note);
+      setNotes(prev => [note, ...prev]);
+      // Also mark as followed up so the row gets the Done badge
+      handleMarkFollowedUp(personId);
+  };
+
   const handleSavePrayer = async () => {
       if (!newPrayer.request || !church.id) return;
 
@@ -1782,6 +1810,9 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
               notes={notes}
               followUpLog={followUpLog}
               riskSettings={church.riskSettings}
+              onAddNote={handleAddNoteForPerson}
+              onMarkFollowedUp={handleMarkFollowedUp}
+              onDismiss={handleDismiss}
           />
       ) : activeTab === 'Calendar' ? (
           <div className="h-[calc(100vh-250px)] min-h-[600px] relative">
