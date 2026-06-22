@@ -241,6 +241,10 @@ export const calculateGivingAnalytics = (
             resolvedName = 'Anonymous';
         }
 
+        // Skip placeholder donors with no real identity — they can't be followed up
+        const PLACEHOLDER_NAMES = new Set(['Donor', 'Unknown', 'Anonymous']);
+        if (!person && PLACEHOLDER_NAMES.has(resolvedName)) return;
+
         const totalAmount = gifts.reduce((sum, g) => sum + g.amount, 0);
         // Calculate avg monthly: spread total giving across distinct calendar months
         const distinctMonths = new Set(gifts.map(g => g.date.slice(0, 7))).size;
