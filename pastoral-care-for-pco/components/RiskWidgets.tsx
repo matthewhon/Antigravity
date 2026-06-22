@@ -283,8 +283,12 @@ export const StatusChangesWidget: React.FC<RiskProps> = ({ recentRiskChanges = [
 };
 
 export const PeopleDirectoryWidget: React.FC<RiskProps> = ({ people }) => {
-    // Filter active people first
-    const activePeople = useMemo(() => people.filter(p => p.status !== 'inactive'), [people]);
+    // Filter active people first (case-insensitive, consistent with App.tsx visiblePeople filter)
+    const activePeople = useMemo(() => people.filter(p => {
+        const status = (p.status || '').toLowerCase();
+        const membership = (p.membership || '').toLowerCase();
+        return status !== 'inactive' && membership !== 'inactive';
+    }), [people]);
 
     // Column Filters
     const [nameFilter, setNameFilter] = useState('');

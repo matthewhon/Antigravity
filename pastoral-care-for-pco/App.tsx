@@ -718,7 +718,16 @@ const App: React.FC = () => {
   // --- PCO Display Filters ---
   const visiblePeople = useMemo(() => {
     if (!church?.pcoSettings?.hideInactiveMembers) return people;
-    return people.filter(p => p.status?.toLowerCase() !== 'inactive');
+    return people.filter(p => {
+      // Check system status field (PCO API returns "inactive" lowercase)
+      const status = (p.status || '').toLowerCase();
+      if (status === 'inactive') return false;
+      // Also check the membership field — some PCO setups use a custom "Inactive"
+      // membership type instead of (or in addition to) the system status field.
+      const membership = (p.membership || '').toLowerCase();
+      if (membership === 'inactive') return false;
+      return true;
+    });
   }, [people, church?.pcoSettings?.hideInactiveMembers]);
 
   const visibleGroups = useMemo(() => {
