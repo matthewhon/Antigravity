@@ -841,6 +841,7 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                                     <th className="p-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">Name</th>
                                                     <th className="p-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">Status</th>
                                                     <th className="p-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">Risk</th>
+                                                    <th className="p-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">Last Contact</th>
                                                     <th className="p-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">Phone</th>
                                                     <th className="p-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">Email</th>
                                                     <th className="p-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">Membership</th>
@@ -914,6 +915,20 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                                             <td className="p-2.5">
                                                                 <span className={`text-[10px] font-black uppercase ${catColor}`}>{cat}</span>
                                                                 <span className="text-[9px] text-slate-400 ml-1">({person.riskProfile?.score ?? 0})</span>
+                                                            </td>
+                                                            <td className="p-2.5 text-[10px] font-medium whitespace-nowrap">
+                                                                {slot ? (
+                                                                    <span className={`${
+                                                                        isContacted ? 'text-emerald-600' :
+                                                                        isNoAnswer  ? 'text-rose-500' :
+                                                                        isPending   ? 'text-blue-500' :
+                                                                        'text-slate-400'
+                                                                    }`}>
+                                                                        {timeSince(slot.completedAt ?? slot.assignedAt)}
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="text-slate-300 dark:text-slate-600">—</span>
+                                                                )}
                                                             </td>
                                                             <td className="p-2.5 text-[10px] text-slate-500 dark:text-slate-400 font-medium">{person.phone || '—'}</td>
                                                             <td className="p-2.5 text-[10px] text-slate-500 dark:text-slate-400 font-medium truncate max-w-[140px]">{person.email || '—'}</td>
