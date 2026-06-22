@@ -83,6 +83,7 @@ const App: React.FC = () => {
      if (path.startsWith('/care/calendar')) return 'pastoral-calendar';
      if (path.startsWith('/care/contact')) return 'pastoral-contact';
      if (path.startsWith('/care/care')) return 'pastoral-care';
+     if (path.startsWith('/care/reports')) return 'pastoral-reports';
      if (path.startsWith('/care')) return 'pastoral';
      if (path.startsWith('/metrics/input')) return 'metrics-input';
      if (path.startsWith('/metrics/settings')) return 'metrics-settings';
@@ -487,6 +488,7 @@ const App: React.FC = () => {
       if (v === 'pastoral-community') return user.roles.includes('Pastor') || user.roles.includes('Pastoral Care');
       if (v === 'pastoral-care') return user.roles.includes('Pastor') || user.roles.includes('Pastoral Care');
       if (v === 'pastoral-calendar') return user.roles.includes('Pastor') || user.roles.includes('Pastoral Care');
+      if (v === 'pastoral-reports') return user.roles.includes('Pastor') || user.roles.includes('Pastoral Care');
       if (v === 'pastor-ai') return user.roles.includes('Pastor AI') || user.roles.includes('Pastor');
       
       const roleMap: Record<string, string> = {
@@ -567,6 +569,7 @@ const App: React.FC = () => {
               'pastoral-care': '/care/care',
               'pastoral-calendar': '/care/calendar',
               'pastoral-contact': '/care/contact',
+              'pastoral-reports': '/care/reports',
               'metrics': '/metrics',
               'metrics-input': '/metrics/input',
               'metrics-settings': '/metrics/settings',

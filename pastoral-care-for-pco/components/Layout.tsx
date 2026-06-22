@@ -376,6 +376,7 @@ const Layout: React.FC<LayoutProps> = ({
                         { view: 'pastoral-care',       icon: '🕊️', label: 'Care'       },
                         { view: 'pastoral-calendar',   icon: '📅', label: 'Calendar'   },
                         { view: 'pastoral-contact',    icon: '📞', label: 'Contact'    },
+                        { view: 'pastoral-reports',    icon: '📋', label: 'Reports'    },
                       ].map(item => (
                         <button
                           key={item.view}
