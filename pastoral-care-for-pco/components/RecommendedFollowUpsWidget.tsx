@@ -328,7 +328,7 @@ export const RecommendedFollowUpsWidget: React.FC<RecommendedFollowUpsWidgetProp
             signal: 'lapsed' as SignalType,
             priority: 'medium_high' as Priority,
             badgeLabel: 'Lapsed Donor',
-            detail: `Last gift ${new Date(d.lastGiftDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · Avg $${d.avgMonthlyAmount.toLocaleString()}/mo`,
+            detail: `Last gift ${new Date(d.lastGiftDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`,
         }));
     }, [givingAnalytics]);
 
@@ -344,7 +344,7 @@ export const RecommendedFollowUpsWidget: React.FC<RecommendedFollowUpsWidgetProp
             signal: 'inactive' as SignalType,
             priority: 'high' as Priority,
             badgeLabel: 'Inactive Donor',
-            detail: `Last gift ${new Date(d.lastGiftDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · Avg $${d.avgMonthlyAmount.toLocaleString()}/mo`,
+            detail: `Last gift ${new Date(d.lastGiftDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`,
         }));
     }, [givingAnalytics]);
 

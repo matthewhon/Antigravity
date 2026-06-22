@@ -1893,6 +1893,12 @@ export interface OutreachSession {
         totalEligible: number;
         lastUpdatedAt: number;
     };
+    /**
+     * How many contacts to pre-assign to each volunteer at once.
+     * Higher = fewer round trips, less responsive queue for other volunteers.
+     * Default: 3
+     */
+    batchSize?: number;
     createdAt: number;
     createdBy: string; // userId
     isActive: boolean;
@@ -1916,12 +1922,14 @@ export interface OutreachSlot {
     assignedPersonPhone?: string | null;
     assignedPersonEmail?: string | null;
     assignedAt: number;
-    /** 
-     * pending  = volunteer has seen the card but not recorded an outcome yet
-     * contacted = volunteer reached the person
-     * no-answer = volunteer could not reach the person
+    /**
+     * pending   = pre-assigned, volunteer has this in their batch
+     * contacted = volunteer successfully reached the person
+     * no-answer = volunteer could not reach the person (24h cooldown applies)
+     * released  = volunteer ended their session before working this slot;
+     *             person is returned to the queue immediately
      */
-    status: 'pending' | 'contacted' | 'no-answer';
+    status: 'pending' | 'contacted' | 'no-answer' | 'released';
     notes: string;
     completedAt?: number | null;
     /**

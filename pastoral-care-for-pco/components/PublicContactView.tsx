@@ -493,13 +493,19 @@ export const PublicContactView: React.FC<{ sessionId: string }> = ({ sessionId }
     const [viewState, setViewState] = useState<ViewState>('loading');
     const [volunteerPhone, setVolunteerPhone] = useState('');
     const [volunteerName, setVolunteerName] = useState<string | null>(null);
-    const [currentSlot, setCurrentSlot] = useState<OutreachSlot | null>(null);
+    // Batch of pre-assigned slots; batchIdx is the current position
+    const [batch, setBatch] = useState<OutreachSlot[]>([]);
+    const [batchIdx, setBatchIdx] = useState(0);
     const [isSaving, setIsSaving] = useState(false);
     // Personal stats for this volunteer
     const [myContacted, setMyContacted] = useState(0);
     const [myNoAnswer, setMyNoAnswer] = useState(0);
     // Live session-wide slots
     const [liveSlots, setLiveSlots] = useState<OutreachSlot[]>([]);
+    // Pre-fetching next batch in background
+    const nextBatchRef = useRef<OutreachSlot[] | null>(null);
+
+    const currentSlot = batch[batchIdx] ?? null;
 
     // Load session on mount
     useEffect(() => {
@@ -524,7 +530,7 @@ export const PublicContactView: React.FC<{ sessionId: string }> = ({ sessionId }
     const sessionNoAnswer  = liveSlots.filter(s => s.status === 'no-answer').length;
     const sessionTotal     = session?.eligiblePeople?.length ?? 0;
 
-    // Get sorted filtered people for the session, using the denormalized list stored in the session doc
+    // Get eligible sorted list (for passing to claimBatch)
     const getFilteredPeople = useCallback(async (): Promise<{ id: string; name: string; phone?: string | null; email?: string | null }[]> => {
         if (!session) return [];
         const allSlots = await firestore.getOutreachSlots(session.id);
@@ -540,6 +546,7 @@ export const PublicContactView: React.FC<{ sessionId: string }> = ({ sessionId }
                     onCooldown.add(slot.assignedPersonId);
                 }
             }
+            // 'released' → not blocked, back in queue
         }
 
         const allPeople = session.eligiblePeople ?? [];
@@ -551,6 +558,14 @@ export const PublicContactView: React.FC<{ sessionId: string }> = ({ sessionId }
         const primaryFiltered = primary.filter(p => !reQueued.find(r => r.id === p.id));
         return [...primaryFiltered, ...reQueued];
     }, [session]);
+
+    // Fetch a fresh batch and return it (or [] if queue exhausted)
+    const fetchBatch = useCallback(async (phone: string, name: string | null, sess: OutreachSession): Promise<OutreachSlot[]> => {
+        const eligible = await getFilteredPeople();
+        if (eligible.length === 0) return [];
+        const size = sess.batchSize ?? 3;
+        return firestore.claimBatch(sess, phone, eligible, size, name);
+    }, [getFilteredPeople]);
 
     const handlePhoneSubmit = async (phone: string) => {
         if (!session || !sessionId) return;
@@ -564,47 +579,73 @@ export const PublicContactView: React.FC<{ sessionId: string }> = ({ sessionId }
         setVolunteerName(resolvedName);
 
         setViewState('assigning');
-        const eligible = await getFilteredPeople();
-        if (eligible.length === 0) { setViewState('done-exhausted'); return; }
-        const slot = await firestore.claimNextPerson(session, phone, eligible, resolvedName);
-        if (!slot) { setViewState('done-exhausted'); return; }
-        setCurrentSlot(slot);
+        const newBatch = await fetchBatch(phone, resolvedName, session);
+        if (newBatch.length === 0) { setViewState('done-exhausted'); return; }
+        setBatch(newBatch);
+        setBatchIdx(0);
         setViewState('contact');
     };
 
     const handleComplete = async (outcome: Outcome, notes: string) => {
         if (!currentSlot || !session) return;
-        setIsSaving(true);
+
+        // 1. Update Firestore in the background (don't await — instant UX)
         const now = Date.now();
         const updates: any = { status: outcome, notes, completedAt: now };
         if (outcome === 'no-answer') updates.noAnswerUntil = now + 24 * 60 * 60 * 1000;
+        firestore.updateOutreachSlot(currentSlot.id, updates); // fire-and-forget
 
-        await firestore.updateOutreachSlot(currentSlot.id, updates);
+        // 2. Update personal stats immediately
         if (outcome === 'contacted') setMyContacted(p => p + 1);
         else setMyNoAnswer(p => p + 1);
 
-        await new Promise(r => setTimeout(r, 800));
-        setIsSaving(false);
-        setCurrentSlot(null);
-        setViewState('assigning');
+        const nextIdx = batchIdx + 1;
 
-        const eligible = await getFilteredPeople();
-        if (eligible.length === 0) { setViewState('done-exhausted'); return; }
-        const nextSlot = await firestore.claimNextPerson(session, volunteerPhone, eligible, volunteerName);
-        if (!nextSlot) { setViewState('done-exhausted'); return; }
-        setCurrentSlot(nextSlot);
-        setViewState('contact');
+        // 3. When we're on the second-to-last item in the batch, pre-fetch the next batch
+        if (nextIdx === batch.length - 1 && nextBatchRef.current === null) {
+            nextBatchRef.current = []; // sentinel — fetching
+            fetchBatch(volunteerPhone, volunteerName, session).then(nb => {
+                nextBatchRef.current = nb;
+            });
+        }
+
+        // 4. Advance immediately — no wait
+        if (nextIdx < batch.length) {
+            setBatchIdx(nextIdx);
+            // viewState stays 'contact' — new slot shown instantly
+        } else {
+            // Batch exhausted — check pre-fetched or fetch now
+            setViewState('assigning');
+            let nextBatch = nextBatchRef.current;
+            nextBatchRef.current = null;
+            if (nextBatch === null) {
+                nextBatch = await fetchBatch(volunteerPhone, volunteerName, session);
+            } else if (nextBatch.length === 0) {
+                // Pre-fetch returned empty — try once more in case of timing
+                nextBatch = await fetchBatch(volunteerPhone, volunteerName, session);
+            }
+            if (nextBatch.length === 0) { setViewState('done-exhausted'); return; }
+            setBatch(nextBatch);
+            setBatchIdx(0);
+            setViewState('contact');
+        }
     };
 
-    const handleEndSession = () => {
+    const handleEndSession = async () => {
         if (!confirm('Are you sure you want to end your session?')) return;
         if (sessionId) sessionStorage.removeItem(STORAGE_KEY(sessionId));
+        // Release any unworked pending slots back to the queue
+        if (sessionId && volunteerPhone) {
+            firestore.releasePendingSlots(sessionId, volunteerPhone); // fire-and-forget
+        }
         setViewState('done-ended');
     };
 
     const sessionName = session?.name ?? '';
     const isActive = viewState === 'contact' || viewState === 'assigning';
     const isDone = viewState === 'done-exhausted' || viewState === 'done-ended';
+    // Progress within current batch: e.g. "2 / 3"
+    const batchProgress = batch.length > 0 ? { current: batchIdx + 1, total: batch.length } : null;
 
     return (
         <Shell sessionName={sessionName || undefined} onEnd={isActive ? handleEndSession : undefined}>
@@ -623,6 +664,24 @@ export const PublicContactView: React.FC<{ sessionId: string }> = ({ sessionId }
                     sessionContacted={sessionContacted}
                     sessionTotal={sessionTotal}
                 />
+            )}
+            {/* Batch progress indicator */}
+            {viewState === 'contact' && batchProgress && batchProgress.total > 1 && (
+                <div className="flex items-center gap-2 mb-3 px-1">
+                    {Array.from({ length: batchProgress.total }).map((_, i) => (
+                        <div
+                            key={i}
+                            className={`flex-1 h-1 rounded-full transition-all duration-300 ${
+                                i < batchIdx ? 'bg-emerald-400' :
+                                i === batchIdx ? 'bg-indigo-500' :
+                                'bg-slate-200 dark:bg-slate-700'
+                            }`}
+                        />
+                    ))}
+                    <span className="text-[9px] font-black text-slate-400 whitespace-nowrap">
+                        {batchProgress.current}/{batchProgress.total}
+                    </span>
+                </div>
             )}
             {viewState === 'contact' && currentSlot && (
                 <ContactCard slot={currentSlot} onComplete={handleComplete} isSaving={isSaving} />

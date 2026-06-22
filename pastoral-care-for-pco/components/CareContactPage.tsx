@@ -36,10 +36,11 @@ const timeSince = (ts: number): string => {
 
 const StatusBadge: React.FC<{ status: OutreachSlot['status'] }> = ({ status }) => {
     const cfg = {
-        pending:   { label: 'In Progress',  cls: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' },
-        contacted: { label: 'Contacted',    cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' },
-        'no-answer': { label: 'No Answer', cls: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400' },
-    }[status];
+        pending:    { label: 'In Progress', cls: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' },
+        contacted:  { label: 'Contacted',   cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' },
+        'no-answer':{ label: 'No Answer',  cls: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400' },
+        released:   { label: 'Released',   cls: 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400' },
+    }[status] ?? { label: status, cls: 'bg-slate-100 text-slate-500' };
     return (
         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wide whitespace-nowrap ${cfg.cls}`}>
             {cfg.label}
@@ -465,9 +466,10 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
             }
         }
 
-        const getGroup = (p: typeof people[0]): number => {
+    const getGroup = (p: typeof people[0]): number => {
             const slot = latestSlot.get(p.id);
             if (!slot) return 0;                                          // Never contacted
+            if (slot.status === 'released') return 0;                     // Released batch slot — back to front
             if (slot.status === 'pending') return 2;                      // Being worked right now
             if (slot.status === 'no-answer') {
                 if (!slot.noAnswerUntil || slot.noAnswerUntil <= now) return 1; // Cooldown expired — re-queue
@@ -502,6 +504,7 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
             name: draft.name, filters: draft.filters,
             eligiblePeople: eligible,
             memberDirectory,
+            batchSize: 3, // default
             createdAt: Date.now(), createdBy: user.id, isActive: true
         };
         await firestore.createOutreachSession(newSession);
@@ -523,6 +526,12 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
         const updates = { isActive: !session.isActive };
         await firestore.updateOutreachSession(session.id, updates);
         setSessions(prev => prev.map(s => s.id === session.id ? { ...s, ...updates } : s));
+    };
+
+    const handleUpdateBatchSize = async (session: OutreachSession, size: number) => {
+        const batchSize = Math.max(1, Math.min(10, size));
+        await firestore.updateOutreachSession(session.id, { batchSize });
+        setSessions(prev => prev.map(s => s.id === session.id ? { ...s, batchSize } : s));
     };
 
     const handleDeleteSession = async (sessionId: string) => {
@@ -698,6 +707,19 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                     >
                                         <Trash2 size={12} /> Delete
                                     </button>
+                                    <div className="flex items-center gap-1.5 shrink-0 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-1.5">
+                                        <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 whitespace-nowrap">Batch</label>
+                                        <input
+                                            type="number"
+                                            min={1}
+                                            max={10}
+                                            value={selectedSession.batchSize ?? 3}
+                                            onChange={e => handleUpdateBatchSize(selectedSession, parseInt(e.target.value) || 3)}
+                                            className="w-10 bg-transparent text-[11px] font-black text-center text-slate-700 dark:text-slate-200 outline-none"
+                                            title="Pre-assign this many contacts per volunteer at once (1–10)"
+                                        />
+                                        <label className="text-[9px] font-black uppercase tracking-widest text-slate-400">/ caller</label>
+                                    </div>
                                 </div>
                             </div>
 

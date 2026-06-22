@@ -1414,68 +1414,110 @@ class FirestoreService {
   async claimNextPerson(
     session: OutreachSession,
     volunteerPhone: string,
-    /** Sorted list of eligible people (by risk score asc), already filtered by session.filters */
     eligiblePeople: { id: string; name: string; phone?: string | null; email?: string | null }[],
-    /** Optional resolved name of the volunteer (looked up from memberDirectory) */
     volunteerName?: string | null
   ): Promise<OutreachSlot | null> {
+    const slots = await this.claimBatch(session, volunteerPhone, eligiblePeople, 1, volunteerName);
+    return slots[0] ?? null;
+  }
+
+  /**
+   * Atomically claim up to `batchSize` unclaimed people in one transaction.
+   * Returns an array of new pending slots (may be fewer than requested if the
+   * queue is almost empty).
+   */
+  async claimBatch(
+    session: OutreachSession,
+    volunteerPhone: string,
+    eligiblePeople: { id: string; name: string; phone?: string | null; email?: string | null }[],
+    batchSize: number,
+    volunteerName?: string | null
+  ): Promise<OutreachSlot[]> {
     try {
       const now = Date.now();
       const slotsRef = collection(db, 'outreach_slots');
 
-      const result = await runTransaction(db, async (txn) => {
-        // Read all current slots for this session
+      const newSlots = await runTransaction(db, async (txn) => {
         const q = query(slotsRef, where('sessionId', '==', session.id));
         const snap = await getDocs(q);
         const existing = snap.docs.map(d => d.data() as OutreachSlot);
 
-        // Build a set of person IDs that are already claimed or on cooldown
-        const claimedIds = new Set<string>();
+        // Build blocked set: pending/contacted/no-answer-on-cooldown block the person.
+        // 'released' does NOT block — those people go back into the queue.
+        const blocked = new Set<string>();
         for (const slot of existing) {
           if (slot.status === 'pending' || slot.status === 'contacted') {
-            // Pending = actively being worked, contacted = done
-            claimedIds.add(slot.assignedPersonId);
+            blocked.add(slot.assignedPersonId);
           } else if (slot.status === 'no-answer') {
-            // On cooldown: block until noAnswerUntil has passed
             if (slot.noAnswerUntil && slot.noAnswerUntil > now) {
-              claimedIds.add(slot.assignedPersonId);
+              blocked.add(slot.assignedPersonId);
             }
-            // Otherwise person is back in queue (at the bottom — handled by caller sort order)
           }
+          // 'released' → not added to blocked → back in queue
         }
 
-        // Find next eligible person not in claimed set
-        const next = eligiblePeople.find(p => !claimedIds.has(p.id));
-        if (!next) return null;
+        const created: OutreachSlot[] = [];
+        for (const person of eligiblePeople) {
+          if (created.length >= batchSize) break;
+          if (blocked.has(person.id)) continue;
 
-        const slotId = `slot_${session.id}_${next.id}_${now}`;
-        const newSlot: OutreachSlot = {
-          id: slotId,
-          sessionId: session.id,
-          churchId: session.churchId,
-          volunteerPhone,
-          volunteerName: volunteerName ?? null,
-          assignedPersonId: next.id,
-          assignedPersonName: next.name,
-          assignedPersonPhone: next.phone ?? null,
-          assignedPersonEmail: next.email ?? null,
-          assignedAt: now,
-          status: 'pending',
-          notes: '',
-          completedAt: null,
-          noAnswerUntil: null,
-        };
+          const slotId = `slot_${session.id}_${person.id}_${now}_${created.length}`;
+          const newSlot: OutreachSlot = {
+            id: slotId,
+            sessionId: session.id,
+            churchId: session.churchId,
+            volunteerPhone,
+            volunteerName: volunteerName ?? null,
+            assignedPersonId: person.id,
+            assignedPersonName: person.name,
+            assignedPersonPhone: person.phone ?? null,
+            assignedPersonEmail: person.email ?? null,
+            assignedAt: now + created.length, // stagger by 1ms so order is deterministic
+            status: 'pending',
+            notes: '',
+            completedAt: null,
+            noAnswerUntil: null,
+          };
+          txn.set(doc(db, 'outreach_slots', slotId), newSlot);
+          // Add to blocked immediately so subsequent iterations don't double-claim
+          blocked.add(person.id);
+          created.push(newSlot);
+        }
 
-        txn.set(doc(db, 'outreach_slots', slotId), newSlot);
-        return newSlot;
+        return created;
       });
 
-      return result;
+      return newSlots;
     } catch (e) {
-      console.error('claimNextPerson error:', e);
-      return null;
+      console.error('claimBatch error:', e);
+      return [];
     }
   }
+
+  /**
+   * Release all pending slots for a volunteer back into the queue.
+   * Called when they end their session before working the full batch.
+   * The 'released' status is ignored by claimBatch so those people
+   * immediately become available to other volunteers.
+   */
+  async releasePendingSlots(sessionId: string, volunteerPhone: string): Promise<void> {
+    try {
+      const q = query(
+        collection(db, 'outreach_slots'),
+        where('sessionId', '==', sessionId),
+        where('volunteerPhone', '==', volunteerPhone),
+        where('status', '==', 'pending')
+      );
+      const snap = await getDocs(q);
+      if (snap.empty) return;
+      const batch = writeBatch(db);
+      snap.docs.forEach(d => batch.update(d.ref, { status: 'released', completedAt: Date.now() }));
+      await batch.commit();
+    } catch (e) {
+      console.warn('releasePendingSlots error:', e);
+    }
+  }
+
 
   /** Persist a stats snapshot to the session document. */
   async updateSessionStats(
