@@ -175,14 +175,8 @@ const SessionModal: React.FC<SessionModalProps> = ({ memberStatuses, onSave, onC
 
 // ─── Live Contact Board ───────────────────────────────────────────────────────
 
-const LiveBoard: React.FC<{ sessionId: string; totalCount: number }> = ({ sessionId, totalCount }) => {
-    const [slots, setSlots] = useState<OutreachSlot[]>([]);
+const LiveBoard: React.FC<{ slots: OutreachSlot[]; totalCount: number }> = ({ slots, totalCount }) => {
     const [showNotes, setShowNotes] = useState<string | null>(null);
-
-    useEffect(() => {
-        const unsub = firestore.subscribeToOutreachSlots(sessionId, setSlots);
-        return () => unsub();
-    }, [sessionId]);
 
     const contacted   = slots.filter(s => s.status === 'contacted').length;
     const noAnswer    = slots.filter(s => s.status === 'no-answer').length;
@@ -322,6 +316,8 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
     const [qrDataUrl, setQrDataUrl]       = useState('');
     const [refreshInterval, setRefreshInterval] = useState(60); // seconds
     const [countdown, setCountdown]       = useState(60);
+    // Real-time slots for selected session (used by left counter + queue sort)
+    const [liveSlots, setLiveSlots]       = useState<OutreachSlot[]>([]);
 
     // Load sessions
     useEffect(() => {
@@ -331,6 +327,13 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
             setIsLoading(false);
         });
     }, [church.id]);
+
+    // Subscribe to slots for selected session (live counter + queue sort)
+    useEffect(() => {
+        if (!selectedId) { setLiveSlots([]); return; }
+        const unsub = firestore.subscribeToOutreachSlots(selectedId, setLiveSlots);
+        return () => unsub();
+    }, [selectedId]);
 
     // Auto-refresh countdown — fires handleRefreshQueue via ref to avoid stale closure
     const refreshHandlerRef = useRef<() => void>(() => {});
@@ -404,19 +407,61 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
             }));
     }, []);
 
-    // Filter people per selected session (for the admin preview table)
+    // Filter + sort people for the queue preview using live slot data
+    // Order: 1) Never contacted (no slot) sorted by risk score asc
+    //        2) No-answer with expired cooldown, sorted by oldest attempt first
+    //        3) Active pending (being called right now)
+    //        4) On 24h cooldown (greyed out)
+    //        5) Already contacted (bottom)
     const filteredPeople = useMemo(() => {
         if (!selectedSession) return [];
         const { riskCategories, membershipStatuses } = selectedSession.filters;
-        return people.filter(p => {
+        const base = people.filter(p => {
             if (p.status?.toLowerCase() === 'inactive') return false;
-            // Must have at least a phone or email to be contactable
             if (!p.phone && !p.email) return false;
             if (riskCategories.length > 0 && !riskCategories.includes(p.riskProfile?.category as any)) return false;
             if (membershipStatuses.length > 0 && !membershipStatuses.includes(p.membership || 'None')) return false;
             return true;
-        }).sort((a, b) => (a.riskProfile?.score ?? 0) - (b.riskProfile?.score ?? 0));
-    }, [selectedSession, people]);
+        });
+
+        const now = Date.now();
+
+        // Build a map of personId -> their most recent slot
+        const latestSlot = new Map<string, OutreachSlot>();
+        for (const slot of liveSlots) {
+            const existing = latestSlot.get(slot.assignedPersonId);
+            if (!existing || slot.assignedAt > existing.assignedAt) {
+                latestSlot.set(slot.assignedPersonId, slot);
+            }
+        }
+
+        const getGroup = (p: typeof people[0]): number => {
+            const slot = latestSlot.get(p.id);
+            if (!slot) return 0;                                          // Never contacted
+            if (slot.status === 'pending') return 2;                      // Being worked right now
+            if (slot.status === 'no-answer') {
+                if (!slot.noAnswerUntil || slot.noAnswerUntil <= now) return 1; // Cooldown expired — re-queue
+                return 3;                                                   // On cooldown
+            }
+            if (slot.status === 'contacted') return 4;                    // Done
+            return 0;
+        };
+
+        return [...base].sort((a, b) => {
+            const ga = getGroup(a);
+            const gb = getGroup(b);
+            if (ga !== gb) return ga - gb;
+            // Within group 0 (never contacted): sort by risk score asc
+            if (ga === 0) return (a.riskProfile?.score ?? 0) - (b.riskProfile?.score ?? 0);
+            // Within group 1 (expired cooldown): sort by oldest noAnswerUntil first
+            if (ga === 1) {
+                const sa = latestSlot.get(a.id);
+                const sb = latestSlot.get(b.id);
+                return (sa?.noAnswerUntil ?? 0) - (sb?.noAnswerUntil ?? 0);
+            }
+            return (a.riskProfile?.score ?? 0) - (b.riskProfile?.score ?? 0);
+        });
+    }, [selectedSession, people, liveSlots]);
 
     const handleCreateSession = async (draft: Pick<OutreachSession, 'name' | 'filters'>) => {
         const id = `os_${church.id}_${Date.now()}`;
@@ -518,19 +563,24 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                     {/* Left: Session List */}
                     <div className="lg:col-span-1 space-y-2">
                         <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Sessions</p>
-                        {sessions.map(s => (
+                        {sessions.map(s => {
+                            const isSelected = selectedId === s.id;
+                            const contacted  = isSelected ? liveSlots.filter(sl => sl.status === 'contacted').length : null;
+                            const noAnswer   = isSelected ? liveSlots.filter(sl => sl.status === 'no-answer').length : null;
+                            const total      = isSelected ? (s.eligiblePeople?.length ?? 0) : null;
+                            return (
                             <button
                                 key={s.id}
                                 onClick={() => setSelectedId(s.id)}
                                 className={`w-full text-left p-3 rounded-xl border transition-all ${
-                                    selectedId === s.id
+                                    isSelected
                                         ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800'
                                         : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:border-indigo-200 dark:hover:border-slate-700'
                                 }`}
                             >
                                 <div className="flex items-start justify-between gap-2">
                                     <div className="min-w-0">
-                                        <p className={`text-xs font-black truncate ${selectedId === s.id ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-900 dark:text-white'}`}>
+                                        <p className={`text-xs font-black truncate ${isSelected ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-900 dark:text-white'}`}>
                                             {s.name}
                                         </p>
                                         <p className="text-[10px] text-slate-400 mt-0.5">
@@ -553,8 +603,29 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                         </span>
                                     ))}
                                 </div>
+                                {/* Live counters (selected session only) */}
+                                {isSelected && total !== null && liveSlots.length > 0 && (
+                                    <div className="mt-2.5 flex items-center gap-2">
+                                        <div className="flex-1 bg-slate-100 dark:bg-slate-800 rounded-full h-1 overflow-hidden">
+                                            <div
+                                                className="bg-emerald-500 h-1 rounded-full transition-all duration-700"
+                                                style={{ width: `${total > 0 ? Math.round(((contacted ?? 0) + (noAnswer ?? 0)) / total * 100) : 0}%` }}
+                                            />
+                                        </div>
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                            <span className="inline-flex items-center gap-0.5 text-[9px] font-black text-emerald-600 dark:text-emerald-400">
+                                                <Check size={9} /> {contacted}
+                                            </span>
+                                            <span className="text-slate-300 text-[9px]">·</span>
+                                            <span className="inline-flex items-center gap-0.5 text-[9px] font-black text-rose-500">
+                                                <PhoneOff size={9} /> {noAnswer}
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
                             </button>
-                        ))}
+                            );
+                        })}
                     </div>
 
                     {/* Right: Session Detail */}
@@ -714,6 +785,7 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                                 <tr>
                                                     <th className="p-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">#</th>
                                                     <th className="p-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">Name</th>
+                                                    <th className="p-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">Status</th>
                                                     <th className="p-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">Risk</th>
                                                     <th className="p-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">Phone</th>
                                                     <th className="p-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">Email</th>
@@ -724,8 +796,51 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                                 {filteredPeople.map((person, idx) => {
                                                     const cat = person.riskProfile?.category ?? 'Disconnected';
                                                     const catColor = cat === 'Healthy' ? 'text-emerald-600' : cat === 'At Risk' ? 'text-amber-600' : 'text-rose-600';
+                                                    const now = Date.now();
+
+                                                    // Find latest slot for this person
+                                                    const slot = liveSlots
+                                                        .filter(sl => sl.assignedPersonId === person.id)
+                                                        .sort((a, b) => b.assignedAt - a.assignedAt)[0];
+
+                                                    const isContacted  = slot?.status === 'contacted';
+                                                    const isPending    = slot?.status === 'pending';
+                                                    const isNoAnswer   = slot?.status === 'no-answer';
+                                                    const onCooldown   = isNoAnswer && slot?.noAnswerUntil && slot.noAnswerUntil > now;
+                                                    const reQueued     = isNoAnswer && (!slot?.noAnswerUntil || slot.noAnswerUntil <= now);
+                                                    const neverContact = !slot;
+
+                                                    const rowBg =
+                                                        isContacted ? 'bg-emerald-50/60 dark:bg-emerald-900/10 opacity-60' :
+                                                        onCooldown  ? 'bg-slate-50 dark:bg-slate-800/30 opacity-50' :
+                                                        isPending   ? 'bg-blue-50/40 dark:bg-blue-900/10' :
+                                                        reQueued    ? 'bg-amber-50/50 dark:bg-amber-900/10' :
+                                                        '';
+
+                                                    const statusBadge = isContacted ? (
+                                                        <span className="inline-flex items-center gap-1 text-[9px] font-black text-emerald-600 bg-emerald-100 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded-full">
+                                                            <Check size={8} /> Contacted
+                                                        </span>
+                                                    ) : isPending ? (
+                                                        <span className="inline-flex items-center gap-1 text-[9px] font-black text-blue-600 bg-blue-100 dark:bg-blue-900/30 px-1.5 py-0.5 rounded-full">
+                                                            <Activity size={8} className="animate-pulse" /> In Progress
+                                                        </span>
+                                                    ) : onCooldown ? (
+                                                        <span className="inline-flex items-center gap-1 text-[9px] font-black text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded-full">
+                                                            <Clock size={8} /> Cooldown
+                                                        </span>
+                                                    ) : reQueued ? (
+                                                        <span className="inline-flex items-center gap-1 text-[9px] font-black text-amber-600 bg-amber-100 dark:bg-amber-900/30 px-1.5 py-0.5 rounded-full">
+                                                            <PhoneOff size={8} /> Re-queued
+                                                        </span>
+                                                    ) : (
+                                                        <span className="inline-flex items-center gap-1 text-[9px] font-black text-slate-400 px-1.5 py-0.5">
+                                                            — New
+                                                        </span>
+                                                    );
+
                                                     return (
-                                                        <tr key={person.id} className="border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30">
+                                                        <tr key={person.id} className={`border-b border-slate-50 dark:border-slate-800/50 ${rowBg}`}>
                                                             <td className="p-2.5 text-[10px] text-slate-400 font-bold">{idx + 1}</td>
                                                             <td className="p-2.5">
                                                                 <div className="flex items-center gap-2">
@@ -736,9 +851,12 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                                                             {person.name.slice(0, 2)}
                                                                         </div>
                                                                     )}
-                                                                    <span className="text-xs font-bold text-slate-900 dark:text-white">{person.name}</span>
+                                                                    <span className={`text-xs font-bold ${isContacted || onCooldown ? 'line-through text-slate-400' : 'text-slate-900 dark:text-white'}`}>
+                                                                        {person.name}
+                                                                    </span>
                                                                 </div>
                                                             </td>
+                                                            <td className="p-2.5">{statusBadge}</td>
                                                             <td className="p-2.5">
                                                                 <span className={`text-[10px] font-black uppercase ${catColor}`}>{cat}</span>
                                                                 <span className="text-[9px] text-slate-400 ml-1">({person.riskProfile?.score ?? 0})</span>
@@ -760,7 +878,7 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3 flex items-center gap-1.5">
                                     <Activity size={11} className="text-emerald-500 animate-pulse" /> Live Contact Board
                                 </p>
-                                <LiveBoard sessionId={selectedSession.id} totalCount={filteredPeople.length} />
+                                <LiveBoard slots={liveSlots} totalCount={filteredPeople.length} />
                             </div>
                         </div>
                     ) : null}
