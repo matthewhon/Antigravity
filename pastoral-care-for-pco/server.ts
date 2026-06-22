@@ -424,6 +424,55 @@ async function startServer() {
       }
     });
 
+    // ─── Outreach Contact Log → PCO Note ────────────────────────────────────────
+    // Called fire-and-forget from the public volunteer page after marking an outcome.
+    // Writes a note to the person's PCO profile so pastors can see who was contacted.
+    app.post('/api/outreach/log-contact', express.json(), async (req: any, res: any) => {
+      const { sessionId, slotId, outcome, notes, volunteerName } = req.body || {};
+      if (!sessionId || !slotId) return res.status(400).json({ error: 'Missing sessionId or slotId' });
+      try {
+        const db = getDb();
+        const sessionSnap = await db.collection('outreach_sessions').doc(sessionId).get();
+        if (!sessionSnap.exists) return res.status(404).json({ error: 'Session not found' });
+        const session = sessionSnap.data() as any;
+        const churchId: string = session.churchId;
+        if (!churchId) return res.status(400).json({ error: 'Session has no churchId' });
+
+        const slotSnap = await db.collection('outreach_slots').doc(slotId).get();
+        if (!slotSnap.exists) return res.status(404).json({ error: 'Slot not found' });
+        const slot = slotSnap.data() as any;
+        if (slot.sessionId !== sessionId) return res.status(403).json({ error: 'Slot does not belong to session' });
+
+        const personId: string = slot.assignedPersonId;
+        const sessionName: string = session.name || 'Outreach Session';
+        const outcomeEmoji = outcome === 'contacted' ? '✅' : '📵';
+        const outcomeLabel = outcome === 'contacted' ? 'Reached' : 'No Answer';
+        const dateStr = new Date().toLocaleString('en-US', {
+          month: 'short', day: 'numeric', year: 'numeric',
+          hour: 'numeric', minute: '2-digit', hour12: true, timeZoneName: 'short'
+        });
+        const noteLines: string[] = [
+          `${outcomeEmoji} Pastoral Outreach — ${outcomeLabel}`,
+          `Session: ${sessionName}`,
+          ...(volunteerName ? [`Contacted by: ${volunteerName}`] : []),
+          `Date: ${dateStr}`,
+          ...(notes?.trim() ? ['', '---', notes.trim()] : []),
+        ];
+
+        const { writePcoNote } = await import('./backend/pcoNotes.js') as any;
+        const { createServerLogger } = await import('./services/logService.js') as any;
+        const log = createServerLogger(db);
+        // Fire-and-forget so volunteer isn't blocked
+        writePcoNote({ db, log, churchId, personId, noteContent: noteLines.join('\n') })
+          .catch(() => { /* already logged inside writePcoNote */ });
+
+        return res.json({ success: true, personId });
+      } catch (e: any) {
+        console.error('[outreach/log-contact]', e.message);
+        return res.status(500).json({ error: e.message });
+      }
+    });
+
     // ─── Web Push Notifications ─────────────────────────────────────────────────
     app.get('/push/vapid-public-key',  getVapidPublicKey);
     app.post('/push/subscribe',        express.json(), savePushSubscription);

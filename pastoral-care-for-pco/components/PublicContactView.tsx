@@ -3,7 +3,7 @@ import { OutreachSession, OutreachSlot } from '../types';
 import { firestore } from '../services/firestoreService';
 import {
     Phone, Mail, CheckCircle2, PhoneOff, ArrowRight, LogOut,
-    Loader2, Heart, Users, ChevronRight, Award, TrendingUp
+    Loader2, Heart, Users, ChevronRight, Award, TrendingUp, MessageSquare
 } from 'lucide-react';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -162,18 +162,25 @@ type Outcome = 'contacted' | 'no-answer';
 interface ContactCardProps {
     slot: OutreachSlot;
     onComplete: (outcome: Outcome, notes: string) => void;
-    isSaving: boolean;
 }
 
-const ContactCard: React.FC<ContactCardProps> = ({ slot, onComplete, isSaving }) => {
+const ContactCard: React.FC<ContactCardProps> = ({ slot, onComplete }) => {
     const [notes, setNotes] = useState('');
     const [selectedOutcome, setSelectedOutcome] = useState<Outcome | null>(null);
     const [confirmed, setConfirmed] = useState(false);
 
+    // Reset internal state when the slot changes (next person in batch)
+    useEffect(() => {
+        setNotes('');
+        setSelectedOutcome(null);
+        setConfirmed(false);
+    }, [slot.id]);
+
     const handleConfirm = () => {
-        if (!selectedOutcome) return;
-        setConfirmed(true);
+        if (!selectedOutcome || confirmed) return;
+        setConfirmed(true); // disable button immediately
         onComplete(selectedOutcome, notes);
+        // Parent advances instantly; React will unmount this or swap slot.id
     };
 
     return (
@@ -208,7 +215,7 @@ const ContactCard: React.FC<ContactCardProps> = ({ slot, onComplete, isSaving })
                                     <Phone size={18} className="text-white" />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-0.5">Phone</p>
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-0.5">Call</p>
                                     <p className="text-base font-black text-slate-900 tracking-wide">{formatPhone(slot.assignedPersonPhone)}</p>
                                 </div>
                                 <ArrowRight size={16} className="text-emerald-400 group-hover:translate-x-1 transition-transform" />
@@ -219,10 +226,27 @@ const ContactCard: React.FC<ContactCardProps> = ({ slot, onComplete, isSaving })
                                     <Phone size={18} className="text-slate-400" />
                                 </div>
                                 <div>
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Phone</p>
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Call</p>
                                     <p className="text-sm font-bold text-slate-400">No phone on file</p>
                                 </div>
                             </div>
+                        )}
+
+                        {/* Text / SMS */}
+                        {slot.assignedPersonPhone && (
+                            <a
+                                href={`sms:${slot.assignedPersonPhone.replace(/\D/g, '').replace(/^(\d{10})$/, '+1$1')}`}
+                                className="flex items-center gap-3 bg-violet-50 hover:bg-violet-100 border border-violet-100 rounded-2xl px-5 py-4 transition-all group"
+                            >
+                                <div className="w-10 h-10 rounded-xl bg-violet-500 flex items-center justify-center shadow-md shadow-violet-200 group-hover:scale-110 transition-transform">
+                                    <MessageSquare size={18} className="text-white" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-violet-600 mb-0.5">Text</p>
+                                    <p className="text-base font-black text-slate-900 tracking-wide">{formatPhone(slot.assignedPersonPhone)}</p>
+                                </div>
+                                <ArrowRight size={16} className="text-violet-400 group-hover:translate-x-1 transition-transform" />
+                            </a>
                         )}
 
                         {slot.assignedPersonEmail ? (
@@ -319,16 +343,16 @@ const ContactCard: React.FC<ContactCardProps> = ({ slot, onComplete, isSaving })
             {selectedOutcome && (
                 <button
                     onClick={handleConfirm}
-                    disabled={isSaving || confirmed}
+                    disabled={confirmed}
                     className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-sm shadow-lg transition-all flex items-center justify-center gap-2 ${
                         selectedOutcome === 'contacted'
                             ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-200'
                             : 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-200'
                     } disabled:opacity-60`}
                 >
-                    {isSaving || confirmed
-                        ? <><Loader2 size={16} className="animate-spin" /> Saving…</>
-                        : <>{selectedOutcome === 'contacted' ? 'Save & Get Next Person' : 'Record & Get Next Person'} <ArrowRight size={16} /></>
+                    {confirmed
+                        ? <><Loader2 size={16} className="animate-spin" /> Loading next…</>
+                        : (selectedOutcome === 'contacted' ? '✅ Mark as Reached' : '📵 Mark as No Answer')
                     }
                 </button>
             )}
@@ -496,7 +520,6 @@ export const PublicContactView: React.FC<{ sessionId: string }> = ({ sessionId }
     // Batch of pre-assigned slots; batchIdx is the current position
     const [batch, setBatch] = useState<OutreachSlot[]>([]);
     const [batchIdx, setBatchIdx] = useState(0);
-    const [isSaving, setIsSaving] = useState(false);
     // Personal stats for this volunteer
     const [myContacted, setMyContacted] = useState(0);
     const [myNoAnswer, setMyNoAnswer] = useState(0);
@@ -589,13 +612,26 @@ export const PublicContactView: React.FC<{ sessionId: string }> = ({ sessionId }
     const handleComplete = async (outcome: Outcome, notes: string) => {
         if (!currentSlot || !session) return;
 
-        // 1. Update Firestore in the background (don't await — instant UX)
+        // 1. Firestore slot update — fire-and-forget
         const now = Date.now();
         const updates: any = { status: outcome, notes, completedAt: now };
         if (outcome === 'no-answer') updates.noAnswerUntil = now + 24 * 60 * 60 * 1000;
-        firestore.updateOutreachSlot(currentSlot.id, updates); // fire-and-forget
+        firestore.updateOutreachSlot(currentSlot.id, updates);
 
-        // 2. Update personal stats immediately
+        // 2. PCO note — fire-and-forget to the server endpoint
+        fetch('/api/outreach/log-contact', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                sessionId: session.id,
+                slotId: currentSlot.id,
+                outcome,
+                notes: notes?.trim() || '',
+                volunteerName,
+            }),
+        }).catch(() => { /* non-blocking */ });
+
+        // 3. Update personal stats immediately
         if (outcome === 'contacted') setMyContacted(p => p + 1);
         else setMyNoAnswer(p => p + 1);
 
@@ -684,7 +720,7 @@ export const PublicContactView: React.FC<{ sessionId: string }> = ({ sessionId }
                 </div>
             )}
             {viewState === 'contact' && currentSlot && (
-                <ContactCard slot={currentSlot} onComplete={handleComplete} isSaving={isSaving} />
+                <ContactCard slot={currentSlot} onComplete={handleComplete} />
             )}
             {isDone && (
                 <AllDoneCard
