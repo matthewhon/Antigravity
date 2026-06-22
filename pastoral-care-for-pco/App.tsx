@@ -488,6 +488,7 @@ const App: React.FC = () => {
       if (v === 'pastoral-community') return user.roles.includes('Pastor') || user.roles.includes('Pastoral Care');
       if (v === 'pastoral-care') return user.roles.includes('Pastor') || user.roles.includes('Pastoral Care');
       if (v === 'pastoral-calendar') return user.roles.includes('Pastor') || user.roles.includes('Pastoral Care');
+      if (v === 'pastoral-contact') return user.roles.includes('Pastor') || user.roles.includes('Pastoral Care');
       if (v === 'pastoral-reports') return user.roles.includes('Pastor') || user.roles.includes('Pastoral Care');
       if (v === 'pastor-ai') return user.roles.includes('Pastor AI') || user.roles.includes('Pastor');
       
