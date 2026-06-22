@@ -1415,7 +1415,9 @@ class FirestoreService {
     session: OutreachSession,
     volunteerPhone: string,
     /** Sorted list of eligible people (by risk score asc), already filtered by session.filters */
-    eligiblePeople: { id: string; name: string; phone?: string | null; email?: string | null }[]
+    eligiblePeople: { id: string; name: string; phone?: string | null; email?: string | null }[],
+    /** Optional resolved name of the volunteer (looked up from memberDirectory) */
+    volunteerName?: string | null
   ): Promise<OutreachSlot | null> {
     try {
       const now = Date.now();
@@ -1452,6 +1454,7 @@ class FirestoreService {
           sessionId: session.id,
           churchId: session.churchId,
           volunteerPhone,
+          volunteerName: volunteerName ?? null,
           assignedPersonId: next.id,
           assignedPersonName: next.name,
           assignedPersonPhone: next.phone ?? null,
@@ -1471,6 +1474,21 @@ class FirestoreService {
     } catch (e) {
       console.error('claimNextPerson error:', e);
       return null;
+    }
+  }
+
+  /** Persist a stats snapshot to the session document. */
+  async updateSessionStats(
+    sessionId: string,
+    stats: { contactedCount: number; noAnswerCount: number; pendingCount: number; totalEligible: number }
+  ): Promise<void> {
+    try {
+      await updateDoc(doc(db, 'outreach_sessions', sessionId), {
+        stats: { ...stats, lastUpdatedAt: Date.now() },
+      });
+    } catch (e) {
+      // Non-critical — best-effort
+      console.warn('updateSessionStats error:', e);
     }
   }
 

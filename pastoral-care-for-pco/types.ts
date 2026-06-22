@@ -1879,6 +1879,20 @@ export interface OutreachSession {
      * Sorted: primary (never-contacted) by risk score asc, then by name.
      */
     eligiblePeople?: { id: string; name: string; phone?: string | null; email?: string | null; riskScore: number }[];
+    /**
+     * Phone-number → member-name lookup for all non-inactive church members.
+     * Allows unauthenticated volunteer pages to resolve a phone number to a name.
+     * Key is the normalised E.164-ish digits string (no formatting).
+     */
+    memberDirectory?: { phone: string; name: string }[];
+    /** Persisted stats snapshot — updated every time a slot outcome is recorded */
+    stats?: {
+        contactedCount: number;
+        noAnswerCount: number;
+        pendingCount: number;
+        totalEligible: number;
+        lastUpdatedAt: number;
+    };
     createdAt: number;
     createdBy: string; // userId
     isActive: boolean;
@@ -1894,6 +1908,8 @@ export interface OutreachSlot {
     churchId: string;
     /** Volunteer's phone number — used as their unique identity within the session */
     volunteerPhone: string;
+    /** Resolved name of the volunteer (looked up from church member directory at assignment time) */
+    volunteerName?: string | null;
     /** The church member being contacted */
     assignedPersonId: string;
     assignedPersonName: string;

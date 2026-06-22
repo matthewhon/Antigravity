@@ -242,15 +242,20 @@ const LiveBoard: React.FC<{ slots: OutreachSlot[]; totalCount: number }> = ({ sl
                                     <tr key={slot.id} className={`border-b border-slate-50 dark:border-slate-800/50 ${isStale ? 'bg-amber-50/50 dark:bg-amber-900/10' : ''}`}>
                                         <td className="p-3">
                                             <div className="flex items-center gap-2">
-                                                <div className="w-7 h-7 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center">
+                                                <div className="w-7 h-7 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center shrink-0">
                                                     <Phone size={11} className="text-indigo-500" />
                                                 </div>
-                                                <span className="text-xs font-mono text-slate-600 dark:text-slate-300">
-                                                    {maskPhone(slot.volunteerPhone)}
-                                                </span>
-                                                {isStale && (
-                                                    <span className="text-[9px] font-black uppercase text-amber-600 bg-amber-100 dark:bg-amber-900/40 rounded px-1">Stale</span>
-                                                )}
+                                                <div>
+                                                    {slot.volunteerName ? (
+                                                        <p className="text-xs font-black text-slate-800 dark:text-white leading-tight">{slot.volunteerName}</p>
+                                                    ) : null}
+                                                    <span className="text-[10px] font-mono text-slate-400">
+                                                        {maskPhone(slot.volunteerPhone)}
+                                                    </span>
+                                                    {isStale && (
+                                                        <span className="ml-1 text-[9px] font-black uppercase text-amber-600 bg-amber-100 dark:bg-amber-900/40 rounded px-1">Stale</span>
+                                                    )}
+                                                </div>
                                             </div>
                                         </td>
                                         <td className="p-3">
@@ -335,6 +340,23 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
         return () => unsub();
     }, [selectedId]);
 
+    // Persist stats snapshot whenever liveSlots change (debounced)
+    useEffect(() => {
+        if (!selectedId || liveSlots.length === 0) return;
+        const session = sessions.find(s => s.id === selectedId);
+        if (!session) return;
+        const timer = setTimeout(() => {
+            const contactedCount = liveSlots.filter(s => s.status === 'contacted').length;
+            const noAnswerCount  = liveSlots.filter(s => s.status === 'no-answer').length;
+            const pendingCount   = liveSlots.filter(s => s.status === 'pending').length;
+            const totalEligible  = session.eligiblePeople?.length ?? 0;
+            firestore.updateSessionStats(session.id, {
+                contactedCount, noAnswerCount, pendingCount, totalEligible
+            });
+        }, 2000); // debounce 2s
+        return () => clearTimeout(timer);
+    }, [liveSlots, selectedId, sessions]);
+
     // Auto-refresh countdown — fires handleRefreshQueue via ref to avoid stale closure
     const refreshHandlerRef = useRef<() => void>(() => {});
     useEffect(() => {
@@ -407,6 +429,14 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
             }));
     }, []);
 
+    // Build phone → name directory from all non-inactive people
+    const buildMemberDirectory = useCallback((allPeople: typeof people) => {
+        return allPeople
+            .filter(p => p.status?.toLowerCase() !== 'inactive' && p.phone)
+            .map(p => ({ phone: p.phone!.replace(/\D/g, ''), name: p.name }))
+            .filter(e => e.phone.length >= 10);
+    }, []);
+
     // Filter + sort people for the queue preview using live slot data
     // Order: 1) Never contacted (no slot) sorted by risk score asc
     //        2) No-answer with expired cooldown, sorted by oldest attempt first
@@ -465,12 +495,13 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
 
     const handleCreateSession = async (draft: Pick<OutreachSession, 'name' | 'filters'>) => {
         const id = `os_${church.id}_${Date.now()}`;
-        // Build the eligible people list from current people data
         const eligible = buildEligiblePeople(people, draft.filters);
+        const memberDirectory = buildMemberDirectory(people);
         const newSession: OutreachSession = {
             id, churchId: church.id,
             name: draft.name, filters: draft.filters,
             eligiblePeople: eligible,
+            memberDirectory,
             createdAt: Date.now(), createdBy: user.id, isActive: true
         };
         await firestore.createOutreachSession(newSession);
@@ -482,7 +513,8 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
     const handleRefreshQueue = async () => {
         if (!selectedSession) return;
         const eligible = buildEligiblePeople(people, selectedSession.filters);
-        const updates = { eligiblePeople: eligible };
+        const memberDirectory = buildMemberDirectory(people);
+        const updates = { eligiblePeople: eligible, memberDirectory };
         await firestore.updateOutreachSession(selectedSession.id, updates);
         setSessions(prev => prev.map(s => s.id === selectedSession.id ? { ...s, ...updates } : s));
     };

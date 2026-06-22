@@ -3,7 +3,7 @@ import { OutreachSession, OutreachSlot } from '../types';
 import { firestore } from '../services/firestoreService';
 import {
     Phone, Mail, CheckCircle2, PhoneOff, ArrowRight, LogOut,
-    Loader2, Heart, Users, ChevronRight
+    Loader2, Heart, Users, ChevronRight, Award, TrendingUp
 } from 'lucide-react';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -336,31 +336,130 @@ const ContactCard: React.FC<ContactCardProps> = ({ slot, onComplete, isSaving })
     );
 };
 
-// ─── All Done Card ────────────────────────────────────────────────────────────
+// ─── Live Stats Strip ─────────────────────────────────────────────────────────
 
-const AllDoneCard: React.FC<{ sessionName: string; count: number; reason: 'exhausted' | 'ended' }> = ({
-    sessionName, count, reason
-}) => (
-    <div className="bg-white rounded-[2rem] shadow-xl border border-slate-100 p-10 text-center">
-        <div className="w-20 h-20 rounded-full bg-gradient-to-br from-emerald-400 to-indigo-500 flex items-center justify-center mx-auto mb-5 shadow-xl shadow-emerald-200/50">
-            {reason === 'ended' ? <LogOut size={32} className="text-white" /> : <Heart size={32} fill="white" className="text-white" />}
+const StatsStrip: React.FC<{
+    myContacted: number;
+    myNoAnswer: number;
+    sessionContacted: number;
+    sessionTotal: number;
+}> = ({ myContacted, myNoAnswer, sessionContacted, sessionTotal }) => (
+    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 mb-4 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+            <div className="text-center">
+                <p className="text-2xl font-black text-emerald-600">{myContacted}</p>
+                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Reached</p>
+            </div>
+            <div className="w-px h-8 bg-slate-100" />
+            <div className="text-center">
+                <p className="text-2xl font-black text-rose-500">{myNoAnswer}</p>
+                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">No Answer</p>
+            </div>
         </div>
-        <h2 className="text-2xl font-black text-slate-900 mb-2">
-            {reason === 'ended' ? 'Session Ended' : 'Amazing Work!'}
-        </h2>
-        <p className="text-sm text-slate-500 mb-3">
-            {reason === 'ended'
-                ? `Thanks for helping with "${sessionName}". You made ${count} contact${count !== 1 ? 's' : ''} today.`
-                : `You've worked through everyone available in "${sessionName}". Thanks for your faithfulness!`
-            }
-        </p>
-        {count > 0 && (
-            <div className="inline-flex items-center gap-2 bg-indigo-50 text-indigo-600 px-4 py-2 rounded-full font-black text-sm">
-                <Users size={14} /> {count} {count === 1 ? 'person' : 'people'} contacted
+        {sessionTotal > 0 && (
+            <div className="flex-1 max-w-[140px]">
+                <div className="flex items-center justify-between mb-1">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Session</p>
+                    <p className="text-[9px] font-black text-indigo-600">{Math.round(sessionContacted / sessionTotal * 100)}%</p>
+                </div>
+                <div className="bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                    <div
+                        className="bg-indigo-500 h-1.5 rounded-full transition-all duration-700"
+                        style={{ width: `${Math.min(100, Math.round(sessionContacted / sessionTotal * 100))}%` }}
+                    />
+                </div>
+                <p className="text-[9px] text-slate-400 mt-1 text-right">{sessionContacted}/{sessionTotal} attempted</p>
             </div>
         )}
     </div>
 );
+
+// ─── All Done Card ────────────────────────────────────────────────────────────
+
+interface AllDoneCardProps {
+    sessionName: string;
+    myContacted: number;
+    myNoAnswer: number;
+    sessionContacted: number;
+    sessionNoAnswer: number;
+    sessionTotal: number;
+    reason: 'exhausted' | 'ended';
+}
+
+const AllDoneCard: React.FC<AllDoneCardProps> = ({
+    sessionName, myContacted, myNoAnswer,
+    sessionContacted, sessionNoAnswer, sessionTotal, reason
+}) => {
+    const myTotal = myContacted + myNoAnswer;
+    const sessionAttempted = sessionContacted + sessionNoAnswer;
+    const pct = sessionTotal > 0 ? Math.round(sessionAttempted / sessionTotal * 100) : 0;
+    return (
+        <div className="space-y-4">
+            <div className="bg-white rounded-[2rem] shadow-xl border border-slate-100 p-8 text-center">
+                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-emerald-400 to-indigo-500 flex items-center justify-center mx-auto mb-4 shadow-xl shadow-emerald-200/50">
+                    {reason === 'ended' ? <Award size={32} className="text-white" /> : <Heart size={32} fill="white" className="text-white" />}
+                </div>
+                <h2 className="text-2xl font-black text-slate-900 mb-1">
+                    {reason === 'ended' ? 'Great Work!' : 'All Done!'}
+                </h2>
+                <p className="text-sm text-slate-500">
+                    {reason === 'ended'
+                        ? `You've finished your session for "${sessionName}".`
+                        : `You've worked through everyone available in "${sessionName}".`}
+                </p>
+            </div>
+            <div className="bg-white rounded-[2rem] shadow-xl border border-slate-100 p-6">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4 flex items-center gap-1.5">
+                    <Award size={11} className="text-indigo-500" /> Your Contribution
+                </p>
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div className="bg-emerald-50 rounded-2xl p-4 text-center">
+                        <p className="text-4xl font-black text-emerald-600 mb-1">{myContacted}</p>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-emerald-500">✅ Reached</p>
+                    </div>
+                    <div className="bg-rose-50 rounded-2xl p-4 text-center">
+                        <p className="text-4xl font-black text-rose-500 mb-1">{myNoAnswer}</p>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-rose-400">📵 No Answer</p>
+                    </div>
+                </div>
+                {myTotal > 0 && (
+                    <div className="bg-indigo-50 rounded-xl px-4 py-2.5 text-center">
+                        <p className="text-sm font-black text-indigo-700">
+                            You attempted {myTotal} {myTotal === 1 ? 'contact' : 'contacts'} — thank you!
+                        </p>
+                    </div>
+                )}
+            </div>
+            {sessionTotal > 0 && (
+                <div className="bg-white rounded-[2rem] shadow-xl border border-slate-100 p-6">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4 flex items-center gap-1.5">
+                        <TrendingUp size={11} className="text-indigo-500" /> Session Progress
+                    </p>
+                    <div className="flex items-center justify-between mb-2">
+                        <p className="text-sm font-black text-slate-700">{pct}% attempted</p>
+                        <p className="text-xs text-slate-400">{sessionAttempted} of {sessionTotal}</p>
+                    </div>
+                    <div className="bg-slate-100 rounded-full h-3 overflow-hidden mb-4">
+                        <div
+                            className="bg-gradient-to-r from-indigo-500 to-emerald-500 h-3 rounded-full transition-all duration-700"
+                            style={{ width: `${Math.min(100, pct)}%` }}
+                        />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className="text-center">
+                            <p className="text-xl font-black text-emerald-600">{sessionContacted}</p>
+                            <p className="text-[9px] uppercase font-black text-slate-400 tracking-widest">Total Reached</p>
+                        </div>
+                        <div className="text-center">
+                            <p className="text-xl font-black text-rose-500">{sessionNoAnswer}</p>
+                            <p className="text-[9px] uppercase font-black text-slate-400 tracking-widest">No Answer</p>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
 
 // ─── Paused Session Card ──────────────────────────────────────────────────────
 
@@ -393,9 +492,14 @@ export const PublicContactView: React.FC<{ sessionId: string }> = ({ sessionId }
     const [session, setSession] = useState<OutreachSession | null>(null);
     const [viewState, setViewState] = useState<ViewState>('loading');
     const [volunteerPhone, setVolunteerPhone] = useState('');
+    const [volunteerName, setVolunteerName] = useState<string | null>(null);
     const [currentSlot, setCurrentSlot] = useState<OutreachSlot | null>(null);
     const [isSaving, setIsSaving] = useState(false);
-    const [contactCount, setContactCount] = useState(0);
+    // Personal stats for this volunteer
+    const [myContacted, setMyContacted] = useState(0);
+    const [myNoAnswer, setMyNoAnswer] = useState(0);
+    // Live session-wide slots
+    const [liveSlots, setLiveSlots] = useState<OutreachSlot[]>([]);
 
     // Load session on mount
     useEffect(() => {
@@ -403,15 +507,22 @@ export const PublicContactView: React.FC<{ sessionId: string }> = ({ sessionId }
         firestore.getOutreachSession(sessionId).then(s => {
             if (!s) { setViewState('not-found'); return; }
             setSession(s);
-            // Check for stored volunteer phone
             const stored = sessionStorage.getItem(STORAGE_KEY(sessionId));
-            if (stored) {
-                setVolunteerPhone(stored);
-                // Don't auto-advance — let user confirm they want to continue
-            }
+            if (stored) setVolunteerPhone(stored);
             setViewState(s.isActive ? 'phone' : 'paused');
         });
     }, [sessionId]);
+
+    // Subscribe to all slots for live session stats
+    useEffect(() => {
+        if (!sessionId) return;
+        const unsub = firestore.subscribeToOutreachSlots(sessionId, setLiveSlots);
+        return () => unsub();
+    }, [sessionId]);
+
+    const sessionContacted = liveSlots.filter(s => s.status === 'contacted').length;
+    const sessionNoAnswer  = liveSlots.filter(s => s.status === 'no-answer').length;
+    const sessionTotal     = session?.eligiblePeople?.length ?? 0;
 
     // Get sorted filtered people for the session, using the denormalized list stored in the session doc
     const getFilteredPeople = useCallback(async (): Promise<{ id: string; name: string; phone?: string | null; email?: string | null }[]> => {
@@ -419,7 +530,6 @@ export const PublicContactView: React.FC<{ sessionId: string }> = ({ sessionId }
         const allSlots = await firestore.getOutreachSlots(session.id);
         const now = Date.now();
 
-        // Build sets of blocked person IDs
         const alreadyDone = new Set<string>();
         const onCooldown = new Set<string>();
         for (const slot of allSlots) {
@@ -432,23 +542,13 @@ export const PublicContactView: React.FC<{ sessionId: string }> = ({ sessionId }
             }
         }
 
-        // Use the denormalized eligiblePeople list stored in the session doc
         const allPeople = session.eligiblePeople ?? [];
-
-        // Primary queue: never attempted and not on cooldown (sorted by riskScore asc)
         const primary = allPeople.filter(p => !alreadyDone.has(p.id) && !onCooldown.has(p.id));
-
-        // Re-queued after cooldown: were no-answer but cooldown expired
         const reQueued = allPeople.filter(p => {
             if (alreadyDone.has(p.id) || onCooldown.has(p.id)) return false;
-            // Was previously no-answer but now eligible
             return allSlots.some(s => s.assignedPersonId === p.id && s.status === 'no-answer');
         });
-
-        // primary is already sorted by riskScore from when the admin built the list
-        // Remove reQueued from primary to avoid duplicates, then append reQueued at bottom
         const primaryFiltered = primary.filter(p => !reQueued.find(r => r.id === p.id));
-
         return [...primaryFiltered, ...reQueued];
     }, [session]);
 
@@ -456,19 +556,18 @@ export const PublicContactView: React.FC<{ sessionId: string }> = ({ sessionId }
         if (!session || !sessionId) return;
         setVolunteerPhone(phone);
         sessionStorage.setItem(STORAGE_KEY(sessionId), phone);
+
+        // Resolve volunteer name from member directory
+        const normalised = phone.replace(/\D/g, '');
+        const match = session.memberDirectory?.find(e => e.phone === normalised);
+        const resolvedName = match?.name ?? null;
+        setVolunteerName(resolvedName);
+
         setViewState('assigning');
-
         const eligible = await getFilteredPeople();
-        if (eligible.length === 0) {
-            setViewState('done-exhausted');
-            return;
-        }
-
-        const slot = await firestore.claimNextPerson(session, phone, eligible);
-        if (!slot) {
-            setViewState('done-exhausted');
-            return;
-        }
+        if (eligible.length === 0) { setViewState('done-exhausted'); return; }
+        const slot = await firestore.claimNextPerson(session, phone, eligible, resolvedName);
+        if (!slot) { setViewState('done-exhausted'); return; }
         setCurrentSlot(slot);
         setViewState('contact');
     };
@@ -476,38 +575,23 @@ export const PublicContactView: React.FC<{ sessionId: string }> = ({ sessionId }
     const handleComplete = async (outcome: Outcome, notes: string) => {
         if (!currentSlot || !session) return;
         setIsSaving(true);
-
         const now = Date.now();
-        const updates: any = {
-            status: outcome,
-            notes,
-            completedAt: now,
-        };
-        if (outcome === 'no-answer') {
-            updates.noAnswerUntil = now + 24 * 60 * 60 * 1000; // 24 hours
-        }
+        const updates: any = { status: outcome, notes, completedAt: now };
+        if (outcome === 'no-answer') updates.noAnswerUntil = now + 24 * 60 * 60 * 1000;
 
         await firestore.updateOutreachSlot(currentSlot.id, updates);
-        setContactCount(prev => prev + 1);
+        if (outcome === 'contacted') setMyContacted(p => p + 1);
+        else setMyNoAnswer(p => p + 1);
 
-        // Brief pause before advancing
         await new Promise(r => setTimeout(r, 800));
         setIsSaving(false);
         setCurrentSlot(null);
         setViewState('assigning');
 
-        // Get next assignment
         const eligible = await getFilteredPeople();
-        if (eligible.length === 0) {
-            setViewState('done-exhausted');
-            return;
-        }
-
-        const nextSlot = await firestore.claimNextPerson(session, volunteerPhone, eligible);
-        if (!nextSlot) {
-            setViewState('done-exhausted');
-            return;
-        }
+        if (eligible.length === 0) { setViewState('done-exhausted'); return; }
+        const nextSlot = await firestore.claimNextPerson(session, volunteerPhone, eligible, volunteerName);
+        if (!nextSlot) { setViewState('done-exhausted'); return; }
         setCurrentSlot(nextSlot);
         setViewState('contact');
     };
@@ -519,36 +603,40 @@ export const PublicContactView: React.FC<{ sessionId: string }> = ({ sessionId }
     };
 
     const sessionName = session?.name ?? '';
+    const isActive = viewState === 'contact' || viewState === 'assigning';
+    const isDone = viewState === 'done-exhausted' || viewState === 'done-ended';
 
     return (
-        <Shell
-            churchName={undefined} // Could be fetched if needed
-            sessionName={sessionName || undefined}
-            onEnd={viewState === 'contact' || viewState === 'assigning' ? handleEndSession : undefined}
-        >
+        <Shell sessionName={sessionName || undefined} onEnd={isActive ? handleEndSession : undefined}>
             {viewState === 'loading' && <LoadingCard />}
             {viewState === 'not-found' && <NotFoundCard />}
             {viewState === 'paused' && <PausedCard sessionName={sessionName} />}
             {viewState === 'phone' && (
-                <PhoneStep
-                    sessionName={sessionName}
-                    onSubmit={handlePhoneSubmit}
-                    isLoading={false}
-                />
+                <PhoneStep sessionName={sessionName} onSubmit={handlePhoneSubmit} isLoading={false} />
             )}
             {viewState === 'assigning' && <AssigningCard />}
-            {viewState === 'contact' && currentSlot && (
-                <ContactCard
-                    slot={currentSlot}
-                    onComplete={handleComplete}
-                    isSaving={isSaving}
+            {/* Personal stats strip — shows after first outcome */}
+            {isActive && (myContacted + myNoAnswer > 0) && (
+                <StatsStrip
+                    myContacted={myContacted}
+                    myNoAnswer={myNoAnswer}
+                    sessionContacted={sessionContacted}
+                    sessionTotal={sessionTotal}
                 />
             )}
-            {viewState === 'done-exhausted' && (
-                <AllDoneCard sessionName={sessionName} count={contactCount} reason="exhausted" />
+            {viewState === 'contact' && currentSlot && (
+                <ContactCard slot={currentSlot} onComplete={handleComplete} isSaving={isSaving} />
             )}
-            {viewState === 'done-ended' && (
-                <AllDoneCard sessionName={sessionName} count={contactCount} reason="ended" />
+            {isDone && (
+                <AllDoneCard
+                    sessionName={sessionName}
+                    myContacted={myContacted}
+                    myNoAnswer={myNoAnswer}
+                    sessionContacted={sessionContacted}
+                    sessionNoAnswer={sessionNoAnswer}
+                    sessionTotal={sessionTotal}
+                    reason={viewState === 'done-ended' ? 'ended' : 'exhausted'}
+                />
             )}
         </Shell>
     );
