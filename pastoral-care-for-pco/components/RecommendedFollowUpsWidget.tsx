@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { PeopleDashboardData, PcoGroup, GivingAnalytics, SmsConversation, SmsTag, LifecycleDonor, CareFollowUpLog } from '../types';
 import { WidgetWrapper } from './SharedUI';
-import { MessageSquare, Check, X, RotateCcw } from 'lucide-react';
+import { MessageSquare, Check, X, RotateCcw, Mail, Phone, User } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -19,6 +19,9 @@ interface FollowUpItem {
     priority: Priority;
     badgeLabel: string;
     detail: string;
+    memberStatus?: string | null;
+    email?: string | null;
+    phone?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -150,6 +153,29 @@ const FollowUpRow: React.FC<FollowUpRowProps> = ({ item, isDone, onMarkFollowedU
                 <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5 truncate">
                     {item.detail}
                 </p>
+                {/* Member status / contact chips */}
+                {(item.memberStatus || item.email || item.phone) && (
+                    <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                        {item.memberStatus && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                                <User size={8} strokeWidth={2.5} />
+                                {item.memberStatus}
+                            </span>
+                        )}
+                        {item.email && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 truncate max-w-[140px]">
+                                <Mail size={8} strokeWidth={2} className="flex-shrink-0" />
+                                <span className="truncate">{item.email}</span>
+                            </span>
+                        )}
+                        {item.phone && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                                <Phone size={8} strokeWidth={2} />
+                                {item.phone}
+                            </span>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* Actions */}
@@ -233,6 +259,15 @@ export const RecommendedFollowUpsWidget: React.FC<RecommendedFollowUpsWidgetProp
     }, [followUpLog]);
 
     // -----------------------------------------------------------------------
+    // Build a person lookup map: personId → PcoPerson (for contact details)
+    // -----------------------------------------------------------------------
+    const personMap = useMemo(() => {
+        const m = new Map<string, { memberStatus?: string | null; email?: string | null; phone?: string | null }>();
+        (peopleData?.allPeople || []).forEach(p => m.set(p.id, { memberStatus: p.membership, email: p.email, phone: p.phone }));
+        return m;
+    }, [peopleData]);
+
+    // -----------------------------------------------------------------------
     // Listen for careFollowUpCompleted events (fired by PersonProfileDrawer)
     // -----------------------------------------------------------------------
     useEffect(() => {
@@ -257,18 +292,23 @@ export const RecommendedFollowUpsWidget: React.FC<RecommendedFollowUpsWidgetProp
                 c.lastMessageDirection === 'inbound' &&
                 !c.isOptedOut
             )
-            .map(c => ({
-                personId: c.personId || c.id,
-                personName: c.personName || c.phoneNumber,
-                personAvatar: c.personAvatar,
-                signal: 'prayer' as SignalType,
-                priority: 'high' as Priority,
-                badgeLabel: 'Needs Prayer',
-                detail: c.lastMessageBody
-                    ? `"${c.lastMessageBody.slice(0, 60)}${c.lastMessageBody.length > 60 ? '…' : ''}"`
-                    : 'Awaiting response',
-            }));
-    }, [conversations, smsTags]);
+            .map(c => {
+                const pid = c.personId || c.id;
+                const contact = personMap.get(pid);
+                return {
+                    personId: pid,
+                    personName: c.personName || c.phoneNumber,
+                    personAvatar: c.personAvatar,
+                    signal: 'prayer' as SignalType,
+                    priority: 'high' as Priority,
+                    badgeLabel: 'Needs Prayer',
+                    detail: c.lastMessageBody
+                        ? `"${c.lastMessageBody.slice(0, 60)}${c.lastMessageBody.length > 60 ? '…' : ''}"`
+                        : 'Awaiting response',
+                    ...contact,
+                };
+            });
+    }, [conversations, smsTags, personMap]);
 
     // -----------------------------------------------------------------------
     // 2. Birthdays — within next 7 days
@@ -279,6 +319,7 @@ export const RecommendedFollowUpsWidget: React.FC<RecommendedFollowUpsWidgetProp
             .filter(p => { const d = daysUntilAnnual(p.birthdate); return d !== null && d <= 7; })
             .map(p => {
                 const d = daysUntilAnnual(p.birthdate)!;
+                const contact = personMap.get(p.id);
                 return {
                     personId: p.id,
                     personName: p.name,
@@ -289,9 +330,10 @@ export const RecommendedFollowUpsWidget: React.FC<RecommendedFollowUpsWidgetProp
                     detail: d === 0 ? `🎉 Today! ${formatMonthDay(p.birthdate)}`
                           : d === 1 ? `Tomorrow — ${formatMonthDay(p.birthdate)}`
                           : `${formatMonthDay(p.birthdate)} (in ${d} days)`,
+                    ...contact,
                 };
             });
-    }, [peopleData]);
+    }, [peopleData, personMap]);
 
     // -----------------------------------------------------------------------
     // 3. Anniversaries — within next 7 days
@@ -302,6 +344,7 @@ export const RecommendedFollowUpsWidget: React.FC<RecommendedFollowUpsWidgetProp
             .filter(p => { const d = daysUntilAnnual(p.anniversary); return d !== null && d <= 7; })
             .map(p => {
                 const d = daysUntilAnnual(p.anniversary)!;
+                const contact = personMap.get(p.id);
                 return {
                     personId: p.id,
                     personName: p.name,
@@ -312,41 +355,50 @@ export const RecommendedFollowUpsWidget: React.FC<RecommendedFollowUpsWidgetProp
                     detail: d === 0 ? `🎉 Today! ${formatMonthDay(p.anniversary)}`
                           : d === 1 ? `Tomorrow — ${formatMonthDay(p.anniversary)}`
                           : `${formatMonthDay(p.anniversary)} (in ${d} days)`,
+                    ...contact,
                 };
             });
-    }, [peopleData]);
+    }, [peopleData, personMap]);
 
     // -----------------------------------------------------------------------
     // 4. Lapsed donors
     // -----------------------------------------------------------------------
     const lapsedItems = useMemo<FollowUpItem[]>(() => {
         if (!givingAnalytics?.lists?.lapsed) return [];
-        return givingAnalytics.lists.lapsed.map((d: LifecycleDonor) => ({
-            personId: d.id,
-            personName: d.name,
-            personAvatar: d.avatar,
-            signal: 'lapsed' as SignalType,
-            priority: 'medium_high' as Priority,
-            badgeLabel: 'Lapsed Donor',
-            detail: `Last gift ${new Date(d.lastGiftDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`,
-        }));
-    }, [givingAnalytics]);
+        return givingAnalytics.lists.lapsed.map((d: LifecycleDonor) => {
+            const contact = personMap.get(d.id);
+            return {
+                personId: d.id,
+                personName: d.name,
+                personAvatar: d.avatar,
+                signal: 'lapsed' as SignalType,
+                priority: 'medium_high' as Priority,
+                badgeLabel: 'Lapsed Donor',
+                detail: `Last gift ${new Date(d.lastGiftDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`,
+                ...contact,
+            };
+        });
+    }, [givingAnalytics, personMap]);
 
     // -----------------------------------------------------------------------
     // 5. Inactive donors
     // -----------------------------------------------------------------------
     const inactiveItems = useMemo<FollowUpItem[]>(() => {
         if (!givingAnalytics?.lists?.inactive) return [];
-        return givingAnalytics.lists.inactive.map((d: LifecycleDonor) => ({
-            personId: d.id,
-            personName: d.name,
-            personAvatar: d.avatar,
-            signal: 'inactive' as SignalType,
-            priority: 'high' as Priority,
-            badgeLabel: 'Inactive Donor',
-            detail: `Last gift ${new Date(d.lastGiftDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`,
-        }));
-    }, [givingAnalytics]);
+        return givingAnalytics.lists.inactive.map((d: LifecycleDonor) => {
+            const contact = personMap.get(d.id);
+            return {
+                personId: d.id,
+                personName: d.name,
+                personAvatar: d.avatar,
+                signal: 'inactive' as SignalType,
+                priority: 'high' as Priority,
+                badgeLabel: 'Inactive Donor',
+                detail: `Last gift ${new Date(d.lastGiftDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`,
+                ...contact,
+            };
+        });
+    }, [givingAnalytics, personMap]);
 
     // -----------------------------------------------------------------------
     // 6. Group absentees — missed 2 of last 3 events
@@ -366,6 +418,7 @@ export const RecommendedFollowUpsWidget: React.FC<RecommendedFollowUpsWidgetProp
                     ).length;
                     if (history.length - attended < 2) return;
                     const person = peopleData?.allPeople.find(p => p.id === memberId);
+                    const contact = personMap.get(memberId);
                     seen.set(memberId, {
                         personId: memberId,
                         personName: person?.name || `Member ${memberId}`,
@@ -374,11 +427,12 @@ export const RecommendedFollowUpsWidget: React.FC<RecommendedFollowUpsWidgetProp
                         priority: 'medium_high',
                         badgeLabel: 'Group Absence',
                         detail: `Missed ${history.length - attended} of last ${history.length} events in ${group.name}`,
+                        ...contact,
                     });
                 });
             });
         return Array.from(seen.values());
-    }, [groups, peopleData]);
+    }, [groups, peopleData, personMap]);
 
     // -----------------------------------------------------------------------
     // Merge & deduplicate — highest priority signal per person
