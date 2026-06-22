@@ -802,7 +802,7 @@ const App: React.FC = () => {
   // ─── Public Contact / Outreach Volunteer Route (no auth required) ────────────
   const contactMatch = window.location.pathname.match(/^\/contact\/([^/]+)/);
   if (contactMatch) {
-    return <PublicContactView />;
+    return <PublicContactView sessionId={contactMatch[1]} />;
   }
 
   if (loading) {

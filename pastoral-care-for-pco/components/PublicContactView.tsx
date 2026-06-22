@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { useParams } from 'react-router-dom';
 import { OutreachSession, OutreachSlot } from '../types';
 import { firestore } from '../services/firestoreService';
 import {
@@ -389,8 +388,7 @@ const NotFoundCard: React.FC = () => (
 
 type ViewState = 'loading' | 'phone' | 'assigning' | 'contact' | 'done-exhausted' | 'done-ended' | 'not-found' | 'paused';
 
-export const PublicContactView: React.FC = () => {
-    const { sessionId } = useParams<{ sessionId: string }>();
+export const PublicContactView: React.FC<{ sessionId: string }> = ({ sessionId }) => {
 
     const [session, setSession] = useState<OutreachSession | null>(null);
     const [viewState, setViewState] = useState<ViewState>('loading');
