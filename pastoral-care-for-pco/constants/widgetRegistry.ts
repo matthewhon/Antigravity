@@ -151,6 +151,7 @@ export const PASTORAL_COMMUNITY_WIDGETS: WidgetDefinition[] = [
 ];
 
 export const PASTORAL_CARE_WIDGETS: WidgetDefinition[] = [
+    { id: 'care_recommended_followups', label: 'Recommended Follow-Ups', icon: '✨' },
     { id: 'care_log', label: 'Care Log', icon: '📝' },
     { id: 'prayer_requests', label: 'Prayer Requests', icon: '🙏' },
     { id: 'follow_ups', label: 'Follow-ups', icon: '📅' },

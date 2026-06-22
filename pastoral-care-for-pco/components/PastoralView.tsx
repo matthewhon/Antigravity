@@ -3,7 +3,8 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
     AttendanceData, PeopleDashboardData, GivingAnalytics, GroupsDashboardData, 
     CensusStats, PcoPerson, User, Church, PastoralNote, PrayerRequest,
-    DetailedDonation, ServicesDashboardData, PcoCheckInRecord
+    DetailedDonation, ServicesDashboardData, PcoCheckInRecord,
+    SmsConversation, SmsTag
 } from '../types';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -23,6 +24,7 @@ import {
 import { CommunityComparison } from './CommunityComparison';
 import { PastoralCalendar } from './PastoralCalendar';
 import { CarePeopleListWidget } from './CarePeopleListWidget';
+import { RecommendedFollowUpsWidget } from './RecommendedFollowUpsWidget';
 import { CohortAnalytics } from './CohortAnalytics';
 import { DEFAULT_RISK_SETTINGS } from '../services/riskService';
 import { fetchCensusDataForTenant } from '../services/censusService';
@@ -404,6 +406,8 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
   // Care State
   const [notes, setNotes] = useState<PastoralNote[]>([]);
   const [prayerRequests, setPrayerRequests] = useState<PrayerRequest[]>([]);
+  const [smsConversations, setSmsConversations] = useState<SmsConversation[]>([]);
+  const [smsTags, setSmsTags] = useState<SmsTag[]>([]);
   const [careAdvice, setCareAdvice] = useState<string>('');
   const [isGeneratingCare, setIsGeneratingCare] = useState(false);
   const [isAddingNote, setIsAddingNote] = useState(false);
@@ -463,6 +467,18 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
       if (activeTab === 'Care' && church.id) {
           firestore.getPastoralNotes(church.id).then(setNotes);
           firestore.getPrayerRequests(church.id, 'Active').then(setPrayerRequests);
+
+          // Fetch SMS conversations + tags for Recommended Follow-Ups (prayer detection signal)
+          import('firebase/firestore').then(({ collection, query, where, getDocs }) => {
+              import('../services/firebase').then(({ db }) => {
+                  getDocs(query(collection(db, 'smsConversations'), where('churchId', '==', church.id)))
+                      .then(snap => setSmsConversations(snap.docs.map(d => d.data() as SmsConversation)))
+                      .catch(() => {});
+                  getDocs(query(collection(db, 'smsTags'), where('churchId', '==', church.id)))
+                      .then(snap => setSmsTags(snap.docs.map(d => d.data() as SmsTag)))
+                      .catch(() => {});
+              });
+          });
       }
   }, [activeTab, church.id]);
 
@@ -1601,6 +1617,18 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                   </div>
               );
           
+          case 'care_recommended_followups':
+              return (
+                  <RecommendedFollowUpsWidget
+                      peopleData={peopleData}
+                      groups={groupsData?.allGroups || []}
+                      givingAnalytics={givingAnalytics}
+                      conversations={smsConversations}
+                      smsTags={smsTags}
+                      onRemove={() => handleRemoveWidget(id)}
+                  />
+              );
+
           case 'care_people_list':
               return (
                   <CarePeopleListWidget
@@ -1696,9 +1724,9 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                       if (!loc) return null;
                       return safeVisibleWidgets.map((id, index) => {
                           let spanClass = "col-span-1";
-                          if (['church_growth_stats', 'member_headline_stats', 'member_map', 'care_people_list'].includes(id)) {
+                          if (['church_growth_stats', 'member_headline_stats', 'member_map', 'care_people_list', 'care_recommended_followups'].includes(id)) {
                               spanClass = "col-span-1 md:col-span-2 lg:col-span-4";
-                          } else if (['church_spiritual_stats', 'censusHero', 'community_ai_agent', 'member_geo_list', 'ministrySignals', 'care_ai_agent'].includes(id)) {
+                          } else if (['church_spiritual_stats', 'censusHero', 'community_ai_agent', 'member_geo_list', 'ministrySignals', 'care_ai_agent', 'member_attrition_chart'].includes(id)) {
                               spanClass = "col-span-1 lg:col-span-2";
                           } else if (['care_log', 'prayer_requests'].includes(id)) {
                               spanClass = "col-span-1 lg:col-span-2";
@@ -1723,9 +1751,9 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                   safeVisibleWidgets.map((id, index) => {
                       // Special Full Width Handling
                       let spanClass = "col-span-1";
-                      if (['church_growth_stats', 'member_headline_stats', 'member_map', 'care_people_list'].includes(id)) {
+                      if (['church_growth_stats', 'member_headline_stats', 'member_map', 'care_people_list', 'care_recommended_followups'].includes(id)) {
                           spanClass = "col-span-1 md:col-span-2 lg:col-span-4";
-                      } else if (['church_spiritual_stats', 'censusHero', 'community_ai_agent', 'member_geo_list', 'ministrySignals', 'care_ai_agent'].includes(id)) {
+                      } else if (['church_spiritual_stats', 'censusHero', 'community_ai_agent', 'member_geo_list', 'ministrySignals', 'care_ai_agent', 'member_attrition_chart'].includes(id)) {
                           spanClass = "col-span-1 lg:col-span-2";
                       } else if (['care_log', 'prayer_requests'].includes(id)) {
                           spanClass = "col-span-1 lg:col-span-2";

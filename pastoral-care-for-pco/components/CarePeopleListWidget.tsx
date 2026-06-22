@@ -3,6 +3,35 @@ import { PcoPerson, PeopleDashboardData, RiskSettings } from '../types';
 import { DEFAULT_RISK_SETTINGS } from '../services/riskService';
 import { WidgetWrapper } from './SharedUI';
 
+/** Format a ISO date string as "Mon DD" (e.g. "Jun 22"). Returns null if invalid. */
+const formatMonthDay = (dateStr?: string | null): string | null => {
+    if (!dateStr) return null;
+    // Parse as local date to avoid timezone shifts on date-only strings
+    const parts = dateStr.split('-');
+    if (parts.length < 2) return null;
+    const month = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2] || '1', 10);
+    const d = new Date(2000, month, day);
+    if (isNaN(d.getTime())) return null;
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+};
+
+/** Returns true if the month/day of the given date falls within the next `days` calendar days. */
+const isUpcomingAnnual = (dateStr?: string | null, withinDays = 30): boolean => {
+    if (!dateStr) return false;
+    const parts = dateStr.split('-');
+    if (parts.length < 2) return false;
+    const month = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2] || '1', 10);
+    const today = new Date();
+    const thisYear = today.getFullYear();
+    let upcoming = new Date(thisYear, month, day);
+    // If already passed this year, check next year
+    if (upcoming < today) upcoming = new Date(thisYear + 1, month, day);
+    const diffMs = upcoming.getTime() - today.getTime();
+    return diffMs >= 0 && diffMs <= withinDays * 86400000;
+};
+
 interface CarePeopleListWidgetProps {
     peopleData: PeopleDashboardData | null;
     settings: RiskSettings;
@@ -125,12 +154,15 @@ export const CarePeopleListWidget: React.FC<CarePeopleListWidgetProps> = ({
                         <thead className="sticky top-0 bg-white dark:bg-slate-850 z-10">
                             <tr>
                                 <th className="p-2 text-[10px] font-black uppercase text-slate-400 border-b border-slate-100 dark:border-slate-800">Person</th>
+                                <th className="p-2 text-[10px] font-black uppercase text-slate-400 border-b border-slate-100 dark:border-slate-800 text-center">Status</th>
                                 <th className="p-2 text-[10px] font-black uppercase text-slate-400 border-b border-slate-100 dark:border-slate-800 text-center">Score</th>
                                 <th className="p-2 text-[10px] font-black uppercase text-slate-400 border-b border-slate-100 dark:border-slate-800 text-center">Attend</th>
                                 <th className="p-2 text-[10px] font-black uppercase text-slate-400 border-b border-slate-100 dark:border-slate-800 text-center">Group</th>
                                 <th className="p-2 text-[10px] font-black uppercase text-slate-400 border-b border-slate-100 dark:border-slate-800 text-center">Serve</th>
                                 <th className="p-2 text-[10px] font-black uppercase text-slate-400 border-b border-slate-100 dark:border-slate-800 text-center">Give</th>
                                 <th className="p-2 text-[10px] font-black uppercase text-slate-400 border-b border-slate-100 dark:border-slate-800 text-center">Member</th>
+                                <th className="p-2 text-[10px] font-black uppercase text-slate-400 border-b border-slate-100 dark:border-slate-800 text-center">Birthday</th>
+                                <th className="p-2 text-[10px] font-black uppercase text-slate-400 border-b border-slate-100 dark:border-slate-800 text-center">Anniversary</th>
                             </tr>
                         </thead>
                         <tbody className="text-sm border-b border-slate-100 dark:border-slate-800">
@@ -141,24 +173,42 @@ export const CarePeopleListWidget: React.FC<CarePeopleListWidgetProps> = ({
                                 if (category === 'Healthy') scoreColor = 'text-emerald-500';
                                 else if (category === 'At Risk') scoreColor = 'text-amber-500';
 
+                                const handleRowClick = () => {
+                                    window.dispatchEvent(new CustomEvent('openPersonProfile', { detail: person.id }));
+                                };
+
+                                let statusBadgeClass = 'bg-rose-100 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400';
+                                if (category === 'Healthy') statusBadgeClass = 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400';
+                                else if (category === 'At Risk') statusBadgeClass = 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400';
+
                                 return (
-                                    <tr key={person.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors border-b border-slate-50 border-dashed dark:border-slate-800/50">
+                                    <tr
+                                        key={person.id}
+                                        onClick={handleRowClick}
+                                        className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors border-b border-slate-50 border-dashed dark:border-slate-800/50 cursor-pointer group"
+                                        title={`View ${person.name}'s profile`}
+                                    >
                                         <td className="p-2 py-3">
                                             <div className="flex items-center gap-3">
                                                 {person.avatar ? (
-                                                    <img src={person.avatar} alt={person.name} width="32" height="32" loading="lazy" className="w-8 h-8 rounded-full bg-slate-200" />
+                                                    <img src={person.avatar} alt={person.name} width="32" height="32" loading="lazy" className="w-8 h-8 rounded-full bg-slate-200 group-hover:ring-2 group-hover:ring-indigo-400 transition-all" />
                                                 ) : (
-                                                    <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-xs uppercase">
+                                                    <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-xs uppercase group-hover:ring-2 group-hover:ring-indigo-400 transition-all">
                                                         {person.name.substring(0, 2)}
                                                     </div>
                                                 )}
                                                 <div>
-                                                    <p className="font-bold text-slate-900 dark:text-white truncate max-w-[140px]" title={person.name}>{person.name}</p>
+                                                    <p className="font-bold text-slate-900 dark:text-white truncate max-w-[140px] group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors" title={person.name}>{person.name}</p>
                                                     <p className="text-[10px] text-slate-400 tracking-wider">
                                                         {person.phone || person.email || 'No Contact Info'}
                                                     </p>
                                                 </div>
                                             </div>
+                                        </td>
+                                        <td className="p-2 text-center">
+                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wide whitespace-nowrap ${statusBadgeClass}`}>
+                                                {category}
+                                            </span>
                                         </td>
                                         <td className="p-2 text-center">
                                             <span className={`font-black ${scoreColor}`}>{rawScore}</span>
@@ -182,6 +232,46 @@ export const CarePeopleListWidget: React.FC<CarePeopleListWidgetProps> = ({
                                         </td>
                                         <td className="p-2 text-center text-xs font-bold text-slate-600 dark:text-slate-300">
                                             {calculateFactorScore(person, 'membership')}<span className="text-[9px] text-slate-400">/{settings.weights.membership}</span>
+                                        </td>
+                                        <td className="p-2 text-center">
+                                            {(() => {
+                                                const bd = formatMonthDay(person.birthdate);
+                                                const upcoming = isUpcomingAnnual(person.birthdate);
+                                                return bd ? (
+                                                    <span
+                                                        className={`inline-flex items-center gap-1 text-[10px] font-bold whitespace-nowrap ${
+                                                            upcoming
+                                                                ? 'text-pink-600 dark:text-pink-400'
+                                                                : 'text-slate-500 dark:text-slate-400'
+                                                        }`}
+                                                        title={upcoming ? 'Birthday coming up!' : undefined}
+                                                    >
+                                                        {upcoming && <span>🎂</span>}{bd}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-[10px] text-slate-300 dark:text-slate-600">—</span>
+                                                );
+                                            })()}
+                                        </td>
+                                        <td className="p-2 text-center">
+                                            {(() => {
+                                                const ann = formatMonthDay(person.anniversary);
+                                                const upcoming = isUpcomingAnnual(person.anniversary);
+                                                return ann ? (
+                                                    <span
+                                                        className={`inline-flex items-center gap-1 text-[10px] font-bold whitespace-nowrap ${
+                                                            upcoming
+                                                                ? 'text-rose-600 dark:text-rose-400'
+                                                                : 'text-slate-500 dark:text-slate-400'
+                                                        }`}
+                                                        title={upcoming ? 'Anniversary coming up!' : undefined}
+                                                    >
+                                                        {upcoming && <span>💍</span>}{ann}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-[10px] text-slate-300 dark:text-slate-600">—</span>
+                                                );
+                                            })()}
                                         </td>
                                     </tr>
                                 );

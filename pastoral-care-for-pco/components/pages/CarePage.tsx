@@ -66,7 +66,7 @@ export const CarePage: React.FC<CarePageProps> = ({
             churchWidgets={user.widgetPreferences?.['pastoral_church'] || []}
             membershipWidgets={user.widgetPreferences?.['pastoral_membership'] || []}
             communityWidgets={user.widgetPreferences?.['pastoral_community'] || []}
-            careWidgets={user.widgetPreferences?.['pastoral_care'] || []}
+            careWidgets={user.widgetPreferences?.['pastoral_care'] ?? ['care_recommended_followups', 'care_log', 'prayer_requests', 'follow_ups', 'care_ai_agent', 'care_people_list']}
             onUpdateChurchWidgets={(w) => {
                 const newPrefs = { ...user.widgetPreferences, 'pastoral_church': w };
                 firestore.updateUserPreferences(user.id, newPrefs);
