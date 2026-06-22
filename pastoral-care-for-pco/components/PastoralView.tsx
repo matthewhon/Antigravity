@@ -25,6 +25,7 @@ import { CommunityComparison } from './CommunityComparison';
 import { PastoralCalendar } from './PastoralCalendar';
 import { CarePeopleListWidget } from './CarePeopleListWidget';
 import { RecommendedFollowUpsWidget } from './RecommendedFollowUpsWidget';
+import { CareReportPage } from './CareReportPage';
 import { CohortAnalytics } from './CohortAnalytics';
 import { DEFAULT_RISK_SETTINGS } from '../services/riskService';
 import { fetchCensusDataForTenant } from '../services/censusService';
@@ -44,7 +45,7 @@ interface PastoralViewProps {
   censusData?: CensusStats | null;
   churchConfig: { city?: string, state?: string };
   censusError?: string;
-  activePage?: 'Church' | 'Membership' | 'Community' | 'Care' | 'Calendar';
+  activePage?: 'Church' | 'Membership' | 'Community' | 'Care' | 'Calendar' | 'Reports';
   // Per-tab widget preferences
   churchWidgets: string[];
   membershipWidgets: string[];
@@ -465,7 +466,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
   }, [activeTab, allowedWidgetIds]);
 
   useEffect(() => {
-      if (activeTab === 'Care' && church.id) {
+      if ((activeTab === 'Care' || activeTab === 'Reports') && church.id) {
           firestore.getPastoralNotes(church.id).then(setNotes);
           firestore.getPrayerRequests(church.id, 'Active').then(setPrayerRequests);
           firestore.getCareFollowUpLog(church.id).then(setFollowUpLog);
@@ -1721,7 +1722,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                 </div>
             )}
             
-            {activeTab !== 'Calendar' && (
+            {activeTab !== 'Calendar' && activeTab !== 'Reports' && (
                 <WidgetsController 
                     availableWidgets={availableWidgets} 
                     visibleWidgets={safeVisibleWidgets} 
@@ -1747,7 +1748,42 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
           </div>
       )}
 
-      {activeTab === 'Calendar' ? (
+      {/* Care sub-navigation: Dashboard | Reports */}
+      {(activeTab === 'Care' || activeTab === 'Reports') && (
+          <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/60 p-1 rounded-2xl self-start">
+              {([
+                  { label: '📊 Dashboard', path: '/care/care' },
+                  { label: '📋 Reports', path: '/care/reports' },
+              ] as const).map(({ label, path }) => {
+                  const isActive =
+                      (path === '/care/care'    && activeTab === 'Care') ||
+                      (path === '/care/reports' && activeTab === 'Reports');
+                  return (
+                      <a
+                          key={path}
+                          href={path}
+                          className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                              isActive
+                                  ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                          }`}
+                      >
+                          {label}
+                      </a>
+                  );
+              })}
+          </div>
+      )}
+
+      {/* Reports page — full-width, replaces widget grid */}
+      {activeTab === 'Reports' ? (
+          <CareReportPage
+              peopleData={peopleData}
+              notes={notes}
+              followUpLog={followUpLog}
+              riskSettings={church.riskSettings}
+          />
+      ) : activeTab === 'Calendar' ? (
           <div className="h-[calc(100vh-250px)] min-h-[600px] relative">
               <div className="absolute top-4 right-4 z-10">
                   <button 

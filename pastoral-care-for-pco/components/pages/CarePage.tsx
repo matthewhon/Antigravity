@@ -37,6 +37,7 @@ export const CarePage: React.FC<CarePageProps> = ({
         subpath === 'community'  ? 'Community'  :
         subpath === 'care'       ? 'Care'       :
         subpath === 'calendar'   ? 'Calendar'   :
+        subpath === 'reports'    ? 'Reports'    :
         'Church';
 
     const riskEnrichedPeople = useRiskEnrichedPeople(people, groups, donations, servicesData, teams, church?.riskSettings);
