@@ -23,7 +23,7 @@ import {
     PastoralNote, PrayerRequest, CheckInRecord, EmailCampaign, PcoRegistrationEvent,
     PcoRegistrationAttendee, PcoRegistrationCampus,
     Poll, PollResponse, RiskChangeRecord, ChurchNote, StatusChangeRecord,
-    WeatherRecord, PcoCheckInRecord
+    WeatherRecord, PcoCheckInRecord, CareFollowUpLog
 } from '../types';
 import { calculateServicesAnalytics, calculateAggregatedStats } from './analyticsService';
 
@@ -92,6 +92,29 @@ class FirestoreService {
   async deletePrayerRequest(id: string) {
     try {
       await deleteDoc(doc(db, 'prayer_requests', id));
+    } catch (e) {
+      this.handleFirestoreError(e);
+    }
+  }
+
+  // --- Care Follow-Up Log ---
+
+  async getCareFollowUpLog(churchId: string): Promise<CareFollowUpLog[]> {
+    try {
+      const q = query(
+        collection(db, 'care_followup_log'),
+        where('churchId', '==', churchId)
+      );
+      const snap = await getDocs(q);
+      return snap.docs.map(d => d.data() as CareFollowUpLog);
+    } catch (e) {
+      return [];
+    }
+  }
+
+  async saveCareFollowUpLog(entry: CareFollowUpLog): Promise<void> {
+    try {
+      await setDoc(doc(db, 'care_followup_log', entry.id), entry, { merge: true });
     } catch (e) {
       this.handleFirestoreError(e);
     }

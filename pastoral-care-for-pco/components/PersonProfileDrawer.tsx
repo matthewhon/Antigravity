@@ -62,6 +62,8 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
 
       setSmsSuccess(true);
       setSmsBody('');
+      // Notify the Recommended Follow-Ups widget that this person was contacted
+      window.dispatchEvent(new CustomEvent('careFollowUpCompleted', { detail: person.id }));
     } catch (err: any) {
       console.error('Failed to send SMS', err);
       setSmsError(err.message || 'An error occurred while sending the message.');

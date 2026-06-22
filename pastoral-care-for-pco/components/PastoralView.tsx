@@ -4,7 +4,7 @@ import {
     AttendanceData, PeopleDashboardData, GivingAnalytics, GroupsDashboardData, 
     CensusStats, PcoPerson, User, Church, PastoralNote, PrayerRequest,
     DetailedDonation, ServicesDashboardData, PcoCheckInRecord,
-    SmsConversation, SmsTag
+    SmsConversation, SmsTag, CareFollowUpLog
 } from '../types';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -408,6 +408,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
   const [prayerRequests, setPrayerRequests] = useState<PrayerRequest[]>([]);
   const [smsConversations, setSmsConversations] = useState<SmsConversation[]>([]);
   const [smsTags, setSmsTags] = useState<SmsTag[]>([]);
+  const [followUpLog, setFollowUpLog] = useState<CareFollowUpLog[]>([]);
   const [careAdvice, setCareAdvice] = useState<string>('');
   const [isGeneratingCare, setIsGeneratingCare] = useState(false);
   const [isAddingNote, setIsAddingNote] = useState(false);
@@ -467,6 +468,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
       if (activeTab === 'Care' && church.id) {
           firestore.getPastoralNotes(church.id).then(setNotes);
           firestore.getPrayerRequests(church.id, 'Active').then(setPrayerRequests);
+          firestore.getCareFollowUpLog(church.id).then(setFollowUpLog);
 
           // Fetch SMS conversations + tags for Recommended Follow-Ups (prayer detection signal)
           import('firebase/firestore').then(({ collection, query, where, getDocs }) => {
@@ -481,6 +483,44 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
           });
       }
   }, [activeTab, church.id]);
+
+  const handleMarkFollowedUp = async (personId: string) => {
+      const existing = followUpLog.find(e => e.personId === personId);
+      const now = Date.now();
+      const isAlreadyFollowedUp = existing?.followedUpAt && (now - existing.followedUpAt) < 7 * 24 * 60 * 60 * 1000;
+      // Toggle: if already followed up within 7 days, un-mark it
+      const newFollowedUpAt = isAlreadyFollowedUp ? null : now;
+      const entry: CareFollowUpLog = {
+          id: `${church.id}_${personId}`,
+          churchId: church.id,
+          personId,
+          followedUpAt: newFollowedUpAt,
+          dismissedAt: existing?.dismissedAt ?? null,
+          dismissedSignal: existing?.dismissedSignal ?? null,
+      };
+      setFollowUpLog(prev => {
+          const next = prev.filter(e => e.personId !== personId);
+          return [...next, entry];
+      });
+      await firestore.saveCareFollowUpLog(entry);
+  };
+
+  const handleDismiss = async (personId: string, signal: string) => {
+      const existing = followUpLog.find(e => e.personId === personId);
+      const entry: CareFollowUpLog = {
+          id: `${church.id}_${personId}`,
+          churchId: church.id,
+          personId,
+          followedUpAt: existing?.followedUpAt ?? null,
+          dismissedAt: Date.now(),
+          dismissedSignal: signal,
+      };
+      setFollowUpLog(prev => {
+          const next = prev.filter(e => e.personId !== personId);
+          return [...next, entry];
+      });
+      await firestore.saveCareFollowUpLog(entry);
+  };
 
   const handleGenerateCareAdvice = async () => {
       if (!church.id || !peopleData) return;
@@ -1625,6 +1665,9 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                       givingAnalytics={givingAnalytics}
                       conversations={smsConversations}
                       smsTags={smsTags}
+                      followUpLog={followUpLog}
+                      onMarkFollowedUp={handleMarkFollowedUp}
+                      onDismiss={handleDismiss}
                       onRemove={() => handleRemoveWidget(id)}
                   />
               );

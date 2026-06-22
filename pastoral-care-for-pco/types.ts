@@ -732,7 +732,21 @@ export interface WidgetDefinition {
     icon: string;
 }
 
+export interface CareFollowUpLog {
+    /** `${churchId}_${personId}` */
+    id: string;
+    churchId: string;
+    personId: string;
+    /** Epoch ms when a message was sent or ✓ was clicked. Null if not yet followed up. */
+    followedUpAt: number | null;
+    /** Epoch ms when the person was manually dismissed from the widget. */
+    dismissedAt: number | null;
+    /** Signal type that was active when dismissed — allows re-appearance if signal changes. */
+    dismissedSignal: string | null;
+}
+
 export interface PastoralNote {
+
     id: string;
     churchId: string;
     personId: string;
