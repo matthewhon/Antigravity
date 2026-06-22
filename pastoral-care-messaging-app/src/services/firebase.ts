@@ -1,6 +1,6 @@
 
 import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 /**
@@ -40,8 +40,14 @@ export const auth = getFirebaseAuthConfig();
  * CRITICAL: Use the named database instance "pcforpco".
  * The "(default)" database does not exist for this project.
  * Explicitly passing the database ID fixes the [code=not-found] error.
+ *
+ * persistentLocalCache enables IndexedDB offline persistence so Firestore
+ * returns cached data instantly on the next app launch before hitting the network.
+ * persistentMultipleTabManager allows multiple browser/webview tabs to share the cache.
  */
-export const db = getFirestore(app, "pcforpco");
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+}, "pcforpco");
 
 export const storage = getStorage(app);
 

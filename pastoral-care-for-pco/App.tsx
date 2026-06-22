@@ -33,6 +33,7 @@ import { PollProjectorView } from './components/PollProjectorView';
 import { PublicNoteView } from './components/PublicNoteView';
 import { PublicFormView } from './components/PublicFormView';
 import { PublicCalendarView } from './components/PublicCalendarView';
+import { PublicContactView } from './components/PublicContactView';
 import { ToolsView } from './components/ToolsView';
 import { SmsWorkflowsManager } from './components/MessagingModule';
 import MobileSmsLayout from './components/MobileSmsLayout';
@@ -80,6 +81,7 @@ const App: React.FC = () => {
      if (path.startsWith('/care/membership')) return 'pastoral-membership';
      if (path.startsWith('/care/community')) return 'pastoral-community';
      if (path.startsWith('/care/calendar')) return 'pastoral-calendar';
+     if (path.startsWith('/care/contact')) return 'pastoral-contact';
      if (path.startsWith('/care/care')) return 'pastoral-care';
      if (path.startsWith('/care')) return 'pastoral';
      if (path.startsWith('/metrics/input')) return 'metrics-input';
@@ -564,6 +566,7 @@ const App: React.FC = () => {
               'pastoral-community': '/care/community',
               'pastoral-care': '/care/care',
               'pastoral-calendar': '/care/calendar',
+              'pastoral-contact': '/care/contact',
               'metrics': '/metrics',
               'metrics-input': '/metrics/input',
               'metrics-settings': '/metrics/settings',
@@ -794,6 +797,12 @@ const App: React.FC = () => {
   const calendarMatch = window.location.pathname.match(/^\/embed\/calendar\/([^/]+)/);
   if (calendarMatch) {
     return <PublicCalendarView churchId={calendarMatch[1]} />;
+  }
+
+  // ─── Public Contact / Outreach Volunteer Route (no auth required) ────────────
+  const contactMatch = window.location.pathname.match(/^\/contact\/([^/]+)/);
+  if (contactMatch) {
+    return <PublicContactView />;
   }
 
   if (loading) {

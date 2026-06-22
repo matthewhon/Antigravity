@@ -171,6 +171,31 @@
         { "fieldPath": "churchId", "order": "ASCENDING" },
         { "fieldPath": "date",     "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "outreach_sessions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "churchId",   "order": "ASCENDING" },
+        { "fieldPath": "createdAt",  "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "outreach_slots",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "sessionId",   "order": "ASCENDING" },
+        { "fieldPath": "assignedAt",  "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "outreach_slots",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "sessionId",       "order": "ASCENDING" },
+        { "fieldPath": "volunteerPhone",  "order": "ASCENDING" },
+        { "fieldPath": "status",          "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [

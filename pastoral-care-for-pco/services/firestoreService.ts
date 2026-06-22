@@ -12,7 +12,10 @@ import {
   limit, 
   writeBatch,
   orderBy,
-  deleteField
+  deleteField,
+  onSnapshot,
+  runTransaction,
+  Unsubscribe
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { 
@@ -23,7 +26,8 @@ import {
     PastoralNote, PrayerRequest, CheckInRecord, EmailCampaign, PcoRegistrationEvent,
     PcoRegistrationAttendee, PcoRegistrationCampus,
     Poll, PollResponse, RiskChangeRecord, ChurchNote, StatusChangeRecord,
-    WeatherRecord, PcoCheckInRecord, CareFollowUpLog
+    WeatherRecord, PcoCheckInRecord, CareFollowUpLog,
+    OutreachSession, OutreachSlot
 } from '../types';
 import { calculateServicesAnalytics, calculateAggregatedStats } from './analyticsService';
 
@@ -1289,6 +1293,190 @@ class FirestoreService {
         }
         await batch.commit();
       }
+    } catch (e) {
+      this.handleFirestoreError(e);
+      throw e;
+    }
+  }
+
+  // ─── Outreach Call Center ────────────────────────────────────────────────────
+
+  async createOutreachSession(session: OutreachSession): Promise<void> {
+    try {
+      await setDoc(doc(db, 'outreach_sessions', session.id), session, { merge: true });
+    } catch (e) {
+      this.handleFirestoreError(e);
+      throw e;
+    }
+  }
+
+  async updateOutreachSession(sessionId: string, updates: Partial<OutreachSession>): Promise<void> {
+    try {
+      await updateDoc(doc(db, 'outreach_sessions', sessionId), updates as any);
+    } catch (e) {
+      this.handleFirestoreError(e);
+      throw e;
+    }
+  }
+
+  async deleteOutreachSession(sessionId: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, 'outreach_sessions', sessionId));
+    } catch (e) {
+      this.handleFirestoreError(e);
+      throw e;
+    }
+  }
+
+  async getOutreachSessions(churchId: string): Promise<OutreachSession[]> {
+    try {
+      const q = query(
+        collection(db, 'outreach_sessions'),
+        where('churchId', '==', churchId),
+        orderBy('createdAt', 'desc')
+      );
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(d => d.data() as OutreachSession);
+    } catch (e) {
+      return [];
+    }
+  }
+
+  async getOutreachSession(sessionId: string): Promise<OutreachSession | null> {
+    try {
+      const snap = await getDoc(doc(db, 'outreach_sessions', sessionId));
+      return snap.exists() ? (snap.data() as OutreachSession) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /**
+   * Real-time listener on all slots for a given session.
+   * Returns an unsubscribe function.
+   */
+  subscribeToOutreachSlots(
+    sessionId: string,
+    callback: (slots: OutreachSlot[]) => void
+  ): Unsubscribe {
+    const q = query(
+      collection(db, 'outreach_slots'),
+      where('sessionId', '==', sessionId),
+      orderBy('assignedAt', 'asc')
+    );
+    return onSnapshot(q, (snap) => {
+      callback(snap.docs.map(d => d.data() as OutreachSlot));
+    }, () => callback([]));
+  }
+
+  /**
+   * Real-time listener on the single slot assigned to this volunteer.
+   */
+  subscribeToVolunteerSlot(
+    sessionId: string,
+    volunteerPhone: string,
+    callback: (slot: OutreachSlot | null) => void
+  ): Unsubscribe {
+    const q = query(
+      collection(db, 'outreach_slots'),
+      where('sessionId', '==', sessionId),
+      where('volunteerPhone', '==', volunteerPhone),
+      where('status', '==', 'pending'),
+      limit(1)
+    );
+    return onSnapshot(q, (snap) => {
+      callback(snap.empty ? null : (snap.docs[0].data() as OutreachSlot));
+    }, () => callback(null));
+  }
+
+  async getOutreachSlots(sessionId: string): Promise<OutreachSlot[]> {
+    try {
+      const q = query(
+        collection(db, 'outreach_slots'),
+        where('sessionId', '==', sessionId),
+        orderBy('assignedAt', 'asc')
+      );
+      const snap = await getDocs(q);
+      return snap.docs.map(d => d.data() as OutreachSlot);
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /**
+   * Atomically claim the next unclaimed person from the filtered list.
+   * Returns the new slot, or null if no eligible person is available.
+   *
+   * Uses a Firestore transaction to read the current slots and write
+   * the new slot atomically, preventing two volunteers from claiming
+   * the same person simultaneously.
+   */
+  async claimNextPerson(
+    session: OutreachSession,
+    volunteerPhone: string,
+    /** Sorted list of eligible people (by risk score asc), already filtered by session.filters */
+    eligiblePeople: { id: string; name: string; phone?: string | null; email?: string | null }[]
+  ): Promise<OutreachSlot | null> {
+    try {
+      const now = Date.now();
+      const slotsRef = collection(db, 'outreach_slots');
+
+      const result = await runTransaction(db, async (txn) => {
+        // Read all current slots for this session
+        const q = query(slotsRef, where('sessionId', '==', session.id));
+        const snap = await getDocs(q);
+        const existing = snap.docs.map(d => d.data() as OutreachSlot);
+
+        // Build a set of person IDs that are already claimed or on cooldown
+        const claimedIds = new Set<string>();
+        for (const slot of existing) {
+          if (slot.status === 'pending' || slot.status === 'contacted') {
+            // Pending = actively being worked, contacted = done
+            claimedIds.add(slot.assignedPersonId);
+          } else if (slot.status === 'no-answer') {
+            // On cooldown: block until noAnswerUntil has passed
+            if (slot.noAnswerUntil && slot.noAnswerUntil > now) {
+              claimedIds.add(slot.assignedPersonId);
+            }
+            // Otherwise person is back in queue (at the bottom — handled by caller sort order)
+          }
+        }
+
+        // Find next eligible person not in claimed set
+        const next = eligiblePeople.find(p => !claimedIds.has(p.id));
+        if (!next) return null;
+
+        const slotId = `slot_${session.id}_${next.id}_${now}`;
+        const newSlot: OutreachSlot = {
+          id: slotId,
+          sessionId: session.id,
+          churchId: session.churchId,
+          volunteerPhone,
+          assignedPersonId: next.id,
+          assignedPersonName: next.name,
+          assignedPersonPhone: next.phone ?? null,
+          assignedPersonEmail: next.email ?? null,
+          assignedAt: now,
+          status: 'pending',
+          notes: '',
+          completedAt: null,
+          noAnswerUntil: null,
+        };
+
+        txn.set(doc(db, 'outreach_slots', slotId), newSlot);
+        return newSlot;
+      });
+
+      return result;
+    } catch (e) {
+      console.error('claimNextPerson error:', e);
+      return null;
+    }
+  }
+
+  async updateOutreachSlot(slotId: string, updates: Partial<OutreachSlot>): Promise<void> {
+    try {
+      await updateDoc(doc(db, 'outreach_slots', slotId), updates as any);
     } catch (e) {
       this.handleFirestoreError(e);
       throw e;

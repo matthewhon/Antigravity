@@ -1,6 +1,7 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
 import { PastoralView } from '../PastoralView';
+import { CareContactPage } from '../CareContactPage';
 import { useTenantData } from '../../contexts/TenantDataContext';
 import { 
     usePeopleDashboardData, 
@@ -47,6 +48,19 @@ export const CarePage: React.FC<CarePageProps> = ({
     const attendanceChartData = useAttendanceChartData(attendance);
 
     if (!user || !church) return null;
+
+    // ─── Contact / Outreach Call Center ────────────────────────────────────────
+    if (subpath === 'contact') {
+        return (
+            <div className="p-6">
+                <CareContactPage
+                    church={church}
+                    user={user}
+                    people={riskEnrichedPeople}
+                />
+            </div>
+        );
+    }
 
     return (
         <PastoralView 

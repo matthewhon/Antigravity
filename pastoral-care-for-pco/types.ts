@@ -1855,3 +1855,63 @@ export interface CohortData {
     peopleIds: string[];
 }
 
+// ─── Care Contact / Outreach Call Center ──────────────────────────────────────
+
+/**
+ * A saved outreach campaign created by an admin.
+ * Each session has its own shareable URL and QR code.
+ */
+export interface OutreachSession {
+    id: string;
+    churchId: string;
+    /** Human-readable campaign name, e.g. "June At-Risk Outreach" */
+    name: string;
+    /** Filter criteria for which people appear in this session's queue */
+    filters: {
+        /** Which risk categories to include (empty array = all) */
+        riskCategories: ('Healthy' | 'At Risk' | 'Disconnected')[];
+        /** Which membership statuses to include (empty array = all) */
+        membershipStatuses: string[];
+    };
+    /**
+     * Denormalized list of eligible people for this session.
+     * Stored in Firestore so unauthenticated volunteers can read it.
+     * Sorted: primary (never-contacted) by risk score asc, then by name.
+     */
+    eligiblePeople?: { id: string; name: string; phone?: string | null; email?: string | null; riskScore: number }[];
+    createdAt: number;
+    createdBy: string; // userId
+    isActive: boolean;
+}
+
+/**
+ * A single volunteer's contact attempt within an OutreachSession.
+ * One slot per (volunteer phone, assigned person) pair.
+ */
+export interface OutreachSlot {
+    id: string;
+    sessionId: string;
+    churchId: string;
+    /** Volunteer's phone number — used as their unique identity within the session */
+    volunteerPhone: string;
+    /** The church member being contacted */
+    assignedPersonId: string;
+    assignedPersonName: string;
+    assignedPersonPhone?: string | null;
+    assignedPersonEmail?: string | null;
+    assignedAt: number;
+    /** 
+     * pending  = volunteer has seen the card but not recorded an outcome yet
+     * contacted = volunteer reached the person
+     * no-answer = volunteer could not reach the person
+     */
+    status: 'pending' | 'contacted' | 'no-answer';
+    notes: string;
+    completedAt?: number | null;
+    /**
+     * For no-answer slots: timestamp before which this person should NOT
+     * be re-assigned to another volunteer (24-hour cooldown).
+     */
+    noAnswerUntil?: number | null;
+}
+
