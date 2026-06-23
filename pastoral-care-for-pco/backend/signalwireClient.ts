@@ -247,8 +247,14 @@ export async function callRegistryApiPaginated(
  * raw buffer and content-type.  Used to re-host inbound MMS attachments in
  * Firebase Storage so they are accessible without SignalWire credentials.
  *
+ * SignalWire's redirect chain for MMS media:
+ *   1. Authenticated GET to /api/laml/.../Media/...
+ *   2. 302 → https://files.signalwire.com/.../message-media/xxxx.smil
+ *   3. The .smil file contains a relative <img src="actualfile.JPG"> reference
+ *   4. Actual image at https://files.signalwire.com/.../message-media/actualfile.JPG
+ *
  * @param mediaUrl  The raw SignalWire MediaUrl (e.g. https://space.signalwire.com/api/laml/…)
- * @returns  { buffer, contentType } or throws on non-2xx / network error
+ * @returns  { buffer, contentType } or throws on error
  */
 export async function fetchSignalWireMedia(
     mediaUrl: string
@@ -263,63 +269,67 @@ export async function fetchSignalWireMedia(
 
     const authHeader = 'Basic ' + Buffer.from(`${projectId}:${apiToken}`).toString('base64');
 
-    return new Promise((resolve, reject) => {
-        const urlObj = new URL(mediaUrl);
-        const options = {
-            hostname: urlObj.hostname,
-            path:     urlObj.pathname + urlObj.search,
-            method:   'GET' as const,
-            headers:  { Authorization: authHeader },
-        };
+    /** Fetch a URL, optionally with auth. Returns { buffer, contentType, location? } */
+    function fetchRaw(url: string, withAuth: boolean): Promise<{ buffer: Buffer; contentType: string; statusCode: number; location?: string }> {
+        return new Promise((resolve, reject) => {
+            const urlObj = new URL(url);
+            const req = https.request({
+                hostname: urlObj.hostname,
+                path:     urlObj.pathname + urlObj.search,
+                method:   'GET',
+                headers:  withAuth ? { Authorization: authHeader } : {},
+            }, (res) => {
+                const statusCode = res.statusCode || 0;
+                const contentType = ((res.headers['content-type'] || 'application/octet-stream').split(';')[0]).trim();
+                const location = res.headers.location as string | undefined;
 
-        const req = https.request(options, (res) => {
-            // Follow a single redirect (SignalWire sometimes 302s to a CDN)
-            if ((res.statusCode === 301 || res.statusCode === 302) && res.headers.location) {
-                const redirectUrl = new URL(res.headers.location);
-                // Pass auth only if the redirect stays on the same SignalWire host
-                const isSameHost = redirectUrl.hostname === urlObj.hostname;
-                const redirectOptions = {
-                    hostname: redirectUrl.hostname,
-                    path:     redirectUrl.pathname + redirectUrl.search,
-                    method:   'GET' as const,
-                    headers:  isSameHost ? { Authorization: authHeader } : {},
-                };
-                const r2req = https.request(redirectOptions, (r2) => {
-                    if ((r2.statusCode || 0) >= 400) {
-                        reject(new Error(`SignalWire media redirect returned HTTP ${r2.statusCode} for ${res.headers.location}`));
-                        r2.resume();
-                        return;
-                    }
-                    const chunks: Buffer[] = [];
-                    r2.on('data', (c: Buffer) => chunks.push(c));
-                    r2.on('end', () => resolve({
-                        buffer:      Buffer.concat(chunks),
-                        contentType: (r2.headers['content-type'] || 'application/octet-stream').split(';')[0].trim(),
-                    }));
-                    r2.on('error', reject);
-                });
-                r2req.on('error', reject);
-                r2req.end();
-                return;
-            }
-            if ((res.statusCode || 0) >= 400) {
-                reject(new Error(`SignalWire media fetch returned HTTP ${res.statusCode} for ${mediaUrl}`));
-                res.resume(); // drain
-                return;
-            }
-            const chunks: Buffer[] = [];
-            res.on('data', (c: Buffer) => chunks.push(c));
-            res.on('end', () => resolve({
-                buffer:      Buffer.concat(chunks),
-                contentType: (res.headers['content-type'] || 'application/octet-stream').split(';')[0].trim(),
-            }));
-            res.on('error', reject);
+                if (statusCode === 301 || statusCode === 302) {
+                    res.resume();
+                    resolve({ buffer: Buffer.alloc(0), contentType, statusCode, location });
+                    return;
+                }
+                if (statusCode >= 400) {
+                    res.resume();
+                    reject(new Error(`HTTP ${statusCode} fetching ${url}`));
+                    return;
+                }
+                const chunks: Buffer[] = [];
+                res.on('data', (c: Buffer) => chunks.push(c));
+                res.on('end', () => resolve({ buffer: Buffer.concat(chunks), contentType, statusCode }));
+                res.on('error', reject);
+            });
+            req.on('error', reject);
+            req.end();
         });
+    }
 
-        req.on('error', reject);
-        req.end();
-    });
+    // Step 1: Authenticated fetch of the SignalWire API media URL
+    let result = await fetchRaw(mediaUrl, true);
+
+    // Step 2: Follow redirect (302 → files.signalwire.com/.../*.smil or direct image)
+    if ((result.statusCode === 301 || result.statusCode === 302) && result.location) {
+        const redirectUrl = result.location;
+        result = await fetchRaw(redirectUrl, false);
+
+        // Step 3: If the redirect target is a SMIL playlist, parse out the actual image URL
+        if (result.contentType.includes('smil') || redirectUrl.endsWith('.smil')) {
+            const smilText = result.buffer.toString('utf8');
+            // Extract src attribute: <img src="filename.JPG" .../>
+            const srcMatch = smilText.match(/<img[^>]+src="([^"]+)"/i)
+                          || smilText.match(/<video[^>]+src="([^"]+)"/i);
+            if (!srcMatch) {
+                throw new Error(`Could not parse media URL from SMIL: ${smilText.slice(0, 200)}`);
+            }
+            // Resolve relative to the SMIL URL's directory
+            const smilBase = redirectUrl.substring(0, redirectUrl.lastIndexOf('/') + 1);
+            const actualUrl = srcMatch[1].startsWith('http') ? srcMatch[1] : smilBase + srcMatch[1];
+            result = await fetchRaw(actualUrl, false);
+        }
+    }
+
+    return { buffer: result.buffer, contentType: result.contentType };
 }
+
 
 /** Shared HTTPS request helper with Basic auth. */
 function _httpsRequest(
