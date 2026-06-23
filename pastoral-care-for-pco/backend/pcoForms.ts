@@ -1,4 +1,5 @@
 import { getDb } from './firebase.js';
+import type { DocumentData } from 'firebase-admin/firestore';
 import { createServerLogger } from '../services/logService.js';
 
 // Helper to make authenticated/refreshed PCO requests
@@ -487,6 +488,231 @@ export async function submitForm(req: any, res: any) {
       errorDetails: e.message
     }, { merge: true });
 
+    res.status(500).json({ error: e.message });
+  }
+}
+
+// 6. POST /api/forms/:churchId/:formId/sync-all
+// Re-runs the full PCO sync pipeline for every stored submission of a form.
+export async function syncAllSubmissions(req: any, res: any) {
+  const { churchId, formId } = req.params;
+  const db = getDb();
+  const log = (await import('../services/logService.js')).createServerLogger(db);
+
+  try {
+    // Load form config
+    const formDoc = await db.collection('pco_forms').doc(formId).get();
+    if (!formDoc.exists || formDoc.data()?.churchId !== churchId) {
+      return res.status(404).json({ error: 'Form not found' });
+    }
+    const formConfig = formDoc.data()!;
+
+    // Load all submissions for this form
+    const subsSnap = await db.collection('pco_form_submissions')
+      .where('formId', '==', formId)
+      .where('churchId', '==', churchId)
+      .get();
+
+    if (subsSnap.empty) {
+      return res.json({ synced: 0, results: [] });
+    }
+
+    const submissions = subsSnap.docs.map((d: DocumentData) => ({ id: d.id, ...d.data() }));
+
+    const results: { submissionId: string; status: 'success' | 'failed'; personId?: string; isNewPerson?: boolean; error?: string }[] = [];
+
+    // Build customFields (same migration logic as submitForm)
+    let customFields = formConfig.customFields || [];
+    if (customFields.length === 0 && formConfig.fields) {
+      Object.entries(formConfig.fields).forEach(([key, f]: any) => {
+        if (f.enabled) {
+          customFields.push({
+            id: key,
+            type: key === 'interests' ? 'checkboxes' : key === 'firstTimeVisitor' ? 'checkbox_single' : key === 'medicalNotes' || key === 'notes' ? 'paragraph' : 'text',
+            label: f.customLabel || f.label,
+            required: !!f.required,
+            mapToPco: key,
+            options: key === 'interests' ? ['Connect Group', 'Serving / Volunteer', 'Baptism', 'Membership', 'Child Dedication', 'Other'] : undefined
+          });
+        }
+      });
+    }
+
+    for (const sub of submissions) {
+      const submissionsData = sub.data || {};
+      const submissionId = sub.id;
+
+      try {
+        let firstName = '', lastName = '', email = '', phone = '', middleName = '', nickname = '';
+        let gender = '', birthday = '', anniversary = '', maritalStatus = '', medicalNotes = '', grade = '';
+        let street = '', city = '', state = '', zip = '';
+        const noteLines: string[] = [];
+        let generalNotes = '';
+
+        customFields.forEach((field: any) => {
+          const val = submissionsData[field.id];
+          if (val === undefined || val === null || val === '') return;
+          const displayVal = Array.isArray(val) ? val.join(', ') : (typeof val === 'boolean' ? (val ? 'Yes' : 'No') : String(val));
+
+          if (field.mapToPco === 'firstName') firstName = String(val).trim();
+          else if (field.mapToPco === 'lastName') lastName = String(val).trim();
+          else if (field.mapToPco === 'email') email = String(val).trim();
+          else if (field.mapToPco === 'phone') phone = String(val).trim();
+          else if (field.mapToPco === 'middleName') middleName = String(val).trim();
+          else if (field.mapToPco === 'nickname') nickname = String(val).trim();
+          else if (field.mapToPco === 'gender') gender = String(val).trim();
+          else if (field.mapToPco === 'birthday') birthday = String(val).trim();
+          else if (field.mapToPco === 'anniversary') anniversary = String(val).trim();
+          else if (field.mapToPco === 'maritalStatus') maritalStatus = String(val).trim();
+          else if (field.mapToPco === 'medicalNotes') medicalNotes = String(val).trim();
+          else if (field.mapToPco === 'grade') grade = String(val).trim();
+          else if (field.mapToPco === 'street') street = String(val).trim();
+          else if (field.mapToPco === 'city') city = String(val).trim();
+          else if (field.mapToPco === 'state') state = String(val).trim();
+          else if (field.mapToPco === 'zip') zip = String(val).trim();
+          else if (field.mapToPco === 'notes') generalNotes = String(val).trim();
+          else {
+            if (field.type !== 'section_heading' && field.type !== 'text_block') {
+              noteLines.push(`• ${field.label}: ${displayVal}`);
+            }
+          }
+        });
+
+        // Match or create PCO person
+        let matchedPersonId: string | null = null;
+        if (email) {
+          const emailQuery = `https://api.planningcenteronline.com/people/v2/emails?where[address]=${encodeURIComponent(email)}`;
+          const searchRes = await pcoRequest(churchId, emailQuery, 'GET');
+          if (searchRes.data && searchRes.data.length > 0) {
+            matchedPersonId = searchRes.data[0].relationships?.person?.data?.id || null;
+          }
+        }
+        if (!matchedPersonId && phone) {
+          const digitsOnly = phone.replace(/\D/g, '');
+          const phoneQuery = `https://api.planningcenteronline.com/people/v2/phone_numbers?where[number]=${digitsOnly}`;
+          const searchRes = await pcoRequest(churchId, phoneQuery, 'GET');
+          if (searchRes.data && searchRes.data.length > 0) {
+            matchedPersonId = searchRes.data[0].relationships?.person?.data?.id || null;
+          }
+        }
+
+        let isNewPerson = false;
+        let personId = matchedPersonId;
+
+        const personAttributes: any = {};
+        if (firstName) personAttributes.first_name = firstName;
+        if (lastName) personAttributes.last_name = lastName;
+        if (middleName) personAttributes.middle_name = middleName;
+        if (nickname) personAttributes.nickname = nickname;
+        if (gender) personAttributes.gender = gender;
+        if (birthday) personAttributes.birthdate = birthday;
+        if (anniversary) personAttributes.anniversary = anniversary;
+        if (medicalNotes) personAttributes.medical_notes = medicalNotes;
+        if (grade !== undefined && grade !== null && grade !== '') {
+          personAttributes.grade = parseInt(grade, 10);
+        }
+
+        if (personId) {
+          await pcoRequest(churchId, `https://api.planningcenteronline.com/people/v2/people/${personId}`, 'PATCH',
+            { data: { type: 'Person', id: personId, attributes: personAttributes } });
+        } else {
+          isNewPerson = true;
+          const createRes = await pcoRequest(churchId, 'https://api.planningcenteronline.com/people/v2/people', 'POST',
+            { data: { type: 'Person', attributes: personAttributes } });
+          personId = createRes.data?.id;
+          if (!personId) throw new Error('Failed to create person in PCO');
+        }
+
+        if (email && personId) {
+          const checkEmails = await pcoRequest(churchId, `https://api.planningcenteronline.com/people/v2/people/${personId}/emails`, 'GET');
+          const existingEmail = checkEmails.data?.find((e: any) => e.attributes?.address?.toLowerCase() === email.toLowerCase());
+          if (!existingEmail) {
+            await pcoRequest(churchId, `https://api.planningcenteronline.com/people/v2/people/${personId}/emails`, 'POST',
+              { data: { type: 'Email', attributes: { address: email, location: 'Home' } } });
+          }
+        }
+
+        if (phone && personId) {
+          const checkPhones = await pcoRequest(churchId, `https://api.planningcenteronline.com/people/v2/people/${personId}/phone_numbers`, 'GET');
+          const normalizedNewPhone = phone.replace(/\D/g, '');
+          const existingPhone = checkPhones.data?.find((p: any) => (p.attributes?.number || '').replace(/\D/g, '') === normalizedNewPhone);
+          if (!existingPhone) {
+            await pcoRequest(churchId, `https://api.planningcenteronline.com/people/v2/people/${personId}/phone_numbers`, 'POST',
+              { data: { type: 'PhoneNumber', attributes: { number: phone, location: 'Mobile' } } });
+          }
+        }
+
+        if ((street || city || state || zip) && personId) {
+          const checkAddresses = await pcoRequest(churchId, `https://api.planningcenteronline.com/people/v2/people/${personId}/addresses`, 'GET');
+          const existingAddress = checkAddresses.data?.find((a: any) => a.attributes?.location === 'Home' || a.attributes?.primary);
+          const addressPayload = { data: { type: 'Address', attributes: { street_line_1: street || '', city: city || '', state: state || '', zip: zip || '', location: 'Home', primary: true } } };
+          if (existingAddress) {
+            await pcoRequest(churchId, `https://api.planningcenteronline.com/people/v2/addresses/${existingAddress.id}`, 'PATCH', addressPayload);
+          } else {
+            await pcoRequest(churchId, `https://api.planningcenteronline.com/people/v2/people/${personId}/addresses`, 'POST', addressPayload);
+          }
+        }
+
+        if (formConfig.actions?.addToGroupId && personId) {
+          try {
+            await pcoRequest(churchId, `https://api.planningcenteronline.com/groups/v2/groups/${formConfig.actions.addToGroupId}/memberships`, 'POST',
+              { data: { type: 'Membership', relationships: { person: { data: { type: 'Person', id: personId } } } } });
+          } catch (grpErr: any) {
+            log.warn(`Force-sync: failed to add to group: ${grpErr.message}`, 'forms', { submissionId }, churchId);
+          }
+        }
+
+        if (formConfig.actions?.enrollInWorkflowId && personId) {
+          try {
+            await pcoRequest(churchId, `https://api.planningcenteronline.com/people/v2/workflows/${formConfig.actions.enrollInWorkflowId}/cards`, 'POST',
+              { data: { type: 'Card', relationships: { person: { data: { type: 'Person', id: personId } } } } });
+          } catch (wfErr: any) {
+            log.warn(`Force-sync: failed to enroll in workflow: ${wfErr.message}`, 'forms', { submissionId }, churchId);
+          }
+        }
+
+        if (medicalNotes) noteLines.push(`• Medical Notes & Allergies: ${medicalNotes}`);
+        if (maritalStatus) noteLines.push(`• Marital Status: ${maritalStatus}`);
+        if (generalNotes) { noteLines.push('\nComments / Prayer Requests:'); noteLines.push(generalNotes); }
+
+        if ((noteLines.length > 0 || generalNotes) && personId) {
+          try {
+            const noteBody = `Form Submission: ${formConfig.name}\n\n${noteLines.join('\n')}`;
+            const notePayload: any = { data: { type: 'Note', attributes: { note: noteBody } } };
+            if (formConfig.actions?.noteCategoryId) {
+              notePayload.data.relationships = { note_category: { data: { type: 'NoteCategory', id: formConfig.actions.noteCategoryId } } };
+            }
+            await pcoRequest(churchId, `https://api.planningcenteronline.com/people/v2/people/${personId}/notes`, 'POST', notePayload);
+          } catch (noteErr: any) {
+            log.warn(`Force-sync: failed to write note: ${noteErr.message}`, 'forms', { submissionId }, churchId);
+          }
+        }
+
+        // Update submission record
+        await db.collection('pco_form_submissions').doc(submissionId).update({
+          matchedPersonId: personId || null,
+          isNewPerson,
+          status: 'success',
+          forceSyncedAt: Date.now()
+        });
+
+        results.push({ submissionId, status: 'success', personId: personId || undefined, isNewPerson });
+        log.info(`Force-sync success for submission ${submissionId} → PCO person ${personId}`, 'forms', { submissionId, personId }, churchId);
+      } catch (subErr: any) {
+        log.error(`Force-sync failed for submission ${submissionId}: ${subErr.message}`, 'forms', { submissionId }, churchId);
+        await db.collection('pco_form_submissions').doc(submissionId).update({
+          status: 'failed',
+          errorDetails: subErr.message,
+          forceSyncedAt: Date.now()
+        });
+        results.push({ submissionId, status: 'failed', error: subErr.message });
+      }
+    }
+
+    const successCount = results.filter(r => r.status === 'success').length;
+    const failedCount = results.filter(r => r.status === 'failed').length;
+    res.json({ synced: successCount, failed: failedCount, total: results.length, results });
+  } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
 }

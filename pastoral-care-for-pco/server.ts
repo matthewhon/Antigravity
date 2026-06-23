@@ -32,7 +32,7 @@ import { handleGrowDailyEmail, setupGrowIntegration, requestGrowAccess, getGrowS
 import { getVapidPublicKey, savePushSubscription, removePushSubscription } from './backend/webPushService';
 import { handleFileProxy } from './backend/fileProxy';
 import { videoProcessingQueue } from './services/jobQueue.js';
-import { listForms, saveForm, deleteForm, getPublicForm, submitForm } from './backend/pcoForms.js';
+import { listForms, saveForm, deleteForm, getPublicForm, submitForm, syncAllSubmissions } from './backend/pcoForms.js';
 import { emailServicePlan } from './backend/servicePlanEmail.js';
 
 // Fix for bundled CJS environment
@@ -314,6 +314,7 @@ async function startServer() {
     app.delete('/api/forms/:churchId/:formId', deleteForm);
     app.get('/api/public/form/:churchId/:formId', getPublicForm);
     app.post('/api/public/form/:churchId/:formId/submit', express.json(), submitForm);
+    app.post('/api/forms/:churchId/:formId/sync-all', syncAllSubmissions);
 
     // ─── File Proxy & Egress Tracking ───────────────────────────────
     app.get('/f/:fileId', handleFileProxy);

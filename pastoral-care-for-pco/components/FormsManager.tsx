@@ -216,6 +216,11 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
   // UI state helpers
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [syncAllState, setSyncAllState] = useState<{
+    loading: boolean;
+    result: { synced: number; failed: number; total: number } | null;
+    error: string | null;
+  }>({ loading: false, result: null, error: null });
   const qrCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   // Load forms on mount
@@ -276,6 +281,30 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
       setLoadingSubmissions(false);
     }
   };
+
+  const handleForceSyncAll = async () => {
+    if (!activeForm) return;
+    if (!confirm(`This will push all ${submissions.length} submission(s) for "${activeForm.name}" to Planning Center — creating or updating each person. Continue?`)) return;
+    setSyncAllState({ loading: true, result: null, error: null });
+    try {
+      const apiBase = import.meta.env.VITE_API_BASE_URL || '';
+      const res = await fetch(`${apiBase}/api/forms/${churchId}/${activeForm.id}/sync-all`, { method: 'POST' });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(err.error || 'Sync failed');
+      }
+      const data = await res.json();
+      setSyncAllState({ loading: false, result: { synced: data.synced, failed: data.failed, total: data.total }, error: null });
+      // Refresh submissions list to reflect updated statuses
+      await loadSubmissions(activeForm.id);
+      // Auto-clear result after 8 s
+      setTimeout(() => setSyncAllState(s => ({ ...s, result: null })), 8000);
+    } catch (err: any) {
+      setSyncAllState({ loading: false, result: null, error: err.message });
+      setTimeout(() => setSyncAllState(s => ({ ...s, error: null })), 8000);
+    }
+  };
+
 
   const handleDownloadCsv = () => {
     if (!activeForm || submissions.length === 0) return;
@@ -1701,7 +1730,34 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
                 Submissions: <span className="font-medium text-slate-600 dark:text-slate-400">{activeForm.name}</span>
               </h2>
             </div>
-            <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3">
+              {syncAllState.result && (
+                <span className={`text-xs font-bold px-3 py-1.5 rounded-xl border ${
+                  syncAllState.result.failed > 0
+                    ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:border-amber-800'
+                    : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-800'
+                }`}>
+                  ✓ {syncAllState.result.synced} synced{syncAllState.result.failed > 0 ? `, ${syncAllState.result.failed} failed` : ''}
+                </span>
+              )}
+              {syncAllState.error && (
+                <span className="text-xs font-bold px-3 py-1.5 rounded-xl border bg-red-50 text-red-700 border-red-200 dark:bg-red-950/20 dark:border-red-800">
+                  {syncAllState.error}
+                </span>
+              )}
+              {submissions.length > 0 && (
+                <button
+                  onClick={handleForceSyncAll}
+                  disabled={syncAllState.loading}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-violet-50 hover:bg-violet-100 dark:bg-violet-950/20 dark:hover:bg-violet-900/35 border border-violet-200 dark:border-violet-900/50 text-violet-700 dark:text-violet-400 text-xs font-bold rounded-xl transition disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {syncAllState.loading ? (
+                    <><Loader2 size={13} className="animate-spin" /> Syncing…</>
+                  ) : (
+                    <><img src="https://planningcenter.com/favicon.ico" alt="PCO" className="w-3.5 h-3.5" /> Force Sync to PCO</>
+                  )}
+                </button>
+              )}
               {submissions.length > 0 && (
                 <button
                   onClick={handleDownloadCsv}
