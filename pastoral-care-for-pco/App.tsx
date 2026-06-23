@@ -503,6 +503,7 @@ const App: React.FC = () => {
           'services-attendance': 'Services',
           'services-teams': 'Services',
           'services-plans': 'Services',
+          'services-reminders': 'Services',
           'giving': 'Giving',
           'giving-donor': 'Giving',
           'giving-budgets': 'Giving',
