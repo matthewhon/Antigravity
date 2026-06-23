@@ -360,3 +360,180 @@ export async function getWorkflowStepCounts(req: any, res: any): Promise<void> {
         res.status(500).json({ error: e?.message || 'Failed to get step counts' });
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared re-sync business logic
+// Re-resolves the PCO list/group attached to a workflow and enrolls any people
+// who are NOT yet enrolled. Existing enrollments (active or completed) are
+// skipped so people stay at their current workflow step.
+// ─────────────────────────────────────────────────────────────────────────────
+export async function reSyncWorkflow(
+    workflowId: string,
+    churchId: string,
+    db: any,
+): Promise<{ enrolled: number; skipped: number; noPhone: number; error?: string }> {
+    // 1. Load workflow
+    const wfDoc = await db.collection('smsWorkflows').doc(workflowId).get();
+    if (!wfDoc.exists) return { enrolled: 0, skipped: 0, noPhone: 0, error: 'Workflow not found' };
+    const wf = wfDoc.data() as any;
+    if (wf.churchId !== churchId) return { enrolled: 0, skipped: 0, noPhone: 0, error: 'Forbidden' };
+    if (!wf.steps?.length && !wf.nodes?.length) return { enrolled: 0, skipped: 0, noPhone: 0, error: 'Workflow has no steps' };
+
+    // 2. Resolve list/group IDs — support list_add trigger and manual triggerGroupId field
+    const listId: string | null  = wf.triggerListId  || null;
+    const groupId: string | null = wf.triggerGroupId || null;
+    if (!listId && !groupId) return { enrolled: 0, skipped: 0, noPhone: 0, error: 'No PCO list or group configured on this workflow' };
+
+    // 3. Load PCO access token
+    const churchSnap = await db.collection('churches').doc(churchId).get();
+    const token: string = churchSnap.data()?.pcoAccessToken || '';
+    if (!token) return { enrolled: 0, skipped: 0, noPhone: 0, error: 'Planning Center is not connected' };
+
+    // 4. Resolve current PCO list/group members
+    const persons = await resolvePcoPersons(token, listId, groupId);
+
+    // 5. Enroll new people, skip existing
+    let enrolled = 0;
+    let skipped  = 0;
+    let noPhone  = 0;
+    const now       = Date.now();
+    const batchSize = 25;
+
+    for (let i = 0; i < persons.length; i += batchSize) {
+        const chunk = persons.slice(i, i + batchSize);
+        await Promise.all(chunk.map(async (person) => {
+            if (!person.e164) { noPhone++; return; }
+
+            // Always use a stable ID for re-sync — ensures we never double-enroll
+            // someone who is already active OR has already completed the workflow.
+            const stableId = person.personId
+                ? `${workflowId}_${person.personId}`
+                : `${workflowId}_${person.e164.replace(/\+/g, '')}`;
+
+            const existing = await db.collection('smsWorkflowEnrollments').doc(stableId).get();
+            if (existing.exists) { skipped++; return; }
+
+            // New person — enroll at step 0
+            const enrollId = wf.allowReentry
+                ? `${stableId}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+                : stableId;
+
+            const enrollment = {
+                id:                enrollId,
+                churchId,
+                workflowId,
+                phoneNumber:       person.e164,
+                personName:        person.name        || null,
+                personId:          person.personId    || null,
+                currentStep:       0,
+                nextSendAt:        now,
+                completed:         false,
+                enrolledAt:        now,
+                lastStepSentAt:    null,
+                personEmail:       person.email       || null,
+                personCity:        person.city        || null,
+                personState:       person.state       || null,
+                personBirthdate:   person.birthdate   || null,
+                personAnniversary: person.anniversary || null,
+                enrollSource:      listId ? 'pco_list_resync' : 'pco_group_resync',
+                enrollSourceId:    (listId || groupId) ?? null,
+            };
+
+            await db.collection('smsWorkflowEnrollments').doc(enrollId).set(enrollment);
+            enrolled++;
+        }));
+    }
+
+    // 6. Update enrolledCount and lastListSyncAt on the workflow
+    if (enrolled > 0 || true /* always stamp lastListSyncAt */) {
+        const updates: any = { lastListSyncAt: now, updatedAt: now };
+        if (enrolled > 0) updates.enrolledCount = (wf.enrolledCount || 0) + enrolled;
+        await db.collection('smsWorkflows').doc(workflowId).update(updates).catch(() => {});
+    }
+
+    return { enrolled, skipped, noPhone };
+}
+
+/**
+ * POST /api/messaging/workflow-resync
+ * Body: { churchId, workflowId }
+ * Forces an immediate re-sync of the workflow's PCO list/group.
+ */
+export async function workflowReSyncHandler(req: any, res: any): Promise<void> {
+    const { churchId, workflowId } = req.body || {};
+    if (!churchId || !workflowId) {
+        res.status(400).json({ error: 'Missing churchId or workflowId' });
+        return;
+    }
+    const db = getDb();
+    try {
+        const result = await reSyncWorkflow(workflowId, churchId, db);
+        if (result.error) {
+            res.status(400).json({ error: result.error });
+            return;
+        }
+        res.json({ success: true, ...result });
+    } catch (e: any) {
+        console.error('[workflowReSyncHandler] Error:', e?.message);
+        res.status(500).json({ error: e?.message || 'Re-sync failed' });
+    }
+}
+
+/**
+ * Daily scanner: re-syncs all active list_add (and group-based) workflows.
+ * Called by smsCampaignScheduler on a 24-hour interval.
+ */
+export async function runListWorkflowReSyncScanner(db: any): Promise<void> {
+    const { createServerLogger } = await import('../services/logService.js');
+    const log = createServerLogger(db);
+
+    try {
+        // Find all active workflows that have a list or group configured
+        const snap = await db.collection('smsWorkflows')
+            .where('isActive', '==', true)
+            .where('trigger', '==', 'list_add')
+            .get()
+            .catch(() => null);
+
+        // Also scan for manual/other workflows that have a triggerGroupId stored
+        const groupSnap = await db.collection('smsWorkflows')
+            .where('isActive', '==', true)
+            .where('trigger', '==', 'manual')
+            .get()
+            .catch(() => null);
+
+        const wfDocs: any[] = [
+            ...(snap?.docs || []),
+            ...((groupSnap?.docs || []).filter((d: any) => d.data().triggerGroupId)),
+        ];
+
+        if (wfDocs.length === 0) {
+            log.info('[ListReSyncScanner] No active list/group workflows found — nothing to do.', 'system', {}, '');
+            return;
+        }
+
+        log.info(`[ListReSyncScanner] Starting daily re-sync for ${wfDocs.length} workflow(s)`, 'system', {}, '');
+
+        for (const wfDoc of wfDocs) {
+            const wf       = wfDoc.data() as any;
+            const wfId     = wfDoc.id;
+            const churchId = wf.churchId;
+
+            try {
+                const result = await reSyncWorkflow(wfId, churchId, db);
+                if (result.error) {
+                    log.warn(`[ListReSyncScanner] Skipped "${wf.name}": ${result.error}`, 'system', { wfId }, churchId);
+                } else {
+                    log.info(
+                        `[ListReSyncScanner] "${wf.name}" — enrolled ${result.enrolled}, skipped ${result.skipped} existing, ${result.noPhone} no-phone`,
+                        'system', { wfId, ...result }, churchId
+                    );
+                }
+            } catch (wfErr: any) {
+                log.error(`[ListReSyncScanner] Error re-syncing "${wf.name}": ${wfErr.message}`, 'system', { wfId }, churchId);
+            }
+        }
+    } catch (e: any) {
+        console.error('[ListReSyncScanner] Fatal error:', e?.message);
+    }
+}

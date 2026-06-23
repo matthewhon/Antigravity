@@ -1,5 +1,6 @@
 import { createServerLogger } from '../services/logService';
 import type { PersonInfo } from './smsSend';
+import { runListWorkflowReSyncScanner } from './workflowEnrollEndpoint.js';
 
 // ─── SMS Campaign Scheduler ───────────────────────────────────────────────────
 // Polls Firestore every 60 seconds for SmsCampaigns with status='scheduled'
@@ -1061,17 +1062,32 @@ export function startSmsCampaignScheduler(db: any): void {
         }
     };
 
+    // ── PCO List/Group workflow re-sync — once per day ────────────────────────
+    // Re-pulls each active list_add workflow's PCO list and enrolls any new people.
+    let lastListReScan = 0;
+    const LIST_RESCAN_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours
+
+    const listReSyncTick = async () => {
+        const now = Date.now();
+        if (now - lastListReScan >= LIST_RESCAN_INTERVAL) {
+            lastListReScan = now;
+            await runListWorkflowReSyncScanner(db);
+        }
+    };
+
     // Start everything
     tick();
     workflowTick();
     birthdayTick();
     eventRegTick();
+    listReSyncTick();
 
     setInterval(tick, 60_000);
     setInterval(workflowTick, 60_000);
-    setInterval(birthdayTick, 60_000); // checks every minute, but only scans once per 24h
-    setInterval(eventRegTick, 60_000); // checks every minute, but only scans once per 24h
+    setInterval(birthdayTick, 60_000);   // checks every minute, but only scans once per 24h
+    setInterval(eventRegTick, 60_000);   // checks every minute, but only scans once per 24h
+    setInterval(listReSyncTick, 60_000); // checks every minute, but only scans once per 24h
 
-    console.log('[SmsScheduler] Started — polling every 60 seconds (campaigns + workflow executor + birthday scanner + event registration scanner)');
+    console.log('[SmsScheduler] Started — polling every 60 seconds (campaigns + workflow executor + birthday scanner + event registration scanner + PCO list re-sync scanner)');
 }
 

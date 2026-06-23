@@ -6522,21 +6522,38 @@ const WorkflowEditor: React.FC<{
 
                         {/* List Add picker */}
                         {wf.trigger === 'list_add' && (
-                            <div>
-                                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">PCO List</label>
-                                <select
-                                    value={wf.triggerListId || ''}
-                                    onChange={e => {
-                                        const l = pcoLists.find(x => x.id === e.target.value);
-                                        patch({ triggerListId: e.target.value || null, triggerListName: l?.name || null });
-                                    }}
-                                    title="Trigger PCO list"
-                                    className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
-                                >
-                                    <option value="">-- Select a list --</option>
-                                    {pcoLists.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-                                </select>
-                                <p className="text-[10px] text-slate-400 mt-1">Contacts are enrolled whenever the scheduler detects them added to this list.</p>
+                            <div className="space-y-3">
+                                <div>
+                                    <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">PCO List</label>
+                                    <select
+                                        value={wf.triggerListId || ''}
+                                        onChange={e => {
+                                            const l = pcoLists.find(x => x.id === e.target.value);
+                                            patch({ triggerListId: e.target.value || null, triggerListName: l?.name || null });
+                                        }}
+                                        title="Trigger PCO list"
+                                        className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                    >
+                                        <option value="">-- Select a list --</option>
+                                        {pcoLists.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                                    </select>
+                                    <p className="text-[10px] text-slate-400 mt-1">New members are enrolled automatically each day. Existing enrollees are never re-enrolled.</p>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">PCO Group <span className="font-normal text-slate-400">(optional — also enroll from a group)</span></label>
+                                    <select
+                                        value={wf.triggerGroupId || ''}
+                                        onChange={e => {
+                                            const g = pcoGroups.find(x => x.id === e.target.value);
+                                            patch({ triggerGroupId: e.target.value || null, triggerGroupName: g?.name || null });
+                                        }}
+                                        title="Additional PCO group to daily-sync"
+                                        className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                    >
+                                        <option value="">-- None --</option>
+                                        {pcoGroups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                                    </select>
+                                </div>
                             </div>
                         )}
 
@@ -7771,6 +7788,8 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
     const [testTarget, setTestTarget] = useState<SmsWorkflow | null>(null);
     // stepCounts: workflowId -> { stepCounts: Record<number,number>, totalActive: number }
     const [stepCountsMap, setStepCountsMap] = useState<Record<string, { stepCounts: Record<number, number>; totalActive: number }>>({});
+    // reSyncState: workflowId -> { loading, result }
+    const [reSyncState, setReSyncState] = useState<Record<string, { loading: boolean; result: string | null }>>({});
 
     // Live listener — also re-fetches step counts whenever the workflow list changes
     useEffect(() => {
@@ -8062,6 +8081,42 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
                                             >
                                                 <ListPlus size={14} />
                                             </button>
+                                            {/* Force sync from PCO list/group — for list_add workflows */}
+                                            {(wf.trigger === 'list_add' && (wf.triggerListId || wf.triggerGroupId)) && (() => {
+                                                const rs = reSyncState[wf.id];
+                                                return (
+                                                    <button
+                                                        onClick={async () => {
+                                                            setReSyncState(prev => ({ ...prev, [wf.id]: { loading: true, result: null } }));
+                                                            try {
+                                                                const apiBase = (import.meta as any).env?.VITE_API_BASE_URL || '';
+                                                                const resp = await fetch(`${apiBase}/api/messaging/workflow-resync`, {
+                                                                    method: 'POST',
+                                                                    headers: { 'Content-Type': 'application/json' },
+                                                                    body: JSON.stringify({ churchId, workflowId: wf.id }),
+                                                                });
+                                                                const data = await resp.json();
+                                                                if (!resp.ok) throw new Error(data.error || 'Re-sync failed');
+                                                                const msg = data.enrolled > 0
+                                                                    ? `✓ ${data.enrolled} new, ${data.skipped} already enrolled`
+                                                                    : `✓ Up to date — ${data.skipped} already enrolled`;
+                                                                setReSyncState(prev => ({ ...prev, [wf.id]: { loading: false, result: msg } }));
+                                                                setTimeout(() => setReSyncState(prev => ({ ...prev, [wf.id]: { loading: false, result: null } })), 8000);
+                                                            } catch (err: any) {
+                                                                setReSyncState(prev => ({ ...prev, [wf.id]: { loading: false, result: `✗ ${err.message}` } }));
+                                                                setTimeout(() => setReSyncState(prev => ({ ...prev, [wf.id]: { loading: false, result: null } })), 8000);
+                                                            }
+                                                        }}
+                                                        disabled={rs?.loading}
+                                                        className="p-1.5 text-slate-400 hover:text-teal-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition disabled:opacity-50"
+                                                        title="Force sync from PCO list/group now"
+                                                    >
+                                                        {rs?.loading
+                                                            ? <svg className="animate-spin" width={14} height={14} viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="31.4" strokeDashoffset="10" strokeLinecap="round"/></svg>
+                                                            : <RefreshCw size={14} />}
+                                                    </button>
+                                                );
+                                            })()}
                                             {wf.trigger === 'manual' && (
                                                 <button onClick={() => setEnrollTarget(wf)} className="p-1.5 text-slate-400 hover:text-violet-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition" title="Enroll contact">
                                                     <Users size={14} />
@@ -8116,6 +8171,22 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
                                             );
                                         })}
                                     </div>
+                                )}
+                                {/* Re-sync result badge */}
+                                {reSyncState[wf.id]?.result && (
+                                    <div className={`mt-2 text-[11px] font-semibold px-3 py-1.5 rounded-xl inline-flex items-center gap-1.5 ${
+                                        reSyncState[wf.id].result!.startsWith('✓')
+                                            ? 'bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800'
+                                            : 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800'
+                                    }`}>
+                                        {reSyncState[wf.id].result}
+                                    </div>
+                                )}
+                                {/* Last synced timestamp for list_add workflows */}
+                                {wf.trigger === 'list_add' && wf.lastListSyncAt && !reSyncState[wf.id]?.result && (
+                                    <p className="mt-1.5 text-[10px] text-slate-400 dark:text-slate-500">
+                                        Last synced: {new Date(wf.lastListSyncAt).toLocaleString()}
+                                    </p>
                                 )}
                             </div>
                         );

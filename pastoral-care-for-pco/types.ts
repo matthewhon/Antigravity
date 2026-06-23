@@ -1609,9 +1609,14 @@ export interface SmsWorkflow {
     /** When trigger = 'list_add', the PCO list id */
     triggerListId?: string | null;
     triggerListName?: string | null;
+    /** Optional PCO Group id — used by the daily re-sync scanner and manual workflows */
+    triggerGroupId?: string | null;
+    triggerGroupName?: string | null;
     /** When trigger = 'event_registration', the PCO Signup/Event ID (PcoRegistrationEvent.pcoId) */
     triggerEventId?: string | null;
     triggerEventName?: string | null;
+    /** Epoch ms of the last successful PCO list/group re-sync */
+    lastListSyncAt?: number | null;
     /**
      * For 'birthday' and 'anniversary' triggers:
      * Number of days BEFORE the event to send Step 1.

@@ -27,7 +27,7 @@ import { sendIndividual, sendBulk } from './backend/smsSend';
 import { handleStatusCallback } from './backend/smsWebhookStatus';
 import { startSmsCampaignScheduler } from './backend/smsCampaignScheduler';
 import { startServicesReminderScheduler, runServicesReminderScanner } from './backend/servicesReminderScheduler';
-import { workflowEnrollList, workflowEnrollPreview, workflowForceScan, getWorkflowStepCounts } from './backend/workflowEnrollEndpoint';
+import { workflowEnrollList, workflowEnrollPreview, workflowForceScan, getWorkflowStepCounts, workflowReSyncHandler } from './backend/workflowEnrollEndpoint';
 import { handleGrowDailyEmail, setupGrowIntegration, requestGrowAccess, getGrowStatus } from './backend/growIntegration';
 import { getVapidPublicKey, savePushSubscription, removePushSubscription } from './backend/webPushService';
 import { handleFileProxy } from './backend/fileProxy';
@@ -401,6 +401,7 @@ async function startServer() {
     app.post('/api/messaging/workflow-enroll-preview', express.json(), workflowEnrollPreview);
     app.post('/api/messaging/workflow-force-scan', express.json(), workflowForceScan);
     app.get('/api/messaging/workflow-step-counts/:churchId/:workflowId', getWorkflowStepCounts);
+    app.post('/api/messaging/workflow-resync', express.json(), workflowReSyncHandler);
 
     // ─── Services Reminders: manual trigger ───────────────────────────────────
     // Allows an admin to immediately run the reminder scanner rather than waiting
