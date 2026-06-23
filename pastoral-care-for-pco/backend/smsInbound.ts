@@ -407,7 +407,25 @@ export const handleInboundSms = async (req: any, res: any) => {
         const hosted: string[] = [];
         for (const srcUrl of urls) {
             try {
-                const { buffer, contentType } = await fetchSignalWireMedia(srcUrl);
+                let { buffer, contentType } = await fetchSignalWireMedia(srcUrl);
+
+                // Guard: if SignalWire returned an HTML error page instead of media
+                // (e.g. a 401 auth-redirect that wasn't caught), bail out immediately
+                // so we don't store garbage in Firebase Storage.
+                if (contentType.startsWith('text/html') || contentType.startsWith('text/plain')) {
+                    throw new Error(`SignalWire returned "${contentType}" — likely an auth error page, not media`);
+                }
+
+                // If content-type is missing or generic, detect from magic bytes
+                if (!contentType || contentType === 'application/octet-stream') {
+                    const h = buffer.slice(0, 12);
+                    if (h[0] === 0xFF && h[1] === 0xD8)                      contentType = 'image/jpeg';
+                    else if (h.slice(0,4).toString('hex') === '89504e47')    contentType = 'image/png';
+                    else if (h.slice(0,4).toString('ascii') === 'GIF8')      contentType = 'image/gif';
+                    else if (h.slice(0,4).toString('ascii') === 'RIFF')      contentType = 'video/webm';
+                    else if (h[0] === 0x25 && h[1] === 0x50)                 contentType = 'application/pdf';
+                }
+
                 // Derive a simple extension from the mime type (image/jpeg → .jpg)
                 const extMap: Record<string, string> = {
                     'image/jpeg': '.jpg', 'image/jpg': '.jpg', 'image/png': '.png',
@@ -428,6 +446,7 @@ export const handleInboundSms = async (req: any, res: any) => {
         }
         return hosted;
     }
+
 
     // mediaUrls is resolved below after we know the churchId (needed for storage path)
     let mediaUrls: string[] = rawMediaUrls; // will be replaced with hosted URLs inside try block
