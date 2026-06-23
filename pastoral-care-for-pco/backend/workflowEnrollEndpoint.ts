@@ -37,50 +37,74 @@ export async function resolvePcoPersons(
     const persons: PersonInfo[] = [];
 
     if (listId) {
-        // PCO People Lists API — include emails & addresses for merge tags
+        // PCO People Lists API
+        // NOTE: phone_numbers is a relationship in PCO API v2 — it cannot be requested
+        // via fields[Person] sparse fieldsets (those only work for plain attributes).
+        // We must use include=phone_numbers to get them via the included[] array,
+        // OR omit fields[] entirely so PCO returns all attributes.
+        // We use include=emails,addresses,phone_numbers and build lookup maps for each.
         let url: string | null =
             `https://api.planningcenteronline.com/people/v2/lists/${listId}/people` +
-            `?per_page=100&include=emails,addresses` +
-            `&fields[Person]=name,first_name,last_name,phone_numbers,birthdate,anniversary`;
+            `?per_page=100&include=emails,addresses,phone_numbers`;
 
         while (url) {
             const res = await fetch(url, {
                 headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
             });
-            if (!res.ok) throw new Error(`PCO List API returned ${res.status}`);
+            if (!res.ok) throw new Error(`PCO List API returned ${res.status}: ${await res.text().catch(() => '')}`);
             const data: any = await res.json();
 
             const included: any[] = data.included || [];
-            const emailByPersonId = new Map<string, string>();
-            const cityByPersonId  = new Map<string, string>();
-            const stateByPersonId = new Map<string, string>();
+            const emailByPersonId  = new Map<string, string>();
+            const cityByPersonId   = new Map<string, string>();
+            const stateByPersonId  = new Map<string, string>();
+            // phone_numbers come through included[] keyed by their own id;
+            // the person resource has a phone_numbers relationship listing which ids belong to it.
+            const phonesByPersonId = new Map<string, { number: string; primary: boolean }[]>();
 
             for (const inc of included) {
-                const attrs    = inc.attributes || {};
-                const personId = inc.relationships?.person?.data?.id;
-                if (!personId) continue;
-                if (inc.type === 'Email' && attrs.primary)   emailByPersonId.set(personId, attrs.address || '');
-                if (inc.type === 'Address' && attrs.primary) {
-                    cityByPersonId.set(personId,  attrs.city  || '');
-                    stateByPersonId.set(personId, attrs.state || '');
+                const attrs = inc.attributes || {};
+                if (inc.type === 'Email') {
+                    const personId = inc.relationships?.person?.data?.id;
+                    if (personId && attrs.primary) emailByPersonId.set(personId, attrs.address || '');
+                }
+                if (inc.type === 'Address') {
+                    const personId = inc.relationships?.person?.data?.id;
+                    if (personId && attrs.primary) {
+                        cityByPersonId.set(personId,  attrs.city  || '');
+                        stateByPersonId.set(personId, attrs.state || '');
+                    }
+                }
+                if (inc.type === 'PhoneNumber') {
+                    const personId = inc.relationships?.person?.data?.id;
+                    if (personId) {
+                        const existing = phonesByPersonId.get(personId) || [];
+                        existing.push({ number: attrs.number || '', primary: !!attrs.primary });
+                        phonesByPersonId.set(personId, existing);
+                    }
                 }
             }
 
             for (const person of (data.data || [])) {
-                const attrs      = person.attributes || {};
-                const phones_    = attrs.phone_numbers || [];
-                const primary    = phones_.find((p: any) => p.primary) || phones_[0];
-                const rawPhone   = primary?.number || '';
-                const digits     = rawPhone.replace(/\D/g, '');
-                const e164       = digits.length === 10 ? `+1${digits}` : digits.length === 11 ? `+${digits}` : '';
+                const attrs   = person.attributes || {};
+                const pid     = person.id;
+
+                // Phone: prefer included PhoneNumber resources, fall back to inline attribute array
+                const phonesFromIncluded = phonesByPersonId.get(pid) || [];
+                const phonesFromAttr     = (attrs.phone_numbers || []) as { number: string; primary: boolean }[];
+                const phones  = phonesFromIncluded.length ? phonesFromIncluded : phonesFromAttr;
+                const primary = phones.find(p => p.primary) || phones[0];
+                const rawPhone = primary?.number || '';
+                const digits   = rawPhone.replace(/\D/g, '');
+                const e164     = digits.length === 10 ? `+1${digits}` : digits.length === 11 ? `+${digits}` : '';
 
                 persons.push({
                     e164,
                     name:        attrs.name || `${attrs.first_name || ''} ${attrs.last_name || ''}`.trim(),
-                    personId:    person.id || null,
-                    email:       emailByPersonId.get(person.id) || '',
-                    city:        cityByPersonId.get(person.id)  || '',
-                    state:       stateByPersonId.get(person.id) || '',
+                    personId:    pid || null,
+                    email:       emailByPersonId.get(pid) || '',
+                    city:        cityByPersonId.get(pid)  || '',
+                    state:       stateByPersonId.get(pid) || '',
                     birthdate:   attrs.birthdate   || null,
                     anniversary: attrs.anniversary || null,
                 });
