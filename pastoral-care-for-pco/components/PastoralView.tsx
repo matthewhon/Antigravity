@@ -601,6 +601,17 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
       } as any;
       await firestore.savePastoralNote(note);
       setNotes(prev => [note, ...prev]);
+
+      // Sync to PCO People if connected (mirrors the main care panel behaviour)
+      if (pcoConnected && person?.id) {
+          try {
+              const noteText = `[Pastoral Care: ${note.type}]\n${note.content}`;
+              await pcoService.addNoteToPerson(church.id, person.id, noteText);
+          } catch (e) {
+              console.error('Failed to sync Reports-page note to PCO:', e);
+          }
+      }
+
       // Also mark as followed up so the row gets the Done badge
       handleMarkFollowedUp(personId);
   };
