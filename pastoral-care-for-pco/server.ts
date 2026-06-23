@@ -33,6 +33,7 @@ import { getVapidPublicKey, savePushSubscription, removePushSubscription } from 
 import { handleFileProxy } from './backend/fileProxy';
 import { videoProcessingQueue } from './services/jobQueue.js';
 import { listForms, saveForm, deleteForm, getPublicForm, submitForm } from './backend/pcoForms.js';
+import { emailServicePlan } from './backend/servicePlanEmail.js';
 
 // Fix for bundled CJS environment
 const __dirname = process.cwd();
@@ -412,6 +413,11 @@ async function startServer() {
             return res.status(500).json({ error: e.message || 'Reminder scan failed' });
         }
     });
+
+    // ─── Service Plan Email ────────────────────────────────────────────────────
+    // Send a beautifully formatted service plan email to the entire scheduled
+    // roster or to a single custom email address.
+    app.post('/api/services/email-plan', express.json(), emailServicePlan);
 
     // 10DLC Brand & Campaign registration (per-tenant)
     app.post('/api/messaging/register-brand',       express.json(), registerSmsBrand);

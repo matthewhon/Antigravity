@@ -1392,6 +1392,8 @@ const ServicesView: React.FC<ServicesViewProps> = ({
         pcoConnected={pcoConnected}
         onSync={handleServiceSync}
         isSyncing={isServicesSyncing}
+        churchId={churchId}
+        church={church}
       />
     );
   }

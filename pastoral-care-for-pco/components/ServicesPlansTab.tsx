@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ServicePlanSnapshot, ServicesTeam, PcoPerson } from '../types';
+import { ServicePlanSnapshot, ServicesTeam, PcoPerson, Church } from '../types';
 
 interface ServicesPlansTabProps {
   futurePlans: ServicePlanSnapshot[];
@@ -8,6 +8,8 @@ interface ServicesPlansTabProps {
   pcoConnected?: boolean;
   onSync?: () => Promise<void>;
   isSyncing?: boolean;
+  churchId?: string;
+  church?: Church;
 }
 
 export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
@@ -17,6 +19,8 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
   pcoConnected,
   onSync,
   isSyncing,
+  churchId,
+  church,
 }) => {
   // --- States ---
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
@@ -33,6 +37,15 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
   const [startDate, setStartDate] = useState<string>(todayStr);
   const [endDate, setEndDate] = useState<string>(defaultEndStr);
   const [activeDetailTab, setActiveDetailTab] = useState<'items' | 'roster' | 'needs'>('items');
+
+  // ── Email state ──────────────────────────────────────────────────────────────
+  const [isEmailOpen, setIsEmailOpen]           = useState(false);
+  const [isSending, setIsSending]               = useState(false);
+  const [emailStatus, setEmailStatus]           = useState<'idle' | 'success' | 'error'>('idle');
+  const [emailError, setEmailError]             = useState('');
+  const [emailInput, setEmailInput]             = useState('');
+  const [showCustomEmail, setShowCustomEmail]   = useState(false);
+  const [lastSentCount, setLastSentCount]       = useState(0);
 
   // --- Helper: get effective plan date ---
   const getPlanDate = (plan: ServicePlanSnapshot): Date => {
@@ -96,6 +109,52 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
       setSelectedPlanId(null);
     }
   }, [filteredPlans, selectedPlanId]);
+
+  // ── Email send helper ─────────────────────────────────────────────────────
+  const sendPlanEmail = async (toEveryone: boolean, toAddress?: string) => {
+    if (!selectedPlan || !churchId) return;
+    setIsSending(true);
+    setEmailStatus('idle');
+    setEmailError('');
+    try {
+      const res = await fetch('/api/services/email-plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          churchId,
+          plan: selectedPlan,
+          toEveryone: toEveryone || undefined,
+          toAddress: toAddress || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to send email');
+      setLastSentCount(data.sent || 1);
+      setEmailStatus('success');
+    } catch (e: any) {
+      setEmailError(e.message || 'Email send failed');
+      setEmailStatus('error');
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const openEmailModal = () => {
+    setIsEmailOpen(true);
+    setEmailStatus('idle');
+    setEmailError('');
+    setEmailInput('');
+    setShowCustomEmail(false);
+    setLastSentCount(0);
+  };
+
+  const closeEmailModal = () => {
+    if (isSending) return;
+    setIsEmailOpen(false);
+    setTimeout(() => setEmailStatus('idle'), 300);
+  };
+
+  const rosterCount = selectedPlan?.teamMembers?.length ?? 0;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -318,23 +377,59 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
                   </p>
                 </div>
 
-                {/* Staffing Load Badge */}
-                <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-4 border border-slate-100 dark:border-slate-700/60 flex items-center gap-4">
-                  <div className="text-center">
-                    <span className="block text-2xl font-black text-indigo-600 dark:text-indigo-400 leading-none">
-                      {selectedPlan.items?.length || 0}
-                    </span>
-                    <span className="text-[8px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider font-bold">Plan Items</span>
+                {/* Right side: stats + email actions */}
+                <div className="flex flex-col gap-3 shrink-0">
+                  {/* Staffing Load Badge */}
+                  <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-4 border border-slate-100 dark:border-slate-700/60 flex items-center gap-4">
+                    <div className="text-center">
+                      <span className="block text-2xl font-black text-indigo-600 dark:text-indigo-400 leading-none">
+                        {selectedPlan.items?.length || 0}
+                      </span>
+                      <span className="text-[8px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider">Plan Items</span>
+                    </div>
+                    <div className="h-8 w-px bg-slate-200 dark:bg-slate-700" />
+                    <div className="text-center">
+                      <span className={`block text-2xl font-black leading-none ${
+                        (selectedPlan.positionsNeeded || 0) > 0 ? 'text-rose-500' : 'text-emerald-500'
+                      }`}>
+                        {selectedPlan.positionsNeeded || 0}
+                      </span>
+                      <span className="text-[8px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider">Needed Slots</span>
+                    </div>
                   </div>
-                  <div className="h-8 w-px bg-slate-200 dark:bg-slate-700" />
-                  <div className="text-center">
-                    <span className={`block text-2xl font-black leading-none ${
-                      (selectedPlan.positionsNeeded || 0) > 0 ? 'text-rose-500' : 'text-emerald-500'
-                    }`}>
-                      {selectedPlan.positionsNeeded || 0}
-                    </span>
-                    <span className="text-[8px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider font-bold">Needed Slots</span>
-                  </div>
+
+                  {/* Email action buttons */}
+                  {churchId && (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={openEmailModal}
+                        disabled={!selectedPlan || rosterCount === 0}
+                        title={rosterCount === 0 ? 'No roster members' : `Email all ${rosterCount} scheduled people`}
+                        className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl
+                          bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-black text-[10px]
+                          uppercase tracking-widest hover:from-indigo-700 hover:to-violet-700
+                          transition-all shadow-lg shadow-indigo-500/30 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round"
+                            d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+                        </svg>
+                        Email Everyone
+                      </button>
+                      <button
+                        onClick={() => { openEmailModal(); setShowCustomEmail(true); }}
+                        title="Send to a specific email address"
+                        className="px-4 py-2.5 rounded-xl border-2 border-indigo-300 dark:border-indigo-700
+                          text-indigo-600 dark:text-indigo-400 font-black text-[10px] uppercase tracking-widest
+                          hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round"
+                            d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487z" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -612,6 +707,182 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
           )}
         </div>
       </div>
+
+      {/* ── Email Modal ──────────────────────────────────────────────────── */}
+      {isEmailOpen && selectedPlan && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) closeEmailModal(); }}
+        >
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={closeEmailModal} />
+
+          {/* Modal Card */}
+          <div className="relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Header gradient */}
+            <div className="bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 p-6 pb-8">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-indigo-200 mb-1">Service Plan</p>
+                  <h2 className="text-xl font-black text-white leading-tight">
+                    {selectedPlan.serviceTypeName || 'Service Plan'}
+                  </h2>
+                  <p className="text-indigo-200 text-xs font-medium mt-1">
+                    {rosterCount} people on the roster
+                  </p>
+                </div>
+                <button
+                  onClick={closeEmailModal}
+                  disabled={isSending}
+                  className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="p-6">
+              {emailStatus === 'success' ? (
+                /* Success state */
+                <div className="text-center py-6">
+                  <div className="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mx-auto mb-4">
+                    <svg className="w-8 h-8 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-black text-slate-900 dark:text-white">Email{lastSentCount > 1 ? 's' : ''} Sent!</h3>
+                  <p className="text-slate-500 dark:text-slate-400 text-sm mt-2">
+                    Successfully sent to <strong>{lastSentCount}</strong> recipient{lastSentCount !== 1 ? 's' : ''}.
+                  </p>
+                  <button
+                    onClick={closeEmailModal}
+                    className="mt-6 px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-colors"
+                  >
+                    Done
+                  </button>
+                </div>
+              ) : (
+                /* Send options */
+                <>
+                  {/* Mode toggle */}
+                  <div className="flex gap-2 mb-6 p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl">
+                    <button
+                      onClick={() => setShowCustomEmail(false)}
+                      className={`flex-1 py-2 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${
+                        !showCustomEmail
+                          ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                          : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+                      }`}
+                    >
+                      📣 Email Everyone
+                    </button>
+                    <button
+                      onClick={() => setShowCustomEmail(true)}
+                      className={`flex-1 py-2 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${
+                        showCustomEmail
+                          ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                          : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+                      }`}
+                    >
+                      ✏️ Custom Email
+                    </button>
+                  </div>
+
+                  {!showCustomEmail ? (
+                    /* Email Everyone panel */
+                    <div className="space-y-4">
+                      <div className="bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/30 rounded-2xl p-4">
+                        <p className="text-sm font-bold text-indigo-900 dark:text-indigo-300 mb-1">
+                          📨 Send to all {rosterCount} scheduled team members
+                        </p>
+                        <p className="text-xs text-indigo-700/70 dark:text-indigo-400/70 leading-relaxed">
+                          Each person will receive a personalized email with the complete Order of Service, 
+                          Scheduled Roster, and Open Positions. Email addresses are pulled from Planning Center.
+                        </p>
+                      </div>
+
+                      {emailStatus === 'error' && (
+                        <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 rounded-xl p-3">
+                          <p className="text-xs font-bold text-red-600 dark:text-red-400">⚠ {emailError}</p>
+                        </div>
+                      )}
+
+                      <button
+                        onClick={() => sendPlanEmail(true)}
+                        disabled={isSending}
+                        className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white
+                          font-black text-sm uppercase tracking-widest hover:from-indigo-700 hover:to-violet-700
+                          transition-all shadow-lg shadow-indigo-500/30 disabled:opacity-50 flex items-center justify-center gap-2"
+                      >
+                        {isSending ? (
+                          <>
+                            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                            </svg>
+                            Sending...
+                          </>
+                        ) : (
+                          <>📧 Send to {rosterCount} People</>
+                        )}
+                      </button>
+                    </div>
+                  ) : (
+                    /* Custom email panel */
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-2">
+                          Email Address
+                        </label>
+                        <input
+                          type="email"
+                          value={emailInput}
+                          onChange={e => setEmailInput(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter' && emailInput.includes('@')) sendPlanEmail(false, emailInput); }}
+                          placeholder="pastor@church.com"
+                          className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700
+                            rounded-xl text-sm text-slate-900 dark:text-white outline-none
+                            focus:ring-2 focus:ring-indigo-500 transition-all"
+                        />
+                        <p className="text-[10px] text-slate-400 mt-1.5">
+                          The full plan — Order of Service, Roster, and Open Positions — will be emailed to this address.
+                        </p>
+                      </div>
+
+                      {emailStatus === 'error' && (
+                        <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 rounded-xl p-3">
+                          <p className="text-xs font-bold text-red-600 dark:text-red-400">⚠ {emailError}</p>
+                        </div>
+                      )}
+
+                      <button
+                        onClick={() => sendPlanEmail(false, emailInput)}
+                        disabled={isSending || !emailInput.includes('@')}
+                        className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white
+                          font-black text-sm uppercase tracking-widest hover:from-indigo-700 hover:to-violet-700
+                          transition-all shadow-lg shadow-indigo-500/30 disabled:opacity-50 flex items-center justify-center gap-2"
+                      >
+                        {isSending ? (
+                          <>
+                            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                            </svg>
+                            Sending...
+                          </>
+                        ) : '📧 Send Email'}
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
