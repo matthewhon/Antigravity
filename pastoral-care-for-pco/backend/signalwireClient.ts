@@ -242,6 +242,69 @@ export async function callRegistryApiPaginated(
     return allData;
 }
 
+/**
+ * Downloads a SignalWire MMS media URL with HTTP Basic auth and returns the
+ * raw buffer and content-type.  Used to re-host inbound MMS attachments in
+ * Firebase Storage so they are accessible without SignalWire credentials.
+ *
+ * @param mediaUrl  The raw SignalWire MediaUrl (e.g. https://space.signalwire.com/api/laml/…)
+ * @returns  { buffer, contentType } or throws on non-2xx / network error
+ */
+export async function fetchSignalWireMedia(
+    mediaUrl: string
+): Promise<{ buffer: Buffer; contentType: string }> {
+    const data      = await getSystemSettings();
+    const projectId = (data.signalwireProjectId || '').trim();
+    const apiToken  = (data.signalwireApiToken  || '').trim();
+
+    if (!projectId || !apiToken) {
+        throw new Error('SignalWire credentials are not configured — cannot fetch media.');
+    }
+
+    const authHeader = 'Basic ' + Buffer.from(`${projectId}:${apiToken}`).toString('base64');
+
+    return new Promise((resolve, reject) => {
+        const urlObj = new URL(mediaUrl);
+        const options = {
+            hostname: urlObj.hostname,
+            path:     urlObj.pathname + urlObj.search,
+            method:   'GET' as const,
+            headers:  { Authorization: authHeader },
+        };
+
+        const req = https.request(options, (res) => {
+            // Follow a single redirect (SignalWire sometimes 302s to a CDN)
+            if ((res.statusCode === 301 || res.statusCode === 302) && res.headers.location) {
+                https.get(res.headers.location, (r2) => {
+                    const chunks: Buffer[] = [];
+                    r2.on('data', (c: Buffer) => chunks.push(c));
+                    r2.on('end', () => resolve({
+                        buffer:      Buffer.concat(chunks),
+                        contentType: (r2.headers['content-type'] || 'application/octet-stream').split(';')[0].trim(),
+                    }));
+                    r2.on('error', reject);
+                }).on('error', reject);
+                return;
+            }
+            if ((res.statusCode || 0) >= 400) {
+                reject(new Error(`SignalWire media fetch returned HTTP ${res.statusCode} for ${mediaUrl}`));
+                res.resume(); // drain
+                return;
+            }
+            const chunks: Buffer[] = [];
+            res.on('data', (c: Buffer) => chunks.push(c));
+            res.on('end', () => resolve({
+                buffer:      Buffer.concat(chunks),
+                contentType: (res.headers['content-type'] || 'application/octet-stream').split(';')[0].trim(),
+            }));
+            res.on('error', reject);
+        });
+
+        req.on('error', reject);
+        req.end();
+    });
+}
+
 /** Shared HTTPS request helper with Basic auth. */
 function _httpsRequest(
     url: string,

@@ -3848,6 +3848,21 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                         className={inputCn + ' resize-none'}
                                                     />
                                                 </div>
+                                                <div>
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <span className="bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full">FIRST MSG</span>
+                                                        <label className={labelCn + ' mb-0'}>First Message Confirmation <span className="normal-case font-normal text-slate-400">(sent once per contact)</span></label>
+                                                    </div>
+                                                    <textarea
+                                                        title="First Message Confirmation"
+                                                        placeholder={`You'll now receive communications from ${church.name || 'our church'} (frequency varies). Msg & data rates may apply. Reply STOP to cancel or HELP for help.`}
+                                                        value={smsForm.firstMessageConfirmation || ''}
+                                                        onChange={e => handleSmsChange('firstMessageConfirmation', e.target.value)}
+                                                        rows={3}
+                                                        className={inputCn + ' resize-none'}
+                                                    />
+                                                    <p className="text-[9px] text-slate-400 mt-1.5">Automatically sent as a follow-up message the <strong>first time</strong> your church texts any phone number. Leave blank to disable. Required by TCPA for new contacts receiving marketing messages.</p>
+                                                </div>
                                             </div>
                                         </div>
 

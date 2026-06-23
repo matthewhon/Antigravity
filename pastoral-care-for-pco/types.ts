@@ -1049,6 +1049,14 @@ export interface SmsSettings {
     optInMessage?: string;
     /** Custom help reply (HELP keyword) */
     helpMessage?: string;
+    /**
+     * TCPA opt-in compliance message sent automatically after the very first outbound SMS
+     * to any phone number for this church. Fires once per phone+church pair (tracked via
+     * the smsOptInConfirmations Firestore collection). Leave blank to disable.
+     * Example: "You'll now receive communications from Grace Church (frequency varies).
+     * Msg & data rates may apply. Reply STOP to cancel or HELP for help."
+     */
+    firstMessageConfirmation?: string;
     /** Whether to prepend the church name to every outbound message */
     prefixMessagesWithName?: boolean;
     /** Footer text appended to every outbound SMS (e.g. "Reply STOP to unsubscribe") */

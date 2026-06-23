@@ -561,6 +561,15 @@ async function runWorkflowStepExecutor(db: any): Promise<void> {
                     }
                 }
 
+                // ── Claim this enrollment before sending ─────────────────────
+                // Push nextSendAt 5 minutes into the future so that any
+                // concurrent 60-second tick whose query runs before our final
+                // update at the end of this block won't re-pick and re-send
+                // the same step (the root cause of duplicate messages).
+                await db.collection('smsWorkflowEnrollments').doc(enrollId).update({
+                    nextSendAt: now + 5 * 60 * 1000,
+                });
+
                 // ── Fire the step ─────────────────────────────────────────────
                 if (channelType === 'sms' || channelType === 'mms') {
                     const { sendBulkInternal } = await import('./smsSend.js');
@@ -731,6 +740,12 @@ async function runWorkflowStepExecutor(db: any): Promise<void> {
                 );
 
             } catch (e: any) {
+                // Restore nextSendAt to now so the enrollment stays
+                // immediately retryable — it won't be stuck behind the
+                // 5-minute claim window we set before the send attempt.
+                await db.collection('smsWorkflowEnrollments').doc(enrollId).update({
+                    nextSendAt: now,
+                }).catch(() => {});
                 log.warn(
                     `[WorkflowExecutor] Error on enrollment ${enrollId}: ${e.message}`,
                     'system', { enrollId, workflowId, churchId }, churchId

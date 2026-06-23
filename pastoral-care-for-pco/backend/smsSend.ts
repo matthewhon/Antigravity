@@ -171,6 +171,53 @@ async function isOptedOut(db: any, churchId: string, phone: string): Promise<boo
     return snap.exists;
 }
 
+/**
+ * After the first outbound SMS to a phone number for a church, send the admin-configured
+ * TCPA opt-in compliance message (smsSettings.firstMessageConfirmation).
+ *
+ * Uses the `smsOptInConfirmations` Firestore collection to ensure the message is sent
+ * exactly once per phone+church pair, regardless of which send path triggered it.
+ *
+ * Always runs fire-and-forget — call with .catch(() => {}) so it never blocks or
+ * errors the primary send.
+ */
+async function sendOptInConfirmationIfNeeded(
+    db: any,
+    client: any,
+    fromNumber: string,
+    to: string,
+    churchId: string,
+): Promise<void> {
+    const docId = `${churchId}_${to.replace(/\+/g, '')}`;
+
+    // 1. Check if we've already sent the compliance message for this pair
+    const existing = await db.collection('smsOptInConfirmations').doc(docId).get();
+    if (existing.exists) return;
+
+    // 2. Load the configured compliance message from smsSettings
+    const churchSnap = await db.collection('churches').doc(churchId).get();
+    const confirmationBody: string = (churchSnap.data()?.smsSettings?.firstMessageConfirmation || '').trim();
+
+    // 3. If blank, admin has opted out of sending compliance messages — do nothing
+    if (!confirmationBody) return;
+
+    // 4. Send the compliance message (best-effort)
+    try {
+        await client.messages.create({ from: fromNumber, to, body: confirmationBody });
+    } catch (e: any) {
+        console.warn(`[OptInConfirmation] Failed to send to ${to}: ${e.message}`);
+    }
+
+    // 5. Record that we've sent it — write this even on send failure so we never spam
+    await db.collection('smsOptInConfirmations').doc(docId).set({
+        id:          docId,
+        churchId,
+        phoneNumber: to,
+        sentAt:      Date.now(),
+    });
+}
+
+
 /** Record a usage entry and update conversation / campaign. */
 async function recordUsage(db: any, params: {
     churchId:       string;
@@ -279,6 +326,9 @@ export async function sendIndividualInternal(params: {
     const msg = await client.messages.create(msgParams);
 
     await recordUsage(db, { churchId, toPhone: to, segments, isMms, messageSid: msg.sid, numberId: resolvedNumberId });
+
+    // ── TCPA first-message compliance (fire-and-forget) ──────────────────────
+    sendOptInConfirmationIfNeeded(db, client, fromNumber, to, churchId).catch(() => {});
 
     const convId  = existingConvId || `${churchId}_${to.replace(/\+/g, '')}`;
     const convRef = db.collection('smsConversations').doc(convId);
@@ -496,6 +546,9 @@ export async function sendBulkInternal(params: {
                 const msg = await client.messages.create(msgParams);
 
                 await recordUsage(db, { churchId, campaignId, toPhone: to, segments, isMms, messageSid: msg.sid, numberId });
+
+                // ── TCPA first-message compliance (fire-and-forget) ──────────────────
+                sendOptInConfirmationIfNeeded(db, client, fromNumber, to, churchId).catch(() => {});
 
                 const convId  = `${churchId}_${to.replace(/\+/g, '')}`;
                 const convRef = db.collection('smsConversations').doc(convId);

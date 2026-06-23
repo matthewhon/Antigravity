@@ -30,10 +30,10 @@ function validateRequest(signingKey: string, signature: string, webhookUrl: stri
         return false;
     }
 }
-import { getDb } from './firebase';
+import { getDb, getStorage } from './firebase';
 import { createServerLogger } from '../services/logService';
 import { FieldValue } from 'firebase-admin/firestore';
-import { getSignalWireSigningKey, getSmsWebhookBaseUrl } from './signalwireClient';
+import { getSignalWireSigningKey, getSmsWebhookBaseUrl, fetchSignalWireMedia } from './signalwireClient';
 import { processExecutiveAiQuery } from './executiveAiAgent';
 import { updatePcoSubscriptionField } from './pcoFieldData';
 
@@ -387,13 +387,50 @@ export const handleInboundSms = async (req: any, res: any) => {
         SmsSid: smsSid, MessageSid: messageSidField,
     } = req.body || {};
 
-    // Collect MMS media URLs (Twilio sends MediaUrl0, MediaUrl1, …)
-    const mediaUrls: string[] = [];
+    // Collect MMS media URLs (SignalWire sends MediaUrl0, MediaUrl1, …)
+    const rawMediaUrls: string[] = [];
     const mediaCount = parseInt(numMedia, 10) || 0;
     for (let i = 0; i < mediaCount; i++) {
         const url = req.body[`MediaUrl${i}`];
-        if (url) mediaUrls.push(url);
+        if (url) rawMediaUrls.push(url);
     }
+
+    /**
+     * Re-host each SignalWire media URL to Firebase Storage so the stored URL
+     * is permanently publicly accessible (no SignalWire credentials required).
+     * Falls back to the original URL on any error so the message is never lost.
+     */
+    async function rehostSignalWireMedia(urls: string[], churchId: string): Promise<string[]> {
+        if (urls.length === 0) return [];
+        const storage = getStorage();
+        const bucket  = storage.bucket();
+        const hosted: string[] = [];
+        for (const srcUrl of urls) {
+            try {
+                const { buffer, contentType } = await fetchSignalWireMedia(srcUrl);
+                // Derive a simple extension from the mime type (image/jpeg → .jpg)
+                const extMap: Record<string, string> = {
+                    'image/jpeg': '.jpg', 'image/jpg': '.jpg', 'image/png': '.png',
+                    'image/gif': '.gif',  'image/webp': '.webp', 'image/heic': '.heic',
+                    'video/mp4': '.mp4',  'video/quicktime': '.mov', 'audio/mpeg': '.mp3',
+                    'audio/ogg': '.ogg',  'application/pdf': '.pdf',
+                };
+                const ext  = extMap[contentType] || '';
+                const name = `sms-media/${churchId}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}${ext}`;
+                const file = bucket.file(name);
+                await file.save(buffer, { metadata: { contentType }, resumable: false });
+                await file.makePublic();
+                hosted.push(`https://storage.googleapis.com/${bucket.name}/${name}`);
+            } catch (err: any) {
+                console.error(`[Inbound SMS] Failed to re-host media ${srcUrl}:`, err.message);
+                hosted.push(srcUrl); // fallback: keep the original URL
+            }
+        }
+        return hosted;
+    }
+
+    // mediaUrls is resolved below after we know the churchId (needed for storage path)
+    let mediaUrls: string[] = rawMediaUrls; // will be replaced with hosted URLs inside try block
 
 
     try {
@@ -498,6 +535,12 @@ export const handleInboundSms = async (req: any, res: any) => {
             log.info(`[Inbound SMS] HELP received from ${from} for church ${churchId}`, 'system', { churchId, from }, churchId);
             res.set('Content-Type', 'text/xml');
             return res.status(200).send('<Response></Response>');
+        }
+
+        // Re-host any inbound MMS attachments to Firebase Storage so the stored
+        // URLs are permanently publicly accessible (no SignalWire auth required).
+        if (rawMediaUrls.length > 0) {
+            mediaUrls = await rehostSignalWireMedia(rawMediaUrls, churchId);
         }
 
         // 3. Find or create the SmsConversation
