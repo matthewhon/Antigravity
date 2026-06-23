@@ -498,6 +498,7 @@ const App: React.FC = () => {
           'people-risk': 'People',
           'people-reports': 'People',
           'groups': 'Groups',
+          'groups-reports': 'Groups',
           'services': 'Services',
           'services-attendance': 'Services',
           'services-teams': 'Services',
