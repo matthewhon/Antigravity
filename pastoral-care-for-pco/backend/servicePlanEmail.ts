@@ -68,14 +68,14 @@ function buildPlanEmailHtml(params: {
                   ${esc(item.title)}
                 </div>
                 ${isSong && item.author
-                    ? `<div style="font-size: 11px; color: #6366f1; font-weight: 600; margin-top: 2px;">by ${esc(item.author)}</div>`
+                    ? `<div style="font-size: 11px; color: #2563eb; font-weight: 600; margin-top: 2px;">by ${esc(item.author)}</div>`
                     : ''}
               </td>
               <td style="padding: 10px 12px; vertical-align: top; width: 80px; text-align: right;">
                 <span style="display: inline-block; font-size: 9px; font-weight: 800; padding: 3px 8px;
                     border-radius: 20px; letter-spacing: 1px; text-transform: uppercase;
-                    background: ${isSong ? '#eef2ff' : '#f1f5f9'};
-                    color: ${isSong ? '#6366f1' : '#64748b'};">
+                    background: ${isSong ? '#dbeafe' : '#f1f5f9'};
+                    color: ${isSong ? '#1d4ed8' : '#64748b'};">
                   ${esc(item.type)}
                 </span>
               </td>
@@ -157,24 +157,24 @@ function buildPlanEmailHtml(params: {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${esc(serviceTypeName)} — Service Plan</title>
 </head>
-<body style="margin:0; padding:0; background:#f0f4ff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;">
+<body style="margin:0; padding:0; background:#eff6ff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;">
 
   <!-- Preheader -->
-  <div style="display:none; max-height:0; overflow:hidden; color:#f0f4ff;">
+  <div style="display:none; max-height:0; overflow:hidden; color:#eff6ff;">
     Service Plan for ${esc(serviceTypeName)} on ${esc(planDate)} — Order of Service, Roster &amp; Open Positions
   </div>
 
   <!-- Outer wrapper -->
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f4ff; padding: 32px 16px;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#eff6ff; padding: 32px 16px;">
     <tr>
       <td align="center">
         <table width="600" cellpadding="0" cellspacing="0"
             style="max-width:600px; width:100%; border-radius:24px; overflow:hidden;
-                   box-shadow: 0 20px 60px rgba(99,102,241,0.15);">
+                   box-shadow: 0 20px 60px rgba(37,99,235,0.15);">
 
           <!-- HERO HEADER -->
           <tr>
-            <td style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #2563eb 100%);
+            <td style="background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 50%, #1e40af 100%);
                 padding: 48px 40px 40px; text-align: center;">
               <div style="display:inline-block; background:rgba(255,255,255,0.15);
                   border-radius: 16px; padding: 12px 20px; margin-bottom: 20px;">
@@ -220,7 +220,7 @@ function buildPlanEmailHtml(params: {
               <!-- ── ORDER OF SERVICE ── -->
               <div style="margin-bottom: 36px;">
                 <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px;">
-                  <div style="width:4px; height:24px; background:linear-gradient(180deg,#6366f1,#818cf8);
+                  <div style="width:4px; height:24px; background:linear-gradient(180deg,#1d4ed8,#2563eb);
                       border-radius:4px;"></div>
                   <h2 style="margin:0; font-size:16px; font-weight:900; color:#1e293b;
                       letter-spacing:-0.3px;">
@@ -237,7 +237,7 @@ function buildPlanEmailHtml(params: {
               <!-- ── ROSTER ── -->
               <div style="margin-bottom: 36px;">
                 <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px;">
-                  <div style="width:4px; height:24px; background:linear-gradient(180deg,#8b5cf6,#a78bfa);
+                  <div style="width:4px; height:24px; background:linear-gradient(180deg,#2563eb,#3b82f6);
                       border-radius:4px;"></div>
                   <h2 style="margin:0; font-size:16px; font-weight:900; color:#1e293b;
                       letter-spacing:-0.3px;">
