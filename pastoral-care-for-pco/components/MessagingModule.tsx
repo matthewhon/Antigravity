@@ -7769,8 +7769,10 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
     const [enrollTarget, setEnrollTarget] = useState<SmsWorkflow | null>(null);
     const [listEnrollTarget, setListEnrollTarget] = useState<SmsWorkflow | null>(null);
     const [testTarget, setTestTarget] = useState<SmsWorkflow | null>(null);
+    // stepCounts: workflowId -> { stepCounts: Record<number,number>, totalActive: number }
+    const [stepCountsMap, setStepCountsMap] = useState<Record<string, { stepCounts: Record<number, number>; totalActive: number }>>({});
 
-    // Live listener
+    // Live listener — also re-fetches step counts whenever the workflow list changes
     useEffect(() => {
         const q = query(
             collection(firebaseDb, 'smsWorkflows'),
@@ -7778,8 +7780,25 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
             orderBy('createdAt', 'desc')
         );
         const unsub = onSnapshot(q, snap => {
-            setWorkflows(snap.docs.map(d => ({ id: d.id, ...d.data() } as SmsWorkflow)));
+            const wfs = snap.docs.map(d => ({ id: d.id, ...d.data() } as SmsWorkflow));
+            setWorkflows(wfs);
             setIsLoading(false);
+            // Fetch step counts for all workflows in the background
+            const apiBase = (import.meta as any).env?.VITE_API_BASE_URL || '';
+            Promise.all(
+                wfs.map(wf =>
+                    fetch(`${apiBase}/api/messaging/workflow-step-counts/${churchId}/${wf.id}`)
+                        .then(r => r.ok ? r.json() : null)
+                        .then(data => data ? ({ id: wf.id, stepCounts: data.stepCounts, totalActive: data.totalActive }) : null)
+                        .catch(() => null)
+                )
+            ).then(results => {
+                const map: Record<string, { stepCounts: Record<number, number>; totalActive: number }> = {};
+                for (const r of results) {
+                    if (r) map[r.id] = { stepCounts: r.stepCounts, totalActive: r.totalActive };
+                }
+                setStepCountsMap(map);
+            });
         });
         return unsub;
     }, [churchId]);
@@ -8000,7 +8019,7 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
 
                                     {/* Right: stats + actions */}
                                     <div className="flex items-center gap-3 shrink-0">
-                                        {/* Enrolled / completed */}
+                                        {/* Enrolled / completed / in-progress */}
                                         <div className="text-right hidden sm:block">
                                             <p className="text-lg font-black text-violet-600 dark:text-violet-300">{wf.enrolledCount}</p>
                                             <p className="text-[10px] text-slate-400 uppercase tracking-widest">enrolled</p>
@@ -8009,6 +8028,12 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
                                             <p className="text-lg font-black text-emerald-600">{wf.completedCount}</p>
                                             <p className="text-[10px] text-slate-400 uppercase tracking-widest">done</p>
                                         </div>
+                                        {stepCountsMap[wf.id]?.totalActive > 0 && (
+                                            <div className="text-right hidden sm:block">
+                                                <p className="text-lg font-black text-amber-500">{stepCountsMap[wf.id].totalActive}</p>
+                                                <p className="text-[10px] text-slate-400 uppercase tracking-widest">active</p>
+                                            </div>
+                                        )}
 
                                         {/* Active toggle */}
                                         <button
@@ -8052,34 +8077,44 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
                                     </div>
                                 </div>
 
-                                {/* Step timeline preview */}
+                                {/* Step timeline preview with per-step counts */}
                                 {wf.steps.length > 0 && (
                                     <div className="mt-3 flex items-center gap-1 overflow-x-auto pb-1">
-                                        {wf.steps.map((step, i) => (
-                                            <React.Fragment key={step.id}>
-                                                {i > 0 && (
-                                                    <div className="flex items-center gap-1 shrink-0">
-                                                        <div className="h-px w-4 bg-violet-200 dark:bg-violet-800" />
-                                                        <span className="text-[9px] text-slate-400 whitespace-nowrap">
-                                                            {(() => {
-                                                                const st = step.scheduleType ?? 'relative';
-                                                                if (st === 'day_of_week') return DOW_LABELS_SHORT[step.scheduleDayOfWeek ?? 1];
-                                                                if (st === 'day_of_month') return `${step.scheduleDayOfMonth ?? 1}${ORDINAL_SUFFIX(step.scheduleDayOfMonth ?? 1)}`;
-                                                                const days = step.delayDays || 0;
-                                                                const hours = step.delayHours || 0;
-                                                                if (days === 0 && hours === 0) return 'now';
-                                                                const parts = [];
-                                                                if (days > 0) parts.push(`${days}d`);
-                                                                if (hours > 0) parts.push(`${hours}h`);
-                                                                return `+${parts.join(' ')}`;
-                                                            })()}
-                                                        </span>
-                                                        <div className="h-px w-4 bg-violet-200 dark:bg-violet-800" />
+                                        {wf.steps.map((step, i) => {
+                                            const countAtStep = stepCountsMap[wf.id]?.stepCounts?.[i] ?? 0;
+                                            return (
+                                                <React.Fragment key={step.id}>
+                                                    {i > 0 && (
+                                                        <div className="flex items-center gap-1 shrink-0">
+                                                            <div className="h-px w-4 bg-violet-200 dark:bg-violet-800" />
+                                                            <span className="text-[9px] text-slate-400 whitespace-nowrap">
+                                                                {(() => {
+                                                                    const st = step.scheduleType ?? 'relative';
+                                                                    if (st === 'day_of_week') return DOW_LABELS_SHORT[step.scheduleDayOfWeek ?? 1];
+                                                                    if (st === 'day_of_month') return `${step.scheduleDayOfMonth ?? 1}${ORDINAL_SUFFIX(step.scheduleDayOfMonth ?? 1)}`;
+                                                                    const days = step.delayDays || 0;
+                                                                    const hours = step.delayHours || 0;
+                                                                    if (days === 0 && hours === 0) return 'now';
+                                                                    const parts = [];
+                                                                    if (days > 0) parts.push(`${days}d`);
+                                                                    if (hours > 0) parts.push(`${hours}h`);
+                                                                    return `+${parts.join(' ')}`;
+                                                                })()}
+                                                            </span>
+                                                            <div className="h-px w-4 bg-violet-200 dark:bg-violet-800" />
+                                                        </div>
+                                                    )}
+                                                    <div className="flex flex-col items-center gap-0.5 shrink-0">
+                                                        <div className="w-6 h-6 rounded-full bg-violet-600 text-white text-[10px] font-black flex items-center justify-center">{i + 1}</div>
+                                                        {countAtStep > 0 && (
+                                                            <span className="text-[9px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                                                                👤 {countAtStep}
+                                                            </span>
+                                                        )}
                                                     </div>
-                                                )}
-                                                <div className="w-6 h-6 rounded-full bg-violet-600 text-white text-[10px] font-black flex items-center justify-center shrink-0">{i + 1}</div>
-                                            </React.Fragment>
-                                        ))}
+                                                </React.Fragment>
+                                            );
+                                        })}
                                     </div>
                                 )}
                             </div>

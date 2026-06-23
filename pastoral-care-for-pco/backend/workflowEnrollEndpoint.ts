@@ -314,3 +314,49 @@ export const workflowForceScan = async (req: any, res: any) => {
         return res.status(500).json({ error: e.message });
     }
 };
+
+/**
+ * GET /api/messaging/workflow-step-counts/:churchId/:workflowId
+ * Returns a map of stepIndex -> count of active (non-completed) enrollments at that step.
+ * Also returns totalActive and totalCompleted.
+ */
+export async function getWorkflowStepCounts(req: any, res: any): Promise<void> {
+    const { churchId, workflowId } = req.params;
+    if (!churchId || !workflowId) {
+        res.status(400).json({ error: 'Missing churchId or workflowId' });
+        return;
+    }
+
+    try {
+        const db = getDb();
+
+        // Load active (not completed) enrollments for this workflow
+        const activeSnap = await db.collection('smsWorkflowEnrollments')
+            .where('workflowId', '==', workflowId)
+            .where('churchId', '==', churchId)
+            .where('completed', '==', false)
+            .get();
+
+        const stepCounts: Record<number, number> = {};
+        for (const doc of activeSnap.docs) {
+            const step: number = doc.data().currentStep ?? 0;
+            stepCounts[step] = (stepCounts[step] || 0) + 1;
+        }
+
+        // Load completed count separately
+        const completedSnap = await db.collection('smsWorkflowEnrollments')
+            .where('workflowId', '==', workflowId)
+            .where('churchId', '==', churchId)
+            .where('completed', '==', true)
+            .get();
+
+        res.json({
+            stepCounts,          // { 0: 5, 1: 3, 2: 1 }
+            totalActive: activeSnap.size,
+            totalCompleted: completedSnap.size,
+        });
+    } catch (e: any) {
+        console.error('[getWorkflowStepCounts] Error:', e?.message);
+        res.status(500).json({ error: e?.message || 'Failed to get step counts' });
+    }
+}
