@@ -520,7 +520,11 @@ export const handleInboundSms = async (req: any, res: any) => {
         // 2. Handle STOP / HELP / START (carrier compliance)
         const upperBody = body.trim().toUpperCase();
         const latestBody = extractLatestMessage(body);
-        const convIdKeyword = `${churchId}_${from.replace(/\+/g, '')}`;
+        // Conv ID is scoped per number so each inbox number has separate threads.
+        // smsNumberId is known here because the number lookup already resolved above.
+        const convIdKeyword = smsNumberId
+            ? `${churchId}_${smsNumberId}_${from.replace(/\+/g, '')}`
+            : `${churchId}_${from.replace(/\+/g, '')}`; // legacy fallback (no number)
 
         if (upperBody === 'STOP' || upperBody === 'STOPALL' || upperBody === 'UNSUBSCRIBE' || upperBody === 'CANCEL' || upperBody === 'END' || upperBody === 'QUIT') {
             // Carrier handles STOP automatically; we mirror it in Firestore for UI awareness
@@ -563,7 +567,11 @@ export const handleInboundSms = async (req: any, res: any) => {
         }
 
         // 3. Find or create the SmsConversation
-        const convId = `${churchId}_${from.replace(/\+/g, '')}`;
+        // Include smsNumberId so the same contact texting two different church numbers
+        // gets separate, isolated conversation threads — not a single merged one.
+        const convId = smsNumberId
+            ? `${churchId}_${smsNumberId}_${from.replace(/\+/g, '')}`
+            : `${churchId}_${from.replace(/\+/g, '')}`; // legacy fallback
         const convRef = db.collection('smsConversations').doc(convId);
         const convSnap = await convRef.get();
 

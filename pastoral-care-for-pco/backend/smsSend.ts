@@ -330,7 +330,12 @@ export async function sendIndividualInternal(params: {
     // ── TCPA first-message compliance (fire-and-forget) ──────────────────────
     sendOptInConfirmationIfNeeded(db, client, fromNumber, to, churchId).catch(() => {});
 
-    const convId  = existingConvId || `${churchId}_${to.replace(/\+/g, '')}`;
+    // Include resolvedNumberId so each phone number has a separate thread per contact.
+    const convId  = existingConvId || (
+        resolvedNumberId
+            ? `${churchId}_${resolvedNumberId}_${to.replace(/\+/g, '')}`
+            : `${churchId}_${to.replace(/\+/g, '')}`   // legacy fallback
+    );
     const convRef = db.collection('smsConversations').doc(convId);
     const now     = Date.now();
 
@@ -550,7 +555,9 @@ export async function sendBulkInternal(params: {
                 // ── TCPA first-message compliance (fire-and-forget) ──────────────────
                 sendOptInConfirmationIfNeeded(db, client, fromNumber, to, churchId).catch(() => {});
 
-                const convId  = `${churchId}_${to.replace(/\+/g, '')}`;
+                const convId  = numberId
+                    ? `${churchId}_${numberId}_${to.replace(/\+/g, '')}`
+                    : `${churchId}_${to.replace(/\+/g, '')}`; // legacy fallback
                 const convRef = db.collection('smsConversations').doc(convId);
                 const now     = Date.now();
                 const pInfo = (personMap as any)[to] as PersonInfo | undefined;
