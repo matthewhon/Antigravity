@@ -178,8 +178,11 @@ export const syncAllData = async (churchId: string) => {
     logger.info('Full sync started', 'sync', { churchId }, churchId);
     const startTime = Date.now();
     
-    // Ensure Webhooks are set up using the standard service
-    await initializeWebhooks(churchId);
+    // Ensure Webhooks are set up using the standard service (non-fatal — a webhook auth
+    // failure should not block the full sync from running)
+    try {
+        await initializeWebhooks(churchId);
+    } catch (e: any) { logger.warn('Webhook initialization failed (non-fatal)', 'sync', { error: e?.message }, churchId); }
 
     // Execute sequentially to manage load better, wrapped in try/catch to ensure partial success
     try {
