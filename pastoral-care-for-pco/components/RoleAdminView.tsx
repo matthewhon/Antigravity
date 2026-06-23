@@ -1056,6 +1056,8 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   const [isSubmittingBrand, setIsSubmittingBrand] = useState(false);
   const [isSubmittingCampaign, setIsSubmittingCampaign] = useState(false);
   const [complianceMessage, setComplianceMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
+  const [isSavingKeywords, setIsSavingKeywords] = useState(false);
+  const [keywordSaveMessage, setKeywordSaveMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
   const [showBrandFormOverride, setShowBrandFormOverride] = useState(false);
   const [showCampaignFormOverride, setShowCampaignFormOverride] = useState(false);
 
@@ -3355,6 +3357,36 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                 }
             };
 
+            /** Save keyword auto-reply messages + first message confirmation to Firestore only.
+             *  Does NOT submit anything to SignalWire — use handleSubmitCampaign for that. */
+            const handleSaveKeywords = async () => {
+                if (!onUpdateChurch) return;
+                setIsSavingKeywords(true);
+                setKeywordSaveMessage(null);
+                try {
+                    const updates = {
+                        ...smsForm,
+                        optOutMessage: campaignForm.optOutMessage,
+                        optInMessage: campaignForm.optInMessage,
+                        helpMessage: campaignForm.helpMessage,
+                        // firstMessageConfirmation is already tracked in smsForm via handleSmsChange
+                    };
+                    await onUpdateChurch({ smsSettings: updates });
+                    setSmsForm((prev: any) => ({
+                        ...prev,
+                        optOutMessage: campaignForm.optOutMessage,
+                        optInMessage: campaignForm.optInMessage,
+                        helpMessage: campaignForm.helpMessage,
+                    }));
+                    setKeywordSaveMessage({ type: 'success', text: 'Keyword auto-replies saved.' });
+                    setTimeout(() => setKeywordSaveMessage(null), 4000);
+                } catch (e: any) {
+                    setKeywordSaveMessage({ type: 'error', text: 'Failed to save: ' + e.message });
+                } finally {
+                    setIsSavingKeywords(false);
+                }
+            };
+
             const inputCn = 'w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-colors';
             const labelCn = 'block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-2';
 
@@ -3864,7 +3896,30 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                     <p className="text-[9px] text-slate-400 mt-1.5">Automatically sent as a follow-up message the <strong>first time</strong> your church texts any phone number. Leave blank to disable. Required by TCPA for new contacts receiving marketing messages.</p>
                                                 </div>
                                             </div>
+
+                                            {/* Save keywords to Firestore — does NOT submit to SignalWire */}
+                                            <div className="pt-3 flex flex-col gap-2">
+                                                {keywordSaveMessage && (
+                                                    <div className={`p-3 rounded-xl text-xs font-bold flex items-center gap-2 ${
+                                                        keywordSaveMessage.type === 'success' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' : 'bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400'
+                                                    }`}>
+                                                        <span>{keywordSaveMessage.type === 'success' ? '✓' : '⚠️'}</span>
+                                                        {keywordSaveMessage.text}
+                                                    </div>
+                                                )}
+                                                <div className="flex items-center gap-3">
+                                                    <button
+                                                        onClick={handleSaveKeywords}
+                                                        disabled={isSavingKeywords}
+                                                        className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all"
+                                                    >
+                                                        {isSavingKeywords ? 'Saving…' : 'Save Keywords'}
+                                                    </button>
+                                                    <p className="text-[9px] text-slate-400">Saves keyword replies locally. Use <strong>Submit Campaign</strong> below to register them with the carrier.</p>
+                                                </div>
+                                            </div>
                                         </div>
+
 
                                         <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
                                             <h6 className="font-bold text-slate-800 dark:text-slate-200 text-sm mb-4">Consent Form Evidence</h6>

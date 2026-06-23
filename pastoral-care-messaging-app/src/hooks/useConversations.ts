@@ -64,22 +64,54 @@ export function useConversations(churchId: string, twilioNumberId: string | null
             return;
         }
 
-        const q = query(
+        // The backend writes the number ID under two field aliases:
+        //   - 'twilioNumberId' (canonical in legacy + SignalWire tenants)
+        //   - 'smsNumberId' (canonical field name going forward)
+        // Both always hold the same value (the smsNumbers doc ID).
+        // We run both queries in parallel and merge so conversations are
+        // never missing regardless of which field was written.
+        const qByTwilio = query(
             collection(db, 'smsConversations'),
             where('churchId', '==', churchId),
             where('twilioNumberId', '==', twilioNumberId),
             orderBy('lastMessageAt', 'desc')
         );
+        const qBySms = query(
+            collection(db, 'smsConversations'),
+            where('churchId', '==', churchId),
+            where('smsNumberId', '==', twilioNumberId),
+            orderBy('lastMessageAt', 'desc')
+        );
 
-        const unsub = onSnapshot(q, snap => {
-            const fresh = snap.docs.map(d => ({ id: d.id, ...d.data() } as SmsConversation));
+        // Merge both snapshots, deduplicate by doc ID, keep sorted newest-first
+        const merge = (a: SmsConversation[], b: SmsConversation[]) => {
+            const map = new Map<string, SmsConversation>();
+            [...a, ...b].forEach(c => map.set(c.id, c));
+            return Array.from(map.values()).sort((x, y) =>
+                (y.lastMessageAt ?? 0) - (x.lastMessageAt ?? 0)
+            );
+        };
+
+        let snapA: SmsConversation[] = [];
+        let snapB: SmsConversation[] = [];
+
+        const unsubA = onSnapshot(qByTwilio, snap => {
+            snapA = snap.docs.map(d => ({ id: d.id, ...d.data() } as SmsConversation));
+            const fresh = merge(snapA, snapB);
             setConversations(fresh);
             setLoading(false);
-            // Persist so next launch is instant
             writeCache(churchId, twilioNumberId, fresh);
         });
 
-        return unsub;
+        const unsubB = onSnapshot(qBySms, snap => {
+            snapB = snap.docs.map(d => ({ id: d.id, ...d.data() } as SmsConversation));
+            const fresh = merge(snapA, snapB);
+            setConversations(fresh);
+            setLoading(false);
+            writeCache(churchId, twilioNumberId, fresh);
+        });
+
+        return () => { unsubA(); unsubB(); };
     }, [churchId, twilioNumberId]);
 
     return {

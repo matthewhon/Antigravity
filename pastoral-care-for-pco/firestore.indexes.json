@@ -165,6 +165,15 @@
       ]
     },
     {
+      "collectionGroup": "smsConversations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "churchId",      "order": "ASCENDING" },
+        { "fieldPath": "smsNumberId",   "order": "ASCENDING" },
+        { "fieldPath": "lastMessageAt", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "attendanceRecords",
       "queryScope": "COLLECTION",
       "fields": [

@@ -582,12 +582,17 @@ export const handleInboundSms = async (req: any, res: any) => {
                 lastMessageDirection: 'inbound',
                 unreadCount: (convSnap.data()?.unreadCount || 0) + 1,
             };
-            // Backfill number fields if not set (migration / first inbound on existing conv)
-            if (!convSnap.data()?.smsNumberId && smsNumberId) {
-                updateData.smsNumberId = smsNumberId;
-                updateData.twilioNumberId = smsNumberId;   // alias for twilioSend.ts
-                updateData.inboxId = smsNumberId;
-                updateData.toPhoneNumber = to;
+            // Backfill number fields if any alias is missing (handles legacy conversations
+            // and conversations created via the fallback church-doc path where smsNumberId
+            // was never written). Always write all three aliases so frontend queries work.
+            if (smsNumberId) {
+                const d = convSnap.data() || {};
+                if (!d.smsNumberId || !d.twilioNumberId || !d.inboxId) {
+                    updateData.smsNumberId   = smsNumberId;
+                    updateData.twilioNumberId = smsNumberId;   // alias for twilioSend.ts
+                    updateData.inboxId        = smsNumberId;
+                }
+                if (!d.toPhoneNumber) updateData.toPhoneNumber = to;
             }
             if (personMatch) {
                 updateData.personId = personMatch.personId;
@@ -609,7 +614,7 @@ export const handleInboundSms = async (req: any, res: any) => {
                 body: latestBody,
                 mediaUrls: mediaUrls.length > 0 ? mediaUrls : [],
                 status: 'received',
-                messageSid: smsSid || null,
+                messageSid: smsSid || messageSidField || null,
                 createdAt: now,
             });
 
@@ -841,7 +846,7 @@ export const handleInboundSms = async (req: any, res: any) => {
                     conversationId: convId,
                     churchId,
                     direction: 'outbound',
-                    body: kw.replyMessage,
+                    body: keywordReplyMessage || kw.replyMessage,
                     mediaUrls: [],
                     status: 'sent',
                     sentBy: null,

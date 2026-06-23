@@ -74,13 +74,13 @@ export const handleStatusCallback = async (req: any, res: any) => {
         if (campaignId) {
             const campaignRef = db.collection('smsCampaigns').doc(campaignId);
             if (messageStatus === 'delivered') {
-                await campaignRef.update({
+                await campaignRef.set({
                     deliveredCount: FieldValue.increment(1),
-                });
+                }, { merge: true });
             } else if (messageStatus === 'failed' || messageStatus === 'undelivered') {
-                await campaignRef.update({
+                await campaignRef.set({
                     failedCount: FieldValue.increment(1),
-                });
+                }, { merge: true });
             }
         }
 

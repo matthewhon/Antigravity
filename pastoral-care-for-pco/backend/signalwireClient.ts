@@ -275,7 +275,21 @@ export async function fetchSignalWireMedia(
         const req = https.request(options, (res) => {
             // Follow a single redirect (SignalWire sometimes 302s to a CDN)
             if ((res.statusCode === 301 || res.statusCode === 302) && res.headers.location) {
-                https.get(res.headers.location, (r2) => {
+                const redirectUrl = new URL(res.headers.location);
+                // Pass auth only if the redirect stays on the same SignalWire host
+                const isSameHost = redirectUrl.hostname === urlObj.hostname;
+                const redirectOptions = {
+                    hostname: redirectUrl.hostname,
+                    path:     redirectUrl.pathname + redirectUrl.search,
+                    method:   'GET' as const,
+                    headers:  isSameHost ? { Authorization: authHeader } : {},
+                };
+                const r2req = https.request(redirectOptions, (r2) => {
+                    if ((r2.statusCode || 0) >= 400) {
+                        reject(new Error(`SignalWire media redirect returned HTTP ${r2.statusCode} for ${res.headers.location}`));
+                        r2.resume();
+                        return;
+                    }
                     const chunks: Buffer[] = [];
                     r2.on('data', (c: Buffer) => chunks.push(c));
                     r2.on('end', () => resolve({
@@ -283,7 +297,9 @@ export async function fetchSignalWireMedia(
                         contentType: (r2.headers['content-type'] || 'application/octet-stream').split(';')[0].trim(),
                     }));
                     r2.on('error', reject);
-                }).on('error', reject);
+                });
+                r2req.on('error', reject);
+                r2req.end();
                 return;
             }
             if ((res.statusCode || 0) >= 400) {

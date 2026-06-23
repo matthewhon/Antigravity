@@ -118,7 +118,20 @@ export const ChatView: React.FC<ChatViewProps> = ({ church, currentUser, convers
                             }`}>
                                 {msg.body}
                                 {msg.mediaUrls && msg.mediaUrls.map((url, i) => (
-                                    <img key={i} src={url} alt="Attachment" className="mt-2 rounded-xl max-w-full" />
+                                    <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+                                        <img
+                                            src={url}
+                                            alt="Attachment"
+                                            className="mt-2 rounded-xl max-w-full"
+                                            onError={(e) => {
+                                                const anchor = (e.target as HTMLImageElement).closest('a');
+                                                if (anchor) {
+                                                    anchor.textContent = '📎 View attachment';
+                                                    anchor.className = 'mt-2 block text-sm underline opacity-70';
+                                                }
+                                            }}
+                                        />
+                                    </a>
                                 ))}
                             </div>
                             <div className="flex items-center gap-2 mt-1 px-1">

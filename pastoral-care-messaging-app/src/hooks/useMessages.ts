@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { collection, query, where, orderBy, onSnapshot, limit } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, limit } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { SmsMessage } from '../types';
 
@@ -78,11 +78,13 @@ export function useMessages(churchId: string, conversationId: string) {
             return;
         }
 
-        // We query the smsMessages subcollection/collection
+        // Messages are stored as a subcollection:
+        //   smsConversations/{conversationId}/messages/{messageId}
+        // Both smsInbound.ts and smsSend.ts write to this path.
+        // The previous query against the top-level 'smsMessages' collection
+        // was incorrect — that collection does not exist.
         const q = query(
-            collection(db, 'smsMessages'),
-            where('churchId', '==', churchId),
-            where('conversationId', '==', conversationId),
+            collection(db, 'smsConversations', conversationId, 'messages'),
             orderBy('createdAt', 'desc'),
             limit(100) // load last 100 messages for mobile perf
         );
