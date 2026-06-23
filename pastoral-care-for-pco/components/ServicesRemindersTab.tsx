@@ -41,6 +41,8 @@ const ServicesRemindersTab: React.FC<Props> = ({ church, onUpdateChurch }) => {
     church?.smsSettings?.servicesReminders || defaultReminders
   );
   const [isSaving, setIsSaving] = useState(false);
+  const [isRunning, setIsRunning] = useState(false);
+  const [runStatus, setRunStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
   useEffect(() => {
     if (church?.smsSettings?.servicesReminders) {
@@ -62,6 +64,22 @@ const ServicesRemindersTab: React.FC<Props> = ({ church, onUpdateChurch }) => {
     } finally {
       // Provide a tiny visual delay for success feedback
       setTimeout(() => setIsSaving(false), 500);
+    }
+  };
+
+  const handleRunNow = async () => {
+    if (isRunning || !settings.enabled) return;
+    setIsRunning(true);
+    setRunStatus('idle');
+    try {
+      const res = await fetch('/api/messaging/run-services-reminders', { method: 'POST' });
+      if (!res.ok) throw new Error(await res.text());
+      setRunStatus('success');
+    } catch {
+      setRunStatus('error');
+    } finally {
+      setIsRunning(false);
+      setTimeout(() => setRunStatus('idle'), 4000);
     }
   };
 
@@ -175,13 +193,41 @@ const ServicesRemindersTab: React.FC<Props> = ({ church, onUpdateChurch }) => {
           <h3 className="text-3xl font-black tracking-tighter text-slate-900 dark:text-white">SMS Reminders</h3>
           <p className="text-slate-400 dark:text-slate-500 font-medium uppercase text-[10px] tracking-widest mt-1">Automated Team Confirmations</p>
         </div>
-        <button 
-          onClick={handleSave}
-          disabled={isSaving}
-          className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-indigo-600 text-white font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-600/30 disabled:opacity-50"
-        >
-          {isSaving ? 'Saving...' : 'Save Settings'}
-        </button>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+          {runStatus === 'success' && (
+            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+              <span>✓</span> Scan completed
+            </span>
+          )}
+          {runStatus === 'error' && (
+            <span className="text-xs font-bold text-red-500 dark:text-red-400 flex items-center gap-1">
+              <span>✗</span> Scan failed
+            </span>
+          )}
+          <button
+            onClick={handleRunNow}
+            disabled={isRunning || !settings.enabled}
+            title={!settings.enabled ? 'Enable reminders first' : 'Immediately run the reminder scan'}
+            className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border-2 border-emerald-500 text-emerald-600 dark:text-emerald-400 font-black text-xs uppercase tracking-widest hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {isRunning ? (
+              <>
+                <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                </svg>
+                Running...
+              </>
+            ) : '▶ Run Now'}
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={isSaving}
+            className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-indigo-600 text-white font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-600/30 disabled:opacity-50"
+          >
+            {isSaving ? 'Saving...' : 'Save Settings'}
+          </button>
+        </div>
       </header>
 
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2rem] p-8 shadow-sm">

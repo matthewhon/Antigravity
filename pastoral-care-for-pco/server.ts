@@ -26,7 +26,7 @@ import { handleInboundSms } from './backend/smsInbound';
 import { sendIndividual, sendBulk } from './backend/smsSend';
 import { handleStatusCallback } from './backend/smsWebhookStatus';
 import { startSmsCampaignScheduler } from './backend/smsCampaignScheduler';
-import { startServicesReminderScheduler } from './backend/servicesReminderScheduler';
+import { startServicesReminderScheduler, runServicesReminderScanner } from './backend/servicesReminderScheduler';
 import { workflowEnrollList, workflowEnrollPreview, workflowForceScan } from './backend/workflowEnrollEndpoint';
 import { handleGrowDailyEmail, setupGrowIntegration, requestGrowAccess, getGrowStatus } from './backend/growIntegration';
 import { getVapidPublicKey, savePushSubscription, removePushSubscription } from './backend/webPushService';
@@ -398,6 +398,21 @@ async function startServer() {
     app.post('/api/messaging/workflow-enroll-list', express.json(), workflowEnrollList);
     app.post('/api/messaging/workflow-enroll-preview', express.json(), workflowEnrollPreview);
     app.post('/api/messaging/workflow-force-scan', express.json(), workflowForceScan);
+
+    // ─── Services Reminders: manual trigger ───────────────────────────────────
+    // Allows an admin to immediately run the reminder scanner rather than waiting
+    // for the next hourly cron tick. Useful for testing configuration changes.
+    app.post('/api/messaging/run-services-reminders', express.json(), async (req: any, res: any) => {
+        try {
+            const db = getDb();
+            await runServicesReminderScanner(db as any);
+            return res.json({ success: true, message: 'Services reminder scan completed.' });
+        } catch (e: any) {
+            console.error('[run-services-reminders]', e.message);
+            return res.status(500).json({ error: e.message || 'Reminder scan failed' });
+        }
+    });
+
     // 10DLC Brand & Campaign registration (per-tenant)
     app.post('/api/messaging/register-brand',       express.json(), registerSmsBrand);
     app.post('/api/messaging/register-campaign',    express.json(), registerSmsCampaign);

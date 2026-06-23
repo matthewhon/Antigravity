@@ -82,6 +82,11 @@ function resolveMergeTags(body: string, person: PersonInfo, church?: any): strin
 }
 
 async function resolveDefaultNumberId(db: any, churchId: string): Promise<string | null> {
+    // Always prefer smsNumbers (SignalWire). Do NOT fall back to twilioNumbers —
+    // a twilioNumbers doc ID passed to getSmsClient would cause a "not found" throw
+    // because getSmsClient only resolves phone numbers from the smsNumbers collection.
+    // For churches with no smsNumbers doc, getSmsClient will fall back to
+    // smsSettings.smsPhoneNumber on the church document instead.
     const defaultSnap = await db.collection('smsNumbers')
         .where('churchId', '==', churchId)
         .where('isDefault', '==', true)
@@ -94,19 +99,6 @@ async function resolveDefaultNumberId(db: any, churchId: string): Promise<string
         .limit(1)
         .get();
     if (!anySnap.empty) return anySnap.docs[0].id;
-
-    const defaultTwilioSnap = await db.collection('twilioNumbers')
-        .where('churchId', '==', churchId)
-        .where('isDefault', '==', true)
-        .limit(1)
-        .get();
-    if (!defaultTwilioSnap.empty) return defaultTwilioSnap.docs[0].id;
-
-    const anyTwilioSnap = await db.collection('twilioNumbers')
-        .where('churchId', '==', churchId)
-        .limit(1)
-        .get();
-    if (!anyTwilioSnap.empty) return anyTwilioSnap.docs[0].id;
 
     return null;
 }
@@ -133,14 +125,20 @@ async function getSmsClient(
     let fromNumber = sms.smsPhoneNumber as string | undefined;
 
     if (smsNumberId) {
-        // Specific number override — lookup smsNumbers collection
+        // Specific number override — look up smsNumbers first (SignalWire), then
+        // twilioNumbers as a legacy fallback for any doc IDs still in circulation.
         const numSnap = await db.collection('smsNumbers').doc(smsNumberId).get();
         if (numSnap.exists && numSnap.data()?.churchId === churchId) {
             fromNumber = numSnap.data()!.phoneNumber;
         } else {
-            // Doc not found or church mismatch — surface the error so sends don't silently
-            // go out from the wrong (default) number.
-            throw new Error(`SMS number ${smsNumberId} not found or does not belong to church ${churchId}.`);
+            // Not found in smsNumbers — try legacy twilioNumbers collection
+            const legacySnap = await db.collection('twilioNumbers').doc(smsNumberId).get();
+            if (legacySnap.exists && legacySnap.data()?.churchId === churchId) {
+                fromNumber = legacySnap.data()!.phoneNumber;
+            } else {
+                // Not found in either collection — surface the error clearly.
+                throw new Error(`SMS number ${smsNumberId} not found or does not belong to church ${churchId}.`);
+            }
         }
     } else if (!fromNumber) {
         // Fall back to default smsNumbers doc for this church
