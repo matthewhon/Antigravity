@@ -1915,6 +1915,14 @@ export interface OutreachSession {
     createdAt: number;
     createdBy: string; // userId
     isActive: boolean;
+    /**
+     * Set when an admin formally closes the session.
+     * A closed session is read-only: the volunteer page shows "This session has ended."
+     * and no new slots can be claimed.
+     */
+    closedAt?: number | null;
+    /** userId of the admin who closed the session */
+    closedBy?: string | null;
 }
 
 /**

@@ -410,6 +410,11 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
   const [smsConversations, setSmsConversations] = useState<SmsConversation[]>([]);
   const [smsTags, setSmsTags] = useState<SmsTag[]>([]);
   const [followUpLog, setFollowUpLog] = useState<CareFollowUpLog[]>([]);
+  // Tracks which church ID we have already fetched care data for, so switching
+  // between the Care and Reports tabs doesn't re-fire the Firestore fetch and
+  // accidentally overwrite in-memory state with a stale result (race condition
+  // when a note was just saved and hasn't replicated yet).
+  const careDataFetchedForChurch = useRef<string | null>(null);
   const [careAdvice, setCareAdvice] = useState<string>('');
   const [isGeneratingCare, setIsGeneratingCare] = useState(false);
   const [isAddingNote, setIsAddingNote] = useState(false);
@@ -467,6 +472,13 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
 
   useEffect(() => {
       if ((activeTab === 'Care' || activeTab === 'Reports') && church.id) {
+          // Only fetch from Firestore the first time we open Care/Reports for this
+          // church. Subsequent tab switches between Care and Reports reuse the
+          // already-loaded (and possibly locally-updated) in-memory state, avoiding
+          // a race where a just-saved note gets overwritten by a stale Firestore read.
+          if (careDataFetchedForChurch.current === church.id) return;
+          careDataFetchedForChurch.current = church.id;
+
           firestore.getPastoralNotes(church.id).then(setNotes);
           firestore.getPrayerRequests(church.id, 'Active').then(setPrayerRequests);
           firestore.getCareFollowUpLog(church.id).then(setFollowUpLog);
