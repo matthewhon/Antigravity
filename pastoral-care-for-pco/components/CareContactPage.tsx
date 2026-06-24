@@ -3,7 +3,7 @@ import QRCode from 'qrcode';
 import {
     Phone, QrCode, Link2, Plus, Trash2, Copy, Check, ChevronDown,
     Users, Activity, PhoneOff, RefreshCw, Eye, EyeOff, X, ToggleLeft, ToggleRight,
-    Clock, Shield
+    Clock, Shield, Download, LockKeyhole, RotateCcw, CheckCircle2
 } from 'lucide-react';
 import { OutreachSession, OutreachSlot, PcoPerson, User, Church } from '../types';
 import { firestore } from '../services/firestoreService';
@@ -328,6 +328,9 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
     const [allTimeSlots, setAllTimeSlots] = useState<OutreachSlot[]>([]);
     // Which person row is expanded to show history
     const [expandedPersonId, setExpandedPersonId] = useState<string | null>(null);
+    // Close / export in-flight states
+    const [isClosing, setIsClosing]       = useState(false);
+    const [isExporting, setIsExporting]   = useState(false);
 
     // Load sessions and all-time slot history
     useEffect(() => {
@@ -567,6 +570,139 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
         if (selectedId === sessionId) setSelectedId(sessions.find(s => s.id !== sessionId)?.id ?? null);
     };
 
+    const handleCloseSession = async (session: OutreachSession) => {
+        const confirmed = window.confirm(
+            `Close "${session.name}"?\n\nThis will:\n• Release any pending volunteer slots immediately\n• Mark the session as read-only\n• Show "Session ended" to any volunteers on the link\n\nYou can reopen it at any time.`
+        );
+        if (!confirmed) return;
+        setIsClosing(true);
+        try {
+            await firestore.closeOutreachSession(session.id, user.id);
+            setSessions(prev => prev.map(s =>
+                s.id === session.id
+                    ? { ...s, isActive: false, closedAt: Date.now(), closedBy: user.id }
+                    : s
+            ));
+        } finally {
+            setIsClosing(false);
+        }
+    };
+
+    const handleReopenSession = async (session: OutreachSession) => {
+        await firestore.reopenOutreachSession(session.id);
+        setSessions(prev => prev.map(s =>
+            s.id === session.id
+                ? { ...s, isActive: true, closedAt: null, closedBy: null }
+                : s
+        ));
+    };
+
+    /**
+     * Export all contact outcomes for the selected session as a CSV.
+     * Fetches slots on demand if viewing a non-active session.
+     */
+    const handleExportCsv = async () => {
+        if (!selectedSession) return;
+        setIsExporting(true);
+        try {
+            // For the currently-watched session liveSlots is already in memory.
+            // For others (or to get the definitive snapshot) we fetch from Firestore.
+            let slots = liveSlots;
+            if (selectedId !== selectedSession.id || liveSlots.length === 0) {
+                slots = await firestore.getOutreachSlots(selectedSession.id);
+            }
+
+            const contactedOrNo = slots.filter(s => s.status === 'contacted' || s.status === 'no-answer');
+            // Map personId -> best slot outcome (contacted > no-answer)
+            const byPerson = new Map<string, OutreachSlot[]>();
+            for (const slot of contactedOrNo) {
+                const list = byPerson.get(slot.assignedPersonId) ?? [];
+                list.push(slot);
+                byPerson.set(slot.assignedPersonId, list);
+            }
+
+            const header = [
+                'Person Name', 'Phone', 'Email', 'Membership', 'Risk Category', 'Risk Score',
+                'Outcome', 'Contacted By', 'Contact Date/Time', 'Notes'
+            ];
+
+            const rows: string[][] = [];
+
+            // First: all people in the eligible list with their outcome(s)
+            const eligible = selectedSession.eligiblePeople ?? [];
+            const eligibleIds = new Set(eligible.map(p => p.id));
+
+            for (const person of eligible) {
+                const pcoMatch = people.find(p => p.id === person.id);
+                const attempts = byPerson.get(person.id) ?? [];
+
+                if (attempts.length === 0) {
+                    // Never contacted within this session
+                    rows.push([
+                        person.name,
+                        pcoMatch?.phone ?? '',
+                        pcoMatch?.email ?? '',
+                        pcoMatch?.membership ?? 'None',
+                        pcoMatch?.riskProfile?.category ?? '',
+                        String(pcoMatch?.riskProfile?.score ?? person.riskScore),
+                        'Not Contacted', '', '', ''
+                    ]);
+                } else {
+                    // One row per attempt (handles multiple no-answer + final contact)
+                    const sorted = [...attempts].sort((a, b) => (a.completedAt ?? a.assignedAt) - (b.completedAt ?? b.assignedAt));
+                    for (const slot of sorted) {
+                        rows.push([
+                            person.name,
+                            pcoMatch?.phone ?? slot.assignedPersonPhone ?? '',
+                            pcoMatch?.email ?? slot.assignedPersonEmail ?? '',
+                            pcoMatch?.membership ?? 'None',
+                            pcoMatch?.riskProfile?.category ?? '',
+                            String(pcoMatch?.riskProfile?.score ?? person.riskScore),
+                            slot.status === 'contacted' ? 'Contacted' : 'No Answer',
+                            slot.volunteerName ?? slot.volunteerPhone,
+                            slot.completedAt ? new Date(slot.completedAt).toLocaleString() : new Date(slot.assignedAt).toLocaleString(),
+                            slot.notes?.trim() ?? ''
+                        ]);
+                    }
+                }
+            }
+
+            // Safety net: include any slots for people NOT in the eligible snapshot
+            for (const [personId, attempts] of byPerson.entries()) {
+                if (eligibleIds.has(personId)) continue;
+                for (const slot of attempts) {
+                    rows.push([
+                        slot.assignedPersonName,
+                        slot.assignedPersonPhone ?? '',
+                        slot.assignedPersonEmail ?? '',
+                        '', '', '',
+                        slot.status === 'contacted' ? 'Contacted' : 'No Answer',
+                        slot.volunteerName ?? slot.volunteerPhone,
+                        slot.completedAt ? new Date(slot.completedAt).toLocaleString() : new Date(slot.assignedAt).toLocaleString(),
+                        slot.notes?.trim() ?? ''
+                    ]);
+                }
+            }
+
+            const escape = (v: string) => `"${v.replace(/"/g, '""')}"`;
+            const csv = [
+                header.map(escape).join(','),
+                ...rows.map(r => r.map(escape).join(','))
+            ].join('\n');
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url  = URL.createObjectURL(blob);
+            const a    = document.createElement('a');
+            const safeName = selectedSession.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+            a.href     = url;
+            a.download = `outreach_${safeName}_${new Date().toISOString().slice(0, 10)}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
     const handleCopyLink = () => {
         navigator.clipboard.writeText(publicUrl);
         setCopied(true);
@@ -632,6 +768,7 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                         <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Sessions</p>
                         {sessions.map(s => {
                             const isSelected = selectedId === s.id;
+                            const isClosed   = !!s.closedAt;
                             const contacted  = isSelected ? liveSlots.filter(sl => sl.status === 'contacted').length : null;
                             const noAnswer   = isSelected ? liveSlots.filter(sl => sl.status === 'no-answer').length : null;
                             const total      = isSelected ? (s.eligiblePeople?.length ?? 0) : null;
@@ -642,24 +779,31 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                 className={`w-full text-left p-3 rounded-xl border transition-all ${
                                     isSelected
                                         ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800'
-                                        : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:border-indigo-200 dark:hover:border-slate-700'
+                                        : isClosed
+                                            ? 'bg-slate-50 dark:bg-slate-900/60 border-slate-100 dark:border-slate-800 opacity-70 hover:opacity-100 hover:border-slate-200'
+                                            : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:border-indigo-200 dark:hover:border-slate-700'
                                 }`}
                             >
                                 <div className="flex items-start justify-between gap-2">
                                     <div className="min-w-0">
-                                        <p className={`text-xs font-black truncate ${isSelected ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-900 dark:text-white'}`}>
+                                        <p className={`text-xs font-black truncate ${isSelected ? 'text-indigo-600 dark:text-indigo-400' : isClosed ? 'text-slate-400 dark:text-slate-500' : 'text-slate-900 dark:text-white'}`}>
                                             {s.name}
                                         </p>
                                         <p className="text-[10px] text-slate-400 mt-0.5">
-                                            {new Date(s.createdAt).toLocaleDateString()}
+                                            {isClosed
+                                                ? `Closed ${new Date(s.closedAt!).toLocaleDateString()}`
+                                                : new Date(s.createdAt).toLocaleDateString()
+                                            }
                                         </p>
                                     </div>
-                                    <span className={`shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase ${
-                                        s.isActive
-                                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                                            : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                                    <span className={`shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase ${
+                                        isClosed
+                                            ? 'bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400'
+                                            : s.isActive
+                                                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                                                : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
                                     }`}>
-                                        {s.isActive ? 'Active' : 'Paused'}
+                                        {isClosed ? <><LockKeyhole size={8} /> Closed</> : s.isActive ? 'Active' : 'Paused'}
                                     </span>
                                 </div>
                                 {/* Filter tags */}
@@ -702,50 +846,94 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                             {/* Session Actions Bar */}
                             <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 flex items-center justify-between gap-4 flex-wrap">
                                 <div>
-                                    <h3 className="text-base font-black dark:text-white">{selectedSession.name}</h3>
+                                    <h3 className="text-base font-black dark:text-white flex items-center gap-2">
+                                        {selectedSession.name}
+                                        {selectedSession.closedAt && (
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400">
+                                                <LockKeyhole size={9} /> Closed
+                                            </span>
+                                        )}
+                                    </h3>
                                     <p className="text-[11px] text-slate-400 mt-0.5">
                                         {filteredPeople.length} people in queue &bull; Created {new Date(selectedSession.createdAt).toLocaleDateString()}
+                                        {selectedSession.closedAt && (
+                                            <> &bull; Closed {new Date(selectedSession.closedAt).toLocaleDateString()}</>
+                                        )}
                                     </p>
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    {/* Export CSV — always available */}
                                     <button
-                                        onClick={handleRefreshQueue}
-                                        title="Re-sync the eligible people list from current risk data"
-                                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wide text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-900/20 transition-all border border-indigo-200 dark:border-indigo-800"
+                                        onClick={handleExportCsv}
+                                        disabled={isExporting}
+                                        title="Download all contact outcomes as a CSV file"
+                                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wide text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/20 transition-all border border-emerald-200 dark:border-emerald-800 disabled:opacity-50"
                                     >
-                                        <RefreshCw size={12} /> Refresh Queue
+                                        <Download size={12} /> {isExporting ? 'Exporting…' : 'Export CSV'}
                                     </button>
-                                    <button
-                                        onClick={() => handleToggleActive(selectedSession)}
-                                        className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wide transition-all border ${
-                                            selectedSession.isActive
-                                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:border-emerald-800 dark:text-emerald-400'
-                                                : 'bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300'
-                                        }`}
-                                        title={selectedSession.isActive ? 'Pause session' : 'Activate session'}
-                                    >
-                                        {selectedSession.isActive ? <ToggleRight size={14} /> : <ToggleLeft size={14} />}
-                                        {selectedSession.isActive ? 'Active' : 'Paused'}
-                                    </button>
+
+                                    {selectedSession.closedAt ? (
+                                        /* ── CLOSED SESSION ACTIONS ── */
+                                        <button
+                                            onClick={() => handleReopenSession(selectedSession)}
+                                            title="Reopen this session so volunteers can continue contacting people"
+                                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wide text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-900/20 transition-all border border-indigo-200 dark:border-indigo-800"
+                                        >
+                                            <RotateCcw size={12} /> Reopen Session
+                                        </button>
+                                    ) : (
+                                        /* ── ACTIVE / PAUSED SESSION ACTIONS ── */
+                                        <>
+                                            <button
+                                                onClick={handleRefreshQueue}
+                                                title="Re-sync the eligible people list from current risk data"
+                                                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wide text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-900/20 transition-all border border-indigo-200 dark:border-indigo-800"
+                                            >
+                                                <RefreshCw size={12} /> Refresh Queue
+                                            </button>
+                                            <button
+                                                onClick={() => handleToggleActive(selectedSession)}
+                                                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wide transition-all border ${
+                                                    selectedSession.isActive
+                                                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:border-emerald-800 dark:text-emerald-400'
+                                                        : 'bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300'
+                                                }`}
+                                                title={selectedSession.isActive ? 'Pause session' : 'Activate session'}
+                                            >
+                                                {selectedSession.isActive ? <ToggleRight size={14} /> : <ToggleLeft size={14} />}
+                                                {selectedSession.isActive ? 'Active' : 'Paused'}
+                                            </button>
+                                            <button
+                                                onClick={() => handleCloseSession(selectedSession)}
+                                                disabled={isClosing}
+                                                title="Close this session — releases pending slots and makes it read-only"
+                                                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wide text-violet-600 hover:bg-violet-50 dark:text-violet-400 dark:hover:bg-violet-900/20 transition-all border border-violet-200 dark:border-violet-800 disabled:opacity-50"
+                                            >
+                                                <CheckCircle2 size={12} /> {isClosing ? 'Closing…' : 'Close Session'}
+                                            </button>
+                                            <div className="flex items-center gap-1.5 shrink-0 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-1.5">
+                                                <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 whitespace-nowrap">Batch</label>
+                                                <input
+                                                    type="number"
+                                                    min={1}
+                                                    max={10}
+                                                    value={selectedSession.batchSize ?? 3}
+                                                    onChange={e => handleUpdateBatchSize(selectedSession, parseInt(e.target.value) || 3)}
+                                                    className="w-10 bg-transparent text-[11px] font-black text-center text-slate-700 dark:text-slate-200 outline-none"
+                                                    title="Pre-assign this many contacts per volunteer at once (1–10)"
+                                                />
+                                                <label className="text-[9px] font-black uppercase tracking-widest text-slate-400">/ caller</label>
+                                            </div>
+                                        </>
+                                    )}
+
+                                    {/* Delete — always available */}
                                     <button
                                         onClick={() => handleDeleteSession(selectedSession.id)}
                                         className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wide text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-all border border-transparent hover:border-rose-200 dark:hover:border-rose-800"
                                     >
                                         <Trash2 size={12} /> Delete
                                     </button>
-                                    <div className="flex items-center gap-1.5 shrink-0 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-1.5">
-                                        <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 whitespace-nowrap">Batch</label>
-                                        <input
-                                            type="number"
-                                            min={1}
-                                            max={10}
-                                            value={selectedSession.batchSize ?? 3}
-                                            onChange={e => handleUpdateBatchSize(selectedSession, parseInt(e.target.value) || 3)}
-                                            className="w-10 bg-transparent text-[11px] font-black text-center text-slate-700 dark:text-slate-200 outline-none"
-                                            title="Pre-assign this many contacts per volunteer at once (1–10)"
-                                        />
-                                        <label className="text-[9px] font-black uppercase tracking-widest text-slate-400">/ caller</label>
-                                    </div>
                                 </div>
                             </div>
 
@@ -790,11 +978,15 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                     </div>
                                 </div>
 
-                                {!selectedSession.isActive && (
-                                    <div className="mt-4 bg-amber-400/20 border border-amber-300/30 rounded-xl px-4 py-3 text-xs font-bold text-amber-100 flex items-center gap-2">
-                                        <Shield size={14} /> This session is paused. Volunteers who visit the link will see a "Session Paused" message.
+                                {selectedSession.closedAt ? (
+                                    <div className="mt-4 bg-violet-500/20 border border-violet-300/30 rounded-xl px-4 py-3 text-xs font-bold text-violet-100 flex items-center gap-2">
+                                        <LockKeyhole size={14} /> This session is closed and read-only. Volunteers who visit the link will see a &ldquo;Session Ended&rdquo; message. Use <strong>Reopen Session</strong> to allow more contacts.
                                     </div>
-                                )}
+                                ) : !selectedSession.isActive ? (
+                                    <div className="mt-4 bg-amber-400/20 border border-amber-300/30 rounded-xl px-4 py-3 text-xs font-bold text-amber-100 flex items-center gap-2">
+                                        <Shield size={14} /> This session is paused. Volunteers who visit the link will see a &ldquo;Session Paused&rdquo; message.
+                                    </div>
+                                ) : null}
                             </div>
 
                             {/* People Queue Preview */}

@@ -497,6 +497,23 @@ const PausedCard: React.FC<{ sessionName: string }> = ({ sessionName }) => (
     </div>
 );
 
+// ─── Closed Session Card ────────────────────────────────────────────────────────────────────────────────────
+
+const ClosedCard: React.FC<{ sessionName: string }> = ({ sessionName }) => (
+    <div className="bg-white rounded-[2rem] shadow-xl border border-slate-100 p-10 text-center">
+        <div className="w-16 h-16 rounded-2xl bg-violet-100 flex items-center justify-center mx-auto mb-5">
+            <CheckCircle2 size={32} className="text-violet-500" />
+        </div>
+        <h2 className="text-xl font-black text-slate-900 mb-2">Session Ended</h2>
+        <p className="text-sm text-slate-500 mb-4">
+            <span className="font-bold">{sessionName}</span> has been closed by the coordinator. Thank you for helping!
+        </p>
+        <p className="text-xs text-slate-400">
+            If you believe this is an error, please contact your session coordinator.
+        </p>
+    </div>
+);
+
 // ─── Not Found Card ───────────────────────────────────────────────────────────
 
 const NotFoundCard: React.FC = () => (
@@ -509,7 +526,7 @@ const NotFoundCard: React.FC = () => (
 
 // ─── Main Public View ─────────────────────────────────────────────────────────
 
-type ViewState = 'loading' | 'phone' | 'assigning' | 'contact' | 'done-exhausted' | 'done-ended' | 'not-found' | 'paused';
+type ViewState = 'loading' | 'phone' | 'assigning' | 'contact' | 'done-exhausted' | 'done-ended' | 'not-found' | 'paused' | 'closed';
 
 export const PublicContactView: React.FC<{ sessionId: string }> = ({ sessionId }) => {
 
@@ -538,7 +555,14 @@ export const PublicContactView: React.FC<{ sessionId: string }> = ({ sessionId }
             setSession(s);
             const stored = sessionStorage.getItem(STORAGE_KEY(sessionId));
             if (stored) setVolunteerPhone(stored);
-            setViewState(s.isActive ? 'phone' : 'paused');
+            // Determine initial view: closed > paused > active
+            if (s.closedAt) {
+                setViewState('closed');
+            } else if (!s.isActive) {
+                setViewState('paused');
+            } else {
+                setViewState('phone');
+            }
         });
     }, [sessionId]);
 
@@ -688,6 +712,7 @@ export const PublicContactView: React.FC<{ sessionId: string }> = ({ sessionId }
             {viewState === 'loading' && <LoadingCard />}
             {viewState === 'not-found' && <NotFoundCard />}
             {viewState === 'paused' && <PausedCard sessionName={sessionName} />}
+            {viewState === 'closed' && <ClosedCard sessionName={sessionName} />}
             {viewState === 'phone' && (
                 <PhoneStep sessionName={sessionName} onSubmit={handlePhoneSubmit} isLoading={false} />
             )}

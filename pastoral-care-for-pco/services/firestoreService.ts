@@ -1328,6 +1328,58 @@ class FirestoreService {
     }
   }
 
+  /**
+   * Formally close a session: marks it as closed (isActive=false, closedAt set)
+   * and releases ALL still-pending slots so volunteers see an empty queue.
+   */
+  async closeOutreachSession(sessionId: string, closedBy: string): Promise<void> {
+    try {
+      // 1. Update session document
+      await updateDoc(doc(db, 'outreach_sessions', sessionId), {
+        isActive: false,
+        closedAt: Date.now(),
+        closedBy,
+      });
+
+      // 2. Release all pending slots for this session in a batch write
+      const pendingQ = query(
+        collection(db, 'outreach_slots'),
+        where('sessionId', '==', sessionId),
+        where('status', '==', 'pending')
+      );
+      const pendingSnap = await getDocs(pendingQ);
+      if (!pendingSnap.empty) {
+        const batch = writeBatch(db);
+        const now = Date.now();
+        pendingSnap.docs.forEach(d =>
+          batch.update(d.ref, { status: 'released', completedAt: now })
+        );
+        await batch.commit();
+      }
+    } catch (e) {
+      this.handleFirestoreError(e);
+      throw e;
+    }
+  }
+
+  /**
+   * Reopen a previously closed session (clears closedAt, sets isActive=true).
+   */
+  async reopenOutreachSession(sessionId: string): Promise<void> {
+    try {
+      await updateDoc(doc(db, 'outreach_sessions', sessionId), {
+        isActive: true,
+        closedAt: null,
+        closedBy: null,
+      });
+    } catch (e) {
+      this.handleFirestoreError(e);
+      throw e;
+    }
+  }
+
+
+
   async getOutreachSessions(churchId: string): Promise<OutreachSession[]> {
     try {
       const q = query(
