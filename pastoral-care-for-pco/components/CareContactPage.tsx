@@ -627,19 +627,65 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
     // Build denormalized eligible people list for a given filter config
     const buildEligiblePeople = useCallback((
         allPeople: typeof people,
-        filters: OutreachSession['filters']
+        filters: OutreachSession['filters'],
+        historySlots: OutreachSlot[]
     ) => {
         const { riskCategories, membershipStatuses } = filters;
-        return allPeople
-            .filter(p => {
-                if (p.status?.toLowerCase() === 'inactive') return false;
-                // Must have at least a phone or email to be contactable
-                if (!p.phone && !p.email) return false;
-                if (riskCategories.length > 0 && !riskCategories.includes(p.riskProfile?.category as any)) return false;
-                if (membershipStatuses.length > 0 && !membershipStatuses.includes(p.membership || 'None')) return false;
-                return true;
+        const eligible = allPeople.filter(p => {
+            if (p.status?.toLowerCase() === 'inactive') return false;
+            if (!p.phone && !p.email) return false;
+            if (riskCategories.length > 0 && !riskCategories.includes(p.riskProfile?.category as any)) return false;
+            if (membershipStatuses.length > 0 && !membershipStatuses.includes(p.membership || 'None')) return false;
+            return true;
+        });
+
+        // Build per-person contact history from all-time slots across ALL sessions.
+        // We care about two timestamps:
+        //   lastContactedAt  — most recent 'contacted' slot completedAt (successfully reached)
+        //   lastAttemptedAt  — most recent slot of any completed status (no-answer / contacted)
+        const lastContactedAt  = new Map<string, number>();
+        const lastAttemptedAt  = new Map<string, number>();
+
+        for (const slot of historySlots) {
+            const ts = slot.completedAt ?? slot.assignedAt;
+            if (slot.status === 'contacted') {
+                const prev = lastContactedAt.get(slot.assignedPersonId) ?? 0;
+                if (ts > prev) lastContactedAt.set(slot.assignedPersonId, ts);
+            }
+            if (slot.status === 'contacted' || slot.status === 'no-answer') {
+                const prev = lastAttemptedAt.get(slot.assignedPersonId) ?? 0;
+                if (ts > prev) lastAttemptedAt.set(slot.assignedPersonId, ts);
+            }
+        }
+
+        // Tier 0: never attempted in any session — sort most at-risk (lowest score) first
+        // Tier 1: attempted but never successfully contacted — oldest attempt first
+        // Tier 2: successfully contacted at least once — oldest successful contact first
+        //
+        // This ensures volunteers always call the neediest / longest-forgotten people first.
+        const tierOf = (p: typeof eligible[0]) => {
+            if (lastContactedAt.has(p.id)) return 2;  // reached before
+            if (lastAttemptedAt.has(p.id)) return 1;  // tried but no answer
+            return 0;                                  // brand new, never tried
+        };
+
+        return eligible
+            .sort((a, b) => {
+                const ta = tierOf(a);
+                const tb = tierOf(b);
+                if (ta !== tb) return ta - tb; // lower tier = higher priority
+
+                if (ta === 0) {
+                    // Both never tried — most at-risk (lowest score) first
+                    return (a.riskProfile?.score ?? 0) - (b.riskProfile?.score ?? 0);
+                }
+                if (ta === 1) {
+                    // Both attempted-only — oldest attempt first
+                    return (lastAttemptedAt.get(a.id) ?? 0) - (lastAttemptedAt.get(b.id) ?? 0);
+                }
+                // Both previously contacted — oldest successful contact first
+                return (lastContactedAt.get(a.id) ?? 0) - (lastContactedAt.get(b.id) ?? 0);
             })
-            .sort((a, b) => (a.riskProfile?.score ?? 0) - (b.riskProfile?.score ?? 0))
             .map(p => ({
                 id: p.id,
                 name: p.name,
@@ -737,7 +783,7 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
 
     const handleCreateSession = async (draft: Pick<OutreachSession, 'name' | 'filters'>) => {
         const id = `os_${church.id}_${Date.now()}`;
-        const eligible = buildEligiblePeople(people, draft.filters);
+        const eligible = buildEligiblePeople(people, draft.filters, allTimeSlots);
         const memberDirectory = buildMemberDirectory(people);
         const newSession: OutreachSession = {
             id, churchId: church.id,
@@ -755,7 +801,7 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
 
     const handleRefreshQueue = async () => {
         if (!selectedSession) return;
-        const eligible = buildEligiblePeople(people, selectedSession.filters);
+        const eligible = buildEligiblePeople(people, selectedSession.filters, allTimeSlots);
         const memberDirectory = buildMemberDirectory(people);
         const updates = { eligiblePeople: eligible, memberDirectory };
         await firestore.updateOutreachSession(selectedSession.id, updates);
@@ -1119,25 +1165,21 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                     </p>
                                 </div>
                                 <div className="flex items-center gap-2 flex-wrap">
-                                    {/* Export CSV — always available */}
-                                    <button
-                                        onClick={handleExportCsv}
-                                        disabled={isExporting}
-                                        title="Download all contact outcomes as a CSV file"
-                                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wide text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/20 transition-all border border-emerald-200 dark:border-emerald-800 disabled:opacity-50"
-                                    >
-                                        <Download size={12} /> {isExporting ? 'Exporting…' : 'Export CSV'}
-                                    </button>
+                                    {/* Export CSV — available for open sessions; closed sessions have it in the compact card */}
+                                    {!selectedSession.closedAt && (
+                                        <button
+                                            onClick={handleExportCsv}
+                                            disabled={isExporting}
+                                            title="Download all contact outcomes as a CSV file"
+                                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wide text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/20 transition-all border border-emerald-200 dark:border-emerald-800 disabled:opacity-50"
+                                        >
+                                            <Download size={12} /> {isExporting ? 'Exporting…' : 'Export CSV'}
+                                        </button>
+                                    )}
 
                                     {selectedSession.closedAt ? (
-                                        /* ── CLOSED SESSION ACTIONS ── */
-                                        <button
-                                            onClick={() => handleReopenSession(selectedSession)}
-                                            title="Reopen this session so volunteers can continue contacting people"
-                                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wide text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-900/20 transition-all border border-indigo-200 dark:border-indigo-800"
-                                        >
-                                            <RotateCcw size={12} /> Reopen Session
-                                        </button>
+                                        /* ── CLOSED SESSION: no extra buttons; compact card handles actions ── */
+                                        null
                                     ) : (
                                         /* ── ACTIVE / PAUSED SESSION ACTIONS ── */
                                         <>
@@ -1194,6 +1236,137 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                 </div>
                             </div>
 
+                            {selectedSession.closedAt ? (
+                                /* ══ CLOSED SESSION: Compact Summary Card ══ */
+                                (() => {
+                                    const totalEligible = selectedSession.eligiblePeople?.length ?? filteredPeople.length;
+                                    const contacted  = liveSlots.filter(s => s.status === 'contacted').length;
+                                    const noAnswer   = liveSlots.filter(s => s.status === 'no-answer').length;
+                                    const notContacted = Math.max(0, totalEligible - contacted - noAnswer);
+                                    const contactRate  = totalEligible > 0 ? Math.round(contacted / totalEligible * 100) : 0;
+                                    const coverageRate = totalEligible > 0 ? Math.round((contacted + noAnswer) / totalEligible * 100) : 0;
+                                    const closedDate   = new Date(selectedSession.closedAt).toLocaleString();
+                                    const duration     = selectedSession.closedAt - selectedSession.createdAt;
+                                    const durationHrs  = Math.floor(duration / 3_600_000);
+                                    const durationMins = Math.floor((duration % 3_600_000) / 60_000);
+                                    const durationStr  = durationHrs > 0 ? `${durationHrs}h ${durationMins}m` : `${durationMins}m`;
+
+                                    // Per-caller from liveSlots
+                                    const callerMap = new Map<string, { name: string; phone: string; contacted: number; noAnswer: number }>();
+                                    for (const slot of liveSlots.filter(s => s.status === 'contacted' || s.status === 'no-answer')) {
+                                        if (!callerMap.has(slot.volunteerPhone)) {
+                                            callerMap.set(slot.volunteerPhone, { name: slot.volunteerName ?? '', phone: slot.volunteerPhone, contacted: 0, noAnswer: 0 });
+                                        }
+                                        const e = callerMap.get(slot.volunteerPhone)!;
+                                        if (slot.status === 'contacted') e.contacted++; else e.noAnswer++;
+                                    }
+                                    const callers = [...callerMap.values()].sort((a, b) => (b.contacted + b.noAnswer) - (a.contacted + a.noAnswer));
+
+                                    return (
+                                        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-violet-100 dark:border-violet-900/40 overflow-hidden shadow-sm">
+                                            {/* Gradient header */}
+                                            <div className="bg-gradient-to-br from-violet-600 to-indigo-700 px-6 py-5 text-white">
+                                                <div className="flex items-center justify-between gap-4 flex-wrap">
+                                                    <div>
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <LockKeyhole size={13} className="text-violet-200" />
+                                                            <p className="text-[10px] font-black uppercase tracking-widest text-violet-200">Session Closed</p>
+                                                        </div>
+                                                        <p className="text-xs text-violet-200">{closedDate} &bull; Ran {durationStr}</p>
+                                                    </div>
+                                                    {/* Quick actions */}
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <button
+                                                            onClick={handleExportCsv}
+                                                            disabled={isExporting}
+                                                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wide bg-white/20 hover:bg-white/30 text-white transition-all border border-white/20 disabled:opacity-50"
+                                                        >
+                                                            <Download size={12} /> {isExporting ? 'Exporting…' : 'Export CSV'}
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleReopenSession(selectedSession)}
+                                                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wide bg-white text-indigo-700 hover:bg-indigo-50 transition-all"
+                                                        >
+                                                            <RotateCcw size={12} /> Reopen
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                {/* Progress bar */}
+                                                <div className="mt-4">
+                                                    <div className="flex items-center justify-between mb-1.5">
+                                                        <span className="text-[10px] font-black uppercase tracking-widest text-violet-200">Coverage</span>
+                                                        <span className="text-[10px] font-black text-white">{coverageRate}% attempted</span>
+                                                    </div>
+                                                    <div className="bg-white/20 rounded-full h-2 overflow-hidden">
+                                                        <div
+                                                            className="h-2 rounded-full bg-white transition-all duration-700"
+                                                            style={{ width: `${Math.min(100, coverageRate)}%` }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Stat strip */}
+                                            <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-y sm:divide-y-0 divide-slate-100 dark:divide-slate-800 border-b border-slate-100 dark:border-slate-800">
+                                                {[
+                                                    { label: 'Reached', value: contacted, sub: `${contactRate}% rate`, icon: <Check size={12} className="text-emerald-500" />, color: 'text-emerald-600 dark:text-emerald-400' },
+                                                    { label: 'No Answer', value: noAnswer, sub: 'attempted', icon: <PhoneOff size={12} className="text-rose-400" />, color: 'text-rose-500' },
+                                                    { label: 'Not Contacted', value: notContacted, sub: 'remaining', icon: <Users size={12} className="text-slate-400" />, color: 'text-slate-600 dark:text-slate-300' },
+                                                    { label: 'Volunteers', value: callers.length, sub: 'made calls', icon: <Award size={12} className="text-violet-500" />, color: 'text-violet-600 dark:text-violet-400' },
+                                                ].map(tile => (
+                                                    <div key={tile.label} className="px-5 py-4">
+                                                        <div className="flex items-center gap-1.5 mb-1">{tile.icon}<p className="text-[9px] font-black uppercase tracking-widest text-slate-400">{tile.label}</p></div>
+                                                        <p className={`text-2xl font-black ${tile.color}`}>{tile.value}</p>
+                                                        <p className="text-[9px] text-slate-400 mt-0.5">{tile.sub}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+
+                                            {/* Volunteer leaderboard */}
+                                            {callers.length > 0 && (
+                                                <div className="px-5 py-4">
+                                                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-3 flex items-center gap-1.5">
+                                                        <Star size={9} className="text-amber-400" /> Volunteer Results
+                                                    </p>
+                                                    <div className="space-y-1.5">
+                                                        {callers.map((c, i) => {
+                                                            const total = c.contacted + c.noAnswer;
+                                                            const pct = total > 0 ? Math.round(c.contacted / total * 100) : 0;
+                                                            return (
+                                                                <div key={c.phone} className="flex items-center gap-3">
+                                                                    <span className="w-6 shrink-0 text-center">
+                                                                        {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : <span className="text-[10px] text-slate-400 font-bold">{i + 1}</span>}
+                                                                    </span>
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <div className="flex items-center justify-between mb-1">
+                                                                            <span className="text-xs font-black text-slate-800 dark:text-white truncate">{c.name || c.phone}</span>
+                                                                            <span className="text-[10px] font-black text-slate-500 dark:text-slate-400 shrink-0 ml-2">
+                                                                                <span className="text-emerald-600 dark:text-emerald-400">{c.contacted}</span>
+                                                                                <span className="text-slate-300 mx-1">·</span>
+                                                                                <span className="text-rose-500">{c.noAnswer}</span>
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="bg-slate-100 dark:bg-slate-800 rounded-full h-1 overflow-hidden">
+                                                                            <div
+                                                                                className="bg-emerald-500 h-1 rounded-full transition-all duration-500"
+                                                                                style={{ width: `${pct}%` }}
+                                                                            />
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })()
+                            ) : (
+                                /* ══ OPEN SESSION: Full Share Panel + Live Board ══ */
+                                <>
+
                             {/* Share Panel */}
                             <div className="bg-gradient-to-br from-indigo-600 to-violet-700 rounded-2xl p-6 text-white shadow-xl shadow-indigo-200/40 dark:shadow-indigo-900/30">
                                 <div className="flex items-start gap-6 flex-wrap">
@@ -1235,15 +1408,11 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                     </div>
                                 </div>
 
-                                {selectedSession.closedAt ? (
-                                    <div className="mt-4 bg-violet-500/20 border border-violet-300/30 rounded-xl px-4 py-3 text-xs font-bold text-violet-100 flex items-center gap-2">
-                                        <LockKeyhole size={14} /> This session is closed and read-only. Volunteers who visit the link will see a &ldquo;Session Ended&rdquo; message. Use <strong>Reopen Session</strong> to allow more contacts.
-                                    </div>
-                                ) : !selectedSession.isActive ? (
+                                {!selectedSession.isActive && !selectedSession.closedAt && (
                                     <div className="mt-4 bg-amber-400/20 border border-amber-300/30 rounded-xl px-4 py-3 text-xs font-bold text-amber-100 flex items-center gap-2">
                                         <Shield size={14} /> This session is paused. Volunteers who visit the link will see a &ldquo;Session Paused&rdquo; message.
                                     </div>
-                                ) : null}
+                                )}
                             </div>
 
                             {/* Live Contact Board — directly under share panel */}
@@ -1462,6 +1631,9 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                     )}
                                 </div>
                             </div>
+
+                            </>
+                        )}
 
                         </div>
                     ) : null}

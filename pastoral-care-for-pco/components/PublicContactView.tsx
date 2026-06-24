@@ -577,33 +577,62 @@ export const PublicContactView: React.FC<{ sessionId: string }> = ({ sessionId }
     const sessionNoAnswer  = liveSlots.filter(s => s.status === 'no-answer').length;
     const sessionTotal     = session?.eligiblePeople?.length ?? 0;
 
-    // Get eligible sorted list (for passing to claimBatch)
+    // Get eligible sorted list (for passing to claimBatch).
+    //
+    // Three categories (evaluated from slot data):
+    //   'contacted'  → permanently excluded; those people are DONE.
+    //   'no-answer'  with active noAnswerUntil → on cooldown, hidden until timer expires.
+    //   everything else (uncalled, released, no-answer with expired/null cooldown) → AVAILABLE.
+    //
+    // Priority order: uncalled people first, then no-answer retries at the end.
+    // When this returns [] the session is effectively exhausted (all contacted or all cooling down).
     const getFilteredPeople = useCallback(async (): Promise<{ id: string; name: string; phone?: string | null; email?: string | null }[]> => {
         if (!session) return [];
         const allSlots = await firestore.getOutreachSlots(session.id);
         const now = Date.now();
 
-        const alreadyDone = new Set<string>();
-        const onCooldown = new Set<string>();
+        const contacted  = new Set<string>(); // done — never re-assign
+        const pending    = new Set<string>(); // currently claimed by another volunteer
+        const onCooldown = new Set<string>(); // no-answer but cooldown still active
+        const triedBefore = new Set<string>(); // no-answer with expired cooldown (re-queue at end)
+
         for (const slot of allSlots) {
-            if (slot.status === 'contacted' || slot.status === 'pending') {
-                alreadyDone.add(slot.assignedPersonId);
+            if (slot.status === 'contacted') {
+                contacted.add(slot.assignedPersonId);
+            } else if (slot.status === 'pending') {
+                pending.add(slot.assignedPersonId);
             } else if (slot.status === 'no-answer') {
-                if (slot.noAnswerUntil && slot.noAnswerUntil > now) {
+                const cooldownActive = slot.noAnswerUntil && slot.noAnswerUntil > now;
+                if (cooldownActive) {
                     onCooldown.add(slot.assignedPersonId);
+                } else {
+                    // Cooldown expired (or cleared on reopen) → re-queue, but at end
+                    triedBefore.add(slot.assignedPersonId);
                 }
             }
-            // 'released' → not blocked, back in queue
+            // 'released' → uncalled for now, available
         }
 
         const allPeople = session.eligiblePeople ?? [];
-        const primary = allPeople.filter(p => !alreadyDone.has(p.id) && !onCooldown.has(p.id));
-        const reQueued = allPeople.filter(p => {
-            if (alreadyDone.has(p.id) || onCooldown.has(p.id)) return false;
-            return allSlots.some(s => s.assignedPersonId === p.id && s.status === 'no-answer');
-        });
-        const primaryFiltered = primary.filter(p => !reQueued.find(r => r.id === p.id));
-        return [...primaryFiltered, ...reQueued];
+
+        // Fresh contacts: never attempted (no slot at all, or only released slots)
+        const fresh = allPeople.filter(p =>
+            !contacted.has(p.id) &&
+            !pending.has(p.id) &&
+            !onCooldown.has(p.id) &&
+            !triedBefore.has(p.id)
+        );
+
+        // Retries: previously got no-answer, cooldown now clear
+        const retries = allPeople.filter(p =>
+            triedBefore.has(p.id) &&
+            !contacted.has(p.id) &&
+            !pending.has(p.id) &&
+            !onCooldown.has(p.id)
+        );
+
+        // Fresh people first, then retries — so new contacts aren't delayed by retries
+        return [...fresh, ...retries];
     }, [session]);
 
     // Fetch a fresh batch and return it (or [] if queue exhausted)

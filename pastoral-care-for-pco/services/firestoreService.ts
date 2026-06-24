@@ -1363,20 +1363,45 @@ class FirestoreService {
   }
 
   /**
-   * Reopen a previously closed session (clears closedAt, sets isActive=true).
+   * Reopen a previously closed session.
+   *
+   * On reopen:
+   *   - Clears closedAt / closedBy, sets isActive = true
+   *   - Clears the 24-hour noAnswerUntil cooldown on ALL no-answer slots so they
+   *     are immediately re-available to volunteers (no waiting out the timer).
+   *
+   * Slots that are already 'contacted' remain excluded — those people won't be
+   * re-assigned. The queue is effectively: everyone NOT yet successfully contacted.
    */
   async reopenOutreachSession(sessionId: string): Promise<void> {
     try {
+      // 1. Re-activate the session
       await updateDoc(doc(db, 'outreach_sessions', sessionId), {
         isActive: true,
         closedAt: null,
         closedBy: null,
       });
+
+      // 2. Clear noAnswerUntil on all no-answer slots so they're immediately callable
+      const noAnswerQ = query(
+        collection(db, 'outreach_slots'),
+        where('sessionId', '==', sessionId),
+        where('status', '==', 'no-answer')
+      );
+      const noAnswerSnap = await getDocs(noAnswerQ);
+      if (!noAnswerSnap.empty) {
+        const batch = writeBatch(db);
+        noAnswerSnap.docs.forEach(d =>
+          batch.update(d.ref, { noAnswerUntil: null })
+        );
+        await batch.commit();
+      }
     } catch (e) {
       this.handleFirestoreError(e);
       throw e;
     }
   }
+
 
 
 
