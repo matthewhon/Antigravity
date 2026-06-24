@@ -282,16 +282,36 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
         });
     }, []);
 
-    // --- Build last-note map ---
+    // --- Build last-note map and count map ---
+    //
+    // Notes saved at different points in time may have personId stored as either:
+    //   - raw PCO ID:       "12345678"
+    //   - composite ID:     "churchABC_12345678"  (older format)
+    //
+    // person.id from allPeople is always the raw PCO ID.
+    // To tolerate both formats we index each note under BOTH keys so the
+    // lookup (person.id → note) always hits regardless of what was saved.
     const lastNoteMap = useMemo(() => {
         const m = new Map<string, PastoralNote>();
-        notes.forEach(n => { if (!m.has(n.personId)) m.set(n.personId, n); });
+        notes.forEach(n => {
+            const raw = n.personId;
+            // Strip a leading "<churchId>_" prefix if present to get the bare PCO ID
+            const bare = raw.includes('_') ? raw.split('_').slice(1).join('_') : raw;
+            if (!m.has(raw))  m.set(raw,  n);
+            if (!m.has(bare)) m.set(bare, n);
+        });
         return m;
     }, [notes]);
 
     const noteCountMap = useMemo(() => {
         const m = new Map<string, number>();
-        notes.forEach(n => { m.set(n.personId, (m.get(n.personId) || 0) + 1); });
+        notes.forEach(n => {
+            const raw  = n.personId;
+            const bare = raw.includes('_') ? raw.split('_').slice(1).join('_') : raw;
+            m.set(raw,  (m.get(raw)  || 0) + 1);
+            // Only count once — don't double-count if raw === bare
+            if (bare !== raw) m.set(bare, (m.get(bare) || 0) + 1);
+        });
         return m;
     }, [notes]);
 
