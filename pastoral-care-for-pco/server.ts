@@ -448,9 +448,11 @@ async function startServer() {
       }
     });
 
-    // ─── Outreach Contact Log → PCO Note ────────────────────────────────────────
+    // ─── Outreach Contact Log → PCO Note + Firestore Pastoral Note ─────────────
     // Called fire-and-forget from the public volunteer page after marking an outcome.
-    // Writes a note to the person's PCO profile so pastors can see who was contacted.
+    // 1. Writes a note to the person's PCO profile.
+    // 2. Also creates a pastoral_notes Firestore document so the contact appears
+    //    in Care & Reports under "Has Notes" without any extra pastoral staff work.
     app.post('/api/outreach/log-contact', express.json(), async (req: any, res: any) => {
       const { sessionId, slotId, outcome, notes, volunteerName } = req.body || {};
       if (!sessionId || !slotId) return res.status(400).json({ error: 'Missing sessionId or slotId' });
@@ -467,7 +469,8 @@ async function startServer() {
         const slot = slotSnap.data() as any;
         if (slot.sessionId !== sessionId) return res.status(403).json({ error: 'Slot does not belong to session' });
 
-        const personId: string = slot.assignedPersonId;
+        const personId: string   = slot.assignedPersonId;
+        const personName: string = slot.assignedPersonName || 'Unknown';
         const sessionName: string = session.name || 'Outreach Session';
         const outcomeEmoji = outcome === 'contacted' ? '✅' : '📵';
         const outcomeLabel = outcome === 'contacted' ? 'Reached' : 'No Answer';
@@ -482,13 +485,33 @@ async function startServer() {
           `Date: ${dateStr}`,
           ...(notes?.trim() ? ['', '---', notes.trim()] : []),
         ];
+        const noteContent = noteLines.join('\n');
 
         const { writePcoNote } = await import('./backend/pcoNotes.js') as any;
         const { createServerLogger } = await import('./services/logService.js') as any;
         const log = createServerLogger(db);
-        // Fire-and-forget so volunteer isn't blocked
-        writePcoNote({ db, log, churchId, personId, noteContent: noteLines.join('\n') })
+        // Fire-and-forget PCO note — volunteer isn't blocked on this
+        writePcoNote({ db, log, churchId, personId, noteContent })
           .catch(() => { /* already logged inside writePcoNote */ });
+
+        // Write a pastoral_notes Firestore document so this contact appears
+        // in Care & Reports ("Has Notes" filter, Last Contact column, etc.)
+        // Note type: 'Call' for both contacted and no-answer (it was a phone call attempt).
+        const noteId = `outreach_${slotId}`;
+        const todayIso = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+        await db.collection('pastoral_notes').doc(noteId).set({
+          id: noteId,
+          churchId,
+          personId,
+          personName,
+          authorId:   'outreach_system',
+          authorName: volunteerName || 'Outreach Volunteer',
+          date:       todayIso,
+          type:       'Call',
+          content:    noteContent,
+          isCompleted: true,
+          tags: ['outreach', outcome === 'contacted' ? 'reached' : 'no-answer'],
+        }, { merge: true });
 
         return res.json({ success: true, personId });
       } catch (e: any) {
@@ -496,6 +519,7 @@ async function startServer() {
         return res.status(500).json({ error: e.message });
       }
     });
+
 
     // ─── Web Push Notifications ─────────────────────────────────────────────────
     app.get('/push/vapid-public-key',  getVapidPublicKey);
@@ -529,8 +553,118 @@ async function startServer() {
       }
     });
 
+    // ─── One-time: backfill pastoral_notes for completed outreach slots ──────────
+    // Hit GET /api/admin/backfill-outreach-notes to create pastoral_notes docs for
+    // all existing completed outreach slots that pre-date the auto-write fix.
+    app.get('/api/admin/backfill-outreach-notes', async (req: any, res: any) => {
+        try {
+            const db = getDb();
+
+            const slotsSnap = await db.collection('outreach_slots')
+                .where('status', 'in', ['contacted', 'no-answer'])
+                .get();
+
+            if (slotsSnap.empty) {
+                return res.json({ created: 0, skipped: 0, message: 'No completed slots found.' });
+            }
+
+            // Cache sessions
+            const sessionCache = new Map<string, any>();
+            const getSession = async (sessionId: string) => {
+                if (sessionCache.has(sessionId)) return sessionCache.get(sessionId);
+                const snap = await db.collection('outreach_sessions').doc(sessionId).get();
+                const data = snap.exists ? snap.data() : null;
+                sessionCache.set(sessionId, data);
+                return data;
+            };
+
+            // Check which noteIds already exist (in chunks of 30)
+            const noteIds = slotsSnap.docs.map(d => `outreach_${d.id}`);
+            const existingSet = new Set<string>();
+            const CHUNK = 30;
+            for (let i = 0; i < noteIds.length; i += CHUNK) {
+                const refs = noteIds.slice(i, i + CHUNK).map(id => db.collection('pastoral_notes').doc(id));
+                const snaps = await db.getAll(...refs);
+                snaps.forEach((s: any) => { if (s.exists) existingSet.add(s.id); });
+            }
+
+            let created = 0;
+            let skipped = 0;
+            const BATCH_LIMIT = 400;
+            let batch = db.batch();
+            let batchCount = 0;
+
+            for (const slotDoc of slotsSnap.docs) {
+                const slot = slotDoc.data() as any;
+                const noteId = `outreach_${slotDoc.id}`;
+
+                if (existingSet.has(noteId)) { skipped++; continue; }
+
+                const session = await getSession(slot.sessionId);
+                if (!session) { skipped++; continue; }
+
+                const churchId    = session.churchId;
+                const sessionName = session.name || 'Outreach Session';
+                const outcome     = slot.status;
+                const outcomeEmoji = outcome === 'contacted' ? '✅' : '📵';
+                const outcomeLabel = outcome === 'contacted' ? 'Reached' : 'No Answer';
+
+                const completedAt = slot.completedAt ?? slot.assignedAt ?? Date.now();
+                const dateStr = new Date(completedAt).toLocaleString('en-US', {
+                    month: 'short', day: 'numeric', year: 'numeric',
+                    hour: 'numeric', minute: '2-digit', hour12: true,
+                });
+                const todayIso = new Date(completedAt).toISOString().split('T')[0];
+
+                const noteLines: string[] = [
+                    `${outcomeEmoji} Pastoral Outreach — ${outcomeLabel}`,
+                    `Session: ${sessionName}`,
+                    ...(slot.volunteerName ? [`Contacted by: ${slot.volunteerName}`] : []),
+                    `Date: ${dateStr}`,
+                    ...(slot.notes?.trim() ? ['', '---', slot.notes.trim()] : []),
+                ];
+
+                const ref = db.collection('pastoral_notes').doc(noteId);
+                batch.set(ref, {
+                    id:          noteId,
+                    churchId,
+                    personId:    slot.assignedPersonId,
+                    personName:  slot.assignedPersonName || 'Unknown',
+                    authorId:    'outreach_system',
+                    authorName:  slot.volunteerName || 'Outreach Volunteer',
+                    date:        todayIso,
+                    type:        'Call',
+                    content:     noteLines.join('\n'),
+                    isCompleted: true,
+                    tags:        ['outreach', outcome === 'contacted' ? 'reached' : 'no-answer'],
+                }, { merge: true });
+
+                created++;
+                batchCount++;
+
+                if (batchCount >= BATCH_LIMIT) {
+                    await batch.commit();
+                    batch = db.batch();
+                    batchCount = 0;
+                }
+            }
+
+            if (batchCount > 0) await batch.commit();
+
+            return res.json({
+                created,
+                skipped,
+                message: `Done! Created ${created} pastoral_notes, skipped ${skipped} (already existed).`,
+            });
+        } catch (e: any) {
+            console.error('[backfill-outreach-notes]', e.message);
+            return res.status(500).json({ error: e.message });
+        }
+    });
+
     // Admin endpoint to backfill SMS conversation names and avatars
     app.get('/api/admin/backfill-sms', async (req: any, res: any) => {
+
         try {
             const db = getDb();
             
