@@ -3,7 +3,8 @@ import QRCode from 'qrcode';
 import {
     Phone, QrCode, Link2, Plus, Trash2, Copy, Check, ChevronDown,
     Users, Activity, PhoneOff, RefreshCw, Eye, EyeOff, X, ToggleLeft, ToggleRight,
-    Clock, Shield, Download, LockKeyhole, RotateCcw, CheckCircle2
+    Clock, Shield, Download, LockKeyhole, RotateCcw, CheckCircle2,
+    Star, Timer, Award, BarChart3
 } from 'lucide-react';
 import { OutreachSession, OutreachSlot, PcoPerson, User, Church } from '../types';
 import { firestore } from '../services/firestoreService';
@@ -65,6 +66,214 @@ const QrCanvas: React.FC<{ url: string; size?: number }> = ({ url, size = 160 })
 // ─── Create / Edit Session Modal ──────────────────────────────────────────────
 
 const RISK_CATEGORIES: OutreachSession['filters']['riskCategories'] = ['Disconnected', 'At Risk', 'Healthy'];
+
+// ─── Session Summary (Close Stats) Modal ──────────────────────────────────────
+
+interface CloseStats {
+    sessionName: string;
+    totalEligible: number;
+    contacted: number;
+    noAnswer: number;
+    notContacted: number;
+    callerCount: number;
+    avgHandleSeconds: number | null; // avg seconds between assignedAt → completedAt
+    callers: { name: string; phone: string; contacted: number; noAnswer: number }[];
+    closedAt: number;
+    createdAt: number;
+}
+
+const fmtDuration = (seconds: number): string => {
+    if (seconds < 60) return `${Math.round(seconds)}s`;
+    const m = Math.floor(seconds / 60);
+    const s = Math.round(seconds % 60);
+    return s > 0 ? `${m}m ${s}s` : `${m}m`;
+};
+
+const SessionSummaryModal: React.FC<{ stats: CloseStats; onClose: () => void }> = ({ stats, onClose }) => {
+    const contactRate  = stats.totalEligible > 0 ? Math.round((stats.contacted  / stats.totalEligible) * 100) : 0;
+    const coverageRate = stats.totalEligible > 0 ? Math.round(((stats.contacted + stats.noAnswer) / stats.totalEligible) * 100) : 0;
+    const duration = stats.closedAt - stats.createdAt;
+    const durationHrs  = Math.floor(duration / 3_600_000);
+    const durationMins = Math.floor((duration % 3_600_000) / 60_000);
+    const durationStr  = durationHrs > 0 ? `${durationHrs}h ${durationMins}m` : `${durationMins}m`;
+    const topCaller = [...stats.callers].sort((a, b) => b.contacted - a.contacted)[0] ?? null;
+
+    return (
+        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto" onClick={onClose}>
+            <div
+                className="bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl w-full max-w-2xl my-6 overflow-hidden"
+                onClick={e => e.stopPropagation()}
+            >
+                {/* Header gradient */}
+                <div className="bg-gradient-to-br from-violet-600 to-indigo-700 px-8 py-7 text-white relative">
+                    <button onClick={onClose} className="absolute top-4 right-4 text-violet-200 hover:text-white transition-colors"><X size={18} /></button>
+                    <div className="flex items-center gap-3 mb-1">
+                        <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center">
+                            <CheckCircle2 size={20} className="text-white" />
+                        </div>
+                        <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-violet-200">Session Closed</p>
+                            <h2 className="text-xl font-black leading-tight">{stats.sessionName}</h2>
+                        </div>
+                    </div>
+                    <p className="text-xs text-violet-200 mt-2">
+                        Ran for {durationStr} &bull; Closed {new Date(stats.closedAt).toLocaleString()}
+                    </p>
+                </div>
+
+                <div className="p-7 space-y-6">
+                    {/* Top stat tiles */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        {[
+                            {
+                                label: 'People Reached',
+                                value: stats.contacted,
+                                sub: `${contactRate}% contact rate`,
+                                color: 'bg-emerald-50 dark:bg-emerald-900/20',
+                                text: 'text-emerald-600 dark:text-emerald-400',
+                                icon: <Check size={14} className="text-emerald-500" />
+                            },
+                            {
+                                label: 'No Answer',
+                                value: stats.noAnswer,
+                                sub: 'attempted',
+                                color: 'bg-rose-50 dark:bg-rose-900/20',
+                                text: 'text-rose-600 dark:text-rose-400',
+                                icon: <PhoneOff size={14} className="text-rose-500" />
+                            },
+                            {
+                                label: 'Not Contacted',
+                                value: stats.notContacted,
+                                sub: 'remain in queue',
+                                color: 'bg-slate-50 dark:bg-slate-800',
+                                text: 'text-slate-600 dark:text-slate-300',
+                                icon: <Users size={14} className="text-slate-400" />
+                            },
+                            {
+                                label: 'Coverage',
+                                value: `${coverageRate}%`,
+                                sub: 'of queue attempted',
+                                color: 'bg-indigo-50 dark:bg-indigo-900/20',
+                                text: 'text-indigo-600 dark:text-indigo-400',
+                                icon: <BarChart3 size={14} className="text-indigo-500" />
+                            },
+                        ].map(tile => (
+                            <div key={tile.label} className={`${tile.color} rounded-2xl p-4`}>
+                                <div className="flex items-center gap-1.5 mb-2">{tile.icon}<p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{tile.label}</p></div>
+                                <p className={`text-2xl font-black ${tile.text}`}>{tile.value}</p>
+                                <p className="text-[10px] text-slate-400 mt-0.5">{tile.sub}</p>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Secondary stats row */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="bg-amber-50 dark:bg-amber-900/10 rounded-2xl p-4 flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-xl bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center shrink-0">
+                                <Users size={16} className="text-amber-600" />
+                            </div>
+                            <div>
+                                <p className="text-xl font-black text-amber-600 dark:text-amber-400">{stats.callerCount}</p>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Volunteers</p>
+                            </div>
+                        </div>
+
+                        <div className="bg-sky-50 dark:bg-sky-900/10 rounded-2xl p-4 flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-xl bg-sky-100 dark:bg-sky-900/40 flex items-center justify-center shrink-0">
+                                <Timer size={16} className="text-sky-600" />
+                            </div>
+                            <div>
+                                <p className="text-xl font-black text-sky-600 dark:text-sky-400">
+                                    {stats.avgHandleSeconds !== null ? fmtDuration(stats.avgHandleSeconds) : '—'}
+                                </p>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Avg. Handle Time</p>
+                            </div>
+                        </div>
+
+                        {topCaller && (
+                            <div className="bg-violet-50 dark:bg-violet-900/10 rounded-2xl p-4 flex items-center gap-3">
+                                <div className="w-9 h-9 rounded-xl bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center shrink-0">
+                                    <Award size={16} className="text-violet-600" />
+                                </div>
+                                <div className="min-w-0">
+                                    <p className="text-sm font-black text-violet-600 dark:text-violet-400 truncate">{topCaller.name || topCaller.phone}</p>
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                        Top Caller &bull; {topCaller.contacted} reached
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Caller leaderboard */}
+                    {stats.callers.length > 0 && (
+                        <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3 flex items-center gap-1.5">
+                                <Star size={10} className="text-amber-400" /> Volunteer Leaderboard
+                            </p>
+                            <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl overflow-hidden">
+                                <table className="w-full text-left">
+                                    <thead>
+                                        <tr className="border-b border-slate-100 dark:border-slate-700">
+                                            <th className="px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">#</th>
+                                            <th className="px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">Volunteer</th>
+                                            <th className="px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400 text-center">Reached</th>
+                                            <th className="px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400 text-center">No Answer</th>
+                                            <th className="px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400 text-center">Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {[...stats.callers]
+                                            .sort((a, b) => (b.contacted + b.noAnswer) - (a.contacted + a.noAnswer))
+                                            .map((caller, i) => (
+                                            <tr key={caller.phone} className="border-b border-slate-100 dark:border-slate-700 last:border-0">
+                                                <td className="px-4 py-2.5">
+                                                    {i === 0 ? (
+                                                        <span className="text-base">🥇</span>
+                                                    ) : i === 1 ? (
+                                                        <span className="text-base">🥈</span>
+                                                    ) : i === 2 ? (
+                                                        <span className="text-base">🥉</span>
+                                                    ) : (
+                                                        <span className="text-[10px] text-slate-400 font-bold">{i + 1}</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-2.5">
+                                                    <p className="text-xs font-black text-slate-800 dark:text-white">{caller.name || '—'}</p>
+                                                    <p className="text-[10px] font-mono text-slate-400">{caller.phone}</p>
+                                                </td>
+                                                <td className="px-4 py-2.5 text-center">
+                                                    <span className="inline-flex items-center gap-1 text-[10px] font-black text-emerald-600 dark:text-emerald-400">
+                                                        <Check size={9} /> {caller.contacted}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-2.5 text-center">
+                                                    <span className="inline-flex items-center gap-1 text-[10px] font-black text-rose-500">
+                                                        <PhoneOff size={9} /> {caller.noAnswer}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-2.5 text-center">
+                                                    <span className="text-[10px] font-black text-slate-600 dark:text-slate-300">{caller.contacted + caller.noAnswer}</span>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+
+                    <button
+                        onClick={onClose}
+                        className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg transition-all"
+                    >
+                        Done
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 interface SessionModalProps {
     memberStatuses: string[];
@@ -331,6 +540,8 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
     // Close / export in-flight states
     const [isClosing, setIsClosing]       = useState(false);
     const [isExporting, setIsExporting]   = useState(false);
+    // Post-close stats modal
+    const [closeStats, setCloseStats]     = useState<CloseStats | null>(null);
 
     // Load sessions and all-time slot history
     useEffect(() => {
@@ -572,15 +783,61 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
 
     const handleCloseSession = async (session: OutreachSession) => {
         const confirmed = window.confirm(
-            `Close "${session.name}"?\n\nThis will:\n• Release any pending volunteer slots immediately\n• Mark the session as read-only\n• Show "Session ended" to any volunteers on the link\n\nYou can reopen it at any time.`
+            `Close "${session.name}"?\n\nThis will release any pending volunteer slots and mark the session as read-only. You can reopen it at any time.`
         );
         if (!confirmed) return;
         setIsClosing(true);
         try {
+            // Snapshot all slots BEFORE closing (includes still-pending)
+            const allSlots = await firestore.getOutreachSlots(session.id);
+            const closedAt = Date.now();
             await firestore.closeOutreachSession(session.id, user.id);
+
+            // Build stats from slot data
+            const completed = allSlots.filter(s => s.status === 'contacted' || s.status === 'no-answer');
+            const contacted  = completed.filter(s => s.status === 'contacted').length;
+            const noAnswer   = completed.filter(s => s.status === 'no-answer').length;
+            const totalEligible = session.eligiblePeople?.length ?? filteredPeople.length;
+            const notContacted  = Math.max(0, totalEligible - contacted - noAnswer);
+
+            // Avg handle time — only completed slots with both timestamps
+            const withTime = completed.filter(s => s.completedAt && s.assignedAt);
+            const avgHandleSeconds = withTime.length > 0
+                ? withTime.reduce((sum, s) => sum + ((s.completedAt! - s.assignedAt) / 1000), 0) / withTime.length
+                : null;
+
+            // Per-caller stats
+            const callerMap = new Map<string, { name: string; phone: string; contacted: number; noAnswer: number }>();
+            for (const slot of completed) {
+                if (!callerMap.has(slot.volunteerPhone)) {
+                    callerMap.set(slot.volunteerPhone, {
+                        name: slot.volunteerName ?? '',
+                        phone: slot.volunteerPhone,
+                        contacted: 0,
+                        noAnswer: 0,
+                    });
+                }
+                const entry = callerMap.get(slot.volunteerPhone)!;
+                if (slot.status === 'contacted') entry.contacted++;
+                else entry.noAnswer++;
+            }
+
+            setCloseStats({
+                sessionName: session.name,
+                totalEligible,
+                contacted,
+                noAnswer,
+                notContacted,
+                callerCount: callerMap.size,
+                avgHandleSeconds,
+                callers: Array.from(callerMap.values()),
+                closedAt,
+                createdAt: session.createdAt,
+            });
+
             setSessions(prev => prev.map(s =>
                 s.id === session.id
-                    ? { ...s, isActive: false, closedAt: Date.now(), closedBy: user.id }
+                    ? { ...s, isActive: false, closedAt, closedBy: user.id }
                     : s
             ));
         } finally {
@@ -989,6 +1246,14 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                 ) : null}
                             </div>
 
+                            {/* Live Contact Board — directly under share panel */}
+                            <div>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3 flex items-center gap-1.5">
+                                    <Activity size={11} className="text-emerald-500 animate-pulse" /> Session Progress
+                                </p>
+                                <LiveBoard slots={liveSlots} totalCount={filteredPeople.length} />
+                            </div>
+
                             {/* People Queue Preview */}
                             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 overflow-hidden">
                                 <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex-wrap gap-2">
@@ -1198,13 +1463,6 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                 </div>
                             </div>
 
-                            {/* Live Board */}
-                            <div>
-                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3 flex items-center gap-1.5">
-                                    <Activity size={11} className="text-emerald-500 animate-pulse" /> Live Contact Board
-                                </p>
-                                <LiveBoard slots={liveSlots} totalCount={filteredPeople.length} />
-                            </div>
                         </div>
                     ) : null}
                 </div>
@@ -1216,6 +1474,14 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                     memberStatuses={memberStatuses}
                     onSave={handleCreateSession}
                     onClose={() => setIsModalOpen(false)}
+                />
+            )}
+
+            {/* Post-close Stats Modal */}
+            {closeStats && (
+                <SessionSummaryModal
+                    stats={closeStats}
+                    onClose={() => setCloseStats(null)}
                 />
             )}
         </div>
