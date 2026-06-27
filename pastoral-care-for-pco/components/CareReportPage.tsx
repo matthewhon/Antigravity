@@ -700,7 +700,11 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
                                                     }
                                                     <div className="min-w-0">
                                                         <div className="flex items-center gap-1.5 flex-wrap">
-                                                            <p className="text-sm font-bold text-slate-900 dark:text-white truncate max-w-[140px]" title={person.name}>{person.name}</p>
+                                                            <button
+                                                            onClick={() => window.dispatchEvent(new CustomEvent('openPersonProfile', { detail: person.id }))}
+                                                            title={`Open ${person.name}'s profile`}
+                                                            className="text-sm font-bold text-slate-900 dark:text-white truncate max-w-[140px] hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors text-left"
+                                                        >{person.name}</button>
                                                             {followedUpRecently && <span className="text-[9px] font-black uppercase tracking-wide bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 px-1.5 py-0.5 rounded-full whitespace-nowrap">✓ Contacted</span>}
                                                             {dismissed && <span className="text-[9px] font-black uppercase tracking-wide bg-slate-100 dark:bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded-full whitespace-nowrap">Cleared</span>}
                                                             {isOverdue && !followedUpRecently && !dismissed && <span className="text-[9px] font-black uppercase tracking-wide bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded-full whitespace-nowrap">⚠️ Overdue</span>}
