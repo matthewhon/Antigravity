@@ -475,6 +475,8 @@ const App: React.FC = () => {
   };
 
   const isStarterPlan = church?.subscription?.status === 'active' && church?.subscription?.planId === 'starter';
+  const isGrowthPlan  = church?.subscription?.status === 'active' && church?.subscription?.planId === 'growth';
+
 
   const hasPermission = (v: string) => {
       if (!user) return false;
