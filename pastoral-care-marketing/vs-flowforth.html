@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pastoral Care for PCO vs Flowforth | Barnabas Software</title>
+  <meta name="description" content="See how Pastoral Care for Planning Center compares to Flowforth. More than email — get SMS, live polls, smart forms, AI insights, pastoral care tools, and full PCO analytics in one platform." />
+  <link rel="canonical" href="https://pastoralcare.barnabassoftware.com/vs-flowforth" />
+  <meta property="og:title" content="Pastoral Care for PCO vs Flowforth | Barnabas Software" />
+  <meta property="og:description" content="Flowforth does email. We do everything. The complete ministry platform vs. a single-channel tool." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --blue: #4A8FCC; --blue-dark: #2C5282; --blue-deeper: #1A3A5C;
+      --navy: #0F2540; --gold: #F6AD1C; --gold-light: #FDE68A; --gold-dark: #D97706;
+      --white: #FFFFFF; --gray-50: #F8FAFC; --gray-100: #F1F5F9;
+      --gray-200: #E2E8F0; --gray-400: #94A3B8; --gray-600: #475569; --gray-800: #1E293B;
+      --green: #10B981; --red: #EF4444; --amber: #F59E0B;
+      --radius: 16px; --shadow: 0 20px 60px rgba(15,37,64,0.12); --shadow-lg: 0 40px 100px rgba(15,37,64,0.18);
+    }
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Inter', sans-serif; color: var(--gray-800); background: var(--white); overflow-x: hidden; }
+
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+      padding: 0 2rem; height: 72px;
+      display: flex; align-items: center; justify-content: space-between;
+      background: rgba(255,255,255,0.92); backdrop-filter: blur(16px);
+      border-bottom: 1px solid rgba(74,143,204,0.12); transition: box-shadow 0.3s;
+    }
+    nav.scrolled { box-shadow: 0 4px 24px rgba(15,37,64,0.10); }
+    .nav-logo { display: flex; align-items: center; gap: 0.6rem; text-decoration: none; }
+    .nav-logo-text { display: flex; flex-direction: column; line-height: 1.1; }
+    .nav-logo-text strong { font-size: 0.95rem; font-weight: 800; color: var(--blue-dark); }
+    .nav-logo-text span { font-size: 0.68rem; font-weight: 500; color: var(--gray-400); }
+    .nav-links { display: flex; align-items: center; gap: 2rem; }
+    .nav-links a { text-decoration: none; color: var(--blue-dark); font-weight: 500; font-size: 0.9rem; transition: color 0.2s; }
+    .nav-links a:hover { color: var(--gold-dark); }
+    .nav-cta {
+      background: linear-gradient(135deg, var(--gold) 0%, var(--gold-dark) 100%);
+      color: var(--navy) !important; font-weight: 700 !important;
+      padding: 0.6rem 1.4rem; border-radius: 50px;
+      box-shadow: 0 4px 16px rgba(246,173,28,0.35);
+      transition: transform 0.2s, box-shadow 0.2s !important;
+    }
+    .nav-cta:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(246,173,28,0.45) !important; }
+
+    .hero {
+      padding: 140px 2rem 80px;
+      background: linear-gradient(160deg, var(--navy) 0%, var(--blue-deeper) 45%, #1E4A7A 100%);
+      position: relative; overflow: hidden; text-align: center;
+    }
+    .hero::before {
+      content: ''; position: absolute; inset: 0;
+      background: radial-gradient(ellipse 60% 50% at 50% 40%, rgba(74,143,204,0.22) 0%, transparent 70%),
+                  radial-gradient(ellipse 40% 40% at 20% 80%, rgba(246,173,28,0.10) 0%, transparent 60%);
+    }
+    .hero-inner { max-width: 860px; margin: 0 auto; position: relative; z-index: 1; }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      background: rgba(246,173,28,0.15); border: 1px solid rgba(246,173,28,0.35);
+      color: var(--gold); padding: 0.4rem 1.2rem; border-radius: 50px;
+      font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 1.8rem;
+    }
+    .hero h1 { font-family: 'Playfair Display', serif; font-size: clamp(2.2rem, 4.5vw, 3.4rem); font-weight: 800; color: var(--white); line-height: 1.15; margin-bottom: 1.4rem; }
+    .hero h1 em { color: var(--gold); font-style: normal; }
+    .hero p { font-size: 1.15rem; color: rgba(255,255,255,0.76); line-height: 1.7; max-width: 660px; margin: 0 auto 2.4rem; }
+    .hero-verdict { display: flex; align-items: center; justify-content: center; gap: 2rem; flex-wrap: wrap; margin-top: 2.8rem; }
+    .verdict-card { background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12); backdrop-filter: blur(12px); border-radius: 20px; padding: 1.4rem 2rem; min-width: 180px; text-align: center; }
+    .verdict-card .big { font-size: 2rem; font-weight: 900; color: var(--gold); line-height: 1; }
+    .verdict-card .label { font-size: 0.75rem; color: rgba(255,255,255,0.6); font-weight: 500; margin-top: 0.3rem; text-transform: uppercase; letter-spacing: 0.06em; }
+    .vs-badge { font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.25); }
+
+    .section { padding: 80px 2rem; }
+    .section-inner { max-width: 1100px; margin: 0 auto; }
+    .section-label { display: inline-block; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; color: var(--blue); margin-bottom: 0.8rem; }
+    .section-title { font-family: 'Playfair Display', serif; font-size: clamp(1.8rem, 3vw, 2.5rem); font-weight: 800; color: var(--navy); line-height: 1.2; margin-bottom: 1rem; }
+    .section-subtitle { font-size: 1.05rem; color: var(--gray-600); line-height: 1.7; max-width: 620px; margin-bottom: 3rem; }
+
+    .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.5rem; margin-bottom: 4rem; }
+    .summary-card { background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: var(--radius); padding: 1.5rem; position: relative; overflow: hidden; transition: transform 0.2s, box-shadow 0.2s; }
+    .summary-card:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
+    .summary-card.winner { background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%); border-color: var(--blue); }
+    .summary-card .icon { font-size: 1.8rem; margin-bottom: 0.6rem; }
+    .summary-card h3 { font-size: 0.85rem; font-weight: 700; color: var(--navy); margin-bottom: 0.3rem; }
+    .summary-card p { font-size: 0.8rem; color: var(--gray-600); line-height: 1.5; }
+    .winner-ribbon { position: absolute; top: 12px; right: -20px; background: var(--gold); color: var(--navy); font-size: 0.6rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 28px; transform: rotate(35deg); }
+
+    .table-wrapper { border-radius: 24px; overflow: hidden; box-shadow: var(--shadow-lg); border: 1px solid var(--gray-200); }
+    table { width: 100%; border-collapse: collapse; }
+    thead tr { background: linear-gradient(135deg, var(--navy) 0%, var(--blue-deeper) 100%); }
+    thead th { padding: 1.4rem 1.6rem; text-align: left; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+    thead th:first-child { color: rgba(255,255,255,0.55); width: 38%; }
+    thead th.col-us { color: var(--gold); }
+    thead th.col-them { color: rgba(255,255,255,0.55); }
+    .cat-row td { background: linear-gradient(90deg, #F0F7FF, #EFF6FF); padding: 0.7rem 1.6rem; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--blue-dark); border-top: 2px solid #BFDBFE; }
+    tbody tr { border-bottom: 1px solid var(--gray-100); }
+    tbody tr:nth-child(even):not(.cat-row) { background: var(--gray-50); }
+    tbody tr:hover:not(.cat-row) { background: #EFF6FF; transition: background 0.15s; }
+    tbody td { padding: 0.9rem 1.6rem; vertical-align: middle; }
+    .feat-name { font-size: 0.88rem; font-weight: 600; color: var(--gray-800); }
+    .feat-sub { font-size: 0.76rem; color: var(--gray-400); margin-top: 0.2rem; }
+    .check-yes { display: inline-flex; align-items: center; gap: 0.4rem; color: var(--green); font-size: 0.85rem; font-weight: 700; }
+    .check-yes::before { content: '&#10003;'; font-weight: 900; font-size: 1rem; }
+    .check-no { display: inline-flex; align-items: center; gap: 0.4rem; color: var(--red); font-size: 0.85rem; font-weight: 600; }
+    .check-no::before { content: '&#10005;'; font-weight: 900; font-size: 1rem; }
+    .check-partial { display: inline-flex; align-items: center; gap: 0.4rem; color: var(--amber); font-size: 0.85rem; font-weight: 600; }
+    .check-partial::before { content: '~'; font-weight: 900; font-size: 1rem; }
+
+    .exclusive-section { background: linear-gradient(135deg, var(--navy) 0%, var(--blue-deeper) 100%); padding: 80px 2rem; }
+    .exclusive-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-top: 2.5rem; }
+    .exclusive-card { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); backdrop-filter: blur(10px); border-radius: 20px; padding: 1.8rem; transition: transform 0.2s, background 0.2s; }
+    .exclusive-card:hover { transform: translateY(-4px); background: rgba(255,255,255,0.10); }
+    .exclusive-card .icon { font-size: 2rem; margin-bottom: 1rem; }
+    .exclusive-card h3 { font-size: 1rem; font-weight: 800; color: var(--white); margin-bottom: 0.5rem; }
+    .exclusive-card p { font-size: 0.85rem; color: rgba(255,255,255,0.65); line-height: 1.6; }
+    .exclusive-badge { display: inline-block; margin-top: 0.8rem; background: rgba(246,173,28,0.2); border: 1px solid rgba(246,173,28,0.4); color: var(--gold); font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; padding: 0.25rem 0.75rem; border-radius: 50px; }
+
+    .channel-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; align-items: start; }
+    @media (max-width: 768px) { .channel-grid { grid-template-columns: 1fr; } }
+    .channel-card { border-radius: 20px; overflow: hidden; box-shadow: var(--shadow); }
+    .channel-card-header { padding: 1.4rem 1.8rem; font-size: 0.85rem; font-weight: 800; letter-spacing: 0.04em; display: flex; align-items: center; gap: 0.6rem; }
+    .channel-card-header.us { background: linear-gradient(135deg, var(--blue-dark), var(--blue-deeper)); color: var(--gold); }
+    .channel-card-header.them { background: var(--gray-100); color: var(--gray-600); }
+    .channel-card-body { padding: 1.4rem 1.8rem; background: var(--white); border: 1px solid var(--gray-200); border-top: none; }
+    .channel-list { list-style: none; display: flex; flex-direction: column; gap: 0.7rem; }
+    .channel-list li { display: flex; align-items: flex-start; gap: 0.6rem; font-size: 0.88rem; }
+    .channel-list li.yes { color: var(--gray-800); }
+    .channel-list li.yes::before { content: '&#10003;'; color: var(--green); font-weight: 900; flex-shrink: 0; margin-top: 1px; }
+    .channel-list li.no { color: var(--gray-400); text-decoration: line-through; }
+    .channel-list li.no::before { content: '&#10005;'; color: var(--red); font-weight: 900; flex-shrink: 0; margin-top: 1px; text-decoration: none; display: inline-block; }
+
+    .pricing-strip { background: linear-gradient(135deg, #FFFBEB, #FEF3C7); border: 1px solid #FDE68A; border-radius: 24px; padding: 2.4rem; margin: 3rem 0; display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap; }
+    .pricing-strip h3 { font-size: 1.2rem; font-weight: 800; color: var(--navy); margin-bottom: 0.4rem; }
+    .pricing-strip p { font-size: 0.88rem; color: var(--gray-600); max-width: 500px; }
+
+    .cta-section { padding: 100px 2rem; background: linear-gradient(160deg, var(--navy) 0%, var(--blue-deeper) 60%, #1E4A7A 100%); text-align: center; position: relative; overflow: hidden; }
+    .cta-section::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse 60% 60% at 50% 50%, rgba(246,173,28,0.08) 0%, transparent 70%); }
+    .cta-inner { position: relative; z-index: 1; max-width: 680px; margin: 0 auto; }
+    .cta-section h2 { font-family: 'Playfair Display', serif; font-size: clamp(2rem, 4vw, 3rem); font-weight: 800; color: var(--white); margin-bottom: 1.2rem; line-height: 1.2; }
+    .cta-section h2 em { color: var(--gold); font-style: normal; }
+    .cta-section p { font-size: 1.05rem; color: rgba(255,255,255,0.72); line-height: 1.7; margin-bottom: 2.5rem; }
+    .cta-buttons { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+    .btn-primary { background: linear-gradient(135deg, var(--gold) 0%, var(--gold-dark) 100%); color: var(--navy); font-weight: 800; font-size: 1rem; padding: 1rem 2.4rem; border-radius: 50px; border: none; cursor: pointer; text-decoration: none; display: inline-block; box-shadow: 0 8px 32px rgba(246,173,28,0.4); transition: transform 0.2s, box-shadow 0.2s; }
+    .btn-primary:hover { transform: translateY(-3px); box-shadow: 0 14px 40px rgba(246,173,28,0.5); }
+    .btn-secondary { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.25); color: var(--white); font-weight: 700; font-size: 1rem; padding: 1rem 2.4rem; border-radius: 50px; cursor: pointer; text-decoration: none; display: inline-block; backdrop-filter: blur(8px); transition: background 0.2s, transform 0.2s; }
+    .btn-secondary:hover { background: rgba(255,255,255,0.18); transform: translateY(-2px); }
+
+    .faq-list { display: flex; flex-direction: column; gap: 1rem; margin-top: 2rem; }
+    .faq-item { border: 1px solid var(--gray-200); border-radius: var(--radius); overflow: hidden; }
+    .faq-q { padding: 1.2rem 1.6rem; font-weight: 700; font-size: 0.95rem; color: var(--navy); cursor: pointer; display: flex; justify-content: space-between; align-items: center; background: var(--white); transition: background 0.15s; list-style: none; }
+    .faq-q:hover { background: var(--gray-50); }
+    .faq-q::after { content: '+'; font-size: 1.4rem; color: var(--blue); font-weight: 300; transition: transform 0.2s; }
+    details[open] .faq-q::after { transform: rotate(45deg); }
+    .faq-a { padding: 0 1.6rem 1.2rem; font-size: 0.9rem; color: var(--gray-600); line-height: 1.7; }
+
+    footer { background: var(--navy); color: rgba(255,255,255,0.5); padding: 2rem; text-align: center; font-size: 0.82rem; }
+    footer a { color: rgba(255,255,255,0.7); text-decoration: none; }
+    footer a:hover { color: var(--gold); }
+
+    @media (max-width: 640px) {
+      .nav-links { display: none; }
+      .hero { padding: 120px 1.2rem 60px; }
+      .section { padding: 56px 1.2rem; }
+      .table-wrapper { overflow-x: auto; }
+      table { min-width: 600px; }
+      .pricing-strip { flex-direction: column; }
+      .exclusive-section { padding: 56px 1.2rem; }
+    }
+  </style>
+</head>
+<body>
+
+<nav id="nav">
+  <a href="https://pastoralcare.barnabassoftware.com" class="nav-logo">
+    <div class="nav-logo-text">
+      <strong>Barnabas Software</strong>
+      <span>Pastoral Care for PCO</span>
+    </div>
+  </a>
+  <div class="nav-links">
+    <a href="https://pastoralcare.barnabassoftware.com/#features">Features</a>
+    <a href="https://pastoralcare.barnabassoftware.com/#pricing">Pricing</a>
+    <a href="vs-clearstream.html">vs Clearstream</a>
+    <a href="vs-textinchurch.html">vs Text In Church</a>
+    <a href="https://pastoralcare.barnabassoftware.com" class="nav-cta">Start Free Trial</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-inner">
+    <div class="hero-badge">&#9876;&#65039; Head-to-Head Comparison</div>
+    <h1>Pastoral Care for PCO vs.<br><em>Flowforth</em></h1>
+    <p>Flowforth is a fine email tool. But your church needs more than email &mdash; AI-powered insights, two-way SMS, live polls, smart forms, pastoral care tracking, and full PCO analytics. That&rsquo;s us.</p>
+    <div class="hero-verdict">
+      <div class="verdict-card">
+        <div class="big">14+</div>
+        <div class="label">Feature Categories</div>
+      </div>
+      <div class="vs-badge">VS</div>
+      <div class="verdict-card">
+        <div class="big">1</div>
+        <div class="label">Flowforth Category<br><span style="font-size:0.65rem;opacity:0.7">(Email only)</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SUMMARY -->
+<section class="section" style="background: var(--gray-50);">
+  <div class="section-inner">
+    <span class="section-label">Why We're Different</span>
+    <h2 class="section-title">One platform. Every channel. Deep PCO intelligence.</h2>
+    <p class="section-subtitle">Flowforth sends emails. We help you understand, reach, and care for every person in your congregation &mdash; across every channel, powered by AI.</p>
+    <div class="summary-grid">
+      <div class="summary-card winner">
+        <div class="winner-ribbon">Us</div>
+        <div class="icon">&#128202;</div>
+        <h3>AI-Powered Analytics</h3>
+        <p>Deep church health insights, risk profiles, giving trends, and attendance patterns &mdash; all from your PCO data.</p>
+      </div>
+      <div class="summary-card winner">
+        <div class="winner-ribbon">Us</div>
+        <div class="icon">&#128172;</div>
+        <h3>Two-Way SMS</h3>
+        <p>Broadcast campaigns, keyword responses, inbox conversations, and an AI SMS agent &mdash; not just email blasts.</p>
+      </div>
+      <div class="summary-card winner">
+        <div class="winner-ribbon">Us</div>
+        <div class="icon">&#128203;</div>
+        <h3>Smart Forms &amp; Polls</h3>
+        <p>Build registration forms, live congregation polls with projector mode, and collect first-time visitor info.</p>
+      </div>
+      <div class="summary-card winner">
+        <div class="winner-ribbon">Us</div>
+        <div class="icon">&#128591;</div>
+        <h3>Pastoral Care Suite</h3>
+        <p>Log care visits, track prayer requests, follow-ups, and at-risk member alerts &mdash; all linked to PCO profiles.</p>
+      </div>
+      <div class="summary-card">
+        <div class="icon">&#9993;&#65039;</div>
+        <h3>Email (Both)</h3>
+        <p>We both send beautiful emails to your PCO lists. Flowforth focuses here exclusively.</p>
+      </div>
+      <div class="summary-card winner">
+        <div class="winner-ribbon">Us</div>
+        <div class="icon">&#129302;</div>
+        <h3>Gemini AI Built-In</h3>
+        <p>AI Insights, risk consultant, pastoral advisor, SMS agent, and community intelligence &mdash; powered by Google Gemini.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CHANNEL COMPARISON -->
+<section class="section">
+  <div class="section-inner">
+    <span class="section-label">Communication Channels</span>
+    <h2 class="section-title">One channel vs. every channel</h2>
+    <p class="section-subtitle">Flowforth is built around email. We built every communication tool your church team uses in one place.</p>
+    <div class="channel-grid">
+      <div class="channel-card">
+        <div class="channel-card-header us">&#9968;&#65039; Pastoral Care for PCO</div>
+        <div class="channel-card-body">
+          <ul class="channel-list">
+            <li class="yes">Email campaigns with drag-and-drop builder</li>
+            <li class="yes">Email automations &amp; drip sequences</li>
+            <li class="yes">Two-way SMS inbox &amp; broadcast campaigns</li>
+            <li class="yes">SMS keyword automation (PRAY, JOIN, GIVE)</li>
+            <li class="yes">AI SMS Agent for automated responses</li>
+            <li class="yes">Live congregation polls with projector mode</li>
+            <li class="yes">Smart registration &amp; visitor forms (QR-enabled)</li>
+            <li class="yes">Personalized merge fields (name, group, event)</li>
+            <li class="yes">SMS analytics &amp; opt-out management</li>
+            <li class="yes">Phone calling with care log tracking</li>
+          </ul>
+        </div>
+      </div>
+      <div class="channel-card">
+        <div class="channel-card-header them">Flowforth</div>
+        <div class="channel-card-body">
+          <ul class="channel-list">
+            <li class="yes">Email campaigns</li>
+            <li class="yes">Email automations</li>
+            <li class="yes">QR codes &amp; link pages</li>
+            <li class="no">Two-way SMS</li>
+            <li class="no">SMS broadcast campaigns</li>
+            <li class="no">SMS keyword automation</li>
+            <li class="no">AI SMS Agent</li>
+            <li class="no">Live polls</li>
+            <li class="no">Registration / visitor forms</li>
+            <li class="no">Phone calling integration</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FULL TABLE -->
+<section class="section" style="background: var(--gray-50);">
+  <div class="section-inner">
+    <span class="section-label">Full Feature Comparison</span>
+    <h2 class="section-title">Every feature, side by side</h2>
+    <p class="section-subtitle">See exactly what you get &mdash; and what Flowforth doesn&rsquo;t offer.</p>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th class="col-us">Pastoral Care for PCO</th>
+            <th class="col-them">Flowforth</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="cat-row"><td colspan="3">&#9993;&#65039; Email Marketing</td></tr>
+          <tr><td><div class="feat-name">Drag-and-drop email builder</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-yes">Yes</span></td></tr>
+          <tr><td><div class="feat-name">Send to PCO lists &amp; groups</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-yes">Yes</span></td></tr>
+          <tr><td><div class="feat-name">Email automations &amp; drip sequences</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-yes">Yes</span></td></tr>
+          <tr><td><div class="feat-name">Embed PCO events, groups &amp; registrations</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-yes">Yes</span></td></tr>
+          <tr><td><div class="feat-name">Email open &amp; click analytics</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-yes">Yes</span></td></tr>
+          <tr><td><div class="feat-name">Unsubscribe management</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-yes">Yes</span></td></tr>
+          <tr><td><div class="feat-name">AI email writing assistant</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-no">No</span></td></tr>
+
+          <tr class="cat-row"><td colspan="3">&#128172; SMS &amp; Messaging</td></tr>
+          <tr><td><div class="feat-name">Two-way SMS inbox</div><div class="feat-sub">Real conversations, not just blasts</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-no">No</span></td></tr>
+          <tr><td><div class="feat-name">SMS broadcast campaigns</div><div class="feat-sub">Send to PCO lists with personalization</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-no">No</span></td></tr>
+          <tr><td><div class="feat-name">SMS keyword automation</div><div class="feat-sub">PRAY, GIVE, JOIN auto-responses</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-no">No</span></td></tr>
+          <tr><td><div class="feat-name">AI SMS Agent</div><div class="feat-sub">Automated, intelligent conversation replies</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-no">No</span></td></tr>
+          <tr><td><div class="feat-name">SMS analytics &amp; opt-out tracking</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-no">No</span></td></tr>
+          <tr><td><div class="feat-name">Multiple SMS numbers &amp; team permissions</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-no">No</span></td></tr>
+          <tr><td><div class="feat-name">Mobile SMS app (iOS &amp; Android)</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-no">No</span></td></tr>
+
+          <tr class="cat-row"><td colspan="3">&#128202; Polls &amp; Engagement</td></tr>
+          <tr><td><div class="feat-name">Live congregation polls</div><div class="feat-sub">Real-time results during service</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-no">No</span></td></tr>
+          <tr><td><div class="feat-name">Projector / big-screen display mode</div><div class="feat-sub">Show live results on stage</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-no">No</span></td></tr>
+          <tr><td><div class="feat-name">QR-code poll access</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-no">No</span></td></tr>
+          <tr><td><div class="feat-name">Poll response analytics</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-no">No</span></td></tr>
+
+          <tr class="cat-row"><td colspan="3">&#128203; Forms &amp; Data Collection</td></tr>
+          <tr><td><div class="feat-name">Visitor / first-time guest forms</div><div class="feat-sub">Capture name, phone, email on arrival</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-no">No</span></td></tr>
+          <tr><td><div class="feat-name">Custom form builder</div><div class="feat-sub">Checkboxes, text fields, dropdowns</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-no">No</span></td></tr>
+          <tr><td><div class="feat-name">QR code form access</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-partial">QR codes only (no forms)</span></td></tr>
+          <tr><td><div class="feat-name">Auto-sync form responses to PCO</div><div class="feat-sub">Create/update PCO people from submissions</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-no">No</span></td></tr>
+          <tr><td><div class="feat-name">Form submission analytics</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-no">No</span></td></tr>
+
+          <tr class="cat-row"><td colspan="3">&#128200; Analytics &amp; Church Intelligence</td></tr>
+          <tr><td><div class="feat-name">People &amp; membership analytics</div><div class="feat-sub">Gender, age, household, membership trends</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-no">No</span></td></tr>
+          <tr><td><div class="feat-name">Attendance &amp; check-in analytics</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-no">No</span></td></tr>
+          <tr><td><div class="feat-name">Giving &amp; donor lifecycle analytics</div><div class="feat-sub">YTD trends, fund performance, donor segments</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-no">No</span></td></tr>
+          <tr><td><div class="feat-name">Group health &amp; attendance tracking</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-no">No</span></td></tr>
+          <tr><td><div class="feat-name">At-risk member detection</div><div class="feat-sub">Automated risk scores &amp; disconnection alerts</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-no">No</span></td></tr>
+          <tr><td><div class="feat-name">Community census benchmarking</div><div class="feat-sub">Compare church vs. surrounding community</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-no">No</span></td></tr>
+          <tr><td><div class="feat-name">Services &amp; volunteer analytics</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-no">No</span></td></tr>
+          <tr><td><div class="feat-name">Customizable dashboard widgets</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-no">No</span></td></tr>
+
+          <tr class="cat-row"><td colspan="3">&#129302; AI &amp; Intelligence</td></tr>
+          <tr><td><div class="feat-name">AI-generated church insights</div><div class="feat-sub">Weekly narrative summaries of your data</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-no">No</span></td></tr>
+          <tr><td><div class="feat-name">AI pastoral care advisor</div><div class="feat-sub">Recommends who to follow up with and why</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-no">No</span></td></tr>
+          <tr><td><div class="feat-name">AI SMS Agent</div><div class="feat-sub">Handles inbound texts intelligently</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-no">No</span></td></tr>
+          <tr><td><div class="feat-name">AI layout personalization on first login</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-no">No</span></td></tr>
+          <tr><td><div class="feat-name">AI community geo-intelligence</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-no">No</span></td></tr>
+
+          <tr class="cat-row"><td colspan="3">&#128591; Pastoral Care</td></tr>
+          <tr><td><div class="feat-name">Care log (visits, calls, meetings)</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-no">No</span></td></tr>
+          <tr><td><div class="feat-name">Prayer request tracking</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-no">No</span></td></tr>
+          <tr><td><div class="feat-name">Follow-up management &amp; reminders</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-no">No</span></td></tr>
+          <tr><td><div class="feat-name">Care report with urgency scoring</div><div class="feat-sub">Who to call this week, ranked by need</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-no">No</span></td></tr>
+          <tr><td><div class="feat-name">Birthday &amp; anniversary milestone alerts</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-no">No</span></td></tr>
+
+          <tr class="cat-row"><td colspan="3">&#128279; Planning Center Integration</td></tr>
+          <tr><td><div class="feat-name">Sync PCO people &amp; lists</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-yes">Yes</span></td></tr>
+          <tr><td><div class="feat-name">Embed PCO events in emails</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-yes">Yes</span></td></tr>
+          <tr><td><div class="feat-name">Sync PCO groups &amp; attendance</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-no">No</span></td></tr>
+          <tr><td><div class="feat-name">Sync PCO giving &amp; donations</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-no">No</span></td></tr>
+          <tr><td><div class="feat-name">Sync PCO services &amp; check-ins</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-no">No</span></td></tr>
+          <tr><td><div class="feat-name">Write-back to PCO (update records)</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-partial">Limited</span></td></tr>
+          <tr><td><div class="feat-name">PCO webhooks for real-time updates</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-no">No</span></td></tr>
+
+          <tr class="cat-row"><td colspan="3">&#128101; Team &amp; Administration</td></tr>
+          <tr><td><div class="feat-name">Role-based access control</div><div class="feat-sub">Pastor, Admin, People, Giving, Services roles</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-no">No</span></td></tr>
+          <tr><td><div class="feat-name">Multi-user team accounts</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-yes">Yes</span></td></tr>
+          <tr><td><div class="feat-name">Customizable views per user role</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-no">No</span></td></tr>
+          <tr><td><div class="feat-name">Dark mode support</div></td><td><span class="check-yes">Yes</span></td><td><span class="check-yes">Yes</span></td></tr>
+          <tr><td><div class="feat-name">Mobile app (iOS &amp; Android)</div></td><td><span class="check-yes">Yes &mdash; SMS inbox</span></td><td><span class="check-no">No</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="pricing-strip">
+      <div>
+        <h3>&#128176; Pricing note</h3>
+        <p>Flowforth charges per email sent (pay-as-you-go). Our platform is a flat monthly subscription with unlimited messages, users, and features &mdash; no per-send fees, no surprise charges.</p>
+      </div>
+      <a href="https://pastoralcare.barnabassoftware.com/#pricing" class="btn-primary" style="white-space:nowrap;">See Our Pricing &rarr;</a>
+    </div>
+  </div>
+</section>
+
+<!-- EXCLUSIVE FEATURES -->
+<section class="exclusive-section">
+  <div class="section-inner">
+    <span class="section-label" style="color: rgba(246,173,28,0.9);">Only in Pastoral Care for PCO</span>
+    <h2 class="section-title" style="color: var(--white);">Features Flowforth simply can&rsquo;t offer</h2>
+    <p class="section-subtitle" style="color: rgba(255,255,255,0.65);">These tools go far beyond email &mdash; they&rsquo;re what separate a complete ministry intelligence platform from a single-channel tool.</p>
+    <div class="exclusive-grid">
+      <div class="exclusive-card">
+        <div class="icon">&#128172;</div>
+        <h3>Two-Way SMS with AI Agent</h3>
+        <p>Real inbox conversations, broadcast campaigns to PCO lists, keyword auto-responders (PRAY, GIVE, JOIN), and an AI agent that handles replies intelligently &mdash; 24/7.</p>
+        <span class="exclusive-badge">SMS Platform</span>
+      </div>
+      <div class="exclusive-card">
+        <div class="icon">&#128202;</div>
+        <h3>Live Congregation Polls</h3>
+        <p>Launch polls during your service, display results on the big screen with projector mode, and let your congregation participate via QR code &mdash; all in real time.</p>
+        <span class="exclusive-badge">Engagement Tool</span>
+      </div>
+      <div class="exclusive-card">
+        <div class="icon">&#128203;</div>
+        <h3>Smart Visitor Forms</h3>
+        <p>Custom forms for first-time guests, volunteer sign-ups, or event registrations &mdash; with QR codes, auto-sync to PCO, and instant follow-up triggers.</p>
+        <span class="exclusive-badge">Data Collection</span>
+      </div>
+      <div class="exclusive-card">
+        <div class="icon">&#129302;</div>
+        <h3>AI Pastoral Intelligence</h3>
+        <p>Gemini AI analyzes your people data to surface who needs a call, generate narrative church health reports, recommend follow-ups, and explain giving trends in plain English.</p>
+        <span class="exclusive-badge">AI-Powered</span>
+      </div>
+      <div class="exclusive-card">
+        <div class="icon">&#9888;&#65039;</div>
+        <h3>At-Risk Member Detection</h3>
+        <p>Automatically scores every person in your PCO database for disconnection risk using attendance, group participation, giving patterns, and care history.</p>
+        <span class="exclusive-badge">Pastoral Care</span>
+      </div>
+      <div class="exclusive-card">
+        <div class="icon">&#128200;</div>
+        <h3>Full Church Analytics Suite</h3>
+        <p>Giving trends, donor lifecycle, service attendance, group health, census benchmarking, membership analysis &mdash; all in a customizable, role-based dashboard.</p>
+        <span class="exclusive-badge">Analytics</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="section">
+  <div class="section-inner" style="max-width: 760px;">
+    <span class="section-label">Common Questions</span>
+    <h2 class="section-title">Frequently asked</h2>
+    <div class="faq-list">
+      <details class="faq-item">
+        <summary class="faq-q">Do you integrate with Planning Center?</summary>
+        <p class="faq-a">Yes &mdash; deeply. We sync People, Groups, Services, Giving, Check-ins, and Registrations from Planning Center. We also write data back (update person records, log care notes) and support PCO webhooks for near-real-time updates. Flowforth only syncs people and email lists.</p>
+      </details>
+      <details class="faq-item">
+        <summary class="faq-q">We already use Flowforth for email. Can we add your platform on top?</summary>
+        <p class="faq-a">You can, but most churches find they switch fully once they see our email builder. We offer the same core email functionality &mdash; plus SMS, polls, forms, and analytics &mdash; all in one platform. No need to manage two tools, two logins, or two billing lines.</p>
+      </details>
+      <details class="faq-item">
+        <summary class="faq-q">How does the SMS feature work?</summary>
+        <p class="faq-a">We partner with SignalWire to provide dedicated phone numbers for your church. You can send broadcasts to PCO lists, manage inbound conversations in a shared team inbox, set up keyword auto-responses, and enable our AI agent to handle replies automatically. Team members get role-based access so pastoral staff sees only relevant conversations.</p>
+      </details>
+      <details class="faq-item">
+        <summary class="faq-q">What are the live polls used for?</summary>
+        <p class="faq-a">Churches use them during Sunday services (sermon topic votes, prayer request collection), small groups, town halls, and leadership meetings. The projector mode shows results live on your big screen &mdash; congregation members participate by scanning a QR code on their phone.</p>
+      </details>
+      <details class="faq-item">
+        <summary class="faq-q">How does pricing compare to Flowforth?</summary>
+        <p class="faq-a">Flowforth charges per email sent, so your costs scale with send volume. We charge a flat monthly subscription with no per-message fees for email, and transparent per-SMS rates. For most active churches, we&rsquo;re more predictable and often less expensive once you factor in SMS and the analytics tools you&rsquo;d otherwise pay separately for.</p>
+      </details>
+      <details class="faq-item">
+        <summary class="faq-q">Can we migrate from Flowforth?</summary>
+        <p class="faq-a">Yes. Our onboarding team will help you export your unsubscribe lists from Flowforth, import them into our platform, and sync your PCO data &mdash; typically in under 30 minutes. We&rsquo;ll make sure no one gets emailed who has already opted out.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section">
+  <div class="cta-inner">
+    <h2>Ready to go <em>beyond email?</em></h2>
+    <p>Join churches that replaced multiple tools with one complete ministry platform &mdash; AI analytics, SMS, polls, forms, and deep PCO integration included.</p>
+    <div class="cta-buttons">
+      <a href="https://pastoralcare.barnabassoftware.com" class="btn-primary">Start Free Trial &rarr;</a>
+      <a href="https://pastoralcare.barnabassoftware.com/#features" class="btn-secondary">Explore All Features</a>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <p>
+    &copy; 2025 Barnabas Software &middot;
+    <a href="https://pastoralcare.barnabassoftware.com">Pastoral Care for PCO</a> &middot;
+    <a href="vs-clearstream.html">vs Clearstream</a> &middot;
+    <a href="vs-textinchurch.html">vs Text In Church</a> &middot;
+    <a href="mailto:support@barnabassoftware.com">support@barnabassoftware.com</a>
+  </p>
+  <p style="margin-top:0.6rem;font-size:0.75rem;opacity:0.5;">
+    Flowforth is a trademark of Trivo Technologies LLC. This comparison is based on publicly available information and is provided for educational purposes.
+  </p>
+</footer>
+
+<script>
+  const nav = document.getElementById('nav');
+  window.addEventListener('scroll', () => {
+    nav.classList.toggle('scrolled', window.scrollY > 20);
+  });
+</script>
+</body>
+</html>
