@@ -31,6 +31,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
         funds, budgets, teams, recentRiskChanges, recentStatusChanges, servicesData 
     } = useTenantData();
 
+    const activePeopleCount = church?.activePeopleCount;
+
     const riskEnrichedPeople = useRiskEnrichedPeople(people, groups, donations, servicesData, teams, church?.riskSettings);
     const peopleDashboardData = usePeopleDashboardData(people, riskEnrichedPeople, recentRiskChanges, recentStatusChanges);
     const givingAnalyticsData = useGivingAnalyticsData(donations, givingFilter, givingDateRange, people, church?.donorLifecycleSettings);
@@ -66,6 +68,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             groupRiskSettings={church.groupRiskSettings}
             onGenerateInsights={onGenerateInsights}
             churchName={church.name}
+            activePeopleCount={activePeopleCount}
         />
     );
 };

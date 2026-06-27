@@ -47,6 +47,8 @@ interface DashboardViewProps {
   onGenerateInsights: () => void;
   // AI Assistant props
   churchName: string;
+  /** Pre-computed count of unique people active in the last 60 days (gave, served, checked-in, or attended a group). */
+  activePeopleCount?: number;
 }
 
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316', '#10b981'];
@@ -58,7 +60,7 @@ const TOOLTIP_STYLE = {
     boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
 };
 
-export const DashboardView: React.FC<DashboardViewProps> = ({ 
+export const DashboardView: React.FC<DashboardViewProps> = ({ activePeopleCount, 
   user,
   peopleData,
   givingAnalytics,
@@ -281,7 +283,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       <StatCard label="Total People" value={peopleData.stats.total.toLocaleString()} color="indigo" source="PCO" />
                       <StatCard label="New (30d)" value={peopleData.stats.newThisMonth.toLocaleString()} color="emerald" source="PCO" />
                       <StatCard label="Members" value={peopleData.stats.members.toLocaleString()} color="violet" source="PCO" />
-                      <StatCard label="Visitors" value={peopleData.stats.nonMembers.toLocaleString()} color="amber" source="PCO" />
+                      <StatCard
+                          label="Active People"
+                          value={activePeopleCount != null ? activePeopleCount.toLocaleString() : '—'}
+                          color="amber"
+                          source="60 days"
+                          subValue="Gave · Served · Checked In · Attended a Group"
+                      />
                   </div>
               ) : null;
           case 'keyMetrics':
