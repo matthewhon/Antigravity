@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { DashboardView } from '../DashboardView';
 import { useTenantData } from '../../contexts/TenantDataContext';
 import { 
@@ -8,6 +8,11 @@ import {
     useGroupsDashboardData, 
     useAttendanceChartData 
 } from '../../hooks/useDashboardData';
+import { computeActivePeopleCount, ACTIVE_WINDOW_DAYS } from '../../services/activePeopleService';
+import { firestore } from '../../services/firestoreService';
+
+/** How old (ms) a cached activePeopleCount can be before auto-refreshing. */
+const STALE_THRESHOLD_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 interface DashboardPageProps {
     onUpdateWidgets: (widgets: string[]) => void;
@@ -31,7 +36,39 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
         funds, budgets, teams, recentRiskChanges, recentStatusChanges, servicesData 
     } = useTenantData();
 
-    const activePeopleCount = church?.activePeopleCount;
+    // Local state so the widget updates immediately after computation without
+    // waiting for a Firestore listener round-trip.
+    const [activePeopleCount, setActivePeopleCount] = useState<number | undefined>(
+        church?.activePeopleCount
+    );
+
+    // Auto-compute on mount (or when church loads) if count is missing or stale.
+    useEffect(() => {
+        if (!church?.id) return;
+
+        const lastCalc = church.activePeopleLastCalculatedAt ?? 0;
+        const isStale = !church.activePeopleCount || (Date.now() - lastCalc > STALE_THRESHOLD_MS);
+
+        if (!isStale) {
+            // Already fresh — just make sure local state is in sync
+            setActivePeopleCount(church.activePeopleCount);
+            return;
+        }
+
+        // Run silently in the background
+        let cancelled = false;
+        computeActivePeopleCount(church.id)
+            .then(count => {
+                if (cancelled) return;
+                setActivePeopleCount(count);
+                firestore.updateActivePeopleCount(church.id, count);
+            })
+            .catch(err => {
+                console.warn('[DashboardPage] activePeopleCount computation failed:', err);
+            });
+
+        return () => { cancelled = true; };
+    }, [church?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const riskEnrichedPeople = useRiskEnrichedPeople(people, groups, donations, servicesData, teams, church?.riskSettings);
     const peopleDashboardData = usePeopleDashboardData(people, riskEnrichedPeople, recentRiskChanges, recentStatusChanges);
