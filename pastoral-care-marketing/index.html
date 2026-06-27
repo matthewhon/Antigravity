@@ -687,6 +687,7 @@
     <a href="#pricing">Pricing</a>
     <a href="#testimonials">Testimonials</a>
     <a href="vs-clearstream.html" style="color:var(--gold-dark);font-weight:600;">vs Clearstream</a>
+    <a href="vs-textinchurch.html" style="color:var(--gold-dark);font-weight:600;">vs Text In Church</a>
     <a href="https://pastoralcare.barnabassoftware.com" class="nav-cta" target="_blank">Sign In →</a>
   </div>
 
@@ -778,6 +779,21 @@
         <h3>Risk Scoring Engine</h3>
         <p>Automatically flags members who may be drifting — based on attendance, giving, group participation, and engagement patterns. Never miss someone slipping away.</p>
       </div>
+      <div class="feature-card fade-up fade-up-delay-2">
+        <div class="feature-icon">📱</div>
+        <h3>Mobile App &amp; SMS Inbox</h3>
+        <p>Two-way SMS conversations, mass texting, keyword auto-responders (Prayer, Help, etc.), live push notifications, and a full mobile PWA — all role-based per staff member.</p>
+      </div>
+      <div class="feature-card fade-up fade-up-delay-3">
+        <div class="feature-icon">🧰</div>
+        <h3>Engagement Tools Suite</h3>
+        <p>Polls, connect cards, prayer request tracking, outreach sessions, PCO Quick-Send Notes, email campaign builder, workflow automation, and mass broadcast SMS.</p>
+      </div>
+      <div class="feature-card fade-up fade-up-delay-1">
+        <div class="feature-icon">🗓️</div>
+        <h3>Pastoral Calendar &amp; Care Log</h3>
+        <p>Log pastoral visits, care tasks, follow-ups, and track baptisms, salvations, new guests, and return rates — synced to Planning Center and your pastoral team.</p>
+      </div>
       <div class="feature-card fade-up fade-up-delay-1">
         <div class="feature-icon">💰</div>
         <h3>Giving & Donor Lifecycle</h3>
@@ -798,16 +814,6 @@
         <h3>Community Benchmarking</h3>
         <p>Integrate US Census data to compare your congregation demographics against your local community — identify where you can grow your reach.</p>
       </div>
-      <div class="feature-card fade-up fade-up-delay-2">
-        <div class="feature-icon">📱</div>
-        <h3>Mobile App & SMS Chat</h3>
-        <p>A full mobile PWA with real-time two-way member SMS, live push notifications for staff care alerts, keywords, and mobile email Quick Send.</p>
-      </div>
-      <div class="feature-card fade-up fade-up-delay-3">
-        <div class="feature-icon">🗓️</div>
-        <h3>Pastoral Calendar & Care</h3>
-        <p>Log pastoral visits, care tasks, follow-ups, and track baptisms, salvations, new guests, and return rates — all in one place.</p>
-      </div>
     </div>
   </div>
 </section>
@@ -817,34 +823,42 @@
   <div class="section-inner">
     <div class="text-center fade-up">
       <div class="section-label">Product Tour</div>
-      <h2 class="section-title" style="color:white;">See Every Module <span style="color:var(--gold)">In Action</span></h2>
+      <h2 class="section-title" style="color:white;">Explore the <span>Pastoral Care Platform</span></h2>
       <p class="section-sub">Click through each module below to explore the real application — no mocks, just the actual product.</p>
     </div>
     <div class="tour-tabs">
       <button class="tour-tab active" onclick="showTour('dashboard', this)" id="tab-dashboard">📊 Dashboard</button>
-      <button class="tour-tab" onclick="showTour('mobile', this)" id="tab-mobile">📱 Mobile App</button>
       <button class="tour-tab" onclick="showTour('people', this)" id="tab-people">👥 People</button>
       <button class="tour-tab" onclick="showTour('groups', this)" id="tab-groups">🏘️ Groups</button>
       <button class="tour-tab" onclick="showTour('services', this)" id="tab-services">⛪ Services</button>
       <button class="tour-tab" onclick="showTour('giving', this)" id="tab-giving">💰 Giving</button>
       <button class="tour-tab" onclick="showTour('pastoral', this)" id="tab-pastoral">🙏 Pastoral</button>
       <button class="tour-tab" onclick="showTour('metrics', this)" id="tab-metrics">📈 Metrics</button>
+      <button class="tour-tab" onclick="showTour('tools', this)" id="tab-tools">🧰 Tools</button>
+      <button class="tour-tab" onclick="showTour('sms', this)" id="tab-sms">💬 SMS Inbox</button>
+      <button class="tour-tab" onclick="showTour('polls', this)" id="tab-polls">📊 Polls</button>
+      <button class="tour-tab" onclick="showTour('forms', this)" id="tab-forms">📋 Forms</button>
       <button class="tour-tab" onclick="showTour('communication', this)" id="tab-communication">✉️ Email</button>
       <button class="tour-tab" onclick="showTour('pastor-ai', this)" id="tab-ai">🤖 Pastor AI</button>
+      <button class="tour-tab" onclick="showTour('mobile', this)" id="tab-mobile">📱 iPhone App</button>
     </div>
     <div class="tour-content fade-up">
       <div class="tour-panel active" id="panel-dashboard"><img src="assets/screenshots/dashboard.png" alt="Dashboard" /></div>
-      <div class="tour-panel" id="panel-mobile">
-        <img src="assets/screenshots/mobile.png" alt="Mobile SMS & Chat Layout" style="max-width: 440px; margin: 0 auto; display: block;" />
-      </div>
       <div class="tour-panel" id="panel-people"><img src="assets/screenshots/people.png" alt="People" /></div>
       <div class="tour-panel" id="panel-groups"><img src="assets/screenshots/groups.png" alt="Groups" /></div>
       <div class="tour-panel" id="panel-services"><img src="assets/screenshots/services.png" alt="Services" /></div>
       <div class="tour-panel" id="panel-giving"><img src="assets/screenshots/giving.png" alt="Giving" /></div>
       <div class="tour-panel" id="panel-pastoral"><img src="assets/screenshots/pastoral.png" alt="Pastoral Care" /></div>
       <div class="tour-panel" id="panel-metrics"><img src="assets/screenshots/metrics.png" alt="Metrics" /></div>
-      <div class="tour-panel" id="panel-communication"><img src="assets/screenshots/communication.png" alt="Communication" /></div>
+      <div class="tour-panel" id="panel-tools"><img src="assets/screenshots/tools-overview.png" alt="Tools &amp; Integrations" /></div>
+      <div class="tour-panel" id="panel-sms"><img src="assets/screenshots/sms-inbox.png" alt="SMS Inbox" /></div>
+      <div class="tour-panel" id="panel-polls"><img src="assets/screenshots/tools-polls.png" alt="Polls" /></div>
+      <div class="tour-panel" id="panel-forms"><img src="assets/screenshots/tools-forms.png" alt="Forms &amp; Connect Cards" /></div>
+      <div class="tour-panel" id="panel-communication"><img src="assets/screenshots/tools-email-campaign.png" alt="Email Campaign Builder" /></div>
       <div class="tour-panel" id="panel-pastor-ai"><img src="assets/screenshots/pastor-ai.png" alt="Pastor AI" /></div>
+      <div class="tour-panel" id="panel-mobile">
+        <img src="assets/screenshots/mobile.png" alt="Mobile SMS &amp; Chat Layout" style="max-width: 440px; margin: 0 auto; display: block;" />
+      </div>
     </div>
   </div>
 </section>
@@ -957,13 +971,31 @@
       <div class="alt-feature-text">
         <div class="feature-pill">👥 People Intelligence</div>
         <h3>Know Every Member by Name — and by Need</h3>
-        <p>270 people in Planning Center is just the start. Pastoral Care enriches each profile with risk scores, engagement tiers, household structures, and upcoming life events.</p>
+        <p>Every profile in Planning Center gets enriched with risk scores, engagement tiers, household structures, and upcoming life events — so no one falls through the cracks.</p>
         <ul class="feature-list">
           <li>Engagement segmentation: Core → Inactive</li>
           <li>Age distribution and gender demographics</li>
           <li>Household size and composition analytics</li>
           <li>Upcoming birthdays and anniversaries with risk flags</li>
           <li>Geographic distribution by city and ZIP code</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="alt-feature reverse fade-up">
+      <div class="alt-feature-img">
+        <img src="assets/screenshots/tools-overview.png" alt="Tools Module" />
+      </div>
+      <div class="alt-feature-text">
+        <div class="feature-pill">🧰 Engagement Tools</div>
+        <h3>Powerful Tools to Engage, Connect & Grow</h3>
+        <p>The Tools module gives your pastoral team a complete outreach and engagement toolkit — from SMS broadcasts and polls to connect cards, prayer requests, and workflow automation.</p>
+        <ul class="feature-list">
+          <li>SMS Mass Texting &amp; Keyword Responders</li>
+          <li>Polls &amp; Connect Cards for congregation feedback</li>
+          <li>Prayer Request tracking and response workflows</li>
+          <li>Outreach Sessions for contact management</li>
+          <li>PCO Quick-Send Notes &amp; Email Builder</li>
         </ul>
       </div>
     </div>
@@ -1118,7 +1150,7 @@
     <div class="text-center fade-up">
       <div class="section-label">Simple Pricing</div>
       <h2 class="section-title">Plans for Every <span>Size of Church</span></h2>
-      <p class="section-sub">All plans include full Planning Center integration, real-time sync, and the Pastor AI assistant. No hidden fees.</p>
+      <p class="section-sub">All plans include full Planning Center integration and real-time sync. No hidden fees.</p>
     </div>
     <div class="pricing-grid">
       <div class="pricing-card fade-up fade-up-delay-1">
@@ -1127,11 +1159,13 @@
         <div class="pricing-desc">Perfect for smaller congregations getting started with data-driven pastoral care.</div>
         <div class="pricing-divider"></div>
         <ul class="pricing-features">
-          <li>Up to 500 people (PCO sync)</li>
-          <li>Dashboard + People + Giving</li>
-          <li>Pastor AI (50 queries/mo)</li>
-          <li>Email communication (3,000 emails/mo)</li>
           <li>5 staff user accounts</li>
+          <li>Up to 200 active people</li>
+          <li>Basic Analytics</li>
+          <li>People &amp; Groups Sync</li>
+          <li>Census Integration</li>
+          <li>Financial Insights</li>
+          <li>Email communication (3,000 emails/mo)</li>
         </ul>
         <a href="https://pastoralcare.barnabassoftware.com" class="btn-pricing btn-pricing-outline" target="_blank">Get Started</a>
       </div>
