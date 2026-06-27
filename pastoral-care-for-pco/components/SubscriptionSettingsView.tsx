@@ -298,6 +298,33 @@ export const SubscriptionSettingsView: React.FC<SubscriptionSettingsViewProps> =
                 </div>
             </div>
 
+            {/* ── Active People Limit Warning (Starter plan) ── */}
+            {currentPlanId === 'starter' && activePeopleCount !== null && activePeopleCount > 200 && (
+                <div className="relative overflow-hidden rounded-[2.5rem] border-2 border-amber-300 dark:border-amber-700 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 p-10 shadow-lg">
+                    {/* Decorative blob */}
+                    <div className="absolute -top-10 -right-10 w-48 h-48 bg-amber-200/40 dark:bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+                    <div className="relative flex flex-col md:flex-row items-start md:items-center gap-6">
+                        <div className="w-16 h-16 rounded-3xl bg-amber-100 dark:bg-amber-900/40 border border-amber-200 dark:border-amber-700 flex items-center justify-center text-3xl flex-shrink-0">
+                            ⚠️
+                        </div>
+                        <div className="flex-1">
+                            <h4 className="text-lg font-black text-amber-900 dark:text-amber-200 mb-1">
+                                Active People Limit Exceeded
+                            </h4>
+                            <p className="text-sm text-amber-800 dark:text-amber-300 leading-relaxed">
+                                Your congregation has <strong>{activePeopleCount.toLocaleString()} active people</strong>, which exceeds the <strong>200-person limit</strong> included in your Starter plan. Upgrade to <strong>Growth</strong> or <strong>Kingdom</strong> to remove this limit and unlock unlimited active members.
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => setShowUpgrade(true)}
+                            className="flex-shrink-0 px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-[10px] uppercase tracking-widest rounded-2xl transition-all shadow-lg shadow-amber-300/40 dark:shadow-amber-900/40 whitespace-nowrap"
+                        >
+                            Upgrade Now →
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* Trial Banner */}
             {isTrialActive && (
                 <div className="bg-gradient-to-r from-violet-500 to-indigo-600 p-8 rounded-[2rem] text-white shadow-xl relative overflow-hidden">

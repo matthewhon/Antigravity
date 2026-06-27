@@ -2290,30 +2290,70 @@ currentUser, onUpdateChurch, activePage, smsTab, mobileSmsUrl, activeNumberId, o
       )}
 
       {/* ─── Messaging (SMS) Tab ──────────────────────────────────────────── */}
-      {effectiveTab === 'messaging' && church && currentUser && (
-        <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-          {/* Mobile App banner */}
-          {mobileSmsUrl && (
-            <MobileSmsBanner url={mobileSmsUrl} />
-          )}
-          <div className="flex-1 min-h-0 overflow-hidden">
-            <MessagingModule
-              churchId={churchId}
-              church={church}
-              currentUser={currentUser}
-              onUpdateChurch={onUpdateChurch || (() => {})}
-              controlledTab={smsTab}
-              activeNumberId={activeNumberId}
-              onActiveNumberIdChange={onActiveNumberIdChange}
-            />
+      {effectiveTab === 'messaging' && (() => {
+        const isStarterPlan = church?.subscription?.status === 'active' && church?.subscription?.planId === 'starter';
+        if (isStarterPlan) {
+          return (
+            <div className="flex-1 flex items-center justify-center p-8">
+              <div className="max-w-md w-full text-center">
+                <div className="w-20 h-20 mx-auto mb-6 rounded-3xl bg-gradient-to-br from-violet-500/20 to-indigo-500/20 border border-violet-200 dark:border-violet-800 flex items-center justify-center">
+                  <span className="text-4xl">💬</span>
+                </div>
+                <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-2">SMS Not Available</h2>
+                <p className="text-slate-500 dark:text-slate-400 text-sm mb-6 leading-relaxed">
+                  SMS messaging is not included in the <strong>Starter plan</strong>. Upgrade to <strong>Growth</strong> or <strong>Kingdom</strong> to unlock two-way texting, broadcast campaigns, keywords, and more.
+                </p>
+                <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 mb-6 text-left space-y-2.5">
+                  {[
+                    '📥 Two-way SMS inbox',
+                    '📨 Broadcast campaigns',
+                    '🔑 Keyword auto-responses',
+                    '📊 SMS analytics',
+                    '✨ AI SMS Agent',
+                  ].map(f => (
+                    <div key={f} className="flex items-center gap-2.5 text-sm text-slate-600 dark:text-slate-300">
+                      <span>{f}</span>
+                    </div>
+                  ))}
+                </div>
+                <a
+                  href="/settings"
+                  onClick={e => { e.preventDefault(); window.location.href = '/settings?tab=Subscription'; }}
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-sm font-black uppercase tracking-widest rounded-2xl transition-all shadow-lg shadow-indigo-500/25"
+                >
+                  Upgrade to Growth →
+                </a>
+              </div>
+            </div>
+          );
+        }
+        if (!church || !currentUser) {
+          return (
+            <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">
+              Unable to load Messaging — church or user context missing.
+            </div>
+          );
+        }
+        return (
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+            {mobileSmsUrl && (
+              <MobileSmsBanner url={mobileSmsUrl} />
+            )}
+            <div className="flex-1 min-h-0 overflow-hidden">
+              <MessagingModule
+                churchId={churchId}
+                church={church}
+                currentUser={currentUser}
+                onUpdateChurch={onUpdateChurch || (() => {})}
+                controlledTab={smsTab}
+                activeNumberId={activeNumberId}
+                onActiveNumberIdChange={onActiveNumberIdChange}
+              />
+            </div>
           </div>
-        </div>
-      )}
-      {effectiveTab === 'messaging' && (!church || !currentUser) && (
-        <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">
-          Unable to load Messaging — church or user context missing.
-        </div>
-      )}
+        );
+      })()}
+
 
       {/* ─── Polls Tab ────────────────────────────────────────────────── */}
       {effectiveTab === 'polls' && (

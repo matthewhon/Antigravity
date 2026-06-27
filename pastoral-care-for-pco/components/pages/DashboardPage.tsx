@@ -78,6 +78,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
 
     if (!user || !church) return null;
 
+    const isStarterPlan = church.subscription?.status === 'active' && church.subscription?.planId === 'starter';
+    const isPastorAIEnabled = !isStarterPlan;
+
     return (
         <DashboardView 
             user={user}
@@ -106,6 +109,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             onGenerateInsights={onGenerateInsights}
             churchName={church.name}
             activePeopleCount={activePeopleCount}
+            isPastorAIEnabled={isPastorAIEnabled}
         />
     );
 };

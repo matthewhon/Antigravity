@@ -375,7 +375,10 @@ const Layout: React.FC<LayoutProps> = ({
                         { view: 'pastoral-community',  icon: '🏙️', label: 'Community'  },
                         { view: 'pastoral-care',       icon: '🕊️', label: 'Care'       },
                         { view: 'pastoral-calendar',   icon: '📅', label: 'Calendar'   },
-                        { view: 'pastoral-contact',    icon: '📞', label: 'Contact'    },
+                        // Calling (Contact) is hidden for Starter plan subscribers
+                        ...(church.subscription?.status === 'active' && church.subscription?.planId === 'starter'
+                          ? []
+                          : [{ view: 'pastoral-contact', icon: '📞', label: 'Contact' }]),
                         { view: 'pastoral-reports',    icon: '📋', label: 'Reports'    },
                       ].map(item => (
                         <button
@@ -394,6 +397,7 @@ const Layout: React.FC<LayoutProps> = ({
                     </div>
                   </div>
                 )}
+
 
                 {/* People dropdown */}
                 {peopleOpen && hasPermission('people') && (

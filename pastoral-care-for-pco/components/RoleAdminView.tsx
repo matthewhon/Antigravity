@@ -2862,6 +2862,23 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 </p>
                             </button>
 
+                            {/* Custom Domain — locked for Starter plan */}
+                            {planId === 'starter' ? (
+                                <div className="p-6 rounded-2xl border-2 border-slate-200 dark:border-slate-700 text-left opacity-70 cursor-not-allowed relative overflow-hidden">
+                                    <div className="absolute top-3 right-3">
+                                        <span className="text-[9px] font-black bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded-full">Growth Plan</span>
+                                    </div>
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <div className="w-5 h-5 rounded-full border-2 border-slate-300 dark:border-slate-600 flex items-center justify-center shrink-0">
+                                            <span className="text-[10px]">🔒</span>
+                                        </div>
+                                        <span className="font-black text-sm text-slate-400 dark:text-slate-500">Custom Domain</span>
+                                    </div>
+                                    <p className="text-xs text-slate-400 dark:text-slate-500 ml-8 leading-relaxed">
+                                        Send from your own domain (e.g. <code className="font-mono bg-slate-100 dark:bg-slate-800 px-1 rounded">contact@mychurch.org</code>). Available on the <strong>Growth</strong> plan and above.
+                                    </p>
+                                </div>
+                            ) : (
                             <button
                                 onClick={() => setMailMode('custom')}
                                 className={`p-6 rounded-2xl border-2 text-left transition-all ${
@@ -2886,7 +2903,9 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                     }
                                 </p>
                             </button>
+                            )}
                         </div>
+
 
                         {/* ── Shared Mode Form ── */}
                         {mailMode === 'shared' && (

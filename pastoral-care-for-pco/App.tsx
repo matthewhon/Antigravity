@@ -474,9 +474,14 @@ const App: React.FC = () => {
       }
   };
 
+  const isStarterPlan = church?.subscription?.status === 'active' && church?.subscription?.planId === 'starter';
+
   const hasPermission = (v: string) => {
       if (!user) return false;
       
+      // ── Starter plan gate: pastor-ai overrides role (applies to everyone, including admins) ──
+      if (isStarterPlan && v === 'pastor-ai') return false;
+
       // Check if module is enabled
       if (v === 'communication' && systemSettings?.enabledModules?.communication === false) return false;
 
@@ -488,9 +493,21 @@ const App: React.FC = () => {
       if (v === 'pastoral-community') return user.roles.includes('Pastor') || user.roles.includes('Pastoral Care');
       if (v === 'pastoral-care') return user.roles.includes('Pastor') || user.roles.includes('Pastoral Care');
       if (v === 'pastoral-calendar') return user.roles.includes('Pastor') || user.roles.includes('Pastoral Care');
-      if (v === 'pastoral-contact') return user.roles.includes('Pastor') || user.roles.includes('Pastoral Care');
       if (v === 'pastoral-reports') return user.roles.includes('Pastor') || user.roles.includes('Pastoral Care');
       if (v === 'pastor-ai') return user.roles.includes('Pastor AI') || user.roles.includes('Pastor');
+
+      // ── Starter plan gate: block Calling (pastoral-contact), Polls, Workflows, Forms, Notes ──
+      // (SMS routes remain accessible so ToolsView can show the upgrade prompt)
+      if (isStarterPlan) {
+          if (v === 'pastoral-contact') return false;
+          if (v === 'tools-polls') return false;
+          if (v === 'tools-workflows') return false;
+          if (v === 'tools-forms') return false;
+          if (v === 'tools-notes') return false;
+      }
+      
+      // ── pastoral-contact role check (non-Starter) ──
+      if (v === 'pastoral-contact') return user.roles.includes('Pastor') || user.roles.includes('Pastoral Care');
       
       const roleMap: Record<string, string> = {
           'people': 'People',
@@ -536,6 +553,7 @@ const App: React.FC = () => {
       const requiredRole = roleMap[v];
       return requiredRole ? user.roles.includes(requiredRole as any) : false;
   };
+
 
   const handleNavigate = (newView: string) => {
       let resolvedView = newView;

@@ -13,8 +13,9 @@ export const PLANS = [
         name: 'Starter',
         price: 49,
         interval: 'month',
-        features: ['5 Users', 'Basic Analytics', 'People & Groups Sync', 'Weekly Email Reports', 'Census Integration', 'Financial Insights'],
-        maxUsers: 5
+        features: ['5 Users', 'Up to 200 Active People', 'Basic Analytics', 'People & Groups Sync', 'Census Integration', 'Financial Insights', 'Email Communication (3,000/mo)'],
+        maxUsers: 5,
+        maxActivePeople: 200,
     },
     {
         id: 'growth',
@@ -22,7 +23,8 @@ export const PLANS = [
         price: 99,
         interval: 'month',
         features: ['Unlimited Users', 'Advanced Analytics', 'Financial Insights', 'Pastor AI Assistant', 'Census Integration'],
-        maxUsers: 99999
+        maxUsers: 99999,
+        maxActivePeople: Infinity,
     },
     {
         id: 'kingdom',
@@ -30,7 +32,8 @@ export const PLANS = [
         price: 199,
         interval: 'month',
         features: ['Everything in Growth', 'Custom Metrics', 'Dedicated Support', 'Multi-Site Data', 'Advanced Risk Profiling'],
-        maxUsers: 99999
+        maxUsers: 99999,
+        maxActivePeople: Infinity,
     }
 ];
 

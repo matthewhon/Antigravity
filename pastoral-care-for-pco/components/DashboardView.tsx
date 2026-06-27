@@ -49,6 +49,8 @@ interface DashboardViewProps {
   churchName: string;
   /** Pre-computed count of unique people active in the last 60 days (gave, served, checked-in, or attended a group). */
   activePeopleCount?: number;
+  /** When false (Starter plan), the Pastor AI panel and toggle are completely hidden. */
+  isPastorAIEnabled?: boolean;
 }
 
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316', '#10b981'];
@@ -86,6 +88,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ activePeopleCount,
   groupRiskSettings,
   onGenerateInsights,
   churchName,
+  isPastorAIEnabled = true,
 }) => {
 
   const [showAI, setShowAI] = useState<boolean>(() => {
@@ -664,7 +667,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ activePeopleCount,
     <div className="grid grid-cols-1 xl:grid-cols-4 gap-8 animate-in fade-in duration-500 items-start">
 
       {/* COLUMNS 1–3 (or 1–4 when AI hidden) — Widgets */}
-      <div className={`${showAI ? 'col-span-1 xl:col-span-3' : 'col-span-1 xl:col-span-4'} space-y-10`}>
+      <div className={`${showAI && isPastorAIEnabled ? 'col-span-1 xl:col-span-3' : 'col-span-1 xl:col-span-4'} space-y-10`}>
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
             <h3 className="text-4xl font-black tracking-tighter text-slate-900 dark:text-white">Dashboard</h3>
@@ -679,6 +682,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ activePeopleCount,
                       Connect Planning Center
                   </button>
               )}
+              {isPastorAIEnabled && (
               <button
                   onClick={toggleShowAI}
                   title={showAI ? 'Hide AI Assistant' : 'Show AI Assistant'}
@@ -691,6 +695,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ activePeopleCount,
                   <span>🤖</span>
                   <span>{showAI ? 'Hide AI' : 'Show AI'}</span>
               </button>
+              )}
               <WidgetsController 
                   availableWidgets={availableWidgets} 
                   visibleWidgets={safeVisibleWidgets} 
@@ -741,7 +746,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ activePeopleCount,
       </div>
 
       {/* COLUMN 4 — AI Assistant (sticky, toggleable) */}
-      {showAI && (
+      {showAI && isPastorAIEnabled && (
         <div className="col-span-1 xl:sticky xl:top-0 h-[600px] xl:h-[calc(100vh-140px)]">
           <PastorAIView
               peopleData={peopleData}
