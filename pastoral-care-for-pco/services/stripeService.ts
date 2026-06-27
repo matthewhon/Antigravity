@@ -13,9 +13,11 @@ export const PLANS = [
         name: 'Starter',
         price: 39,
         interval: 'month',
-        features: ['5 Users', 'Up to 200 Active People', 'Basic Analytics', 'People & Groups Sync', 'Census Integration', 'Financial Insights', 'Email Communication (3,000/mo)'],
+        features: ['5 Users', 'Up to 200 Active People', 'Basic Analytics', 'People & Groups Sync', 'Census Integration', 'Financial Insights', 'Email (5,000/mo)'],
         maxUsers: 5,
         maxActivePeople: 200,
+        /** Maximum outbound emails per calendar month. */
+        maxEmailsPerMonth: 5000,
     },
     {
         id: 'growth',
@@ -36,6 +38,8 @@ export const PLANS = [
         ],
         maxUsers: 10,
         maxActivePeople: 401,
+        /** Maximum outbound emails per calendar month. */
+        maxEmailsPerMonth: 5000,
         /** Maximum outbound SMS segments per calendar month. MMS counts as 2 segments. */
         maxSmsPerMonth: 1500,
         /** Maximum provisioned phone numbers. Grandfathered churches with more are not affected. */

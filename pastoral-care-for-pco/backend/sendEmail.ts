@@ -1351,16 +1351,24 @@ export async function executeSend(
         throw new Error('All recipients have unsubscribed. No emails were sent.');
     }
 
-    // 6. Check Starter subscription limit
+    // 6. Check monthly email quota (Starter: 5,000/mo · Growth: 5,000/mo · Kingdom: unlimited)
     const now = new Date();
     const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     const usage = churchData.emailUsage || {};
     const currentUsage = usage[currentMonth] || 0;
 
-    if (!testEmail && churchData.subscription?.planId === 'starter') {
-        const remaining = 3000 - currentUsage;
+    const EMAIL_QUOTA: Record<string, number> = { starter: 5000, growth: 5000 };
+    const planId = churchData.subscription?.planId || '';
+    const monthlyQuota = EMAIL_QUOTA[planId] ?? Infinity;
+
+    if (!testEmail && isFinite(monthlyQuota)) {
+        const remaining = monthlyQuota - currentUsage;
         if (recipients.length > remaining) {
-            throw new Error(`Starter plan limit reached: You can only send ${remaining} more emails this month (3000 max). You are trying to send ${recipients.length}.`);
+            throw new Error(
+                `Monthly email limit reached: You can only send ${remaining} more emails this month ` +
+                `(${monthlyQuota.toLocaleString()} max on the ${planId} plan). ` +
+                `You are trying to send ${recipients.length}.`
+            );
         }
     }
 
@@ -1535,10 +1543,17 @@ export const sendEmail = async (req: any, res: any) => {
             const usage = churchData.emailUsage || {};
             const currentUsage = usage[currentMonth] || 0;
 
-            if (churchData.subscription?.planId === 'starter') {
-                const remaining = 3000 - currentUsage;
+            const EMAIL_QUOTA_ADHOC: Record<string, number> = { starter: 5000, growth: 5000 };
+            const planIdAdhoc = churchData.subscription?.planId || '';
+            const monthlyQuotaAdhoc = EMAIL_QUOTA_ADHOC[planIdAdhoc] ?? Infinity;
+
+            if (isFinite(monthlyQuotaAdhoc)) {
+                const remaining = monthlyQuotaAdhoc - currentUsage;
                 if (toAddresses.length > remaining) {
-                    throw new Error(`Starter plan limit reached`);
+                    throw new Error(
+                        `Monthly email limit reached: ${remaining} emails remaining this month ` +
+                        `(${monthlyQuotaAdhoc.toLocaleString()} max on the ${planIdAdhoc} plan).`
+                    );
                 }
             }
 
