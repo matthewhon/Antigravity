@@ -79,6 +79,20 @@ export interface Church {
     /** Epoch ms — when activePeopleCount was last computed. */
     activePeopleLastCalculatedAt?: number;
     emailUsage?: { [month: string]: number };
+    /** Outbound SMS segment counts per month key `YYYY-MM`. MMS messages count as 2 segments. */
+    smsUsage?: { [month: string]: number };
+
+    /**
+     * SMS add-on subscriptions for Growth plan churches.
+     * Each add-on costs $20/mo and grants +1 phone number + 1,500 more SMS segments/month.
+     * Max quantity: 8 (total phone numbers cap: 10, total SMS cap: 13,500/mo).
+     */
+    smsAddOns?: {
+        quantity: number;
+        /** Stripe subscription item ID — used to update/remove the add-on line item. */
+        stripeItemId?: string;
+    };
+
     metricsSettings?: { showCensusWidgets?: boolean, showCityPenetration?: boolean, showMissionalGap?: boolean, dashboardOrder?: string[] };
     address?: string;
     city?: string;

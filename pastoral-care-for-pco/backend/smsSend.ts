@@ -8,6 +8,65 @@ import { fireAndForgetSmsNote } from './pcoNotes';
 const SMS_COST_PER_SEGMENT = 0.0079;  // USD per outbound SMS segment
 const MMS_COST_PER_MESSAGE = 0.02;    // USD per outbound MMS
 
+// ─── Plan SMS quotas (segments per month; MMS = 2 segments) ──────────────────
+const PLAN_SMS_QUOTA: Record<string, number> = {
+    starter: 0,       // No SMS on Starter plan
+    growth:  1500,
+    kingdom: Infinity,
+};
+
+/**
+ * Hard SMS quota check. Queries smsUsageRecords for the current calendar month,
+ * sums segments (MMS already recorded as isMms=true → counts as 2 segments),
+ * and throws a 429-style error if adding `additionalSegments` would exceed the plan limit.
+ *
+ * Pass `additionalSegments = 0` for a read-only check (e.g. before a broadcast).
+ * Grandfathered churches: only applies to plans with a finite quota.
+ */
+async function checkSmsQuota(
+    db: any,
+    churchId: string,
+    additionalSegments: number,
+): Promise<void> {
+    // Determine plan and add-on quantity
+    const churchSnap = await db.collection('churches').doc(churchId).get();
+    if (!churchSnap.exists) return; // If church not found, let other checks handle it
+    const churchData = churchSnap.data() || {};
+    const planId: string = churchData.subscription?.planId || '';
+    const baseQuota = PLAN_SMS_QUOTA[planId] ?? Infinity;
+    // Each SMS add-on grants +1,500 segments/month
+    const addOnBonus = (churchData.smsAddOns?.quantity ?? 0) * 1500;
+    const quota = isFinite(baseQuota) ? baseQuota + addOnBonus : Infinity;
+    if (!isFinite(quota)) return; // Unlimited plan — no check needed
+
+    // Build YYYY-MM key for the current UTC month
+    const now = new Date();
+    const monthKey = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+    const monthStart = new Date(`${monthKey}-01T00:00:00.000Z`).getTime();
+    const monthEnd   = new Date(now.getUTCFullYear(), now.getUTCMonth() + 1, 1).getTime();
+
+    // Sum all outbound segments for this month
+    const usageSnap = await db.collection('smsUsageRecords')
+        .where('churchId', '==', churchId)
+        .where('createdAt', '>=', monthStart)
+        .where('createdAt', '<',  monthEnd)
+        .get();
+
+    let used = 0;
+    usageSnap.forEach((doc: any) => {
+        const d = doc.data();
+        // MMS counts as 2 segments; SMS counts as its actual segment count
+        used += d.isMms ? 2 : (d.segments || 1);
+    });
+
+    if (used + additionalSegments > quota) {
+        throw {
+            status:  429,
+            message: `SMS quota exceeded. Your plan allows ${quota} SMS segments per month. Used: ${used}, requested: ${additionalSegments}.`,
+        };
+    }
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function normaliseE164(phone: string): string {
@@ -277,6 +336,13 @@ export async function sendIndividualInternal(params: {
         throw { status: 403, message: `${to} has opted out of messages from this church.` };
     }
 
+    // ── Plan SMS quota hard block ─────────────────────────────────────────────
+    // MMS counts as 2 segments for quota purposes
+    const isMmsPreCheck = (mediaUrls?.length ?? 0) > 0;
+    const segmentsPreCheck = isMmsPreCheck ? 2 : countSegments(body);
+    await checkSmsQuota(db, churchId, segmentsPreCheck);
+    // ─────────────────────────────────────────────────────────────────────────
+
     // Resolve number ID (accept both new and legacy field names).
     // The frontend sends 'twilioNumberId' (which is actually the smsNumbers doc ID for
     // SignalWire tenants); 'smsNumberId' is the canonical field name on this backend.
@@ -502,6 +568,16 @@ export async function sendBulkInternal(params: {
     if (!numberId) {
         numberId = await resolveDefaultNumberId(db, churchId);
     }
+
+    // ── Plan SMS quota hard block for bulk sends ───────────────────────────────
+    // For broadcasts, compute total segments the campaign would consume and
+    // reject up front if it would exceed the monthly quota.
+    const isMmsBulk        = (mediaUrls?.length ?? 0) > 0;
+    const segmentsPerMsg   = isMmsBulk ? 2 : countSegments(body);
+    const totalSegments    = segmentsPerMsg * phones.length;
+    await checkSmsQuota(db, churchId, totalSegments);
+    // ─────────────────────────────────────────────────────────────────────────
+
     const { client, fromNumber } = await getSmsClient(db, churchId, numberId);
 
     const churchSnap = await db.collection('churches').doc(churchId).get();

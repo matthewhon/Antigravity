@@ -9,6 +9,7 @@ import { createServer as createViteServer } from 'vite';
 import { createCheckoutSession } from './backend/createCheckoutSession';
 import { cancelSubscription } from './backend/cancelSubscription';
 import { handleStripeWebhook } from './backend/stripeWebhook';
+import { addSmsAddon, removeSmsAddon } from './backend/smsAddon';
 import { pcoTokenExchange } from './backend/pcoTokenExchange';
 import { pcoProxy } from './backend/pcoProxy';
 import { handlePcoWebhook } from './backend/pcoWebhookHandler';
@@ -68,6 +69,9 @@ async function startServer() {
     app.post('/stripe/webhook', express.raw({ type: 'application/json' }), handleStripeWebhook);
     app.post('/createCheckoutSession', express.json(), createCheckoutSession);
     app.post('/cancelSubscription',    express.json(), cancelSubscription);
+    // SMS add-on purchase/removal (Growth plan)
+    app.post('/api/billing/add-sms-addon',    express.json(), addSmsAddon);
+    app.post('/api/billing/remove-sms-addon', express.json(), removeSmsAddon);
 
     // PCO Webhook Endpoint
     // We use express.raw to ensure we can verify the HMAC signature based on the raw body

@@ -174,7 +174,47 @@ export const getAvailableNumbers = async (req: any, res: any) => {
     }
 };
 
-// ─── POST /api/messaging/provision ───────────────────────────────────────────
+// ─── Plan phone-number limits ─────────────────────────────────────────────────
+// Only enforced for new provisioning requests — existing numbers are grandfathered.
+const PLAN_PHONE_NUMBER_LIMIT: Record<string, number> = {
+    starter:  0,        // No SMS on Starter plan
+    growth:   2,
+    kingdom:  Infinity,
+};
+
+/**
+ * Hard gate: rejects provisioning a new phone number if the church's plan limit
+ * has been reached. Churches that already exceed the limit are grandfathered
+ * (this only prevents adding *new* numbers beyond the cap).
+ */
+async function checkPhoneNumberLimit(db: any, churchId: string): Promise<void> {
+    const churchSnap = await db.collection('churches').doc(churchId).get();
+    if (!churchSnap.exists) return;
+    const churchData = churchSnap.data() || {};
+    const planId: string = churchData.subscription?.planId || '';
+    const baseLimit = PLAN_PHONE_NUMBER_LIMIT[planId] ?? Infinity;
+    // Each SMS add-on grants +1 phone number
+    const addOnBonus = (churchData.smsAddOns?.quantity ?? 0) * 1;
+    const limit = isFinite(baseLimit) ? baseLimit + addOnBonus : Infinity;
+    if (!isFinite(limit)) return; // Unlimited plan
+
+    const existingSnap = await db.collection('smsNumbers')
+        .where('churchId', '==', churchId)
+        .get();
+    const currentCount = existingSnap.size;
+
+    // Grandfathering: only block if they are AT the limit (not already over it).
+    // Churches that signed up before this limit was introduced and already have
+    // more numbers than the plan allows are allowed to keep them.
+    if (currentCount >= limit) {
+        throw {
+            status:  403,
+            message: `Your plan allows a maximum of ${limit} phone number${limit !== 1 ? 's' : ''}. ` +
+                     `You currently have ${currentCount}. Add an SMS add-on ($20/mo) or upgrade your plan to add more.`,
+        };
+    }
+}
+
 // Purchases the chosen number directly on the SignalWire project (no sub-accounts),
 // configures the inbound webhook + status callback, and writes to Firestore.
 
@@ -208,12 +248,21 @@ export const provisionSmsNumber = async (req: any, res: any) => {
             }
         }
 
+        // ── Plan phone number limit gate ──────────────────────────────────────
+        try {
+            await checkPhoneNumberLimit(db, churchId);
+        } catch (limitErr: any) {
+            return res.status(limitErr.status || 403).json({ error: limitErr.message });
+        }
+        // ─────────────────────────────────────────────────────────────────────
+
         const { inboundUrl, inboundFallbackUrl, statusCallback } = await resolveWebhookUrls();
         const client = await getSignalWireClient();
 
         // Check if number already purchased/ported on the SignalWire project
         const existingList = await client.incomingPhoneNumbers.list({ phoneNumber });
         let purchased;
+
 
         if (existingList && existingList.length > 0) {
             // Number already exists in the project (e.g. it was ported). Update webhook URLs.
@@ -328,12 +377,21 @@ export const addSmsNumber = async (req: any, res: any) => {
             }
         }
 
+        // ── Plan phone number limit gate ──────────────────────────────────────
+        try {
+            await checkPhoneNumberLimit(db, churchId);
+        } catch (limitErr: any) {
+            return res.status(limitErr.status || 403).json({ error: limitErr.message });
+        }
+        // ─────────────────────────────────────────────────────────────────────
+
         const { inboundUrl, inboundFallbackUrl, statusCallback } = await resolveWebhookUrls();
         const client = await getSignalWireClient();
 
         // Check if number already purchased/ported on the SignalWire project
         const existingList = await client.incomingPhoneNumbers.list({ phoneNumber });
         let purchased;
+
 
         if (existingList && existingList.length > 0) {
             // Number already exists in the project (e.g. it was ported). Update webhook URLs.

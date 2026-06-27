@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Church } from '../types';
-import { PLANS, stripeService } from '../services/stripeService';
+import { PLANS, stripeService, SMS_ADDON, getEffectiveSmsLimits } from '../services/stripeService';
 import { auth } from '../services/firebase';
 import { computeActivePeopleCount, ACTIVE_WINDOW_DAYS } from '../services/activePeopleService';
 import { firestore } from '../services/firestoreService';
@@ -19,6 +19,8 @@ export const SubscriptionSettingsView: React.FC<SubscriptionSettingsViewProps> =
     const [processingPlanId, setProcessingPlanId] = useState<string | null>(null);
     const [statusMessage, setStatusMessage] = useState<{type: 'success'|'error', text: string} | null>(null);
     const [showUpgrade, setShowUpgrade] = useState(false);
+    const [addonLoading, setAddonLoading] = useState<'add' | 'remove' | null>(null);
+    const [addonMessage, setAddonMessage] = useState<{type: 'success'|'error', text: string} | null>(null);
 
     // Active People state
     const [activePeopleCount, setActivePeopleCount] = useState<number | null>(church.activePeopleCount ?? null);
@@ -325,7 +327,202 @@ export const SubscriptionSettingsView: React.FC<SubscriptionSettingsViewProps> =
                 </div>
             )}
 
-            {/* Trial Banner */}
+            {/* ── Active People Limit Warning (Growth plan > 401) ── */}
+            {currentPlanId === 'growth' && activePeopleCount !== null && activePeopleCount > 401 && (
+                <div className="relative overflow-hidden rounded-[2.5rem] border-2 border-amber-300 dark:border-amber-700 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 p-10 shadow-lg">
+                    <div className="absolute -top-10 -right-10 w-48 h-48 bg-amber-200/40 dark:bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+                    <div className="relative flex flex-col md:flex-row items-start md:items-center gap-6">
+                        <div className="w-16 h-16 rounded-3xl bg-amber-100 dark:bg-amber-900/40 border border-amber-200 dark:border-amber-700 flex items-center justify-center text-3xl flex-shrink-0">
+                            ⚠️
+                        </div>
+                        <div className="flex-1">
+                            <h4 className="text-lg font-black text-amber-900 dark:text-amber-200 mb-1">
+                                Active People Limit Exceeded
+                            </h4>
+                            <p className="text-sm text-amber-800 dark:text-amber-300 leading-relaxed">
+                                Your congregation has <strong>{activePeopleCount.toLocaleString()} active people</strong>, which exceeds the <strong>401-person limit</strong> included in your Growth plan. Upgrade to <strong>Kingdom</strong> to remove this limit and unlock unlimited active members.
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => setShowUpgrade(true)}
+                            className="flex-shrink-0 px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-[10px] uppercase tracking-widest rounded-2xl transition-all shadow-lg shadow-amber-300/40 dark:shadow-amber-900/40 whitespace-nowrap"
+                        >
+                            Upgrade Now →
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* ── SMS Quota Card (Growth plan) ── */}
+            {currentPlanId === 'growth' && (() => {
+                const SMS_QUOTA = 1500;
+                const nowDate = new Date();
+                const monthKey = `${nowDate.getFullYear()}-${String(nowDate.getMonth() + 1).padStart(2, '0')}`;
+                const usedSegments = church.smsUsage?.[monthKey] ?? 0;
+                const pct = Math.min(100, Math.round((usedSegments / SMS_QUOTA) * 100));
+                const isWarning = pct >= 80;
+                const isExceeded = usedSegments >= SMS_QUOTA;
+                return (
+                    <div className="rounded-[2rem] border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/50 p-8 shadow-sm">
+                        <div className="flex items-start justify-between gap-4 mb-5">
+                            <div className="flex items-center gap-3">
+                                <div className="w-12 h-12 rounded-2xl bg-violet-100 dark:bg-violet-900/30 border border-violet-200 dark:border-violet-700 flex items-center justify-center text-2xl">
+                                    💬
+                                </div>
+                                <div>
+                                    <h4 className="text-base font-black text-slate-900 dark:text-white">SMS Usage This Month</h4>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Resets on the 1st · MMS = 2 segments · 2 phone numbers included</p>
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <p className={`text-2xl font-black tabular-nums ${isExceeded ? 'text-red-600 dark:text-red-400' : isWarning ? 'text-amber-600 dark:text-amber-400' : 'text-slate-800 dark:text-white'}`}>
+                                    {usedSegments.toLocaleString()} <span className="text-sm font-semibold text-slate-400">/ {SMS_QUOTA.toLocaleString()}</span>
+                                </p>
+                                <p className="text-xs text-slate-400 mt-0.5">{SMS_QUOTA - usedSegments > 0 ? `${(SMS_QUOTA - usedSegments).toLocaleString()} remaining` : 'Limit reached'}</p>
+                            </div>
+                        </div>
+                        {/* Progress bar */}
+                        <div className="h-3 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                            <div
+                                className={`h-full rounded-full transition-all ${isExceeded ? 'bg-red-500' : isWarning ? 'bg-amber-400' : 'bg-violet-500'}`}
+                                style={{ width: `${pct}%` }}
+                            />
+                        </div>
+                        {isExceeded && (
+                            <div className="mt-4 flex items-center gap-3 p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+                                <span className="text-lg">🚫</span>
+                                <p className="text-sm text-red-800 dark:text-red-300 font-medium">
+                                    SMS sending is paused — your monthly quota of {SMS_QUOTA.toLocaleString()} segments has been reached. Upgrade to <strong>Kingdom</strong> for unlimited SMS.
+                                </p>
+                                <button onClick={() => setShowUpgrade(true)} className="flex-shrink-0 ml-auto px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl transition">
+                                    Upgrade
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                );
+            })()}
+
+            {/* ── SMS Add-On Card (Growth plan only) ── */}
+            {currentPlanId === 'growth' && (() => {
+                const addonQty      = church.smsAddOns?.quantity ?? 0;
+                const limits        = getEffectiveSmsLimits(church);
+                const atMax         = addonQty >= SMS_ADDON.maxAddons;
+                const canRemove     = addonQty > 0;
+                const effectiveSms  = limits.maxSmsPerMonth;
+                const effectiveNums = limits.maxSmsNumbers;
+
+                const handleAddAddon = async () => {
+                    setAddonLoading('add');
+                    setAddonMessage(null);
+                    try {
+                        const result = await stripeService.purchaseSmsAddon(church.id);
+                        setAddonMessage({ type: 'success', text: result.message });
+                        // Optimistic UI update
+                        onUpdateChurch({ smsAddOns: { quantity: result.quantity, stripeItemId: church.smsAddOns?.stripeItemId } });
+                    } catch (e: any) {
+                        setAddonMessage({ type: 'error', text: e.message || 'Could not add SMS pack.' });
+                    } finally {
+                        setAddonLoading(null);
+                    }
+                };
+
+                const handleRemoveAddon = async () => {
+                    if (!window.confirm('Remove one SMS Add-On? This will reduce your SMS and phone number limits at your next invoice.')) return;
+                    setAddonLoading('remove');
+                    setAddonMessage(null);
+                    try {
+                        const result = await stripeService.removeSmsAddon(church.id);
+                        setAddonMessage({ type: 'success', text: result.message });
+                        // Optimistic UI update
+                        onUpdateChurch({ smsAddOns: { quantity: result.quantity, stripeItemId: result.quantity > 0 ? church.smsAddOns?.stripeItemId : undefined } });
+                    } catch (e: any) {
+                        setAddonMessage({ type: 'error', text: e.message || 'Could not remove SMS pack.' });
+                    } finally {
+                        setAddonLoading(null);
+                    }
+                };
+
+                return (
+                    <div className="rounded-[2rem] border border-violet-200 dark:border-violet-800/50 bg-gradient-to-br from-violet-50 to-indigo-50 dark:from-violet-950/30 dark:to-indigo-950/30 p-8 shadow-sm">
+                        {/* Header */}
+                        <div className="flex items-start justify-between gap-4 mb-5">
+                            <div className="flex items-center gap-3">
+                                <div className="w-12 h-12 rounded-2xl bg-violet-100 dark:bg-violet-900/40 border border-violet-200 dark:border-violet-700 flex items-center justify-center text-2xl">
+                                    ➕
+                                </div>
+                                <div>
+                                    <h4 className="text-base font-black text-slate-900 dark:text-white">SMS Add-On Packs</h4>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                        ${SMS_ADDON.pricePerMonth}/mo each · +{SMS_ADDON.smsPerAddon.toLocaleString()} SMS · +{SMS_ADDON.numbersPerAddon} number · max {SMS_ADDON.maxTotalNumbers} numbers total
+                                    </p>
+                                </div>
+                            </div>
+                            {/* Current count badge */}
+                            <div className="text-right flex-shrink-0">
+                                <p className="text-2xl font-black text-violet-700 dark:text-violet-300 tabular-nums">{addonQty}</p>
+                                <p className="text-xs text-slate-400">{addonQty === 1 ? 'pack active' : 'packs active'}</p>
+                            </div>
+                        </div>
+
+                        {/* Effective limits summary */}
+                        <div className="flex flex-wrap gap-3 mb-5">
+                            <div className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                                <span>💬</span>
+                                <span>{isFinite(effectiveSms) ? effectiveSms.toLocaleString() : '∞'} SMS/mo</span>
+                            </div>
+                            <div className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                                <span>📞</span>
+                                <span>{isFinite(effectiveNums) ? effectiveNums : '∞'} phone number{effectiveNums !== 1 ? 's' : ''}</span>
+                            </div>
+                        </div>
+
+                        {/* Action buttons */}
+                        <div className="flex items-center gap-3">
+                            <button
+                                id="btn-add-sms-addon"
+                                onClick={handleAddAddon}
+                                disabled={atMax || addonLoading !== null}
+                                title={atMax ? `Maximum ${SMS_ADDON.maxAddons} add-ons reached (${SMS_ADDON.maxTotalNumbers} numbers)` : 'Add one SMS Pack (+$20/mo)'}
+                                className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm rounded-xl transition shadow-md shadow-violet-300/30 dark:shadow-violet-900/40"
+                            >
+                                {addonLoading === 'add' ? <span className="animate-spin">⟳</span> : '+'} Add SMS Pack
+                            </button>
+                            {canRemove && (
+                                <button
+                                    id="btn-remove-sms-addon"
+                                    onClick={handleRemoveAddon}
+                                    disabled={addonLoading !== null}
+                                    className="flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 disabled:cursor-not-allowed text-red-600 dark:text-red-400 font-bold text-sm rounded-xl border border-red-200 dark:border-red-800 transition"
+                                >
+                                    {addonLoading === 'remove' ? <span className="animate-spin">⟳</span> : '−'} Remove Pack
+                                </button>
+                            )}
+                            {atMax && (
+                                <span className="text-xs text-amber-600 dark:text-amber-400 font-semibold">
+                                    Max reached — upgrade to Kingdom for unlimited SMS
+                                </span>
+                            )}
+                        </div>
+
+                        {/* Status message */}
+                        {addonMessage && (
+                            <div className={`mt-4 p-3 rounded-xl text-sm font-medium ${
+                                addonMessage.type === 'success'
+                                    ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                                    : 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-800'
+                            }`}>
+                                {addonMessage.text}
+                            </div>
+                        )}
+
+                        <p className="text-xs text-slate-400 dark:text-slate-500 mt-4">
+                            Changes apply to your next invoice. No immediate charge.
+                        </p>
+                    </div>
+                );
+            })()}
+
             {isTrialActive && (
                 <div className="bg-gradient-to-r from-violet-500 to-indigo-600 p-8 rounded-[2rem] text-white shadow-xl relative overflow-hidden">
                     <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-6">

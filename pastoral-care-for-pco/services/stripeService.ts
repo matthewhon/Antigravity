@@ -22,9 +22,24 @@ export const PLANS = [
         name: 'Growth',
         price: 99,
         interval: 'month',
-        features: ['Unlimited Users', 'Advanced Analytics', 'Financial Insights', 'Pastor AI Assistant', 'Census Integration'],
-        maxUsers: 99999,
-        maxActivePeople: Infinity,
+        features: [
+            '10 Users',
+            'Up to 401 Active People',
+            'Advanced Analytics',
+            'Financial Insights',
+            'Pastor AI Assistant',
+            'Census Integration',
+            'Polls & Workflows',
+            'QR Codes',
+            'SMS (1,500 msg/mo · 2 numbers · MMS=2)',
+            'Custom Domain Email',
+        ],
+        maxUsers: 10,
+        maxActivePeople: 401,
+        /** Maximum outbound SMS segments per calendar month. MMS counts as 2 segments. */
+        maxSmsPerMonth: 1500,
+        /** Maximum provisioned phone numbers. Grandfathered churches with more are not affected. */
+        maxSmsNumbers: 2,
     },
     {
         id: 'kingdom',
@@ -162,6 +177,66 @@ class StripeService {
         alert("Subscription canceled.");
         window.location.reload();
     }
+
+    /**
+     * Adds one SMS add-on unit (+$20/mo, +1 number, +1,500 SMS) to a Growth plan subscription.
+     * Charges apply to the next invoice (no immediate proration).
+     */
+    async purchaseSmsAddon(churchId: string): Promise<{ quantity: number; maxSmsPerMonth: number; maxSmsNumbers: number; message: string }> {
+        const baseUrl = await this.getApiUrl();
+        const response = await fetch(`${baseUrl}/api/billing/add-sms-addon`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ churchId }),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || `Add-on purchase failed (HTTP ${response.status})`);
+        return data;
+    }
+
+    /**
+     * Removes one SMS add-on unit from a Growth plan subscription.
+     * Change applies to the next invoice (no immediate credit).
+     */
+    async removeSmsAddon(churchId: string): Promise<{ quantity: number; maxSmsPerMonth: number; maxSmsNumbers: number; message: string }> {
+        const baseUrl = await this.getApiUrl();
+        const response = await fetch(`${baseUrl}/api/billing/remove-sms-addon`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ churchId }),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || `Add-on removal failed (HTTP ${response.status})`);
+        return data;
+    }
 }
 
 export const stripeService = new StripeService();
+
+/**
+ * Compute effective SMS limits for a church, incorporating any purchased add-ons.
+ * Returns the base plan limits when no add-ons are active.
+ */
+export function getEffectiveSmsLimits(church: { subscription?: { planId?: string }; smsAddOns?: { quantity?: number } }): {
+    maxSmsPerMonth: number;
+    maxSmsNumbers: number;
+} {
+    const planId = church.subscription?.planId || '';
+    const plan = PLANS.find(p => p.id === planId);
+    const baseSms     = (plan as any)?.maxSmsPerMonth  ?? Infinity;
+    const baseNumbers = (plan as any)?.maxSmsNumbers   ?? Infinity;
+    const addOnQty    = church.smsAddOns?.quantity ?? 0;
+    return {
+        maxSmsPerMonth: isFinite(baseSms)     ? baseSms     + addOnQty * 1500 : Infinity,
+        maxSmsNumbers:  isFinite(baseNumbers) ? baseNumbers + addOnQty        : Infinity,
+    };
+}
+
+/** SMS Add-On product metadata (for display in the UI). */
+export const SMS_ADDON = {
+    pricePerMonth: 20,
+    smsPerAddon:   1500,
+    numbersPerAddon: 1,
+    maxAddons:     8,
+    maxTotalNumbers: 10,
+} as const;

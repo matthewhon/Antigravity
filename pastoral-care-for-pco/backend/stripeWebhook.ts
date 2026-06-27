@@ -371,11 +371,55 @@ export const handleStripeWebhook = async (req: any, res: any) => {
 
             if (!churchesSnapshot.empty) {
                 const churchDoc = churchesSnapshot.docs[0];
-                await churchDoc.ref.update({
-                    'subscription.status':          subscription.status,
+
+                // ── Resolve planId from subscription items ──────────────────────
+                // The priceIds map in Firestore is { planId → stripePrice }.
+                // We build a reverse map { stripePrice → planId } to resolve the current plan.
+                const priceMap: Record<string, string> = settings.stripePriceIds || {};
+                const reversePriceMap: Record<string, string> = {};
+                for (const [pid, priceId] of Object.entries(priceMap)) {
+                    if (typeof priceId === 'string') reversePriceMap[priceId] = pid;
+                }
+
+                const addonPriceId: string = (priceMap.smsAddon || '').trim();
+                let resolvedPlanId: string | null = null;
+                let addonQuantity: number = 0;
+
+                for (const item of subscription.items.data) {
+                    const itemPriceId = item.price.id;
+                    if (addonPriceId && itemPriceId === addonPriceId) {
+                        // This item is the SMS add-on
+                        addonQuantity = item.quantity ?? 0;
+                    } else if (reversePriceMap[itemPriceId]) {
+                        // This item is a plan price
+                        resolvedPlanId = reversePriceMap[itemPriceId];
+                    }
+                }
+
+                const updatePayload: Record<string, any> = {
+                    'subscription.status':           subscription.status,
                     'subscription.currentPeriodEnd': (subscription as any).current_period_end * 1000,
-                });
-                console.log(`[StripeWebhook] Updated subscription status for ${churchDoc.id}: ${subscription.status}`);
+                };
+
+                // Only update planId if we successfully resolved it (prevents wiping it on
+                // unrecognised price IDs like coupon adjustments or usage-based items).
+                if (resolvedPlanId) {
+                    updatePayload['subscription.planId'] = resolvedPlanId;
+                    console.log(`[StripeWebhook] Synced planId=${resolvedPlanId} for ${churchDoc.id}`);
+                }
+
+                // Always sync add-on quantity (0 if the item is not present)
+                updatePayload['smsAddOns.quantity'] = addonQuantity;
+                if (addonQuantity === 0) {
+                    updatePayload['smsAddOns.stripeItemId'] = null;
+                } else {
+                    // Store the Stripe item ID for future update calls
+                    const addonItem = subscription.items.data.find(i => i.price.id === addonPriceId);
+                    if (addonItem) updatePayload['smsAddOns.stripeItemId'] = addonItem.id;
+                }
+
+                await churchDoc.ref.update(updatePayload);
+                console.log(`[StripeWebhook] Updated subscription for ${churchDoc.id}: status=${subscription.status}, addOns=${addonQuantity}`);
             }
             break;
         }
