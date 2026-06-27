@@ -11,8 +11,8 @@ const PLAN_NAMES: Record<string, string> = {
     kingdom: 'Kingdom',
 };
 const PLAN_PRICES: Record<string, string> = {
-    starter: '$49/mo',
-    growth:  '$99/mo',
+    starter: '$39/mo',
+    growth:  '$69/mo',
     kingdom: '$199/mo',
 };
 

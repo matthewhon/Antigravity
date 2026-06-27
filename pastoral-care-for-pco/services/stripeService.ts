@@ -11,7 +11,7 @@ export const PLANS = [
     {
         id: 'starter',
         name: 'Starter',
-        price: 49,
+        price: 39,
         interval: 'month',
         features: ['5 Users', 'Up to 200 Active People', 'Basic Analytics', 'People & Groups Sync', 'Census Integration', 'Financial Insights', 'Email Communication (3,000/mo)'],
         maxUsers: 5,
@@ -20,7 +20,7 @@ export const PLANS = [
     {
         id: 'growth',
         name: 'Growth',
-        price: 99,
+        price: 69,
         interval: 'month',
         features: [
             '10 Users',
