@@ -13,10 +13,12 @@ export const SubscriptionSettingsView: React.FC<SubscriptionSettingsViewProps> =
     const [isManaging, setIsManaging] = useState(false);
     const [processingPlanId, setProcessingPlanId] = useState<string | null>(null);
     const [statusMessage, setStatusMessage] = useState<{type: 'success'|'error', text: string} | null>(null);
+    const [showUpgrade, setShowUpgrade] = useState(false);
 
     const currentPlanId = church.subscription?.status === 'active' ? church.subscription.planId : null;
     const isPastDue = church.subscription?.status === 'past_due';
-    
+    const currentPlan = PLANS.find(p => p.id === currentPlanId);
+
     // Check trial status
     const now = Date.now();
     const trialEndsAt = church.trialEndsAt || 0;
@@ -75,6 +77,15 @@ export const SubscriptionSettingsView: React.FC<SubscriptionSettingsViewProps> =
         }
     };
 
+    /** Returns the label for a plan's CTA button relative to the current plan. */
+    const getPlanButtonLabel = (plan: typeof PLANS[number]) => {
+        if (processingPlanId === plan.id) return 'Redirecting to Stripe...';
+        if (plan.id === currentPlanId) return 'Current Plan';
+        if (currentPlan && plan.price > currentPlan.price) return `Upgrade to ${plan.name}`;
+        if (currentPlan && plan.price < currentPlan.price) return `Downgrade to ${plan.name}`;
+        return `Select ${plan.name}`;
+    };
+
     return (
         <div className="space-y-8 animate-in fade-in">
             {statusMessage && (
@@ -93,7 +104,7 @@ export const SubscriptionSettingsView: React.FC<SubscriptionSettingsViewProps> =
                         <span className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase tracking-widest">Current Status:</span>
                         {currentPlanId ? (
                             <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${isPastDue ? 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400' : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400'}`}>
-                                {isPastDue ? 'Past Due' : `${PLANS.find(p => p.id === currentPlanId)?.name || 'Premium'} Plan`}
+                                {isPastDue ? 'Past Due' : `${currentPlan?.name || 'Premium'} Plan`}
                             </span>
                         ) : isTrialActive ? (
                             <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400">
@@ -113,7 +124,18 @@ export const SubscriptionSettingsView: React.FC<SubscriptionSettingsViewProps> =
                 </div>
                 
                 {currentPlanId && (
-                    <div className="flex gap-3">
+                    <div className="flex gap-3 flex-wrap justify-end">
+                        {/* Change Plan toggle */}
+                        <button
+                            onClick={() => setShowUpgrade(v => !v)}
+                            className={`px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all border ${
+                                showUpgrade
+                                ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700'
+                                : 'bg-white dark:bg-slate-900 border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20'
+                            }`}
+                        >
+                            {showUpgrade ? '✕ Hide Plans' : '⬆ Change Plan'}
+                        </button>
                         <button 
                             onClick={handleManage}
                             disabled={isManaging}
@@ -153,65 +175,105 @@ export const SubscriptionSettingsView: React.FC<SubscriptionSettingsViewProps> =
                 </div>
             )}
 
-            {/* Custom Pricing Grid */}
-            {!currentPlanId && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 my-8">
-                    {PLANS.map((plan) => {
-                        const isRecommended = plan.id === 'growth';
-                        return (
-                            <div 
-                                key={plan.id}
-                                className={`relative p-8 rounded-[2.5rem] border flex flex-col transition-all duration-300 ${isRecommended ? 'bg-slate-900 dark:bg-slate-800 text-white border-slate-900 dark:border-slate-700 shadow-2xl scale-105 z-10' : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 shadow-sm hover:border-indigo-100 dark:hover:border-slate-700'}`}
-                            >
-                                {isRecommended && (
-                                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-indigo-500 to-violet-500 text-white text-[10px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full shadow-lg">
-                                        Most Popular
-                                    </div>
-                                )}
-                                
-                                <div className="mb-6">
-                                    <h4 className={`text-lg font-black ${isRecommended ? 'text-white' : 'text-slate-900 dark:text-white'}`}>{plan.name}</h4>
-                                    <div className="flex items-baseline gap-1 mt-2">
-                                        <span className={`text-4xl font-black ${isRecommended ? 'text-white' : 'text-slate-900 dark:text-white'}`}>${plan.price}</span>
-                                        <span className={`text-xs font-bold ${isRecommended ? 'text-slate-400' : 'text-slate-400 dark:text-slate-500'}`}>/ {plan.interval}</span>
-                                    </div>
-                                </div>
+            {/* Plan Comparison Grid — shown for new subscribers OR when an existing subscriber opens "Change Plan" */}
+            {(!currentPlanId || showUpgrade) && (
+                <div>
+                    {currentPlanId && showUpgrade && (
+                        <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-4 text-center">
+                            Select a new plan — Stripe will handle proration automatically
+                        </p>
+                    )}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 my-2">
+                        {PLANS.map((plan) => {
+                            const isRecommended = plan.id === 'growth';
+                            const isCurrent = plan.id === currentPlanId;
+                            const isProcessing = processingPlanId === plan.id;
+                            const isUpgrade = currentPlan ? plan.price > currentPlan.price : false;
+                            const isDowngrade = currentPlan ? plan.price < currentPlan.price : false;
 
-                                <ul className="space-y-3 mb-8 flex-1">
-                                    {plan.features.map((feature, i) => (
-                                        <li key={i} className="flex items-start gap-3 text-xs font-medium">
-                                            <span className={`mt-0.5 ${isRecommended ? 'text-emerald-400' : 'text-emerald-500'}`}>✓</span>
-                                            <span className={`${isRecommended ? 'text-slate-300' : 'text-slate-500 dark:text-slate-400'}`}>{feature}</span>
-                                        </li>
-                                    ))}
-                                </ul>
-
-                                <button
-                                    onClick={() => handleSubscribe(plan.id)}
-                                    disabled={!!processingPlanId}
-                                    className={`w-full py-4 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${
-                                        isRecommended 
-                                        ? 'bg-white text-slate-900 hover:bg-indigo-50' 
-                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-700'
-                                    } ${processingPlanId && processingPlanId !== plan.id ? 'opacity-50' : ''}`}
+                            return (
+                                <div 
+                                    key={plan.id}
+                                    className={`relative p-8 rounded-[2.5rem] border flex flex-col transition-all duration-300 ${
+                                        isCurrent
+                                            ? 'bg-slate-900 dark:bg-slate-800 text-white border-slate-900 dark:border-slate-700 shadow-2xl scale-105 z-10'
+                                            : isRecommended && !currentPlanId
+                                            ? 'bg-slate-900 dark:bg-slate-800 text-white border-slate-900 dark:border-slate-700 shadow-2xl scale-105 z-10'
+                                            : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 shadow-sm hover:border-indigo-100 dark:hover:border-slate-700'
+                                    }`}
                                 >
-                                    {processingPlanId === plan.id ? 'Redirecting to Stripe...' : `Select ${plan.name}`}
-                                </button>
-                            </div>
-                        );
-                    })}
+                                    {/* Badges */}
+                                    {isCurrent && (
+                                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-[10px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full shadow-lg">
+                                            Current Plan
+                                        </div>
+                                    )}
+                                    {!isCurrent && isRecommended && !currentPlanId && (
+                                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-indigo-500 to-violet-500 text-white text-[10px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full shadow-lg">
+                                            Most Popular
+                                        </div>
+                                    )}
+                                    {!isCurrent && isUpgrade && (
+                                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-indigo-500 to-violet-500 text-white text-[10px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full shadow-lg">
+                                            ⬆ Upgrade
+                                        </div>
+                                    )}
+                                    {!isCurrent && isDowngrade && (
+                                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-slate-600 text-slate-200 text-[10px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full shadow-md">
+                                            ⬇ Downgrade
+                                        </div>
+                                    )}
+
+                                    <div className="mb-6">
+                                        <h4 className={`text-lg font-black ${isCurrent || (isRecommended && !currentPlanId) ? 'text-white' : 'text-slate-900 dark:text-white'}`}>{plan.name}</h4>
+                                        <div className="flex items-baseline gap-1 mt-2">
+                                            <span className={`text-4xl font-black ${isCurrent || (isRecommended && !currentPlanId) ? 'text-white' : 'text-slate-900 dark:text-white'}`}>${plan.price}</span>
+                                            <span className={`text-xs font-bold ${isCurrent || (isRecommended && !currentPlanId) ? 'text-slate-400' : 'text-slate-400 dark:text-slate-500'}`}>/ {plan.interval}</span>
+                                        </div>
+                                    </div>
+
+                                    <ul className="space-y-3 mb-8 flex-1">
+                                        {plan.features.map((feature, i) => (
+                                            <li key={i} className="flex items-start gap-3 text-xs font-medium">
+                                                <span className={`mt-0.5 ${isCurrent || (isRecommended && !currentPlanId) ? 'text-emerald-400' : 'text-emerald-500'}`}>✓</span>
+                                                <span className={`${isCurrent || (isRecommended && !currentPlanId) ? 'text-slate-300' : 'text-slate-500 dark:text-slate-400'}`}>{feature}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+
+                                    <button
+                                        onClick={() => !isCurrent && handleSubscribe(plan.id)}
+                                        disabled={!!processingPlanId || isCurrent}
+                                        className={`w-full py-4 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${
+                                            isCurrent
+                                                ? 'bg-white/20 text-white cursor-default opacity-60'
+                                                : isUpgrade
+                                                ? 'bg-gradient-to-r from-indigo-500 to-violet-500 text-white hover:opacity-90 shadow-lg'
+                                                : isDowngrade
+                                                ? 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600'
+                                                : isCurrent || (isRecommended && !currentPlanId)
+                                                ? 'bg-white text-slate-900 hover:bg-indigo-50'
+                                                : 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-700'
+                                        } ${processingPlanId && processingPlanId !== plan.id ? 'opacity-50' : ''}`}
+                                    >
+                                        {getPlanButtonLabel(plan)}
+                                    </button>
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
             )}
 
-            {/* Active Subscription View */}
-            {currentPlanId && (
+            {/* Active Subscription summary — only shown when upgrade grid is hidden */}
+            {currentPlanId && !showUpgrade && (
                  <div className="bg-slate-50 dark:bg-slate-900 p-10 rounded-[3rem] border border-slate-100 dark:border-slate-800 text-center transition-colors">
                     <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center text-3xl mx-auto mb-4">
                         💎
                     </div>
                     <p className="text-xl font-black text-slate-900 dark:text-white mb-2">Active Subscription</p>
                     <p className="text-slate-500 dark:text-slate-400 text-sm mb-6 max-w-md mx-auto">
-                        Your organization has full access to premium features. Use the Billing Portal above to manage payment methods, download invoices, or change plans.
+                        Your organization has full access to premium features. Click <strong>Change Plan</strong> above to switch tiers, or use the <strong>Billing Portal</strong> to manage payment methods and invoices.
                     </p>
                  </div>
             )}
