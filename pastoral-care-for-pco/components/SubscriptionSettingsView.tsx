@@ -125,6 +125,24 @@ export const SubscriptionSettingsView: React.FC<SubscriptionSettingsViewProps> =
         return `Select ${plan.name}`;
     };
 
+    /**
+     * Safely formats a timestamp (number or Firestore Timestamp) as a locale date string.
+     * Returns null if the value is missing, NaN, or produces an invalid date.
+     */
+    const formatDate = (value: any): string | null => {
+        if (!value && value !== 0) return null;
+        // Handle Firestore Timestamp objects (they have a .toDate() method)
+        const ms = typeof value?.toDate === 'function'
+            ? value.toDate().getTime()
+            : Number(value);
+        if (isNaN(ms)) return null;
+        const d = new Date(ms);
+        if (isNaN(d.getTime())) return null;
+        return d.toLocaleDateString();
+    };
+
+    const renewalDateLabel = formatDate(church.subscription?.currentPeriodEnd);
+
     const lastCalculatedLabel = activePeopleLastCalculatedAt
         ? new Date(activePeopleLastCalculatedAt).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
         : null;
@@ -159,9 +177,9 @@ export const SubscriptionSettingsView: React.FC<SubscriptionSettingsViewProps> =
                             </span>
                         )}
                     </div>
-                    {church.subscription?.currentPeriodEnd && currentPlanId && (
+                    {renewalDateLabel && currentPlanId && (
                         <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-2 font-mono">
-                            Renews: {new Date(church.subscription.currentPeriodEnd).toLocaleDateString()}
+                            Renews: {renewalDateLabel}
                         </p>
                     )}
                 </div>
