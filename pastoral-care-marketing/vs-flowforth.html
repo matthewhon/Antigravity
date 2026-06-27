@@ -104,11 +104,11 @@
     .feat-name { font-size: 0.88rem; font-weight: 600; color: var(--gray-800); }
     .feat-sub { font-size: 0.76rem; color: var(--gray-400); margin-top: 0.2rem; }
     .check-yes { display: inline-flex; align-items: center; gap: 0.4rem; color: var(--green); font-size: 0.85rem; font-weight: 700; }
-    .check-yes::before { content: '&#10003;'; font-weight: 900; font-size: 1rem; }
+    .check-yes::before { content: '\2713'; font-weight: 900; font-size: 1rem; }
     .check-no { display: inline-flex; align-items: center; gap: 0.4rem; color: var(--red); font-size: 0.85rem; font-weight: 600; }
-    .check-no::before { content: '&#10005;'; font-weight: 900; font-size: 1rem; }
+    .check-no::before { content: '\2715'; font-weight: 900; font-size: 1rem; }
     .check-partial { display: inline-flex; align-items: center; gap: 0.4rem; color: var(--amber); font-size: 0.85rem; font-weight: 600; }
-    .check-partial::before { content: '~'; font-weight: 900; font-size: 1rem; }
+    .check-partial::before { content: '\007E'; font-weight: 900; font-size: 1rem; }
 
     .exclusive-section { background: linear-gradient(135deg, var(--navy) 0%, var(--blue-deeper) 100%); padding: 80px 2rem; }
     .exclusive-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-top: 2.5rem; }
@@ -129,9 +129,9 @@
     .channel-list { list-style: none; display: flex; flex-direction: column; gap: 0.7rem; }
     .channel-list li { display: flex; align-items: flex-start; gap: 0.6rem; font-size: 0.88rem; }
     .channel-list li.yes { color: var(--gray-800); }
-    .channel-list li.yes::before { content: '&#10003;'; color: var(--green); font-weight: 900; flex-shrink: 0; margin-top: 1px; }
+    .channel-list li.yes::before { content: '\2713'; color: var(--green); font-weight: 900; flex-shrink: 0; margin-top: 1px; }
     .channel-list li.no { color: var(--gray-400); text-decoration: line-through; }
-    .channel-list li.no::before { content: '&#10005;'; color: var(--red); font-weight: 900; flex-shrink: 0; margin-top: 1px; text-decoration: none; display: inline-block; }
+    .channel-list li.no::before { content: '\2715'; color: var(--red); font-weight: 900; flex-shrink: 0; margin-top: 1px; text-decoration: none; display: inline-block; }
 
     .pricing-strip { background: linear-gradient(135deg, #FFFBEB, #FEF3C7); border: 1px solid #FDE68A; border-radius: 24px; padding: 2.4rem; margin: 3rem 0; display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap; }
     .pricing-strip h3 { font-size: 1.2rem; font-weight: 800; color: var(--navy); margin-bottom: 0.4rem; }
