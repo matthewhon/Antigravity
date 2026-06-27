@@ -168,6 +168,22 @@ class FirestoreService {
     }
   }
 
+  /**
+   * Persists the computed active people count to the Church document.
+   * Called after computeActivePeopleCount() returns a result.
+   */
+  async updateActivePeopleCount(churchId: string, count: number): Promise<void> {
+    try {
+      const churchRef = doc(db, 'churches', churchId);
+      await setDoc(churchRef, {
+        activePeopleCount: count,
+        activePeopleLastCalculatedAt: Date.now(),
+      }, { merge: true });
+    } catch (e) {
+      this.handleFirestoreError(e);
+    }
+  }
+
   async flushSyncedData(churchId: string): Promise<void> {
     try {
         console.log(`Flushing synced PCO data for tenant: ${churchId}`);

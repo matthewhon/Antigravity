@@ -74,6 +74,10 @@ export interface Church {
     groupRiskSettings?: GroupRiskSettings;
     donorLifecycleSettings?: DonorLifecycleSettings;
     subscription?: { status: string, planId: string, currentPeriodEnd?: number, customerId?: string };
+    /** Number of unique people active in the last 60 days (gave, served, checked-in, or attended a group). */
+    activePeopleCount?: number;
+    /** Epoch ms — when activePeopleCount was last computed. */
+    activePeopleLastCalculatedAt?: number;
     emailUsage?: { [month: string]: number };
     metricsSettings?: { showCensusWidgets?: boolean, showCityPenetration?: boolean, showMissionalGap?: boolean, dashboardOrder?: string[] };
     address?: string;
