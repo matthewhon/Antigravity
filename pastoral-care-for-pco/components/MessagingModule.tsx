@@ -8177,8 +8177,8 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
                                             >
                                                 <ListPlus size={14} />
                                             </button>
-                                            {/* Force sync from PCO list/group — for list_add workflows */}
-                                            {(wf.trigger === 'list_add' && (wf.triggerListId || wf.triggerGroupId)) && (() => {
+                                            {/* Force sync from PCO list/group — for any workflow with a list/group configured */}
+                                            {(wf.triggerListId || wf.triggerGroupId) && (() => {
                                                 const rs = reSyncState[wf.id];
                                                 return (
                                                     <button
@@ -8278,8 +8278,8 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
                                         {reSyncState[wf.id].result}
                                     </div>
                                 )}
-                                {/* Last synced timestamp for list_add workflows */}
-                                {wf.trigger === 'list_add' && wf.lastListSyncAt && !reSyncState[wf.id]?.result && (
+                                {/* Last synced timestamp for workflows with list/group sync */}
+                                {wf.lastListSyncAt && !reSyncState[wf.id]?.result && (
                                     <p className="mt-1.5 text-[10px] text-slate-400 dark:text-slate-500">
                                         Last synced: {new Date(wf.lastListSyncAt).toLocaleString()}
                                     </p>
