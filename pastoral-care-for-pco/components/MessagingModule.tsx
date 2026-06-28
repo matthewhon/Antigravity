@@ -6697,7 +6697,7 @@ const WorkflowEditor: React.FC<{
                     <div className="space-y-3">
                         <div className="flex items-center justify-between">
                             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                Sequence ({nodes.length} node{nodes.length !== 1 ? 's' : ''})
+                                Sequence ({nodes.filter(n => n.nodeType === 'action').length} step{nodes.filter(n => n.nodeType === 'action').length !== 1 ? 's' : ''})
                             </p>
                             {/* 3-button add toolbar (top) */}
                             <div className="flex items-center gap-1.5">
@@ -6735,20 +6735,24 @@ const WorkflowEditor: React.FC<{
                                             <div className="w-0.5 h-3 bg-amber-300 dark:bg-amber-700 mx-auto" />
                                         </>
                                     )}
-                                    {node.nodeType === 'action' && (
-                                        <ActionNodeCard
-                                            step={node}
-                                            index={idx}
-                                            total={nodes.length}
-                                            onChange={p => updateNode(idx, p)}
-                                            onDelete={() => deleteNode(idx)}
-                                            onMoveUp={() => moveNode(idx, 'up')}
-                                            onMoveDown={() => moveNode(idx, 'down')}
-                                            pcoLists={pcoLists}
-                                            pcoGroups={pcoGroups}
-                                            churchId={churchId}
-                                        />
-                                    )}
+                                    {node.nodeType === 'action' && (() => {
+                                        const actionIndex = nodes.slice(0, idx).filter(n => n.nodeType === 'action').length;
+                                        const actionTotal = nodes.filter(n => n.nodeType === 'action').length;
+                                        return (
+                                            <ActionNodeCard
+                                                step={node}
+                                                index={actionIndex}
+                                                total={actionTotal}
+                                                onChange={p => updateNode(idx, p)}
+                                                onDelete={() => deleteNode(idx)}
+                                                onMoveUp={() => moveNode(idx, 'up')}
+                                                onMoveDown={() => moveNode(idx, 'down')}
+                                                pcoLists={pcoLists}
+                                                pcoGroups={pcoGroups}
+                                                churchId={churchId}
+                                            />
+                                        );
+                                    })()}
                                     {node.nodeType === 'branch' && (
                                         <BranchNodeCard
                                             node={node}
