@@ -434,13 +434,23 @@ export async function reSyncWorkflow(
                 ? `${workflowId}_${person.personId}`
                 : `${workflowId}_${person.e164.replace(/\+/g, '')}`;
 
-            const existing = await db.collection('smsWorkflowEnrollments').doc(stableId).get();
-            if (existing.exists) { skipped++; return; }
+            // Robust check: see if they have ANY enrollment for this workflow (active or completed)
+            // This catches previous manual enrollments that may have used a randomized ID.
+            const query = person.personId
+                ? db.collection('smsWorkflowEnrollments')
+                    .where('workflowId', '==', workflowId)
+                    .where('personId', '==', person.personId)
+                    .limit(1)
+                : db.collection('smsWorkflowEnrollments')
+                    .where('workflowId', '==', workflowId)
+                    .where('phoneNumber', '==', person.e164)
+                    .limit(1);
 
-            // New person — enroll at step 0
-            const enrollId = wf.allowReentry
-                ? `${stableId}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
-                : stableId;
+            const existing = await query.get();
+            if (!existing.empty) { skipped++; return; }
+
+            // New person — enroll at step 0. Always use stableId for list re-syncs.
+            const enrollId = stableId;
 
             const enrollment = {
                 id:                enrollId,

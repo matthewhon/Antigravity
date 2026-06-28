@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pastoral Care for PCO vs Text In Church | Barnabas Software</title>
+  <meta name="description" content="See how Pastoral Care for Planning Center compares to Text In Church. More than texting — get AI-powered pastoral intelligence, attendance tracking, donor lifecycle analysis, and deep PCO integration in one platform." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --blue: #4A8FCC;
+      --blue-dark: #2C5282;
+      --blue-deeper: #1A3A5C;
+      --navy: #0F2540;
+      --gold: #F6AD1C;
+      --gold-light: #FDE68A;
+      --gold-dark: #D97706;
+      --white: #FFFFFF;
+      --gray-50: #F8FAFC;
+      --gray-100: #F1F5F9;
+      --gray-200: #E2E8F0;
+      --gray-400: #94A3B8;
+      --gray-600: #475569;
+      --gray-800: #1E293B;
+      --green: #10B981;
+      --red: #EF4444;
+      --radius: 16px;
+      --shadow: 0 20px 60px rgba(15,37,64,0.12);
+      --shadow-lg: 0 40px 100px rgba(15,37,64,0.18);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      color: var(--gray-800);
+      background: var(--white);
+      overflow-x: hidden;
+    }
+
+    /* ── NAV ─────────────────────────────────────── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+      padding: 0 2rem;
+      height: 72px;
+      display: flex; align-items: center; justify-content: space-between;
+      background: rgba(255,255,255,0.92);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid rgba(74,143,204,0.12);
+      transition: box-shadow 0.3s;
+    }
+    nav.scrolled { box-shadow: 0 4px 24px rgba(15,37,64,0.10); }
+    .nav-logo { display: flex; align-items: center; gap: 0.6rem; text-decoration: none; }
+    .nav-logo-text { display: flex; flex-direction: column; line-height: 1.1; }
+    .nav-logo-text strong { font-size: 0.95rem; font-weight: 800; color: var(--blue-dark); letter-spacing: -0.01em; }
+    .nav-logo-text span { font-size: 0.68rem; font-weight: 500; color: var(--gray-400); letter-spacing: 0.02em; }
+    .nav-links { display: flex; align-items: center; gap: 2rem; }
+    .nav-links a {
+      text-decoration: none; color: var(--blue-dark); font-weight: 500;
+      font-size: 0.9rem; transition: color 0.2s;
+    }
+    .nav-links a:hover { color: var(--gold-dark); }
+    .nav-cta {
+      background: linear-gradient(135deg, var(--gold) 0%, var(--gold-dark) 100%);
+      color: var(--navy) !important; font-weight: 700 !important;
+      padding: 0.6rem 1.4rem; border-radius: 50px;
+      box-shadow: 0 4px 16px rgba(246,173,28,0.35);
+      transition: transform 0.2s, box-shadow 0.2s !important;
+    }
+    .nav-cta:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(246,173,28,0.45) !important; }
+
+    /* ── HERO ─────────────────────────────────────── */
+    .hero {
+      padding: 140px 2rem 80px;
+      background: linear-gradient(160deg, var(--navy) 0%, var(--blue-deeper) 45%, #1E4A7A 100%);
+      position: relative; overflow: hidden; text-align: center;
+    }
+    .hero::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse 60% 50% at 50% 40%, rgba(74,143,204,0.22) 0%, transparent 70%),
+                  radial-gradient(ellipse 40% 40% at 20% 80%, rgba(246,173,28,0.10) 0%, transparent 60%);
+    }
+    .hero-inner { max-width: 860px; margin: 0 auto; position: relative; z-index: 1; }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      background: rgba(246,173,28,0.15); border: 1px solid rgba(246,173,28,0.35);
+      color: var(--gold); padding: 0.4rem 1.2rem; border-radius: 50px;
+      font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em;
+      text-transform: uppercase; margin-bottom: 1.8rem;
+    }
+    .hero h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(2.2rem, 4.5vw, 3.4rem);
+      font-weight: 800; color: var(--white);
+      line-height: 1.15; margin-bottom: 1.4rem;
+    }
+    .hero h1 em { color: var(--gold); font-style: normal; }
+    .hero p {
+      font-size: 1.15rem; color: rgba(255,255,255,0.76);
+      line-height: 1.7; max-width: 640px; margin: 0 auto 2.4rem;
+    }
+    .hero-verdict {
+      display: flex; align-items: center; justify-content: center; gap: 2rem;
+      flex-wrap: wrap; margin-top: 2.8rem;
+    }
+    .verdict-card {
+      background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12);
+      backdrop-filter: blur(12px); border-radius: 20px;
+      padding: 1.4rem 2rem; min-width: 180px; text-align: center;
+    }
+    .verdict-card .big { font-size: 2rem; font-weight: 900; color: var(--gold); line-height: 1; }
+    .verdict-card .label { font-size: 0.75rem; color: rgba(255,255,255,0.6); font-weight: 500; margin-top: 0.3rem; text-transform: uppercase; letter-spacing: 0.06em; }
+    .vs-badge {
+      font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.25);
+    }
+
+    /* ── SECTION WRAPPER ──────────────────────────── */
+    section { padding: 80px 2rem; }
+    .container { max-width: 1140px; margin: 0 auto; }
+    .section-label {
+      font-size: 0.75rem; font-weight: 800; text-transform: uppercase;
+      letter-spacing: 0.12em; color: var(--blue); margin-bottom: 0.6rem;
+    }
+    .section-title {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(1.8rem, 3vw, 2.4rem);
+      font-weight: 800; color: var(--navy); line-height: 1.2; margin-bottom: 1rem;
+    }
+    .section-sub {
+      font-size: 1.05rem; color: var(--gray-600); line-height: 1.7; max-width: 600px;
+    }
+
+    /* ── QUICK-WIN BANNER ─────────────────────────── */
+    .quick-wins {
+      background: var(--gray-50);
+      border-top: 1px solid var(--gray-200);
+      border-bottom: 1px solid var(--gray-200);
+    }
+    .wins-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr));
+      gap: 1.5rem; margin-top: 3rem;
+    }
+    .win-card {
+      background: var(--white); border: 1px solid var(--gray-200);
+      border-radius: var(--radius); padding: 1.6rem;
+      box-shadow: 0 4px 16px rgba(15,37,64,0.05);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .win-card:hover { transform: translateY(-4px); box-shadow: var(--shadow); }
+    .win-icon {
+      width: 44px; height: 44px; border-radius: 12px;
+      background: linear-gradient(135deg, var(--navy), var(--blue-deeper));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.2rem; margin-bottom: 1rem;
+    }
+    .win-card h3 { font-size: 0.95rem; font-weight: 700; color: var(--navy); margin-bottom: 0.4rem; }
+    .win-card p { font-size: 0.85rem; color: var(--gray-600); line-height: 1.6; }
+    .win-tag {
+      display: inline-block; margin-top: 0.8rem;
+      background: rgba(16,185,129,0.1); color: #059669;
+      font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.06em; padding: 0.2rem 0.6rem; border-radius: 50px;
+      border: 1px solid rgba(16,185,129,0.25);
+    }
+    .win-tag.tic { background: rgba(246,173,28,0.10); color: var(--gold-dark); border-color: rgba(246,173,28,0.3); }
+
+    /* ── COMPARISON TABLE ─────────────────────────── */
+    .table-wrap {
+      overflow-x: auto; border-radius: 20px;
+      box-shadow: var(--shadow); margin-top: 3rem;
+      border: 1px solid var(--gray-200);
+    }
+    table {
+      width: 100%; border-collapse: collapse; min-width: 640px;
+    }
+    thead tr {
+      background: var(--navy);
+    }
+    thead th {
+      padding: 1.2rem 1.4rem; text-align: left;
+      font-size: 0.8rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.08em; color: rgba(255,255,255,0.5);
+    }
+    thead th:first-child { color: rgba(255,255,255,0.5); }
+    thead th.col-us { color: var(--gold); }
+    thead th.col-them { color: rgba(255,255,255,0.4); }
+
+    .cat-row td {
+      background: linear-gradient(90deg, #F1F5F9, #F8FAFC);
+      padding: 0.7rem 1.4rem;
+      font-size: 0.7rem; font-weight: 800; text-transform: uppercase;
+      letter-spacing: 0.12em; color: var(--blue-dark);
+      border-bottom: 1px solid var(--gray-200);
+    }
+
+    tbody tr { border-bottom: 1px solid var(--gray-100); transition: background 0.15s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:not(.cat-row):hover { background: rgba(74,143,204,0.04); }
+
+    tbody td {
+      padding: 1rem 1.4rem; vertical-align: middle;
+      font-size: 0.9rem; color: var(--gray-800);
+    }
+    tbody td:first-child { font-weight: 600; color: var(--navy); }
+    tbody td .sub { font-size: 0.78rem; color: var(--gray-400); font-weight: 400; display: block; margin-top: 0.15rem; }
+
+    .check { color: var(--green); font-size: 1.1rem; font-weight: 700; }
+    .cross { color: var(--red); font-size: 1.1rem; font-weight: 700; }
+    .partial { color: #D97706; font-size: 0.85rem; font-weight: 600; }
+    .our-cell { font-weight: 600; color: var(--navy); }
+    .highlight-cell {
+      background: rgba(246,173,28,0.06);
+    }
+
+    /* ── PRICING SECTION ──────────────────────────── */
+    .pricing-section { background: var(--navy); }
+    .pricing-section .section-title { color: var(--white); }
+    .pricing-section .section-sub { color: rgba(255,255,255,0.6); }
+    .pricing-section .section-label { color: var(--gold); }
+
+    .pricing-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(300px,1fr));
+      gap: 2rem; margin-top: 3rem;
+    }
+    .price-card {
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 24px; padding: 2rem; position: relative; overflow: hidden;
+    }
+    .price-card.ours {
+      background: rgba(246,173,28,0.08); border-color: rgba(246,173,28,0.3);
+    }
+    .price-card.ours::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      background: linear-gradient(90deg, var(--gold), var(--gold-dark));
+    }
+    .price-card-header { margin-bottom: 1.4rem; }
+    .price-card-tag {
+      display: inline-block; font-size: 0.7rem; font-weight: 800;
+      text-transform: uppercase; letter-spacing: 0.1em;
+      padding: 0.3rem 0.8rem; border-radius: 50px; margin-bottom: 0.8rem;
+    }
+    .tag-them { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.4); }
+    .tag-us { background: rgba(246,173,28,0.2); color: var(--gold); }
+    .price-card-name { font-size: 1.1rem; font-weight: 800; color: var(--white); margin-bottom: 0.4rem; }
+    .price-amount { font-size: 2.2rem; font-weight: 900; color: var(--white); line-height: 1; }
+    .price-amount sup { font-size: 1rem; vertical-align: top; padding-top: 0.4rem; }
+    .price-amount .per { font-size: 0.85rem; font-weight: 500; color: rgba(255,255,255,0.45); }
+    .price-note { font-size: 0.8rem; color: rgba(255,255,255,0.4); margin-top: 0.3rem; }
+    .price-divider { border: none; border-top: 1px solid rgba(255,255,255,0.08); margin: 1.4rem 0; }
+    .price-features { list-style: none; display: flex; flex-direction: column; gap: 0.7rem; }
+    .price-features li { font-size: 0.88rem; color: rgba(255,255,255,0.7); display: flex; gap: 0.6rem; align-items: flex-start; }
+    .price-features li .pf-check { color: var(--green); flex-shrink: 0; margin-top: 1px; }
+    .price-features li .pf-cross { color: rgba(255,255,255,0.25); flex-shrink: 0; margin-top: 1px; }
+    .price-features li strong { color: rgba(255,255,255,0.95); font-weight: 600; }
+
+    /* ── CALLOUT STRIP ────────────────────────────── */
+    .callout-strip {
+      background: linear-gradient(135deg, var(--blue-deeper) 0%, var(--navy) 100%);
+      border-top: 1px solid rgba(255,255,255,0.06);
+      text-align: center; padding: 60px 2rem;
+    }
+    .callout-strip h2 {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(1.7rem, 3vw, 2.4rem);
+      font-weight: 800; color: var(--white); margin-bottom: 1rem;
+    }
+    .callout-strip h2 em { color: var(--gold); font-style: normal; }
+    .callout-strip p { font-size: 1rem; color: rgba(255,255,255,0.65); max-width: 540px; margin: 0 auto 2rem; line-height: 1.7; }
+    .btn-primary {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      background: linear-gradient(135deg, var(--gold) 0%, var(--gold-dark) 100%);
+      color: var(--navy); font-weight: 700; font-size: 1rem;
+      padding: 0.9rem 2.2rem; border-radius: 50px; text-decoration: none;
+      box-shadow: 0 8px 30px rgba(246,173,28,0.4);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .btn-primary:hover { transform: translateY(-3px); box-shadow: 0 14px 40px rgba(246,173,28,0.5); }
+    .btn-secondary {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.8); font-weight: 600; font-size: 0.95rem;
+      padding: 0.9rem 2rem; border-radius: 50px; text-decoration: none;
+      border: 1px solid rgba(255,255,255,0.15);
+      transition: background 0.2s, color 0.2s;
+    }
+    .btn-secondary:hover { background: rgba(255,255,255,0.14); color: var(--white); }
+    .cta-row { display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap; }
+
+    /* ── FOOTER ──────────────────────────────────── */
+    footer {
+      background: #0A1929; padding: 2.5rem 2rem;
+      text-align: center; font-size: 0.82rem; color: rgba(255,255,255,0.3);
+    }
+    footer a { color: rgba(255,255,255,0.45); text-decoration: none; }
+    footer a:hover { color: var(--gold); }
+
+    /* ── RESPONSIVE ────────────────────────────────── */
+    @media (max-width: 640px) {
+      .nav-links { display: none; }
+      .hero-verdict { flex-direction: column; gap: 1rem; }
+      .vs-badge { display: none; }
+    }
+
+    /* ── ANIMATIONS ─────────────────────────────── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(24px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .fade-up { animation: fadeUp 0.6s ease both; }
+    .delay-1 { animation-delay: 0.1s; }
+    .delay-2 { animation-delay: 0.2s; }
+    .delay-3 { animation-delay: 0.3s; }
+  </style>
+</head>
+<body>
+
+<!-- ── NAV ── -->
+<nav id="topNav">
+  <a href="index.html" class="nav-logo">
+    <div class="nav-logo-text">
+      <strong>Pastoral Care for PCO</strong>
+      <span>by Barnabas Software</span>
+    </div>
+  </a>
+  <div class="nav-links">
+    <a href="index.html">Home</a>
+    <a href="index.html#features">Features</a>
+    <a href="index.html#pricing">Pricing</a>
+    <a href="index.html#contact" class="nav-cta">Get Started</a>
+  </div>
+</nav>
+
+<!-- ── HERO ── -->
+<section class="hero">
+  <div class="hero-inner">
+    <div class="hero-badge fade-up">Comparison</div>
+    <h1 class="fade-up delay-1">
+      Pastoral Care for PCO<br>
+      vs <em>Text In Church</em>
+    </h1>
+    <p class="fade-up delay-2">
+      Text In Church is an excellent church texting and communication platform. But if your church
+      runs on Planning Center and needs deep pastoral intelligence — at-risk member tracking, 
+      care notes that sync to PCO, donor lifecycle analysis, and AI-powered shepherding — 
+      you need a tool built for pastors, not just communicators.
+    </p>
+
+    <div class="hero-verdict fade-up delay-3">
+      <div class="verdict-card">
+        <div class="big">PCO</div>
+        <div class="label">Deep Native Integration</div>
+      </div>
+      <div class="vs-badge">vs</div>
+      <div class="verdict-card">
+        <div class="big">AI</div>
+        <div class="label">Pastor AI Built In</div>
+      </div>
+      <div class="vs-badge">vs</div>
+      <div class="verdict-card">
+        <div class="big">1 App</div>
+        <div class="label">Care + SMS + Analytics</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── QUICK WINS ── -->
+<section class="quick-wins">
+  <div class="container">
+    <div class="section-label">Why switch</div>
+    <h2 class="section-title">What you get that Text In Church can't offer</h2>
+    <p class="section-sub">Text In Church excels at church-wide communication. Pastoral Care for PCO is built for shepherding — it goes far beyond messaging to give you a complete, AI-powered picture of your congregation's health.</p>
+
+    <div class="wins-grid">
+      <div class="win-card">
+        <div class="win-icon">🧠</div>
+        <h3>Pastor AI</h3>
+        <p>An AI assistant trained on pastoral care, congregational risk signals, and your PCO data — not just a chatbot or message composer.</p>
+        <span class="win-tag">Exclusive</span>
+      </div>
+      <div class="win-card">
+        <div class="win-icon">📊</div>
+        <h3>At-Risk Member Tracking</h3>
+        <p>Automatic risk scoring based on attendance drop-offs, giving gaps, and engagement signals. Know who needs care before they slip away.</p>
+        <span class="win-tag">Exclusive</span>
+      </div>
+      <div class="win-card">
+        <div class="win-icon">🔗</div>
+        <h3>Native PCO Giving Sync</h3>
+        <p>Two-way sync with PCO People, Check-Ins, Giving, and Notes — not just a people list import. Donor lifecycle and lapse detection built in.</p>
+        <span class="win-tag">Exclusive</span>
+      </div>
+      <div class="win-card">
+        <div class="win-icon">🙏</div>
+        <h3>Pastoral Care Notes</h3>
+        <p>Log care visits, hospital calls, and crisis moments. Every note syncs back to the person's PCO profile automatically — no double-entry.</p>
+        <span class="win-tag">Exclusive</span>
+      </div>
+      <div class="win-card">
+        <div class="win-icon">📞</div>
+        <h3>Outreach Contact Sessions</h3>
+        <p>Run coordinated calling campaigns with volunteer-facing assignment queues, outcome tracking, and automatic stats reporting.</p>
+        <span class="win-tag">Exclusive</span>
+      </div>
+      <div class="win-card">
+        <div class="win-icon">💬</div>
+        <h3>Two-Way SMS Included</h3>
+        <p>Everything Text In Church does for 1:1 texting, unified with your full pastoral care workflow and congregation dashboard — in one platform.</p>
+        <span class="win-tag tic">Also Included</span>
+      </div>
+      <div class="win-card">
+        <div class="win-icon">⚡</div>
+        <h3>AI Workflow Builder</h3>
+        <p>Just describe your follow-up process in plain English and the AI builds the entire workflow for you — triggers, delays, messages, and branching logic included.</p>
+        <span class="win-tag">Exclusive</span>
+      </div>
+      <div class="win-card">
+        <div class="win-icon">📧</div>
+        <h3>PCO-Smart Email Builder</h3>
+        <p>Pull content directly from Planning Center groups, registrations, and calendar events into your emails in seconds. No copy-paste, no switching tabs.</p>
+        <span class="win-tag">Exclusive</span>
+      </div>
+      <div class="win-card">
+        <div class="win-icon">📋</div>
+        <h3>Polls &amp; PCO Quick-Send Notes</h3>
+        <p>Send a live poll to your congregation, or instantly share a Planning Center item — event details, registration links, notes — straight from your dashboard.</p>
+        <span class="win-tag">Exclusive</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── COMPARISON TABLE ── -->
+<section>
+  <div class="container">
+    <div class="section-label">Feature Breakdown</div>
+    <h2 class="section-title">Head-to-head comparison</h2>
+    <p class="section-sub">An honest look at what each platform does — and doesn't — do for churches on Planning Center.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:38%">Feature</th>
+            <th class="col-us" style="width:31%">✦ Pastoral Care for PCO</th>
+            <th class="col-them" style="width:31%">Text In Church</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <!-- CATEGORY: Messaging -->
+          <tr class="cat-row"><td colspan="3">📱 Messaging &amp; Communication</td></tr>
+
+          <tr>
+            <td>Two-Way SMS / 1:1 Texting<span class="sub">Incoming &amp; outgoing conversations</span></td>
+            <td class="highlight-cell our-cell"><span class="check">✓</span> Included</td>
+            <td><span class="check">✓</span> Core feature</td>
+          </tr>
+          <tr>
+            <td>Mass / Broadcast Texting<span class="sub">Send to large lists at once</span></td>
+            <td class="highlight-cell our-cell"><span class="check">✓</span> Included</td>
+            <td><span class="check">✓</span> Core feature</td>
+          </tr>
+          <tr>
+            <td>MMS / Picture Messages</td>
+            <td class="highlight-cell our-cell"><span class="check">✓</span> Included</td>
+            <td><span class="check">✓</span> Included</td>
+          </tr>
+          <tr>
+            <td>Email Campaigns<span class="sub">Pull from PCO groups, registrations &amp; calendar events</span></td>
+            <td class="highlight-cell our-cell"><span class="check">✓</span> PCO-native content pulling</td>
+            <td><span class="check">✓</span> Generic email builder</td>
+          </tr>
+          <tr>
+            <td>Text-to-Join Keywords<span class="sub">People text a word to subscribe</span></td>
+            <td class="highlight-cell our-cell"><span class="check">✓</span> Included</td>
+            <td><span class="check">✓</span> Core feature</td>
+          </tr>
+          <tr>
+            <td>Send a Poll<span class="sub">Collect responses from your congregation</span></td>
+            <td class="highlight-cell our-cell"><span class="check">✓</span> Included</td>
+            <td><span class="cross">✗</span> Not available</td>
+          </tr>
+          <tr>
+            <td>PCO Quick-Send Notes<span class="sub">Instantly share a PCO event, registration, or note</span></td>
+            <td class="highlight-cell our-cell"><span class="check">✓</span> One-click from dashboard</td>
+            <td><span class="cross">✗</span> Not available</td>
+          </tr>
+          <tr>
+            <td>Automated Workflows / Drip Sequences<span class="sub">Describe in plain English — AI builds it for you</span></td>
+            <td class="highlight-cell our-cell"><span class="check">✓</span> AI Workflow Builder</td>
+            <td><span class="check">✓</span> Manual builder</td>
+          </tr>
+          <tr>
+            <td>Video Messaging<span class="sub">Send video files via MMS</span></td>
+            <td class="highlight-cell our-cell"><span class="check">✓</span> Via file attachments</td>
+            <td><span class="check">✓</span> Included</td>
+          </tr>
+          <tr>
+            <td>Digital Connect Cards<span class="sub">Capture guest info &amp; auto-update Planning Center</span></td>
+            <td class="highlight-cell our-cell"><span class="check">✓</span> Via forms → syncs to PCO</td>
+            <td><span class="check">✓</span> Included (no PCO write-back)</td>
+          </tr>
+          <tr>
+            <td>Calling Features / Phone Receptionist</td>
+            <td class="highlight-cell"><span class="partial">— Not included</span></td>
+            <td><span class="check">✓</span> Full calling suite</td>
+          </tr>
+          <tr>
+            <td>Multiple SMS Inboxes / Ministry Teams</td>
+            <td class="highlight-cell our-cell"><span class="check">✓</span> Per ministry</td>
+            <td><span class="check">✓</span> Included</td>
+          </tr>
+          <tr>
+            <td>Message Scheduling</td>
+            <td class="highlight-cell our-cell"><span class="check">✓</span> Included</td>
+            <td><span class="check">✓</span> Included</td>
+          </tr>
+          <tr>
+            <td>Message Templates</td>
+            <td class="highlight-cell our-cell"><span class="check">✓</span> Included</td>
+            <td><span class="check">✓</span> Included</td>
+          </tr>
+
+          <!-- CATEGORY: Planning Center -->
+          <tr class="cat-row"><td colspan="3">🔗 Planning Center Integration</td></tr>
+
+          <tr>
+            <td>PCO People Sync<span class="sub">Real-time person data</span></td>
+            <td class="highlight-cell our-cell"><span class="check">✓</span> Deep native sync</td>
+            <td><span class="check">✓</span> Integration available</td>
+          </tr>
+          <tr>
+            <td>PCO Check-In / Attendance Tracking<span class="sub">Attendance pulled automatically</span></td>
+            <td class="highlight-cell our-cell"><span class="check">✓</span> Automatic sync</td>
+            <td><span class="cross">✗</span> Not available</td>
+          </tr>
+          <tr>
+            <td>PCO Giving / Donation Data<span class="sub">Donor lifecycle analysis built in</span></td>
+            <td class="highlight-cell our-cell"><span class="check">✓</span> Full giving sync</td>
+            <td><span class="cross">✗</span> Not available</td>
+          </tr>
+          <tr>
+            <td>Write Notes Back to PCO Profile<span class="sub">Care notes auto-synced</span></td>
+            <td class="highlight-cell our-cell"><span class="check">✓</span> Automatic</td>
+            <td><span class="cross">✗</span> Not available</td>
+          </tr>
+          <tr>
+            <td>Segment by PCO List / Group</td>
+            <td class="highlight-cell our-cell"><span class="check">✓</span> Included</td>
+            <td><span class="check">✓</span> Included</td>
+          </tr>
+          <tr>
+            <td>PCO Groups / Ministry Assignments</td>
+            <td class="highlight-cell our-cell"><span class="check">✓</span> Included</td>
+            <td><span class="partial">Lists only</span></td>
+          </tr>
+          <tr>
+            <td>Other Integrations (Rock, CCB, Zapier, etc.)</td>
+            <td class="highlight-cell"><span class="partial">PCO only</span></td>
+            <td><span class="check">✓</span> Multiple integrations</td>
+          </tr>
+
+          <!-- CATEGORY: Pastoral Intelligence -->
+          <tr class="cat-row"><td colspan="3">🧠 Pastoral Intelligence (Exclusive to Pastoral Care for PCO)</td></tr>
+
+          <tr>
+            <td>At-Risk Member Scoring<span class="sub">Automatic flagging based on attendance &amp; giving gaps</span></td>
+            <td class="highlight-cell our-cell"><span class="check">✓</span> Automatic &amp; real-time</td>
+            <td><span class="cross">✗</span> Not available</td>
+          </tr>
+          <tr>
+            <td>Donor Lifecycle Analysis<span class="sub">Lapsed, at-risk, and new donor detection</span></td>
+            <td class="highlight-cell our-cell"><span class="check">✓</span> Included</td>
+            <td><span class="cross">✗</span> Not available</td>
+          </tr>
+          <tr>
+            <td>Pastoral Care Notes &amp; Visit Logging</td>
+            <td class="highlight-cell our-cell"><span class="check">✓</span> With PCO sync</td>
+            <td><span class="cross">✗</span> Not available</td>
+          </tr>
+          <tr>
+            <td>Prayer Request Tracking<span class="sub">Log, manage, and follow up on requests</span></td>
+            <td class="highlight-cell our-cell"><span class="check">✓</span> Included</td>
+            <td><span class="cross">✗</span> Not available</td>
+          </tr>
+          <tr>
+            <td>Pastor AI Assistant<span class="sub">Care-trained AI for insights &amp; outreach drafts</span></td>
+            <td class="highlight-cell our-cell"><span class="check">✓</span> Built in</td>
+            <td><span class="cross">✗</span> Not available</td>
+          </tr>
+          <tr>
+            <td>AI Workflow Builder<span class="sub">Describe your follow-up in plain English — AI builds the automation</span></td>
+            <td class="highlight-cell our-cell"><span class="check">✓</span> Exclusive feature</td>
+            <td><span class="cross">✗</span> Not available</td>
+          </tr>
+          <tr>
+            <td>Outreach Contact Sessions<span class="sub">Volunteer-facing calling campaigns</span></td>
+            <td class="highlight-cell our-cell"><span class="check">✓</span> With volunteer portal</td>
+            <td><span class="cross">✗</span> Not available</td>
+          </tr>
+          <tr>
+            <td>Congregation Health Dashboard<span class="sub">Membership, attendance &amp; care trends</span></td>
+            <td class="highlight-cell our-cell"><span class="check">✓</span> Included</td>
+            <td><span class="cross">✗</span> Not available</td>
+          </tr>
+
+          <!-- CATEGORY: Analytics & Reporting -->
+          <tr class="cat-row"><td colspan="3">📈 Analytics &amp; Reporting</td></tr>
+
+          <tr>
+            <td>Message Delivery &amp; Open Rate Stats</td>
+            <td class="highlight-cell our-cell"><span class="check">✓</span> Included</td>
+            <td><span class="check">✓</span> Included</td>
+          </tr>
+          <tr>
+            <td>Attendance Trend Reporting</td>
+            <td class="highlight-cell our-cell"><span class="check">✓</span> Full PCO data</td>
+            <td><span class="cross">✗</span> Not available</td>
+          </tr>
+          <tr>
+            <td>Giving &amp; Donor Trend Reporting</td>
+            <td class="highlight-cell our-cell"><span class="check">✓</span> Full PCO data</td>
+            <td><span class="cross">✗</span> Not available</td>
+          </tr>
+          <tr>
+            <td>Care Activity Reporting<span class="sub">Who was visited, called, or prayed for</span></td>
+            <td class="highlight-cell our-cell"><span class="check">✓</span> Included</td>
+            <td><span class="cross">✗</span> Not available</td>
+          </tr>
+          <tr>
+            <td>Opt-Out / Compliance Tracking</td>
+            <td class="highlight-cell our-cell"><span class="check">✓</span> Included</td>
+            <td><span class="check">✓</span> Included</td>
+          </tr>
+
+          <!-- CATEGORY: Platform -->
+          <tr class="cat-row"><td colspan="3">⚙️ Platform &amp; Administration</td></tr>
+
+          <tr>
+            <td>Multi-Campus / Multi-Ministry</td>
+            <td class="highlight-cell our-cell"><span class="check">✓</span> Included</td>
+            <td><span class="check">✓</span> Included</td>
+          </tr>
+          <tr>
+            <td>Role-Based User Permissions</td>
+            <td class="highlight-cell our-cell"><span class="check">✓</span> Included</td>
+            <td><span class="check">✓</span> Included</td>
+          </tr>
+          <tr>
+            <td>Mobile-Friendly Interface</td>
+            <td class="highlight-cell our-cell"><span class="check">✓</span> Responsive web app</td>
+            <td><span class="check">✓</span> Mobile app available</td>
+          </tr>
+          <tr>
+            <td>Public-Facing Volunteer Portal<span class="sub">For outreach calling volunteers</span></td>
+            <td class="highlight-cell our-cell"><span class="check">✓</span> Included</td>
+            <td><span class="cross">✗</span> Not available</td>
+          </tr>
+          <tr>
+            <td>Plan a Visit / Guest Experience Flow</td>
+            <td class="highlight-cell"><span class="partial">— Not included</span></td>
+            <td><span class="check">✓</span> Included</td>
+          </tr>
+          <tr>
+            <td>Built Exclusively for Planning Center Churches</td>
+            <td class="highlight-cell our-cell"><span class="check">✓</span> Designed from day one</td>
+            <td><span class="partial">PCO is one of many integrations</span></td>
+          </tr>
+
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ── PRICING ── -->
+<section class="pricing-section">
+  <div class="container">
+    <div class="section-label">Pricing</div>
+    <h2 class="section-title">What does each platform cost?</h2>
+    <p class="section-sub">Text In Church pricing scales by congregation size. Pastoral Care for PCO starts at <strong style="color:var(--gold)">$39/mo</strong> — with every pastoral care feature included at every tier, no per-contact fees.</p>
+
+    <div class="pricing-grid" style="grid-template-columns: repeat(auto-fit, minmax(260px,1fr));">
+
+      <!-- Text In Church Starter -->
+      <div class="price-card">
+        <div class="price-card-header">
+          <span class="price-card-tag tag-them">Text In Church</span>
+          <div class="price-card-name">Starter Plan</div>
+          <div class="price-amount"><sup>$</sup>35<span class="per">/mo</span></div>
+          <div class="price-note">Up to 200 contacts · texting &amp; email</div>
+        </div>
+        <hr class="price-divider" />
+        <ul class="price-features">
+          <li><span class="pf-check">✓</span> <span>Mass texting &amp; email</span></li>
+          <li><span class="pf-check">✓</span> <span>2-way SMS inbox</span></li>
+          <li><span class="pf-check">✓</span> <span>Planning Center sync</span></li>
+          <li><span class="pf-check">✓</span> <span>Message templates</span></li>
+          <li><span class="pf-cross">✗</span> <span style="color:rgba(255,255,255,0.3)">Pastoral care notes</span></li>
+          <li><span class="pf-cross">✗</span> <span style="color:rgba(255,255,255,0.3)">At-risk member tracking</span></li>
+          <li><span class="pf-cross">✗</span> <span style="color:rgba(255,255,255,0.3)">PCO attendance &amp; giving sync</span></li>
+          <li><span class="pf-cross">✗</span> <span style="color:rgba(255,255,255,0.3)">Pastor AI</span></li>
+          <li><span class="pf-cross">✗</span> <span style="color:rgba(255,255,255,0.3)">Prayer request tracking</span></li>
+        </ul>
+      </div>
+
+      <!-- Text In Church Growth -->
+      <div class="price-card">
+        <div class="price-card-header">
+          <span class="price-card-tag tag-them">Text In Church</span>
+          <div class="price-card-name">Growth Plan</div>
+          <div class="price-amount"><sup>$</sup>79<span class="per">/mo</span></div>
+          <div class="price-note">Scales by contact count · full features</div>
+        </div>
+        <hr class="price-divider" />
+        <ul class="price-features">
+          <li><span class="pf-check">✓</span> <span>Everything in Starter</span></li>
+          <li><span class="pf-check">✓</span> <span>Automated workflows</span></li>
+          <li><span class="pf-check">✓</span> <span>Calling features</span></li>
+          <li><span class="pf-check">✓</span> <span>Video messaging</span></li>
+          <li><span class="pf-check">✓</span> <span>Connect cards</span></li>
+          <li><span class="pf-cross">✗</span> <span style="color:rgba(255,255,255,0.3)">Pastoral intelligence</span></li>
+          <li><span class="pf-cross">✗</span> <span style="color:rgba(255,255,255,0.3)">At-risk member scoring</span></li>
+          <li><span class="pf-cross">✗</span> <span style="color:rgba(255,255,255,0.3)">PCO attendance &amp; giving</span></li>
+          <li><span class="pf-cross">✗</span> <span style="color:rgba(255,255,255,0.3)">Pastor AI assistant</span></li>
+        </ul>
+      </div>
+
+      <!-- Our Starter -->
+      <div class="price-card ours">
+        <div class="price-card-header">
+          <span class="price-card-tag tag-us">✦ Pastoral Care for PCO</span>
+          <div class="price-card-name">Starter</div>
+          <div class="price-amount"><sup>$</sup>39<span class="per">/mo</span></div>
+          <div class="price-note">Up to 200 active people · 5 users · 3,000 emails/mo</div>
+        </div>
+        <hr class="price-divider" />
+        <ul class="price-features">
+          <li><span class="pf-check">✓</span> <span><strong>Native PCO sync</strong> — people, check-ins, giving</span></li>
+          <li><span class="pf-check">✓</span> <span><strong>At-risk member scoring</strong> — automatic</span></li>
+          <li><span class="pf-check">✓</span> <span><strong>Pastoral care notes</strong> → sync to PCO profile</span></li>
+          <li><span class="pf-check">✓</span> <span><strong>Prayer request</strong> tracking &amp; management</span></li>
+          <li><span class="pf-check">✓</span> <span><strong>PCO-integrated email</strong> — no manual imports</span></li>
+          <li><span class="pf-check">✓</span> <span>Financial insights &amp; donor analytics</span></li>
+          <li><span class="pf-check">✓</span> <span>Care &amp; congregation dashboards</span></li>
+        </ul>
+      </div>
+
+      <!-- Our Growth -->
+      <div class="price-card ours">
+        <div class="price-card-header">
+          <span class="price-card-tag tag-us">✦ Pastoral Care for PCO</span>
+          <div class="price-card-name">Growth</div>
+          <div class="price-amount"><sup>$</sup>69<span class="per">/mo</span></div>
+          <div class="price-note">Up to 401 active people · 10 users · SMS included</div>
+        </div>
+        <hr class="price-divider" />
+        <ul class="price-features">
+          <li><span class="pf-check">✓</span> <span>Everything in Starter</span></li>
+          <li><span class="pf-check">✓</span> <span><strong>Two-way SMS</strong> — 1,500 msg/mo · 2 numbers</span></li>
+          <li><span class="pf-check">✓</span> <span><strong>Pastor AI</strong> — care-trained assistant</span></li>
+          <li><span class="pf-check">✓</span> <span><strong>Outreach contact sessions</strong> with volunteer portal</span></li>
+          <li><span class="pf-check">✓</span> <span>Advanced analytics &amp; custom domain email</span></li>
+          <li><span class="pf-check">✓</span> <span>Polls &amp; workflows · QR codes</span></li>
+        </ul>
+      </div>
+
+      <!-- Our Kingdom -->
+      <div class="price-card ours">
+        <div class="price-card-header">
+          <span class="price-card-tag tag-us">✦ Pastoral Care for PCO</span>
+          <div class="price-card-name">Kingdom</div>
+          <div class="price-amount"><sup>$</sup>199<span class="per">/mo</span></div>
+          <div class="price-note">Unlimited active people · unlimited users · dedicated support</div>
+        </div>
+        <hr class="price-divider" />
+        <ul class="price-features">
+          <li><span class="pf-check">✓</span> <span>Everything in Growth</span></li>
+          <li><span class="pf-check">✓</span> <span><strong>Unlimited congregation size</strong></span></li>
+          <li><span class="pf-check">✓</span> <span><strong>Multi-site data</strong> &amp; custom metrics</span></li>
+          <li><span class="pf-check">✓</span> <span><strong>Advanced risk profiling</strong></span></li>
+          <li><span class="pf-check">✓</span> <span>Dedicated support</span></li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ── CTA ── -->
+<section class="callout-strip">
+  <div class="container">
+    <h2>Ready to go beyond <em>texting</em>?</h2>
+    <p>Pastoral Care for PCO gives your team the tools to know who needs care, reach them personally, and keep every detail in one place — all connected to Planning Center.</p>
+    <div class="cta-row">
+      <a href="index.html#contact" class="btn-primary">Get Started Free →</a>
+      <a href="index.html#features" class="btn-secondary">See All Features</a>
+    </div>
+  </div>
+</section>
+
+<!-- ── FOOTER ── -->
+<footer>
+  <p>&copy; 2025 Barnabas Software · <a href="index.html">Pastoral Care for PCO</a> · <a href="delete-data.html">Privacy &amp; Data</a></p>
+  <p style="margin-top:0.5rem; font-size:0.75rem; color:rgba(255,255,255,0.18)">
+    Text In Church is a trademark of Text In Church, LLC. This comparison is based on publicly available information and our independent assessment. Pricing and features subject to change.
+  </p>
+</footer>
+
+<script>
+  // Sticky nav shadow
+  const nav = document.getElementById('topNav');
+  window.addEventListener('scroll', () => {
+    nav.classList.toggle('scrolled', window.scrollY > 40);
+  });
+</script>
+
+</body>
+</html>

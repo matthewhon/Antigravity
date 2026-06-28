@@ -2628,7 +2628,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                             </div>
                                         )}
                                         <div className={`text-[10px] mt-1 flex items-center gap-1 flex-wrap ${msg.direction === 'outbound' ? 'text-violet-200' : 'text-slate-400'}`}>
-                                            {new Date(msg.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                                            {new Date(msg.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                                             {msg.direction === 'outbound' && msg.sentByName && ` • ${msg.sentByName}`}
                                             {msg.direction === 'outbound' && msg.status && (() => {
                                                 const s = msg.status;
@@ -7770,6 +7770,99 @@ const BulkEnrollFromListModal: React.FC<{
 
 // --- Workflows List + Manager -------------------------------------------------
 
+const WorkflowEnrollmentsModal: React.FC<{
+    workflow: SmsWorkflow;
+    churchId: string;
+    onClose: () => void;
+}> = ({ workflow, churchId, onClose }) => {
+    const [enrollments, setEnrollments] = useState<SmsWorkflowEnrollment[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchEnrollments = async () => {
+            try {
+                const q = query(
+                    collection(firebaseDb, 'smsWorkflowEnrollments'),
+                    where('churchId', '==', churchId),
+                    where('workflowId', '==', workflow.id)
+                );
+                const snap = await getDocs(q);
+                const data = snap.docs.map(d => ({ id: d.id, ...d.data() } as SmsWorkflowEnrollment));
+                data.sort((a, b) => b.enrolledAt - a.enrolledAt);
+                setEnrollments(data);
+            } catch (err) {
+                console.error('Failed to fetch enrollments:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchEnrollments();
+    }, [workflow.id, churchId]);
+
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+            <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col max-h-[80vh]" onClick={e => e.stopPropagation()}>
+                <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
+                    <div>
+                        <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                            <Users size={20} className="text-violet-500" />
+                            Enrolled People
+                        </h2>
+                        <p className="text-xs text-slate-500 mt-1">Workflow: {workflow.name}</p>
+                    </div>
+                    <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition">
+                        <X size={20} />
+                    </button>
+                </div>
+                <div className="p-6 overflow-y-auto">
+                    {loading ? (
+                        <div className="flex items-center justify-center h-40 text-slate-400">
+                            <Loader2 size={24} className="animate-spin" />
+                        </div>
+                    ) : enrollments.length === 0 ? (
+                        <div className="text-center py-12 text-slate-500">
+                            No one is currently enrolled in this workflow.
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            {enrollments.map(e => (
+                                <div key={e.id} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800">
+                                    <div>
+                                        <p className="font-bold text-slate-900 dark:text-white">
+                                            {e.personName || 'Unknown Person'}
+                                        </p>
+                                        <p className="text-xs text-slate-500 font-mono mt-0.5">
+                                            {e.phoneNumber}
+                                        </p>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300">
+                                            {e.completed ? (
+                                                <>
+                                                    <CheckCircle size={12} />
+                                                    Completed
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <ChevronRight size={12} />
+                                                    Step {e.currentStep + 1}
+                                                </>
+                                            )}
+                                        </div>
+                                        <p className="text-[10px] text-slate-400 mt-1">
+                                            Enrolled {new Date(e.enrolledAt).toLocaleDateString()}
+                                        </p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
 export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }) => {
     const { numbers: twilioNumbers } = useTwilioNumbers(churchId);
     const [workflows, setWorkflows] = useState<SmsWorkflow[]>([]);
@@ -7786,6 +7879,7 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
     const [enrollTarget, setEnrollTarget] = useState<SmsWorkflow | null>(null);
     const [listEnrollTarget, setListEnrollTarget] = useState<SmsWorkflow | null>(null);
     const [testTarget, setTestTarget] = useState<SmsWorkflow | null>(null);
+    const [viewingEnrollments, setViewingEnrollments] = useState<SmsWorkflow | null>(null);
     // stepCounts: workflowId -> { stepCounts: Record<number,number>, totalActive: number }
     const [stepCountsMap, setStepCountsMap] = useState<Record<string, { stepCounts: Record<number, number>; totalActive: number }>>({});
     // reSyncState: workflowId -> { loading, result }
@@ -8040,8 +8134,10 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
                                     <div className="flex items-center gap-3 shrink-0">
                                         {/* Enrolled / completed / in-progress */}
                                         <div className="text-right hidden sm:block">
-                                            <p className="text-lg font-black text-violet-600 dark:text-violet-300">{wf.enrolledCount}</p>
-                                            <p className="text-[10px] text-slate-400 uppercase tracking-widest">enrolled</p>
+                                            <button onClick={() => setViewingEnrollments(wf)} className="group/enroll flex flex-col items-end hover:bg-violet-50 dark:hover:bg-violet-900/20 px-2 py-1 rounded-lg transition-colors">
+                                                <p className="text-lg font-black text-violet-600 dark:text-violet-300 group-hover/enroll:text-violet-700 dark:group-hover/enroll:text-violet-200 transition-colors">{wf.enrolledCount}</p>
+                                                <p className="text-[10px] text-slate-400 uppercase tracking-widest group-hover/enroll:text-violet-500 transition-colors">enrolled</p>
+                                            </button>
                                         </div>
                                         <div className="text-right hidden sm:block">
                                             <p className="text-lg font-black text-emerald-600">{wf.completedCount}</p>
@@ -8221,6 +8317,15 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
                     pcoGroups={pcoGroups}
                     pcoRegistrationEvents={pcoRegistrationEvents}
                     onClose={() => setTestTarget(null)}
+                />
+            )}
+
+            {/* Viewing Enrollments Modal */}
+            {viewingEnrollments && (
+                <WorkflowEnrollmentsModal
+                    workflow={viewingEnrollments}
+                    churchId={churchId}
+                    onClose={() => setViewingEnrollments(null)}
                 />
             )}
         </div>

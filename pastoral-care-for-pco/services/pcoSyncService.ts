@@ -10,6 +10,7 @@ import {
 import { initializeWebhooks } from './pcoWebhookService';
 import { calculateBulkRisk, DEFAULT_RISK_SETTINGS } from './riskService';
 import { fetchWeatherRange, fetchWeatherForecast } from '../backend/weatherService.js';
+import { computeActivePeopleCount } from './activePeopleService';
 
 // Server-side logger — only initialised when running in Node.js.
 // In the browser this module is imported (for client-side syncAllData calls that
@@ -225,6 +226,13 @@ export const syncAllData = async (churchId: string) => {
     try {
         await syncRiskChanges(churchId);
     } catch (e: any) { logger.error('Sync Risk Changes failed', 'sync', { error: e?.message }, churchId); }
+
+    // Recompute active people count now that all PCO data is fresh
+    try {
+        const count = await computeActivePeopleCount(churchId);
+        await firestore.updateActivePeopleCount(churchId, count);
+        logger.info('Active people count updated', 'sync', { churchId, count }, churchId);
+    } catch (e: any) { logger.warn('Active people count update failed (non-fatal)', 'sync', { error: e?.message }, churchId); }
 
     // Update last sync timestamp regardless of partial failures
     const durationMs = Date.now() - startTime;

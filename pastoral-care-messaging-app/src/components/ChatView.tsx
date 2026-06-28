@@ -136,7 +136,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ church, currentUser, convers
                             </div>
                             <div className="flex items-center gap-2 mt-1 px-1">
                                 <span className="text-[10px] font-semibold text-slate-400">
-                                    {new Date(msg.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                                    {new Date(msg.createdAt).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                                 </span>
                                 {isOutbound && msg.sentByName && (
                                     <span className="text-[10px] font-semibold text-slate-400">

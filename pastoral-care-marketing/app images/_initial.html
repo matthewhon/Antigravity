@@ -1,0 +1,43 @@
+<!DOCTYPE html><html lang="en" style="color-scheme: light;"><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <!-- PWA / Add-to-Home-Screen support -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="SMS Manager">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#7c3aed">
+    <title>Pastoral Care for PCO</title>
+    <link rel="manifest" href="/manifest.json">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .logo-gradient-blue { fill: url(#blue-grad); }
+        .logo-gradient-yellow { fill: url(#yellow-grad); }
+        
+        /* Custom Scrollbar for Dark Mode */
+        .dark ::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+        .dark ::-webkit-scrollbar-track {
+          background: #0f172a; 
+        }
+        .dark ::-webkit-scrollbar-thumb {
+          background: #334155; 
+          border-radius: 4px;
+        }
+        .dark ::-webkit-scrollbar-thumb:hover {
+          background: #475569; 
+        }
+    </style>
+  <script type="module" crossorigin="" src="/assets/index-hl35u53M.js"></script>
+  <link rel="stylesheet" crossorigin="" href="/assets/index-AqC_KJGa.css">
+<script src="https://js.stripe.com/v3"></script></head>
+<body class="bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white transition-colors duration-300">
+    <div id="root"><div class="flex min-h-screen items-center justify-center bg-slate-100 dark:bg-slate-950 p-4 animate-in fade-in zoom-in duration-300"><div class="w-full max-w-md bg-white dark:bg-slate-900 rounded-[2rem] shadow-xl p-10 border border-slate-100 dark:border-slate-800"><div class="flex justify-center mb-8"><svg width="64" height="64" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="blue-grad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#4A90E2"></stop><stop offset="100%" stop-color="#357ABD"></stop></linearGradient><linearGradient id="yellow-grad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#F5A623"></stop><stop offset="100%" stop-color="#F8E71C"></stop></linearGradient></defs><circle cx="35" cy="30" r="15" fill="url(#blue-grad)"></circle><path d="M15 70C15 50 35 45 50 45C35 45 35 60 35 80C35 80 15 80 15 70Z" fill="url(#blue-grad)"></path><circle cx="65" cy="30" r="15" fill="url(#yellow-grad)"></circle><path d="M85 70C85 50 65 45 50 45C65 45 65 60 65 80C65 80 85 80 85 70Z" fill="url(#yellow-grad)"></path><path d="M50 40C40 50 40 75 50 85C60 75 60 50 50 40Z" fill="#357ABD" stroke="white" stroke-width="4"></path><path d="M50 48V77M40 60H60" stroke="white" stroke-width="6" stroke-linecap="round"></path></svg></div><div class="text-center mb-8"><h2 class="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Welcome Back</h2><p class="text-xs font-bold text-slate-400 uppercase tracking-widest mt-2">Sign in to your dashboard</p></div><form class="space-y-5"><div><label for="login-email" class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Email</label><input id="login-email" class="w-full p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-900 dark:text-white transition-all" required="" placeholder="name@church.com" autocomplete="username" inputmode="email" type="email" value=""></div><div><div class="flex justify-between items-center mb-2"><label for="login-password" class="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Password</label><button type="button" class="text-[10px] font-bold text-indigo-500 hover:text-indigo-600 transition-colors">Forgot Password?</button></div><div class="relative"><input id="login-password" class="w-full p-3 pr-10 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-900 dark:text-white transition-all" required="" placeholder="••••••••" autocomplete="current-password" type="password" value=""><button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors" aria-label="Show password"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye" aria-hidden="true"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"></path><circle cx="12" cy="12" r="3"></circle></svg></button></div></div><button type="submit" class="w-full bg-indigo-600 text-white py-4 rounded-xl font-black uppercase tracking-widest text-xs hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 dark:shadow-none disabled:opacity-50 disabled:cursor-not-allowed mt-4">Sign In</button></form><div class="mt-8 text-center border-t border-slate-100 dark:border-slate-800 pt-6"><p class="text-xs font-medium text-slate-400">Don't have an account?</p><a href="/register" class="mt-2 inline-block text-xs font-black text-indigo-600 hover:text-indigo-800 transition-colors uppercase tracking-widest">Create Organization</a></div></div></div></div>
+
+
+<iframe name="__privateStripeMetricsController2620" frameborder="0" allowtransparency="true" scrolling="no" role="presentation" allow="payment *" src="https://js.stripe.com/v3/m-outer-3437aaddcdf6922d623e172c2d6f9278.html#url=https%3A%2F%2Fpastoralcare.barnabassoftware.com%2F&amp;title=Pastoral%20Care%20for%20PCO&amp;referrer=&amp;muid=NA&amp;sid=NA&amp;version=6&amp;preview=false&amp;__shared_params__[version]=v3" aria-hidden="true" tabindex="-1" style="border-width: medium !important; border-style: none !important; border-color: currentcolor !important; border-image: initial !important; margin: 0px !important; padding: 0px !important; width: 1px !important; min-width: 100% !important; overflow: hidden !important; display: block !important; visibility: hidden !important; position: fixed !important; height: 1px !important; pointer-events: none !important; user-select: none !important;"></iframe></body></html>

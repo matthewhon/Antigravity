@@ -2680,7 +2680,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                             </div>
                                         )}
                                         <div className={`text-[10px] mt-1 flex items-center gap-1 flex-wrap ${msg.direction === 'outbound' ? 'text-violet-200' : 'text-slate-400'}`}>
-                                            {new Date(msg.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                                            {new Date(msg.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                                             {msg.direction === 'outbound' && msg.sentByName && ` • ${msg.sentByName}`}
                                             {msg.direction === 'outbound' && msg.status && (() => {
                                                 const s = msg.status;
