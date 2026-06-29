@@ -1976,7 +1976,7 @@ currentUser, onUpdateChurch, activePage, smsTab, mobileSmsUrl, activeNumberId, o
       // Backend already updated Firestore; sync local state
       const updates: Partial<EmailCampaign> = { status: 'sent', sentAt: Date.now() };
       handleSave(updates);
-      showToast(result.message || 'Campaign sent successfully!');\r
+      showToast(result.message || 'Campaign sent successfully!');
       setActiveCampaign(null);
     } catch (e: any) {
       showToast(e.message || 'Failed to send campaign.', 'error');
