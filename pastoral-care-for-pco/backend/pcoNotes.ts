@@ -100,7 +100,7 @@ async function resolveCategoryId(
  * Write a single note to a PCO person using the church's stored OAuth token.
  * Returns true on success, false on failure.
  */
-async function writePcoNote(params: {
+export async function writePcoNote(params: {
     db: any;
     log: any;
     churchId: string;
