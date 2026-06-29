@@ -1246,6 +1246,7 @@ export const CommunicationModule: React.FC<{ churchId: string; church?: Church; 
       const updates: Partial<EmailCampaign> = { status: 'sent', sentAt: Date.now() };
       handleSave(updates);
       showToast(result.message || 'Campaign sent successfully!');
+      setActiveCampaign(null);
     } catch (e: any) {
       showToast(e.message || 'Failed to send campaign.', 'error');
     } finally {
