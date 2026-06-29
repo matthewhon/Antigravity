@@ -1667,11 +1667,12 @@ class FirestoreService {
         collection(db, 'outreach_slots'),
         where('sessionId', '==', sessionId),
         where('volunteerPhone', '==', volunteerPhone),
-        where('status', 'in', ['contacted', 'no-answer']),
-        orderBy('completedAt', 'desc')
+        where('status', 'in', ['contacted', 'no-answer'])
       );
       const snap = await getDocs(q);
-      return snap.docs.map(d => d.data() as OutreachSlot);
+      const slots = snap.docs.map(d => d.data() as OutreachSlot);
+      // Sort client-side: most recent first (avoids needing an extra composite index)
+      return slots.sort((a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0));
     } catch (e) {
       console.warn('getVolunteerSlots error:', e);
       return [];
