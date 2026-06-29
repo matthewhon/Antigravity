@@ -612,7 +612,11 @@ const FollowUpView: React.FC<{ sessionId: string }> = ({ sessionId }) => {
     const filteredSlots = useMemo(() => {
         if (!searchQuery.trim()) return slots;
         const q = searchQuery.toLowerCase();
-        return slots.filter(s => s.assignedPersonName.toLowerCase().includes(q));
+        const qDigits = q.replace(/\D/g, '');
+        return slots.filter(s =>
+            s.assignedPersonName.toLowerCase().includes(q) ||
+            (qDigits && s.assignedPersonPhone?.replace(/\D/g, '').includes(qDigits))
+        );
     }, [slots, searchQuery]);
 
     const sessionName = session?.name ?? '';
@@ -657,7 +661,7 @@ const FollowUpView: React.FC<{ sessionId: string }> = ({ sessionId }) => {
                                     type="text"
                                     value={searchQuery}
                                     onChange={e => setSearchQuery(e.target.value)}
-                                    placeholder="Search by name…"
+                                    placeholder="Search by name or phone…"
                                     className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 placeholder:text-slate-300 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-colors"
                                 />
                             </div>
