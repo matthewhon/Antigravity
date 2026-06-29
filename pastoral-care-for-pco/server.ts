@@ -525,6 +525,94 @@ async function startServer() {
     });
 
 
+    // ─── Outreach Follow-Up Note (post-session) ──────────────────────────────────
+    // Allows volunteers to add follow-up notes to people they contacted,
+    // even after the session has been closed.
+    app.post('/api/outreach/followup-note', express.json(), async (req: any, res: any) => {
+      const { sessionId, slotId, followUpNote, volunteerPhone } = req.body || {};
+      if (!sessionId || !slotId || !followUpNote?.trim() || !volunteerPhone) {
+        return res.status(400).json({ error: 'Missing required fields' });
+      }
+      try {
+        const db = getDb();
+
+        // Validate slot exists, belongs to session, and matches volunteer phone
+        const slotSnap = await db.collection('outreach_slots').doc(slotId).get();
+        if (!slotSnap.exists) return res.status(404).json({ error: 'Slot not found' });
+        const slot = slotSnap.data() as any;
+        if (slot.sessionId !== sessionId) return res.status(403).json({ error: 'Slot does not belong to session' });
+
+        const normalizedVolunteer = volunteerPhone.replace(/\D/g, '');
+        const slotVolunteer = (slot.volunteerPhone || '').replace(/\D/g, '');
+        if (normalizedVolunteer !== slotVolunteer) {
+          return res.status(403).json({ error: 'This contact was not assigned to you' });
+        }
+
+        // Load session for churchId and name
+        const sessionSnap = await db.collection('outreach_sessions').doc(sessionId).get();
+        if (!sessionSnap.exists) return res.status(404).json({ error: 'Session not found' });
+        const session = sessionSnap.data() as any;
+        const churchId: string = session.churchId;
+
+        // Append to followUpNotes array on the slot
+        const newEntry = { note: followUpNote.trim(), addedAt: Date.now() };
+        const existingNotes: any[] = slot.followUpNotes || [];
+        existingNotes.push(newEntry);
+        await db.collection('outreach_slots').doc(slotId).update({
+          followUpNotes: existingNotes,
+        });
+
+        // Write follow-up note to PCO and pastoral_notes (same pattern as log-contact)
+        const personId: string   = slot.assignedPersonId;
+        const personName: string = slot.assignedPersonName || 'Unknown';
+        const sessionName: string = session.name || 'Outreach Session';
+        const volunteerName: string = slot.volunteerName || 'Outreach Volunteer';
+        const dateStr = new Date().toLocaleString('en-US', {
+          month: 'short', day: 'numeric', year: 'numeric',
+          hour: 'numeric', minute: '2-digit', hour12: true, timeZoneName: 'short'
+        });
+        const noteContent = [
+          `📝 Follow-Up Note — Pastoral Outreach`,
+          `Session: ${sessionName}`,
+          `Added by: ${volunteerName}`,
+          `Date: ${dateStr}`,
+          '',
+          '---',
+          followUpNote.trim(),
+        ].join('\n');
+
+        const { writePcoNote } = await import('./backend/pcoNotes.js') as any;
+        const { createServerLogger } = await import('./services/logService.js') as any;
+        const log = createServerLogger(db);
+
+        // Fire-and-forget PCO note
+        writePcoNote({ db, log, churchId, personId, noteContent })
+          .catch(() => { /* already logged inside writePcoNote */ });
+
+        // Write pastoral_notes Firestore document
+        const noteId = `outreach_followup_${slotId}_${Date.now()}`;
+        const todayIso = new Date().toISOString().split('T')[0];
+        await db.collection('pastoral_notes').doc(noteId).set({
+          id: noteId,
+          churchId,
+          personId,
+          personName,
+          authorId:   'outreach_system',
+          authorName: volunteerName,
+          date:       todayIso,
+          type:       'Call',
+          content:    noteContent,
+          isCompleted: true,
+          tags: ['outreach', 'follow-up'],
+        }, { merge: true });
+
+        return res.json({ success: true, personId });
+      } catch (e: any) {
+        console.error('[outreach/followup-note]', e.message);
+        return res.status(500).json({ error: e.message });
+      }
+    });
+
     // ─── Web Push Notifications ─────────────────────────────────────────────────
     app.get('/push/vapid-public-key',  getVapidPublicKey);
     app.post('/push/subscribe',        express.json(), savePushSubscription);

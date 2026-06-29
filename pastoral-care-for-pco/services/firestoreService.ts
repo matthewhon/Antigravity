@@ -1656,6 +1656,27 @@ class FirestoreService {
       return [];
     }
   }
+
+  /**
+   * Fetch all completed slots for a specific volunteer (by phone) within a session.
+   * Returns only 'contacted' and 'no-answer' slots — used by the follow-up view.
+   */
+  async getVolunteerSlots(sessionId: string, volunteerPhone: string): Promise<OutreachSlot[]> {
+    try {
+      const q = query(
+        collection(db, 'outreach_slots'),
+        where('sessionId', '==', sessionId),
+        where('volunteerPhone', '==', volunteerPhone),
+        where('status', 'in', ['contacted', 'no-answer']),
+        orderBy('completedAt', 'desc')
+      );
+      const snap = await getDocs(q);
+      return snap.docs.map(d => d.data() as OutreachSlot);
+    } catch (e) {
+      console.warn('getVolunteerSlots error:', e);
+      return [];
+    }
+  }
 }
 
 export interface SermonVerseRecord {

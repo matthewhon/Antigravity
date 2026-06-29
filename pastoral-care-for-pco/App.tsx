@@ -835,7 +835,12 @@ const App: React.FC = () => {
   }
 
   // ─── Public Contact / Outreach Volunteer Route (no auth required) ────────────
-  const contactMatch = window.location.pathname.match(/^\/contact\/([^/]+)/);
+  // Follow-up route must match first (more specific path)
+  const followupMatch = window.location.pathname.match(/^\/contact\/([^/]+)\/followup/);
+  if (followupMatch) {
+    return <PublicContactView sessionId={followupMatch[1]} mode="followup" />;
+  }
+  const contactMatch = window.location.pathname.match(/^\/contact\/([^/]+)$/);
   if (contactMatch) {
     return <PublicContactView sessionId={contactMatch[1]} />;
   }

@@ -1976,5 +1976,7 @@ export interface OutreachSlot {
      * be re-assigned to another volunteer (24-hour cooldown).
      */
     noAnswerUntil?: number | null;
+    /** Follow-up notes added after the initial contact attempt */
+    followUpNotes?: { note: string; addedAt: number }[];
 }
 

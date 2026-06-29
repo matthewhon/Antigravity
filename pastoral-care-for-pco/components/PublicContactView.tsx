@@ -3,7 +3,8 @@ import { OutreachSession, OutreachSlot } from '../types';
 import { firestore } from '../services/firestoreService';
 import {
     Phone, Mail, CheckCircle2, PhoneOff, ArrowRight, LogOut,
-    Loader2, Heart, Users, ChevronRight, Award, TrendingUp, MessageSquare
+    Loader2, Heart, Users, ChevronRight, Award, TrendingUp, MessageSquare,
+    Search, Edit3, Send, Clock as ClockIcon
 } from 'lucide-react';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -499,20 +500,30 @@ const PausedCard: React.FC<{ sessionName: string }> = ({ sessionName }) => (
 
 // ─── Closed Session Card ────────────────────────────────────────────────────────────────────────────────────
 
-const ClosedCard: React.FC<{ sessionName: string }> = ({ sessionName }) => (
-    <div className="bg-white rounded-[2rem] shadow-xl border border-slate-100 p-10 text-center">
-        <div className="w-16 h-16 rounded-2xl bg-violet-100 flex items-center justify-center mx-auto mb-5">
-            <CheckCircle2 size={32} className="text-violet-500" />
+const ClosedCard: React.FC<{ sessionName: string; sessionId: string }> = ({ sessionName, sessionId }) => {
+    const followUpUrl = `${window.location.protocol}//${window.location.host}/contact/${sessionId}/followup`;
+    return (
+        <div className="bg-white rounded-[2rem] shadow-xl border border-slate-100 p-10 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-violet-100 flex items-center justify-center mx-auto mb-5">
+                <CheckCircle2 size={32} className="text-violet-500" />
+            </div>
+            <h2 className="text-xl font-black text-slate-900 mb-2">Session Ended</h2>
+            <p className="text-sm text-slate-500 mb-4">
+                <span className="font-bold">{sessionName}</span> has been closed by the coordinator. Thank you for helping!
+            </p>
+            <div className="border-t border-slate-100 pt-5 mt-5">
+                <p className="text-xs text-slate-400 mb-3">Need to add follow-up notes for someone who called back?</p>
+                <a
+                    href={followUpUrl}
+                    className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-2xl text-sm font-black uppercase tracking-wide shadow-lg shadow-indigo-200 transition-all"
+                >
+                    <Edit3 size={15} />
+                    Open Follow-Up Notes
+                </a>
+            </div>
         </div>
-        <h2 className="text-xl font-black text-slate-900 mb-2">Session Ended</h2>
-        <p className="text-sm text-slate-500 mb-4">
-            <span className="font-bold">{sessionName}</span> has been closed by the coordinator. Thank you for helping!
-        </p>
-        <p className="text-xs text-slate-400">
-            If you believe this is an error, please contact your session coordinator.
-        </p>
-    </div>
-);
+    );
+};
 
 // ─── Not Found Card ───────────────────────────────────────────────────────────
 
@@ -526,9 +537,280 @@ const NotFoundCard: React.FC = () => (
 
 // ─── Main Public View ─────────────────────────────────────────────────────────
 
+// ─── Follow-Up View (post-session note editing) ──────────────────────────────
+
+const FollowUpView: React.FC<{ sessionId: string }> = ({ sessionId }) => {
+    const [session, setSession] = useState<OutreachSession | null>(null);
+    const [viewState, setViewState] = useState<'loading' | 'phone' | 'list' | 'not-found'>('loading');
+    const [volunteerPhone, setVolunteerPhone] = useState('');
+    const [slots, setSlots] = useState<OutreachSlot[]>([]);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [expandedSlotId, setExpandedSlotId] = useState<string | null>(null);
+    const [noteText, setNoteText] = useState('');
+    const [saving, setSaving] = useState(false);
+    const [savedSlotId, setSavedSlotId] = useState<string | null>(null);
+
+    // Load session on mount
+    useEffect(() => {
+        if (!sessionId) { setViewState('not-found'); return; }
+        firestore.getOutreachSession(sessionId).then(s => {
+            if (!s) { setViewState('not-found'); return; }
+            setSession(s);
+            // Check for stored phone
+            const stored = sessionStorage.getItem(STORAGE_KEY(sessionId));
+            if (stored) setVolunteerPhone(stored);
+            setViewState('phone');
+        });
+    }, [sessionId]);
+
+    const handlePhoneSubmit = async (phone: string) => {
+        if (!session) return;
+        setVolunteerPhone(phone);
+        sessionStorage.setItem(STORAGE_KEY(sessionId), phone);
+        setViewState('loading');
+        const mySlots = await firestore.getVolunteerSlots(sessionId, phone);
+        setSlots(mySlots);
+        setViewState('list');
+    };
+
+    const handleSaveNote = async (slot: OutreachSlot) => {
+        if (!noteText.trim() || saving) return;
+        setSaving(true);
+        try {
+            const resp = await fetch('/api/outreach/followup-note', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    sessionId,
+                    slotId: slot.id,
+                    followUpNote: noteText.trim(),
+                    volunteerPhone,
+                }),
+            });
+            if (!resp.ok) {
+                const data = await resp.json().catch(() => ({ error: 'Failed' }));
+                throw new Error(data.error || 'Failed to save note');
+            }
+            // Update local state
+            setSlots(prev => prev.map(s => {
+                if (s.id !== slot.id) return s;
+                const updated = { ...s };
+                updated.followUpNotes = [...(updated.followUpNotes || []), { note: noteText.trim(), addedAt: Date.now() }];
+                return updated;
+            }));
+            setNoteText('');
+            setExpandedSlotId(null);
+            setSavedSlotId(slot.id);
+            setTimeout(() => setSavedSlotId(null), 3000);
+        } catch (err: any) {
+            alert(err.message || 'Failed to save note');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const filteredSlots = useMemo(() => {
+        if (!searchQuery.trim()) return slots;
+        const q = searchQuery.toLowerCase();
+        return slots.filter(s => s.assignedPersonName.toLowerCase().includes(q));
+    }, [slots, searchQuery]);
+
+    const sessionName = session?.name ?? '';
+
+    return (
+        <Shell sessionName={sessionName || undefined}>
+            {viewState === 'loading' && <LoadingCard message="Loading your contacts…" />}
+            {viewState === 'not-found' && <NotFoundCard />}
+            {viewState === 'phone' && (
+                <div>
+                    <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 mb-4 text-center">
+                        <Edit3 size={20} className="mx-auto text-indigo-500 mb-2" />
+                        <p className="text-sm font-bold text-indigo-800">Follow-Up Notes</p>
+                        <p className="text-xs text-indigo-600 mt-1">
+                            Enter your phone number to view the people you contacted and add follow-up notes.
+                        </p>
+                    </div>
+                    <PhoneStep sessionName={sessionName} onSubmit={handlePhoneSubmit} isLoading={false} />
+                </div>
+            )}
+            {viewState === 'list' && (
+                <div className="space-y-4">
+                    {/* Header */}
+                    <div className="bg-white rounded-[2rem] shadow-xl border border-slate-100 p-6">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center shadow-md shadow-indigo-200">
+                                <Edit3 size={18} className="text-white" />
+                            </div>
+                            <div>
+                                <h2 className="text-lg font-black text-slate-900">Follow-Up Notes</h2>
+                                <p className="text-[11px] text-slate-400 font-medium">
+                                    {slots.length} {slots.length === 1 ? 'contact' : 'contacts'} from your session
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Search */}
+                        {slots.length > 3 && (
+                            <div className="relative">
+                                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" />
+                                <input
+                                    type="text"
+                                    value={searchQuery}
+                                    onChange={e => setSearchQuery(e.target.value)}
+                                    placeholder="Search by name…"
+                                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 placeholder:text-slate-300 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-colors"
+                                />
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Empty state */}
+                    {slots.length === 0 && (
+                        <div className="bg-white rounded-[2rem] shadow-xl border border-slate-100 p-10 text-center">
+                            <Users size={32} className="mx-auto text-slate-300 mb-3" />
+                            <h3 className="text-lg font-black text-slate-700 mb-2">No Contacts Found</h3>
+                            <p className="text-sm text-slate-400">We couldn't find any completed contacts for your phone number in this session.</p>
+                        </div>
+                    )}
+
+                    {/* Contact cards */}
+                    {filteredSlots.map(slot => {
+                        const isExpanded = expandedSlotId === slot.id;
+                        const justSaved = savedSlotId === slot.id;
+                        return (
+                            <div key={slot.id} className="bg-white rounded-[2rem] shadow-xl shadow-slate-200/40 border border-slate-100 overflow-hidden">
+                                {/* Status stripe */}
+                                <div className={`h-1.5 ${slot.status === 'contacted' ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+
+                                <div className="p-5">
+                                    {/* Person info */}
+                                    <div className="flex items-center justify-between mb-3">
+                                        <div className="flex items-center gap-3">
+                                            <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-white font-black text-lg shadow-md ${
+                                                slot.status === 'contacted'
+                                                    ? 'bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-emerald-200'
+                                                    : 'bg-gradient-to-br from-rose-400 to-rose-600 shadow-rose-200'
+                                            }`}>
+                                                {slot.assignedPersonName.slice(0, 1).toUpperCase()}
+                                            </div>
+                                            <div>
+                                                <p className="font-black text-slate-900 leading-tight">{slot.assignedPersonName}</p>
+                                                <div className="flex items-center gap-2 mt-0.5">
+                                                    <span className={`inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wide px-2 py-0.5 rounded-full ${
+                                                        slot.status === 'contacted'
+                                                            ? 'bg-emerald-100 text-emerald-700'
+                                                            : 'bg-rose-100 text-rose-700'
+                                                    }`}>
+                                                        {slot.status === 'contacted' ? '✅ Reached' : '📵 No Answer'}
+                                                    </span>
+                                                    {slot.completedAt && (
+                                                        <span className="text-[9px] text-slate-400">
+                                                            {new Date(slot.completedAt).toLocaleDateString()}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Original notes */}
+                                    {slot.notes && (
+                                        <div className="bg-slate-50 rounded-xl px-4 py-2.5 mb-3">
+                                            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Original Notes</p>
+                                            <p className="text-sm text-slate-600">{slot.notes}</p>
+                                        </div>
+                                    )}
+
+                                    {/* Existing follow-up notes */}
+                                    {slot.followUpNotes && slot.followUpNotes.length > 0 && (
+                                        <div className="space-y-2 mb-3">
+                                            {slot.followUpNotes.map((fn, i) => (
+                                                <div key={i} className="bg-indigo-50 rounded-xl px-4 py-2.5">
+                                                    <div className="flex items-center gap-1.5 mb-1">
+                                                        <Edit3 size={10} className="text-indigo-500" />
+                                                        <p className="text-[9px] font-black uppercase tracking-widest text-indigo-500">Follow-Up</p>
+                                                        <span className="text-[9px] text-slate-400 ml-auto">
+                                                            {new Date(fn.addedAt).toLocaleDateString()}
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-sm text-slate-700">{fn.note}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {/* Just saved indicator */}
+                                    {justSaved && (
+                                        <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2.5 mb-3">
+                                            <CheckCircle2 size={14} className="text-emerald-500" />
+                                            <p className="text-xs font-bold text-emerald-700">Note saved successfully!</p>
+                                        </div>
+                                    )}
+
+                                    {/* Add note button / form */}
+                                    {isExpanded ? (
+                                        <div className="space-y-2">
+                                            <textarea
+                                                value={noteText}
+                                                onChange={e => setNoteText(e.target.value)}
+                                                placeholder="Type your follow-up note…"
+                                                rows={3}
+                                                autoFocus
+                                                className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-400 rounded-xl px-4 py-3 text-sm text-slate-700 placeholder:text-slate-300 outline-none focus:ring-2 focus:ring-indigo-100 resize-none transition-colors"
+                                            />
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={() => handleSaveNote(slot)}
+                                                    disabled={!noteText.trim() || saving}
+                                                    className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white py-2.5 rounded-xl text-xs font-black uppercase tracking-wide shadow-md shadow-indigo-200 transition-all"
+                                                >
+                                                    {saving
+                                                        ? <><Loader2 size={14} className="animate-spin" /> Saving…</>
+                                                        : <><Send size={14} /> Save Note</>}
+                                                </button>
+                                                <button
+                                                    onClick={() => { setExpandedSlotId(null); setNoteText(''); }}
+                                                    className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-xl text-xs font-bold transition-colors"
+                                                >
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <button
+                                            onClick={() => { setExpandedSlotId(slot.id); setNoteText(''); }}
+                                            className="w-full flex items-center justify-center gap-2 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 py-3 rounded-xl text-xs font-black uppercase tracking-wide transition-all"
+                                        >
+                                            <Edit3 size={14} />
+                                            Add Follow-Up Note
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })}
+
+                    {/* No search results */}
+                    {filteredSlots.length === 0 && slots.length > 0 && (
+                        <div className="bg-white rounded-2xl border border-slate-100 p-6 text-center">
+                            <Search size={24} className="mx-auto text-slate-300 mb-2" />
+                            <p className="text-sm text-slate-400">No contacts match "{searchQuery}"</p>
+                        </div>
+                    )}
+                </div>
+            )}
+        </Shell>
+    );
+};
+
+// ─── Main Public View ─────────────────────────────────────────────────────────
+
 type ViewState = 'loading' | 'phone' | 'assigning' | 'contact' | 'done-exhausted' | 'done-ended' | 'not-found' | 'paused' | 'closed';
 
-export const PublicContactView: React.FC<{ sessionId: string }> = ({ sessionId }) => {
+export const PublicContactView: React.FC<{ sessionId: string; mode?: 'followup' }> = ({ sessionId, mode }) => {
+
+    // If follow-up mode, render the dedicated view
+    if (mode === 'followup') return <FollowUpView sessionId={sessionId} />;
 
     const [session, setSession] = useState<OutreachSession | null>(null);
     const [viewState, setViewState] = useState<ViewState>('loading');
@@ -741,7 +1023,7 @@ export const PublicContactView: React.FC<{ sessionId: string }> = ({ sessionId }
             {viewState === 'loading' && <LoadingCard />}
             {viewState === 'not-found' && <NotFoundCard />}
             {viewState === 'paused' && <PausedCard sessionName={sessionName} />}
-            {viewState === 'closed' && <ClosedCard sessionName={sessionName} />}
+            {viewState === 'closed' && <ClosedCard sessionName={sessionName} sessionId={sessionId} />}
             {viewState === 'phone' && (
                 <PhoneStep sessionName={sessionName} onSubmit={handlePhoneSubmit} isLoading={false} />
             )}
