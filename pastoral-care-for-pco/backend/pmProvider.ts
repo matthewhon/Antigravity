@@ -202,7 +202,31 @@ export class PostmarkProvider implements EmailProvider {
                 const resBody = await res.json().catch(() => ({}));
                 const errorCode = (resBody as any)?.ErrorCode;
                 const message   = (resBody as any)?.Message || `Postmark HTTP ${res.status}`;
+
+                // ErrorCode 406 = inactive recipient (hard bounce, spam complaint,
+                // or manual suppression).  Log a warning and skip so the remaining
+                // recipients still receive their emails.
+                if (errorCode === 406) {
+                    const recipients = batch.map(m => m.to).join(', ');
+                    console.warn(`[Postmark] Skipping inactive recipient(s): ${recipients} — ${message}`);
+                    continue;
+                }
+
                 throw new Error(`[Postmark] ErrorCode=${errorCode} ${message}`);
+            }
+
+            // For batch sends, Postmark returns 200 with per-message results.
+            // Individual messages may still have ErrorCode 406; log those as
+            // warnings instead of silently swallowing them.
+            if (batch.length > 1) {
+                const results = await res.json().catch(() => []);
+                if (Array.isArray(results)) {
+                    for (const r of results) {
+                        if (r.ErrorCode === 406) {
+                            console.warn(`[Postmark] Skipping inactive recipient: ${r.To} — ${r.Message}`);
+                        }
+                    }
+                }
             }
         }
     }
