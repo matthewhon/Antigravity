@@ -283,7 +283,7 @@ interface SessionModalProps {
     initial?: Pick<OutreachSession, 'name' | 'filters'>;
 }
 
-const SessionModal: React.FC<SessionModalProps> = ({ groups, memberStatuses, onSave, onClose, initial }) => {
+const SessionModal: React.FC<SessionModalProps> = ({ groups = [], memberStatuses, onSave, onClose, initial }) => {
     const [name, setName] = useState(initial?.name ?? '');
     const [riskCats, setRiskCats] = useState<OutreachSession['filters']['riskCategories']>(
         initial?.filters.riskCategories ?? ['Disconnected', 'At Risk']
@@ -391,7 +391,7 @@ const SessionModal: React.FC<SessionModalProps> = ({ groups, memberStatuses, onS
                     )}
 
                     {/* Absentee Group Filter */}
-                    {groups.length > 0 && (
+                    {groups?.length > 0 && (
                         <div>
                             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">
                                 Filter by Group Absentees <span className="font-medium text-slate-300">(empty = all)</span>
@@ -577,7 +577,7 @@ interface CareContactPageProps {
     groups: PcoGroup[];
 }
 
-export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, people, groups }) => {
+export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, people, groups = [] }) => {
     const [sessions, setSessions]         = useState<OutreachSession[]>([]);
     const [selectedId, setSelectedId]     = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen]   = useState(false);
