@@ -855,7 +855,7 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
                     </div>
 
                     {/* Totals Section */}
-                    {validDefs.length > 0 && (
+                    {validDefs.length > 0 && !ministry.id.toLowerCase().includes('youtube') && !ministry.name.toLowerCase().includes('youtube') && (
                         <div className="border-t border-slate-100 dark:border-slate-800 pt-4 mt-6 space-y-3">
                             <h5 className="text-[9px] font-black text-slate-400 dark:text-slate-550 uppercase tracking-widest">Totals Overview</h5>
                             <div className="grid grid-cols-1 gap-2.5">
