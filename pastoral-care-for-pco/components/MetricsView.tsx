@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { MetricDefinition, Ministry, MetricEntry, User, CensusStats, Church, PeopleDashboardData } from '../types';
+import { MetricDefinition, Ministry, MetricEntry, User, CensusStats, Church, PeopleDashboardData, WidgetDefinition } from '../types';
 import { firestore } from '../services/firestoreService';
 import { StatCard, WidgetWrapper } from './SharedUI';
 import { syncYoutubeMetrics } from '../services/youtubeService';
+import WidgetsController from './WidgetsController';
 import { 
     LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
@@ -16,6 +17,7 @@ interface MetricsViewProps {
     church?: Church;
     systemSettings?: any;
     onUpdateChurch?: (updates: Partial<Church>) => void;
+    onUpdateWidgets?: (newWidgets: string[]) => void;
 }
 
 type TimeFilter = 'Week' | 'Month' | 'Quarter' | 'Year';
@@ -48,7 +50,7 @@ interface MetricsViewPropsExtended extends MetricsViewProps {
     activePage?: 'Dashboard' | 'Input' | 'Settings';
 }
 
-export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, currentUser, censusData, peopleData, church, systemSettings, onUpdateChurch, activePage = 'Dashboard' }) => {
+export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, currentUser, censusData, peopleData, church, systemSettings, onUpdateChurch, onUpdateWidgets, activePage = 'Dashboard' }) => {
     const activeTab = activePage;
     const [definitions, setDefinitions] = useState<MetricDefinition[]>([]);
     const [ministries, setMinistries] = useState<Ministry[]>([]);
@@ -72,15 +74,10 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
 
     // Dashboard State
     const [timeFilter, setTimeFilter] = useState<TimeFilter>('Year');
-    const [widgetOrder, setWidgetOrder] = useState<string[]>([]);
     
     // Drag & Drop Refs
     const dragItem = useRef<number | null>(null);
     const dragOverItem = useRef<number | null>(null);
-
-    const showCensus = church?.metricsSettings?.showCensusWidgets || false;
-    const showCityPenetration = church?.metricsSettings?.showCityPenetration || false;
-    const showMissionalGap = church?.metricsSettings?.showMissionalGap || false;
 
     // YouTube State
     const [isAutoSyncing, setIsAutoSyncing] = useState(false);
@@ -193,43 +190,45 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
         }
     };
 
-    // Reconcile Widget Order based on toggles and available ministries
-    useEffect(() => {
-        const censusIds = showCensus ? ['census_pop', 'census_income', 'census_age', 'census_poverty'] : [];
-        const impactIds = [];
-        if (showMissionalGap) impactIds.push('missional_gap');
-        if (showCityPenetration) impactIds.push('city_penetration');
-        
+    // Available widgets list
+    const availableWidgets = useMemo<WidgetDefinition[]>(() => {
+        const list: WidgetDefinition[] = [
+            { id: 'census_pop', label: 'Census: Total Population', icon: '📊' },
+            { id: 'census_income', label: 'Census: Median Income', icon: '💰' },
+            { id: 'census_age', label: 'Census: Median Age', icon: '👥' },
+            { id: 'census_poverty', label: 'Census: Poverty Rate', icon: '📉' },
+            { id: 'missional_gap', label: 'Missional Gap', icon: '🏙️' },
+            { id: 'city_penetration', label: 'City Penetration', icon: '📍' },
+        ];
+
         const showYoutube = church?.metricsSettings?.showYoutubeWidgets || false;
-        const youtubeIds = (showYoutube && church?.metricsSettings?.youtubeChannelId) ? ['youtube_channel', 'youtube_latest_video'] : [];
-        
-        const ministryIds = ministries.map(m => `ministry_${m.id}`);
-        
-        const allRelevantIds = [...censusIds, ...impactIds, ...youtubeIds, ...ministryIds];
-        const savedOrder = church?.metricsSettings?.dashboardOrder || [];
-
-        // 1. Keep existing saved order, removing obsolete IDs
-        let newOrder = savedOrder.filter(id => allRelevantIds.includes(id));
-        
-        // 2. Append new IDs that weren't in the saved order
-        const missingIds = allRelevantIds.filter(id => !newOrder.includes(id));
-        newOrder = [...newOrder, ...missingIds];
-
-        // If order changed significantly (e.g. initial load or toggle change), update state
-        if (JSON.stringify(newOrder) !== JSON.stringify(widgetOrder)) {
-            setWidgetOrder(newOrder);
+        if (showYoutube && church?.metricsSettings?.youtubeChannelId) {
+            list.push({ id: 'youtube_channel', label: 'YouTube Channel Stats', icon: '▶️' });
+            list.push({ id: 'youtube_latest_video', label: 'YouTube Latest Video', icon: '🎬' });
         }
-    }, [showCensus, showCityPenetration, showMissionalGap, ministries, church?.metricsSettings?.dashboardOrder, church?.metricsSettings?.showYoutubeWidgets, church?.metricsSettings?.youtubeChannelId]);
 
-    const handleUpdateOrder = (newOrder: string[]) => {
-        setWidgetOrder(newOrder);
-        if (onUpdateChurch && church) {
-            onUpdateChurch({
-                metricsSettings: {
-                    ...church.metricsSettings,
-                    dashboardOrder: newOrder
-                }
-            });
+        ministries.forEach(m => {
+            list.push({ id: `ministry_${m.id}`, label: `${m.name} Chart`, icon: '📈' });
+        });
+
+        return list;
+    }, [church?.metricsSettings?.showYoutubeWidgets, church?.metricsSettings?.youtubeChannelId, ministries]);
+
+    // Visible widgets list
+    const visibleWidgets = useMemo<string[]>(() => {
+        const saved = currentUser?.widgetPreferences?.['metrics'];
+        if (saved && Array.isArray(saved)) {
+            // Filter to only include widgets that are actually available
+            return saved.filter(id => availableWidgets.some(w => w.id === id));
+        }
+
+        // Default list of widgets: all available widgets!
+        return availableWidgets.map(w => w.id);
+    }, [currentUser?.widgetPreferences, availableWidgets]);
+
+    const handleRemoveWidget = (id: string) => {
+        if (onUpdateWidgets) {
+            onUpdateWidgets(visibleWidgets.filter(w => w !== id));
         }
     };
 
@@ -251,38 +250,16 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
     const handleDragEnd = (e: React.DragEvent<HTMLDivElement>) => {
         e.currentTarget.style.opacity = '1';
         if (dragItem.current !== null && dragOverItem.current !== null && dragItem.current !== dragOverItem.current) {
-            const copy = [...widgetOrder];
+            const copy = [...visibleWidgets];
             const draggedContent = copy[dragItem.current];
             copy.splice(dragItem.current, 1);
             copy.splice(dragOverItem.current, 0, draggedContent);
-            handleUpdateOrder(copy);
+            if (onUpdateWidgets) {
+                onUpdateWidgets(copy);
+            }
         }
         dragItem.current = null;
         dragOverItem.current = null;
-    };
-
-    const handleToggleCensus = () => {
-        if (onUpdateChurch && church) {
-            onUpdateChurch({
-                metricsSettings: { ...church.metricsSettings, showCensusWidgets: !showCensus }
-            });
-        }
-    };
-
-    const handleToggleCityPenetration = () => {
-        if (onUpdateChurch && church) {
-            onUpdateChurch({
-                metricsSettings: { ...church.metricsSettings, showCityPenetration: !showCityPenetration }
-            });
-        }
-    };
-
-    const handleToggleMissionalGap = () => {
-        if (onUpdateChurch && church) {
-            onUpdateChurch({
-                metricsSettings: { ...church.metricsSettings, showMissionalGap: !showMissionalGap }
-            });
-        }
     };
 
     // --- Settings Handlers (Same as before) ---
@@ -491,10 +468,46 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
 
         if (id.startsWith('census_')) {
             if (!censusData) return null;
-            if (id === 'census_pop') return <StatCard label="Total Population" value={censusData.totalPopulation.toLocaleString()} color="indigo" source="US Census" />;
-            if (id === 'census_income') return <StatCard label="Median Income" value={`$${censusData.economics?.medianHouseholdIncome?.toLocaleString() || 'N/A'}`} color="emerald" source="US Census" />;
-            if (id === 'census_age') return <StatCard label="Median Age" value={censusData.demographics?.medianAge?.toFixed(1) || 'N/A'} color="violet" source="US Census" />;
-            if (id === 'census_poverty') return <StatCard label="Poverty Rate" value={`${censusData.economics?.povertyRate?.toFixed(1)}%`} color="amber" source="US Census" />;
+            if (id === 'census_pop') {
+                return (
+                    <WidgetWrapper title="Total Population" onRemove={() => handleRemoveWidget(id)} source="US Census">
+                        <div className="flex flex-col justify-center items-center h-full py-8 text-center">
+                            <span className="text-4xl font-black text-slate-850 dark:text-white tracking-tight">{censusData.totalPopulation.toLocaleString()}</span>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2">Residents</span>
+                        </div>
+                    </WidgetWrapper>
+                );
+            }
+            if (id === 'census_income') {
+                return (
+                    <WidgetWrapper title="Median Income" onRemove={() => handleRemoveWidget(id)} source="US Census">
+                        <div className="flex flex-col justify-center items-center h-full py-8 text-center">
+                            <span className="text-4xl font-black text-slate-850 dark:text-white tracking-tight">${censusData.economics?.medianHouseholdIncome?.toLocaleString() || 'N/A'}</span>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2">Household Median</span>
+                        </div>
+                    </WidgetWrapper>
+                );
+            }
+            if (id === 'census_age') {
+                return (
+                    <WidgetWrapper title="Median Age" onRemove={() => handleRemoveWidget(id)} source="US Census">
+                        <div className="flex flex-col justify-center items-center h-full py-8 text-center">
+                            <span className="text-4xl font-black text-slate-850 dark:text-white tracking-tight">{censusData.demographics?.medianAge?.toFixed(1) || 'N/A'}</span>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2">Years Old</span>
+                        </div>
+                    </WidgetWrapper>
+                );
+            }
+            if (id === 'census_poverty') {
+                return (
+                    <WidgetWrapper title="Poverty Rate" onRemove={() => handleRemoveWidget(id)} source="US Census">
+                        <div className="flex flex-col justify-center items-center h-full py-8 text-center">
+                            <span className="text-4xl font-black text-slate-850 dark:text-white tracking-tight">{censusData.economics?.povertyRate?.toFixed(1)}%</span>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2">Below Poverty Line</span>
+                        </div>
+                    </WidgetWrapper>
+                );
+            }
         }
 
         if (id === 'youtube_channel') {
@@ -717,10 +730,9 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
                 </WidgetWrapper>
             );
         }
-
         if (id === 'missional_gap') {
             return (
-                <WidgetWrapper title="Missional Gap" onRemove={() => handleToggleMissionalGap()} source="Census & PCO">
+                <WidgetWrapper title="Missional Gap" onRemove={() => handleRemoveWidget(id)} source="Census & PCO">
                     <div className="flex flex-col justify-center h-full items-center text-center p-6">
                         <div className="w-40 h-40 rounded-full border-[16px] border-slate-100 dark:border-slate-800 flex items-center justify-center relative mb-6">
                             <div className="absolute inset-0 rounded-full border-[16px] border-emerald-500" style={{clipPath: `inset(${100 - (peopleData && censusData ? (peopleData.stats.total / censusData.totalPopulation) * 100 : 0)}% 0 0 0)`}}></div>
@@ -737,7 +749,7 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
 
         if (id === 'city_penetration') {
             return (
-                <WidgetWrapper title="City Penetration" onRemove={() => handleToggleCityPenetration()} source="PCO Addresses & Census">
+                <WidgetWrapper title="City Penetration" onRemove={() => handleRemoveWidget(id)} source="PCO Addresses & Census">
                     <div className="space-y-4 max-h-80 overflow-y-auto custom-scrollbar pr-2">
                         {peopleData?.geoData?.byCity.map((city, idx) => {
                             const censusLoc = censusData?.locationName.toLowerCase() || '';
@@ -780,11 +792,12 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
             if (!ministry) return null;
             const { chartData, validDefs } = getChartDataForMinistry(ministry.id);
             return (
-                <div className="bg-white dark:bg-slate-850 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col h-96 h-full transition-colors">
-                    <div className="mb-6 flex justify-between items-center">
-                        <h4 className="font-black text-slate-900 dark:text-white text-lg">{ministry.name}</h4>
-                        <span className="text-[9px] font-black bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-2 py-1 rounded uppercase tracking-widest">{timeFilter} View</span>
-                    </div>
+                <WidgetWrapper 
+                    title={ministry.name} 
+                    onRemove={() => handleRemoveWidget(id)} 
+                    source="Manual Entry"
+                    headerControl={<span className="text-[9px] font-black bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-2 py-1 rounded uppercase tracking-widest">{timeFilter} View</span>}
+                >
                     <div className="h-64 w-full">
                         {validDefs.length > 0 ? (
                             <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={1}>
@@ -803,7 +816,7 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
                             <div className="h-full flex items-center justify-center text-slate-400 text-xs font-bold bg-slate-50 dark:bg-slate-900 rounded-2xl">No metrics defined.</div>
                         )}
                     </div>
-                </div>
+                </WidgetWrapper>
             );
         }
         return null;
@@ -821,27 +834,20 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
                     <h3 className="text-4xl font-black tracking-tighter text-slate-900 dark:text-white">{pageTitle}</h3>
                     <p className="text-slate-400 dark:text-slate-500 font-medium uppercase text-[10px] tracking-widest mt-1">{pageSubtitle}</p>
                 </div>
+                {activeTab === 'Dashboard' && onUpdateWidgets && (
+                    <div className="flex items-center gap-4">
+                        <WidgetsController 
+                            availableWidgets={availableWidgets}
+                            visibleWidgets={visibleWidgets}
+                            onUpdate={onUpdateWidgets}
+                            currentTheme={currentUser.theme}
+                        />
+                    </div>
+                )}
             </header>
 
             {activeTab === 'Settings' && (
                 <>
-                    <div className="bg-white dark:bg-slate-850 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm mb-8 transition-colors">
-                        <h4 className="font-black text-indigo-900 dark:text-indigo-300 mb-6">Dashboard Configuration</h4>
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between">
-                                <div><p className="font-bold text-slate-900 dark:text-white text-sm">Census Context Widgets</p><p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Display community demographics (population, income, etc.)</p></div>
-                                <button onClick={handleToggleCensus} title="Toggle Census Context Widgets" className={`w-14 h-8 rounded-full p-1 transition-all duration-300 ${showCensus ? 'bg-indigo-600' : 'bg-slate-200 dark:bg-slate-700'}`}><div className={`w-6 h-6 bg-white rounded-full shadow-md transition-transform duration-300 ${showCensus ? 'translate-x-6' : ''}`}></div></button>
-                            </div>
-                            <div className="flex items-center justify-between">
-                                <div><p className="font-bold text-slate-900 dark:text-white text-sm">City Penetration</p><p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Show member distribution across local cities vs population.</p></div>
-                                <button onClick={handleToggleCityPenetration} title="Toggle City Penetration Widget" className={`w-14 h-8 rounded-full p-1 transition-all duration-300 ${showCityPenetration ? 'bg-indigo-600' : 'bg-slate-200 dark:bg-slate-700'}`}><div className={`w-6 h-6 bg-white rounded-full shadow-md transition-transform duration-300 ${showCityPenetration ? 'translate-x-6' : ''}`}></div></button>
-                            </div>
-                            <div className="flex items-center justify-between">
-                                <div><p className="font-bold text-slate-900 dark:text-white text-sm">Missional Gap</p><p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Display unreached population count.</p></div>
-                                <button onClick={handleToggleMissionalGap} title="Toggle Missional Gap Widget" className={`w-14 h-8 rounded-full p-1 transition-all duration-300 ${showMissionalGap ? 'bg-indigo-600' : 'bg-slate-200 dark:bg-slate-700'}`}><div className={`w-6 h-6 bg-white rounded-full shadow-md transition-transform duration-300 ${showMissionalGap ? 'translate-x-6' : ''}`}></div></button>
-                            </div>
-                        </div>
-                    </div>
                     {/* ... (Existing Ministries & Definitions Config UI) ... */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         <div className="bg-white dark:bg-slate-850 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm transition-colors">
@@ -934,7 +940,7 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
 
                     {/* Unified Drag & Drop Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 grid-flow-row-dense">
-                        {widgetOrder.map((id, index) => {
+                        {visibleWidgets.map((id, index) => {
                             let colSpan = 'col-span-1';
                             if (id.startsWith('ministry_') || id === 'city_penetration' || id === 'youtube_channel' || id === 'youtube_latest_video') {
                                 colSpan = 'col-span-1 md:col-span-2 lg:col-span-2';
@@ -954,10 +960,10 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
                                 </div>
                             );
                         })}
-                        {widgetOrder.length === 0 && (
+                        {visibleWidgets.length === 0 && (
                             <div className="col-span-full text-center py-20 bg-slate-50 dark:bg-slate-900 rounded-[3rem] border border-dashed border-slate-200 dark:border-slate-700">
                                 <p className="text-slate-400 font-bold mb-2">Dashboard Empty</p>
-                                <p className="text-indigo-600 font-black text-xs uppercase tracking-widest">Use Metrics → Configure in the nav to add widgets</p>
+                                <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">Use the "Customize Layout" button to add widgets.</p>
                             </div>
                         )}
                     </div>

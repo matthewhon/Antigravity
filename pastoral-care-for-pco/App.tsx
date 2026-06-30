@@ -1038,8 +1038,10 @@ const App: React.FC = () => {
                         systemSettings={systemSettings || {}}
                         activePage={view === 'metrics-input' ? 'Input' : view === 'metrics-settings' ? 'Settings' : 'Dashboard'}
                         onUpdateChurch={(updates) => { firestore.updateChurch(church!.id, updates); setChurch({ ...church!, ...updates }); }}
+                        onUpdateWidgets={handleUpdateWidgets}
                     />
                 } />
+
                 <Route path="/settings" element={
                     <RoleAdminView 
                         currentUser={user!}

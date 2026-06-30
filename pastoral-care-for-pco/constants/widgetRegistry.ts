@@ -255,6 +255,7 @@ export const getDefaultWidgets = (view: string): string[] => {
         case 'giving_donor': return ['topGivers', 'demographics', 'donorLifecycle'];
         case 'pastoral': return ['church_growth_stats', 'church_spiritual_stats', 'member_headline_stats', 'member_map'];
         case 'pastoral_care': return ['care_log', 'prayer_requests', 'follow_ups', 'care_ai_agent', 'care_people_list'];
+        case 'metrics': return ['census_pop', 'census_income', 'census_age', 'census_poverty', 'missional_gap', 'city_penetration'];
         default: return [];
     }
 };
