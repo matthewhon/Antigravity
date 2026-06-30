@@ -1044,6 +1044,7 @@ const App: React.FC = () => {
                         currentUser={user!}
                         churchId={church!.id}
                         church={church!}
+                        systemSettings={systemSettings || {}}
                         onUpdateChurch={(updates) => { firestore.updateChurch(church!.id, updates); setChurch({ ...church!, ...updates }); }}
                         initialTab={settingsTab}
                         onSync={handleSync}

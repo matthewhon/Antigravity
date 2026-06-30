@@ -93,7 +93,29 @@ export interface Church {
         stripeItemId?: string;
     };
 
-    metricsSettings?: { showCensusWidgets?: boolean, showCityPenetration?: boolean, showMissionalGap?: boolean, dashboardOrder?: string[] };
+    metricsSettings?: { 
+        showCensusWidgets?: boolean; 
+        showCityPenetration?: boolean; 
+        showMissionalGap?: boolean; 
+        dashboardOrder?: string[]; 
+        youtubeChannelId?: string;
+        showYoutubeWidgets?: boolean;
+        youtubeChannelName?: string;
+        youtubeChannelAvatar?: string;
+        youtubeSubscribers?: number;
+        youtubeViews?: number;
+        youtubeVideos?: number;
+        youtubeLastSynced?: number;
+        youtubeLatestVideo?: {
+            id: string;
+            title: string;
+            thumbnail: string;
+            views: number;
+            likes: number;
+            comments: number;
+            publishedAt: string;
+        };
+    };
     address?: string;
     city?: string;
     state?: string;
@@ -545,6 +567,7 @@ export interface GivingRecord {
 
 export interface SystemSettings {
     apiBaseUrl?: string;
+    youtubeApiKey?: string;
     pcoClientId?: string;
     pcoClientSecret?: string;
     googleMapsApiKey?: string;

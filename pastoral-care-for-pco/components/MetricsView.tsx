@@ -18,6 +18,30 @@ interface MetricsViewProps {
 
 type TimeFilter = 'Week' | 'Month' | 'Quarter' | 'Year';
 
+const normalizeDateStr = (dateStr: string): string => {
+    if (dateStr && dateStr.length === 7) { // YYYY-MM
+        return `${dateStr}-01`;
+    }
+    return dateStr;
+};
+
+const getLocalISOString = (date: Date): string => {
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+};
+
+const getXAxisLabel = (dateStr: string): string => {
+    const parts = dateStr.split('-');
+    if (parts.length >= 2) {
+        const month = parseInt(parts[1], 10);
+        const day = parts[2] ? parseInt(parts[2], 10) : 1;
+        return `${month}/${day}`;
+    }
+    return dateStr;
+};
+
 interface MetricsViewPropsExtended extends MetricsViewProps {
     activePage?: 'Dashboard' | 'Input' | 'Settings';
 }
@@ -327,30 +351,39 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
 
     const getChartDataForMinistry = (ministryId: string) => {
         const startDate = getStartDate(timeFilter);
-        const startDateStr = startDate.toISOString().split('T')[0];
+        const startDateStr = getLocalISOString(startDate);
         const today = new Date();
 
-        const relevantEntries = entries.filter(e => 
-            e.ministryId === ministryId && e.date >= startDateStr
-        ).sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        const relevantEntries = entries.filter(e => {
+            const normalizedDate = normalizeDateStr(e.date);
+            return e.ministryId === ministryId && normalizedDate >= startDateStr;
+        }).sort((a,b) => new Date(normalizeDateStr(a.date)).getTime() - new Date(normalizeDateStr(b.date)).getTime());
 
         const ministryDefs = definitions.filter(d => d.ministryId === ministryId);
         const dataMap: Record<string, any> = {};
 
         relevantEntries.forEach(entry => {
-            if (!dataMap[entry.date]) {
-                dataMap[entry.date] = { date: entry.date, name: new Date(entry.date).toLocaleDateString(undefined, {month:'numeric', day:'numeric'}) };
+            const normalizedDate = normalizeDateStr(entry.date);
+            if (!dataMap[normalizedDate]) {
+                dataMap[normalizedDate] = { 
+                    date: normalizedDate, 
+                    name: getXAxisLabel(normalizedDate) 
+                };
             }
             Object.entries(entry.values).forEach(([defId, val]) => {
                 const def = ministryDefs.find(d => d.id === defId);
-                if (def) dataMap[entry.date][def.name] = val;
+                if (def) dataMap[normalizedDate][def.name] = val;
             });
         });
 
         let chartData = Object.values(dataMap);
         if (chartData.length === 0 && ministryDefs.length > 0) {
             const createZeroPoint = (d: Date) => {
-                const point: any = { date: d.toISOString().split('T')[0], name: d.toLocaleDateString(undefined, {month:'numeric', day:'numeric'}) };
+                const localStr = getLocalISOString(d);
+                const point: any = { 
+                    date: localStr, 
+                    name: getXAxisLabel(localStr) 
+                };
                 ministryDefs.forEach(def => { point[def.name] = 0; });
                 return point;
             };
@@ -453,7 +486,7 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
                                     <Tooltip contentStyle={{borderRadius:'12px', border:'none', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)', backgroundColor: '#1e293b', color: '#fff'}} />
                                     <Legend verticalAlign="top" height={36} wrapperStyle={{color: axisColor}}/>
                                     {validDefs.map((def, i) => (
-                                        <Line key={def.id} type="monotone" dataKey={def.name} stroke={LINE_COLORS[i % LINE_COLORS.length]} strokeWidth={3} dot={false} activeDot={{r: 6}} />
+                                        <Line key={def.id} type="monotone" dataKey={def.name} stroke={LINE_COLORS[i % LINE_COLORS.length]} strokeWidth={3} dot={{ r: 3.5, strokeWidth: 0 }} activeDot={{r: 6}} />
                                     ))}
                                 </LineChart>
                             </ResponsiveContainer>
