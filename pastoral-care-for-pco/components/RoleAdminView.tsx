@@ -14,6 +14,7 @@ import { SubscriptionSettingsView } from './SubscriptionSettingsView';
 import { ALL_WIDGETS } from '../constants/widgetRegistry';
 import { PLANS } from '../services/stripeService';
 import { pcoService } from '../services/pcoService';
+import { syncYoutubeMetrics } from '../services/youtubeService';
 
 // ─── Pastoral Care Tab Setup Wizard ──────────────────────────────────────────
 //
@@ -958,6 +959,7 @@ interface RoleAdminViewProps {
   currentUser: User;
   churchId: string;
   church: Church;
+  systemSettings?: any;
   onUpdateChurch?: (updates: Partial<Church>) => void;
   onSaveRiskSettings?: (settings: RiskSettings) => void;
   initialTab?: string;
@@ -973,6 +975,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
     currentUser, 
     churchId, 
     church, 
+    systemSettings,
     onUpdateChurch,
     onSaveRiskSettings,
     initialTab,
@@ -1103,6 +1106,11 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   // Grow Integration tab state (must be at top-level — cannot be inside an IIFE)
   const [growApproving, setGrowApproving] = useState(false);
   const [growMsg, setGrowMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // YouTube Integration State
+  const [isSyncingYoutube, setIsSyncingYoutube] = useState(false);
+  const [youtubeSyncError, setYoutubeSyncError] = useState<string | null>(null);
+  const [youtubeSyncSuccess, setYoutubeSyncSuccess] = useState(false);
 
   useEffect(() => {
     loadUsers();
@@ -1423,6 +1431,69 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
           }
       } else {
           setFormData(prev => ({ ...prev, [field]: value }));
+      }
+  };
+
+  const handleMetricsSettingsChange = (key: string, value: any) => {
+      setFormData(prev => ({
+          ...prev,
+          metricsSettings: {
+              ...prev.metricsSettings,
+              [key]: value
+          }
+      }));
+  };
+
+  const handleSyncYoutube = async () => {
+      const channelVal = formData.metricsSettings?.youtubeChannelId || '';
+      if (!channelVal.trim()) {
+          alert("Please enter a YouTube Channel ID or URL first.");
+          return;
+      }
+      setIsSyncingYoutube(true);
+      setYoutubeSyncError(null);
+      setYoutubeSyncSuccess(false);
+      try {
+          const result = await syncYoutubeMetrics(
+              churchId,
+              channelVal,
+              systemSettings?.youtubeApiKey
+          );
+          setFormData(prev => ({
+              ...prev,
+              metricsSettings: {
+                  ...prev.metricsSettings,
+                  youtubeChannelId: result.channelName,
+                  youtubeChannelName: result.channelName,
+                  youtubeChannelAvatar: result.avatarUrl,
+                  youtubeSubscribers: result.subscribers,
+                  youtubeViews: result.views,
+                  youtubeVideos: result.videos,
+                  youtubeLastSynced: Date.now(),
+                  youtubeLatestVideo: result.latestVideo
+              }
+          }));
+          setYoutubeSyncSuccess(true);
+          if (onUpdateChurch) {
+              onUpdateChurch({
+                  metricsSettings: {
+                      ...church.metricsSettings,
+                      youtubeChannelId: result.channelName,
+                      youtubeChannelName: result.channelName,
+                      youtubeChannelAvatar: result.avatarUrl,
+                      youtubeSubscribers: result.subscribers,
+                      youtubeViews: result.views,
+                      youtubeVideos: result.videos,
+                      youtubeLastSynced: Date.now(),
+                      youtubeLatestVideo: result.latestVideo
+                  }
+              });
+          }
+      } catch (err: any) {
+          console.error("YouTube sync error:", err);
+          setYoutubeSyncError(err.message || "Failed to sync YouTube metrics.");
+      } finally {
+          setIsSyncingYoutube(false);
       }
   };
 
@@ -2038,6 +2109,77 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 >
                                     <div className={`w-4 h-4 bg-white rounded-full transition-transform ${formData.metricsSharingEnabled ? 'translate-x-6' : ''}`}></div>
                                 </button>
+                            </div>
+
+                            {/* YouTube Integration */}
+                            <div className="mt-6 p-4 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700">
+                                <p className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-widest mb-1">YouTube Integration</p>
+                                <p className="text-[10px] text-slate-400 dark:text-slate-500 mb-4 leading-relaxed">
+                                    Link your YouTube channel to pull statistics and track growth metrics directly on the Metrics Dashboard.
+                                </p>
+                                
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-1.5">YouTube Channel ID or URL</label>
+                                        <input 
+                                            type="text" 
+                                            value={formData.metricsSettings?.youtubeChannelId || ''}
+                                            onChange={e => handleMetricsSettingsChange('youtubeChannelId', e.target.value)}
+                                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-colors text-xs"
+                                            placeholder="e.g. @elevationchurch or UCxxxx..."
+                                        />
+                                    </div>
+
+                                    <div className="flex items-center justify-between p-2 bg-slate-50 dark:bg-slate-800/40 rounded-xl">
+                                        <div>
+                                            <p className="text-xs font-bold text-slate-900 dark:text-white">Show YouTube Widgets on Dashboard</p>
+                                        </div>
+                                        <button 
+                                            type="button"
+                                            onClick={() => handleMetricsSettingsChange('showYoutubeWidgets', !formData.metricsSettings?.showYoutubeWidgets)}
+                                            className={`w-12 h-6 rounded-full p-1 transition-colors ${formData.metricsSettings?.showYoutubeWidgets ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'}`}
+                                        >
+                                            <div className={`w-4 h-4 bg-white rounded-full transition-transform ${formData.metricsSettings?.showYoutubeWidgets ? 'translate-x-6' : ''}`}></div>
+                                        </button>
+                                    </div>
+
+                                    <div className="flex flex-col gap-3 pt-2">
+                                        <div className="flex items-center gap-3">
+                                            <button
+                                                type="button"
+                                                onClick={handleSyncYoutube}
+                                                disabled={isSyncingYoutube || !(formData.metricsSettings?.youtubeChannelId)}
+                                                className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-md shadow-indigo-200 dark:shadow-none"
+                                            >
+                                                {isSyncingYoutube ? 'Syncing...' : '🔄 Sync YouTube Metrics'}
+                                            </button>
+                                            {youtubeSyncSuccess && (
+                                                <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">✓ Synced</span>
+                                            )}
+                                            {youtubeSyncError && (
+                                                <span className="text-[10px] font-bold text-rose-500">{youtubeSyncError}</span>
+                                            )}
+                                        </div>
+
+                                        {formData.metricsSettings?.youtubeLastSynced && (
+                                            <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800 flex items-center gap-3">
+                                                {formData.metricsSettings?.youtubeChannelAvatar && (
+                                                    <img 
+                                                        src={formData.metricsSettings.youtubeChannelAvatar} 
+                                                        alt="Channel Avatar" 
+                                                        className="w-10 h-10 rounded-full border border-slate-200 dark:border-slate-700"
+                                                    />
+                                                )}
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-xs font-bold text-slate-850 dark:text-white truncate">{formData.metricsSettings.youtubeChannelName || 'Connected Channel'}</p>
+                                                    <p className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase">
+                                                        Subscribers: {(formData.metricsSettings.youtubeSubscribers || 0).toLocaleString()} • Last Synced: {new Date(formData.metricsSettings.youtubeLastSynced).toLocaleString()}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                         </div>
 

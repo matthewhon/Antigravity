@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { MetricDefinition, Ministry, MetricEntry, User, CensusStats, Church, PeopleDashboardData } from '../types';
 import { firestore } from '../services/firestoreService';
 import { StatCard, WidgetWrapper } from './SharedUI';
+import { syncYoutubeMetrics } from '../services/youtubeService';
 import { 
     LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
@@ -13,6 +14,7 @@ interface MetricsViewProps {
     censusData?: CensusStats | null;
     peopleData?: PeopleDashboardData | null;
     church?: Church;
+    systemSettings?: any;
     onUpdateChurch?: (updates: Partial<Church>) => void;
 }
 
@@ -46,7 +48,7 @@ interface MetricsViewPropsExtended extends MetricsViewProps {
     activePage?: 'Dashboard' | 'Input' | 'Settings';
 }
 
-export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, currentUser, censusData, peopleData, church, onUpdateChurch, activePage = 'Dashboard' }) => {
+export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, currentUser, censusData, peopleData, church, systemSettings, onUpdateChurch, activePage = 'Dashboard' }) => {
     const activeTab = activePage;
     const [definitions, setDefinitions] = useState<MetricDefinition[]>([]);
     const [ministries, setMinistries] = useState<Ministry[]>([]);
@@ -80,9 +82,92 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
     const showCityPenetration = church?.metricsSettings?.showCityPenetration || false;
     const showMissionalGap = church?.metricsSettings?.showMissionalGap || false;
 
+    // YouTube State
+    const [isAutoSyncing, setIsAutoSyncing] = useState(false);
+
     useEffect(() => {
         loadData();
     }, [churchId]);
+
+    // Automatic YouTube metrics sync on page load (older than 1 hr)
+    useEffect(() => {
+        const autoSyncYoutube = async () => {
+            const ytChannelId = church?.metricsSettings?.youtubeChannelId;
+            const showYoutube = church?.metricsSettings?.showYoutubeWidgets;
+            if (!ytChannelId || !showYoutube || isAutoSyncing) return;
+
+            const lastSynced = church?.metricsSettings?.youtubeLastSynced || 0;
+            const oneHourMs = 60 * 60 * 1000;
+            const shouldSync = Date.now() - lastSynced > oneHourMs;
+
+            if (shouldSync) {
+                setIsAutoSyncing(true);
+                try {
+                    console.log("[MetricsView] Auto-syncing YouTube metrics on load...");
+                    await syncYoutubeMetrics(
+                        churchId,
+                        ytChannelId,
+                        systemSettings?.youtubeApiKey
+                    );
+                    await loadData();
+                } catch (e) {
+                    console.error("[MetricsView] Auto-syncing YouTube metrics failed:", e);
+                } finally {
+                    setIsAutoSyncing(false);
+                }
+            }
+        };
+
+        if (activeTab === 'Dashboard') {
+            autoSyncYoutube();
+        }
+    }, [activeTab, churchId, church?.metricsSettings?.youtubeChannelId, church?.metricsSettings?.showYoutubeWidgets, systemSettings]);
+
+    // Calculate growth rates based on historical metric entries
+    const getSubscribersGrowth = useMemo(() => {
+        const ytEntries = entries.filter(e => e.ministryId === 'min_youtube');
+        if (ytEntries.length === 0) return { weekly: null, monthly: null };
+
+        const sorted = [...ytEntries].sort((a, b) => a.date.localeCompare(b.date));
+        const latestEntry = sorted[sorted.length - 1];
+        const latestSubs = latestEntry?.values?.['def_yt_subscribers'] || church?.metricsSettings?.youtubeSubscribers || 0;
+
+        if (latestSubs === 0) return { weekly: null, monthly: null };
+
+        const getClosestEntryValue = (daysAgo: number): number | null => {
+            const targetDate = new Date();
+            targetDate.setDate(targetDate.getDate() - daysAgo);
+            const targetDateStr = targetDate.toISOString().split('T')[0];
+
+            let closestEntry: MetricEntry | null = null;
+            let minDiff = Infinity;
+
+            for (const entry of sorted) {
+                const diff = Math.abs(new Date(entry.date).getTime() - new Date(targetDateStr).getTime());
+                if (diff < minDiff && diff < (daysAgo * 0.5 * 24 * 60 * 60 * 1000)) {
+                    minDiff = diff;
+                    closestEntry = entry;
+                }
+            }
+
+            return closestEntry?.values?.['def_yt_subscribers'] || null;
+        };
+
+        const weeklySubs = getClosestEntryValue(7);
+        const monthlySubs = getClosestEntryValue(30);
+
+        const calcRate = (current: number, past: number | null): string | null => {
+            if (past === null || past === 0) return null;
+            const rate = ((current - past) / past) * 100;
+            const sign = rate >= 0 ? '+' : '';
+            return `${sign}${rate.toFixed(1)}%`;
+        };
+
+        return {
+            weekly: calcRate(latestSubs, weeklySubs),
+            monthly: calcRate(latestSubs, monthlySubs)
+        };
+    }, [entries, church?.metricsSettings?.youtubeSubscribers]);
 
     const loadData = async () => {
         setIsLoading(true);
@@ -115,9 +200,12 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
         if (showMissionalGap) impactIds.push('missional_gap');
         if (showCityPenetration) impactIds.push('city_penetration');
         
+        const showYoutube = church?.metricsSettings?.showYoutubeWidgets || false;
+        const youtubeIds = (showYoutube && church?.metricsSettings?.youtubeChannelId) ? ['youtube_channel', 'youtube_latest_video'] : [];
+        
         const ministryIds = ministries.map(m => `ministry_${m.id}`);
         
-        const allRelevantIds = [...censusIds, ...impactIds, ...ministryIds];
+        const allRelevantIds = [...censusIds, ...impactIds, ...youtubeIds, ...ministryIds];
         const savedOrder = church?.metricsSettings?.dashboardOrder || [];
 
         // 1. Keep existing saved order, removing obsolete IDs
@@ -131,7 +219,7 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
         if (JSON.stringify(newOrder) !== JSON.stringify(widgetOrder)) {
             setWidgetOrder(newOrder);
         }
-    }, [showCensus, showCityPenetration, showMissionalGap, ministries, church?.metricsSettings?.dashboardOrder]);
+    }, [showCensus, showCityPenetration, showMissionalGap, ministries, church?.metricsSettings?.dashboardOrder, church?.metricsSettings?.showYoutubeWidgets, church?.metricsSettings?.youtubeChannelId]);
 
     const handleUpdateOrder = (newOrder: string[]) => {
         setWidgetOrder(newOrder);
@@ -409,6 +497,167 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
             if (id === 'census_poverty') return <StatCard label="Poverty Rate" value={`${censusData.economics?.povertyRate?.toFixed(1)}%`} color="amber" source="US Census" />;
         }
 
+        if (id === 'youtube_channel') {
+            const ytSettings = church?.metricsSettings;
+            if (!ytSettings?.youtubeChannelId) return null;
+            const lastSyncedText = ytSettings.youtubeLastSynced 
+                ? new Date(ytSettings.youtubeLastSynced).toLocaleDateString()
+                : 'Never';
+
+            return (
+                <WidgetWrapper title="YouTube Channel" onRemove={() => {}} source="YouTube API">
+                    <div className="flex flex-col h-full p-4 justify-between">
+                        <div className="flex items-center gap-4 mb-4">
+                            {ytSettings.youtubeChannelAvatar ? (
+                                <img 
+                                    src={ytSettings.youtubeChannelAvatar} 
+                                    alt="YouTube Avatar" 
+                                    className="w-12 h-12 rounded-full border border-slate-205 dark:border-slate-700 object-cover"
+                                />
+                            ) : (
+                                <div className="w-12 h-12 rounded-full bg-rose-100 dark:bg-rose-900/20 text-rose-600 flex items-center justify-center font-black text-xl">▶</div>
+                            )}
+                            <div className="min-w-0 flex-1">
+                                <h5 className="text-sm font-black text-slate-900 dark:text-white truncate">
+                                    {ytSettings.youtubeChannelName || 'Connected Channel'}
+                                </h5>
+                                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">
+                                    Last Synced: {lastSyncedText}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-2 text-center mb-4">
+                            <div className="bg-slate-50 dark:bg-slate-900/40 p-2 rounded-xl">
+                                <p className="text-xs font-black text-slate-800 dark:text-white">
+                                    {(ytSettings.youtubeSubscribers || 0).toLocaleString()}
+                                </p>
+                                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tight">Subscribers</p>
+                            </div>
+                            <div className="bg-slate-50 dark:bg-slate-900/40 p-2 rounded-xl">
+                                <p className="text-xs font-black text-slate-800 dark:text-white">
+                                    {(ytSettings.youtubeViews || 0).toLocaleString()}
+                                </p>
+                                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tight">Total Views</p>
+                            </div>
+                            <div className="bg-slate-50 dark:bg-slate-900/40 p-2 rounded-xl">
+                                <p className="text-xs font-black text-slate-800 dark:text-white">
+                                    {(ytSettings.youtubeVideos || 0).toLocaleString()}
+                                </p>
+                                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tight">Videos</p>
+                            </div>
+                        </div>
+
+                        {/* Subscriber Growth Rates */}
+                        <div className="space-y-1.5 border-t border-slate-100 dark:border-slate-800 pt-3">
+                            <div className="flex justify-between items-center text-[10px]">
+                                <span className="font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">7-Day Growth</span>
+                                <span className={`font-black ${getSubscribersGrowth.weekly && getSubscribersGrowth.weekly.startsWith('-') ? 'text-rose-500' : 'text-emerald-500'}`}>
+                                    {getSubscribersGrowth.weekly || '---'}
+                                </span>
+                            </div>
+                            <div className="flex justify-between items-center text-[10px]">
+                                <span className="font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">30-Day Growth</span>
+                                <span className={`font-black ${getSubscribersGrowth.monthly && getSubscribersGrowth.monthly.startsWith('-') ? 'text-rose-500' : 'text-emerald-500'}`}>
+                                    {getSubscribersGrowth.monthly || '---'}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div className="mt-4 flex items-center justify-between gap-2">
+                            <a 
+                                href={`https://youtube.com/${ytSettings.youtubeChannelName?.startsWith('@') ? ytSettings.youtubeChannelName : ''}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="flex-1 text-center bg-rose-600 hover:bg-rose-700 text-white font-black text-[9px] uppercase tracking-wider py-2 rounded-xl shadow-sm transition-all"
+                            >
+                                Open Channel
+                            </a>
+                            <button
+                                type="button"
+                                onClick={async () => {
+                                    if (isAutoSyncing) return;
+                                    setIsAutoSyncing(true);
+                                    try {
+                                        await syncYoutubeMetrics(churchId, ytSettings.youtubeChannelId!, systemSettings?.youtubeApiKey);
+                                        await loadData();
+                                    } catch (e) {
+                                        console.error(e);
+                                    } finally {
+                                        setIsAutoSyncing(false);
+                                    }
+                                }}
+                                disabled={isAutoSyncing}
+                                className="p-2 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-xl transition-all"
+                                title="Sync metrics now"
+                            >
+                                {isAutoSyncing ? '…' : '🔄'}
+                            </button>
+                        </div>
+                    </div>
+                </WidgetWrapper>
+            );
+        }
+
+        if (id === 'youtube_latest_video') {
+            const ytSettings = church?.metricsSettings;
+            if (!ytSettings?.youtubeChannelId || !ytSettings.youtubeLatestVideo) return null;
+            const video = ytSettings.youtubeLatestVideo;
+            const publishDate = new Date(video.publishedAt).toLocaleDateString();
+
+            return (
+                <WidgetWrapper title="Latest Video Performance" onRemove={() => {}} source="YouTube API">
+                    <div className="flex flex-col h-full justify-between p-4">
+                        <a 
+                            href={`https://youtube.com/watch?v=${video.id}`} 
+                            target="_blank" 
+                            rel="noreferrer"
+                            className="relative block group rounded-xl overflow-hidden mb-3 border border-slate-100 dark:border-slate-800 shadow-sm"
+                        >
+                            <img 
+                                src={video.thumbnail} 
+                                alt={video.title}
+                                className="w-full aspect-video object-cover group-hover:scale-105 transition-transform duration-300"
+                            />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                <span className="w-12 h-12 bg-rose-600 rounded-full flex items-center justify-center text-white text-xl font-bold shadow-md shadow-rose-900/50">▶</span>
+                            </div>
+                        </a>
+
+                        <div className="flex-1 mb-3">
+                            <h5 className="text-xs font-black text-slate-900 dark:text-white line-clamp-2 leading-relaxed" title={video.title}>
+                                {video.title}
+                            </h5>
+                            <p className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider mt-1">
+                                Published: {publishDate}
+                            </p>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-2 border-t border-slate-100 dark:border-slate-800 pt-3 text-center">
+                            <div>
+                                <p className="text-xs font-black text-slate-800 dark:text-white">
+                                    {(video.views || 0).toLocaleString()}
+                                </p>
+                                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tight">Views</p>
+                            </div>
+                            <div>
+                                <p className="text-xs font-black text-slate-800 dark:text-white">
+                                    {(video.likes || 0).toLocaleString()}
+                                </p>
+                                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tight">Likes</p>
+                            </div>
+                            <div>
+                                <p className="text-xs font-black text-slate-800 dark:text-white">
+                                    {(video.comments || 0).toLocaleString()}
+                                </p>
+                                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tight">Comments</p>
+                            </div>
+                        </div>
+                    </div>
+                </WidgetWrapper>
+            );
+        }
+
         if (id === 'missional_gap') {
             return (
                 <WidgetWrapper title="Missional Gap" onRemove={() => handleToggleMissionalGap()} source="Census & PCO">
@@ -627,7 +876,9 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 grid-flow-row-dense">
                         {widgetOrder.map((id, index) => {
                             let colSpan = 'col-span-1';
-                            if (id.startsWith('ministry_') || id === 'city_penetration') colSpan = 'col-span-1 md:col-span-2 lg:col-span-2';
+                            if (id.startsWith('ministry_') || id === 'city_penetration' || id === 'youtube_channel' || id === 'youtube_latest_video') {
+                                colSpan = 'col-span-1 md:col-span-2 lg:col-span-2';
+                            }
                             
                             return (
                                 <div 

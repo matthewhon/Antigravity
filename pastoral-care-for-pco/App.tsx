@@ -1035,6 +1035,7 @@ const App: React.FC = () => {
                         censusData={censusData}
                         peopleData={peopleDashboardData}
                         church={church!}
+                        systemSettings={systemSettings || {}}
                         activePage={view === 'metrics-input' ? 'Input' : view === 'metrics-settings' ? 'Settings' : 'Dashboard'}
                         onUpdateChurch={(updates) => { firestore.updateChurch(church!.id, updates); setChurch({ ...church!, ...updates }); }}
                     />
