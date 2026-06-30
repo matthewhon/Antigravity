@@ -20,6 +20,7 @@ async function main() {
     email: 'matthew.hon@honventures.com',
     churchId: 'c1',
     roles: [
+      'System Administration',
       'Church Admin', 
       'Pastor', 
       'People', 

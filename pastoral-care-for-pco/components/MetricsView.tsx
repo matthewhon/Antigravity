@@ -707,7 +707,7 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
                                 <p className="text-[8px] text-slate-400 font-bold uppercase tracking-tight mt-0.5">Comments</p>
                             </div>
                             <div className="p-2 bg-rose-50/50 dark:bg-rose-950/20 rounded-xl border border-rose-100/30 dark:border-rose-900/20">
-                                <p className="text-xs font-black text-rose-600 dark:text-rose-455">
+                                <p className="text-xs font-black text-rose-600 dark:text-rose-400">
                                     {engagementRate.toFixed(1)}%
                                 </p>
                                 <p className="text-[8px] text-rose-500/80 font-bold uppercase tracking-tight mt-0.5">Engagement</p>
