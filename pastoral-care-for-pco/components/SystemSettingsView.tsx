@@ -5,6 +5,8 @@ import { firestore } from '../services/firestoreService';
 import { loadStripe } from '@stripe/stripe-js';
 import { initializeWebhooks } from '../services/pcoWebhookService';
 
+import { BillingReportsView } from './BillingReportsView';
+
 interface SystemSettingsViewProps {
   settings?: SystemSettings;
   onSave: (settings: SystemSettings) => Promise<void>;
@@ -16,7 +18,7 @@ const DEFAULT_API_URL = 'https://api.pastoralcare.barnabassoftware.com';
 
 
 export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings: initialSettings, onSave, onRecalculateBenchmarks }) => {
-  const [activeTab, setActiveTab] = useState<'Configuration' | 'Tenants' | 'Users' | 'Logging' | 'Planning Center'>('Configuration');
+  const [activeTab, setActiveTab] = useState<'Configuration' | 'Tenants' | 'Users' | 'Logging' | 'Planning Center' | 'Reports'>('Configuration');
   const [settings, setSettings] = useState<SystemSettings>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -287,7 +289,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
             </div>
             
             <div className="flex bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl gap-1 overflow-x-auto">
-                {['Configuration', 'Tenants', 'Users', 'Logging', 'Planning Center'].map(tab => (
+                {['Configuration', 'Tenants', 'Users', 'Logging', 'Planning Center', 'Reports'].map(tab => (
                     <button 
                         key={tab}
                         onClick={() => setActiveTab(tab as any)}
@@ -1426,7 +1428,10 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                         </table>
                     </div>
                 </div>
-            </div>
+        )}
+
+        {activeTab === 'Reports' && (
+            <BillingReportsView />
         )}
     </div>
   );

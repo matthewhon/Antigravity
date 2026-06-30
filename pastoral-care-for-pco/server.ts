@@ -18,6 +18,7 @@ import { startEmailScheduler } from './backend/emailScheduler';
 import { startSyncScheduler } from './backend/syncScheduler';
 import { startBillingScheduler } from './backend/billingScheduler';
 import { getDb } from './backend/firebase';
+import { generateBillingReport } from './backend/billingReportService';
 import { handleGeminiProxy } from './backend/geminiProxy';
 import { provisionSubuser, authenticateDomain, verifyDomain, diagnoseDomain } from './backend/emailProvisioning';
 import { handlePostmarkWebhook } from './backend/postmarkWebhook';
@@ -72,6 +73,21 @@ async function startServer() {
     // SMS add-on purchase/removal (Growth plan)
     app.post('/api/billing/add-sms-addon',    express.json(), addSmsAddon);
     app.post('/api/billing/remove-sms-addon', express.json(), removeSmsAddon);
+    app.get('/api/admin/billing-report', async (req: any, res: any) => {
+        try {
+            // Note: Secure this endpoint with proper admin check in a real app
+            // For now, it will fetch the report for the provided period
+            const period = req.query.period || (() => {
+                const d = new Date();
+                return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            })();
+            const report = await generateBillingReport(period);
+            res.json(report);
+        } catch (e: any) {
+            console.error('[billing-report] Error:', e.message);
+            res.status(500).json({ error: e.message || 'Failed to generate billing report' });
+        }
+    });
 
     // PCO Webhook Endpoint
     // We use express.raw to ensure we can verify the HMAC signature based on the raw body

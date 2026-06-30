@@ -181,17 +181,29 @@ ${messageBody}`,
 }
 
 /** Shape the AI returns for a generated workflow. */
+interface AiWorkflowDraftStep {
+    channelType: 'sms' | 'mms' | 'email' | 'staff_sms' | 'staff_email';
+    delayDays: number;
+    delayHours?: number;
+    /**
+     * For steps that use a specific day-of-week delay.
+     * scheduleType = 'day_of_week', scheduleDayOfWeek = 0-6 (0=Sunday).
+     */
+    scheduleType?: 'relative' | 'day_of_week' | 'day_of_month';
+    scheduleDayOfWeek?: number;
+    scheduleDayOfMonth?: number;
+    scheduleTime?: string;
+    message?: string;          // Required for sms, mms, staff_sms
+    emailSubject?: string;     // Required for email, staff_email
+    emailBody?: string;        // Required for email, staff_email
+    /** Plain-English note shown in the preview for staff steps */
+    staffNote?: string;
+}
+
 interface AiWorkflowDraft {
     name: string;
     description: string;
-    steps: {
-        channelType: 'sms' | 'mms' | 'email';
-        delayDays: number;
-        delayHours?: number;
-        message?: string;
-        emailSubject?: string;
-        emailBody?: string;
-    }[];
+    steps: AiWorkflowDraftStep[];
 }
 
 /** Call the AI to build a full workflow from a natural-language prompt. */
@@ -204,25 +216,40 @@ You must respond with ONLY a valid JSON object (no markdown, no explanation) mat
   "description": string,   // 1-2 sentence description of what the workflow does
   "steps": [
     {
-      "channelType": "sms" | "mms" | "email",
-      "delayDays": number,     // Days to wait after the previous step. Step 0 is always 0.
-      "delayHours": number,    // Optional. Hours to wait after the previous step. Step 0 is always 0.
-      "message": string,       // Required for sms and mms steps. Keep SMS under 160 chars. Use {firstName} for personalisation.
-      "emailSubject": string,  // Required only for email steps
-      "emailBody": string      // Required only for email steps. Use {firstName} for personalisation.
+      "channelType": "sms" | "mms" | "email" | "staff_sms" | "staff_email",
+      // --- Timing (pick ONE approach) ---
+      "delayDays": number,          // Days to wait after previous step (default timing mode). Step 0 is always 0.
+      "delayHours": number,         // Optional hours on top of delayDays. Step 0 is always 0.
+      "scheduleType": "relative" | "day_of_week" | "day_of_month",  // Default is "relative".
+      "scheduleDayOfWeek": number,  // 0=Sunday … 6=Saturday. Only used when scheduleType="day_of_week".
+      "scheduleDayOfMonth": number, // 1-31. Only used when scheduleType="day_of_month".
+      "scheduleTime": string,       // "HH:MM" 24h send time for day_of_week / day_of_month modes. Default "09:00".
+      // --- Content (fill the fields required for the channel type) ---
+      "message": string,            // Required for sms, mms, and staff_sms steps. Keep SMS under 160 chars. Use {firstName} for personalisation.
+      "emailSubject": string,       // Required only for email and staff_email steps.
+      "emailBody": string,          // Required only for email and staff_email steps. Use {firstName} for personalisation.
+      "staffNote": string           // Optional plain-English note for staff_sms / staff_email steps explaining who receives it.
     }
   ]
 }
 
+Channel type guide:
+- "sms"         — standard text message sent to the enrolled contact.
+- "mms"         — picture/media message sent to the enrolled contact (also include a message caption).
+- "email"       — email sent to the enrolled contact (requires emailSubject and emailBody).
+- "staff_sms"   — internal SMS notification sent to a pastor or staff member (not the contact). Use when the user wants to alert staff to follow up.
+- "staff_email" — internal email notification sent to a pastor or staff member (not the contact). Use when the user wants to email staff with a care alert.
+
 Guidelines:
 - Use warm, pastoral, encouraging language appropriate for a church audience.
 - For SMS steps, keep "message" under 160 characters when possible (1 segment).
-- Include real content (actual Bible verses, actual prayer encouragements, etc.) ... do NOT use placeholders like "[verse here]".
-- Use {firstName} to personalise messages where natural.
-- delayDays and delayHours for the first step is always 0. For subsequent steps, use the delay the user specified or infer a sensible one (e.g. 4 hours or 1 day).
-- If the user asks for emails, set channelType to "email" and provide both emailSubject and emailBody.
-- If the user asks for texts, set channelType to "sms".
-- If the user asks for picture/image messages, set channelType to "mms" and still write a message caption.
+- Include real content (actual Bible verses, actual prayer encouragements, etc.) — do NOT use placeholders like "[verse here]".
+- Use {firstName} to personalise messages to the contact where natural.
+- delayDays and delayHours for the first step are always 0.
+- For subsequent steps, use the delay the user specifies or infer a sensible default (e.g. 4 hours or 1 day between steps).
+- If the user asks for a weekly cadence, prefer scheduleType "day_of_week" with an appropriate scheduleDayOfWeek.
+- If the user asks for a monthly reminder on a specific date, prefer scheduleType "day_of_month".
+- If the user asks for staff follow-up or pastor alerts, add a staff_sms or staff_email step after the relevant contact step.
 - Infer the number of steps and channel mix from the user's description.
 
 User's workflow request:
@@ -4552,31 +4579,6 @@ const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[]; smsNu
                     </div>
                 </div>
 
-                {/* Cost card */}
-                <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 flex flex-col">
-                    <p className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4">Estimated Cost</p>
-                    <div className="flex-1 flex flex-col items-center justify-center">
-                        <div className="w-16 h-16 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center mb-3">
-                            <DollarSign size={28} className="text-emerald-600 dark:text-emerald-400" />
-                        </div>
-                        <p className="text-3xl font-black text-slate-900 dark:text-white">
-                            ${(summary?.estimatedCostUsd ?? 0).toFixed(2)}
-                        </p>
-                        <p className="text-xs text-slate-400 text-center mt-2">
-                            Based on tracked usage records at ~$0.0075/segment. Actual billing is in your Twilio Console.
-                        </p>
-                    </div>
-                    <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl">
-                        <div className="flex justify-between text-xs mb-1">
-                            <span className="text-slate-500">Failed messages</span>
-                            <span className="font-bold text-slate-700 dark:text-slate-300">{summary?.totalFailed ?? 0}</span>
-                        </div>
-                        <div className="flex justify-between text-xs">
-                            <span className="text-slate-500">Opt-outs (total)</span>
-                            <span className="font-bold text-red-500">{summary?.totalOptOuts ?? 0}</span>
-                        </div>
-                    </div>
-                </div>
             </div>
 
             {/* Campaign performance table */}
@@ -5878,6 +5880,8 @@ const EXAMPLE_PROMPTS = [
     'Create a 3-step new visitor follow-up: a welcome text on day 0, an email on day 3 about getting connected, and an SMS on day 7 inviting them back.',
     'Build a 7-day Easter devotional series with daily SMS scripture and a final email summarising the Resurrection story.',
     'Send 4 weekly SMS giving encouragements reminding donors of the church mission.',
+    'New member onboarding: welcome SMS immediately, then a staff email alerting the pastor to call them, then a check-in SMS on day 7.',
+    'Birthday workflow: send a warm birthday SMS to the contact, then alert the pastor via staff SMS so they can call to say happy birthday.',
 ];
 
 const AiWorkflowBuilderPanel: React.FC<{
@@ -5912,6 +5916,16 @@ const AiWorkflowBuilderPanel: React.FC<{
         sms: 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300',
         mms: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
         email: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
+        staff_sms: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300',
+        staff_email: 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300',
+    };
+
+    const chLabel: Record<string, string> = {
+        sms: 'SMS',
+        mms: 'MMS',
+        email: 'Email',
+        staff_sms: 'Staff SMS',
+        staff_email: 'Staff Email',
     };
 
     return (
@@ -6008,29 +6022,56 @@ const AiWorkflowBuilderPanel: React.FC<{
 
                             {/* Step cards */}
                             <div className="space-y-3">
-                                {draft.steps.map((step, idx) => (
-                                    <div key={idx} className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4">
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <span className="w-6 h-6 rounded-full bg-violet-600 text-white text-[10px] font-black flex items-center justify-center shrink-0">{idx + 1}</span>
-                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide ${chBadgeClass[step.channelType] ?? chBadgeClass.sms}`}>{step.channelType.toUpperCase()}</span>
-                                            <span className="text-[10px] text-slate-400">
-                                                {idx === 0 ? 'Sends immediately' : `After ${step.delayDays} day${step.delayDays !== 1 ? 's' : ''}`}
-                                            </span>
-                                        </div>
-                                        {step.channelType === 'email' ? (
-                                            <div className="space-y-1">
-                                                <p className="text-xs font-bold text-slate-700 dark:text-slate-200">Subject: {step.emailSubject}</p>
-                                                <p className="text-xs text-slate-600 dark:text-slate-400 whitespace-pre-wrap leading-relaxed line-clamp-4">{step.emailBody}</p>
+                                {draft.steps.map((step, idx) => {
+                                    const isStaff = step.channelType === 'staff_sms' || step.channelType === 'staff_email';
+                                    const isEmail = step.channelType === 'email' || step.channelType === 'staff_email';
+                                    const delayLabel = (() => {
+                                        if (idx === 0) return 'Sends immediately';
+                                        if (step.scheduleType === 'day_of_week') {
+                                            const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+                                            return `Next ${days[step.scheduleDayOfWeek ?? 1]} at ${step.scheduleTime ?? '09:00'}`;
+                                        }
+                                        if (step.scheduleType === 'day_of_month') {
+                                            return `On day ${step.scheduleDayOfMonth ?? 1} of the month`;
+                                        }
+                                        const d = step.delayDays ?? 0;
+                                        const h = step.delayHours ?? 0;
+                                        if (d === 0 && h > 0) return `After ${h} hour${h !== 1 ? 's' : ''}`;
+                                        if (h > 0) return `After ${d}d ${h}h`;
+                                        return `After ${d} day${d !== 1 ? 's' : ''}`;
+                                    })();
+                                    return (
+                                        <div key={idx} className={`border rounded-2xl p-4 ${isStaff ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <span className="w-6 h-6 rounded-full bg-violet-600 text-white text-[10px] font-black flex items-center justify-center shrink-0">{idx + 1}</span>
+                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide ${chBadgeClass[step.channelType] ?? chBadgeClass.sms}`}>
+                                                    {chLabel[step.channelType] ?? step.channelType.toUpperCase()}
+                                                </span>
+                                                {isStaff && <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400">Staff Alert</span>}
+                                                <span className="text-[10px] text-slate-400">{delayLabel}</span>
                                             </div>
-                                        ) : (
-                                            <div className="flex justify-end">
-                                                <div className="bg-violet-600 text-white text-xs px-3 py-2 rounded-2xl rounded-br-sm max-w-[90%] leading-relaxed whitespace-pre-wrap break-words font-medium shadow-sm">
-                                                    {step.message}
+                                            {isEmail ? (
+                                                <div className="space-y-1">
+                                                    <p className="text-xs font-bold text-slate-700 dark:text-slate-200">Subject: {step.emailSubject}</p>
+                                                    <p className="text-xs text-slate-600 dark:text-slate-400 whitespace-pre-wrap leading-relaxed line-clamp-4">{step.emailBody}</p>
                                                 </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
+                                            ) : (
+                                                <div className={`flex ${isStaff ? 'justify-start' : 'justify-end'}`}>
+                                                    <div className={`text-xs px-3 py-2 rounded-2xl max-w-[90%] leading-relaxed whitespace-pre-wrap break-words font-medium shadow-sm ${
+                                                        isStaff
+                                                            ? 'bg-amber-200 dark:bg-amber-800 text-amber-900 dark:text-amber-100 rounded-bl-sm'
+                                                            : 'bg-violet-600 text-white rounded-br-sm'
+                                                    }`}>
+                                                        {step.message}
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {step.staffNote && (
+                                                <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-2 italic">📋 {step.staffNote}</p>
+                                            )}
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
                     )}
@@ -6213,19 +6254,26 @@ const WorkflowEditor: React.FC<{
     const handleApplyAiDraft = (draft: AiWorkflowDraft) => {
         const newNodes: WorkflowNode[] = [];
         draft.steps.forEach((s, i) => {
-            // If not the first step, insert a delay node from the draft's delayDays or delayHours
-            if (i > 0 && ((s.delayDays ?? 1) > 0 || (s.delayHours ?? 0) > 0)) {
-                newNodes.push({
+            // If not the first step, insert a delay node from the draft's timing info
+            if (i > 0) {
+                const schedType = s.scheduleType ?? 'relative';
+                const delayNode: WorkflowDelayNode = {
                     nodeType: 'delay',
                     id: uid(),
                     order: newNodes.length,
-                    delayDays: s.delayDays ?? 1,
+                    delayDays: s.delayDays ?? (schedType === 'relative' ? 1 : 0),
                     delayHours: s.delayHours ?? 0,
-                    scheduleType: 'relative'
-                });
+                    scheduleType: schedType,
+                    ...(schedType === 'day_of_week' && { scheduleDayOfWeek: s.scheduleDayOfWeek ?? 1 }),
+                    ...(schedType === 'day_of_month' && { scheduleDayOfMonth: s.scheduleDayOfMonth ?? 1 }),
+                    ...(schedType !== 'relative' && { scheduleTime: s.scheduleTime ?? '09:00' }),
+                };
+                newNodes.push(delayNode);
             }
             newNodes.push({
-                nodeType: 'action', id: uid(), order: newNodes.length,
+                nodeType: 'action',
+                id: uid(),
+                order: newNodes.length,
                 channelType: (s.channelType ?? 'sms') as WorkflowChannelType,
                 message: s.message || '',
                 emailSubject: s.emailSubject,
