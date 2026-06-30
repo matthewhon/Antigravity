@@ -458,6 +458,43 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
         return { chartData, validDefs: ministryDefs };
     };
 
+    const getTotalsForMinistry = (ministryId: string) => {
+        const today = new Date();
+        const currentYear = today.getFullYear();
+        const currentMonth = today.getMonth() + 1;
+
+        const ministryDefs = definitions.filter(d => d.ministryId === ministryId);
+        const totals: Record<string, { month: number; year: number; allTime: number; type: 'number' | 'currency' }> = {};
+
+        ministryDefs.forEach(def => {
+            totals[def.id] = { month: 0, year: 0, allTime: 0, type: def.type };
+        });
+
+        const relevantEntries = entries.filter(e => e.ministryId === ministryId);
+
+        relevantEntries.forEach(entry => {
+            const dateStr = normalizeDateStr(entry.date);
+            const parts = dateStr.split('-');
+            if (parts.length >= 2) {
+                const entryYear = parseInt(parts[0], 10);
+                const entryMonth = parseInt(parts[1], 10);
+
+                const isCurrentMonth = entryYear === currentYear && entryMonth === currentMonth;
+                const isCurrentYear = entryYear === currentYear;
+
+                Object.entries(entry.values).forEach(([defId, val]) => {
+                    const numVal = typeof val === 'number' ? val : Number(val) || 0;
+                    if (totals[defId] !== undefined) {
+                        totals[defId].allTime += numVal;
+                        if (isCurrentYear) totals[defId].year += numVal;
+                        if (isCurrentMonth) totals[defId].month += numVal;
+                    }
+                });
+            }
+        });
+
+        return totals;
+    };
     const activeDefinitions = definitions.filter(d => d.ministryId === selectedMinistryId);
     const LINE_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#f43f5e', '#8b5cf6', '#06b6d4'];
 
@@ -816,6 +853,46 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
                             <div className="h-full flex items-center justify-center text-slate-400 text-xs font-bold bg-slate-50 dark:bg-slate-900 rounded-2xl">No metrics defined.</div>
                         )}
                     </div>
+
+                    {/* Totals Section */}
+                    {validDefs.length > 0 && (
+                        <div className="border-t border-slate-100 dark:border-slate-800 pt-4 mt-6 space-y-3">
+                            <h5 className="text-[9px] font-black text-slate-400 dark:text-slate-550 uppercase tracking-widest">Totals Overview</h5>
+                            <div className="grid grid-cols-1 gap-2.5">
+                                {validDefs.map((def, idx) => {
+                                    const mTotals = getTotalsForMinistry(ministry.id)[def.id] || { month: 0, year: 0, allTime: 0, type: def.type };
+                                    const formatVal = (v: number) => {
+                                        if (def.type === 'currency') {
+                                            return `$${v.toLocaleString()}`;
+                                        }
+                                        return v.toLocaleString();
+                                    };
+                                    return (
+                                        <div key={def.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100/50 dark:border-slate-800/30">
+                                            <div className="flex items-center gap-2">
+                                                <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: LINE_COLORS[idx % LINE_COLORS.length] }}></span>
+                                                <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{def.name}</span>
+                                            </div>
+                                            <div className="flex gap-4 text-[10px] font-extrabold uppercase tracking-wide">
+                                                <div className="flex flex-col items-end">
+                                                    <span className="text-slate-400 dark:text-slate-500 text-[8px] tracking-wider">Month</span>
+                                                    <span className="text-slate-700 dark:text-slate-300 mt-0.5">{formatVal(mTotals.month)}</span>
+                                                </div>
+                                                <div className="flex flex-col items-end border-l border-slate-200 dark:border-slate-800 pl-4">
+                                                    <span className="text-slate-400 dark:text-slate-500 text-[8px] tracking-wider">Year</span>
+                                                    <span className="text-indigo-600 dark:text-indigo-400 mt-0.5">{formatVal(mTotals.year)}</span>
+                                                </div>
+                                                <div className="flex flex-col items-end border-l border-slate-200 dark:border-slate-800 pl-4">
+                                                    <span className="text-slate-400 dark:text-slate-500 text-[8px] tracking-wider">All Time</span>
+                                                    <span className="text-emerald-600 dark:text-emerald-400 mt-0.5">{formatVal(mTotals.allTime)}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
                 </WidgetWrapper>
             );
         }
