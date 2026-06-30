@@ -57,6 +57,7 @@ export const CarePage: React.FC<CarePageProps> = ({
                     church={church}
                     user={user}
                     people={riskEnrichedPeople}
+                    groups={groups}
                 />
             </div>
         );

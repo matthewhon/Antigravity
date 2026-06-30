@@ -6,7 +6,7 @@ import {
     Clock, Shield, Download, LockKeyhole, RotateCcw, CheckCircle2,
     Star, Timer, Award, BarChart3
 } from 'lucide-react';
-import { OutreachSession, OutreachSlot, PcoPerson, User, Church } from '../types';
+import { OutreachSession, OutreachSlot, PcoPerson, User, Church, PcoGroup } from '../types';
 import { firestore } from '../services/firestoreService';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -276,19 +276,26 @@ const SessionSummaryModal: React.FC<{ stats: CloseStats; onClose: () => void }> 
 };
 
 interface SessionModalProps {
+    groups: PcoGroup[];
     memberStatuses: string[];
     onSave: (draft: Pick<OutreachSession, 'name' | 'filters'>) => void;
     onClose: () => void;
     initial?: Pick<OutreachSession, 'name' | 'filters'>;
 }
 
-const SessionModal: React.FC<SessionModalProps> = ({ memberStatuses, onSave, onClose, initial }) => {
+const SessionModal: React.FC<SessionModalProps> = ({ groups, memberStatuses, onSave, onClose, initial }) => {
     const [name, setName] = useState(initial?.name ?? '');
     const [riskCats, setRiskCats] = useState<OutreachSession['filters']['riskCategories']>(
         initial?.filters.riskCategories ?? ['Disconnected', 'At Risk']
     );
     const [membershipSels, setMembershipSels] = useState<string[]>(
         initial?.filters.membershipStatuses ?? []
+    );
+    const [absenteeGroupIds, setAbsenteeGroupIds] = useState<string[]>(
+        initial?.filters.absenteeGroupIds ?? []
+    );
+    const [absenteeSinceDate, setAbsenteeSinceDate] = useState<string>(
+        initial?.filters.absenteeSince ? new Date(initial.filters.absenteeSince).toISOString().split('T')[0] : ''
     );
 
     const toggleRisk = (cat: 'Healthy' | 'At Risk' | 'Disconnected') => {
@@ -299,9 +306,22 @@ const SessionModal: React.FC<SessionModalProps> = ({ memberStatuses, onSave, onC
         setMembershipSels(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
     };
 
+    const toggleGroup = (id: string) => {
+        setAbsenteeGroupIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+    };
+
     const handleSave = () => {
         if (!name.trim()) return;
-        onSave({ name: name.trim(), filters: { riskCategories: riskCats, membershipStatuses: membershipSels } });
+        const absenteeSince = absenteeSinceDate ? new Date(absenteeSinceDate).getTime() : undefined;
+        onSave({ 
+            name: name.trim(), 
+            filters: { 
+                riskCategories: riskCats, 
+                membershipStatuses: membershipSels,
+                absenteeGroupIds: absenteeGroupIds.length > 0 ? absenteeGroupIds : undefined,
+                absenteeSince
+            } 
+        });
     };
 
     return (
@@ -367,6 +387,40 @@ const SessionModal: React.FC<SessionModalProps> = ({ memberStatuses, onSave, onC
                                     );
                                 })}
                             </div>
+                        </div>
+                    )}
+
+                    {/* Absentee Group Filter */}
+                    {groups.length > 0 && (
+                        <div>
+                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">
+                                Filter by Group Absentees <span className="font-medium text-slate-300">(empty = all)</span>
+                            </label>
+                            <div className="flex flex-wrap gap-2 mb-3">
+                                {groups.map(g => {
+                                    const active = absenteeGroupIds.includes(g.id);
+                                    return (
+                                        <button key={g.id} onClick={() => toggleGroup(g.id)}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wide border-2 transition-all ${
+                                                active ? 'bg-indigo-600 text-white border-indigo-600' : 'border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300'
+                                            }`}>
+                                            {g.name}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            {absenteeGroupIds.length > 0 && (
+                                <div>
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">Absent Since (Optional)</label>
+                                    <input
+                                        type="date"
+                                        value={absenteeSinceDate}
+                                        onChange={e => setAbsenteeSinceDate(e.target.value)}
+                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none dark:text-white"
+                                    />
+                                    <p className="text-[10px] text-slate-400 mt-1.5">Select a date. People who have not attended these groups since this date will be included.</p>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
@@ -520,9 +574,10 @@ interface CareContactPageProps {
     church: Church;
     user: User;
     people: PcoPerson[];
+    groups: PcoGroup[];
 }
 
-export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, people }) => {
+export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, people, groups }) => {
     const [sessions, setSessions]         = useState<OutreachSession[]>([]);
     const [selectedId, setSelectedId]     = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen]   = useState(false);
@@ -627,15 +682,37 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
     // Build denormalized eligible people list for a given filter config
     const buildEligiblePeople = useCallback((
         allPeople: typeof people,
+        allGroups: PcoGroup[],
         filters: OutreachSession['filters'],
         historySlots: OutreachSlot[]
     ) => {
-        const { riskCategories, membershipStatuses } = filters;
+        const { riskCategories, membershipStatuses, absenteeGroupIds, absenteeSince } = filters;
         const eligible = allPeople.filter(p => {
             if (p.status?.toLowerCase() === 'inactive') return false;
             if (!p.phone && !p.email) return false;
             if (riskCategories.length > 0 && !riskCategories.includes(p.riskProfile?.category as any)) return false;
             if (membershipStatuses.length > 0 && !membershipStatuses.includes(p.membership || 'None')) return false;
+            
+            if (absenteeGroupIds && absenteeGroupIds.length > 0) {
+                let isAbsentee = false;
+                for (const gid of absenteeGroupIds) {
+                    if (p.groupIds?.includes(gid)) {
+                        const group = allGroups.find(g => g.id === gid);
+                        if (group) {
+                            const attendedRecently = group.attendanceHistory?.some(event => {
+                                const eventTime = new Date(event.date).getTime();
+                                const sinceTime = absenteeSince || 0;
+                                return eventTime >= sinceTime && event.attendeeIds?.includes(p.id);
+                            });
+                            if (!attendedRecently) {
+                                isAbsentee = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (!isAbsentee) return false;
+            }
             return true;
         });
 
@@ -783,7 +860,7 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
 
     const handleCreateSession = async (draft: Pick<OutreachSession, 'name' | 'filters'>) => {
         const id = `os_${church.id}_${Date.now()}`;
-        const eligible = buildEligiblePeople(people, draft.filters, allTimeSlots);
+        const eligible = buildEligiblePeople(people, groups, draft.filters, allTimeSlots);
         const memberDirectory = buildMemberDirectory(people);
         const newSession: OutreachSession = {
             id, churchId: church.id,
@@ -801,7 +878,7 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
 
     const handleRefreshQueue = async () => {
         if (!selectedSession) return;
-        const eligible = buildEligiblePeople(people, selectedSession.filters, allTimeSlots);
+        const eligible = buildEligiblePeople(people, groups, selectedSession.filters, allTimeSlots);
         const memberDirectory = buildMemberDirectory(people);
         const updates = { eligiblePeople: eligible, memberDirectory };
         await firestore.updateOutreachSession(selectedSession.id, updates);
@@ -1658,6 +1735,7 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
             {/* Create Session Modal */}
             {isModalOpen && (
                 <SessionModal
+                    groups={groups}
                     memberStatuses={memberStatuses}
                     onSave={handleCreateSession}
                     onClose={() => setIsModalOpen(false)}

@@ -1903,6 +1903,10 @@ export interface OutreachSession {
         riskCategories: ('Healthy' | 'At Risk' | 'Disconnected')[];
         /** Which membership statuses to include (empty array = all) */
         membershipStatuses: string[];
+        /** Which group IDs to target for absentees */
+        absenteeGroupIds?: string[];
+        /** Unix timestamp of the date since which they haven't attended */
+        absenteeSince?: number;
     };
     /**
      * Denormalized list of eligible people for this session.
