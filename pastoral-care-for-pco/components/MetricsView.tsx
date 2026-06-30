@@ -504,22 +504,40 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
                 ? new Date(ytSettings.youtubeLastSynced).toLocaleDateString()
                 : 'Never';
 
+            const subscribersCount = ytSettings.youtubeSubscribers || 0;
+            // Calculate next milestone (e.g. nearest power of 10 or next 5k/10k/100k milestone)
+            let nextMilestone = 1000;
+            if (subscribersCount >= 1000000) {
+                nextMilestone = Math.ceil((subscribersCount + 1) / 500000) * 500000;
+            } else if (subscribersCount >= 100000) {
+                nextMilestone = Math.ceil((subscribersCount + 1) / 50000) * 50000;
+            } else if (subscribersCount >= 10000) {
+                nextMilestone = Math.ceil((subscribersCount + 1) / 5000) * 5000;
+            } else {
+                nextMilestone = Math.ceil((subscribersCount + 1) / 1000) * 1000;
+            }
+            const milestoneProgress = Math.min(100, Math.max(0, (subscribersCount / nextMilestone) * 100));
+
             return (
-                <WidgetWrapper title="YouTube Channel" onRemove={() => {}} source="YouTube API">
-                    <div className="flex flex-col h-full p-4 justify-between">
-                        <div className="flex items-center gap-4 mb-4">
-                            {ytSettings.youtubeChannelAvatar ? (
-                                <img 
-                                    src={ytSettings.youtubeChannelAvatar} 
-                                    alt="YouTube Avatar" 
-                                    className="w-12 h-12 rounded-full border border-slate-205 dark:border-slate-700 object-cover"
-                                />
-                            ) : (
-                                <div className="w-12 h-12 rounded-full bg-rose-100 dark:bg-rose-900/20 text-rose-600 flex items-center justify-center font-black text-xl">▶</div>
-                            )}
+                <WidgetWrapper title="YouTube Analytics" onRemove={() => {}} source="YouTube Live API">
+                    <div className="flex flex-col h-full justify-between p-4 bg-gradient-to-br from-white to-slate-50/50 dark:from-slate-850 dark:to-slate-900 transition-all rounded-[2rem] gap-3">
+                        {/* Channel Header */}
+                        <div className="flex items-center gap-3">
+                            <div className="relative">
+                                {ytSettings.youtubeChannelAvatar ? (
+                                    <img 
+                                        src={ytSettings.youtubeChannelAvatar} 
+                                        alt="YouTube Avatar" 
+                                        className="w-12 h-12 rounded-2xl border-2 border-rose-500/20 object-cover shadow-sm"
+                                    />
+                                ) : (
+                                    <div className="w-12 h-12 rounded-2xl bg-rose-600 text-white flex items-center justify-center font-black text-xl shadow-md shadow-rose-900/10">▶</div>
+                                )}
+                                <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-600 text-[8px] text-white font-bold ring-2 ring-white dark:ring-slate-850">✓</span>
+                            </div>
                             <div className="min-w-0 flex-1">
                                 <h5 className="text-sm font-black text-slate-900 dark:text-white truncate">
-                                    {ytSettings.youtubeChannelName || 'Connected Channel'}
+                                    {ytSettings.youtubeChannelName || 'YouTube Channel'}
                                 </h5>
                                 <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">
                                     Last Synced: {lastSyncedText}
@@ -527,49 +545,62 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-2 text-center mb-4">
-                            <div className="bg-slate-50 dark:bg-slate-900/40 p-2 rounded-xl">
-                                <p className="text-xs font-black text-slate-800 dark:text-white">
-                                    {(ytSettings.youtubeSubscribers || 0).toLocaleString()}
-                                </p>
-                                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tight">Subscribers</p>
+                        {/* Subscribers Hero Stat */}
+                        <div className="pt-1">
+                            <p className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Subscribers</p>
+                            <div className="flex items-baseline gap-2 flex-wrap">
+                                <span className="text-3xl font-black tracking-tight text-slate-900 dark:text-white leading-none">
+                                    {subscribersCount.toLocaleString()}
+                                </span>
+                                {getSubscribersGrowth.weekly && (
+                                    <span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[9px] font-black ${getSubscribersGrowth.weekly.startsWith('-') ? 'bg-rose-100 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400' : 'bg-emerald-100 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400'}`}>
+                                        {getSubscribersGrowth.weekly.startsWith('-') ? '▼' : '▲'} {getSubscribersGrowth.weekly}
+                                    </span>
+                                )}
                             </div>
-                            <div className="bg-slate-50 dark:bg-slate-900/40 p-2 rounded-xl">
-                                <p className="text-xs font-black text-slate-800 dark:text-white">
+                        </div>
+
+                        {/* Goal Progress Bar */}
+                        <div className="space-y-1">
+                            <div className="flex justify-between text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                                <span>Milestone Goal Progress</span>
+                                <span>{milestoneProgress.toFixed(0)}%</span>
+                            </div>
+                            <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden p-0.5 border border-slate-200/50 dark:border-slate-700/50">
+                                <div 
+                                    className="bg-gradient-to-r from-rose-500 to-rose-600 h-full rounded-full transition-all duration-1000 shadow-sm shadow-rose-500/20" 
+                                    style={{ width: `${milestoneProgress}%` }}
+                                ></div>
+                            </div>
+                            <div className="flex justify-between text-[8px] font-black text-slate-400/80 dark:text-slate-500/80 uppercase">
+                                <span>0</span>
+                                <span>{nextMilestone.toLocaleString()} Goals</span>
+                            </div>
+                        </div>
+
+                        {/* Secondary Stats Grid */}
+                        <div className="grid grid-cols-2 gap-3 pt-1">
+                            <div className="bg-slate-50 dark:bg-slate-900/40 p-2.5 rounded-2xl border border-slate-100 dark:border-slate-800/80 flex flex-col justify-center">
+                                <p className="text-xs font-black text-slate-850 dark:text-white">
                                     {(ytSettings.youtubeViews || 0).toLocaleString()}
                                 </p>
-                                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tight">Total Views</p>
+                                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tight mt-0.5">Total Views</p>
                             </div>
-                            <div className="bg-slate-50 dark:bg-slate-900/40 p-2 rounded-xl">
-                                <p className="text-xs font-black text-slate-800 dark:text-white">
+                            <div className="bg-slate-50 dark:bg-slate-900/40 p-2.5 rounded-2xl border border-slate-100 dark:border-slate-800/80 flex flex-col justify-center">
+                                <p className="text-xs font-black text-slate-850 dark:text-white">
                                     {(ytSettings.youtubeVideos || 0).toLocaleString()}
                                 </p>
-                                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tight">Videos</p>
+                                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tight mt-0.5">Videos Published</p>
                             </div>
                         </div>
 
-                        {/* Subscriber Growth Rates */}
-                        <div className="space-y-1.5 border-t border-slate-100 dark:border-slate-800 pt-3">
-                            <div className="flex justify-between items-center text-[10px]">
-                                <span className="font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">7-Day Growth</span>
-                                <span className={`font-black ${getSubscribersGrowth.weekly && getSubscribersGrowth.weekly.startsWith('-') ? 'text-rose-500' : 'text-emerald-500'}`}>
-                                    {getSubscribersGrowth.weekly || '---'}
-                                </span>
-                            </div>
-                            <div className="flex justify-between items-center text-[10px]">
-                                <span className="font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">30-Day Growth</span>
-                                <span className={`font-black ${getSubscribersGrowth.monthly && getSubscribersGrowth.monthly.startsWith('-') ? 'text-rose-500' : 'text-emerald-500'}`}>
-                                    {getSubscribersGrowth.monthly || '---'}
-                                </span>
-                            </div>
-                        </div>
-
-                        <div className="mt-4 flex items-center justify-between gap-2">
+                        {/* Sync Actions */}
+                        <div className="flex items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
                             <a 
                                 href={`https://youtube.com/${ytSettings.youtubeChannelName?.startsWith('@') ? ytSettings.youtubeChannelName : ''}`}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="flex-1 text-center bg-rose-600 hover:bg-rose-700 text-white font-black text-[9px] uppercase tracking-wider py-2 rounded-xl shadow-sm transition-all"
+                                className="flex-1 text-center bg-rose-600 hover:bg-rose-700 text-white font-black text-[9px] uppercase tracking-wider py-2.5 rounded-xl shadow-md shadow-rose-950/10 hover:shadow-rose-600/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
                             >
                                 Open Channel
                             </a>
@@ -588,10 +619,15 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
                                     }
                                 }}
                                 disabled={isAutoSyncing}
-                                className="p-2 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-xl transition-all"
+                                className="p-2.5 bg-slate-100 dark:bg-slate-850 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-xl transition-all border border-slate-200/50 dark:border-slate-700/50 hover:scale-[1.02] active:scale-[0.98]"
                                 title="Sync metrics now"
                             >
-                                {isAutoSyncing ? '…' : '🔄'}
+                                {isAutoSyncing ? (
+                                    <svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                                    </svg>
+                                ) : '🔄'}
                             </button>
                         </div>
                     </div>
@@ -605,52 +641,76 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
             const video = ytSettings.youtubeLatestVideo;
             const publishDate = new Date(video.publishedAt).toLocaleDateString();
 
+            // Calculate engagement rate
+            const views = video.views || 0;
+            const likes = video.likes || 0;
+            const comments = video.comments || 0;
+            const engagementRate = views > 0 ? ((likes + comments) / views) * 100 : 0;
+
             return (
-                <WidgetWrapper title="Latest Video Performance" onRemove={() => {}} source="YouTube API">
-                    <div className="flex flex-col h-full justify-between p-4">
+                <WidgetWrapper title="Latest Video Stats" onRemove={() => {}} source="YouTube Content API">
+                    <div className="flex flex-col h-full justify-between p-4 bg-gradient-to-br from-white to-slate-50/50 dark:from-slate-850 dark:to-slate-900 rounded-[2rem] gap-3">
+                        {/* Image Container with Floating Badges */}
                         <a 
                             href={`https://youtube.com/watch?v=${video.id}`} 
                             target="_blank" 
                             rel="noreferrer"
-                            className="relative block group rounded-xl overflow-hidden mb-3 border border-slate-100 dark:border-slate-800 shadow-sm"
+                            className="relative block group rounded-2xl overflow-hidden border border-slate-100 dark:border-slate-800 shadow-sm aspect-video bg-slate-900"
                         >
                             <img 
                                 src={video.thumbnail} 
                                 alt={video.title}
-                                className="w-full aspect-video object-cover group-hover:scale-105 transition-transform duration-300"
+                                className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500 opacity-90 group-hover:opacity-100"
                             />
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                                <span className="w-12 h-12 bg-rose-600 rounded-full flex items-center justify-center text-white text-xl font-bold shadow-md shadow-rose-900/50">▶</span>
+                            {/* Hover Play Button Overlay */}
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all duration-300">
+                                <span className="w-11 h-11 bg-rose-600 rounded-full flex items-center justify-center text-white text-lg font-bold shadow-lg shadow-rose-900/40 transform scale-75 group-hover:scale-100 transition-transform duration-300">▶</span>
+                            </div>
+                            
+                            {/* Floating Stats on Thumbnail */}
+                            <div className="absolute bottom-2 left-2 px-2.5 py-1 rounded-lg backdrop-blur-md bg-black/60 text-white text-[9px] font-black uppercase tracking-wider flex items-center gap-1 shadow-sm">
+                                👁️ {views.toLocaleString()}
+                            </div>
+                            <div className="absolute top-2 right-2 px-2 py-0.5 rounded-lg bg-rose-600 text-white text-[8px] font-black uppercase tracking-widest shadow-sm">
+                                Latest Upload
                             </div>
                         </a>
 
-                        <div className="flex-1 mb-3">
-                            <h5 className="text-xs font-black text-slate-900 dark:text-white line-clamp-2 leading-relaxed" title={video.title}>
+                        {/* Title and Metadata */}
+                        <div>
+                            <a 
+                                href={`https://youtube.com/watch?v=${video.id}`} 
+                                target="_blank" 
+                                rel="noreferrer"
+                                className="text-xs font-black text-slate-900 dark:text-white line-clamp-2 leading-relaxed hover:text-rose-600 dark:hover:text-rose-400 transition-colors" 
+                                title={video.title}
+                            >
                                 {video.title}
-                            </h5>
-                            <p className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider mt-1">
-                                Published: {publishDate}
+                            </a>
+                            <p className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider mt-1.5 flex items-center gap-1.5">
+                                <span>Published: {publishDate}</span>
                             </p>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-2 border-t border-slate-100 dark:border-slate-800 pt-3 text-center">
-                            <div>
-                                <p className="text-xs font-black text-slate-800 dark:text-white">
-                                    {(video.views || 0).toLocaleString()}
+                        {/* Performance & Engagement Stats Grid */}
+                        <div className="grid grid-cols-3 gap-2 text-center pt-2 border-t border-slate-100 dark:border-slate-800">
+                            <div className="p-2 bg-slate-50 dark:bg-slate-900/30 rounded-xl border border-slate-100/55 dark:border-slate-800/50">
+                                <p className="text-xs font-black text-slate-850 dark:text-white">
+                                    {likes.toLocaleString()}
                                 </p>
-                                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tight">Views</p>
+                                <p className="text-[8px] text-slate-400 font-bold uppercase tracking-tight mt-0.5">Likes</p>
                             </div>
-                            <div>
-                                <p className="text-xs font-black text-slate-800 dark:text-white">
-                                    {(video.likes || 0).toLocaleString()}
+                            <div className="p-2 bg-slate-50 dark:bg-slate-900/30 rounded-xl border border-slate-100/55 dark:border-slate-800/50">
+                                <p className="text-xs font-black text-slate-850 dark:text-white">
+                                    {comments.toLocaleString()}
                                 </p>
-                                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tight">Likes</p>
+                                <p className="text-[8px] text-slate-400 font-bold uppercase tracking-tight mt-0.5">Comments</p>
                             </div>
-                            <div>
-                                <p className="text-xs font-black text-slate-800 dark:text-white">
-                                    {(video.comments || 0).toLocaleString()}
+                            <div className="p-2 bg-rose-50/50 dark:bg-rose-950/20 rounded-xl border border-rose-100/30 dark:border-rose-900/20">
+                                <p className="text-xs font-black text-rose-600 dark:text-rose-455">
+                                    {engagementRate.toFixed(1)}%
                                 </p>
-                                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tight">Comments</p>
+                                <p className="text-[8px] text-rose-500/80 font-bold uppercase tracking-tight mt-0.5">Engagement</p>
                             </div>
                         </div>
                     </div>
@@ -725,13 +785,13 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
                         <h4 className="font-black text-slate-900 dark:text-white text-lg">{ministry.name}</h4>
                         <span className="text-[9px] font-black bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-2 py-1 rounded uppercase tracking-widest">{timeFilter} View</span>
                     </div>
-                    <div className="flex-1 w-full min-h-0">
+                    <div className="h-64 w-full">
                         {validDefs.length > 0 ? (
                             <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={1}>
                                 <LineChart data={chartData}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} strokeOpacity={0.2} />
                                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: axisColor}} />
-                                    <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: axisColor}} width={30} />
+                                    <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: axisColor}} width={40} />
                                     <Tooltip contentStyle={{borderRadius:'12px', border:'none', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)', backgroundColor: '#1e293b', color: '#fff'}} />
                                     <Legend verticalAlign="top" height={36} wrapperStyle={{color: axisColor}}/>
                                     {validDefs.map((def, i) => (
