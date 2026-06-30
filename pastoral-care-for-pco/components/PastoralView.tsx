@@ -1838,16 +1838,18 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
               onDismiss={handleDismiss}
           />
       ) : activeTab === 'Calendar' ? (
-          <div className="h-[calc(100vh-250px)] min-h-[600px] relative">
-              <div className="absolute top-4 right-4 z-10">
-                  <button 
-                      onClick={() => setIsEmbedModalOpen(true)}
-                      className="bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 px-4 py-2 rounded-xl text-xs font-black tracking-widest shadow-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors flex items-center gap-2 border border-slate-200 dark:border-slate-700 uppercase"
-                  >
-                      <span>🔗</span> Embed
-                  </button>
-              </div>
-              <PastoralCalendar people={peopleData?.allPeople || []} />
+          <div className="h-[calc(100vh-250px)] min-h-[600px]">
+              <PastoralCalendar 
+                  people={peopleData?.allPeople || []} 
+                  headerControl={
+                      <button 
+                          onClick={() => setIsEmbedModalOpen(true)}
+                          className="bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 px-4 py-2 rounded-xl text-xs font-black tracking-widest shadow-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors flex items-center gap-2 border border-slate-200 dark:border-slate-700 uppercase"
+                      >
+                          <span>🔗</span> Embed
+                      </button>
+                  }
+              />
           </div>
       ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">

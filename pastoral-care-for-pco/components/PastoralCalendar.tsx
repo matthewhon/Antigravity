@@ -9,6 +9,7 @@ import {
 
 interface PastoralCalendarProps {
     people: PcoPerson[];
+    headerControl?: React.ReactNode;
 }
 
 type EventType = 'birthday' | 'anniversary' | 'salvation' | 'baptism';
@@ -27,7 +28,7 @@ interface CalendarEvent {
     avatar?: string | null;
 }
 
-export const PastoralCalendar: React.FC<PastoralCalendarProps> = ({ people }) => {
+export const PastoralCalendar: React.FC<PastoralCalendarProps> = ({ people, headerControl }) => {
     const [currentDate, setCurrentDate] = useState(new Date());
     const [viewMode, setViewMode] = useState<'month' | 'week'>('month');
 
@@ -158,6 +159,11 @@ export const PastoralCalendar: React.FC<PastoralCalendarProps> = ({ people }) =>
                         </button>
                     </div>
                 </div>
+                {headerControl && (
+                    <div className="flex items-center justify-center">
+                        {headerControl}
+                    </div>
+                )}
                 <div className="flex items-center gap-2">
                     <button onClick={prev} title="Previous" className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
