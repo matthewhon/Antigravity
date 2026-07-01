@@ -1428,6 +1428,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                         </table>
                     </div>
                 </div>
+            </div>
         )}
 
         {activeTab === 'Reports' && (
