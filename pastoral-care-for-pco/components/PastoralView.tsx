@@ -1827,32 +1827,6 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
           </div>
       )}
 
-      {/* Care sub-navigation: Dashboard | Reports */}
-      {(activeTab === 'Care' || activeTab === 'Reports') && (
-          <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/60 p-1 rounded-2xl self-start">
-              {([
-                  { label: '📊 Dashboard', path: '/care/care' },
-                  { label: '📋 Reports', path: '/care/reports' },
-              ] as const).map(({ label, path }) => {
-                  const isActive =
-                      (path === '/care/care'    && activeTab === 'Care') ||
-                      (path === '/care/reports' && activeTab === 'Reports');
-                  return (
-                      <a
-                          key={path}
-                          href={path}
-                          className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-                              isActive
-                                  ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm'
-                                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
-                          }`}
-                      >
-                          {label}
-                      </a>
-                  );
-              })}
-          </div>
-      )}
 
       {/* Reports page — full-width, replaces widget grid */}
       {activeTab === 'Reports' ? (
