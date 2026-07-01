@@ -1,5 +1,6 @@
 import twilio from 'twilio';
 import { getDb } from './firebase';
+import { FieldValue } from 'firebase-admin/firestore';
 import { createServerLogger } from '../services/logService';
 
 // ─── Master credentials helper ────────────────────────────────────────────────
@@ -206,6 +207,14 @@ async function recordUsage(db: any, params: {
         numberId:        params.numberId || null,
         createdAt:       Date.now(),
     });
+
+    const d = new Date();
+    const currentMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    await db.collection('churches').doc(params.churchId).set({
+        smsUsage: {
+            [currentMonth]: FieldValue.increment(params.segments)
+        }
+    }, { merge: true }).catch((e: any) => console.error('[twilioSend] Failed to increment church smsUsage:', e));
 }
 
 // ─── POST /api/messaging/send-individual ────────────────────────────────────

@@ -645,6 +645,35 @@ export const handleInboundSms = async (req: any, res: any) => {
                 createdAt: now,
             });
 
+        // 4-0. Record inbound SMS usage
+        const segmentsStr = req.body.NumSegments || '1';
+        const segments = parseInt(segmentsStr, 10) || 1;
+        const isMms = mediaUrls.length > 0;
+        const costUsd = isMms ? 0.02 : segments * 0.0079; // Defaulting to outbound rates or generic inbound rate
+        const usageId = `usage_inbound_${now}_${Math.random().toString(36).slice(2, 8)}`;
+        const d = new Date();
+        const currentMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        
+        await db.collection('smsUsageRecords').doc(usageId).set({
+            id: usageId,
+            churchId,
+            conversationId: convId,
+            toPhone: to,
+            fromPhone: from,
+            segments,
+            isMms,
+            costUsd,
+            direction: 'inbound',
+            messageSid: smsSid || messageSidField || null,
+            createdAt: now,
+        });
+
+        await db.collection('churches').doc(churchId).set({
+            smsUsage: {
+                [currentMonth]: FieldValue.increment(segments)
+            }
+        }, { merge: true }).catch((e: any) => log.warn(`Failed to increment church inbound smsUsage: ${e.message}`, 'system', { churchId }, churchId));
+
         // 4-A. Push notification — fire-and-forget, must not block the TwiML response
         const senderName = personMatch?.personName || convSnap.data()?.personName || from;
         const preview = body.length > 80 ? body.slice(0, 77) + '...' : body;
