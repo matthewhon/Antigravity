@@ -1678,6 +1678,22 @@ class FirestoreService {
       return [];
     }
   }
+
+  async getPersonOutreachSlots(churchId: string, personId: string): Promise<OutreachSlot[]> {
+    try {
+      const q = query(
+        collection(db, 'outreach_slots'),
+        where('churchId', '==', churchId),
+        where('assignedPersonId', '==', personId)
+      );
+      const snap = await getDocs(q);
+      const slots = snap.docs.map(d => d.data() as OutreachSlot);
+      return slots.sort((a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0));
+    } catch (e) {
+      console.warn('getPersonOutreachSlots error:', e);
+      return [];
+    }
+  }
 }
 
 export interface SermonVerseRecord {

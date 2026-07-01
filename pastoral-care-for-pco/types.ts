@@ -800,6 +800,7 @@ export interface PastoralNote {
     followUpDate?: string;
     isCompleted: boolean;
     tags?: string[];
+    isOutreach?: boolean;
 }
 
 export interface PrayerRequest {

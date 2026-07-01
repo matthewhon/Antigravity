@@ -83,6 +83,7 @@ interface EnrichedRow {
     urgencyScore: number;
     followedUpRecently: boolean;
     dismissed: boolean;
+    allNotes: PastoralNote[];
 }
 
 // ---------------------------------------------------------------------------
@@ -109,24 +110,28 @@ function exportToCSV(rows: EnrichedRow[], filename: string) {
         'Name', 'Email', 'Phone', 'Membership', 'Status',
         'Risk Category', 'Risk Score',
         'Last Care Contact', 'Contact Type', 'Days Since Contact', 'Notes Count',
-        'Followed Up Recently', 'Birthday', 'Anniversary',
+        'Notes', 'Followed Up Recently', 'Birthday', 'Anniversary',
     ];
-    const csvRows = rows.map(({ person, lastNote, daysSinceContact, noteCount, followedUpRecently }) => [
-        escapeCsvCell(person.name),
-        escapeCsvCell(person.email),
-        escapeCsvCell(person.phone),
-        escapeCsvCell(person.membership),
-        escapeCsvCell(person.status),
-        escapeCsvCell(person.riskProfile?.category),
-        escapeCsvCell(person.riskProfile?.score),
-        escapeCsvCell(lastNote?.date),
-        escapeCsvCell(lastNote?.type),
-        escapeCsvCell(daysSinceContact === 9999 ? 'Never' : daysSinceContact),
-        escapeCsvCell(noteCount),
-        escapeCsvCell(followedUpRecently ? 'Yes' : 'No'),
-        escapeCsvCell(person.birthdate),
-        escapeCsvCell(person.anniversary),
-    ].join(','));
+    const csvRows = rows.map(({ person, lastNote, daysSinceContact, noteCount, allNotes, followedUpRecently }) => {
+        const notesStr = allNotes.map(n => `[${formatDate(n.date)} - ${n.type}] ${n.content}`).join('\n\n');
+        return [
+            escapeCsvCell(person.name),
+            escapeCsvCell(person.email),
+            escapeCsvCell(person.phone),
+            escapeCsvCell(person.membership),
+            escapeCsvCell(person.status),
+            escapeCsvCell(person.riskProfile?.category),
+            escapeCsvCell(person.riskProfile?.score),
+            escapeCsvCell(lastNote?.date),
+            escapeCsvCell(lastNote?.type),
+            escapeCsvCell(daysSinceContact === 9999 ? 'Never' : daysSinceContact),
+            escapeCsvCell(noteCount),
+            escapeCsvCell(notesStr),
+            escapeCsvCell(followedUpRecently ? 'Yes' : 'No'),
+            escapeCsvCell(person.birthdate),
+            escapeCsvCell(person.anniversary),
+        ].join(',');
+    });
 
     const csv = [headers.join(','), ...csvRows].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -291,11 +296,25 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
     // person.id from allPeople is always the raw PCO ID.
     // To tolerate both formats we index each note under BOTH keys so the
     // lookup (person.id → note) always hits regardless of what was saved.
+    const allNotesMap = useMemo(() => {
+        const m = new Map<string, PastoralNote[]>();
+        notes.forEach(n => {
+            const raw = n.personId;
+            const bare = raw.includes('_') ? raw.split('_').slice(1).join('_') : raw;
+            if (!m.has(raw)) m.set(raw, []);
+            m.get(raw)!.push(n);
+            if (bare !== raw) {
+                if (!m.has(bare)) m.set(bare, []);
+                m.get(bare)!.push(n);
+            }
+        });
+        return m;
+    }, [notes]);
+
     const lastNoteMap = useMemo(() => {
         const m = new Map<string, PastoralNote>();
         notes.forEach(n => {
             const raw = n.personId;
-            // Strip a leading "<churchId>_" prefix if present to get the bare PCO ID
             const bare = raw.includes('_') ? raw.split('_').slice(1).join('_') : raw;
             if (!m.has(raw))  m.set(raw,  n);
             if (!m.has(bare)) m.set(bare, n);
@@ -346,9 +365,10 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
                 const logEntry = followUpMap.get(person.id);
                 const followedUpRecently = !!(logEntry?.followedUpAt && (now - logEntry.followedUpAt) < SEVEN_DAYS_MS);
                 const dismissed = !!(logEntry?.dismissedAt);
-                return { person, lastNote, noteCount, daysSinceContact: days, urgencyScore: urgency, followedUpRecently, dismissed };
+                const allNotes = allNotesMap.get(person.id) || [];
+                return { person, lastNote, noteCount, daysSinceContact: days, urgencyScore: urgency, followedUpRecently, dismissed, allNotes };
             });
-    }, [peopleData, lastNoteMap, noteCountMap, followUpMap]);
+    }, [peopleData, lastNoteMap, noteCountMap, followUpMap, allNotesMap]);
 
     // --- Filter rows ---
     const filteredRows = useMemo(() => {

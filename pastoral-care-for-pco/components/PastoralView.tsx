@@ -479,7 +479,35 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
           if (careDataFetchedForChurch.current === church.id) return;
           careDataFetchedForChurch.current = church.id;
 
-          firestore.getPastoralNotes(church.id).then(setNotes);
+          Promise.all([
+              firestore.getPastoralNotes(church.id),
+              firestore.getChurchOutreachSlots(church.id)
+          ]).then(([pastoralNotes, slots]) => {
+              const outreachNotes: PastoralNote[] = slots
+                  .filter(s => s.status === 'contacted' && !!s.notes)
+                  .map(s => {
+                      const noteStr = s.followUpNotes?.length
+                        ? s.notes + '\n\n' + s.followUpNotes.map(f => `Follow-up: ${f.note}`).join('\n')
+                        : s.notes;
+
+                      return {
+                          id: s.id,
+                          churchId: s.churchId,
+                          personId: s.assignedPersonId,
+                          personName: s.assignedPersonName,
+                          authorId: s.volunteerPhone,
+                          authorName: s.volunteerName || 'Volunteer',
+                          date: new Date(s.completedAt || s.assignedAt).toISOString(),
+                          type: 'Call',
+                          content: noteStr,
+                          isCompleted: true,
+                          isOutreach: true
+                      } as PastoralNote;
+                  });
+
+              const combined = [...pastoralNotes, ...outreachNotes].sort((a, b) => b.date.localeCompare(a.date));
+              setNotes(combined);
+          });
           firestore.getPrayerRequests(church.id, 'Active').then(setPrayerRequests);
           firestore.getCareFollowUpLog(church.id).then(setFollowUpLog);
 
@@ -1595,7 +1623,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                               <CareNoteCard 
                                 key={note.id} 
                                 note={note} 
-                                onRemove={() => firestore.deletePastoralNote(note.id).then(() => setNotes(notes.filter(n => n.id !== note.id)))} 
+                                onRemove={note.isOutreach ? undefined : () => firestore.deletePastoralNote(note.id).then(() => setNotes(notes.filter(n => n.id !== note.id)))} 
                               />
                           ))}
                           {notes.length === 0 && (

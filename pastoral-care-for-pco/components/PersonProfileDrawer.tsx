@@ -165,15 +165,40 @@ export const PersonProfileDrawer: React.FC<PersonProfileDrawerProps> = ({ person
       setNotes([]);
       setTimeline([]);
       try {
-        const [people, changes, personNotes] = await Promise.all([
+        const [people, changes, personNotes, outreachSlots] = await Promise.all([
           firestore.getPeople(churchId),
           firestore.getPersonRiskTimeline(churchId, personId),
           firestore.getPastoralNotes(churchId, personId),
+          firestore.getPersonOutreachSlots(churchId, personId),
         ]);
         const p = people.find(p => p.id === personId);
         if (p) setPerson(p);
         setTimeline(changes);
-        setNotes(personNotes);
+
+        const outreachNotes: PastoralNote[] = outreachSlots
+            .filter(s => s.status === 'contacted' && !!s.notes)
+            .map(s => {
+                const noteStr = s.followUpNotes?.length
+                  ? s.notes + '\n\n' + s.followUpNotes.map(f => `Follow-up: ${f.note}`).join('\n')
+                  : s.notes;
+
+                return {
+                    id: s.id,
+                    churchId: s.churchId,
+                    personId: s.assignedPersonId,
+                    personName: s.assignedPersonName,
+                    authorId: s.volunteerPhone,
+                    authorName: s.volunteerName || 'Volunteer',
+                    date: new Date(s.completedAt || s.assignedAt).toISOString(),
+                    type: 'Call',
+                    content: noteStr,
+                    isCompleted: true,
+                    isOutreach: true
+                } as PastoralNote;
+            });
+
+        const combined = [...personNotes, ...outreachNotes].sort((a, b) => b.date.localeCompare(a.date));
+        setNotes(combined);
       } catch (e) {
         console.error('Failed to load person details', e);
       } finally {
