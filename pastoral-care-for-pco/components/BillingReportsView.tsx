@@ -5,6 +5,13 @@ export interface TenantBillingReport {
     churchId: string;
     name: string;
     gcpCost: number;
+    gcpBreakdown: {
+        storage: number;
+        database: number;
+        hosting: number;
+        appHosting: number;
+        other: number;
+    };
     postmarkCost: number;
     signalwireCost: number;
     totalCost: number;
@@ -19,6 +26,13 @@ export interface BillingReportResponse {
     period: string;
     totals: {
         gcpCost: number;
+        gcpBreakdown: {
+            storage: number;
+            database: number;
+            hosting: number;
+            appHosting: number;
+            other: number;
+        };
         postmarkCost: number;
         signalwireCost: number;
         grandTotal: number;
@@ -129,28 +143,36 @@ export const BillingReportsView: React.FC = () => {
                         <table className="w-full text-left text-sm whitespace-nowrap">
                             <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-500">
                                 <tr>
-                                    <th className="px-6 py-4 font-medium">Tenant</th>
-                                    <th className="px-6 py-4 font-medium text-right">GCP Cost</th>
-                                    <th className="px-6 py-4 font-medium text-right">Postmark</th>
-                                    <th className="px-6 py-4 font-medium text-right">SignalWire</th>
+                                    <th className="px-6 py-4 font-medium border-r border-slate-200 dark:border-slate-800">Tenant</th>
+                                    <th className="px-4 py-4 font-medium text-right text-xs">Storage</th>
+                                    <th className="px-4 py-4 font-medium text-right text-xs">Database</th>
+                                    <th className="px-4 py-4 font-medium text-right text-xs">Hosting</th>
+                                    <th className="px-4 py-4 font-medium text-right text-xs">App Hosting</th>
+                                    <th className="px-4 py-4 font-medium text-right text-xs border-r border-slate-200 dark:border-slate-800">Other GCP</th>
+                                    <th className="px-6 py-4 font-medium text-right text-xs">Postmark</th>
+                                    <th className="px-6 py-4 font-medium text-right text-xs">SignalWire</th>
                                     <th className="px-6 py-4 font-medium text-right bg-slate-100 dark:bg-slate-800">Total Cost</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50 text-slate-600 dark:text-slate-300">
                                 {report.tenants.length === 0 ? (
                                     <tr>
-                                        <td colSpan={5} className="px-6 py-8 text-center text-slate-400">
+                                        <td colSpan={9} className="px-6 py-8 text-center text-slate-400">
                                             No billing data available for this period.
                                         </td>
                                     </tr>
                                 ) : (
                                     report.tenants.map(t => (
                                         <tr key={t.churchId} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
-                                            <td className="px-6 py-4 font-medium text-slate-800 dark:text-slate-200">
+                                            <td className="px-6 py-4 font-medium text-slate-800 dark:text-slate-200 border-r border-slate-200 dark:border-slate-800">
                                                 {t.name}
                                                 <div className="text-xs text-slate-400 font-normal">ID: {t.churchId}</div>
                                             </td>
-                                            <td className="px-6 py-4 text-right">{formatCurrency(t.gcpCost)}</td>
+                                            <td className="px-4 py-4 text-right">{formatCurrency(t.gcpBreakdown.storage)}</td>
+                                            <td className="px-4 py-4 text-right">{formatCurrency(t.gcpBreakdown.database)}</td>
+                                            <td className="px-4 py-4 text-right">{formatCurrency(t.gcpBreakdown.hosting)}</td>
+                                            <td className="px-4 py-4 text-right">{formatCurrency(t.gcpBreakdown.appHosting)}</td>
+                                            <td className="px-4 py-4 text-right border-r border-slate-200 dark:border-slate-800">{formatCurrency(t.gcpBreakdown.other)}</td>
                                             <td className="px-6 py-4 text-right">{formatCurrency(t.postmarkCost)}</td>
                                             <td className="px-6 py-4 text-right">{formatCurrency(t.signalwireCost)}</td>
                                             <td className="px-6 py-4 text-right font-bold bg-slate-50 dark:bg-slate-800/30">

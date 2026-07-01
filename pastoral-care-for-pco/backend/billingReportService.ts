@@ -7,6 +7,13 @@ export interface TenantBillingReport {
     churchId: string;
     name: string;
     gcpCost: number;
+    gcpBreakdown: {
+        storage: number;
+        database: number;
+        hosting: number;
+        appHosting: number;
+        other: number;
+    };
     postmarkCost: number;
     signalwireCost: number;
     totalCost: number;
@@ -21,6 +28,13 @@ export interface BillingReportResponse {
     period: string;
     totals: {
         gcpCost: number;
+        gcpBreakdown: {
+            storage: number;
+            database: number;
+            hosting: number;
+            appHosting: number;
+            other: number;
+        };
         postmarkCost: number;
         signalwireCost: number;
         grandTotal: number;
@@ -73,22 +87,30 @@ async function getSignalWireTotalCost(
     }
 }
 
+export interface GcpCostBreakdown {
+    total: number;
+    storage: number;
+    database: number;
+    hosting: number;
+    appHosting: number;
+    other: number;
+}
+
 /**
- * Fetch total GCP cost from BigQuery
+ * Fetch GCP costs from BigQuery, grouped by service
  * Assumes a dataset named `billing_export` and a table `gcp_billing_export_v1_*`
  * in the default GCP project.
  */
-async function getGcpTotalCost(yearMonth: string): Promise<number> {
+async function getGcpCosts(yearMonth: string): Promise<GcpCostBreakdown> {
+    const breakdown: GcpCostBreakdown = { total: 0, storage: 0, database: 0, hosting: 0, appHosting: 0, other: 0 };
     try {
         const bigquery = new BigQuery();
         
-        // This is a generic query. Users will need to update the dataset/table name
-        // to match their actual billing export setup.
-        // E.g., `your-project.billing_export.gcp_billing_export_v1_*`
         const query = `
-            SELECT SUM(cost) as total_cost 
+            SELECT service.description as service, SUM(cost) as cost
             FROM \`billing_export.gcp_billing_export_v1_*\`
             WHERE invoice.month = @invoice_month
+            GROUP BY service.description
         `;
         
         const invoiceMonth = yearMonth.replace('-', ''); // E.g., '2026-06' -> '202606'
@@ -101,15 +123,30 @@ async function getGcpTotalCost(yearMonth: string): Promise<number> {
         const [job] = await bigquery.createQueryJob(options);
         const [rows] = await job.getQueryResults();
 
-        if (rows && rows.length > 0 && rows[0].total_cost) {
-            return Number(rows[0].total_cost);
+        if (rows && rows.length > 0) {
+            for (const row of rows) {
+                const cost = Number(row.cost || 0);
+                const svc = (row.service || '').toLowerCase();
+                
+                breakdown.total += cost;
+                
+                if (svc.includes('storage')) {
+                    breakdown.storage += cost;
+                } else if (svc.includes('firestore') || svc.includes('database')) {
+                    breakdown.database += cost;
+                } else if (svc.includes('app hosting')) {
+                    breakdown.appHosting += cost;
+                } else if (svc.includes('hosting')) {
+                    breakdown.hosting += cost;
+                } else {
+                    breakdown.other += cost;
+                }
+            }
         }
-        return 0;
     } catch (e: any) {
         console.error(`[BillingService] Failed to fetch GCP costs from BigQuery: ${e.message}`);
-        // Return 0 if BigQuery is not configured or query fails
-        return 0;
     }
+    return breakdown;
 }
 
 export async function generateBillingReport(period: string): Promise<BillingReportResponse> {
@@ -158,16 +195,24 @@ export async function generateBillingReport(period: string): Promise<BillingRepo
         postmarkTotalCost += Math.ceil((totalEmailSent - 10000) / 1000) * 1.50;
     }
 
-    const [gcpTotalCost, signalwireTotalCost] = await Promise.all([
-        getGcpTotalCost(period),
-        getSignalWireTotalCost(settings, period)
-    ]);
+    // Estimate SignalWire costs at $0.0079 per segment
+    const signalwireTotalCost = totalSmsSegments * 0.0079;
+
+    const gcpCosts = await getGcpCosts(period);
+    const gcpTotalCost = gcpCosts.total;
 
     // 4. Allocate Costs
     const reports: TenantBillingReport[] = tenantsData.map(tenant => {
         // GCP allocated proportionally by active users
         const gcpRatio = totalActiveUsers > 0 ? (tenant.metrics.activeUsers / totalActiveUsers) : 0;
         const gcpCost = gcpTotalCost * gcpRatio;
+        const gcpBreakdown = {
+            storage: gcpCosts.storage * gcpRatio,
+            database: gcpCosts.database * gcpRatio,
+            hosting: gcpCosts.hosting * gcpRatio,
+            appHosting: gcpCosts.appHosting * gcpRatio,
+            other: gcpCosts.other * gcpRatio,
+        };
 
         // Postmark allocated evenly for base rate + proportionally for overage, 
         // OR simply distributed evenly based on the user's preference
@@ -179,14 +224,14 @@ export async function generateBillingReport(period: string): Promise<BillingRepo
         const postmarkCost = postmarkBasePerTenant + (postmarkOverage * emailRatio);
 
         // SignalWire allocated proportionally by SMS segments sent
-        // (Even though we pulled total invoice cost, we allocate it by usage ratio)
-        const smsRatio = totalSmsSegments > 0 ? (tenant.metrics.smsSegments / totalSmsSegments) : 0;
-        const signalwireCost = signalwireTotalCost * smsRatio;
+        // Estimated at standard rate
+        const signalwireCost = tenant.metrics.smsSegments * 0.0079;
 
         return {
             churchId: tenant.churchId,
             name: tenant.name,
             gcpCost,
+            gcpBreakdown,
             postmarkCost,
             signalwireCost,
             totalCost: gcpCost + postmarkCost + signalwireCost,
@@ -198,6 +243,13 @@ export async function generateBillingReport(period: string): Promise<BillingRepo
         period,
         totals: {
             gcpCost: gcpTotalCost,
+            gcpBreakdown: {
+                storage: gcpCosts.storage,
+                database: gcpCosts.database,
+                hosting: gcpCosts.hosting,
+                appHosting: gcpCosts.appHosting,
+                other: gcpCosts.other,
+            },
             postmarkCost: postmarkTotalCost,
             signalwireCost: signalwireTotalCost,
             grandTotal: gcpTotalCost + postmarkTotalCost + signalwireTotalCost
