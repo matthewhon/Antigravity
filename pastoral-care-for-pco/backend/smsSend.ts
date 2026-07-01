@@ -705,14 +705,17 @@ export async function sendBulkInternal(params: {
     }
 
     if (campaignId && !campaignId.startsWith('wf_') && !campaignId.startsWith('services_')) {
-        await db.collection('smsCampaigns').doc(campaignId).update({
+        const updateData: any = {
             status: 'sent', sentAt: Date.now(),
             recipientCount: phones.length,
             deliveredCount: sent,
             failedCount:    failed,
             optOutCount:    optedOut,
             updatedAt:      Date.now(),
-        }).catch((e: any) => {
+        };
+        if (sentBy) updateData.sentBy = sentBy;
+        if (sentByName) updateData.sentByName = sentByName;
+        await db.collection('smsCampaigns').doc(campaignId).update(updateData).catch((e: any) => {
             log.warn(`[BulkSend] Failed to update campaign doc ${campaignId}: ${e.message}`, 'system', { campaignId }, churchId);
         });
     }

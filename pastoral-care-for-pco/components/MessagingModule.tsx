@@ -9986,6 +9986,8 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
             toListId: null, toGroupId: null,
             createdAt: now, updatedAt: now,
             twilioNumberId: activeNumberId || null,
+            sentBy: currentUser.id,
+            sentByName: currentUser.name,
         };
         const ref = await addDoc(collection(firebaseDb, 'smsCampaigns'), data);
         setActiveCampaign({ id: ref.id, ...data });
@@ -10007,7 +10009,18 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
 
     const handleDuplicate = async (c: SmsCampaign) => {
         const now = Date.now();
-        const data = { ...c, name: `Copy of ${c.name}`, status: 'draft' as const, sentAt: null, scheduledAt: null, createdAt: now, updatedAt: now, twilioNumberId: activeNumberId || null };
+        const data = {
+            ...c,
+            name: `Copy of ${c.name}`,
+            status: 'draft' as const,
+            sentAt: null,
+            scheduledAt: null,
+            createdAt: now,
+            updatedAt: now,
+            twilioNumberId: activeNumberId || null,
+            sentBy: currentUser.id,
+            sentByName: currentUser.name,
+        };
         delete (data as any).id;
         await addDoc(collection(firebaseDb, 'smsCampaigns'), data);
         showToast('Campaign duplicated');
@@ -10201,9 +10214,11 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
     }
 
 
-    const filteredCampaigns = activeNumberId
-        ? campaigns.filter(c => !c.twilioNumberId || c.twilioNumberId === activeNumberId)
-        : campaigns;
+    const filteredCampaigns = (
+        activeNumberId
+            ? campaigns.filter(c => !c.twilioNumberId || c.twilioNumberId === activeNumberId)
+            : campaigns
+    ).filter(c => c.sentBy === currentUser.id);
 
     const hasPillNav = !controlledTab;
     const hasNumberSelector = !hideNumberSelector && smsEnabled && visibleNumbers.length > 0;
