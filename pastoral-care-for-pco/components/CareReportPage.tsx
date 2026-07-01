@@ -110,7 +110,7 @@ function exportToCSV(rows: EnrichedRow[], filename: string) {
         'Name', 'Email', 'Phone', 'Membership', 'Status',
         'Risk Category', 'Risk Score',
         'Last Care Contact', 'Contact Type', 'Days Since Contact', 'Notes Count',
-        'Notes', 'Followed Up Recently', 'Birthday', 'Anniversary',
+        'Last Note', 'All Notes', 'Followed Up Recently', 'Birthday', 'Anniversary',
     ];
     const csvRows = rows.map(({ person, lastNote, daysSinceContact, noteCount, allNotes, followedUpRecently }) => {
         const notesStr = allNotes.map(n => `[${formatDate(n.date)} - ${n.type}] ${n.content}`).join('\n\n');
@@ -126,6 +126,7 @@ function exportToCSV(rows: EnrichedRow[], filename: string) {
             escapeCsvCell(lastNote?.type),
             escapeCsvCell(daysSinceContact === 9999 ? 'Never' : daysSinceContact),
             escapeCsvCell(noteCount),
+            escapeCsvCell(lastNote?.content),
             escapeCsvCell(notesStr),
             escapeCsvCell(followedUpRecently ? 'Yes' : 'No'),
             escapeCsvCell(person.birthdate),
