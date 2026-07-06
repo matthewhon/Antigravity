@@ -320,6 +320,10 @@ export async function handleGrowDailyEmail(req: any, res: any) {
  *   devotional         { title, contentPreview, link }
  *   memoryVerse        string          (rendered as colorful quote card)
  *   prayerRequests     Array<{ name, request }>
+ *   arenaChallenges    Array<{ type, categoryTitle, challengerName, challengedNames, status, expiresAt, link }>
+ *   discipleshipRings  { targets: { chaptersRead, prayers, devotionals, smallGroups, bibleKnowledge },
+ *                        progress: { chaptersRead, prayers, devotionals, smallGroups, bibleKnowledge },
+ *                        monthKey: string }
  */
 function buildGrowEmailHtml(data: any, churchName: string, churchId: string = '') {
     const primary   = '#4f46e5';
@@ -424,7 +428,95 @@ function buildGrowEmailHtml(data: any, churchName: string, churchId: string = ''
             </div>`;
     }
 
-    /* ── prayer requests block ──────────────────────────────────────────── */
+    /* ── arena challenges block ─────────────────────────────────────────── */
+    let arenaHtml = '';
+    const challenges = Array.isArray(data.arenaChallenges) ? data.arenaChallenges.filter(Boolean) : [];
+    if (challenges.length > 0) {
+        const typeLabel = (type: string) => {
+            if (type === 'iron_1v1')      return { label: '⚔️ 1v1 Battle',     bg: '#fef3c7', color: '#92400e', border: '#fde68a' };
+            if (type === 'pass_baton')    return { label: '🏃 Relay Race',      bg: '#ede9fe', color: '#5b21b6', border: '#c4b5fd' };
+            if (type === 'goliath_bounty') return { label: '🏆 Open Bounty',    bg: '#ecfdf5', color: '#065f46', border: '#a7f3d0' };
+            return                               { label: '📖 Challenge',       bg: '#f0f9ff', color: '#0c4a6e', border: '#bae6fd' };
+        };
+
+        const challengeCards = challenges.slice(0, 3).map((c: any) => {
+            const { label, bg, color, border } = typeLabel(c.type);
+            const opponent = c.type === 'goliath_bounty'
+                ? 'Open to everyone — beat the high score!'
+                : c.challengerName
+                    ? `${esc(c.challengerName)} challenged you`
+                    : `${esc((c.challengedNames || []).join(', '))} is waiting`;
+            const expiry = c.expiresAt
+                ? (() => {
+                    const diff = Math.round((new Date(c.expiresAt).getTime() - Date.now()) / (1000 * 60 * 60));
+                    return diff > 24 ? `Expires in ${Math.round(diff / 24)}d` : diff > 0 ? `Expires in ${diff}h` : 'Expiring soon';
+                })()
+                : null;
+
+            return `
+                <div style="border:1px solid ${border};background:${bg};border-radius:12px;padding:14px 16px;margin-bottom:10px;">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
+                        <span style="font-size:11px;font-weight:700;background:${border};color:${color};padding:3px 9px;border-radius:999px;">${label}</span>
+                        ${expiry ? `<span style="font-size:11px;color:#6b7280;">${esc(expiry)}</span>` : ''}
+                    </div>
+                    <div style="font-size:15px;font-weight:700;color:#0f172a;margin-bottom:2px;">${esc(c.categoryTitle || 'Bible Challenge')}</div>
+                    <div style="font-size:13px;color:#475569;margin-bottom:10px;">${esc(opponent)}</div>
+                    <a href="${esc(c.link || 'https://app.growwithgrow.com/arena')}"
+                       style="display:inline-block;padding:8px 18px;background:#4f46e5;color:#ffffff;
+                              text-decoration:none;border-radius:8px;font-weight:700;font-size:13px;">
+                        ⚔️ Play Now
+                    </a>
+                </div>`;
+        }).join('');
+
+        arenaHtml = `
+            <hr style="border:none;border-top:1px solid #e5e7eb;margin:0 0 28px 0;" />
+            <div style="margin-bottom:28px;">
+                <div style="font-size:11px;font-weight:700;color:#4f46e5;text-transform:uppercase;letter-spacing:1.2px;">⚔️ Arena Challenges Waiting for You</div>
+                <div style="margin-top:12px;">${challengeCards}</div>
+            </div>`;
+    }
+
+    /* ── discipleship rings block ───────────────────────────────────────── */
+    let ringsHtml = '';
+    const rings = data.discipleshipRings;
+    if (rings?.targets && rings?.progress) {
+        const now = new Date();
+        const monthLabel = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        const ringDefs = [
+            { key: 'chaptersRead',  icon: '📖', label: 'Bible Chapters Read',    color: '#0284c7', track: '#e0f2fe' },
+            { key: 'prayers',       icon: '🙏', label: 'Prayers Tapped',         color: '#8b5cf6', track: '#ede9fe' },
+            { key: 'devotionals',   icon: '📝', label: 'Devotionals Completed',  color: '#d97706', track: '#fef3c7' },
+            { key: 'smallGroups',   icon: '👥', label: 'Small Group Sessions',   color: '#0f766e', track: '#ccfbf1' },
+            { key: 'bibleKnowledge',icon: '⚔️', label: 'Bible Knowledge (XP)',   color: '#e11d48', track: '#ffe4e6' },
+        ];
+
+        const ringRows = ringDefs.map(({ key, icon, label, color, track }) => {
+            const progress = Math.max(0, rings.progress[key] ?? 0);
+            const target   = Math.max(1, rings.targets[key] ?? 1);
+            const pct      = Math.min(100, Math.round((progress / target) * 100));
+            const done     = pct >= 100;
+            return `
+                <div style="margin-bottom:14px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+                        <span style="font-size:13px;font-weight:600;color:#1e293b;">${icon} ${esc(label)}${done ? ' 💍' : ''}</span>
+                        <span style="font-size:12px;color:#64748b;">${progress} / ${target}</span>
+                    </div>
+                    <div style="background:${track};border-radius:999px;height:10px;overflow:hidden;">
+                        <div style="background:${color};width:${pct}%;height:10px;border-radius:999px;"></div>
+                    </div>
+                </div>`;
+        }).join('');
+
+        ringsHtml = `
+            <hr style="border:none;border-top:1px solid #e5e7eb;margin:0 0 28px 0;" />
+            <div style="margin-bottom:28px;">
+                <div style="font-size:11px;font-weight:700;color:#4f46e5;text-transform:uppercase;letter-spacing:1.2px;">💍 Discipleship Rings &mdash; ${esc(monthLabel)}</div>
+                <p style="font-size:13px;color:#64748b;margin:6px 0 16px;">Your progress this month toward each ring goal.</p>
+                ${ringRows}
+            </div>`;
+    }
+
     let prayerHtml = '';
     const prayers = Array.isArray(data.prayerRequests) ? data.prayerRequests.filter(Boolean) : [];
     if (prayers.length > 0) {
@@ -481,6 +573,8 @@ function buildGrowEmailHtml(data: any, churchName: string, churchId: string = ''
                             ${readingPlanHtml}
                             ${devotionalHtml}
                             ${verseHtml}
+                            ${arenaHtml}
+                            ${ringsHtml}
                             ${prayerHtml}
                         </td>
                     </tr>
