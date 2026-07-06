@@ -9021,13 +9021,19 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
         pcoService.getGroups(churchId)
             .then((raw: any[]) => setPcoGroups(raw.map(r => ({ id: r.id, name: r.attributes?.name || 'Unnamed' }))))
             .catch(() => { });
-        // Load synced registration events from Firestore cache
+        // Load synced registration events from Firestore cache (exclude archived events)
         getDocs(query(collection(firebaseDb, 'pco_registrations'), where('churchId', '==', churchId)))
             .then(snap => setPcoRegistrationEvents(
-                snap.docs.map(d => {
-                    const data = d.data() as any;
-                    return { id: d.id, pcoId: data.pcoId, name: data.name || 'Unnamed Event', startsAt: data.startsAt || null };
-                }).sort((a, b) => (a.startsAt || '').localeCompare(b.startsAt || ''))
+                snap.docs
+                    .filter(d => {
+                        const data = d.data() as any;
+                        // Exclude events marked archived by the sync service
+                        return data.openSignup !== false && data.visibility !== 'archived';
+                    })
+                    .map(d => {
+                        const data = d.data() as any;
+                        return { id: d.id, pcoId: data.pcoId, name: data.name || 'Unnamed Event', startsAt: data.startsAt || null };
+                    }).sort((a, b) => (a.startsAt || '').localeCompare(b.startsAt || ''))
             ))
             .catch(() => { });
     }, [churchId]);
