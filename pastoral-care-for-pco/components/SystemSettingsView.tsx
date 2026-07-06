@@ -44,6 +44,56 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
   const [growSecretMsg, setGrowSecretMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [growSecretVisible, setGrowSecretVisible] = useState(false);
 
+  // Grow Access Request management
+  const [growRequestMsg, setGrowRequestMsg] = useState<{ type: 'success' | 'error'; text: string; churchId?: string } | null>(null);
+  const [growRequestProcessing, setGrowRequestProcessing] = useState<string>('');
+
+  const handleGrowRequest = async (churchId: string, action: 'approve' | 'reject') => {
+    setGrowRequestProcessing(churchId);
+    setGrowRequestMsg(null);
+    try {
+      const church = churches.find(c => c.id === churchId);
+      let update: Record<string, any>;
+      if (action === 'approve') {
+        // Generate a 32-byte hex secret for this tenant
+        const array = new Uint8Array(32);
+        crypto.getRandomValues(array);
+        const secret = Array.from(array).map(b => b.toString(16).padStart(2, '0')).join('');
+        update = {
+          growSettings: {
+            ...((church as any)?.growSettings || {}),
+            growIntegrationSecret: secret,
+            growPendingRequest: {
+              ...((church as any)?.growSettings?.growPendingRequest || {}),
+              status: 'approved',
+              approvedAt: new Date().toISOString(),
+            },
+          },
+        };
+        setGrowRequestMsg({ type: 'success', text: `✅ Approved! Secret generated. The Grow app will receive it on its next poll.`, churchId });
+      } else {
+        update = {
+          growSettings: {
+            ...((church as any)?.growSettings || {}),
+            growPendingRequest: {
+              ...((church as any)?.growSettings?.growPendingRequest || {}),
+              status: 'rejected',
+              rejectedAt: new Date().toISOString(),
+            },
+          },
+        };
+        setGrowRequestMsg({ type: 'error', text: `❌ Rejected. The Grow app will be informed on its next poll.`, churchId });
+      }
+      await firestore.updateChurch(churchId, update);
+      const list = await firestore.getAllChurches();
+      setChurches(list);
+    } catch (e: any) {
+      setGrowRequestMsg({ type: 'error', text: 'Error: ' + e.message, churchId });
+    } finally {
+      setGrowRequestProcessing('');
+    }
+  };
+
   useEffect(() => {
     loadSettings();
   }, []);
@@ -1017,6 +1067,100 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                         )}
                     </div>
                 </div>
+
+                {/* ── Grow Access Requests ──────────────────────────────────────── */}
+                {(() => {
+                  const pending = churches.filter(c => (c as any)?.growSettings?.growPendingRequest?.status === 'pending');
+                  const approved = churches.filter(c => (c as any)?.growSettings?.growPendingRequest?.status === 'approved');
+                  const rejected = churches.filter(c => (c as any)?.growSettings?.growPendingRequest?.status === 'rejected');
+                  const hasAny = pending.length > 0 || approved.length > 0 || rejected.length > 0;
+                  if (!hasAny) return null;
+                  return (
+                    <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] border border-slate-100 dark:border-slate-800 shadow-sm">
+                      <div className="flex items-center gap-3 mb-6">
+                        <div className="w-9 h-9 rounded-2xl bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-lg">🔗</div>
+                        <div>
+                          <h3 className="text-lg font-black text-slate-900 dark:text-white">Grow App Access Requests</h3>
+                          <p className="text-[10px] text-slate-400 mt-0.5">Review and approve or reject Grow integration requests from your tenants.</p>
+                        </div>
+                        {pending.length > 0 && (
+                          <span className="ml-auto bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest">
+                            {pending.length} Pending
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="space-y-3">
+                        {[...pending, ...approved, ...rejected].map(church => {
+                          const req = (church as any)?.growSettings?.growPendingRequest;
+                          const status: 'pending' | 'approved' | 'rejected' = req?.status || 'pending';
+                          const isProcessing = growRequestProcessing === church.id;
+                          return (
+                            <div key={church.id} className={`flex items-center gap-4 p-4 rounded-2xl border ${
+                              status === 'pending'  ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800' :
+                              status === 'approved' ? 'bg-emerald-50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-800' :
+                                                      'bg-rose-50 dark:bg-rose-900/10 border-rose-200 dark:border-rose-800'
+                            }`}>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-black text-slate-900 dark:text-white truncate">{church.name}</p>
+                                <p className="text-[10px] text-slate-400 font-mono">{church.id}</p>
+                                {req?.appName && <p className="text-[10px] text-slate-500 mt-0.5">App: <strong>{req.appName}</strong></p>}
+                                {req?.requestedAt && <p className="text-[9px] text-slate-400 mt-0.5">Requested: {new Date(req.requestedAt).toLocaleString()}</p>}
+                              </div>
+                              <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${
+                                status === 'pending'  ? 'bg-amber-200 dark:bg-amber-800 text-amber-800 dark:text-amber-200' :
+                                status === 'approved' ? 'bg-emerald-200 dark:bg-emerald-800 text-emerald-800 dark:text-emerald-200' :
+                                                        'bg-rose-200 dark:bg-rose-800 text-rose-800 dark:text-rose-200'
+                              }`}>
+                                {status === 'pending' ? '⏳ Pending' : status === 'approved' ? '✅ Approved' : '❌ Rejected'}
+                              </span>
+                              {status === 'pending' && (
+                                <div className="flex gap-2 shrink-0">
+                                  <button
+                                    disabled={isProcessing}
+                                    onClick={() => handleGrowRequest(church.id, 'approve')}
+                                    className="bg-emerald-600 text-white px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 disabled:opacity-50 transition-all"
+                                  >
+                                    {isProcessing ? '…' : 'Approve'}
+                                  </button>
+                                  <button
+                                    disabled={isProcessing}
+                                    onClick={() => handleGrowRequest(church.id, 'reject')}
+                                    className="bg-rose-100 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-rose-200 dark:hover:bg-rose-900/30 disabled:opacity-50 transition-all"
+                                  >
+                                    {isProcessing ? '…' : 'Reject'}
+                                  </button>
+                                </div>
+                              )}
+                              {status === 'approved' && (
+                                <button
+                                  onClick={() => {
+                                    setSelectedGrowChurchId(church.id);
+                                    setGrowSecret((church as any)?.growSettings?.growIntegrationSecret || '');
+                                    setGrowSecretVisible(false);
+                                  }}
+                                  className="text-[10px] font-black text-indigo-500 dark:text-indigo-400 hover:underline shrink-0"
+                                >
+                                  View Secret ↓
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                        {growRequestMsg && (
+                          <div className={`px-4 py-3 rounded-xl text-xs font-bold flex items-center gap-2 mt-2 ${
+                            growRequestMsg.type === 'success'
+                              ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                              : 'bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
+                          }`}>
+                            {growRequestMsg.text}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+
 
                 <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] border border-slate-100 dark:border-slate-800 shadow-sm">
                     <div className="flex flex-col lg:flex-row gap-8">

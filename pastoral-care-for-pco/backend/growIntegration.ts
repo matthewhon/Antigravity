@@ -268,7 +268,7 @@ export async function handleGrowDailyEmail(req: any, res: any) {
             const email = (recipient.email || '').toLowerCase().trim();
             if (!email || unsubscribedEmails.has(email)) continue;
 
-            const html = buildGrowEmailHtml(recipient, churchData.name || 'Your Church');
+            const html = buildGrowEmailHtml(recipient, churchData.name || 'Your Church', churchId);
 
             const msg = {
                 to: email,
@@ -321,7 +321,7 @@ export async function handleGrowDailyEmail(req: any, res: any) {
  *   memoryVerse        string          (rendered as colorful quote card)
  *   prayerRequests     Array<{ name, request }>
  */
-function buildGrowEmailHtml(data: any, churchName: string) {
+function buildGrowEmailHtml(data: any, churchName: string, churchId: string = '') {
     const primary   = '#4f46e5';
     const primaryDk = '#3730a3';
     const accent    = '#f59e0b';   // streak / badge orange
@@ -388,7 +388,9 @@ function buildGrowEmailHtml(data: any, churchName: string) {
     /* ── devotional block ───────────────────────────────────────────────── */
     let devotionalHtml = '';
     const dev = data.devotional;
-    if (dev?.title || dev?.contentPreview) {
+    // Accept both 'content' (Grow cron field name) and 'contentPreview' (legacy)
+    const devBodyText = dev?.content || dev?.contentPreview || '';
+    if (dev?.title || devBodyText) {
         const contLink = dev.link
             ? `<a href="${esc(dev.link)}" style="display:inline-block;margin-top:12px;font-weight:700;color:${primary};text-decoration:none;font-size:14px;">Continue Reading &rarr;</a>`
             : '';
@@ -396,7 +398,7 @@ function buildGrowEmailHtml(data: any, churchName: string) {
             <div style="margin-bottom:28px;">
                 <div style="font-size:11px;font-weight:700;color:${primary};text-transform:uppercase;letter-spacing:1.2px;">✨ Devotional</div>
                 <div style="font-size:19px;font-weight:800;margin-top:6px;color:#0f172a;line-height:1.3;">${esc(dev.title || "Today's Devotional")}</div>
-                <div style="font-size:15px;color:#475569;margin-top:10px;line-height:1.7;">${esc(dev.contentPreview || '')}</div>
+                <div style="font-size:15px;color:#475569;margin-top:10px;line-height:1.7;">${esc(devBodyText)}</div>
                 ${contLink}
             </div>
             <hr style="border:none;border-top:1px solid #e5e7eb;margin:0 0 28px 0;" />`;
@@ -488,6 +490,7 @@ function buildGrowEmailHtml(data: any, churchName: string) {
                         <td style="padding:24px 32px;text-align:center;background:#f8fafc;border-top:1px solid #e2e8f0;">
                             <p style="margin:0;font-size:12px;color:#64748b;">Powered by <strong>Grow App</strong> &amp; Pastoral Care for PCO</p>
                             <p style="margin:8px 0 0;font-size:11px;color:#94a3b8;">You are receiving this because you opted in via your Grow App settings.</p>
+                            ${churchId && data.email ? `<p style="margin:10px 0 0;font-size:11px;"><a href="https://pastoralcare.barnabassoftware.com/unsubscribe?token=${Buffer.from(churchId + ':' + (data.email || '')).toString('base64url')}" style="color:#94a3b8;text-decoration:underline;">Unsubscribe</a></p>` : ''}
                         </td>
                     </tr>
 
