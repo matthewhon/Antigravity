@@ -6278,8 +6278,10 @@ const AiDraftPreview: React.FC<{ draft: AiWorkflowDraft; onRegenerate: () => voi
 const GuidedBuilderTab: React.FC<{
     pcoRegistrationEvents: { id: string; pcoId: string; name: string; startsAt?: string | null }[];
     onApply: (draft: AiWorkflowDraft, ctx: AiBuilderContext) => void;
+    /** Save a draft directly to Firestore as a new workflow (used in 'both' mode) */
+    onSaveDirectly?: (draft: AiWorkflowDraft, ctx: AiBuilderContext) => Promise<void>;
     onClose: () => void;
-}> = ({ pcoRegistrationEvents, onApply, onClose }) => {
+}> = ({ pcoRegistrationEvents, onApply, onSaveDirectly, onClose }) => {
     const TOTAL_STEPS = 5;
     const [step, setStep] = useState(1);
     const [loading, setLoading] = useState(false);
@@ -6401,6 +6403,7 @@ const GuidedBuilderTab: React.FC<{
             borderColor: string; headerBg: string; labelColor: string; subColor: string;
         }) => {
             const applied = appliedPair[goalKey];
+            const [saving, setSaving] = useState(false);
             const chBadge: Record<string, string> = {
                 sms: 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300',
                 email: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
@@ -6408,6 +6411,22 @@ const GuidedBuilderTab: React.FC<{
                 staff_email: 'bg-orange-100 text-orange-700',
             };
             const chLabel: Record<string, string> = { sms: 'SMS', email: 'Email', staff_sms: 'Staff SMS', staff_email: 'Staff Email' };
+
+            const handleApply = async () => {
+                if (applied || saving) return;
+                setSaving(true);
+                try {
+                    if (onSaveDirectly) {
+                        await onSaveDirectly(d, buildCtx(goalKey));
+                    } else {
+                        onApply(d, buildCtx(goalKey));
+                    }
+                    setAppliedPair(prev => ({ ...prev, [goalKey]: true }));
+                } finally {
+                    setSaving(false);
+                }
+            };
+
             return (
                 <div className={`border-2 ${borderColor} rounded-2xl overflow-hidden`}>
                     <div className={`${headerBg} px-4 py-2.5 flex items-center gap-2`}>
@@ -6418,7 +6437,7 @@ const GuidedBuilderTab: React.FC<{
                         </div>
                         {applied && (
                             <span className="flex items-center gap-1 text-[10px] font-black uppercase tracking-wide text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-700 px-2 py-0.5 rounded-full">
-                                ✓ Applied
+                                ✓ Saved
                             </span>
                         )}
                     </div>
@@ -6448,17 +6467,17 @@ const GuidedBuilderTab: React.FC<{
                             })}
                         </div>
                         <button
-                            onClick={() => {
-                                onApply(d, buildCtx(goalKey));
-                                setAppliedPair(prev => ({ ...prev, [goalKey]: true }));
-                            }}
-                            className={`w-full flex items-center justify-center gap-2 py-2.5 text-sm font-bold rounded-xl transition ${
+                            onClick={handleApply}
+                            disabled={applied || saving}
+                            className={`w-full flex items-center justify-center gap-2 py-2.5 text-sm font-bold rounded-xl transition disabled:opacity-60 ${
                                 applied
                                     ? 'bg-emerald-50 dark:bg-emerald-900/20 border-2 border-emerald-400 text-emerald-700 dark:text-emerald-300'
                                     : 'bg-violet-600 hover:bg-violet-700 text-white shadow-md shadow-violet-200 dark:shadow-violet-900/40'
                             }`}
                         >
-                            {applied ? '✓ Applied to Editor' : <><ChevronRight size={14} /> Apply to Editor</>}
+                            {saving ? <><Loader2 size={14} className="animate-spin" /> Saving...</>
+                                : applied ? '✓ Workflow Created'
+                                : <><ChevronRight size={14} /> Create Workflow</>}
                         </button>
                     </div>
                 </div>
@@ -6466,6 +6485,25 @@ const GuidedBuilderTab: React.FC<{
         };
 
         const bothApplied = appliedPair.invite && appliedPair.remind;
+        const [savingBoth, setSavingBoth] = useState(false);
+
+        const handleApplyBoth = async () => {
+            setSavingBoth(true);
+            try {
+                if (onSaveDirectly) {
+                    await Promise.all([
+                        !appliedPair.invite ? onSaveDirectly(draftPair.invite, buildCtx('invite')) : Promise.resolve(),
+                        !appliedPair.remind ? onSaveDirectly(draftPair.remind, buildCtx('remind')) : Promise.resolve(),
+                    ]);
+                } else {
+                    if (!appliedPair.invite) onApply(draftPair.invite, buildCtx('invite'));
+                    if (!appliedPair.remind) onApply(draftPair.remind, buildCtx('remind'));
+                }
+                setAppliedPair({ invite: true, remind: true });
+            } finally {
+                setSavingBoth(false);
+            }
+        };
 
         return (
             <div className="space-y-5">
@@ -6503,14 +6541,11 @@ const GuidedBuilderTab: React.FC<{
                     <div className="flex-1" />
                     {!bothApplied && (
                         <button
-                            onClick={() => {
-                                onApply(draftPair.invite, buildCtx('invite'));
-                                onApply(draftPair.remind, buildCtx('remind'));
-                                setAppliedPair({ invite: true, remind: true });
-                            }}
-                            className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 dark:bg-slate-700 hover:bg-slate-700 dark:hover:bg-slate-600 text-white text-sm font-bold rounded-xl transition"
+                            onClick={handleApplyBoth}
+                            disabled={savingBoth}
+                            className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 dark:bg-slate-700 hover:bg-slate-700 dark:hover:bg-slate-600 disabled:opacity-60 text-white text-sm font-bold rounded-xl transition"
                         >
-                            Apply Both
+                            {savingBoth ? <><Loader2 size={13} className="animate-spin" /> Saving...</> : 'Create Both Workflows'}
                         </button>
                     )}
                     <button
@@ -7131,9 +7166,10 @@ const CustomPromptTab: React.FC<{
 
 const AiWorkflowBuilderPanel: React.FC<{
     onApply: (draft: AiWorkflowDraft, ctx?: AiBuilderContext) => void;
+    onSaveDirectly?: (draft: AiWorkflowDraft, ctx: AiBuilderContext) => Promise<void>;
     onClose: () => void;
     pcoRegistrationEvents?: { id: string; pcoId: string; name: string; startsAt?: string | null }[];
-}> = ({ onApply, onClose, pcoRegistrationEvents = [] }) => {
+}> = ({ onApply, onSaveDirectly, onClose, pcoRegistrationEvents = [] }) => {
     const [activeTab, setActiveTab] = useState<'guided' | 'custom'>('guided');
 
     const chBadgeClass: Record<string, string> = {
@@ -7199,6 +7235,7 @@ const AiWorkflowBuilderPanel: React.FC<{
                         <GuidedBuilderTab
                             pcoRegistrationEvents={pcoRegistrationEvents}
                             onApply={(draft, ctx) => { onApply(draft, ctx); onClose(); }}
+                            onSaveDirectly={onSaveDirectly}
                             onClose={onClose}
                         />
                     ) : (
@@ -7403,6 +7440,50 @@ const WorkflowEditor: React.FC<{
         setWf(prev => ({ ...prev, ...wfPatch }));
     };
 
+    /** Directly save an AI-generated draft as a brand-new workflow to Firestore (used by 'Both' mode). */
+    const handleSaveAiDraftDirectly = async (draft: AiWorkflowDraft, ctx: AiBuilderContext): Promise<void> => {
+        const newNodes: WorkflowNode[] = [];
+        draft.steps.forEach((s, i) => {
+            if (i > 0) {
+                const schedType = s.scheduleType ?? 'relative';
+                newNodes.push({
+                    nodeType: 'delay', id: uid(), order: newNodes.length,
+                    delayDays: s.delayDays ?? (schedType === 'relative' ? 1 : 0),
+                    delayHours: s.delayHours ?? 0,
+                    scheduleType: schedType,
+                    ...(schedType === 'day_of_week' && { scheduleDayOfWeek: s.scheduleDayOfWeek ?? 1 }),
+                    ...(schedType === 'day_of_month' && { scheduleDayOfMonth: s.scheduleDayOfMonth ?? 1 }),
+                    ...(schedType !== 'relative' && { scheduleTime: s.scheduleTime ?? '09:00' }),
+                } as WorkflowDelayNode);
+            }
+            newNodes.push({
+                nodeType: 'action', id: uid(), order: newNodes.length,
+                channelType: (s.channelType ?? 'sms') as WorkflowChannelType,
+                message: s.message || '',
+                emailSubject: s.emailSubject,
+                emailBody: s.emailBody,
+            } as WorkflowActionNode);
+        });
+
+        const newWf: SmsWorkflow = {
+            ...makeBlank(),
+            name: draft.name || ctx.eventName,
+            description: draft.description || '',
+            nodes: newNodes,
+            steps: nodesToSteps(newNodes),
+            isActive: false, // Start inactive — user activates after reviewing
+        };
+
+        // Auto-set trigger for reminder workflows on PCO Registration events
+        if (ctx.goal === 'remind' && ctx.eventType === 'registration' && ctx.eventPcoId) {
+            newWf.trigger = 'event_registration';
+            newWf.triggerEventId = ctx.eventPcoId;
+            newWf.triggerEventName = ctx.eventName;
+        }
+
+        await onSave(newWf);
+    };
+
     const patch = (p: Partial<SmsWorkflow>) => setWf(prev => ({ ...prev, ...p }));
 
     // -- Node CRUD helpers -----------------------------------------------------
@@ -7548,6 +7629,7 @@ const WorkflowEditor: React.FC<{
             {showAiBuilder && (
                 <AiWorkflowBuilderPanel
                     onApply={handleApplyAiDraft}
+                    onSaveDirectly={handleSaveAiDraftDirectly}
                     onClose={() => setShowAiBuilder(false)}
                     pcoRegistrationEvents={pcoRegistrationEvents}
                 />
