@@ -786,7 +786,52 @@ export const handleInboundSms = async (req: any, res: any) => {
             let baseReply = kw.replyMessage || '';
             const actionType = kw.actionType || 'static';
 
-            if (actionType === 'registration_events' || actionType === 'small_groups') {
+            if (actionType === 'event_registration' && kw.pcoSignupId) {
+                try {
+                    const { getPcoSignupDetails } = await import('./pcoRegistrationsService.js');
+                    const signupDetails = await getPcoSignupDetails(churchId, kw.pcoSignupId);
+                    
+                    if (signupDetails.isPaid) {
+                        const eventLink = signupDetails.publicUrl || 'https://churchcenter.com';
+                        baseReply = baseReply ? `${baseReply}\n\nRegister & pay here: ${eventLink}` : `Register & pay here: ${eventLink}`;
+                    } else {
+                        // Free event: Conversational SMS flow
+                        const regProgressId = smsNumberId
+                            ? `${churchId}_${smsNumberId}_${from.replace(/\+/g, '')}`
+                            : `${churchId}_${from.replace(/\+/g, '')}`;
+                        
+                        const initialProgress = {
+                            id: regProgressId,
+                            churchId,
+                            smsNumberId,
+                            phoneNumber: from,
+                            personId: personMatch?.personId || convSnap.data()?.personId || null,
+                            personName: personMatch?.personName || convSnap.data()?.personName || 'Guest',
+                            signupId: kw.pcoSignupId,
+                            eventName: signupDetails.name,
+                            status: 'invited',
+                            currentQuestionIndex: -1,
+                            answers: {},
+                            createdAt: Date.now(),
+                            updatedAt: Date.now()
+                        };
+                        
+                        await db.collection('smsRegistrationProgress').doc(regProgressId).set(initialProgress);
+                        
+                        // Increment keyword match count
+                        await db.collection('smsKeywords').doc(kw.id).update({
+                            matchCount: (kw.matchCount || 0) + 1,
+                        }).catch(() => {});
+                        
+                        const twiml = await processRegistrationFlowReply(db, log, churchId, initialProgress, 'YES', convId, smsNumberId, to);
+                        res.set('Content-Type', 'text/xml');
+                        return res.status(200).send(twiml);
+                    }
+                } catch (e: any) {
+                    log.error(`Failed to handle keyword event registration: ${e.message}`, 'system', { keyword: kw.keyword }, churchId);
+                    baseReply = "Sorry, we encountered a technical issue setting up your registration. Please try again later.";
+                }
+            } else if (actionType === 'registration_events' || actionType === 'small_groups') {
                 try {
                     const churchSnap = await db.collection('churches').doc(churchId).get();
                     const subdomain = churchSnap.data()?.subdomain;

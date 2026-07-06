@@ -3057,6 +3057,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
 
 interface KeywordModalProps {
     initial?: SmsKeyword | null;
+    churchId: string;
     pcoLists: { id: string; name: string; total_people: number }[];
     loadingLists: boolean;
     tags: SmsTag[];
@@ -3068,16 +3069,34 @@ interface KeywordModalProps {
     saveError?: string;
 }
 
-const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingLists, tags, polls, allSmsNumbers, onSave, onClose, isBusy, saveError }) => {
+const KeywordModal: React.FC<KeywordModalProps> = ({ initial, churchId, pcoLists, loadingLists, tags, polls, allSmsNumbers, onSave, onClose, isBusy, saveError }) => {
     const [keyword, setKeyword] = useState(initial?.keyword || '');
     const [actionType, setActionType] = useState<SmsKeywordAction>(initial?.actionType || 'static');
     const [replyMessage, setReplyMessage] = useState(initial?.replyMessage || '');
+    const [pcoSignupId, setPcoSignupId] = useState(initial?.pcoSignupId || '');
+    const [signups, setSignups] = useState<{ id: string; name: string }[]>([]);
+    const [loadingSignups, setLoadingSignups] = useState(false);
     const [addToListId, setAddToListId] = useState(initial?.addToListId || '');
     const [isActive, setIsActive] = useState(initial?.isActive ?? true);
     const [autoTagIds, setAutoTagIds] = useState<string[]>(initial?.autoTagIds || []);
     const [linkedPollId, setLinkedPollId] = useState(initial?.linkedPollId || '');
     const [numberIds, setNumberIds] = useState<string[]>(initial?.numberIds || []);
     const [error, setError] = useState('');
+
+    useEffect(() => {
+        if (actionType === 'event_registration' && signups.length === 0) {
+            setLoadingSignups(true);
+            fetch(`/api/public/registrations/${churchId}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (Array.isArray(data)) {
+                        setSignups(data);
+                    }
+                    setLoadingSignups(false);
+                })
+                .catch(() => setLoadingSignups(false));
+        }
+    }, [actionType, churchId, signups.length]);
 
     const segs = countSegments(replyMessage);
     const isEdit = !!initial;
@@ -3087,6 +3106,7 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingL
         if (!kw) { setError('Keyword is required.'); return; }
         if (!replyMessage.trim()) { setError('Auto-reply message is required.'); return; }
         if (!/^[A-Z0-9]+$/.test(kw)) { setError('Keywords can only contain letters and numbers.'); return; }
+        if (actionType === 'event_registration' && !pcoSignupId) { setError('Please select a Planning Center Event Signup.'); return; }
         setError('');
         const selectedList = pcoLists.find(l => l.id === addToListId);
         const selectedPoll = polls.find(p => p.id === linkedPollId);
@@ -3094,6 +3114,7 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingL
             churchId: initial?.churchId || '',   // parent will fill in
             keyword: kw,
             actionType: actionType,
+            pcoSignupId: actionType === 'event_registration' ? pcoSignupId : undefined,
             replyMessage: replyMessage.trim(),
             addToListId: addToListId || null,
             addToListName: selectedList?.name || null,
@@ -3142,11 +3163,35 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingL
                         <option value="registration_events">Send Registration Events</option>
                         <option value="small_groups">Send Small Groups</option>
                         <option value="giving_ytd">Send Giving YTD (by Phone Number)</option>
+                        <option value="event_registration">Event Registration Flow</option>
                     </select>
                     {actionType === 'registration_events' && <p className="text-[10px] text-slate-400 mt-1">Replies with a link to your Church Center Registrations page.</p>}
                     {actionType === 'small_groups' && <p className="text-[10px] text-slate-400 mt-1">Replies with a link to your Church Center Groups page.</p>}
                     {actionType === 'giving_ytd' && <p className="text-[10px] text-slate-400 mt-1">Looks up the person by their phone number and replies with their Year-to-Date giving total.</p>}
+                    {actionType === 'event_registration' && <p className="text-[10px] text-slate-400 mt-1">Starts an interactive SMS conversational flow to register the sender for a free/paid event.</p>}
                 </div>
+
+                {/* Event Signup select */}
+                {actionType === 'event_registration' && (
+                    <div className="mb-4 bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 rounded-2xl p-4">
+                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">PCO Event Signup</label>
+                        {loadingSignups ? (
+                            <div className="flex items-center gap-2 text-sm text-slate-400"><Loader2 size={13} className="animate-spin" /> Loading signups...</div>
+                        ) : (
+                            <select
+                                value={pcoSignupId}
+                                onChange={e => setPcoSignupId(e.target.value)}
+                                title="PCO Event Signup"
+                                className="w-full text-sm font-semibold border-2 border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500"
+                            >
+                                <option value="">— Select PCO Event Signup —</option>
+                                {signups.map(s => (
+                                    <option key={s.id} value={s.id}>{s.name}</option>
+                                ))}
+                            </select>
+                        )}
+                    </div>
+                )}
 
                 {/* Auto-reply message */}
                 <div className="mb-4">
@@ -4192,10 +4237,10 @@ const SmsKeywordsManager: React.FC<{
                 );
             })()}
 
-            {/* Keyword modal */}
             {modalOpen && (
                 <KeywordModal
                     initial={editKw}
+                    churchId={churchId}
                     pcoLists={pcoLists}
                     loadingLists={loadingLists}
                     tags={tags}

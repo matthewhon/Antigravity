@@ -1370,7 +1370,7 @@ export interface SmsTag {
     createdAt: number;
 }
 
-export type SmsKeywordAction = 'static' | 'registration_events' | 'small_groups' | 'giving_ytd';
+export type SmsKeywordAction = 'static' | 'registration_events' | 'small_groups' | 'giving_ytd' | 'event_registration';
 
 export interface SmsKeyword {
     id: string;
@@ -1381,6 +1381,8 @@ export interface SmsKeyword {
     replyMessage: string;
     /** Action to take when this keyword matches */
     actionType?: SmsKeywordAction;
+    /** Planning Center event registration signup ID for conversational flow */
+    pcoSignupId?: string;
     /** Optionally add the replying contact to this PCO list */
     addToListId?: string | null;
     addToListName?: string | null;
