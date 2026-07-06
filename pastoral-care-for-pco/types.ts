@@ -1318,6 +1318,9 @@ export interface SmsCampaign {
     // Retry
     retryCount?: number;
     lastError?: string | null;
+    // Event Registration options
+    campaignType?: string;
+    pcoSignupId?: string;
     // Metadata
     sentBy?: string | null;
     sentByName?: string | null;

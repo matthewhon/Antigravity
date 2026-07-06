@@ -982,19 +982,99 @@ export function startSmsCampaignScheduler(db: any): void {
                                 throw new Error('No phone numbers resolved for this campaign.');
                             }
 
-                            // Delegate actual send to the send-bulk endpoint
-                            const { sendBulkInternal } = await import('./smsSend.js');
-                            result = await sendBulkInternal({
-                                db,
-                                churchId,
-                                campaignId,
-                                phones,
-                                body:        campaign.body,
-                                mediaUrls:   campaign.mediaUrls || [],
-                                personMap,
-                                smsNumberId: campaign.smsNumberId || campaign.twilioNumberId || null,
-                                attachVcard: campaign.attachVcard || false,
-                            });
+                            if (campaign.campaignType === 'event_registration' && campaign.pcoSignupId) {
+                                try {
+                                    const { getPcoSignupDetails } = await import('./pcoRegistrationsService.js');
+                                    const signupDetails = await getPcoSignupDetails(churchId, campaign.pcoSignupId);
+                                    
+                                    if (signupDetails.isPaid) {
+                                        // Paid event: immediately send the link
+                                        const eventLink = signupDetails.publicUrl || 'https://churchcenter.com';
+                                        const paidBody = `${campaign.body}\n\nRegister & pay here: ${eventLink}`;
+                                        
+                                        const { sendBulkInternal } = await import('./smsSend.js');
+                                        result = await sendBulkInternal({
+                                            db,
+                                            churchId,
+                                            campaignId,
+                                            phones,
+                                            body:        paidBody,
+                                            mediaUrls:   campaign.mediaUrls || [],
+                                            personMap,
+                                            smsNumberId: campaign.smsNumberId || campaign.twilioNumberId || null,
+                                            attachVcard: campaign.attachVcard || false,
+                                        });
+                                    } else {
+                                        // Free event: Conversational SMS flow
+                                        const { sendBulkInternal } = await import('./smsSend.js');
+                                        result = await sendBulkInternal({
+                                            db,
+                                            churchId,
+                                            campaignId,
+                                            phones,
+                                            body:        campaign.body,
+                                            mediaUrls:   campaign.mediaUrls || [],
+                                            personMap,
+                                            smsNumberId: campaign.smsNumberId || campaign.twilioNumberId || null,
+                                            attachVcard: campaign.attachVcard || false,
+                                        });
+
+                                        // Initialize progress in batches of 400
+                                        const smsNumberId = campaign.smsNumberId || campaign.twilioNumberId || 'main';
+                                        let batch = db.batch();
+                                        let count = 0;
+                                        
+                                        for (const phone of phones) {
+                                            const pInfo = personMap[phone] || {};
+                                            const regProgressId = `${churchId}_${smsNumberId}_${phone.replace(/\+/g, '')}`;
+                                            const regProgressRef = db.collection('smsRegistrationProgress').doc(regProgressId);
+                                            
+                                            batch.set(regProgressRef, {
+                                                id: regProgressId,
+                                                churchId,
+                                                smsNumberId,
+                                                phoneNumber: phone,
+                                                personId: pInfo.pcoPersonId || null,
+                                                personName: pInfo.personName || 'Guest',
+                                                signupId: campaign.pcoSignupId,
+                                                eventName: signupDetails.name,
+                                                status: 'invited',
+                                                currentQuestionIndex: -1,
+                                                answers: {},
+                                                createdAt: Date.now(),
+                                                updatedAt: Date.now()
+                                            }, { merge: true });
+                                            
+                                            count++;
+                                            if (count >= 400) {
+                                                await batch.commit();
+                                                batch = db.batch();
+                                                count = 0;
+                                            }
+                                        }
+                                        if (count > 0) {
+                                            await batch.commit();
+                                        }
+                                    }
+                                } catch (err: any) {
+                                    log.error(`[SmsScheduler] Event registration campaign setup failed: ${err.message}`, 'system', { campaignId }, churchId);
+                                    throw err;
+                                }
+                            } else {
+                                // Standard campaign blast
+                                const { sendBulkInternal } = await import('./smsSend.js');
+                                result = await sendBulkInternal({
+                                    db,
+                                    churchId,
+                                    campaignId,
+                                    phones,
+                                    body:        campaign.body,
+                                    mediaUrls:   campaign.mediaUrls || [],
+                                    personMap,
+                                    smsNumberId: campaign.smsNumberId || campaign.twilioNumberId || null,
+                                    attachVcard: campaign.attachVcard || false,
+                                });
+                            }
                         }
 
                         log.info(

@@ -36,6 +36,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { getSignalWireSigningKey, getSmsWebhookBaseUrl, fetchSignalWireMedia } from './signalwireClient';
 import { processExecutiveAiQuery } from './executiveAiAgent';
 import { updatePcoSubscriptionField } from './pcoFieldData';
+import { getPcoSignupQuestions, createPcoPerson, registerPersonForEvent } from './pcoRegistrationsService.js';
 
 // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Helpers Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
@@ -686,6 +687,20 @@ export const handleInboundSms = async (req: any, res: any) => {
             tag: `sms-${convId}`,
         }).catch(() => { });
 
+        // ─── Event Registration Conversational Flow Interceptor ───────────────────
+        const regProgressId = smsNumberId
+            ? `${churchId}_${smsNumberId}_${from.replace(/\+/g, '')}`
+            : `${churchId}_${from.replace(/\+/g, '')}`;
+        const regProgressSnap = await db.collection('smsRegistrationProgress').doc(regProgressId).get();
+        if (regProgressSnap.exists) {
+            const regProgress = regProgressSnap.data() as any;
+            if (regProgress.status !== 'completed' && regProgress.status !== 'declined') {
+                const twiml = await processRegistrationFlowReply(db, log, churchId, regProgress, latestBody, convId, smsNumberId, to);
+                res.set('Content-Type', 'text/xml');
+                return res.status(200).send(twiml);
+            }
+        }
+
         // 4-B. Executive AI Auto-Responder
         const bodyTrimmed = latestBody.trim();
         const aiAgentPrefix = resolvedExecutiveAiAgentKeyword.toLowerCase();
@@ -1196,4 +1211,281 @@ export const handleInboundSms = async (req: any, res: any) => {
         return res.status(200).send('<Response></Response>');
     }
 };
+
+/**
+ * Event Registration conversational SMS state machine.
+ */
+export async function processRegistrationFlowReply(
+    db: any,
+    log: any,
+    churchId: string,
+    progress: any,
+    replyBody: string,
+    convId: string,
+    smsNumberId: string | null,
+    toPhone: string
+): Promise<string> {
+    const fromPhone = progress.phoneNumber;
+    const regProgressId = progress.id;
+    let nextStatus = progress.status;
+    let currentQuestionIndex = progress.currentQuestionIndex ?? -1;
+    const answers = { ...(progress.answers || {}) };
+    let replyText = '';
+
+    const saveOutboundMessage = async (text: string) => {
+        const replyId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        await db.collection('smsConversations').doc(convId)
+            .collection('messages').doc(replyId).set({
+                id: replyId,
+                conversationId: convId,
+                churchId,
+                direction: 'outbound',
+                body: text,
+                mediaUrls: [],
+                status: 'sent',
+                sentBy: null,
+                sentByName: 'Auto-Reply (Event Registration)',
+                createdAt: Date.now(),
+            });
+        
+        await db.collection('smsConversations').doc(convId).update({
+            lastMessageAt: Date.now(),
+            lastMessageBody: text,
+            lastMessageDirection: 'outbound',
+        }).catch(() => {});
+    };
+
+    const trimReply = replyBody.trim();
+    const upperReply = trimReply.toUpperCase();
+
+    if (progress.status === 'invited') {
+        const isYes = ['YES', 'YEAH', 'SURE', 'OK', 'Y', 'SIGN UP', 'SIGNUP'].some(k => upperReply.startsWith(k));
+        const isNo = ['NO', 'NOPE', 'N', 'DECLINE'].some(k => upperReply.startsWith(k));
+
+        if (isYes) {
+            if (!progress.personId) {
+                nextStatus = 'gathering_profile';
+                currentQuestionIndex = 0;
+                replyText = "Great! Let's get your profile set up first. What is your First Name?";
+                
+                await db.collection('smsRegistrationProgress').doc(regProgressId).update({
+                    status: nextStatus,
+                    currentQuestionIndex,
+                    updatedAt: Date.now()
+                });
+            } else {
+                try {
+                    const questions = await getPcoSignupQuestions(churchId, progress.signupId);
+                    
+                    if (questions.length === 0) {
+                        nextStatus = 'completed';
+                        await registerPersonForEvent(churchId, progress.personId, progress.signupId, {});
+                        replyText = `Thank you! You have been successfully registered for ${progress.eventName || 'the event'}.`;
+                        
+                        await db.collection('smsRegistrationProgress').doc(regProgressId).update({
+                            status: nextStatus,
+                            updatedAt: Date.now()
+                        });
+                    } else {
+                        nextStatus = 'in_progress';
+                        currentQuestionIndex = 0;
+                        const firstQ = questions[0];
+                        
+                        let qText = firstQ.label;
+                        if (firstQ.options && firstQ.options.length > 0) {
+                            qText += '\n' + firstQ.options.map((opt: string, idx: number) => `${idx + 1}. ${opt}`).join('\n');
+                        }
+                        
+                        replyText = `Great! Let's answer a few questions. \n\n${qText}`;
+                        
+                        await db.collection('smsRegistrationProgress').doc(regProgressId).update({
+                            status: nextStatus,
+                            currentQuestionIndex,
+                            questions,
+                            updatedAt: Date.now()
+                        });
+                    }
+                } catch (e: any) {
+                    log.error(`Failed to fetch questions for signup ${progress.signupId}: ${e.message}`, 'system', {}, churchId);
+                    replyText = "Sorry, we encountered an error setting up your registration. Please try again later or register online.";
+                    nextStatus = 'declined';
+                    await db.collection('smsRegistrationProgress').doc(regProgressId).update({
+                        status: nextStatus,
+                        updatedAt: Date.now()
+                    });
+                }
+            }
+        } else if (isNo) {
+            nextStatus = 'declined';
+            replyText = "No problem! We have canceled your registration request.";
+            await db.collection('smsRegistrationProgress').doc(regProgressId).update({
+                status: nextStatus,
+                updatedAt: Date.now()
+            });
+        } else {
+            replyText = `Would you like to register for ${progress.eventName || 'the event'}? Reply YES to sign up, or NO to decline.`;
+        }
+    } else if (progress.status === 'gathering_profile') {
+        let nextQuestionIndex = currentQuestionIndex;
+        let tempFirstName = progress.personFirstName || null;
+        let tempLastName = progress.personLastName || null;
+        let tempEmail = progress.personEmail || null;
+
+        if (currentQuestionIndex === 0) {
+            if (!trimReply) {
+                replyText = "Please reply with a valid First Name.";
+            } else {
+                tempFirstName = trimReply;
+                nextQuestionIndex = 1;
+                replyText = "Got it. What is your Last Name?";
+            }
+        } else if (currentQuestionIndex === 1) {
+            if (!trimReply) {
+                replyText = "Please reply with a valid Last Name.";
+            } else {
+                tempLastName = trimReply;
+                nextQuestionIndex = 2;
+                replyText = "Thank you. What is your Email Address? (Reply with email, or type SKIP if you don't have one)";
+            }
+        } else if (currentQuestionIndex === 2) {
+            const isSkip = upperReply === 'SKIP';
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            
+            if (!isSkip && !emailRegex.test(trimReply)) {
+                replyText = "That doesn't look like a valid email. Please reply with a valid email address or reply SKIP.";
+            } else {
+                tempEmail = isSkip ? null : trimReply;
+                
+                try {
+                    const newPersonId = await createPcoPerson(churchId, tempFirstName, tempLastName, tempEmail, fromPhone);
+                    const questions = await getPcoSignupQuestions(churchId, progress.signupId);
+                    
+                    if (questions.length === 0) {
+                        nextStatus = 'completed';
+                        await registerPersonForEvent(churchId, newPersonId, progress.signupId, {});
+                        replyText = `Thank you, ${tempFirstName}! You have been registered successfully for ${progress.eventName || 'the event'}.`;
+                    } else {
+                        nextStatus = 'in_progress';
+                        nextQuestionIndex = 0;
+                        const firstQ = questions[0];
+                        let qText = firstQ.label;
+                        if (firstQ.options && firstQ.options.length > 0) {
+                            qText += '\n' + firstQ.options.map((opt: string, idx: number) => `${idx + 1}. ${opt}`).join('\n');
+                        }
+                        
+                        replyText = `Welcome, ${tempFirstName}! Let's answer a few questions. \n\n${qText}`;
+                    }
+
+                    await db.collection('smsRegistrationProgress').doc(regProgressId).update({
+                        status: nextStatus,
+                        personId: newPersonId,
+                        personName: `${tempFirstName} ${tempLastName}`,
+                        personFirstName: tempFirstName,
+                        personLastName: tempLastName,
+                        personEmail: tempEmail,
+                        currentQuestionIndex: nextQuestionIndex,
+                        questions: nextStatus === 'in_progress' ? questions : [],
+                        updatedAt: Date.now()
+                    });
+                } catch (e: any) {
+                    log.error(`Failed to create person or fetch questions in registration: ${e.message}`, 'system', {}, churchId);
+                    replyText = "Sorry, we had an issue setting up your profile in our system. Please try again later or register online.";
+                    nextStatus = 'declined';
+                    await db.collection('smsRegistrationProgress').doc(regProgressId).update({
+                        status: nextStatus,
+                        updatedAt: Date.now()
+                    });
+                }
+                
+                await saveOutboundMessage(replyText);
+                const safeBody = replyText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                return `<Response><Message><Body>${safeBody}</Body></Message></Response>`;
+            }
+        }
+
+        await db.collection('smsRegistrationProgress').doc(regProgressId).update({
+            personFirstName: tempFirstName,
+            personLastName: tempLastName,
+            personEmail: tempEmail,
+            currentQuestionIndex: nextQuestionIndex,
+            updatedAt: Date.now()
+        });
+
+    } else if (progress.status === 'in_progress') {
+        const questions = progress.questions || [];
+        const currentQ = questions[currentQuestionIndex];
+
+        if (currentQ) {
+            let isValid = true;
+            let finalValue = trimReply;
+
+            if (currentQ.options && currentQ.options.length > 0) {
+                const matchIndex = /^[1-9][0-9]*$/.test(trimReply) ? parseInt(trimReply, 10) - 1 : -1;
+                if (matchIndex >= 0 && matchIndex < currentQ.options.length) {
+                    finalValue = currentQ.options[matchIndex];
+                } else {
+                    const matchedOption = currentQ.options.find((opt: string) => opt.toLowerCase() === trimReply.toLowerCase());
+                    if (matchedOption) {
+                        finalValue = matchedOption;
+                    } else {
+                        isValid = false;
+                    }
+                }
+            } else if (currentQ.kind === 'number') {
+                const isNumber = !isNaN(Number(trimReply));
+                if (!isNumber) {
+                    isValid = false;
+                }
+            }
+
+            if (!isValid) {
+                let optionsMsg = '';
+                if (currentQ.options && currentQ.options.length > 0) {
+                    optionsMsg = '\n' + currentQ.options.map((opt: string, idx: number) => `${idx + 1}. ${opt}`).join('\n');
+                }
+                replyText = `Sorry, that's not a valid response. Please reply to: \n${currentQ.label}${optionsMsg}`;
+            } else {
+                answers[currentQ.id] = finalValue;
+                const nextQuestionIndex = currentQuestionIndex + 1;
+
+                if (nextQuestionIndex >= questions.length) {
+                    nextStatus = 'completed';
+                    try {
+                        await registerPersonForEvent(churchId, progress.personId, progress.signupId, answers);
+                        replyText = `Thank you! Your registration for ${progress.eventName || 'the event'} is now complete!`;
+                    } catch (e: any) {
+                        log.error(`Failed to register person ${progress.personId} on signup ${progress.signupId}: ${e.message}`, 'system', {}, churchId);
+                        replyText = "Sorry, we encountered a technical issue submitting your registration to Planning Center. Please contact the church office to confirm.";
+                    }
+                } else {
+                    const nextQ = questions[nextQuestionIndex];
+                    let qText = nextQ.label;
+                    if (nextQ.options && nextQ.options.length > 0) {
+                        qText += '\n' + nextQ.options.map((opt: string, idx: number) => `${idx + 1}. ${opt}`).join('\n');
+                    }
+                    replyText = qText;
+                }
+
+                await db.collection('smsRegistrationProgress').doc(regProgressId).update({
+                    status: nextStatus,
+                    currentQuestionIndex: nextQuestionIndex,
+                    answers,
+                    updatedAt: Date.now()
+                });
+            }
+        } else {
+            replyText = "Oops! Something went wrong. We couldn't find your registration questionnaire.";
+            nextStatus = 'declined';
+            await db.collection('smsRegistrationProgress').doc(regProgressId).update({
+                status: nextStatus,
+                updatedAt: Date.now()
+            });
+        }
+    }
+
+    await saveOutboundMessage(replyText);
+
+    const safeBody = replyText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return `<Response><Message><Body>${safeBody}</Body></Message></Response>`;
+}
 

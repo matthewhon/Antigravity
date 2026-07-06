@@ -562,6 +562,23 @@ const CampaignComposer: React.FC<ComposerProps> = ({
     const [loadingGroups, setLoadingGroups] = useState(false);
     const [showSchedule, setShowSchedule] = useState(false);
     const [lastSaved, setLastSaved] = useState<number | null>(null);
+    const [signups, setSignups] = useState<{ id: string; name: string }[]>([]);
+    const [loadingSignups, setLoadingSignups] = useState(false);
+
+    useEffect(() => {
+        if (local.campaignType === 'event_registration' && signups.length === 0) {
+            setLoadingSignups(true);
+            fetch(`/api/public/registrations/${churchId}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (Array.isArray(data)) {
+                        setSignups(data);
+                    }
+                    setLoadingSignups(false);
+                })
+                .catch(() => setLoadingSignups(false));
+        }
+    }, [local.campaignType, churchId, signups.length]);
 
     // Composer extras
     const [showEmojis, setShowEmojis] = useState(false);
@@ -806,6 +823,51 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                             </div>
                         )}
                     </div>
+
+                    {/* Campaign Type & Event Link */}
+                    {local.channelType !== 'email' && (
+                        <div className="bg-slate-50 dark:bg-slate-900/30 p-3 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-3 mt-4">
+                            <div>
+                                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-1.5">Campaign Type</label>
+                                <select
+                                    title="Campaign Type"
+                                    className="w-full text-xs border border-slate-200 dark:border-slate-600 rounded-xl px-2.5 py-1.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 font-bold"
+                                    value={local.campaignType || 'standard'}
+                                    onChange={e => {
+                                        const type = e.target.value;
+                                        update({ 
+                                            campaignType: type, 
+                                            pcoSignupId: type === 'event_registration' ? local.pcoSignupId : undefined 
+                                        });
+                                    }}
+                                >
+                                    <option value="standard">Standard SMS Blast</option>
+                                    <option value="event_registration">Event Registration Flow</option>
+                                </select>
+                            </div>
+
+                            {local.campaignType === 'event_registration' && (
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-1.5">PCO Event Signup</label>
+                                    {loadingSignups ? (
+                                        <div className="flex items-center gap-2 text-xs text-slate-400"><Loader2 size={11} className="animate-spin" /> Loading Events...</div>
+                                    ) : (
+                                        <select
+                                            title="Select PCO Event"
+                                            className="w-full text-xs border border-slate-200 dark:border-slate-600 rounded-xl px-2.5 py-1.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                            value={local.pcoSignupId || ''}
+                                            onChange={e => update({ pcoSignupId: e.target.value })}
+                                        >
+                                            <option value="">— Select PCO Event Signup —</option>
+                                            {signups.map(s => (
+                                                <option key={s.id} value={s.id}>{s.name}</option>
+                                            ))}
+                                        </select>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* Analytics (readonly for sent campaigns) */}
                     {local.status === 'sent' && (
