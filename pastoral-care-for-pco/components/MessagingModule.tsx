@@ -208,12 +208,14 @@ interface AiWorkflowDraft {
 
 /** Structured context collected by the Guided wizard — fed into generateWorkflowFromContext. */
 interface AiBuilderContext {
-    // Step 1 — Event
+    // Step 1 — Event & Goal
     eventType: 'registration' | 'calendar';
     eventName: string;
     eventDate?: string;           // YYYY-MM-DD
     eventPcoId?: string;          // PCO event ID (if from PCO list)
     isManualEntry: boolean;
+    /** What this workflow is trying to accomplish */
+    goal: 'invite' | 'remind' | 'both';
     // Step 2 — Touchpoints
     touchpointCount: number;      // 1–10
     timingMode: 'before_event' | 'after_registration';
@@ -302,6 +304,16 @@ async function generateWorkflowFromContext(ctx: AiBuilderContext): Promise<AiWor
         ? new Date(ctx.eventDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
         : 'date not specified';
 
+    const isInvite = ctx.goal === 'invite';
+    const isRemind = ctx.goal === 'remind';
+
+    // Goal-specific prompt sections
+    const goalSection = isInvite
+        ? `GOAL: INVITATION — Drive signups for ${ctx.eventName}. These messages go to people on a list who have NOT yet registered. Every message should build excitement and include a clear call to action to sign up for the event. The urgency and excitement should increase as the event approaches.`
+        : isRemind
+            ? `GOAL: REMINDERS — Prepare registered attendees for ${ctx.eventName}. These messages go to people who have ALREADY signed up. Do NOT include a CTA to register. Focus on what to expect, practical details (what to bring, where to go, parking), spiritual preparation, and building anticipation.`
+            : `GOAL: REMINDERS — Prepare registered attendees for ${ctx.eventName}. These messages go to people who have ALREADY signed up. Do NOT include a CTA to register. Focus on preparation, logistics, and spiritual anticipation.`;
+
     const timingDesc = ctx.timingMode === 'before_event'
         ? `The first message should go out ${ctx.firstMessageDaysBefore ?? 7} days before the event (${eventDateStr}). Space the remaining ${ctx.touchpointCount - 1} message(s) ${ctx.spacing === 'even' ? 'evenly across the window' : ctx.spacing === 'closer_to_event' ? 'with messages spaced closer together as the event approaches' : 'at sensible intervals of your choosing'}.`
         : `The first message goes out immediately when someone registers. Space the remaining ${ctx.touchpointCount - 1} message(s) ${ctx.spacing === 'even' ? 'evenly' : ctx.spacing === 'closer_to_event' ? 'closer together as the event approaches' : 'at sensible intervals'}. Use delayDays between steps.`;
@@ -335,6 +347,7 @@ You must respond with ONLY a valid JSON object (no markdown, no explanation) mat
 Here is the workflow brief:
 
 EVENT: ${ctx.eventName} (${eventLabel})${ctx.eventDate ? ` on ${eventDateStr}` : ''}
+${goalSection}
 TOTAL CONTACT MESSAGES: ${ctx.touchpointCount}
 TIMING: ${timingDesc}
 CHANNELS: ${channelDesc}
@@ -349,7 +362,7 @@ Guidelines:
 - Use {firstName} to personalise messages where natural.
 - delayDays for the very first step is always 0.
 - For email steps, write a compelling emailSubject and a warm, 2-3 paragraph emailBody with greeting, body, and sign-off. Use {firstName}.
-- The name should reference the event. The description should be 1-2 sentences.`;
+- The name should reference the event and the goal (e.g. "${ctx.eventName} — ${isInvite ? 'Invitation' : 'Reminders'}"). The description should be 1-2 sentences.`;
 
     const res = await fetch('/ai/generate', {
         method: 'POST',
@@ -6086,9 +6099,12 @@ const GuidedBuilderTab: React.FC<{
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [draft, setDraft] = useState<AiWorkflowDraft | null>(null);
+    // For 'both' goal: two separate drafts
+    const [draftPair, setDraftPair] = useState<{ invite: AiWorkflowDraft; remind: AiWorkflowDraft } | null>(null);
 
     // Step 1
     const [eventType, setEventType] = useState<'registration' | 'calendar' | null>(null);
+    const [goal, setGoal] = useState<'invite' | 'remind' | 'both' | null>(null);
     const [selectedPcoEvent, setSelectedPcoEvent] = useState<{ id: string; pcoId: string; name: string; startsAt?: string | null } | null>(null);
     const [manualMode, setManualMode] = useState(false);
     const [manualName, setManualName] = useState('');
@@ -6111,7 +6127,7 @@ const GuidedBuilderTab: React.FC<{
     // Step 5
     const [customContent, setCustomContent] = useState('');
 
-    const buildCtx = (): AiBuilderContext => {
+    const buildCtx = (goalOverride?: 'invite' | 'remind'): AiBuilderContext => {
         const isManual = manualMode || eventType === 'calendar';
         const eventName = isManual ? manualName : (selectedPcoEvent?.name ?? '');
         const eventDate = isManual ? manualDate : (selectedPcoEvent?.startsAt ? selectedPcoEvent.startsAt.substring(0, 10) : undefined);
@@ -6121,9 +6137,10 @@ const GuidedBuilderTab: React.FC<{
             eventDate: eventDate || undefined,
             eventPcoId: selectedPcoEvent?.pcoId,
             isManualEntry: isManual,
+            goal: goalOverride ?? (goal as 'invite' | 'remind' | 'both'),
             touchpointCount,
-            timingMode,
-            firstMessageDaysBefore: timingMode === 'before_event' ? daysBefore : undefined,
+            timingMode: goalOverride === 'invite' ? 'before_event' : timingMode,
+            firstMessageDaysBefore: timingMode === 'before_event' || goalOverride === 'invite' ? daysBefore : undefined,
             spacing,
             tone,
             includeStaffAlert,
@@ -6137,10 +6154,20 @@ const GuidedBuilderTab: React.FC<{
         setLoading(true);
         setError('');
         setDraft(null);
+        setDraftPair(null);
         try {
-            const ctx = buildCtx();
-            const result = await generateWorkflowFromContext(ctx);
-            setDraft(result);
+            if (goal === 'both') {
+                // Generate two workflows: one to invite, one to remind
+                const [inviteDraft, remindDraft] = await Promise.all([
+                    generateWorkflowFromContext(buildCtx('invite')),
+                    generateWorkflowFromContext(buildCtx('remind')),
+                ]);
+                setDraftPair({ invite: inviteDraft, remind: remindDraft });
+            } else {
+                const ctx = buildCtx();
+                const result = await generateWorkflowFromContext(ctx);
+                setDraft(result);
+            }
         } catch (e: any) {
             setError(e.message || 'Generation failed. Please try again.');
         } finally {
@@ -6150,13 +6177,14 @@ const GuidedBuilderTab: React.FC<{
 
     const handleRegenerate = async () => {
         setDraft(null);
+        setDraftPair(null);
         await handleGenerate();
     };
 
     // Validation per step
     const canProceed = () => {
         if (step === 1) {
-            if (!eventType) return false;
+            if (!eventType || !goal) return false;
             if (manualMode || eventType === 'calendar') return manualName.trim().length > 0;
             return !!selectedPcoEvent;
         }
@@ -6174,6 +6202,66 @@ const GuidedBuilderTab: React.FC<{
     const radioCard = (active: boolean) => `flex items-start gap-3 p-3.5 rounded-xl border-2 cursor-pointer transition ${
         active ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20' : 'border-slate-200 dark:border-slate-700 hover:border-violet-300 dark:hover:border-violet-700'
     }`;
+
+    if (draftPair) {
+        // 'Both' mode: show two side-by-side draft previews
+        return (
+            <div className="space-y-6">
+                <div className="text-center">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Two Workflows Generated</p>
+                    <h3 className="text-base font-black text-slate-900 dark:text-white">Apply each one to the editor separately</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">The Invitation workflow goes to your list. The Reminder workflow goes to registered attendees.</p>
+                </div>
+
+                {/* Invite draft */}
+                <div className="border-2 border-blue-200 dark:border-blue-800 rounded-2xl overflow-hidden">
+                    <div className="bg-blue-50 dark:bg-blue-900/20 px-4 py-2.5 flex items-center gap-2">
+                        <span className="text-base">📣</span>
+                        <div>
+                            <p className="font-black text-sm text-blue-700 dark:text-blue-300">Workflow 1 — Invitation</p>
+                            <p className="text-[10px] text-blue-500 dark:text-blue-400">Send to your list → drives signups</p>
+                        </div>
+                    </div>
+                    <div className="p-4">
+                        <AiDraftPreview
+                            draft={draftPair.invite}
+                            loading={loading}
+                            onRegenerate={handleRegenerate}
+                            onApply={() => onApply(draftPair.invite, buildCtx('invite'))}
+                            onClose={onClose}
+                        />
+                    </div>
+                </div>
+
+                {/* Remind draft */}
+                <div className="border-2 border-violet-200 dark:border-violet-800 rounded-2xl overflow-hidden">
+                    <div className="bg-violet-50 dark:bg-violet-900/20 px-4 py-2.5 flex items-center gap-2">
+                        <span className="text-base">🔔</span>
+                        <div>
+                            <p className="font-black text-sm text-violet-700 dark:text-violet-300">Workflow 2 — Reminders</p>
+                            <p className="text-[10px] text-violet-500 dark:text-violet-400">Send to registered attendees → prepares them for the event</p>
+                        </div>
+                    </div>
+                    <div className="p-4">
+                        <AiDraftPreview
+                            draft={draftPair.remind}
+                            loading={loading}
+                            onRegenerate={handleRegenerate}
+                            onApply={() => onApply(draftPair.remind, buildCtx('remind'))}
+                            onClose={onClose}
+                        />
+                    </div>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-1">
+                    <button onClick={() => { setDraftPair(null); }} className="px-4 py-2.5 text-sm font-semibold rounded-xl border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition flex items-center gap-2">
+                        <RotateCcw size={13} /> Regenerate Both
+                    </button>
+                    <button onClick={onClose} className="px-4 py-2.5 text-sm font-semibold rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition">Close</button>
+                </div>
+            </div>
+        );
+    }
 
     if (draft) {
         return (
@@ -6231,30 +6319,85 @@ const GuidedBuilderTab: React.FC<{
 
             {/* Step 1 — Event Selection */}
             {step === 1 && (
-                <div className="space-y-4">
+                <div className="space-y-5">
                     <div>
                         <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Step 1</p>
-                        <h3 className="text-base font-black text-slate-900 dark:text-white">What kind of event is this for?</h3>
+                        <h3 className="text-base font-black text-slate-900 dark:text-white">Tell me about the event</h3>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                        <button
-                            onClick={() => { setEventType('registration'); setManualMode(false); }}
-                            className={`p-4 rounded-2xl border-2 text-left transition ${eventType === 'registration' ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20' : 'border-slate-200 dark:border-slate-700 hover:border-violet-300'}`}
-                        >
-                            <div className="text-2xl mb-1">📋</div>
-                            <p className="font-bold text-sm text-slate-900 dark:text-white">Registration Event</p>
-                            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-tight">People sign up via PCO Registrations</p>
-                        </button>
-                        <button
-                            onClick={() => { setEventType('calendar'); setManualMode(true); setSelectedPcoEvent(null); }}
-                            className={`p-4 rounded-2xl border-2 text-left transition ${eventType === 'calendar' ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20' : 'border-slate-200 dark:border-slate-700 hover:border-violet-300'}`}
-                        >
-                            <div className="text-2xl mb-1">📅</div>
-                            <p className="font-bold text-sm text-slate-900 dark:text-white">Calendar Event</p>
-                            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-tight">A service, retreat, or campus event</p>
-                        </button>
+                    {/* Event type */}
+                    <div>
+                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2">What kind of event?</label>
+                        <div className="grid grid-cols-2 gap-3">
+                            <button
+                                onClick={() => { setEventType('registration'); setManualMode(false); }}
+                                className={`p-4 rounded-2xl border-2 text-left transition ${eventType === 'registration' ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20' : 'border-slate-200 dark:border-slate-700 hover:border-violet-300'}`}
+                            >
+                                <div className="text-2xl mb-1">📋</div>
+                                <p className="font-bold text-sm text-slate-900 dark:text-white">Registration Event</p>
+                                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-tight">People sign up via PCO Registrations</p>
+                            </button>
+                            <button
+                                onClick={() => { setEventType('calendar'); setManualMode(true); setSelectedPcoEvent(null); }}
+                                className={`p-4 rounded-2xl border-2 text-left transition ${eventType === 'calendar' ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20' : 'border-slate-200 dark:border-slate-700 hover:border-violet-300'}`}
+                            >
+                                <div className="text-2xl mb-1">📅</div>
+                                <p className="font-bold text-sm text-slate-900 dark:text-white">Calendar Event</p>
+                                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-tight">A service, retreat, or campus event</p>
+                            </button>
+                        </div>
                     </div>
+
+                    {/* Goal selection */}
+                    {eventType && (
+                        <div>
+                            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2">What's the goal of this workflow?</label>
+                            <div className="space-y-2">
+                                <button
+                                    onClick={() => setGoal('invite')}
+                                    className={`w-full p-3.5 rounded-xl border-2 text-left transition ${
+                                        goal === 'invite' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-slate-200 dark:border-slate-700 hover:border-blue-300'
+                                    }`}
+                                >
+                                    <div className="flex items-start gap-3">
+                                        <span className="text-xl shrink-0">📣</span>
+                                        <div>
+                                            <p className="font-bold text-sm text-slate-900 dark:text-white">Invite people to sign up</p>
+                                            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">Messages go to a list of people who haven't registered yet — build excitement and drive signups</p>
+                                        </div>
+                                    </div>
+                                </button>
+                                <button
+                                    onClick={() => setGoal('remind')}
+                                    className={`w-full p-3.5 rounded-xl border-2 text-left transition ${
+                                        goal === 'remind' ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20' : 'border-slate-200 dark:border-slate-700 hover:border-violet-300'
+                                    }`}
+                                >
+                                    <div className="flex items-start gap-3">
+                                        <span className="text-xl shrink-0">🔔</span>
+                                        <div>
+                                            <p className="font-bold text-sm text-slate-900 dark:text-white">Remind registered attendees</p>
+                                            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">Messages go to people who are already signed up — prepare them and build anticipation</p>
+                                        </div>
+                                    </div>
+                                </button>
+                                <button
+                                    onClick={() => setGoal('both')}
+                                    className={`w-full p-3.5 rounded-xl border-2 text-left transition ${
+                                        goal === 'both' ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' : 'border-slate-200 dark:border-slate-700 hover:border-emerald-300'
+                                    }`}
+                                >
+                                    <div className="flex items-start gap-3">
+                                        <span className="text-xl shrink-0">🎯</span>
+                                        <div>
+                                            <p className="font-bold text-sm text-slate-900 dark:text-white">Both — build two workflows</p>
+                                            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">AI generates an Invitation workflow AND a Reminder workflow — apply each one separately</p>
+                                        </div>
+                                    </div>
+                                </button>
+                            </div>
+                        </div>
+                    )}
 
                     {/* PCO Registration events list */}
                     {eventType === 'registration' && !manualMode && (
@@ -6322,11 +6465,14 @@ const GuidedBuilderTab: React.FC<{
                     )}
 
                     {/* Confirmation chip */}
-                    {eventDisplayName && (
+                    {eventDisplayName && goal && (
                         <div className="flex items-center gap-2 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700 rounded-xl px-3 py-2">
                             <span className="text-sm">{eventType === 'registration' ? '📋' : '📅'}</span>
                             <span className="text-xs font-bold text-violet-700 dark:text-violet-300">{eventDisplayName}</span>
                             {eventDisplayDate && <span className="text-xs text-slate-500 dark:text-slate-400">· {eventDisplayDate}</span>}
+                            <span className="ml-auto text-[10px] font-bold uppercase tracking-wide text-violet-500 dark:text-violet-400">
+                                {goal === 'invite' ? '📣 Invite' : goal === 'remind' ? '🔔 Remind' : '🎯 Both'}
+                            </span>
                         </div>
                     )}
                 </div>
@@ -6978,13 +7124,15 @@ const WorkflowEditor: React.FC<{
 
         // Auto-populate trigger fields from the guided context
         if (ctx) {
-            if (ctx.eventType === 'registration' && ctx.eventPcoId) {
-                // If the user selected a real PCO Registration event, set the trigger
+            const effectiveGoal = ctx.goal;
+            if (effectiveGoal === 'remind' && ctx.eventType === 'registration' && ctx.eventPcoId) {
+                // Reminder workflow for a PCO Registration event → set trigger to event_registration
                 wfPatch.trigger = 'event_registration';
                 wfPatch.triggerEventId = ctx.eventPcoId;
                 wfPatch.triggerEventName = ctx.eventName;
             }
-            // For calendar/manual events there is no PCO ID, leave trigger as-is (manual)
+            // For invite goal: trigger is list-based (no auto-set — user picks the list manually)
+            // For both goal: the ctx.goal will be overridden to 'invite' or 'remind' per-draft
         }
 
         setWf(prev => ({ ...prev, ...wfPatch }));
