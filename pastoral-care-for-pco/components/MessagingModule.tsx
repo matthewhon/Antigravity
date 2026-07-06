@@ -270,6 +270,7 @@ Guidelines:
 - For SMS steps, keep "message" under 160 characters when possible (1 segment).
 - Include real content (actual Bible verses, actual prayer encouragements, etc.) — do NOT use placeholders like "[verse here]".
 - Use {firstName} to personalise messages to the contact where natural.
+- If the workflow involves inviting people to register/sign up for an event, you MUST include the {eventLink} merge tag in the message body or email body of all contact steps as the registration link (e.g., "Register here: {eventLink}").
 - delayDays and delayHours for the first step are always 0.
 - For subsequent steps, use the delay the user specifies or infer a sensible default (e.g. 4 hours or 1 day between steps).
 - If the user asks for a weekly cadence, prefer scheduleType "day_of_week" with an appropriate scheduleDayOfWeek.
@@ -360,6 +361,7 @@ Guidelines:
 - For SMS steps, keep "message" under 160 characters.
 - Include real, specific content (actual Bible verses, actual encouragements) — never use placeholders like "[verse here]".
 - Use {firstName} to personalise messages where natural.
+${ctx.eventType === 'registration' && isInvite ? '- This is an event invitation workflow. You MUST include the `{eventLink}` merge tag in the message body or email body of all contact steps as the registration link (e.g. "Register here: {eventLink}").' : ''}
 - delayDays for the very first step is always 0.
 - For email steps, write a compelling emailSubject and a warm, 2-3 paragraph emailBody with greeting, body, and sign-off. Use {firstName}.
 - The name should reference the event and the goal (e.g. "${ctx.eventName} — ${isInvite ? 'Invitation' : 'Reminders'}"). The description should be 1-2 sentences.`;

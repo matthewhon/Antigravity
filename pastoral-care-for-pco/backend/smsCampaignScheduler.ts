@@ -570,6 +570,45 @@ async function runWorkflowStepExecutor(db: any): Promise<void> {
                     nextSendAt: now + 5 * 60 * 1000,
                 });
 
+                // Resolve registration event link placeholders {eventLink} or {registrationLink}
+                let bodyText = step.message || '';
+                let emailHtml = step.emailBody || '';
+
+                if (wf.triggerEventId) {
+                    try {
+                        const regSnap = await db.collection('pco_registrations')
+                            .where('churchId', '==', churchId)
+                            .where('pcoId', '==', wf.triggerEventId)
+                            .limit(1)
+                            .get();
+                        
+                        let eventLink = '';
+                        if (!regSnap.empty) {
+                            eventLink = regSnap.docs[0].data().publicUrl || '';
+                        }
+                        if (!eventLink) {
+                            const churchSnap = await db.collection('churches').doc(churchId).get();
+                            const subdomain = churchSnap.data()?.subdomain;
+                            if (subdomain) {
+                                eventLink = `https://${subdomain}.churchcenter.com/registrations`;
+                            } else {
+                                eventLink = 'https://churchcenter.com';
+                            }
+                        }
+
+                        bodyText = bodyText.replace(/\{eventLink\}|\{registrationLink\}/gi, eventLink);
+                        emailHtml = emailHtml.replace(/\{eventLink\}|\{registrationLink\}/gi, eventLink);
+                    } catch (e: any) {
+                        log.warn(`Failed to resolve eventLink for workflow ${workflowId}: ${e.message}`, 'system', { workflowId }, churchId);
+                    }
+                } else {
+                    const churchSnap = await db.collection('churches').doc(churchId).get();
+                    const subdomain = churchSnap.data()?.subdomain;
+                    const eventLink = subdomain ? `https://${subdomain}.churchcenter.com/registrations` : 'https://churchcenter.com';
+                    bodyText = bodyText.replace(/\{eventLink\}|\{registrationLink\}/gi, eventLink);
+                    emailHtml = emailHtml.replace(/\{eventLink\}|\{registrationLink\}/gi, eventLink);
+                }
+
                 // ── Fire the step ─────────────────────────────────────────────
                 if (channelType === 'sms' || channelType === 'mms') {
                     const { sendBulkInternal } = await import('./smsSend.js');
@@ -578,7 +617,7 @@ async function runWorkflowStepExecutor(db: any): Promise<void> {
                         churchId,
                         campaignId:     `wf_${workflowId}_step${currentStep}`,
                         phones:         [phoneNumber],
-                        body:           step.message || '',
+                        body:           bodyText,
                         mediaUrls:      step.mediaUrls || [],
                         personMap:      { [phoneNumber]: personInfo },
                         twilioNumberId: wf.twilioNumberId || null,
@@ -592,7 +631,7 @@ async function runWorkflowStepExecutor(db: any): Promise<void> {
                             body: {
                                 churchId,
                                 subject:     step.emailSubject || '(no subject)',
-                                htmlContent: step.emailBody    || '',
+                                htmlContent: emailHtml,
                                 toAddresses: [personInfo.email],
                                 personData:  { [personInfo.email]: personInfo },
                             }
