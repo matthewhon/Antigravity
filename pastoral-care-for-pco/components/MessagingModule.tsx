@@ -3065,7 +3065,7 @@ interface KeywordModalProps {
     tags: SmsTag[];
     polls: { id: string; title: string }[];
     allSmsNumbers: any[];
-    onSave: (kw: Omit<SmsKeyword, 'id' | 'matchCount' | 'createdAt'>) => Promise<void>;
+    onSave: (kw: Omit<SmsKeyword, 'id' | 'matchCount' | 'createdAt'> & { createWorkflow?: boolean }) => Promise<void>;
     onClose: () => void;
     isBusy: boolean;
     saveError?: string;
@@ -3083,6 +3083,7 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, churchId, pcoLists
     const [autoTagIds, setAutoTagIds] = useState<string[]>(initial?.autoTagIds || []);
     const [linkedPollId, setLinkedPollId] = useState(initial?.linkedPollId || '');
     const [numberIds, setNumberIds] = useState<string[]>(initial?.numberIds || []);
+    const [createWorkflow, setCreateWorkflow] = useState(false);
     const [error, setError] = useState('');
 
     useEffect(() => {
@@ -3125,6 +3126,7 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, churchId, pcoLists
             linkedPollTitle: selectedPoll?.title || null,
             numberIds,
             isActive,
+            createWorkflow: actionType === 'event_registration' ? createWorkflow : false,
         });
     };
 
@@ -3175,24 +3177,42 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, churchId, pcoLists
 
                 {/* Event Signup select */}
                 {actionType === 'event_registration' && (
-                    <div className="mb-4 bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 rounded-2xl p-4">
-                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">PCO Event Signup</label>
-                        {loadingSignups ? (
-                            <div className="flex items-center gap-2 text-sm text-slate-400"><Loader2 size={13} className="animate-spin" /> Loading signups...</div>
-                        ) : (
-                            <select
-                                value={pcoSignupId}
-                                onChange={e => setPcoSignupId(e.target.value)}
-                                title="PCO Event Signup"
-                                className="w-full text-sm font-semibold border-2 border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500"
-                            >
-                                <option value="">— Select PCO Event Signup —</option>
-                                {signups.map(s => (
-                                    <option key={s.id} value={s.id}>{s.name}</option>
-                                ))}
-                            </select>
-                        )}
-                    </div>
+                    <>
+                        <div className="mb-4 bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 rounded-2xl p-4">
+                            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">PCO Event Signup</label>
+                            {loadingSignups ? (
+                                <div className="flex items-center gap-2 text-sm text-slate-400"><Loader2 size={13} className="animate-spin" /> Loading signups...</div>
+                            ) : (
+                                <select
+                                    value={pcoSignupId}
+                                    onChange={e => setPcoSignupId(e.target.value)}
+                                    title="PCO Event Signup"
+                                    className="w-full text-sm font-semibold border-2 border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500"
+                                >
+                                    <option value="">— Select PCO Event Signup —</option>
+                                    {signups.map(s => (
+                                        <option key={s.id} value={s.id}>{s.name}</option>
+                                    ))}
+                                </select>
+                            )}
+                        </div>
+
+                        {/* Automatically create workflow checkbox */}
+                        <div className="mb-4 bg-violet-50/20 dark:bg-violet-950/10 border border-violet-100 dark:border-violet-900/30 rounded-2xl p-4">
+                            <label className="flex items-start gap-2.5 cursor-pointer text-xs font-bold text-slate-700 dark:text-slate-200 select-none">
+                                <input
+                                    type="checkbox"
+                                    checked={createWorkflow}
+                                    onChange={e => setCreateWorkflow(e.target.checked)}
+                                    className="mt-0.5 rounded border-slate-300 text-violet-600 focus:ring-violet-500 w-4 h-4 shrink-0"
+                                />
+                                <span>Automatically create keyword workflow</span>
+                            </label>
+                            <p className="text-[10px] text-slate-400 pl-6.5 mt-1 leading-snug">
+                                Automatically builds an active multi-step follow-up series (invite immediately + reminder in 2 days) tied to this keyword.
+                            </p>
+                        </div>
+                    </>
                 )}
 
                 {/* Auto-reply message */}
@@ -3651,28 +3671,85 @@ const SmsKeywordsManager: React.FC<{
         }).catch(() => setLoadingLists(false));
     }, [churchId]);
 
-    const handleSave = async (data: Omit<SmsKeyword, 'id' | 'matchCount' | 'createdAt'>) => {
+    const handleSave = async (data: Omit<SmsKeyword, 'id' | 'matchCount' | 'createdAt'> & { createWorkflow?: boolean }) => {
         setIsBusy(true);
         setSaveError(null);
         try {
+            const { createWorkflow, ...kwData } = data;
+            let kwId = '';
+
             if (editKw) {
                 // Editing existing keyword
+                kwId = editKw.id;
                 await updateDoc(doc(firebaseDb, 'smsKeywords', editKw.id), {
-                    ...data,
+                    ...kwData,
                     churchId,
                     twilioNumberId: twilioNumberId || null,
                 });
             } else {
                 // Creating new keyword
                 const now = Date.now();
-                await addDoc(collection(firebaseDb, 'smsKeywords'), {
-                    ...data,
+                const newDocRef = await addDoc(collection(firebaseDb, 'smsKeywords'), {
+                    ...kwData,
                     churchId,
                     matchCount: 0,
                     createdAt: now,
                     twilioNumberId: twilioNumberId || null,
                 });
+                kwId = newDocRef.id;
             }
+
+            if (createWorkflow && kwData.actionType === 'event_registration' && kwData.pcoSignupId) {
+                const regSnap = await getDocs(query(
+                    collection(firebaseDb, 'pco_registrations'),
+                    where('churchId', '==', churchId),
+                    where('pcoId', '==', kwData.pcoSignupId)
+                ));
+
+                let eventName = 'Event';
+                if (!regSnap.empty) {
+                    eventName = regSnap.docs[0].data().name || 'Event';
+                }
+
+                const steps = [
+                    {
+                        id: `step_${Date.now()}_1`,
+                        order: 0,
+                        delayDays: 0,
+                        delayHours: 0,
+                        channelType: 'sms' as const,
+                        message: `Hi {firstName}! Let's get you registered for ${eventName}. Reply YES to sign up!`,
+                        scheduleType: 'relative' as const
+                    },
+                    {
+                        id: `step_${Date.now()}_2`,
+                        order: 1,
+                        delayDays: 2,
+                        delayHours: 0,
+                        channelType: 'sms' as const,
+                        message: `Hi {firstName}, just checking in! Don't forget to register for ${eventName} here: {eventLink}`,
+                        scheduleType: 'relative' as const
+                    }
+                ];
+
+                await addDoc(collection(firebaseDb, 'smsWorkflows'), {
+                    churchId,
+                    name: `${kwData.keyword} Registration Workflow`,
+                    description: `Automated registration flow and follow-up reminders for ${eventName}.`,
+                    trigger: 'keyword',
+                    triggerKeywordId: kwId,
+                    triggerKeywordWord: kwData.keyword,
+                    twilioNumberId: twilioNumberId || null,
+                    isActive: true,
+                    enrolledCount: 0,
+                    completedCount: 0,
+                    allowReentry: true,
+                    steps,
+                    createdAt: Date.now(),
+                    updatedAt: Date.now()
+                });
+            }
+
             setModalOpen(false);
             setEditKw(null);
         } catch (e: any) {

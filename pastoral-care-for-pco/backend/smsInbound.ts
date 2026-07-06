@@ -954,6 +954,61 @@ export const handleInboundSms = async (req: any, res: any) => {
             }
             // ────────────────────────────────────────────────────────────────
 
+            // Enroll contact in any active keyword workflows matched to this keyword trigger
+            try {
+                const wfSnap = await db.collection('smsWorkflows')
+                    .where('churchId', '==', churchId)
+                    .where('isActive', '==', true)
+                    .where('trigger', '==', 'keyword')
+                    .where('triggerKeywordId', '==', kw.id)
+                    .get();
+                
+                for (const doc of wfSnap.docs) {
+                    const wf = doc.data();
+                    const enrollId = `${doc.id}_${from.replace(/\+/g, '')}`;
+                    
+                    const enrollRef = db.collection('smsWorkflowEnrollments').doc(enrollId);
+                    const enrollSnap = await enrollRef.get();
+                    
+                    if (!enrollSnap.exists || wf.allowReentry) {
+                        const personId = personMatch?.personId || convSnap.data()?.personId || null;
+                        const personName = personMatch?.personName || convSnap.data()?.personName || 'Guest';
+                        
+                        await enrollRef.set({
+                            id: enrollId,
+                            churchId,
+                            workflowId: doc.id,
+                            phoneNumber: from,
+                            personId,
+                            personName,
+                            completed: false,
+                            enrolledAt: Date.now(),
+                            updatedAt: Date.now(),
+                            // If this was an event_registration keyword, we don't want to double-invite them immediately
+                            // since handleInboundSms is already sending them the first question or register link.
+                            // So we set nextSendAt to trigger Step 2 (follow-up) later, skipping Step 1.
+                            // Wait! Let's think: if we want the workflow follow-up to fire in 2 days, we should set the nextSendAt
+                            // based on the first step's delay! But since step 1 delay is 0, it fires step 1 immediately.
+                            // If we want to skip step 1 because we already sent it, we can set currentStep to 1!
+                            // That way, it starts from Step 2 directly!
+                            // Let's implement this check:
+                            currentStep: kw.actionType === 'event_registration' ? 1 : 0,
+                            nextSendAt: kw.actionType === 'event_registration' && wf.steps && wf.steps[1]
+                                ? Date.now() + (wf.steps[1].delayDays || 2) * 24 * 60 * 60 * 1000
+                                : Date.now(),
+                        }, { merge: true });
+                        
+                        await doc.ref.update({
+                            enrolledCount: (wf.enrolledCount || 0) + 1
+                        }).catch(() => {});
+                        
+                        log.info(`Enrolled ${from} in keyword workflow ${doc.id}`, 'system', { workflowId: doc.id }, churchId);
+                    }
+                }
+            } catch (err: any) {
+                log.warn(`Failed to enroll in keyword workflow: ${err.message}`, 'system', {}, churchId);
+            }
+
             // Save the keyword auto-reply as an outbound message
             const replyId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
             await db.collection('smsConversations').doc(convId)
