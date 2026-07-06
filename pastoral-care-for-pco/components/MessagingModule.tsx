@@ -206,7 +206,30 @@ interface AiWorkflowDraft {
     steps: AiWorkflowDraftStep[];
 }
 
-/** Call the AI to build a full workflow from a natural-language prompt. */
+/** Structured context collected by the Guided wizard — fed into generateWorkflowFromContext. */
+interface AiBuilderContext {
+    // Step 1 — Event
+    eventType: 'registration' | 'calendar';
+    eventName: string;
+    eventDate?: string;           // YYYY-MM-DD
+    eventPcoId?: string;          // PCO event ID (if from PCO list)
+    isManualEntry: boolean;
+    // Step 2 — Touchpoints
+    touchpointCount: number;      // 1–10
+    timingMode: 'before_event' | 'after_registration';
+    firstMessageDaysBefore?: number;
+    spacing: 'even' | 'closer_to_event' | 'ai_decides';
+    // Step 3 — Tone
+    tone: string;                 // Free text
+    // Step 4 — Staff follow-up
+    includeStaffAlert: boolean;
+    staffAlertTiming?: 'with_first' | 'with_last' | 'day_of_event';
+    includeRegistrantCount: boolean;
+    // Step 5 — Extra content
+    customContent?: string;
+}
+
+/** Call the AI to build a full workflow from a natural-language prompt (Custom Prompt tab). */
 async function generateWorkflowWithAi(prompt: string): Promise<AiWorkflowDraft> {
     const systemPrompt = `You are an expert church communications strategist helping a pastor build automated message workflows.
 The user will describe the workflow they want in plain English.
@@ -264,6 +287,78 @@ ${prompt}`;
     const data = await res.json();
     const raw = (data.text || '').trim();
     // Strip any accidental markdown code fences
+    const cleaned = raw.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/i, '').trim();
+    try {
+        return JSON.parse(cleaned) as AiWorkflowDraft;
+    } catch {
+        throw new Error('AI returned an unexpected format. Please try again.');
+    }
+}
+
+/** Build a workflow from a structured AiBuilderContext (Guided tab). */
+async function generateWorkflowFromContext(ctx: AiBuilderContext): Promise<AiWorkflowDraft> {
+    const eventLabel = ctx.eventType === 'registration' ? 'Registration Event' : 'Calendar Event';
+    const eventDateStr = ctx.eventDate
+        ? new Date(ctx.eventDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+        : 'date not specified';
+
+    const timingDesc = ctx.timingMode === 'before_event'
+        ? `The first message should go out ${ctx.firstMessageDaysBefore ?? 7} days before the event (${eventDateStr}). Space the remaining ${ctx.touchpointCount - 1} message(s) ${ctx.spacing === 'even' ? 'evenly across the window' : ctx.spacing === 'closer_to_event' ? 'with messages spaced closer together as the event approaches' : 'at sensible intervals of your choosing'}.`
+        : `The first message goes out immediately when someone registers. Space the remaining ${ctx.touchpointCount - 1} message(s) ${ctx.spacing === 'even' ? 'evenly' : ctx.spacing === 'closer_to_event' ? 'closer together as the event approaches' : 'at sensible intervals'}. Use delayDays between steps.`;
+
+    const channelDesc = `Alternate SMS and Email for the ${ctx.touchpointCount} contact messages — odd steps (1, 3, 5…) = SMS, even steps (2, 4, 6…) = Email.`;
+
+    const staffDesc = ctx.includeStaffAlert
+        ? `After the ${ctx.staffAlertTiming === 'with_first' ? 'first contact message' : ctx.staffAlertTiming === 'with_last' ? 'final contact message' : 'last contact message (day of event)'}, add a staff_email step alerting the pastor that people are registered for ${ctx.eventName}.${ctx.includeRegistrantCount ? ' Include the merge tag {registrantCount} in the staff message body to show how many people are registered.' : ''}`
+        : 'Do not include any staff alert steps.';
+
+    const systemPrompt = `You are an expert church communications strategist helping a pastor build automated message workflows.
+You must respond with ONLY a valid JSON object (no markdown, no explanation) matching this exact schema:
+{
+  "name": string,
+  "description": string,
+  "steps": [
+    {
+      "channelType": "sms" | "email" | "staff_email",
+      "delayDays": number,
+      "delayHours": number,
+      "scheduleType": "relative",
+      "scheduleTime": string,
+      "message": string,
+      "emailSubject": string,
+      "emailBody": string,
+      "staffNote": string
+    }
+  ]
+}
+
+Here is the workflow brief:
+
+EVENT: ${ctx.eventName} (${eventLabel})${ctx.eventDate ? ` on ${eventDateStr}` : ''}
+TOTAL CONTACT MESSAGES: ${ctx.touchpointCount}
+TIMING: ${timingDesc}
+CHANNELS: ${channelDesc}
+TONE: ${ctx.tone}
+STAFF ALERT: ${staffDesc}${ctx.customContent ? `
+ADDITIONAL CONTENT TO INCLUDE: ${ctx.customContent}` : ''}
+
+Guidelines:
+- Use warm, pastoral language appropriate for a church.
+- For SMS steps, keep "message" under 160 characters.
+- Include real, specific content (actual Bible verses, actual encouragements) — never use placeholders like "[verse here]".
+- Use {firstName} to personalise messages where natural.
+- delayDays for the very first step is always 0.
+- For email steps, write a compelling emailSubject and a warm, 2-3 paragraph emailBody with greeting, body, and sign-off. Use {firstName}.
+- The name should reference the event. The description should be 1-2 sentences.`;
+
+    const res = await fetch('/ai/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'gemini-2.5-flash', prompt: systemPrompt }),
+    });
+    if (!res.ok) throw new Error('AI request failed');
+    const data = await res.json();
+    const raw = (data.text || '').trim();
     const cleaned = raw.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/i, '').trim();
     try {
         return JSON.parse(cleaned) as AiWorkflowDraft;
@@ -5875,6 +5970,7 @@ const ActionNodeCard: React.FC<{
         </div>
     );
 };
+
 const EXAMPLE_PROMPTS = [
     'Send a text once a day for 5 days with a Bible verse about prayer. On the last day, remind them the church is praying for them.',
     'Create a 3-step new visitor follow-up: a welcome text on day 0, an email on day 3 about getting connected, and an SMS on day 7 inviting them back.',
@@ -5884,7 +5980,634 @@ const EXAMPLE_PROMPTS = [
     'Birthday workflow: send a warm birthday SMS to the contact, then alert the pastor via staff SMS so they can call to say happy birthday.',
 ];
 
-const AiWorkflowBuilderPanel: React.FC<{
+// ─── Shared draft preview component (used by both Guided and Custom tabs) ─────
+
+const AiDraftPreview: React.FC<{ draft: AiWorkflowDraft; onRegenerate: () => void; onApply: () => void; onClose: () => void; loading: boolean; prompt?: string }> = ({ draft, onRegenerate, onApply, onClose, loading, prompt }) => {
+    const chBadgeClass: Record<string, string> = {
+        sms: 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300',
+        mms: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
+        email: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
+        staff_sms: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300',
+        staff_email: 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300',
+    };
+    const chLabel: Record<string, string> = { sms: 'SMS', mms: 'MMS', email: 'Email', staff_sms: 'Staff SMS', staff_email: 'Staff Email' };
+
+    return (
+        <div className="space-y-4">
+            <div className="flex items-center justify-between">
+                <div>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Generated Workflow</p>
+                    <h3 className="font-black text-slate-900 dark:text-white text-base">{draft.name}</h3>
+                    {draft.description && <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{draft.description}</p>}
+                </div>
+                <span className="text-xs font-bold bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 px-2.5 py-1 rounded-full">{draft.steps.length} step{draft.steps.length !== 1 ? 's' : ''}</span>
+            </div>
+            <div className="space-y-3">
+                {draft.steps.map((step, idx) => {
+                    const isStaff = step.channelType === 'staff_sms' || step.channelType === 'staff_email';
+                    const isEmail = step.channelType === 'email' || step.channelType === 'staff_email';
+                    const delayLabel = (() => {
+                        if (idx === 0) return 'Sends immediately';
+                        if (step.scheduleType === 'day_of_week') {
+                            const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+                            return `Next ${days[step.scheduleDayOfWeek ?? 1]} at ${step.scheduleTime ?? '09:00'}`;
+                        }
+                        if (step.scheduleType === 'day_of_month') return `On day ${step.scheduleDayOfMonth ?? 1} of the month`;
+                        const d = step.delayDays ?? 0;
+                        const h = step.delayHours ?? 0;
+                        if (d === 0 && h > 0) return `After ${h} hour${h !== 1 ? 's' : ''}`;
+                        if (h > 0) return `After ${d}d ${h}h`;
+                        return `After ${d} day${d !== 1 ? 's' : ''}`;
+                    })();
+                    return (
+                        <div key={idx} className={`border rounded-2xl p-4 ${isStaff ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
+                            <div className="flex items-center gap-2 mb-2">
+                                <span className="w-6 h-6 rounded-full bg-violet-600 text-white text-[10px] font-black flex items-center justify-center shrink-0">{idx + 1}</span>
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide ${chBadgeClass[step.channelType] ?? chBadgeClass.sms}`}>
+                                    {chLabel[step.channelType] ?? step.channelType.toUpperCase()}
+                                </span>
+                                {isStaff && <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400">Staff Alert</span>}
+                                <span className="text-[10px] text-slate-400">{delayLabel}</span>
+                            </div>
+                            {isEmail ? (
+                                <div className="space-y-1">
+                                    <p className="text-xs font-bold text-slate-700 dark:text-slate-200">Subject: {step.emailSubject}</p>
+                                    <p className="text-xs text-slate-600 dark:text-slate-400 whitespace-pre-wrap leading-relaxed line-clamp-4">{step.emailBody}</p>
+                                </div>
+                            ) : (
+                                <div className={`flex ${isStaff ? 'justify-start' : 'justify-end'}`}>
+                                    <div className={`text-xs px-3 py-2 rounded-2xl max-w-[90%] leading-relaxed whitespace-pre-wrap break-words font-medium shadow-sm ${
+                                        isStaff
+                                            ? 'bg-amber-200 dark:bg-amber-800 text-amber-900 dark:text-amber-100 rounded-bl-sm'
+                                            : 'bg-violet-600 text-white rounded-br-sm'
+                                    }`}>
+                                        {step.message}
+                                    </div>
+                                </div>
+                            )}
+                            {step.staffNote && (
+                                <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-2 italic">📋 {step.staffNote}</p>
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
+            {/* Footer */}
+            <div className="flex items-center gap-3 pt-2">
+                <button
+                    onClick={onRegenerate}
+                    disabled={loading}
+                    className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-xl border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                >
+                    <RotateCcw size={13} /> Regenerate
+                </button>
+                <div className="flex-1" />
+                <button onClick={onClose} className="px-4 py-2.5 text-sm font-semibold rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition">Cancel</button>
+                <button
+                    onClick={onApply}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold rounded-xl transition shadow-md shadow-violet-200 dark:shadow-violet-900/40"
+                >
+                    <ChevronRight size={15} /> Apply to Editor
+                </button>
+            </div>
+        </div>
+    );
+};
+
+// ─── Guided wizard tab ────────────────────────────────────────────────────────
+
+const GuidedBuilderTab: React.FC<{
+    pcoRegistrationEvents: { id: string; pcoId: string; name: string; startsAt?: string | null }[];
+    onApply: (draft: AiWorkflowDraft, ctx: AiBuilderContext) => void;
+    onClose: () => void;
+}> = ({ pcoRegistrationEvents, onApply, onClose }) => {
+    const TOTAL_STEPS = 5;
+    const [step, setStep] = useState(1);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+    const [draft, setDraft] = useState<AiWorkflowDraft | null>(null);
+
+    // Step 1
+    const [eventType, setEventType] = useState<'registration' | 'calendar' | null>(null);
+    const [selectedPcoEvent, setSelectedPcoEvent] = useState<{ id: string; pcoId: string; name: string; startsAt?: string | null } | null>(null);
+    const [manualMode, setManualMode] = useState(false);
+    const [manualName, setManualName] = useState('');
+    const [manualDate, setManualDate] = useState('');
+
+    // Step 2
+    const [touchpointCount, setTouchpointCount] = useState(3);
+    const [timingMode, setTimingMode] = useState<'before_event' | 'after_registration'>('before_event');
+    const [daysBefore, setDaysBefore] = useState(14);
+    const [spacing, setSpacing] = useState<'even' | 'closer_to_event' | 'ai_decides'>('even');
+
+    // Step 3
+    const [tone, setTone] = useState('');
+
+    // Step 4
+    const [includeStaffAlert, setIncludeStaffAlert] = useState(true);
+    const [staffAlertTiming, setStaffAlertTiming] = useState<'with_first' | 'with_last' | 'day_of_event'>('with_first');
+    const [includeRegistrantCount, setIncludeRegistrantCount] = useState(true);
+
+    // Step 5
+    const [customContent, setCustomContent] = useState('');
+
+    const buildCtx = (): AiBuilderContext => {
+        const isManual = manualMode || eventType === 'calendar';
+        const eventName = isManual ? manualName : (selectedPcoEvent?.name ?? '');
+        const eventDate = isManual ? manualDate : (selectedPcoEvent?.startsAt ? selectedPcoEvent.startsAt.substring(0, 10) : undefined);
+        return {
+            eventType: eventType ?? 'registration',
+            eventName,
+            eventDate: eventDate || undefined,
+            eventPcoId: selectedPcoEvent?.pcoId,
+            isManualEntry: isManual,
+            touchpointCount,
+            timingMode,
+            firstMessageDaysBefore: timingMode === 'before_event' ? daysBefore : undefined,
+            spacing,
+            tone,
+            includeStaffAlert,
+            staffAlertTiming: includeStaffAlert ? staffAlertTiming : undefined,
+            includeRegistrantCount: includeStaffAlert && includeRegistrantCount,
+            customContent: customContent.trim() || undefined,
+        };
+    };
+
+    const handleGenerate = async () => {
+        setLoading(true);
+        setError('');
+        setDraft(null);
+        try {
+            const ctx = buildCtx();
+            const result = await generateWorkflowFromContext(ctx);
+            setDraft(result);
+        } catch (e: any) {
+            setError(e.message || 'Generation failed. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleRegenerate = async () => {
+        setDraft(null);
+        await handleGenerate();
+    };
+
+    // Validation per step
+    const canProceed = () => {
+        if (step === 1) {
+            if (!eventType) return false;
+            if (manualMode || eventType === 'calendar') return manualName.trim().length > 0;
+            return !!selectedPcoEvent;
+        }
+        if (step === 2) return touchpointCount >= 1;
+        if (step === 3) return tone.trim().length > 0;
+        return true;
+    };
+
+    const eventDisplayName = manualMode || eventType === 'calendar' ? manualName : selectedPcoEvent?.name;
+    const eventDisplayDate = manualMode || eventType === 'calendar'
+        ? (manualDate ? new Date(manualDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '')
+        : (selectedPcoEvent?.startsAt ? new Date(selectedPcoEvent.startsAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '');
+
+    const inputBase = 'w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500';
+    const radioCard = (active: boolean) => `flex items-start gap-3 p-3.5 rounded-xl border-2 cursor-pointer transition ${
+        active ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20' : 'border-slate-200 dark:border-slate-700 hover:border-violet-300 dark:hover:border-violet-700'
+    }`;
+
+    if (draft) {
+        return (
+            <div className="space-y-4">
+                <AiDraftPreview
+                    draft={draft}
+                    loading={loading}
+                    onRegenerate={handleRegenerate}
+                    onApply={() => onApply(draft, buildCtx())}
+                    onClose={onClose}
+                />
+            </div>
+        );
+    }
+
+    if (loading) {
+        return (
+            <div className="flex flex-col items-center justify-center py-16 gap-4 text-slate-400">
+                <div className="relative">
+                    <div className="w-16 h-16 rounded-full bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
+                        <Sparkles size={28} className="text-violet-500 animate-pulse" />
+                    </div>
+                    <Loader2 size={48} className="absolute inset-0 m-auto text-violet-400 animate-spin opacity-40" />
+                </div>
+                <div className="text-center">
+                    <p className="font-bold text-slate-700 dark:text-slate-300">Building your workflow...</p>
+                    <p className="text-xs mt-1">AI is crafting every step with real content</p>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-6">
+            {/* Progress bar */}
+            <div className="space-y-1.5">
+                <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    <span>Step {step} of {TOTAL_STEPS}</span>
+                    <span>{Math.round((step / TOTAL_STEPS) * 100)}%</span>
+                </div>
+                <div className="h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                    <div
+                        className="h-full bg-violet-500 rounded-full transition-all duration-500"
+                        style={{ width: `${(step / TOTAL_STEPS) * 100}%` }}
+                    />
+                </div>
+            </div>
+
+            {/* Error */}
+            {error && (
+                <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl p-4">
+                    <AlertTriangle size={16} className="shrink-0" /> {error}
+                </div>
+            )}
+
+            {/* Step 1 — Event Selection */}
+            {step === 1 && (
+                <div className="space-y-4">
+                    <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Step 1</p>
+                        <h3 className="text-base font-black text-slate-900 dark:text-white">What kind of event is this for?</h3>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                        <button
+                            onClick={() => { setEventType('registration'); setManualMode(false); }}
+                            className={`p-4 rounded-2xl border-2 text-left transition ${eventType === 'registration' ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20' : 'border-slate-200 dark:border-slate-700 hover:border-violet-300'}`}
+                        >
+                            <div className="text-2xl mb-1">📋</div>
+                            <p className="font-bold text-sm text-slate-900 dark:text-white">Registration Event</p>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-tight">People sign up via PCO Registrations</p>
+                        </button>
+                        <button
+                            onClick={() => { setEventType('calendar'); setManualMode(true); setSelectedPcoEvent(null); }}
+                            className={`p-4 rounded-2xl border-2 text-left transition ${eventType === 'calendar' ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20' : 'border-slate-200 dark:border-slate-700 hover:border-violet-300'}`}
+                        >
+                            <div className="text-2xl mb-1">📅</div>
+                            <p className="font-bold text-sm text-slate-900 dark:text-white">Calendar Event</p>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-tight">A service, retreat, or campus event</p>
+                        </button>
+                    </div>
+
+                    {/* PCO Registration events list */}
+                    {eventType === 'registration' && !manualMode && (
+                        <div className="space-y-3">
+                            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400">Select event</label>
+                            {pcoRegistrationEvents.length > 0 ? (
+                                <select
+                                    value={selectedPcoEvent?.pcoId ?? ''}
+                                    onChange={e => {
+                                        const ev = pcoRegistrationEvents.find(x => x.pcoId === e.target.value);
+                                        setSelectedPcoEvent(ev ?? null);
+                                    }}
+                                    className={inputBase}
+                                >
+                                    <option value="">— Choose a PCO event —</option>
+                                    {pcoRegistrationEvents.map(ev => (
+                                        <option key={ev.pcoId} value={ev.pcoId}>
+                                            {ev.name}{ev.startsAt ? ` · ${new Date(ev.startsAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}
+                                        </option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <p className="text-xs text-slate-500 dark:text-slate-400 italic">No PCO events loaded — enter manually below.</p>
+                            )}
+                            <button
+                                onClick={() => setManualMode(true)}
+                                className="text-xs text-violet-600 dark:text-violet-400 underline underline-offset-2 hover:no-underline transition"
+                            >
+                                Or enter event details manually →
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Manual entry (Calendar always, Registration if user clicks) */}
+                    {(eventType === 'calendar' || manualMode) && (
+                        <div className="space-y-3">
+                            {eventType === 'registration' && (
+                                <button
+                                    onClick={() => setManualMode(false)}
+                                    className="text-xs text-violet-600 dark:text-violet-400 underline underline-offset-2 hover:no-underline transition"
+                                >
+                                    ← Back to PCO event list
+                                </button>
+                            )}
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Event name</label>
+                                <input
+                                    type="text"
+                                    value={manualName}
+                                    onChange={e => setManualName(e.target.value)}
+                                    placeholder="e.g. Easter Sunday Service"
+                                    className={inputBase}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Event date</label>
+                                <input
+                                    type="date"
+                                    value={manualDate}
+                                    onChange={e => setManualDate(e.target.value)}
+                                    className={inputBase}
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Confirmation chip */}
+                    {eventDisplayName && (
+                        <div className="flex items-center gap-2 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700 rounded-xl px-3 py-2">
+                            <span className="text-sm">{eventType === 'registration' ? '📋' : '📅'}</span>
+                            <span className="text-xs font-bold text-violet-700 dark:text-violet-300">{eventDisplayName}</span>
+                            {eventDisplayDate && <span className="text-xs text-slate-500 dark:text-slate-400">· {eventDisplayDate}</span>}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Step 2 — Touchpoints */}
+            {step === 2 && (
+                <div className="space-y-5">
+                    <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Step 2</p>
+                        <h3 className="text-base font-black text-slate-900 dark:text-white">How many messages?</h3>
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2">Number of messages to send</label>
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={() => setTouchpointCount(Math.max(1, touchpointCount - 1))}
+                                className="w-9 h-9 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition font-bold text-lg flex items-center justify-center"
+                            >−</button>
+                            <span className="w-10 text-center font-black text-xl text-slate-900 dark:text-white">{touchpointCount}</span>
+                            <button
+                                onClick={() => setTouchpointCount(Math.min(10, touchpointCount + 1))}
+                                className="w-9 h-9 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition font-bold text-lg flex items-center justify-center"
+                            >+</button>
+                            <span className="text-xs text-slate-500 dark:text-slate-400">messages (max 10)</span>
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400">When should the first message go out?</label>
+                        <label className={radioCard(timingMode === 'before_event')} onClick={() => setTimingMode('before_event')}>
+                            <div className={`w-4 h-4 rounded-full border-2 mt-0.5 shrink-0 flex items-center justify-center ${
+                                timingMode === 'before_event' ? 'border-violet-500' : 'border-slate-300 dark:border-slate-600'
+                            }`}>
+                                {timingMode === 'before_event' && <div className="w-2 h-2 rounded-full bg-violet-500" />}
+                            </div>
+                            <div className="flex-1">
+                                <p className="text-sm font-semibold text-slate-900 dark:text-white">Days before the event</p>
+                                {timingMode === 'before_event' && (
+                                    <div className="flex items-center gap-2 mt-2">
+                                        <input
+                                            type="number"
+                                            min={1} max={90}
+                                            value={daysBefore}
+                                            onChange={e => setDaysBefore(parseInt(e.target.value) || 1)}
+                                            onClick={e => e.stopPropagation()}
+                                            className="w-16 text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                        />
+                                        <span className="text-xs text-slate-500">days before the event</span>
+                                    </div>
+                                )}
+                            </div>
+                        </label>
+                        <label className={radioCard(timingMode === 'after_registration')} onClick={() => setTimingMode('after_registration')}>
+                            <div className={`w-4 h-4 rounded-full border-2 mt-0.5 shrink-0 flex items-center justify-center ${
+                                timingMode === 'after_registration' ? 'border-violet-500' : 'border-slate-300 dark:border-slate-600'
+                            }`}>
+                                {timingMode === 'after_registration' && <div className="w-2 h-2 rounded-full bg-violet-500" />}
+                            </div>
+                            <div>
+                                <p className="text-sm font-semibold text-slate-900 dark:text-white">Immediately after they register</p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">First message sends right when they sign up</p>
+                            </div>
+                        </label>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400">How should messages be spaced?</label>
+                        {(['even', 'closer_to_event', 'ai_decides'] as const).map(s => (
+                            <label key={s} className={radioCard(spacing === s)} onClick={() => setSpacing(s)}>
+                                <div className={`w-4 h-4 rounded-full border-2 mt-0.5 shrink-0 flex items-center justify-center ${
+                                    spacing === s ? 'border-violet-500' : 'border-slate-300 dark:border-slate-600'
+                                }`}>
+                                    {spacing === s && <div className="w-2 h-2 rounded-full bg-violet-500" />}
+                                </div>
+                                <div>
+                                    <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                                        {s === 'even' ? 'Evenly spread' : s === 'closer_to_event' ? 'Closer together near the event' : 'Let AI decide spacing'}
+                                    </p>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                        {s === 'even' ? 'Equal time between each message' : s === 'closer_to_event' ? 'More frequent reminders as the day approaches' : 'AI will choose the best cadence'}
+                                    </p>
+                                </div>
+                            </label>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Step 3 — Tone */}
+            {step === 3 && (
+                <div className="space-y-4">
+                    <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Step 3</p>
+                        <h3 className="text-base font-black text-slate-900 dark:text-white">What tone should these messages have?</h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Be as specific as you like. This guides every word the AI writes.</p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                        {[
+                            { label: 'Warm & Encouraging', value: 'Warm and encouraging, with a spiritual focus and personal touch' },
+                            { label: 'Practical & Clear', value: 'Practical and clear — focus on logistics and next steps, keep it concise' },
+                            { label: 'Excited & Celebratory', value: 'Excited and celebratory — high energy, enthusiastic, creates anticipation' },
+                            { label: 'Reverent & Prayerful', value: 'Reverent and prayerful — scripture-rich, quiet, spiritually contemplative' },
+                        ].map(t => (
+                            <button
+                                key={t.value}
+                                onClick={() => setTone(t.value)}
+                                className={`p-3 text-left rounded-xl border-2 transition text-xs font-semibold ${
+                                    tone === t.value
+                                        ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300'
+                                        : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-violet-300'
+                                }`}
+                            >
+                                {t.label}
+                            </button>
+                        ))}
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Or describe the tone in your own words</label>
+                        <textarea
+                            rows={3}
+                            value={tone}
+                            onChange={e => setTone(e.target.value)}
+                            placeholder='e.g. "Casual and friendly, like a text from a friend — include a relevant Bible verse in each message"'
+                            className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none leading-relaxed"
+                        />
+                    </div>
+                </div>
+            )}
+
+            {/* Step 4 — Staff follow-up */}
+            {step === 4 && (
+                <div className="space-y-5">
+                    <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Step 4</p>
+                        <h3 className="text-base font-black text-slate-900 dark:text-white">Staff follow-up alert?</h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Automatically notify your pastor or staff team during the workflow.</p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                        <button
+                            onClick={() => setIncludeStaffAlert(true)}
+                            className={`p-4 rounded-2xl border-2 text-left transition ${includeStaffAlert ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20' : 'border-slate-200 dark:border-slate-700 hover:border-violet-300'}`}
+                        >
+                            <div className="text-xl mb-1">✅</div>
+                            <p className="font-bold text-sm text-slate-900 dark:text-white">Yes, alert staff</p>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Send a staff reminder email</p>
+                        </button>
+                        <button
+                            onClick={() => setIncludeStaffAlert(false)}
+                            className={`p-4 rounded-2xl border-2 text-left transition ${!includeStaffAlert ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20' : 'border-slate-200 dark:border-slate-700 hover:border-violet-300'}`}
+                        >
+                            <div className="text-xl mb-1">🚫</div>
+                            <p className="font-bold text-sm text-slate-900 dark:text-white">No staff alert</p>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Contacts only</p>
+                        </button>
+                    </div>
+
+                    {includeStaffAlert && (
+                        <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 space-y-4">
+                            <div className="space-y-2">
+                                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400">When should the staff alert go out?</label>
+                                {([
+                                    { value: 'with_first', label: 'With the first message', desc: 'Staff notified as soon as the workflow starts' },
+                                    { value: 'with_last', label: 'With the final message', desc: 'Staff alert fires alongside the last touchpoint' },
+                                    { value: 'day_of_event', label: 'On the day of the event', desc: 'Last-minute heads-up for your team' },
+                                ] as const).map(opt => (
+                                    <label key={opt.value} className={radioCard(staffAlertTiming === opt.value)} onClick={() => setStaffAlertTiming(opt.value)}>
+                                        <div className={`w-4 h-4 rounded-full border-2 mt-0.5 shrink-0 flex items-center justify-center ${
+                                            staffAlertTiming === opt.value ? 'border-violet-500' : 'border-slate-300 dark:border-slate-600'
+                                        }`}>
+                                            {staffAlertTiming === opt.value && <div className="w-2 h-2 rounded-full bg-violet-500" />}
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-semibold text-slate-900 dark:text-white">{opt.label}</p>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{opt.desc}</p>
+                                        </div>
+                                    </label>
+                                ))}
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400">Include registrant count in the staff message?</label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button
+                                        onClick={() => setIncludeRegistrantCount(true)}
+                                        className={`p-3 rounded-xl border-2 text-left text-xs font-semibold transition ${
+                                            includeRegistrantCount ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300' : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-violet-300'
+                                        }`}
+                                    >
+                                        Yes — show <span className="font-black">{'{registrantCount}'}</span> people registered
+                                    </button>
+                                    <button
+                                        onClick={() => setIncludeRegistrantCount(false)}
+                                        className={`p-3 rounded-xl border-2 text-left text-xs font-semibold transition ${
+                                            !includeRegistrantCount ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300' : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-violet-300'
+                                        }`}
+                                    >
+                                        No — just the alert
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Step 5 — Extra content */}
+            {step === 5 && (
+                <div className="space-y-4">
+                    <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Step 5</p>
+                        <h3 className="text-base font-black text-slate-900 dark:text-white">Anything specific to include?</h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Optional — the AI will handle everything, but you can guide it here.</p>
+                    </div>
+
+                    <textarea
+                        rows={5}
+                        value={customContent}
+                        onChange={e => setCustomContent(e.target.value)}
+                        placeholder={'e.g. "Mention parking is on the east side, include John 3:16 in the final message, and remind them to bring a friend"'}
+                        className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none leading-relaxed"
+                    />
+
+                    {/* Summary card */}
+                    <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 space-y-2 text-xs">
+                        <p className="font-black text-[10px] uppercase tracking-widest text-slate-400 mb-2">Summary</p>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                            <div><span className="text-slate-500">Event:</span> <span className="font-semibold text-slate-800 dark:text-slate-200">{eventDisplayName || '—'}</span></div>
+                            <div><span className="text-slate-500">Date:</span> <span className="font-semibold text-slate-800 dark:text-slate-200">{eventDisplayDate || '—'}</span></div>
+                            <div><span className="text-slate-500">Messages:</span> <span className="font-semibold text-slate-800 dark:text-slate-200">{touchpointCount}</span></div>
+                            <div><span className="text-slate-500">Timing:</span> <span className="font-semibold text-slate-800 dark:text-slate-200">{timingMode === 'before_event' ? `${daysBefore}d before` : 'After registration'}</span></div>
+                            <div><span className="text-slate-500">Channels:</span> <span className="font-semibold text-slate-800 dark:text-slate-200">SMS + Email mix</span></div>
+                            <div><span className="text-slate-500">Staff alert:</span> <span className="font-semibold text-slate-800 dark:text-slate-200">{includeStaffAlert ? 'Yes' : 'No'}</span></div>
+                        </div>
+                        <div className="pt-1"><span className="text-slate-500">Tone:</span> <span className="font-semibold text-slate-800 dark:text-slate-200 italic">{tone}</span></div>
+                    </div>
+                </div>
+            )}
+
+            {/* Navigation */}
+            <div className="flex items-center gap-3 pt-2">
+                {step > 1 ? (
+                    <button
+                        onClick={() => setStep(s => s - 1)}
+                        className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold rounded-xl border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                    >
+                        <ArrowLeft size={14} /> Back
+                    </button>
+                ) : (
+                    <button onClick={onClose} className="px-4 py-2.5 text-sm font-semibold rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition">Cancel</button>
+                )}
+                <div className="flex-1" />
+                {step < TOTAL_STEPS ? (
+                    <button
+                        onClick={() => setStep(s => s + 1)}
+                        disabled={!canProceed()}
+                        className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold rounded-xl transition"
+                    >
+                        Next <ChevronRight size={15} />
+                    </button>
+                ) : (
+                    <button
+                        onClick={handleGenerate}
+                        disabled={loading}
+                        className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-sm font-bold rounded-xl transition shadow-md shadow-violet-200 dark:shadow-violet-900/40"
+                    >
+                        <Sparkles size={14} /> Generate Workflow
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+};
+
+// ─── Custom prompt tab ────────────────────────────────────────────────────────
+
+const CustomPromptTab: React.FC<{
     onApply: (draft: AiWorkflowDraft) => void;
     onClose: () => void;
 }> = ({ onApply, onClose }) => {
@@ -5912,6 +6635,96 @@ const AiWorkflowBuilderPanel: React.FC<{
         if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') handleGenerate();
     };
 
+    if (draft) {
+        return (
+            <AiDraftPreview
+                draft={draft}
+                loading={loading}
+                prompt={prompt}
+                onRegenerate={async () => { setDraft(null); setLoading(true); try { const r = await generateWorkflowWithAi(prompt); setDraft(r); } catch(e:any){setError(e.message);} finally{setLoading(false);} }}
+                onApply={() => onApply(draft)}
+                onClose={onClose}
+            />
+        );
+    }
+
+    return (
+        <div className="space-y-5">
+            <div>
+                <label className="block text-xs font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">Describe Your Workflow</label>
+                <textarea
+                    rows={5}
+                    value={prompt}
+                    onChange={e => setPrompt(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="e.g. Send a text once a day for 5 days with a Bible verse about prayer. On the last day, remind them the church has them on the prayer list."
+                    className="w-full text-sm border-2 border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500 dark:focus:border-violet-400 resize-none leading-relaxed"
+                />
+                <p className="text-[10px] text-slate-400 mt-1.5">Tip: ⌘ / Ctrl + Enter to generate</p>
+            </div>
+
+            {!loading && (
+                <div>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Try an example</p>
+                    <div className="space-y-2">
+                        {EXAMPLE_PROMPTS.map((ep, i) => (
+                            <button
+                                key={i}
+                                onClick={() => setPrompt(ep)}
+                                className="w-full text-left text-xs text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-violet-50 dark:hover:bg-violet-900/20 hover:text-violet-700 dark:hover:text-violet-300 border border-slate-200 dark:border-slate-700 hover:border-violet-300 dark:hover:border-violet-700 rounded-xl px-3 py-2.5 transition leading-relaxed"
+                            >
+                                "{ep}"
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {loading && (
+                <div className="flex flex-col items-center justify-center py-12 gap-4 text-slate-400">
+                    <div className="relative">
+                        <div className="w-16 h-16 rounded-full bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
+                            <Sparkles size={28} className="text-violet-500 animate-pulse" />
+                        </div>
+                        <Loader2 size={48} className="absolute inset-0 m-auto text-violet-400 animate-spin opacity-40" />
+                    </div>
+                    <div className="text-center">
+                        <p className="font-bold text-slate-700 dark:text-slate-300">Building your workflow...</p>
+                        <p className="text-xs mt-1">AI is writing every step with real content</p>
+                    </div>
+                </div>
+            )}
+
+            {error && (
+                <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl p-4">
+                    <AlertTriangle size={16} className="shrink-0" /> {error}
+                </div>
+            )}
+
+            <div className="flex items-center gap-3 pt-1">
+                <div className="flex-1" />
+                <button onClick={onClose} className="px-4 py-2.5 text-sm font-semibold rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition">Cancel</button>
+                <button
+                    onClick={handleGenerate}
+                    disabled={loading || !prompt.trim()}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-sm font-bold rounded-xl transition shadow-md shadow-violet-200 dark:shadow-violet-900/40"
+                >
+                    {loading ? <><Loader2 size={14} className="animate-spin" /> Generating...</> : <><Sparkles size={14} /> Generate Workflow</>}
+                </button>
+            </div>
+        </div>
+    );
+};
+
+// ─── Main AI Workflow Builder modal (tabs) ────────────────────────────────────
+
+const AiWorkflowBuilderPanel: React.FC<{
+    onApply: (draft: AiWorkflowDraft, ctx?: AiBuilderContext) => void;
+    onClose: () => void;
+    pcoRegistrationEvents?: { id: string; pcoId: string; name: string; startsAt?: string | null }[];
+}> = ({ onApply, onClose, pcoRegistrationEvents = [] }) => {
+    const [activeTab, setActiveTab] = useState<'guided' | 'custom'>('guided');
+
     const chBadgeClass: Record<string, string> = {
         sms: 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300',
         mms: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
@@ -5919,202 +6732,77 @@ const AiWorkflowBuilderPanel: React.FC<{
         staff_sms: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300',
         staff_email: 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300',
     };
-
-    const chLabel: Record<string, string> = {
-        sms: 'SMS',
-        mms: 'MMS',
-        email: 'Email',
-        staff_sms: 'Staff SMS',
-        staff_email: 'Staff Email',
-    };
+    // Suppress unused-variable warning — kept here since it may be used in future shared renders
+    void chBadgeClass;
 
     return (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
             <div
-                className="relative w-full max-w-2xl bg-white dark:bg-slate-900 flex flex-col shadow-2xl overflow-hidden rounded-3xl max-h-[90vh]"
+                className="relative w-full max-w-2xl bg-white dark:bg-slate-900 flex flex-col shadow-2xl overflow-hidden rounded-3xl max-h-[92vh]"
                 onClick={e => e.stopPropagation()}
             >
                 {/* Header */}
-                <div className="shrink-0 px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between bg-gradient-to-r from-violet-600 to-purple-600">
-                    <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 bg-white/20 rounded-2xl flex items-center justify-center text-white">
-                            <Sparkles size={18} />
+                <div className="shrink-0 px-6 pt-5 pb-0 bg-gradient-to-r from-violet-600 to-purple-600">
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 bg-white/20 rounded-2xl flex items-center justify-center text-white">
+                                <Sparkles size={18} />
+                            </div>
+                            <div>
+                                <h2 className="text-white font-black text-base">AI Workflow Builder</h2>
+                                <p className="text-violet-200 text-xs">Let AI write every step — guided or freeform</p>
+                            </div>
                         </div>
-                        <div>
-                            <h2 className="text-white font-black text-base">AI Workflow Builder</h2>
-                            <p className="text-violet-200 text-xs">Describe your workflow — AI writes every step for you</p>
-                        </div>
+                        <button onClick={onClose} title="Close" className="p-1.5 rounded-xl text-white/70 hover:text-white hover:bg-white/20 transition">
+                            <X size={18} />
+                        </button>
                     </div>
-                    <button onClick={onClose} title="Close" className="p-1.5 rounded-xl text-white/70 hover:text-white hover:bg-white/20 transition">
-                        <X size={18} />
-                    </button>
+                    {/* Tabs */}
+                    <div className="flex">
+                        <button
+                            onClick={() => setActiveTab('guided')}
+                            className={`flex items-center gap-1.5 px-5 py-2.5 text-sm font-bold rounded-t-xl transition ${
+                                activeTab === 'guided'
+                                    ? 'bg-white dark:bg-slate-900 text-violet-700 dark:text-violet-300'
+                                    : 'text-white/70 hover:text-white hover:bg-white/10'
+                            }`}
+                        >
+                            <Sparkles size={13} /> Guided
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('custom')}
+                            className={`flex items-center gap-1.5 px-5 py-2.5 text-sm font-bold rounded-t-xl transition ${
+                                activeTab === 'custom'
+                                    ? 'bg-white dark:bg-slate-900 text-violet-700 dark:text-violet-300'
+                                    : 'text-white/70 hover:text-white hover:bg-white/10'
+                            }`}
+                        >
+                            <MessageCircle size={13} /> Custom Prompt
+                        </button>
+                    </div>
                 </div>
 
                 {/* Body */}
-                <div className="flex-1 overflow-y-auto p-6 space-y-5">
-
-                    {/* Prompt input */}
-                    <div>
-                        <label className="block text-xs font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">Describe Your Workflow</label>
-                        <textarea
-                            rows={4}
-                            value={prompt}
-                            onChange={e => setPrompt(e.target.value)}
-                            onKeyDown={handleKeyDown}
-                            placeholder="e.g. Send a text once a day for 5 days with a Bible verse about prayer. On the last day, remind them the church has them on the prayer list."
-                            className="w-full text-sm border-2 border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500 dark:focus:border-violet-400 resize-none leading-relaxed"
+                <div className="flex-1 overflow-y-auto p-6">
+                    {activeTab === 'guided' ? (
+                        <GuidedBuilderTab
+                            pcoRegistrationEvents={pcoRegistrationEvents}
+                            onApply={(draft, ctx) => { onApply(draft, ctx); onClose(); }}
+                            onClose={onClose}
                         />
-                        <p className="text-[10px] text-slate-400 mt-1.5">Tip: ? / Ctrl + Enter to generate</p>
-                    </div>
-
-                    {/* Example prompts */}
-                    {!draft && !loading && (
-                        <div>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Try an example</p>
-                            <div className="space-y-2">
-                                {EXAMPLE_PROMPTS.map((ep, i) => (
-                                    <button
-                                        key={i}
-                                        onClick={() => setPrompt(ep)}
-                                        className="w-full text-left text-xs text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 hover:bg-violet-50 dark:hover:bg-violet-900/20 hover:text-violet-700 dark:hover:text-violet-300 border border-slate-200 dark:border-slate-700 hover:border-violet-300 dark:hover:border-violet-700 rounded-xl px-3 py-2.5 transition leading-relaxed"
-                                    >
-                                        "{ep}"
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Loading state */}
-                    {loading && (
-                        <div className="flex flex-col items-center justify-center py-16 gap-4 text-slate-400">
-                            <div className="relative">
-                                <div className="w-16 h-16 rounded-full bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
-                                    <Sparkles size={28} className="text-violet-500 animate-pulse" />
-                                </div>
-                                <Loader2 size={48} className="absolute inset-0 m-auto text-violet-400 animate-spin opacity-40" />
-                            </div>
-                            <div className="text-center">
-                                <p className="font-bold text-slate-700 dark:text-slate-300">Building your workflow...</p>
-                                <p className="text-xs mt-1">AI is writing every step with real content</p>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Error */}
-                    {error && (
-                        <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl p-4">
-                            <AlertTriangle size={16} className="shrink-0" /> {error}
-                        </div>
-                    )}
-
-                    {/* Draft preview */}
-                    {draft && !loading && (
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Generated Workflow</p>
-                                    <h3 className="font-black text-slate-900 dark:text-white text-base">{draft.name}</h3>
-                                    {draft.description && <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{draft.description}</p>}
-                                </div>
-                                <span className="text-xs font-bold bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 px-2.5 py-1 rounded-full">{draft.steps.length} step{draft.steps.length !== 1 ? 's' : ''}</span>
-                            </div>
-
-                            {/* Step cards */}
-                            <div className="space-y-3">
-                                {draft.steps.map((step, idx) => {
-                                    const isStaff = step.channelType === 'staff_sms' || step.channelType === 'staff_email';
-                                    const isEmail = step.channelType === 'email' || step.channelType === 'staff_email';
-                                    const delayLabel = (() => {
-                                        if (idx === 0) return 'Sends immediately';
-                                        if (step.scheduleType === 'day_of_week') {
-                                            const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-                                            return `Next ${days[step.scheduleDayOfWeek ?? 1]} at ${step.scheduleTime ?? '09:00'}`;
-                                        }
-                                        if (step.scheduleType === 'day_of_month') {
-                                            return `On day ${step.scheduleDayOfMonth ?? 1} of the month`;
-                                        }
-                                        const d = step.delayDays ?? 0;
-                                        const h = step.delayHours ?? 0;
-                                        if (d === 0 && h > 0) return `After ${h} hour${h !== 1 ? 's' : ''}`;
-                                        if (h > 0) return `After ${d}d ${h}h`;
-                                        return `After ${d} day${d !== 1 ? 's' : ''}`;
-                                    })();
-                                    return (
-                                        <div key={idx} className={`border rounded-2xl p-4 ${isStaff ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <span className="w-6 h-6 rounded-full bg-violet-600 text-white text-[10px] font-black flex items-center justify-center shrink-0">{idx + 1}</span>
-                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide ${chBadgeClass[step.channelType] ?? chBadgeClass.sms}`}>
-                                                    {chLabel[step.channelType] ?? step.channelType.toUpperCase()}
-                                                </span>
-                                                {isStaff && <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400">Staff Alert</span>}
-                                                <span className="text-[10px] text-slate-400">{delayLabel}</span>
-                                            </div>
-                                            {isEmail ? (
-                                                <div className="space-y-1">
-                                                    <p className="text-xs font-bold text-slate-700 dark:text-slate-200">Subject: {step.emailSubject}</p>
-                                                    <p className="text-xs text-slate-600 dark:text-slate-400 whitespace-pre-wrap leading-relaxed line-clamp-4">{step.emailBody}</p>
-                                                </div>
-                                            ) : (
-                                                <div className={`flex ${isStaff ? 'justify-start' : 'justify-end'}`}>
-                                                    <div className={`text-xs px-3 py-2 rounded-2xl max-w-[90%] leading-relaxed whitespace-pre-wrap break-words font-medium shadow-sm ${
-                                                        isStaff
-                                                            ? 'bg-amber-200 dark:bg-amber-800 text-amber-900 dark:text-amber-100 rounded-bl-sm'
-                                                            : 'bg-violet-600 text-white rounded-br-sm'
-                                                    }`}>
-                                                        {step.message}
-                                                    </div>
-                                                </div>
-                                            )}
-                                            {step.staffNote && (
-                                                <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-2 italic">📋 {step.staffNote}</p>
-                                            )}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                {/* Footer */}
-                <div className="shrink-0 px-6 py-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex items-center gap-3">
-                    {draft && !loading ? (
-                        <>
-                            <button
-                                onClick={handleGenerate}
-                                disabled={loading || !prompt.trim()}
-                                className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-xl border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
-                            >
-                                <RotateCcw size={13} /> Regenerate
-                            </button>
-                            <div className="flex-1" />
-                            <button onClick={onClose} className="px-4 py-2.5 text-sm font-semibold rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition">Cancel</button>
-                            <button
-                                onClick={() => { onApply(draft); onClose(); }}
-                                className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold rounded-xl transition shadow-md shadow-violet-200 dark:shadow-violet-900/40"
-                            >
-                                <ChevronRight size={15} /> Apply to Editor
-                            </button>
-                        </>
                     ) : (
-                        <>
-                            <div className="flex-1" />
-                            <button onClick={onClose} className="px-4 py-2.5 text-sm font-semibold rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition">Cancel</button>
-                            <button
-                                onClick={handleGenerate}
-                                disabled={loading || !prompt.trim()}
-                                className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-sm font-bold rounded-xl transition shadow-md shadow-violet-200 dark:shadow-violet-900/40"
-                            >
-                                {loading ? <><Loader2 size={14} className="animate-spin" /> Generating...</> : <><Sparkles size={14} /> Generate Workflow</>}
-                            </button>
-                        </>
+                        <CustomPromptTab
+                            onApply={draft => { onApply(draft); onClose(); }}
+                            onClose={onClose}
+                        />
                     )}
                 </div>
             </div>
         </div>
     );
 };
+
+
 
 // --- Workflow Editor ---------------------------------------------------------
 
@@ -6251,7 +6939,7 @@ const WorkflowEditor: React.FC<{
     const [showAiBuilder, setShowAiBuilder] = useState(false);
     const [showTestDrawer, setShowTestDrawer] = useState(false);
 
-    const handleApplyAiDraft = (draft: AiWorkflowDraft) => {
+    const handleApplyAiDraft = (draft: AiWorkflowDraft, ctx?: AiBuilderContext) => {
         const newNodes: WorkflowNode[] = [];
         draft.steps.forEach((s, i) => {
             // If not the first step, insert a delay node from the draft's timing info
@@ -6281,7 +6969,25 @@ const WorkflowEditor: React.FC<{
             });
         });
         setNodes(newNodes);
-        setWf(prev => ({ ...prev, name: draft.name || prev.name, description: draft.description || prev.description }));
+
+        // Build the workflow patch — include name, description, and optionally the trigger
+        const wfPatch: Partial<SmsWorkflow> = {
+            name: draft.name || wf.name,
+            description: draft.description || wf.description,
+        };
+
+        // Auto-populate trigger fields from the guided context
+        if (ctx) {
+            if (ctx.eventType === 'registration' && ctx.eventPcoId) {
+                // If the user selected a real PCO Registration event, set the trigger
+                wfPatch.trigger = 'event_registration';
+                wfPatch.triggerEventId = ctx.eventPcoId;
+                wfPatch.triggerEventName = ctx.eventName;
+            }
+            // For calendar/manual events there is no PCO ID, leave trigger as-is (manual)
+        }
+
+        setWf(prev => ({ ...prev, ...wfPatch }));
     };
 
     const patch = (p: Partial<SmsWorkflow>) => setWf(prev => ({ ...prev, ...p }));
@@ -6430,6 +7136,7 @@ const WorkflowEditor: React.FC<{
                 <AiWorkflowBuilderPanel
                     onApply={handleApplyAiDraft}
                     onClose={() => setShowAiBuilder(false)}
+                    pcoRegistrationEvents={pcoRegistrationEvents}
                 />
             )}
 
