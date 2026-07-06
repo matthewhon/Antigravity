@@ -6285,8 +6285,9 @@ const GuidedBuilderTab: React.FC<{
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [draft, setDraft] = useState<AiWorkflowDraft | null>(null);
-    // For 'both' goal: two separate drafts
+    // For 'both' goal: two separate drafts + applied tracking
     const [draftPair, setDraftPair] = useState<{ invite: AiWorkflowDraft; remind: AiWorkflowDraft } | null>(null);
+    const [appliedPair, setAppliedPair] = useState<{ invite: boolean; remind: boolean }>({ invite: false, remind: false });
 
     // Step 1
     const [eventType, setEventType] = useState<'registration' | 'calendar' | null>(null);
@@ -6341,6 +6342,7 @@ const GuidedBuilderTab: React.FC<{
         setError('');
         setDraft(null);
         setDraftPair(null);
+        setAppliedPair({ invite: false, remind: false });
         try {
             if (goal === 'both') {
                 // Generate two workflows: one to invite, one to remind
@@ -6364,6 +6366,7 @@ const GuidedBuilderTab: React.FC<{
     const handleRegenerate = async () => {
         setDraft(null);
         setDraftPair(null);
+        setAppliedPair({ invite: false, remind: false });
         await handleGenerate();
     };
 
@@ -6390,60 +6393,136 @@ const GuidedBuilderTab: React.FC<{
     }`;
 
     if (draftPair) {
-        // 'Both' mode: show two side-by-side draft previews
+        const PairCard = ({
+            label, emoji, draft: d, goalKey, borderColor, headerBg, labelColor, subColor,
+        }: {
+            label: string; emoji: string; draft: AiWorkflowDraft;
+            goalKey: 'invite' | 'remind';
+            borderColor: string; headerBg: string; labelColor: string; subColor: string;
+        }) => {
+            const applied = appliedPair[goalKey];
+            const chBadge: Record<string, string> = {
+                sms: 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300',
+                email: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
+                staff_sms: 'bg-amber-100 text-amber-700',
+                staff_email: 'bg-orange-100 text-orange-700',
+            };
+            const chLabel: Record<string, string> = { sms: 'SMS', email: 'Email', staff_sms: 'Staff SMS', staff_email: 'Staff Email' };
+            return (
+                <div className={`border-2 ${borderColor} rounded-2xl overflow-hidden`}>
+                    <div className={`${headerBg} px-4 py-2.5 flex items-center gap-2`}>
+                        <span className="text-base">{emoji}</span>
+                        <div className="flex-1">
+                            <p className={`font-black text-sm ${labelColor}`}>{label}</p>
+                            <p className={`text-[10px] ${subColor}`}>{d.name}</p>
+                        </div>
+                        {applied && (
+                            <span className="flex items-center gap-1 text-[10px] font-black uppercase tracking-wide text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-700 px-2 py-0.5 rounded-full">
+                                ✓ Applied
+                            </span>
+                        )}
+                    </div>
+                    <div className="p-4 space-y-3">
+                        {d.description && <p className="text-xs text-slate-500 dark:text-slate-400 italic">{d.description}</p>}
+                        <div className="space-y-2">
+                            {d.steps.map((s, i) => {
+                                const isStaff = s.channelType === 'staff_sms' || s.channelType === 'staff_email';
+                                const isEmail = s.channelType === 'email' || s.channelType === 'staff_email';
+                                const delay = i === 0 ? 'Immediately' : (s.delayDays ?? 0) > 0 ? `After ${s.delayDays}d` : `After ${s.delayHours ?? 0}h`;
+                                return (
+                                    <div key={i} className={`rounded-xl border p-3 text-xs ${
+                                        isStaff ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800'
+                                            : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+                                    }`}>
+                                        <div className="flex items-center gap-2 mb-1.5">
+                                            <span className="w-5 h-5 rounded-full bg-violet-600 text-white text-[9px] font-black flex items-center justify-center shrink-0">{i + 1}</span>
+                                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase ${chBadge[s.channelType] ?? chBadge.sms}`}>{chLabel[s.channelType] ?? s.channelType}</span>
+                                            <span className="text-slate-400 text-[10px]">{delay}</span>
+                                        </div>
+                                        {isEmail
+                                            ? <p className="text-slate-600 dark:text-slate-400 line-clamp-2"><span className="font-bold">Subj:</span> {s.emailSubject}</p>
+                                            : <p className="text-slate-600 dark:text-slate-400 line-clamp-2">{s.message}</p>
+                                        }
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        <button
+                            onClick={() => {
+                                onApply(d, buildCtx(goalKey));
+                                setAppliedPair(prev => ({ ...prev, [goalKey]: true }));
+                            }}
+                            className={`w-full flex items-center justify-center gap-2 py-2.5 text-sm font-bold rounded-xl transition ${
+                                applied
+                                    ? 'bg-emerald-50 dark:bg-emerald-900/20 border-2 border-emerald-400 text-emerald-700 dark:text-emerald-300'
+                                    : 'bg-violet-600 hover:bg-violet-700 text-white shadow-md shadow-violet-200 dark:shadow-violet-900/40'
+                            }`}
+                        >
+                            {applied ? '✓ Applied to Editor' : <><ChevronRight size={14} /> Apply to Editor</>}
+                        </button>
+                    </div>
+                </div>
+            );
+        };
+
+        const bothApplied = appliedPair.invite && appliedPair.remind;
+
         return (
-            <div className="space-y-6">
+            <div className="space-y-5">
                 <div className="text-center">
                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Two Workflows Generated</p>
-                    <h3 className="text-base font-black text-slate-900 dark:text-white">Apply each one to the editor separately</h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">The Invitation workflow goes to your list. The Reminder workflow goes to registered attendees.</p>
+                    <h3 className="text-base font-black text-slate-900 dark:text-white">Apply each workflow to the editor</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Apply each one separately — the editor loads one workflow at a time.</p>
                 </div>
 
-                {/* Invite draft */}
-                <div className="border-2 border-blue-200 dark:border-blue-800 rounded-2xl overflow-hidden">
-                    <div className="bg-blue-50 dark:bg-blue-900/20 px-4 py-2.5 flex items-center gap-2">
-                        <span className="text-base">📣</span>
-                        <div>
-                            <p className="font-black text-sm text-blue-700 dark:text-blue-300">Workflow 1 — Invitation</p>
-                            <p className="text-[10px] text-blue-500 dark:text-blue-400">Send to your list → drives signups</p>
-                        </div>
-                    </div>
-                    <div className="p-4">
-                        <AiDraftPreview
-                            draft={draftPair.invite}
-                            loading={loading}
-                            onRegenerate={handleRegenerate}
-                            onApply={() => onApply(draftPair.invite, buildCtx('invite'))}
-                            onClose={onClose}
-                        />
-                    </div>
-                </div>
+                <PairCard
+                    label="Workflow 1 — Invitation" emoji="📣"
+                    draft={draftPair.invite} goalKey="invite"
+                    borderColor="border-blue-200 dark:border-blue-800"
+                    headerBg="bg-blue-50 dark:bg-blue-900/20"
+                    labelColor="text-blue-700 dark:text-blue-300"
+                    subColor="text-blue-500 dark:text-blue-400"
+                />
 
-                {/* Remind draft */}
-                <div className="border-2 border-violet-200 dark:border-violet-800 rounded-2xl overflow-hidden">
-                    <div className="bg-violet-50 dark:bg-violet-900/20 px-4 py-2.5 flex items-center gap-2">
-                        <span className="text-base">🔔</span>
-                        <div>
-                            <p className="font-black text-sm text-violet-700 dark:text-violet-300">Workflow 2 — Reminders</p>
-                            <p className="text-[10px] text-violet-500 dark:text-violet-400">Send to registered attendees → prepares them for the event</p>
-                        </div>
-                    </div>
-                    <div className="p-4">
-                        <AiDraftPreview
-                            draft={draftPair.remind}
-                            loading={loading}
-                            onRegenerate={handleRegenerate}
-                            onApply={() => onApply(draftPair.remind, buildCtx('remind'))}
-                            onClose={onClose}
-                        />
-                    </div>
-                </div>
+                <PairCard
+                    label="Workflow 2 — Reminders" emoji="🔔"
+                    draft={draftPair.remind} goalKey="remind"
+                    borderColor="border-violet-200 dark:border-violet-800"
+                    headerBg="bg-violet-50 dark:bg-violet-900/20"
+                    labelColor="text-violet-700 dark:text-violet-300"
+                    subColor="text-violet-500 dark:text-violet-400"
+                />
 
-                <div className="flex justify-end gap-3 pt-1">
-                    <button onClick={() => { setDraftPair(null); }} className="px-4 py-2.5 text-sm font-semibold rounded-xl border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition flex items-center gap-2">
-                        <RotateCcw size={13} /> Regenerate Both
+                <div className="flex items-center gap-3 pt-1">
+                    <button
+                        onClick={() => { setDraftPair(null); setAppliedPair({ invite: false, remind: false }); }}
+                        className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-xl border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                    >
+                        <RotateCcw size={13} /> Regenerate
                     </button>
-                    <button onClick={onClose} className="px-4 py-2.5 text-sm font-semibold rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition">Close</button>
+                    <div className="flex-1" />
+                    {!bothApplied && (
+                        <button
+                            onClick={() => {
+                                onApply(draftPair.invite, buildCtx('invite'));
+                                onApply(draftPair.remind, buildCtx('remind'));
+                                setAppliedPair({ invite: true, remind: true });
+                            }}
+                            className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 dark:bg-slate-700 hover:bg-slate-700 dark:hover:bg-slate-600 text-white text-sm font-bold rounded-xl transition"
+                        >
+                            Apply Both
+                        </button>
+                    )}
+                    <button
+                        onClick={onClose}
+                        className={`px-5 py-2.5 text-sm font-bold rounded-xl transition ${
+                            bothApplied
+                                ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md'
+                                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
+                        }`}
+                    >
+                        {bothApplied ? 'Done ✓' : 'Close'}
+                    </button>
                 </div>
             </div>
         );
