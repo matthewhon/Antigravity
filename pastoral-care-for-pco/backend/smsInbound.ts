@@ -1406,8 +1406,12 @@ export async function processRegistrationFlowReply(
                         });
                     }
                 } catch (e: any) {
-                    log.error(`Failed to fetch questions for signup ${progress.signupId}: ${e.message}`, 'system', {}, churchId);
-                    replyText = "Sorry, we encountered an error setting up your registration. Please try again later or register online.";
+                    log.error(`Failed to fetch questions or register for signup ${progress.signupId}: ${e.message}`, 'system', {}, churchId);
+                    if (e.message?.includes('Forbidden') || e.message?.includes('scope') || e.message?.includes('scopes')) {
+                        replyText = "Sorry, registrations are not authorized. Please reconnect Planning Center in Settings → Planning Center to grant Registrations access.";
+                    } else {
+                        replyText = "Sorry, we encountered an error setting up your registration. Please try again later or register online.";
+                    }
                     nextStatus = 'declined';
                     await db.collection('smsRegistrationProgress').doc(regProgressId).update({
                         status: nextStatus,
@@ -1489,7 +1493,11 @@ export async function processRegistrationFlowReply(
                     });
                 } catch (e: any) {
                     log.error(`Failed to create person or fetch questions in registration: ${e.message}`, 'system', {}, churchId);
-                    replyText = "Sorry, we had an issue setting up your profile in our system. Please try again later or register online.";
+                    if (e.message?.includes('Forbidden') || e.message?.includes('scope') || e.message?.includes('scopes')) {
+                        replyText = "Sorry, registrations are not authorized. Please reconnect Planning Center in Settings → Planning Center to grant Registrations access.";
+                    } else {
+                        replyText = "Sorry, we had an issue setting up your profile in our system. Please try again later or register online.";
+                    }
                     nextStatus = 'declined';
                     await db.collection('smsRegistrationProgress').doc(regProgressId).update({
                         status: nextStatus,
@@ -1555,7 +1563,11 @@ export async function processRegistrationFlowReply(
                         replyText = `Thank you! Your registration for ${progress.eventName || 'the event'} is now complete!`;
                     } catch (e: any) {
                         log.error(`Failed to register person ${progress.personId} on signup ${progress.signupId}: ${e.message}`, 'system', {}, churchId);
-                        replyText = "Sorry, we encountered a technical issue submitting your registration to Planning Center. Please contact the church office to confirm.";
+                        if (e.message?.includes('Forbidden') || e.message?.includes('scope') || e.message?.includes('scopes')) {
+                            replyText = "Sorry, registrations are not authorized. Please reconnect Planning Center in Settings → Planning Center to grant Registrations access.";
+                        } else {
+                            replyText = "Sorry, we encountered a technical issue submitting your registration to Planning Center. Please contact the church office to confirm.";
+                        }
                     }
                 } else {
                     const nextQ = questions[nextQuestionIndex];

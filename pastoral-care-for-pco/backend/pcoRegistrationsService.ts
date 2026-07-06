@@ -129,25 +129,32 @@ export async function getPcoSignupQuestions(
     if (mocks.getPcoSignupQuestions) {
         return mocks.getPcoSignupQuestions(churchId, signupId);
     }
-    const data = await requestPco(churchId, `${PCO_BASE}/registrations/v2/signups/${signupId}/questions?per_page=100`);
-    const rawQuestions = data.data || [];
-    
-    return rawQuestions.map((q: any) => {
-        const attrs = q.attributes || {};
-        const rawOptions = attrs.options || [];
-        const options = rawOptions.map((o: any) => {
-            if (typeof o === 'string') return o;
-            return o?.value || o?.name || JSON.stringify(o);
-        });
+    try {
+        const data = await requestPco(churchId, `${PCO_BASE}/registrations/v2/signups/${signupId}/questions?per_page=100`);
+        const rawQuestions = data.data || [];
         
-        return {
-            id: q.id,
-            label: attrs.label || attrs.text || attrs.title || '',
-            kind: attrs.kind || 'string',
-            required: !!attrs.required,
-            options,
-        };
-    });
+        return rawQuestions.map((q: any) => {
+            const attrs = q.attributes || {};
+            const rawOptions = attrs.options || [];
+            const options = rawOptions.map((o: any) => {
+                if (typeof o === 'string') return o;
+                return o?.value || o?.name || JSON.stringify(o);
+            });
+            
+            return {
+                id: q.id,
+                label: attrs.label || attrs.text || attrs.title || '',
+                kind: attrs.kind || 'string',
+                required: !!attrs.required,
+                options,
+            };
+        });
+    } catch (e: any) {
+        const db = getDb();
+        const log = createServerLogger(db);
+        log.warn(`Could not fetch questions for signup ${signupId}: ${e.message}. Treating as no questions.`, 'system', { signupId }, churchId);
+        return [];
+    }
 }
 
 /**
