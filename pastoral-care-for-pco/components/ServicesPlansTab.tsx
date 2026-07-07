@@ -495,9 +495,10 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
                                     {item.title}
                                   </h5>
                                   {item.description && (
-                                    <p className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold mt-0.5">
-                                      {item.description}
-                                    </p>
+                                    <div 
+                                      className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold mt-0.5"
+                                      dangerouslySetInnerHTML={{ __html: item.description }}
+                                    />
                                   )}
                                 </div>
                               </div>
@@ -542,9 +543,10 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
                                       </p>
                                     )}
                                     {item.description && (
-                                      <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium mt-2 border-l border-slate-200 dark:border-slate-700 pl-2">
-                                        {item.description}
-                                      </p>
+                                      <div 
+                                        className="text-[10px] text-slate-400 dark:text-slate-500 font-medium mt-2 border-l border-slate-200 dark:border-slate-700 pl-2"
+                                        dangerouslySetInnerHTML={{ __html: item.description }}
+                                      />
                                     )}
                                   </div>
                                 </div>

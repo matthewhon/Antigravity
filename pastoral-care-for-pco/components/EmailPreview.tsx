@@ -228,9 +228,10 @@ const PcoServicePlanCard = ({ block, primaryColor, textColor }: { block: EmailBl
                           {item.title}
                         </span>
                         {item.description && (
-                          <div style={{ fontSize: 9, color: '#94a3b8', marginTop: 2, fontWeight: 600 }}>
-                            {item.description}
-                          </div>
+                          <div 
+                            style={{ fontSize: 9, color: '#94a3b8', marginTop: 2, fontWeight: 600 }}
+                            dangerouslySetInnerHTML={{ __html: item.description }}
+                          />
                         )}
                       </td>
                     </tr>
@@ -269,9 +270,10 @@ const PcoServicePlanCard = ({ block, primaryColor, textColor }: { block: EmailBl
                                 <div style={{ fontSize: 9, color: '#6366f1', fontWeight: 600, marginTop: 2 }}>by {item.author}</div>
                               )}
                               {item.description && (
-                                <div style={{ fontSize: 10, color: '#64748b', marginTop: 6, paddingLeft: 6, borderLeft: '2px solid #cbd5e1', lineHeight: 1.4 }}>
-                                  {item.description}
-                                </div>
+                                <div 
+                                  style={{ fontSize: 10, color: '#64748b', marginTop: 6, paddingLeft: 6, borderLeft: '2px solid #cbd5e1', lineHeight: 1.4 }}
+                                  dangerouslySetInnerHTML={{ __html: item.description }}
+                                />
                               )}
                             </td>
                           </tr>

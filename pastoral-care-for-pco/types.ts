@@ -383,7 +383,8 @@ export interface ServicePlanSnapshot {
         name?: string;
         photoThumbnail?: string;
     }[];
-    items?: { type: string; title: string; author?: string; item_type?: string }[];
+    title?: string;
+    items?: { type: string; title: string; author?: string; item_type?: string; description?: string; sequence?: number }[];
     planTimes?: { id: string; startsAt: string; endsAt: string }[];
     positionsFilled?: number;
     positionsNeeded?: number;
