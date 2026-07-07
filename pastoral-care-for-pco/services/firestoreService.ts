@@ -494,7 +494,7 @@ class FirestoreService {
           for (let i = 0; i < entries.length; i += CHUNK) {
               const batch = writeBatch(db);
               entries.slice(i, i + CHUNK).forEach(([personId, count]) => {
-                  const ref = doc(db, 'people', `${churchId}_${personId}`);
+                  const ref = doc(db, 'people', personId);
                   batch.update(ref, { checkInCount: count });
               });
               await batch.commit();

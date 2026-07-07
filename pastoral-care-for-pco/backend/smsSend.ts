@@ -425,11 +425,14 @@ export async function sendIndividualInternal(params: {
             if (!personDoc.exists && churchId === 'c1' && !resolvedPersonId.startsWith('c1_')) {
                 personDoc = await db.collection('people').doc(`c1_${resolvedPersonId}`).get();
             }
-            if (personDoc.exists) {
-                const pData = personDoc.data();
+            if (personDoc.exists && personDoc.data()?.churchId === churchId) {
+                const pData = personDoc.data()!;
                 if (!resolvedPersonName) resolvedPersonName = pData.name || null;
                 resolvedPersonAvatar = pData.avatar || null;
                 resolvedPersonId = churchId === 'c1' ? personDoc.id.replace('c1_', '') : personDoc.id;
+            } else if (personDoc.exists) {
+                // Doc belongs to a different church (bare-ID collision) — don't trust it; fall back to the churchId-scoped phone lookup below.
+                resolvedPersonId = null;
             }
         } catch (e: any) {
             log.warn(`Failed to fetch person doc by ID ${resolvedPersonId}: ${e.message}`, 'system', { churchId, resolvedPersonId }, churchId);
