@@ -2945,7 +2945,7 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingL
     const handleSubmit = async () => {
         const kw = keyword.trim().toUpperCase().replace(/\s+/g, '');
         if (!kw) { setError('Keyword is required.'); return; }
-        if (!replyMessage.trim()) { setError('Auto-reply message is required.'); return; }
+        if (actionType === 'static' && !replyMessage.trim()) { setError('Auto-reply message is required.'); return; }
         if (!/^[A-Z0-9]+$/.test(kw)) { setError('Keywords can only contain letters and numbers.'); return; }
         setError('');
         const selectedList = pcoLists.find(l => l.id === addToListId);
@@ -3058,36 +3058,7 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, pcoLists, loadingL
                     )}
                 </div>
 
-                {/* Auto-tag conversations */}
-                {tags.length > 0 && (
-                    <div className="mb-4">
-                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Auto-Tag Conversations</label>
-                        <p className="text-[10px] text-slate-400 mb-2">When this keyword matches, automatically apply these tags to the conversation.</p>
-                        <div className="flex flex-wrap gap-2">
-                            {tags.map(t => {
-                                const isOn = autoTagIds.includes(t.id);
-                                const c = TAG_COLOR_MAP[t.color] || TAG_COLOR_MAP.violet;
-                                return (
-                                    <button
-                                        key={t.id}
-                                        type="button"
-                                        onClick={() => setAutoTagIds(prev =>
-                                            isOn ? prev.filter(id => id !== t.id) : [...prev, t.id]
-                                        )}
-                                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border-2 transition ${isOn
-                                                ? `${c.bg} ${c.text} ${c.border}`
-                                                : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-violet-300'
-                                            }`}
-                                    >
-                                        {isOn && <CheckCircle size={11} />}
-                                        {t.emoji && <span>{t.emoji}</span>}
-                                        {t.name}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
-                )}
+
 
                 {/* Link to Poll (Phase 3) */}
                 {polls.length > 0 && (
