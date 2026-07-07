@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { User, Church, RiskSettings, ChurchRiskSettings, DonorLifecycleSettings, GroupRiskSettings, CommunityLocation, UserRole, PortingRequest } from '../types';
 import { CreateUserModal } from './CreateUserModal';
 import { firestore } from '../services/firestoreService';
+import { useTenantData } from '../contexts/TenantDataContext';
 import { auth, db as firebaseDb, storage } from '../services/firebase';
 import { setDoc, doc, collection, query, where, getDocs, addDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -981,6 +982,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
     initialTab,
     onSync
 }) => {
+  const { campuses } = useTenantData();
   const [users, setUsers] = useState<User[]>([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'Team' | 'Organization' | 'Planning Center' | 'Community' | 'Widget Directory' | 'Risk Profiles' | 'Subscription' | 'Mail Settings' | 'SMS' | 'Grow Integration'>('Team');
@@ -1090,6 +1092,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   const [saveMessage, setSaveMessage] = useState('');
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [pendingRoles, setPendingRoles] = useState<UserRole[]>([]);
+  const [pendingCampuses, setPendingCampuses] = useState<string[]>([]);
   const [isSavingRoles, setIsSavingRoles] = useState(false);
 
   // PCO Lists state (for regular attenders selection)
@@ -1345,11 +1348,18 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   const handleStartEditRoles = (u: User) => {
     setEditingUserId(u.id);
     setPendingRoles([...u.roles]);
+    setPendingCampuses([...(u.allowedCampuses || [])]);
   };
 
   const handleToggleRole = (role: UserRole) => {
     setPendingRoles(prev =>
       prev.includes(role) ? prev.filter(r => r !== role) : [...prev, role]
+    );
+  };
+
+  const handleToggleCampus = (campusId: string) => {
+    setPendingCampuses(prev =>
+      prev.includes(campusId) ? prev.filter(c => c !== campusId) : [...prev, campusId]
     );
   };
 
@@ -1362,8 +1372,13 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
     try {
       const target = users.find(u => u.id === uid);
       if (!target) return;
-      await firestore.createUserProfile({ ...target, roles: pendingRoles });
-      setUsers(prev => prev.map(u => u.id === uid ? { ...u, roles: pendingRoles } : u));
+      const updatedUser = { 
+        ...target, 
+        roles: pendingRoles,
+        allowedCampuses: pendingCampuses 
+      };
+      await firestore.createUserProfile(updatedUser);
+      setUsers(prev => prev.map(u => u.id === uid ? updatedUser : u));
       setEditingUserId(null);
     } catch (e: any) {
       alert('Failed to save roles: ' + (e?.message || 'Unknown error'));
@@ -1887,6 +1902,40 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             );
                                         })}
                                     </div>
+
+                                    {/* Campus Permissions (Multi-Campus Only) */}
+                                    {church.multiCampusEnabled && campuses && campuses.length > 0 && (
+                                        <div className="mt-6 mb-5">
+                                            <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3">Campus Permissions — {u.name}</p>
+                                            {pendingRoles.includes('Church Admin') ? (
+                                                <p className="text-[10px] text-slate-400 dark:text-slate-500 italic">Church Admins always have access to all campuses.</p>
+                                            ) : (
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                                                    {campuses.map(campus => {
+                                                        const checked = pendingCampuses.includes(campus.pcoId);
+                                                        return (
+                                                            <label
+                                                                key={campus.pcoId}
+                                                                className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition ${
+                                                                    checked
+                                                                    ? 'border-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 dark:border-indigo-600'
+                                                                    : 'border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-700'
+                                                                }`}
+                                                            >
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={checked}
+                                                                    onChange={() => handleToggleCampus(campus.pcoId)}
+                                                                    className="accent-indigo-600 shrink-0"
+                                                                />
+                                                                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{campus.name}</span>
+                                                            </label>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
                                     <div className="flex items-center gap-4">
                                         <button
                                             onClick={() => handleSaveRoles(u.id)}
@@ -2108,6 +2157,21 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                     className={`w-12 h-6 rounded-full p-1 transition-colors ${formData.metricsSharingEnabled ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'}`}
                                 >
                                     <div className={`w-4 h-4 bg-white rounded-full transition-transform ${formData.metricsSharingEnabled ? 'translate-x-6' : ''}`}></div>
+                                </button>
+                            </div>
+
+                            {/* Multi-Campus Support Toggle */}
+                            <div className="mt-3 flex items-center justify-between p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 transition-colors">
+                                <div>
+                                    <p className="text-xs font-bold text-slate-900 dark:text-white">Multi-Campus Support</p>
+                                    <p className="text-[10px] text-slate-500 dark:text-slate-400">Enable Planning Center campus integration and data separation</p>
+                                </div>
+                                <button 
+                                    title="Toggle Multi-Campus Support"
+                                    onClick={() => handleChange('multiCampusEnabled', !formData.multiCampusEnabled)}
+                                    className={`w-12 h-6 rounded-full p-1 transition-colors ${formData.multiCampusEnabled ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-700'}`}
+                                >
+                                    <div className={`w-4 h-4 bg-white rounded-full transition-transform ${formData.multiCampusEnabled ? 'translate-x-6' : ''}`}></div>
                                 </button>
                             </div>
 

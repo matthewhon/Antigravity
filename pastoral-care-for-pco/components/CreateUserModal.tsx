@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { firestore } from '../services/firestoreService';
 import { UserRole } from '../types';
 import { Eye, EyeOff } from 'lucide-react';
+import { useTenantData } from '../contexts/TenantDataContext';
 
 interface CreateUserModalProps {
   churchId: string;
@@ -29,10 +30,12 @@ const AVAILABLE_ROLES: UserRole[] = [
 ];
 
 export const CreateUserModal: React.FC<CreateUserModalProps> = ({ churchId, onClose, onSuccess }) => {
+  const { church, campuses } = useTenantData();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [roles, setRoles] = useState<UserRole[]>(['Pastoral Care']); // Default role
+  const [allowedCampuses, setAllowedCampuses] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -61,7 +64,8 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ churchId, onCl
             name,
             email,
             password,
-            roles
+            roles,
+            allowedCampuses: roles.includes('Church Admin') ? [] : allowedCampuses
         });
         onSuccess();
     } catch (e: any) {
@@ -78,7 +82,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ churchId, onCl
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-slate-900 rounded-[2rem] w-full max-w-lg p-8 shadow-2xl border border-slate-100 dark:border-slate-800 relative transition-colors">
+      <div className="bg-white dark:bg-slate-900 rounded-[2rem] w-full max-w-lg p-8 shadow-2xl border border-slate-100 dark:border-slate-800 relative transition-colors overflow-y-auto max-h-[90vh]">
         <button 
             onClick={onClose}
             className="absolute top-6 right-6 text-slate-300 dark:text-slate-600 hover:text-slate-500 dark:hover:text-slate-400 transition-colors"
@@ -173,6 +177,42 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ churchId, onCl
                     })}
                 </div>
             </div>
+
+            {/* Campus Selection (Multi-Campus Only) */}
+            {church?.multiCampusEnabled && campuses && campuses.length > 0 && (
+                <div>
+                    <label className="block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-3">Campus Permissions</label>
+                    {roles.includes('Church Admin') ? (
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 italic">Church Admins always have access to all campuses.</p>
+                    ) : (
+                        <div className="flex flex-wrap gap-2">
+                            {campuses.map(campus => {
+                                const isSelected = allowedCampuses.includes(campus.pcoId);
+                                return (
+                                    <button
+                                        key={campus.pcoId}
+                                        type="button"
+                                        onClick={() => {
+                                            if (isSelected) {
+                                                setAllowedCampuses(allowedCampuses.filter(c => c !== campus.pcoId));
+                                            } else {
+                                                setAllowedCampuses([...allowedCampuses, campus.pcoId]);
+                                            }
+                                        }}
+                                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-all border ${
+                                            isSelected 
+                                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-200 dark:shadow-indigo-900/50' 
+                                            : 'bg-white dark:bg-slate-800 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-500 hover:text-indigo-500 dark:hover:text-indigo-400'
+                                        }`}
+                                    >
+                                        {campus.name}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            )}
 
             <button type="submit" disabled={loading} className="w-full bg-indigo-600 text-white font-black text-xs uppercase tracking-widest py-4 rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 dark:shadow-indigo-900/50 mt-4 disabled:opacity-50">
                 {loading ? 'Creating Account...' : 'Create Account'}

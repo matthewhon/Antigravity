@@ -130,6 +130,20 @@ async function handlePersonEvent(eventName: string, data: any, churchId: string)
         return;
     }
 
+    // Resolve primary campus relationship if present
+    const primaryCampusId = data.relationships?.primary_campus?.data?.id || null;
+    let primaryCampusName: string | null = null;
+    if (primaryCampusId) {
+        try {
+            const campusDoc = await db.collection('pco_campuses').doc(`${churchId}_${primaryCampusId}`).get();
+            if (campusDoc.exists) {
+                primaryCampusName = campusDoc.data()?.name || null;
+            }
+        } catch (e: any) {
+            log.warn(`Failed to resolve campus name for webhook update`, 'webhook', { churchId, primaryCampusId, error: e?.message }, churchId);
+        }
+    }
+
     const updateData: any = {
         id: personId,
         churchId,
@@ -146,6 +160,8 @@ async function handlePersonEvent(eventName: string, data: any, churchId: string)
         age: attrs.birthdate
             ? new Date().getFullYear() - new Date(attrs.birthdate).getFullYear()
             : undefined,
+        primaryCampusId,
+        primaryCampusName,
     };
 
     await db.collection('people').doc(personId).set(updateData, { merge: true });

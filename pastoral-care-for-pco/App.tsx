@@ -43,7 +43,7 @@ import {
   User, Church, PeopleDashboardData, GivingAnalytics, GroupsDashboardData, 
   ServicesDashboardData, AttendanceData, CensusStats, BudgetRecord, PcoFund, 
   DetailedDonation, PcoPerson, ServicesFilter, GivingFilter, GeoInsight,
-  PcoGroup, AttendanceRecord, ServicesTeam, RiskSettings, SystemSettings, RiskChangeRecord, StatusChangeRecord, PcoCheckInRecord
+  PcoGroup, AttendanceRecord, ServicesTeam, RiskSettings, SystemSettings, RiskChangeRecord, StatusChangeRecord, PcoCheckInRecord, PcoCampus
 } from './types';
 import { getDefaultWidgets } from './constants/widgetRegistry';
 import { calculateGivingAnalytics, DEFAULT_LIFECYCLE_SETTINGS } from './services/analyticsService';
@@ -125,6 +125,28 @@ const App: React.FC = () => {
   const [recentRiskChanges, setRecentRiskChanges] = useState<RiskChangeRecord[]>([]);
   const [recentStatusChanges, setRecentStatusChanges] = useState<StatusChangeRecord[]>([]);
   const [checkIns, setCheckIns] = useState<PcoCheckInRecord[]>([]);
+  const [campuses, setCampuses] = useState<PcoCampus[]>([]);
+  const [selectedCampusId, setSelectedCampusId] = useState<string>('all');
+
+  // Initialize selected campus from localStorage or allowed restrictions
+  useEffect(() => {
+      if (user && church) {
+          const isRestricted = user.allowedCampuses && user.allowedCampuses.length > 0 && !user.roles.includes('Church Admin');
+          if (church.multiCampusEnabled && isRestricted) {
+              setSelectedCampusId(user.allowedCampuses![0]);
+          } else {
+              const cached = localStorage.getItem(`selectedCampus_${church.id}`);
+              setSelectedCampusId(cached || 'all');
+          }
+      }
+  }, [user, church]);
+
+  const handleSelectCampus = (id: string) => {
+      setSelectedCampusId(id);
+      if (church) {
+          localStorage.setItem(`selectedCampus_${church.id}`, id);
+      }
+  };
   
   // Dashboard Aggregates
   const [servicesData, setServicesData] = useState<ServicesDashboardData | null>(null);
@@ -437,7 +459,7 @@ const App: React.FC = () => {
   }, [church?.city, church?.state, church?.communityLocations]);
 
   const loadTenantData = async (churchId: string) => {
-      const [p, g, a, d, f, b, t, rc, sc, ci] = await Promise.all([
+      const [p, g, a, d, f, b, t, rc, sc, ci, camp] = await Promise.all([
           firestore.getPeople(churchId),
           firestore.getGroups(churchId),
           firestore.getAttendance(churchId),
@@ -447,7 +469,8 @@ const App: React.FC = () => {
           firestore.getServicesTeams(churchId),
           firestore.getRecentRiskChanges(churchId),
           firestore.getRecentStatusChanges(churchId),
-          firestore.getCheckIns(churchId)
+          firestore.getCheckIns(churchId),
+          firestore.getCampuses(churchId)
       ]);
       setPeople(p);
       setGroups(g);
@@ -459,6 +482,7 @@ const App: React.FC = () => {
       setRecentRiskChanges(rc);
       setRecentStatusChanges(sc);
       setCheckIns(ci);
+      setCampuses(camp);
   };
 
   const loadServicesData = async (churchId: string, filter: ServicesFilter) => {
@@ -743,31 +767,95 @@ const App: React.FC = () => {
 
   // --- PCO Display Filters ---
   const visiblePeople = useMemo(() => {
-    if (!church?.pcoSettings?.hideInactiveMembers) return people;
-    return people.filter(p => {
-      // Check system status field (PCO API returns "inactive" lowercase)
-      const status = (p.status || '').toLowerCase();
-      if (status === 'inactive') return false;
-      // Also check the membership field — some PCO setups use a custom "Inactive"
-      // membership type instead of (or in addition to) the system status field.
-      const membership = (p.membership || '').toLowerCase();
-      if (membership === 'inactive') return false;
-      return true;
-    });
-  }, [people, church?.pcoSettings?.hideInactiveMembers]);
+    let filtered = people;
+    if (church?.pcoSettings?.hideInactiveMembers) {
+      filtered = filtered.filter(p => {
+        // Check system status field (PCO API returns "inactive" lowercase)
+        const status = (p.status || '').toLowerCase();
+        if (status === 'inactive') return false;
+        // Also check the membership field
+        const membership = (p.membership || '').toLowerCase();
+        if (membership === 'inactive') return false;
+        return true;
+      });
+    }
+    if (church?.multiCampusEnabled && selectedCampusId !== 'all') {
+      filtered = filtered.filter(p => p.primaryCampusId === selectedCampusId);
+    }
+    return filtered;
+  }, [people, church?.pcoSettings?.hideInactiveMembers, church?.multiCampusEnabled, selectedCampusId]);
 
   const visibleGroups = useMemo(() => {
-    if (!church?.pcoSettings?.hideArchivedItems) return groups;
-    return groups.filter(g => !g.archivedAt);
-  }, [groups, church?.pcoSettings?.hideArchivedItems]);
+    let filtered = groups;
+    if (church?.pcoSettings?.hideArchivedItems) {
+      filtered = filtered.filter(g => !g.archivedAt);
+    }
+    if (church?.multiCampusEnabled && selectedCampusId !== 'all') {
+      filtered = filtered.filter(g => g.campusId === selectedCampusId);
+    }
+    return filtered;
+  }, [groups, church?.pcoSettings?.hideArchivedItems, church?.multiCampusEnabled, selectedCampusId]);
+
+  const visibleAttendance = useMemo(() => {
+    if (!church?.multiCampusEnabled || selectedCampusId === 'all') return attendance;
+    return attendance.filter(a => a.campusId === selectedCampusId);
+  }, [attendance, church?.multiCampusEnabled, selectedCampusId]);
+
+  const visibleDonations = useMemo(() => {
+    if (!church?.multiCampusEnabled || selectedCampusId === 'all') return donations;
+    const peopleMap = new Map(people.map(p => [p.id, p]));
+    return donations.filter(d => {
+      if (!d.donorId || d.donorId === 'anonymous') return false;
+      const person = peopleMap.get(d.donorId);
+      return person?.primaryCampusId === selectedCampusId;
+    });
+  }, [donations, people, church?.multiCampusEnabled, selectedCampusId]);
+
+  const visibleTeams = useMemo(() => {
+    if (!church?.multiCampusEnabled || selectedCampusId === 'all') return teams;
+    return teams.filter(t => t.campusId === selectedCampusId);
+  }, [teams, church?.multiCampusEnabled, selectedCampusId]);
+
+  const visibleRecentRiskChanges = useMemo(() => {
+    if (!church?.multiCampusEnabled || selectedCampusId === 'all') return recentRiskChanges;
+    const peopleMap = new Map(people.map(p => [p.id, p]));
+    return recentRiskChanges.filter(rc => {
+      const person = peopleMap.get(rc.personId);
+      return person?.primaryCampusId === selectedCampusId;
+    });
+  }, [recentRiskChanges, people, church?.multiCampusEnabled, selectedCampusId]);
+
+  const visibleRecentStatusChanges = useMemo(() => {
+    if (!church?.multiCampusEnabled || selectedCampusId === 'all') return recentStatusChanges;
+    const peopleMap = new Map(people.map(p => [p.id, p]));
+    return recentStatusChanges.filter(sc => {
+      const person = peopleMap.get(sc.personId);
+      return person?.primaryCampusId === selectedCampusId;
+    });
+  }, [recentStatusChanges, people, church?.multiCampusEnabled, selectedCampusId]);
+
+  const visibleCheckIns = useMemo(() => {
+    if (!church?.multiCampusEnabled || selectedCampusId === 'all') return checkIns;
+    return checkIns.filter(ci => ci.campusId === selectedCampusId);
+  }, [checkIns, church?.multiCampusEnabled, selectedCampusId]);
+
+  const visibleServicesData = useMemo(() => {
+    if (!servicesData) return null;
+    if (!church?.multiCampusEnabled || selectedCampusId === 'all') return servicesData;
+    const filteredPlans = (servicesData.plans || []).filter(p => p.campusId === selectedCampusId);
+    return {
+      ...servicesData,
+      plans: filteredPlans
+    };
+  }, [servicesData, church?.multiCampusEnabled, selectedCampusId]);
 
   // --- Derived Data Calculations ---
 
-  const riskEnrichedPeople = useRiskEnrichedPeople(visiblePeople, visibleGroups, donations, servicesData, teams, church?.riskSettings);
-  const peopleDashboardData = usePeopleDashboardData(visiblePeople, riskEnrichedPeople, recentRiskChanges, recentStatusChanges);
-  const givingAnalyticsData = useGivingAnalyticsData(donations, givingFilter, givingDateRange, visiblePeople, church?.donorLifecycleSettings);
+  const riskEnrichedPeople = useRiskEnrichedPeople(visiblePeople, visibleGroups, visibleDonations, visibleServicesData, visibleTeams, church?.riskSettings);
+  const peopleDashboardData = usePeopleDashboardData(visiblePeople, riskEnrichedPeople, visibleRecentRiskChanges, visibleRecentStatusChanges);
+  const givingAnalyticsData = useGivingAnalyticsData(visibleDonations, givingFilter, givingDateRange, visiblePeople, church?.donorLifecycleSettings);
   const groupsDashboardData = useGroupsDashboardData(visibleGroups, visiblePeople);
-  const attendanceChartData = useAttendanceChartData(attendance);
+  const attendanceChartData = useAttendanceChartData(visibleAttendance);
 
 
   const handleGenerateAIInsights = async () => {
@@ -922,8 +1010,9 @@ const App: React.FC = () => {
     
         <TenantDataProvider value={{
             user, church, allChurches, systemSettings, widgets,
-            people: visiblePeople, groups: visibleGroups, attendance, donations, funds, budgets, teams,
-            recentRiskChanges, recentStatusChanges, servicesData, checkIns,
+            people: visiblePeople, groups: visibleGroups, attendance: visibleAttendance, donations: visibleDonations, funds, budgets, teams: visibleTeams,
+            recentRiskChanges: visibleRecentRiskChanges, recentStatusChanges: visibleRecentStatusChanges, servicesData: visibleServicesData, checkIns: visibleCheckIns,
+            campuses, selectedCampusId, setSelectedCampusId: handleSelectCampus,
             setPeople, setGroups, setAttendance, setDonations, setFunds, setBudgets,
             setTeams, setRecentRiskChanges, setRecentStatusChanges, setServicesData, setCheckIns
         }}>

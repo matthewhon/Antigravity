@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Church, User } from '../types';
 import UserProfileModal from './UserProfileModal';
 import { AppLogo } from './AppLogo';
+import { useTenantData } from '../contexts/TenantDataContext';
 
 
 
@@ -40,6 +41,8 @@ const Layout: React.FC<LayoutProps> = ({
   subNavItems,
   noPadding,
 }) => {
+
+  const { campuses, selectedCampusId, setSelectedCampusId } = useTenantData();
 
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [metricsOpen, setMetricsOpen] = useState(false);
@@ -625,6 +628,40 @@ const Layout: React.FC<LayoutProps> = ({
                         </select>
                     </div>
                 )}
+
+                {/* Campus Selector (Multi-Campus Enabled) */}
+                {church.multiCampusEnabled && campuses && campuses.length > 0 && (() => {
+                    const isRestricted = user.allowedCampuses && user.allowedCampuses.length > 0 && !user.roles.includes('Church Admin');
+                    const allowedCampusesList = isRestricted 
+                        ? campuses.filter(c => user.allowedCampuses?.includes(c.pcoId))
+                        : campuses;
+
+                    if (isRestricted && allowedCampusesList.length <= 1) {
+                        const singleCampus = allowedCampusesList[0];
+                        return singleCampus ? (
+                            <div className="bg-slate-800 border border-slate-700 text-slate-300 text-[10px] font-black uppercase tracking-wider py-1.5 px-3 rounded-lg flex items-center gap-1.5 max-w-[150px] truncate" title={`Restricted to ${singleCampus.name}`}>
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+                                {singleCampus.name}
+                            </div>
+                        ) : null;
+                    }
+
+                    return (
+                        <div className="flex items-center gap-1.5 mr-2">
+                            <select
+                                value={selectedCampusId}
+                                onChange={(e) => setSelectedCampusId(e.target.value)}
+                                className="bg-slate-800 text-white border border-slate-700 text-[10px] font-black uppercase tracking-widest py-1.5 rounded-lg px-3 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer max-w-[150px] truncate"
+                                title="Select Campus"
+                            >
+                                {!isRestricted && <option value="all">All Campuses</option>}
+                                {allowedCampusesList.map(c => (
+                                    <option key={c.pcoId} value={c.pcoId}>{c.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                    );
+                })()}
 
                 {/* Settings Gear Icon */}
                 {hasPermission('settings') && (

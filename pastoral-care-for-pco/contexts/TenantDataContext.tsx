@@ -2,7 +2,7 @@ import React, { createContext, useContext, ReactNode } from 'react';
 import { 
   PcoPerson, PcoGroup, AttendanceRecord, DetailedDonation, PcoFund, 
   BudgetRecord, ServicesTeam, RiskChangeRecord, StatusChangeRecord, ServicesDashboardData,
-  User, Church, SystemSettings, PcoCheckInRecord
+  User, Church, SystemSettings, PcoCheckInRecord, PcoCampus
 } from '../types';
 
 interface TenantDataState {
@@ -23,6 +23,10 @@ interface TenantDataState {
   recentStatusChanges: StatusChangeRecord[];
   servicesData: ServicesDashboardData | null;
   checkIns: PcoCheckInRecord[];
+  
+  campuses: PcoCampus[];
+  selectedCampusId: string;
+  setSelectedCampusId: (id: string) => void;
   
   // Also pass the setters if components need to update raw data locally before a sync
   setPeople: (data: PcoPerson[]) => void;

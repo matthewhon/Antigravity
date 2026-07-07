@@ -24,7 +24,7 @@ import {
     ServicesDashboardData, ServicesFilter, SystemSettings, CensusStats,
     Ministry, MetricDefinition, MetricEntry, AggregatedChurchStats, LogEntry,
     PastoralNote, PrayerRequest, CheckInRecord, EmailCampaign, PcoRegistrationEvent,
-    PcoRegistrationAttendee, PcoRegistrationCampus,
+    PcoRegistrationAttendee, PcoRegistrationCampus, PcoCampus,
     Poll, PollResponse, RiskChangeRecord, ChurchNote, StatusChangeRecord,
     WeatherRecord, PcoCheckInRecord, CareFollowUpLog,
     OutreachSession, OutreachSlot
@@ -740,6 +740,7 @@ class FirestoreService {
   async upsertRegistrations(records: PcoRegistrationEvent[]) { await this.batchUpsert('pco_registrations', records); }
   async upsertRegistrationAttendees(records: PcoRegistrationAttendee[]) { await this.batchUpsert('pco_registration_attendees', records); }
   async upsertRegistrationCampuses(records: PcoRegistrationCampus[]) { await this.batchUpsert('pco_registration_campuses', records); }
+  async upsertCampuses(records: PcoCampus[]) { await this.batchUpsert('pco_campuses', records); }
   async upsertWeather(records: WeatherRecord[]) { await this.batchUpsert('weather', records); }
 
   /**
@@ -799,6 +800,14 @@ class FirestoreService {
           const q = query(collection(db, 'pco_registration_campuses'), where('churchId', '==', churchId));
           const snapshot = await getDocs(q);
           return snapshot.docs.map(d => d.data() as PcoRegistrationCampus);
+      } catch (e) { return []; }
+  }
+
+  async getCampuses(churchId: string): Promise<PcoCampus[]> {
+      try {
+          const q = query(collection(db, 'pco_campuses'), where('churchId', '==', churchId));
+          const snapshot = await getDocs(q);
+          return snapshot.docs.map(d => d.data() as PcoCampus);
       } catch (e) { return []; }
   }
   

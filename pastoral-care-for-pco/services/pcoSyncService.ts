@@ -4,7 +4,7 @@ import { createServerLogger } from './logService';
 import { 
     PcoPerson, PcoGroup, DetailedDonation, PcoFund, AttendanceRecord, 
     ServicePlanSnapshot, ServicesTeam, CheckInRecord,
-    PcoRegistrationEvent, PcoRegistrationAttendee, PcoRegistrationCampus,
+    PcoRegistrationEvent, PcoRegistrationAttendee, PcoRegistrationCampus, PcoCampus,
     RiskChangeRecord, StatusChangeRecord, PcoCheckInRecord
 } from '../types';
 import { initializeWebhooks } from './pcoWebhookService';
@@ -175,15 +175,65 @@ const fetchAllPages = async (churchId: string, endpoint: string, mapFn: (item: a
 
 // --- Sync Functions ---
 
+export const syncCampusesData = async (churchId: string): Promise<PcoCampus[]> => {
+    logger.info('Syncing campuses...', 'sync', { churchId }, churchId);
+    const now = Date.now();
+    try {
+        const campuses = await fetchAllPages(
+            churchId,
+            'people/v2/campuses',
+            (item: any) => {
+                if (!item) return null;
+                const attrs = item.attributes || {};
+                return {
+                    id: `${churchId}_${item.id}`,
+                    pcoId: item.id,
+                    churchId,
+                    name: attrs.name || 'Unnamed Campus',
+                    active: attrs.active ?? true,
+                    createdAt: attrs.created_at || null,
+                    updatedAt: attrs.updated_at || null,
+                    lastSynced: now,
+                } as PcoCampus;
+            }
+        );
+        const filtered = campuses.filter(Boolean);
+        if (filtered.length > 0) {
+            await firestore.upsertCampuses(filtered);
+        }
+        logger.info('Campuses synced', 'sync', { churchId, count: filtered.length }, churchId);
+        return filtered;
+    } catch (e: any) {
+        logger.error('Sync Campuses failed', 'sync', { error: e?.message }, churchId);
+        return [];
+    }
+};
+
 export const syncAllData = async (churchId: string) => {
     logger.info('Full sync started', 'sync', { churchId }, churchId);
     const startTime = Date.now();
     
+    // Check if multi-campus features are enabled for this tenant
+    let multiCampusEnabled = false;
+    try {
+        const church = await firestore.getChurch(churchId);
+        multiCampusEnabled = church?.multiCampusEnabled ?? false;
+    } catch (e: any) {
+        logger.warn('Failed to load church settings for campus check', 'sync', { error: e?.message }, churchId);
+    }
+
     // Ensure Webhooks are set up using the standard service (non-fatal — a webhook auth
     // failure should not block the full sync from running)
     try {
         await initializeWebhooks(churchId);
     } catch (e: any) { logger.warn('Webhook initialization failed (non-fatal)', 'sync', { error: e?.message }, churchId); }
+
+    // Sync campuses first if enabled
+    if (multiCampusEnabled) {
+        try {
+            await syncCampusesData(churchId);
+        } catch (e: any) { logger.error('Sync Campuses failed', 'sync', { error: e?.message }, churchId); }
+    }
 
     // Execute sequentially to manage load better, wrapped in try/catch to ensure partial success
     try {
@@ -242,10 +292,28 @@ export const syncAllData = async (churchId: string) => {
 
 export const syncPeopleData = async (churchId: string) => {
     logger.info('Syncing people...', 'sync', { churchId }, churchId);
+    
+    // Fetch campuses to build a name mapping lookup
+    const campuses = await firestore.getCampuses(churchId);
+    const campusMap = new Map<string, string>();
+    campuses.forEach(c => campusMap.set(c.pcoId, c.name));
+
+    let multiCampusEnabled = false;
+    try {
+        const church = await firestore.getChurch(churchId);
+        multiCampusEnabled = church?.multiCampusEnabled ?? false;
+    } catch (e) {
+        logger.warn('Failed to load church for campus check in syncPeopleData', 'sync', { churchId }, churchId);
+    }
+
+    // Include primary_campus in standard include if multi-campus is enabled
+    const includeUrl = multiCampusEnabled
+        ? 'people/v2/people?include=addresses,emails,phone_numbers,households,field_data,primary_campus'
+        : 'people/v2/people?include=addresses,emails,phone_numbers,households,field_data';
+
     const people = await fetchAllPages(
         churchId,
-        // Include households so we can get householdId + householdName from the included array
-        'people/v2/people?include=addresses,emails,phone_numbers,households,field_data',
+        includeUrl,
         (p: any, included: any[] = []) => {
             const attrs = p.attributes;
             const rels = p.relationships;
@@ -271,6 +339,14 @@ export const syncPeopleData = async (churchId: string) => {
                 ? (included || []).find(i => i.type === 'Household' && i.id === householdId)
                 : null;
             const householdName = householdObj?.attributes?.name || null;
+
+            // ── Primary Campus ──────────────────────────────────────────────
+            const campusRef = rels?.primary_campus?.data;
+            const primaryCampusId = campusRef?.id || null;
+            const campusObj = primaryCampusId
+                ? (included || []).find(i => i.type === 'Campus' && i.id === primaryCampusId)
+                : null;
+            const primaryCampusName = campusObj?.attributes?.name || (primaryCampusId ? (campusMap.get(primaryCampusId) ?? null) : null);
 
             // ── Spiritual milestones (placeholder — requires custom field mapping) ──
             const milestones = {
@@ -347,6 +423,8 @@ export const syncPeopleData = async (churchId: string) => {
                     })),
                 // checkInCount will be back-filled by syncCheckInCounts()
                 checkInCount: 0,
+                primaryCampusId,
+                primaryCampusName,
             } as PcoPerson;
         }
     );
@@ -448,6 +526,11 @@ export const syncPeopleData = async (churchId: string) => {
 export const syncCheckInCounts = async (churchId: string) => {
     logger.info('Syncing check-in counts...', 'sync', { churchId }, churchId);
 
+    // Fetch campuses to build lookup map for check-ins
+    const campuses = await firestore.getCampuses(churchId);
+    const campusMap = new Map<string, string>();
+    campuses.forEach(c => campusMap.set(c.pcoId, c.name));
+
     // PCO returns check-in records newest-first. Fetch last 90 days.
     const since = new Date();
     since.setDate(since.getDate() - 90);
@@ -462,11 +545,17 @@ export const syncCheckInCounts = async (churchId: string) => {
             churchId,
             `check-ins/v2/check_ins?where[created_at][gte]=${sinceStr}&per_page=100`,
 
-            (ci: any) => ({
-                id: ci.id,
-                personId: ci.attributes?.person_id || ci.relationships?.person?.data?.id || null,
-                createdAt: ci.attributes?.created_at ? ci.attributes.created_at.split('T')[0] : null
-            })
+            (ci: any) => {
+                const campusId = ci.relationships?.campus?.data?.id || null;
+                const campusName = campusId ? (campusMap.get(campusId) ?? null) : null;
+                return {
+                    id: ci.id,
+                    personId: ci.attributes?.person_id || ci.relationships?.person?.data?.id || null,
+                    createdAt: ci.attributes?.created_at ? ci.attributes.created_at.split('T')[0] : null,
+                    campusId,
+                    campusName
+                };
+            }
         );
 
         const validCheckIns: PcoCheckInRecord[] = checkIns
@@ -476,7 +565,9 @@ export const syncCheckInCounts = async (churchId: string) => {
                 pcoId: ci.id,
                 churchId,
                 personId: ci.personId,
-                createdAt: ci.createdAt
+                createdAt: ci.createdAt,
+                campusId: ci.campusId,
+                campusName: ci.campusName
             }));
 
         if (validCheckIns.length > 0) {
@@ -591,12 +682,22 @@ export const syncRiskChanges = async (churchId: string) => {
 export const syncGroupsData = async (churchId: string) => {
     logger.info('Syncing groups (deep scan)...', 'sync', { churchId }, churchId);
     
-    // 1. Fetch Basic Group List with correctly mapped Types (via 'include')
-    const groups = await fetchAllPages(churchId, 'groups/v2/groups?include=group_type', (g: any, included: any[] = []) => {
+    // Fetch campuses to build a name mapping lookup
+    const campuses = await firestore.getCampuses(churchId);
+    const campusMap = new Map<string, string>();
+    campuses.forEach(c => campusMap.set(c.pcoId, c.name));
+
+    // 1. Fetch Basic Group List with correctly mapped Types & Campuses (via 'include')
+    const groups = await fetchAllPages(churchId, 'groups/v2/groups?include=group_type,campus', (g: any, included: any[] = []) => {
         // Resolve Group Type Name from 'included'
         const typeId = g.relationships?.group_type?.data?.id;
         const typeObj = included?.find(i => i.type === 'GroupType' && i.id === typeId);
         const groupTypeName = typeObj?.attributes?.name || 'Small Group';
+
+        // Resolve Campus from 'included' or map
+        const campusId = g.relationships?.campus?.data?.id || null;
+        const campusObj = campusId ? included?.find(i => i.type === 'Campus' && i.id === campusId) : null;
+        const campusName = campusObj?.attributes?.name || (campusId ? (campusMap.get(campusId) ?? null) : null);
 
         return {
             id: g.id,
@@ -610,7 +711,9 @@ export const syncGroupsData = async (churchId: string) => {
             lastUpdated: Date.now(),
             leaderIds: [], 
             memberIds: [], // Placeholder
-            attendanceHistory: [] // Placeholder
+            attendanceHistory: [], // Placeholder
+            campusId,
+            campusName
         } as PcoGroup;
     });
 
@@ -765,19 +868,51 @@ export const syncGroupsData = async (churchId: string) => {
 export const syncServicesData = async (churchId: string) => {
     logger.info('Syncing services plans & teams...', 'sync', { churchId }, churchId);
     
+    // Fetch campuses to build lookup map
+    const campuses = await firestore.getCampuses(churchId);
+    const campusMap = new Map<string, string>();
+    campuses.forEach(c => campusMap.set(c.pcoId, c.name));
+
+    // Fetch Service Types first (with campus included)
+    let serviceTypes: any[] = [];
+    const serviceTypeCampusMap = new Map<string, { campusId: string | null, campusName: string | null }>();
+    try {
+        serviceTypes = await fetchAllPages(churchId, 'services/v2/service_types?include=campus', (st: any, included: any[] = []) => {
+            const campusId = st.relationships?.campus?.data?.id || null;
+            const campusObj = campusId ? included?.find(i => i.type === 'Campus' && i.id === campusId) : null;
+            const campusName = campusObj?.attributes?.name || (campusId ? (campusMap.get(campusId) ?? null) : null);
+            return {
+                id: st.id,
+                name: st.attributes.name,
+                campusId,
+                campusName
+            };
+        });
+        serviceTypes.forEach(st => {
+            serviceTypeCampusMap.set(st.id, { campusId: st.campusId, campusName: st.campusName });
+        });
+    } catch (e: any) {
+        logger.warn('Service types fetch failed (non-fatal) — Services may be disabled', 'sync', { churchId, error: e?.message }, churchId);
+    }
+
     // 1. Sync Teams
     let teams: ServicesTeam[] = [];
     try {
         teams = await fetchAllPages(churchId, 'services/v2/teams', (t: any) => {
             console.log(`PCO Team: ${t.attributes.name} (ID: ${t.id})`);
+            const serviceTypeId = t.relationships?.service_type?.data?.id || null;
+            const campusInfo = serviceTypeId ? serviceTypeCampusMap.get(serviceTypeId) : null;
+
             return {
                 id: t.id,
                 churchId,
                 name: t.attributes.name,
-                serviceTypeId: t.relationships?.service_type?.data?.id || null,
+                serviceTypeId,
                 memberIds: [], 
                 leaderPersonIds: [],
-                leaderCount: 0
+                leaderCount: 0,
+                campusId: campusInfo?.campusId || null,
+                campusName: campusInfo?.campusName || null
             } as ServicesTeam;
         });
 
@@ -823,17 +958,10 @@ export const syncServicesData = async (churchId: string) => {
     }
 
     // 2. Sync Future Plans (Next 90 Days) AND Recent Past Plans (Last 90 Days)
-    // STRATEGY CHANGE: Iterate Service Types instead of 'all/plans' to prevent 404s
     let plans: ServicePlanSnapshot[] = [];
     
-    try {
-        // Fetch Service Types first
-        const serviceTypes = await fetchAllPages(churchId, 'services/v2/service_types', (st: any) => ({
-            id: st.id,
-            name: st.attributes.name
-        }));
-
-        console.log(`Found ${serviceTypes.length} Service Types. Fetching plans...`);
+    if (serviceTypes.length > 0) {
+        console.log(`Fetching plans for ${serviceTypes.length} Service Types...`);
 
         // Fetch plans for each type individually
         for (const st of serviceTypes) {
@@ -865,12 +993,13 @@ export const syncServicesData = async (churchId: string) => {
                         title: p.attributes.title || null,
                         positionsFilled: 0,
                         positionsNeeded: 0,
-                        planTimes: planTimes.length > 0 ? planTimes.map(t => ({ id: t.id, startsAt: t.startsAt, endsAt: t.endsAt })) : undefined
+                        planTimes: planTimes.length > 0 ? planTimes.map(t => ({ id: t.id, startsAt: t.startsAt, endsAt: t.endsAt })) : undefined,
+                        campusId: st.campusId,
+                        campusName: st.campusName
                     } as ServicePlanSnapshot;
                 });
                 
                 // Fetch Past Plans (Last 90 Days)
-                // PCO API filter=past returns most recent past plans first by default
                 const pastPlans = await fetchAllPages(churchId, `services/v2/service_types/${st.id}/plans?filter=past&per_page=10&include=plan_times`, (p: any, included: any[] = []) => {
                      // Map plan times from included
                     const planTimes = (included || [])
@@ -897,7 +1026,9 @@ export const syncServicesData = async (churchId: string) => {
                         title: p.attributes.title || null,
                         positionsFilled: 0,
                         positionsNeeded: 0,
-                        planTimes: planTimes.length > 0 ? planTimes.map(t => ({ id: t.id, startsAt: t.startsAt, endsAt: t.endsAt })) : undefined
+                        planTimes: planTimes.length > 0 ? planTimes.map(t => ({ id: t.id, startsAt: t.startsAt, endsAt: t.endsAt })) : undefined,
+                        campusId: st.campusId,
+                        campusName: st.campusName
                     } as ServicePlanSnapshot;
                 });
 
@@ -910,13 +1041,10 @@ export const syncServicesData = async (churchId: string) => {
                 await delay(50); // Small throttle
             } catch (innerE) {
                 console.warn(`Could not sync plans for Service Type ${st.id}`, innerE);
-                // Continue to next service type, don't abort all
             }
         }
-
-    } catch (e) {
-        console.error("Failed to sync service types (Services likely disabled)", e);
-        return; // Exit if we can't even get service types
+    } else {
+        logger.warn("Skipping plans fetch because no Service Types were found", 'sync', { churchId }, churchId);
     }
 
     // Sort plans by date
@@ -1362,6 +1490,11 @@ export const syncRecentGiving = async (churchId: string, startDate?: Date) => {
 export const syncCheckInsData = async (churchId: string) => {
     logger.info('Syncing Check-Ins via EventTimes + Headcounts...', 'sync', { churchId }, churchId);
 
+    // Fetch campuses to build lookup map for check-ins events
+    const campuses = await firestore.getCampuses(churchId);
+    const campusMap = new Map<string, string>();
+    campuses.forEach(c => campusMap.set(c.pcoId, c.name));
+
     // Fetch last 90 days of event times
     // PCO Check-Ins hierarchy: Event → EventPeriod → EventTime
     // EventTime has headcount data directly as attributes (regular_count, guest_count, volunteer_count, total_count)
@@ -1371,7 +1504,7 @@ export const syncCheckInsData = async (churchId: string) => {
 
     try {
         // Fetch event times with event name, headcounts, AND attendance_type names
-        // include=event            → event name (e.g. "Sunday Morning")
+        // include=event            → event name (e.g. "Sunday Morning") and its campus relationship
         // include=headcounts       → manually-entered headcount totals per AttendanceType
         // include=attendance_types → the name of each AttendanceType (Standard, Custom, etc.)
         const eventTimes = await fetchAllPages(
@@ -1382,17 +1515,17 @@ export const syncCheckInsData = async (churchId: string) => {
                 const startsAt: string = attrs.starts_at;
                 if (!startsAt) return null;
 
-                // Resolve the parent event name from included resources
+                // Resolve the parent event name and campus from included resources
                 const eventId = et.relationships?.event?.data?.id;
                 const eventObj = included?.find(i => i.type === 'Event' && i.id === eventId);
                 const eventName = eventObj?.attributes?.name || 'Service';
+                const campusId = eventObj?.relationships?.campus?.data?.id || null;
+                const campusName = campusId ? (campusMap.get(campusId) ?? null) : null;
 
                 // --- Digital check-in transaction count (people who used the PCO app/kiosk) ---
                 const digitalCheckins: number = attrs.total_count || 0;
 
                 // --- Manual headcounts (from included Headcount + AttendanceType resources) ---
-                // Each Headcount links to an AttendanceType via relationships.attendance_type.data.id
-                // The AttendanceType.name tells us whether it's Standard (Regular/Guest/Volunteer) or Custom
                 const headcountRefs: any[] = et.relationships?.headcounts?.data || [];
 
                 let regulars = 0;
@@ -1449,11 +1582,11 @@ export const syncCheckInsData = async (churchId: string) => {
                     customHeadcounts,
                     total,
                     headcount: 0, // legacy field, kept for compatibility
+                    campusId,
+                    campusName
                 };
             }
         );
-
-
 
         // Filter out nulls
         const validTimes = eventTimes.filter(Boolean);
@@ -1469,8 +1602,7 @@ export const syncCheckInsData = async (churchId: string) => {
         }
 
         // Aggregate event times into daily AttendanceRecord objects
-        // Multiple services on the same day are combined into one daily record,
-        // with individual event details stored in the 'events' array for the Events table widget.
+        // Group by Date + Campus to allow campus-specific attendance tracking
         const dailyMap = new Map<string, {
             total: number;
             guests: number;
@@ -1480,10 +1612,13 @@ export const syncCheckInsData = async (churchId: string) => {
             digitalCheckins: number;
             customHeadcounts: { name: string; total: number }[];
             events: any[];
+            campusId: string | null;
+            campusName: string | null;
         }>();
 
         for (const et of validTimes) {
-            const existing = dailyMap.get(et.date) || {
+            const key = `${et.date}_${et.campusId || 'all'}`;
+            const existing = dailyMap.get(key) || {
                 total: 0,
                 guests: 0,
                 volunteers: 0,
@@ -1492,6 +1627,8 @@ export const syncCheckInsData = async (churchId: string) => {
                 digitalCheckins: 0,
                 customHeadcounts: [] as { name: string; total: number }[],
                 events: [],
+                campusId: et.campusId || null,
+                campusName: et.campusName || null,
             };
 
             existing.total += et.total;
@@ -1519,16 +1656,19 @@ export const syncCheckInsData = async (churchId: string) => {
                 digitalCheckins: et.digitalCheckins || 0,
                 customHeadcounts: et.customHeadcounts || [],
                 total: et.total,
+                campusId: et.campusId,
+                campusName: et.campusName
             });
 
-            dailyMap.set(et.date, existing);
+            dailyMap.set(key, existing);
         }
 
         // Convert to AttendanceRecord array and save to Firestore
         const attendanceRecords: AttendanceRecord[] = [];
-        dailyMap.forEach((stats, date) => {
+        dailyMap.forEach((stats, key) => {
+            const date = key.split('_')[0];
             attendanceRecords.push({
-                id: `daily_${churchId}_${date}`,
+                id: `daily_${churchId}_${key}`,
                 churchId,
                 date,
                 count: stats.total,
@@ -1539,7 +1679,9 @@ export const syncCheckInsData = async (churchId: string) => {
                 digitalCheckins: stats.digitalCheckins,
                 customHeadcounts: stats.customHeadcounts,
                 events: stats.events,
-            } as any);
+                campusId: stats.campusId,
+                campusName: stats.campusName
+            } as AttendanceRecord);
         });
 
         if (attendanceRecords.length > 0) {

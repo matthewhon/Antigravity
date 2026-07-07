@@ -10,6 +10,8 @@ export interface User {
     lastLogin?: number;
     widgetPreferences?: Record<string, string[]>;
     theme?: 'traditional' | 'dark';
+    allowedCampuses?: string[];
+    primaryCampusId?: string | null;
 }
 
 export interface RiskSettings {
@@ -59,6 +61,7 @@ export interface Church {
     name: string;
     subdomain: string;
     pcoConnected: boolean;
+    multiCampusEnabled?: boolean;
     lastSyncTimestamp?: number | null;
     pcoClientId?: string;
     pcoClientSecret?: string;
@@ -284,6 +287,8 @@ export interface PcoPerson {
         recentServices?: { date: string, planId?: string, teamName?: string, serviceTypeName?: string }[];
     };
     field_data?: { field_definition: { name: string }, value: string }[];
+    primaryCampusId?: string | null;
+    primaryCampusName?: string | null;
 }
 
 export interface PcoGroup {
@@ -299,6 +304,8 @@ export interface PcoGroup {
     leaderIds?: string[];
     memberIds?: string[];
     attendanceHistory?: { eventId: string, date: string, count: number, members: number, visitors: number, attendeeIds: string[] }[];
+    campusId?: string | null;
+    campusName?: string | null;
 }
 
 export interface ProgressStats {
@@ -391,6 +398,8 @@ export interface ServicePlanSnapshot {
     isUnderstaffed?: boolean;
     neededPositions?: { teamName: string; quantity: number }[];
     planNotes?: { category: string; content: string }[];
+    campusId?: string | null;
+    campusName?: string | null;
 }
 
 export interface ServicesTeam {
@@ -404,6 +413,8 @@ export interface ServicesTeam {
     leaderCount: number;
     scheduledMemberIds?: string[];
     positionCount?: number;
+    campusId?: string | null;
+    campusName?: string | null;
 }
 
 export interface SongUsage {
@@ -514,6 +525,8 @@ export interface AttendanceRecord {
     digitalCheckins?: number; // People who actually checked in via PCO Check-Ins app
     customHeadcounts?: { name: string; total: number }[]; // Custom attendance types
     events?: AttendanceEventSummary[];
+    campusId?: string | null;
+    campusName?: string | null;
 }
 
 /** Weather conditions for a specific date and church location */
@@ -884,6 +897,18 @@ export interface PcoRegistrationAttendee {
     balanceDueCents?: number | null;
     // Metadata
     createdAt?: string | null;
+    lastSynced: number;
+}
+
+/** Core Campus from PCO People /v2/campuses */
+export interface PcoCampus {
+    id: string;                    // `${churchId}_${pcoCampusId}`
+    pcoId: string;
+    churchId: string;
+    name: string;
+    active: boolean;
+    createdAt?: string | null;
+    updatedAt?: string | null;
     lastSynced: number;
 }
 
@@ -1899,6 +1924,8 @@ export interface PcoCheckInRecord {
     churchId: string;
     personId: string;
     createdAt: string; // YYYY-MM-DD
+    campusId?: string | null;
+    campusName?: string | null;
 }
 
 export interface CohortRetentionPoint {
