@@ -484,12 +484,14 @@ export const handleInboundSms = async (req: any, res: any) => {
                     // Ignore errors
                 }
             } else if (actionType === 'giving_ytd') {
-                if (personMatch?.personId) {
+                const resolvedPersonId = personMatch?.personId || convSnap.data()?.personId;
+                const resolvedPersonName = personMatch?.personName || convSnap.data()?.personName;
+                if (resolvedPersonId) {
                     try {
-                        const personSnap = await db.collection('people').doc(personMatch.personId).get();
+                        const personSnap = await db.collection('people').doc(resolvedPersonId).get();
                         const ytd = personSnap.data()?.givingStats?.ytd || 0;
                         const formattedYtd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(ytd);
-                        const msg = `Hi ${personMatch.personName?.split(' ')[0] || 'there'}, your year-to-date giving is ${formattedYtd}. Thank you for your generosity!`;
+                        const msg = `Hi ${resolvedPersonName?.split(' ')[0] || 'there'}, your year-to-date giving is ${formattedYtd}. Thank you for your generosity!`;
                         baseReply = baseReply ? `${baseReply}\n\n${msg}` : msg;
                     } catch (e) {
                         const msg = '(Unable to retrieve giving information)';
@@ -536,8 +538,9 @@ export const handleInboundSms = async (req: any, res: any) => {
             }
 
             // Optionally add person to a PCO list
-            if (kw.addToListId && personMatch?.personId) {
-                log.info(`[Inbound SMS] Keyword "${kw.keyword}" matched — would add ${personMatch.personId} to list ${kw.addToListId}`, 'system', { churchId, keyword: kw.keyword }, churchId);
+            const resolvedPersonId = personMatch?.personId || convSnap.data()?.personId;
+            if (kw.addToListId && resolvedPersonId) {
+                log.info(`[Inbound SMS] Keyword "${kw.keyword}" matched — would add ${resolvedPersonId} to list ${kw.addToListId}`, 'system', { churchId, keyword: kw.keyword }, churchId);
                 // The PCO list add is handled asynchronously; full implementation in Phase 3.
             }
 
