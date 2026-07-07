@@ -851,10 +851,42 @@ export const handleInboundSms = async (req: any, res: any) => {
                 const resolvedPersonName = personMatch?.personName || convSnap.data()?.personName;
                 if (resolvedPersonId) {
                     try {
-                        const personSnap = await db.collection('people').doc(resolvedPersonId).get();
-                        const ytd = personSnap.data()?.givingStats?.ytd || 0;
-                        const formattedYtd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(ytd);
-                        const msg = `Hi ${resolvedPersonName?.split(' ')[0] || 'there'}, your year-to-date giving is ${formattedYtd}. Thank you for your generosity!`;
+                        const currentYear = new Date().getFullYear();
+                        const startOfYearStr = `${currentYear}-01-01`;
+                        
+                        const donationsSnap = await db.collection('detailed_donations')
+                            .where('donorId', '==', resolvedPersonId)
+                            .get();
+                        
+                        const fundTotals: { [fundName: string]: number } = {};
+                        let total = 0;
+                        
+                        donationsSnap.docs.forEach((doc: any) => {
+                            const d = doc.data();
+                            if (d.churchId === churchId && d.date && d.date >= startOfYearStr) {
+                                const amount = d.amount || 0;
+                                const fund = d.fundName || 'General';
+                                fundTotals[fund] = (fundTotals[fund] || 0) + amount;
+                                total += amount;
+                            }
+                        });
+                        
+                        const formattedTotal = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(total);
+                        const firstName = resolvedPersonName?.split(' ')[0] || 'there';
+                        
+                        let msg = `Hi ${firstName}, here is your year-to-date giving breakdown for ${currentYear}:\n`;
+                        
+                        const funds = Object.keys(fundTotals).sort();
+                        if (funds.length > 0) {
+                            funds.forEach(fund => {
+                                const formattedFundAmount = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(fundTotals[fund]);
+                                msg += `- ${fund}: ${formattedFundAmount}\n`;
+                            });
+                            msg += `Total YTD: ${formattedTotal}. Thank you for your generosity!`;
+                        } else {
+                            msg = `Hi ${firstName}, your year-to-date giving is $0.00. Thank you!`;
+                        }
+                        
                         baseReply = baseReply ? `${baseReply}\n\n${msg}` : msg;
                     } catch (e) {
                         const msg = '(Unable to retrieve giving information)';
