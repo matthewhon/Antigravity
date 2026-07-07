@@ -9045,11 +9045,9 @@ const MessagingModule: React.FC<MessagingModuleProps> = ({ churchId, church, cur
     }
 
 
-    const filteredCampaigns = (
-        activeNumberId
-            ? campaigns.filter(c => !c.twilioNumberId || c.twilioNumberId === activeNumberId)
-            : campaigns
-    ).filter(c => c.sentBy === currentUser.id);
+    const filteredCampaigns = activeNumberId
+        ? campaigns.filter(c => !c.twilioNumberId || c.twilioNumberId === activeNumberId)
+        : campaigns;
 
     const hasPillNav = !controlledTab;
     const hasNumberSelector = !hideNumberSelector && smsEnabled && visibleNumbers.length > 0;
