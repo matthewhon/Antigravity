@@ -3117,7 +3117,7 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, churchId, pcoLists
             churchId: initial?.churchId || '',   // parent will fill in
             keyword: kw,
             actionType: actionType,
-            pcoSignupId: actionType === 'event_registration' ? pcoSignupId : undefined,
+            pcoSignupId: actionType === 'event_registration' ? pcoSignupId : null,
             replyMessage: replyMessage.trim(),
             addToListId: addToListId || null,
             addToListName: selectedList?.name || null,
