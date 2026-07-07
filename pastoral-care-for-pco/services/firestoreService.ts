@@ -1539,31 +1539,57 @@ class FirestoreService {
       const now = Date.now();
       const slotsRef = collection(db, 'outreach_slots');
 
-      const newSlots = await runTransaction(db, async (txn) => {
-        const q = query(slotsRef, where('sessionId', '==', session.id));
-        const snap = await getDocs(q);
-        const existing = snap.docs.map(d => d.data() as OutreachSlot);
+      // 1. Fetch all existing slots for this session outside the transaction.
+      // Client-side transactions do not support query-based reads.
+      const q = query(slotsRef, where('sessionId', '==', session.id));
+      const snap = await getDocs(q);
+      const existing = snap.docs.map(d => d.data() as OutreachSlot);
 
-        // Build blocked set: pending/contacted/no-answer-on-cooldown block the person.
-        // 'released' does NOT block — those people go back into the queue.
-        const blocked = new Set<string>();
-        for (const slot of existing) {
-          if (slot.status === 'pending' || slot.status === 'contacted') {
+      // Build the initial blocked set and a map tracking the count of existing slots per person
+      const blocked = new Set<string>();
+      const countMap = new Map<string, number>();
+
+      for (const slot of existing) {
+        countMap.set(slot.assignedPersonId, (countMap.get(slot.assignedPersonId) || 0) + 1);
+
+        if (slot.status === 'pending' || slot.status === 'contacted') {
+          blocked.add(slot.assignedPersonId);
+        } else if (slot.status === 'no-answer') {
+          if (slot.noAnswerUntil && slot.noAnswerUntil > now) {
             blocked.add(slot.assignedPersonId);
-          } else if (slot.status === 'no-answer') {
-            if (slot.noAnswerUntil && slot.noAnswerUntil > now) {
-              blocked.add(slot.assignedPersonId);
-            }
           }
-          // 'released' → not added to blocked → back in queue
         }
+      }
 
+      // 2. Perform atomic locks and writes inside the transaction
+      const newSlots = await runTransaction(db, async (txn) => {
         const created: OutreachSlot[] = [];
+        const localBlocked = new Set<string>(blocked);
+
         for (const person of eligiblePeople) {
           if (created.length >= batchSize) break;
-          if (blocked.has(person.id)) continue;
+          if (localBlocked.has(person.id)) continue;
 
-          const slotId = `slot_${session.id}_${person.id}_${now}_${created.length}`;
+          // Deterministic slot ID per person's attempt in this session
+          const attemptIndex = countMap.get(person.id) || 0;
+          const slotId = `slot_${session.id}_${person.id}_${attemptIndex}`;
+          const slotRef = doc(db, 'outreach_slots', slotId);
+
+          // Atomic check to see if someone else just claimed this attempt
+          const slotSnap = await txn.get(slotRef);
+          if (slotSnap.exists()) {
+            const slotData = slotSnap.data() as OutreachSlot;
+            if (slotData.status === 'pending' || slotData.status === 'contacted') {
+              localBlocked.add(person.id);
+              continue;
+            } else if (slotData.status === 'no-answer') {
+              if (slotData.noAnswerUntil && slotData.noAnswerUntil > now) {
+                localBlocked.add(person.id);
+                continue;
+              }
+            }
+          }
+
           const newSlot: OutreachSlot = {
             id: slotId,
             sessionId: session.id,
@@ -1580,9 +1606,9 @@ class FirestoreService {
             completedAt: null,
             noAnswerUntil: null,
           };
-          txn.set(doc(db, 'outreach_slots', slotId), newSlot);
-          // Add to blocked immediately so subsequent iterations don't double-claim
-          blocked.add(person.id);
+
+          txn.set(slotRef, newSlot);
+          localBlocked.add(person.id);
           created.push(newSlot);
         }
 
