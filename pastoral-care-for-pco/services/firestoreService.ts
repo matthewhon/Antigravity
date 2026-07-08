@@ -1561,24 +1561,40 @@ class FirestoreService {
         }
       }
 
+      // Filter eligiblePeople to get candidates that aren't blocked according to our initial read.
+      // We will perform txn.get on the top candidate references first.
+      const candidateList = eligiblePeople.filter(p => !blocked.has(p.id));
+      const candidateCount = Math.min(candidateList.length, batchSize * 2);
+      const candidates = candidateList.slice(0, candidateCount);
+
       // 2. Perform atomic locks and writes inside the transaction
       const newSlots = await runTransaction(db, async (txn) => {
+        const docRefs = candidates.map(person => {
+          const attemptIndex = countMap.get(person.id) || 0;
+          return {
+            person,
+            attemptIndex,
+            ref: doc(db, 'outreach_slots', `slot_${session.id}_${person.id}_${attemptIndex}`)
+          };
+        });
+
+        // CRITICAL: Perform all transaction reads concurrently before any writes.
+        const snaps = await Promise.all(docRefs.map(item => txn.get(item.ref)));
+
         const created: OutreachSlot[] = [];
         const localBlocked = new Set<string>(blocked);
 
-        for (const person of eligiblePeople) {
+        for (let i = 0; i < docRefs.length; i++) {
           if (created.length >= batchSize) break;
+
+          const { person, ref, attemptIndex } = docRefs[i];
+          const snap = snaps[i];
+
           if (localBlocked.has(person.id)) continue;
 
-          // Deterministic slot ID per person's attempt in this session
-          const attemptIndex = countMap.get(person.id) || 0;
-          const slotId = `slot_${session.id}_${person.id}_${attemptIndex}`;
-          const slotRef = doc(db, 'outreach_slots', slotId);
-
-          // Atomic check to see if someone else just claimed this attempt
-          const slotSnap = await txn.get(slotRef);
-          if (slotSnap.exists()) {
-            const slotData = slotSnap.data() as OutreachSlot;
+          // Check if someone else just claimed this attempt concurrently
+          if (snap.exists()) {
+            const slotData = snap.data() as OutreachSlot;
             if (slotData.status === 'pending' || slotData.status === 'contacted') {
               localBlocked.add(person.id);
               continue;
@@ -1590,6 +1606,7 @@ class FirestoreService {
             }
           }
 
+          const slotId = `slot_${session.id}_${person.id}_${attemptIndex}`;
           const newSlot: OutreachSlot = {
             id: slotId,
             sessionId: session.id,
@@ -1607,7 +1624,7 @@ class FirestoreService {
             noAnswerUntil: null,
           };
 
-          txn.set(slotRef, newSlot);
+          txn.set(ref, newSlot);
           localBlocked.add(person.id);
           created.push(newSlot);
         }
