@@ -210,6 +210,70 @@ export async function workflowEnrollList(req: any, res: any): Promise<void> {
         for (let i = 0; i < persons.length; i += batchSize) {
             const chunk = persons.slice(i, i + batchSize);
             await Promise.all(chunk.map(async (person) => {
+                if (!person.e164) return;
+
+                let existingDoc: any = null;
+
+                // 1. Try to find by personId first (if available)
+                if (person.personId) {
+                    const byPersonId = await db.collection('smsWorkflowEnrollments')
+                        .where('workflowId', '==', workflowId)
+                        .where('personId', '==', person.personId)
+                        .limit(1)
+                        .get();
+                    if (!byPersonId.empty) {
+                        existingDoc = byPersonId.docs[0];
+                    }
+                }
+
+                // 2. Try to find by phoneNumber
+                if (!existingDoc && person.e164) {
+                    const byPhone = await db.collection('smsWorkflowEnrollments')
+                        .where('workflowId', '==', workflowId)
+                        .where('phoneNumber', '==', person.e164)
+                        .limit(1)
+                        .get();
+                    if (!byPhone.empty) {
+                        existingDoc = byPhone.docs[0];
+                    }
+                }
+
+                if (existingDoc) {
+                    const data = existingDoc.data();
+                    // Skip if active, OR if completed and re-entry is not allowed
+                    if (!data.completed || !wf.allowReentry) {
+                        const updates: any = {};
+                        if (person.personId && data.personId !== person.personId) {
+                            updates.personId = person.personId;
+                        }
+                        if (person.name && data.personName !== person.name) {
+                            updates.personName = person.name;
+                        }
+                        if (person.email && data.personEmail !== person.email) {
+                            updates.personEmail = person.email;
+                        }
+                        if (person.city && data.personCity !== person.city) {
+                            updates.personCity = person.city;
+                        }
+                        if (person.state && data.personState !== person.state) {
+                            updates.personState = person.state;
+                        }
+                        if (person.birthdate && data.personBirthdate !== person.birthdate) {
+                            updates.personBirthdate = person.birthdate;
+                        }
+                        if (person.anniversary && data.personAnniversary !== person.anniversary) {
+                            updates.personAnniversary = person.anniversary;
+                        }
+
+                        if (Object.keys(updates).length > 0) {
+                            await existingDoc.ref.update(updates);
+                        }
+
+                        skipped++;
+                        return;
+                    }
+                }
+
                 // Enrollment ID: prefer personId so we avoid double-enrolling the same person
                 // who might have two phone numbers; fall back to phone-based ID.
                 const baseId = person.personId
@@ -218,14 +282,6 @@ export async function workflowEnrollList(req: any, res: any): Promise<void> {
                 const enrollId = wf.allowReentry
                     ? `${baseId}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
                     : baseId;
-
-                if (!wf.allowReentry) {
-                    const existing = await db.collection('smsWorkflowEnrollments').doc(enrollId).get();
-                    if (existing.exists) {
-                        skipped++;
-                        return;
-                    }
-                }
 
                 // Fire Step 1 immediately (nextSendAt = now)
                 const enrollment = {
@@ -428,26 +484,71 @@ export async function reSyncWorkflow(
         await Promise.all(chunk.map(async (person) => {
             if (!person.e164) { noPhone++; return; }
 
+            let existingDoc: any = null;
+
+            // 1. Try to find by personId first (if available)
+            if (person.personId) {
+                const byPersonId = await db.collection('smsWorkflowEnrollments')
+                    .where('workflowId', '==', workflowId)
+                    .where('personId', '==', person.personId)
+                    .limit(1)
+                    .get();
+                if (!byPersonId.empty) {
+                    existingDoc = byPersonId.docs[0];
+                }
+            }
+
+            // 2. Try to find by phoneNumber
+            if (!existingDoc && person.e164) {
+                const byPhone = await db.collection('smsWorkflowEnrollments')
+                    .where('workflowId', '==', workflowId)
+                    .where('phoneNumber', '==', person.e164)
+                    .limit(1)
+                    .get();
+                if (!byPhone.empty) {
+                    existingDoc = byPhone.docs[0];
+                }
+            }
+
+            if (existingDoc) {
+                // Update existing enrollment with PCO details if needed, keeping step
+                const data = existingDoc.data();
+                const updates: any = {};
+                if (person.personId && data.personId !== person.personId) {
+                    updates.personId = person.personId;
+                }
+                if (person.name && data.personName !== person.name) {
+                    updates.personName = person.name;
+                }
+                if (person.email && data.personEmail !== person.email) {
+                    updates.personEmail = person.email;
+                }
+                if (person.city && data.personCity !== person.city) {
+                    updates.personCity = person.city;
+                }
+                if (person.state && data.personState !== person.state) {
+                    updates.personState = person.state;
+                }
+                if (person.birthdate && data.personBirthdate !== person.birthdate) {
+                    updates.personBirthdate = person.birthdate;
+                }
+                if (person.anniversary && data.personAnniversary !== person.anniversary) {
+                    updates.personAnniversary = person.anniversary;
+                }
+
+                if (Object.keys(updates).length > 0) {
+                    await existingDoc.ref.update(updates);
+                }
+
+                skipped++;
+                return;
+            }
+
             // Always use a stable ID for re-sync — ensures we never double-enroll
             // someone who is already active OR has already completed the workflow.
             const stableId = person.personId
                 ? `${workflowId}_${person.personId}`
                 : `${workflowId}_${person.e164.replace(/\+/g, '')}`;
-
-            // Robust check: see if they have ANY enrollment for this workflow (active or completed)
-            // This catches previous manual enrollments that may have used a randomized ID.
-            const query = person.personId
-                ? db.collection('smsWorkflowEnrollments')
-                    .where('workflowId', '==', workflowId)
-                    .where('personId', '==', person.personId)
-                    .limit(1)
-                : db.collection('smsWorkflowEnrollments')
-                    .where('workflowId', '==', workflowId)
-                    .where('phoneNumber', '==', person.e164)
-                    .limit(1);
-
-            const existing = await query.get();
-            if (!existing.empty) { skipped++; return; }
 
             // New person — enroll at step 0. Always use stableId for list re-syncs.
             const enrollId = stableId;
