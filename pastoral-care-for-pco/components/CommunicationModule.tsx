@@ -521,9 +521,11 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
   const toggleSection = (id: string) => setOpenSection(prev => prev === id ? null : id);
 
   const isToComplete = !!(localCampaign.toListId || localCampaign.toGroupId);
-  const toRecipientLabel = localCampaign.toGroupName
+  const toRecipientLabel = localCampaign.toGroupId && localCampaign.toGroupName
     ? `Group: ${localCampaign.toGroupName}`
-    : localCampaign.toListName ? `List: ${localCampaign.toListName}` : localCampaign.toListId || '';
+    : localCampaign.toListId && localCampaign.toListName
+      ? `List: ${localCampaign.toListName}`
+      : localCampaign.toListId || localCampaign.toGroupId || '';
   const isFromComplete = !!(localCampaign.fromName && localCampaign.fromEmail);
   const isSubjectComplete = !!(localCampaign.subject?.trim());
   const isSendTimeComplete = !!(localCampaign.sendAt !== undefined);
@@ -681,8 +683,8 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
                           update({
                             toListId: selected?.id,
                             toListName: selected?.name,
-                            toGroupId: undefined,
-                            toGroupName: undefined,
+                            toGroupId: null,
+                            toGroupName: null,
                           });
                         }}
                       >
@@ -715,8 +717,8 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
                           update({
                             toGroupId: selected?.id,
                             toGroupName: selected?.name,
-                            toListId: undefined,
-                            toListName: undefined,
+                            toListId: null,
+                            toListName: null,
                           });
                         }}
                       >

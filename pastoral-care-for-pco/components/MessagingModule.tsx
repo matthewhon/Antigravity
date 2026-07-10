@@ -672,7 +672,11 @@ const CampaignComposer: React.FC<ComposerProps> = ({
         }
     }, [toTab, churchId, pcoGroups.length, church, currentUser]);
 
-    const recipientLabel = local.toGroupName ? `Group: ${local.toGroupName}` : local.toListName || '';
+    const recipientLabel = (local.toGroupId && local.toGroupName)
+        ? `Group: ${local.toGroupName}`
+        : (local.toListId && local.toListName)
+            ? `List: ${local.toListName}`
+            : '';
 
     return (
         <div className="flex flex-col h-full">
@@ -788,7 +792,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                         value={local.toListId || ''}
                                         onChange={e => {
                                             const sel = pcoLists.find(l => l.id === e.target.value);
-                                            update({ toListId: sel?.id ?? null, toListName: sel?.name, toGroupId: null, toGroupName: undefined });
+                                            update({ toListId: sel?.id ?? null, toListName: sel?.name ?? null, toGroupId: null, toGroupName: null });
                                         }}
                                     >
                                         <option value="">— Select a PCO List —</option>
@@ -809,7 +813,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                         value={local.toGroupId || ''}
                                         onChange={e => {
                                             const sel = pcoGroups.find(g => g.id === e.target.value);
-                                            update({ toGroupId: sel?.id ?? null, toGroupName: sel?.name, toListId: null, toListName: undefined });
+                                            update({ toGroupId: sel?.id ?? null, toGroupName: sel?.name ?? null, toListId: null, toListName: null });
                                         }}
                                     >
                                         <option value="">— Select a PCO Group —</option>
@@ -1264,8 +1268,8 @@ const CampaignList: React.FC<{
                                             <span className={`text-xs font-bold px-2 py-0.5 rounded-full shrink-0 ${si.color}`}>{si.label}</span>
                                         </div>
                                         <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 space-y-0.5">
-                                            {c.toListName && <div>List: {c.toListName}</div>}
-                                            {c.toGroupName && <div>Group: {c.toGroupName}</div>}
+                                            {(c.toListId && c.toListName) && <div>List: {c.toListName}</div>}
+                                            {(c.toGroupId && c.toGroupName) && <div>Group: {c.toGroupName}</div>}
                                             {c.status === 'sent' && c.sentAt && (
                                                 <div className="text-emerald-600 dark:text-emerald-400">
                                                     Sent {new Date(c.sentAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} ... {c.deliveredCount ?? 0} delivered
