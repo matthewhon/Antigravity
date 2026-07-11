@@ -476,6 +476,12 @@ function calcNextSendAt(step: any, fromMs: number): number {
         }
     }
 
+    if (scheduleType === 'relative' && step.scheduleTime) {
+        const candidate = new Date(fromMs + (step.delayDays || 0) * 86_400_000 + (step.delayHours || 0) * 3_600_000);
+        candidate.setHours(schedHours, schedMinutes, 0, 0);
+        return candidate.getTime() > fromMs ? candidate.getTime() : fromMs;
+    }
+
     // Default: relative offset
     return fromMs + (step.delayDays || 0) * 86_400_000 + (step.delayHours || 0) * 3_600_000;
 }

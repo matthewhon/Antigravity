@@ -723,6 +723,7 @@ export const registerSmsCampaign = async (req: any, res: any) => {
         churchId, name, usecase, description,
         sample1, sample2, sample3, sample4, sample5,
         messageFlow, optOutMessage, optInMessage, helpMessage, consentFormUrl,
+        firstMessageConfirmation,
     } = req.body || {};
 
     if (!churchId)     return res.status(400).json({ error: 'Missing churchId' });
@@ -749,6 +750,11 @@ export const registerSmsCampaign = async (req: any, res: any) => {
             });
         }
 
+        const finalFirstMsg = (firstMessageConfirmation !== undefined ? firstMessageConfirmation : smsSettings.firstMessageConfirmation || '').trim();
+        if (!finalFirstMsg) {
+            return res.status(400).json({ error: 'First Message Confirmation is required for submitting the campaign.' });
+        }
+
         const churchName = churchSnap.data()?.name || 'Church';
 
         const payload: CampaignRegistrationPayload = {
@@ -766,6 +772,7 @@ export const registerSmsCampaign = async (req: any, res: any) => {
             optInMessage:  optInMessage || undefined,
             helpMessage:   helpMessage || `For assistance contact ${churchName}. Reply STOP to unsubscribe.`,
             consentFormUrl: consentFormUrl || undefined,
+            firstMessageConfirmation: finalFirstMsg,
         };
 
         const { campaignId, status } = await registerTenantCampaign(churchId, payload);

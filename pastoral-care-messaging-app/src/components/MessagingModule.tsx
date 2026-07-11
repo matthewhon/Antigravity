@@ -4749,9 +4749,10 @@ function stepTimingLabel(node: WorkflowDelayNode): string {
         const time = node.scheduleTime ? ` at ${fmt12(node.scheduleTime)}` : '';
         return `every ${days}${time}`;
     }
+    const time = node.scheduleTime ? ` at ${fmt12(node.scheduleTime)}` : '';
     return node.delayDays === 0
-        ? 'immediately'
-        : `after ${node.delayDays} day${node.delayDays !== 1 ? 's' : ''}`;
+        ? `immediately${time}`
+        : `after ${node.delayDays} day${node.delayDays !== 1 ? 's' : ''}${time}`;
 }
 
 // --- Delay Node Card ----------------------------------------------------------
@@ -4812,18 +4813,53 @@ const DelayNodeCard: React.FC<{
 
             {/* Relative: day counter */}
             {schedType === 'relative' && (
-                <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Wait</span>
-                    <input
-                        type="number" min={0} max={365}
-                        value={node.delayDays}
-                        onChange={e => onChange({ delayDays: Math.max(0, parseInt(e.target.value) || 0) })}
-                        title="Delay in days"
-                        className="w-16 text-center text-sm font-black border border-amber-200 dark:border-amber-700 rounded-xl px-2 py-1.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
-                    />
-                    <span className="text-xs text-slate-500 dark:text-slate-400">
-                        {node.delayDays === 0 ? 'days (immediate)' : `day${node.delayDays !== 1 ? 's' : ''}`}
-                    </span>
+                <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Wait</span>
+                        <input
+                            type="number" min={0} max={365}
+                            value={node.delayDays}
+                            onChange={e => onChange({ delayDays: Math.max(0, parseInt(e.target.value) || 0) })}
+                            title="Delay in days"
+                            className="w-16 text-center text-sm font-black border border-amber-200 dark:border-amber-700 rounded-xl px-2 py-1.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+                        />
+                        <span className="text-xs text-slate-500 dark:text-slate-400">
+                            {node.delayDays === 0 ? 'days (immediate)' : `day${node.delayDays !== 1 ? 's' : ''}`}
+                        </span>
+                    </div>
+
+                    <div className="flex items-center gap-3 pt-1">
+                        <label className="flex items-center gap-2 cursor-pointer select-none">
+                            <input
+                                type="checkbox"
+                                checked={node.scheduleTime !== undefined && node.scheduleTime !== ''}
+                                onChange={e => {
+                                    if (e.target.checked) {
+                                        onChange({ scheduleTime: '09:00' });
+                                    } else {
+                                        onChange({ scheduleTime: undefined });
+                                    }
+                                }}
+                                className="rounded text-amber-500 focus:ring-amber-400 border-amber-200 dark:border-amber-700 bg-white dark:bg-slate-700"
+                            />
+                            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                                <Clock size={12} className="text-amber-400 shrink-0" />
+                                Send at specific time of day
+                            </span>
+                        </label>
+                        {node.scheduleTime !== undefined && node.scheduleTime !== '' && (
+                            <div className="flex items-center gap-1.5">
+                                <input
+                                    type="time"
+                                    value={node.scheduleTime}
+                                    onChange={e => onChange({ scheduleTime: e.target.value })}
+                                    title="Send time (24-hour)"
+                                    className="text-xs border border-amber-200 dark:border-amber-700 rounded-xl px-2.5 py-1 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400 font-semibold"
+                                />
+                                <span className="text-[10px] text-slate-400">server time</span>
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
 

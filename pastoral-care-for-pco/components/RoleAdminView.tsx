@@ -1012,7 +1012,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   const [formData, setFormData] = useState<Partial<Church>>(church);
 
   // SMS Settings state
-  const [smsSubTab, setSmsSubTab] = useState<'setup' | 'compliance' | 'numbers'>('setup');
+  const [smsSubTab, setSmsSubTab] = useState<'setup' | 'first-message' | 'compliance' | 'numbers'>('setup');
   const [showPortInModal, setShowPortInModal] = useState(false);
   const [showRep2, setShowRep2] = useState(false);
   const [expandedSteps, setExpandedSteps] = useState<Set<number>>(new Set([1]));
@@ -3563,13 +3563,25 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
             };
 
             const handleSubmitCampaign = async () => {
+                const firstMsg = (smsForm.firstMessageConfirmation || '').trim();
+                if (!firstMsg) {
+                    setComplianceMessage({
+                        type: 'error',
+                        text: 'First Message Confirmation is required for submitting the campaign. Please fill it out under the First Message tab or in the campaign form.'
+                    });
+                    return;
+                }
                 setIsSubmittingCampaign(true);
                 setComplianceMessage(null);
                 try {
                     const res = await fetch('/api/messaging/register-campaign', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ churchId, ...campaignForm }),
+                        body: JSON.stringify({ 
+                            churchId, 
+                            ...campaignForm, 
+                            firstMessageConfirmation: firstMsg 
+                        }),
                     });
                     const data = await res.json();
                     if (!data.success) throw new Error(data.error || 'Campaign registration failed');
@@ -3651,7 +3663,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
 
                         {/* Sub-tab switcher */}
                         <div className="flex bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl gap-1 w-fit flex-wrap">
-                            {(['setup', 'compliance', 'numbers'] as const).map(st => (
+                            {(['setup', 'first-message', 'compliance', 'numbers'] as const).map(st => (
                                 <button
                                     key={st}
                                     onClick={() => setSmsSubTab(st as any)}
@@ -3661,7 +3673,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             : 'text-slate-500 dark:text-slate-400 hover:bg-white/50 dark:hover:bg-slate-700/50'
                                     }`}
                                 >
-                                    {st === 'setup' ? '⚡ SMS Setup' : st === 'compliance' ? '⚖️ Compliance & Sender' : '📱 Phone Numbers'}
+                                    {st === 'setup' ? '⚡ SMS Setup' : st === 'first-message' ? '💬 First Message' : st === 'compliance' ? '⚖️ Compliance & Sender' : '📱 Phone Numbers'}
                                 </button>
                             ))}
                         </div>
@@ -3771,6 +3783,54 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 </button>
                             </div>
 
+                        </div>
+                    )}
+
+                    {smsSubTab === 'first-message' && (
+                        <div className="space-y-6">
+                            <div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800">
+                                <h4 className="text-sm font-black text-slate-900 dark:text-white mb-1">First Message Confirmation</h4>
+                                <p className="text-[10px] text-slate-400 mb-6 leading-relaxed">
+                                    Configure the automated message sent to new contacts the first time you message them.
+                                </p>
+
+                                <div className="space-y-5">
+                                    <div>
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <span className="bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full">FIRST MSG</span>
+                                            <label className={labelCn + ' mb-0'}>First Message Confirmation <span className="normal-case font-normal text-slate-400">(sent once per contact)</span></label>
+                                        </div>
+                                        <textarea
+                                            title="First Message Confirmation"
+                                            placeholder={`You'll now receive communications from ${church.name || 'our church'} (frequency varies). Msg & data rates may apply. Reply STOP to cancel or HELP for help.`}
+                                            value={smsForm.firstMessageConfirmation || ''}
+                                            onChange={e => handleSmsChange('firstMessageConfirmation', e.target.value)}
+                                            rows={4}
+                                            className={inputCn + ' resize-none'}
+                                        />
+                                        <p className="text-[9px] text-slate-400 mt-1.5">Automatically sent as a follow-up message the <strong>first time</strong> your church texts any phone number. Required by TCPA for new contacts receiving marketing messages.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Save button */}
+                            {smsMessage && (
+                                <div className={`p-4 rounded-xl text-xs font-bold flex items-center gap-2 ${
+                                    smsMessage.type === 'success' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' : 'bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400'
+                                }`}>
+                                    <span>{smsMessage.type === 'success' ? '✓' : '⚠️'}</span>
+                                    {smsMessage.text}
+                                </div>
+                            )}
+                            <div className="flex justify-end">
+                                <button
+                                    onClick={handleSmsSave}
+                                    disabled={isSmsSaving}
+                                    className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-8 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30"
+                                >
+                                    {isSmsSaving ? 'Saving…' : 'Save SMS Settings'}
+                                </button>
+                            </div>
                         </div>
                     )}
 

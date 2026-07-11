@@ -24,6 +24,9 @@ const initAdmin = () => {
 let dbInstance: FirebaseFirestore.Firestore | null = null;
 
 export const getDb = () => {
+  if ((global as any).__mockDb) {
+    return (global as any).__mockDb;
+  }
   if (!dbInstance) {
     initAdmin();
     // Use the named database "pcforpco" — the (default) database does not exist

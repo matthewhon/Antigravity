@@ -2,9 +2,9 @@ apply plugin: 'com.android.application'
 
 android {
     namespace "com.pastoralcaremessaging"
-    compileSdk rootProject.ext.compileSdkVersion
+    compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.pastoralcaremessaging"
+        applicationId = "com.pastoralcaremessaging"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 3
@@ -54,6 +54,6 @@ try {
     if (servicesJSON.text) {
         apply plugin: 'com.google.gms.google-services'
     }
-} catch(Exception e) {
+} catch(Exception ignored) {
     logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
 }

@@ -478,6 +478,7 @@ export interface CampaignRegistrationPayload {
     optInMessage?:   string;
     helpMessage:     string;
     consentFormUrl?: string;
+    firstMessageConfirmation?: string;
 }
 
 /**
@@ -525,7 +526,7 @@ export async function registerTenantCampaign(
     const campaignId = result.id || result.campaign_id || '';
     const status     = result.state || result.status || 'pending';
 
-    await db.collection('churches').doc(churchId).update({
+    const updateData: Record<string, any> = {
         'smsSettings.campaignId':          campaignId,
         'smsSettings.campaignStatus':       status.toLowerCase(),
         'smsSettings.campaignUsecase':      payload.usecase,
@@ -535,7 +536,12 @@ export async function registerTenantCampaign(
         'smsSettings.campaignSample2':     payload.sample2 || null,
         'smsSettings.campaignMessageFlow': payload.messageFlow,
         'smsSettings.campaignSubmittedAt': Date.now(),
-    });
+    };
+    if (payload.firstMessageConfirmation) {
+        updateData['smsSettings.firstMessageConfirmation'] = payload.firstMessageConfirmation;
+    }
+
+    await db.collection('churches').doc(churchId).update(updateData);
 
     return { campaignId, status };
 }
