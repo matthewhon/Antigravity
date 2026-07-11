@@ -38,6 +38,68 @@ function toMmDd(dateStr?: string | null): string {
     return `${parts[1]}-${parts[2]}`;
 }
 
+/**
+ * Helper to check if sending is allowed based on SMS sending hours restriction.
+ * If not allowed, returns the next allowed sending time in UTC milliseconds.
+ */
+export function getNextAllowedSmsTime(
+    now: number,
+    timeZone: string,
+    startHourStr: string, // e.g. "09:00"
+    endHourStr: string    // e.g. "21:00"
+): { allowed: boolean; nextAllowedTime: number } {
+    // Determine offset in ms by comparing local string formatting
+    const dateObj = new Date(now);
+    const dateUTC = new Date(dateObj.toLocaleString("en-US", { timeZone: "UTC" }));
+    const dateTZ = new Date(dateObj.toLocaleString("en-US", { timeZone }));
+    const offsetMs = dateTZ.getTime() - dateUTC.getTime();
+
+    // Local time in milliseconds
+    const localTimeMs = now + offsetMs;
+    const localDate = new Date(localTimeMs);
+
+    // Current local hour and minute
+    const localH = localDate.getUTCHours();
+    const localM = localDate.getUTCMinutes();
+
+    // Parse start and end times
+    const [startH, startM] = startHourStr.split(':').map(Number);
+    const [endH, endM] = endHourStr.split(':').map(Number);
+
+    // Helper to check if current time is within range
+    const currentMinutes = localH * 60 + localM;
+    const startMinutes = startH * 60 + startM;
+    const endMinutes = endH * 60 + endM;
+
+    let allowed = false;
+    if (startMinutes <= endMinutes) {
+        // Standard range (e.g. 9:00 to 21:00)
+        allowed = currentMinutes >= startMinutes && currentMinutes < endMinutes;
+    } else {
+        // Overnight range (e.g. 21:00 to 9:00)
+        allowed = currentMinutes >= startMinutes || currentMinutes < endMinutes;
+    }
+
+    if (allowed) {
+        return { allowed: true, nextAllowedTime: now };
+    }
+
+    // Not allowed: calculate next allowed time (start of window)
+    const startWindowLocalDate = new Date(localTimeMs);
+    startWindowLocalDate.setUTCHours(startH, startM, 0, 0);
+
+    let startWindowLocalTimeMs = startWindowLocalDate.getTime();
+    if (startWindowLocalTimeMs <= localTimeMs) {
+        // If the start window for "today" has already passed, it must be tomorrow's window
+        startWindowLocalTimeMs += 24 * 60 * 60 * 1000;
+    }
+
+    // Convert local time back to UTC by subtracting the offset
+    const nextAllowedTimeUTC = startWindowLocalTimeMs - offsetMs;
+
+    return { allowed: false, nextAllowedTime: nextAllowedTimeUTC };
+}
+
 /** Helper to resolve mock recipients for the c1 tenant directly from local Firestore collections. */
 async function resolveMockC1Recipients(
     db: any,
@@ -524,6 +586,28 @@ async function runWorkflowStepExecutor(db: any): Promise<void> {
                 }
                 const wf = wfDoc.data() as any;
                 if (!wf.isActive) return; // workflow paused
+
+                // SMS Sending Hours check
+                const churchSnap = await db.collection('churches').doc(churchId).get();
+                if (churchSnap.exists) {
+                    const churchData = churchSnap.data() as any;
+                    const smsSettings = churchData.smsSettings || {};
+                    if (smsSettings.smsHoursEnabled) {
+                        const start = smsSettings.smsHoursStart || '09:00';
+                        const end = smsSettings.smsHoursEnd || '21:00';
+                        const timeZone = smsSettings.smsHoursTimeZone || 'UTC';
+
+                        const { allowed, nextAllowedTime } = getNextAllowedSmsTime(now, timeZone, start, end);
+                        if (!allowed) {
+                            // Defer the execution to nextAllowedTime
+                            await db.collection('smsWorkflowEnrollments').doc(enrollId).update({
+                                nextSendAt: nextAllowedTime,
+                            });
+                            log.info(`[WorkflowExecutor] Deferring enrollment ${enrollId} to ${new Date(nextAllowedTime).toISOString()} due to SMS sending hours restriction.`, 'system', { enrollId }, churchId);
+                            return; // Skip sending now!
+                        }
+                    }
+                }
 
                 const steps: any[] = wf.steps || [];
                 if (currentStep >= steps.length) {

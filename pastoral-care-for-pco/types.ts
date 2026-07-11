@@ -1131,6 +1131,14 @@ export interface SmsSettings {
     messageFooter?: string;
     /** Whether the SMS AI Agent is enabled for this tenant */
     smsAgentEnabled?: boolean;
+    /** Whether the SMS sending hours restriction is enabled */
+    smsHoursEnabled?: boolean;
+    /** The start of allowed sending hours, e.g. "09:00" */
+    smsHoursStart?: string;
+    /** The end of allowed sending hours, e.g. "21:00" */
+    smsHoursEnd?: string;
+    /** The timezone for the allowed sending hours, e.g. "America/New_York" */
+    smsHoursTimeZone?: string;
     
     // -- Executive AI Auto-Responder -------------------------------------------
     /** Whether the Executive AI Auto-Responder is enabled */

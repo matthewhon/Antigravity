@@ -3725,6 +3725,76 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 </div>
                             </div>
 
+                            {/* SMS Quiet Hours */}
+                            <div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800 space-y-5">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <h4 className="text-sm font-black text-slate-900 dark:text-white mb-1">SMS Sending Hours</h4>
+                                        <p className="text-[11px] text-slate-400 mt-1 max-w-lg">
+                                            Restrict SMS workflow messages from being sent during night time. Messages will wait until the allowed hours window begins.
+                                        </p>
+                                    </div>
+                                    <button
+                                        title="Toggle SMS Hours Restriction"
+                                        aria-label="Toggle SMS Hours Restriction"
+                                        onClick={() => handleSmsChange('smsHoursEnabled', !smsForm.smsHoursEnabled)}
+                                        className={`relative w-12 h-6 rounded-full transition-all duration-300 focus:outline-none ${
+                                            smsForm.smsHoursEnabled ? 'bg-indigo-500' : 'bg-slate-300 dark:bg-slate-600'
+                                        }`}
+                                    >
+                                        <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-300 ${
+                                            smsForm.smsHoursEnabled ? 'translate-x-6' : 'translate-x-0'
+                                        }`} />
+                                    </button>
+                                </div>
+
+                                {smsForm.smsHoursEnabled && (
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+                                        <div>
+                                            <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1.5">Start Hour</label>
+                                            <input
+                                                type="time"
+                                                value={smsForm.smsHoursStart || '09:00'}
+                                                onChange={e => handleSmsChange('smsHoursStart', e.target.value)}
+                                                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1.5">End Hour</label>
+                                            <input
+                                                type="time"
+                                                value={smsForm.smsHoursEnd || '21:00'}
+                                                onChange={e => handleSmsChange('smsHoursEnd', e.target.value)}
+                                                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1.5">Time Zone</label>
+                                            <select
+                                                title="SMS Time Zone"
+                                                value={smsForm.smsHoursTimeZone || Intl.DateTimeFormat().resolvedOptions().timeZone}
+                                                onChange={e => handleSmsChange('smsHoursTimeZone', e.target.value)}
+                                                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                            >
+                                                {[
+                                                    'America/New_York',
+                                                    'America/Chicago',
+                                                    'America/Denver',
+                                                    'America/Los_Angeles',
+                                                    'America/Phoenix',
+                                                    'America/Anchorage',
+                                                    'America/Adak',
+                                                    'Pacific/Honolulu',
+                                                    'UTC'
+                                                ].map(tz => (
+                                                    <option key={tz} value={tz}>{tz}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
                             {/* How it works */}
                             <div className="bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 p-8 rounded-[2rem]">
                                 <div className="flex items-start gap-4">
