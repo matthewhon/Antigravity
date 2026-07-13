@@ -152,6 +152,15 @@ export const pcoService = {
         const data = await pcoFetch(churchId, `https://api.planningcenteronline.com/groups/v2/groups?per_page=100`);
         return safeData(data);
     },
+    async getForms(churchId: string): Promise<any[]> {
+        if (isSimulated(churchId)) {
+            return [
+                { id: 'f1', attributes: { name: 'New Visitor Card', public_url: 'https://demo.churchcenter.com/people/forms/f1' } }
+            ];
+        }
+        const data = await pcoFetch(churchId, `https://api.planningcenteronline.com/people/v2/forms?per_page=100`);
+        return safeData(data);
+    },
     async getRegistrations(churchId: string): Promise<any[]> {
         if (isSimulated(churchId)) {
             return [

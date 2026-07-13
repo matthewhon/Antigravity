@@ -413,7 +413,7 @@ const PcoServicePlanCard = ({ block, primaryColor, textColor }: { block: EmailBl
 // Rich card for PCO Registration / Group / Calendar event blocks
 const PcoContentCard = ({ block, primaryColor }: { block: EmailBlock; primaryColor: string }) => {
   const c = block.content || {};
-  const Icon = block.type === 'pco_group' ? Users : block.type === 'pco_registration' ? ClipboardList : CalendarDays;
+  const Icon = block.type === 'pco_group' ? Users : (block.type === 'pco_registration' || block.type === 'pco_form') ? ClipboardList : CalendarDays;
   // Strip tags helper for plain-text contexts
   const stripTags = (html: string) => html.replace(/<[^>]*>/g, '').trim();
   return (
@@ -559,8 +559,21 @@ export const EmailPreview: React.FC<Props> = ({ blocks = [], settings, churchLog
               );
             })()}
 
-            {(block.type === 'pco_registration' || block.type === 'pco_group' || block.type === 'pco_event') && (
+            {(block.type === 'pco_registration' || block.type === 'pco_group' || block.type === 'pco_event' || block.type === 'pco_form') && (
               <PcoContentCard block={block} primaryColor={settings.primaryColor} />
+            )}
+
+            {block.type === 'pco_giving_form' && (
+              <div style={{ background: '#fdf2f8', border: '1px solid #fbcfe8', borderRadius: 12, padding: '24px 20px', textAlign: 'center', marginBottom: 4 }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 48, height: 48, borderRadius: '50%', background: '#fce7f3', color: '#db2777', marginBottom: 12 }}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+                </div>
+                <h3 style={{ margin: '0 0 8px 0', fontSize: 18, color: '#9d174d', fontWeight: 700 }}>Give Online</h3>
+                <p style={{ margin: '0 0 16px 0', fontSize: 14, color: '#be185d', lineHeight: 1.4 }}>Support our ministry easily and securely through Church Center.</p>
+                <a href={block.content?.url || '#'} style={{ display: 'inline-block', padding: '10px 24px', background: '#db2777', color: '#fff', borderRadius: 8, textDecoration: 'none', fontSize: 14, fontWeight: 700, boxShadow: '0 2px 4px rgba(219,39,119,0.2)' }}>
+                  {block.content?.text || 'Give Now'}
+                </a>
+              </div>
             )}
 
             {block.type === 'pco_service_plan' && (

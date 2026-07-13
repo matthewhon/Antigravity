@@ -16,19 +16,19 @@ import {
   Minus, Video, Code, Users, Calendar, ClipboardList, GripVertical, Trash2,
   Copy, ChevronRight, ChevronDown, Palette, AlignLeft, AlignCenter, AlignRight, LayoutGrid, Plus,
   AtSign, Search, Loader2, X, ChevronUp, Bold, Italic, List, ListOrdered, Link, Upload, Images,
-  Sparkles, Send, RotateCcw, Check, ChevronLeft, MessageSquare, FileText
+  Sparkles, Send, RotateCcw, Check, ChevronLeft, MessageSquare, FileText, Heart
 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export type BlockType =
   | 'text' | 'header' | 'image' | 'button' | 'file' | 'divider' | 'video' | 'html'
-  | 'pco_group' | 'pco_registration' | 'pco_event' | 'pco_service_plan'
+  | 'pco_group' | 'pco_registration' | 'pco_event' | 'pco_service_plan' | 'pco_form'
   | 'pco_groups_widget' | 'pco_registrations_widget'
   | 'pastoral_care_chart' | 'data_chart'
   | 'columns'
   // Bulletin-only embedded blocks
-  | 'embedded_note' | 'embedded_poll' | 'embedded_form';
+  | 'embedded_note' | 'embedded_poll' | 'embedded_form' | 'pco_giving_form';
 
 export interface ColumnCell {
   id: string;
@@ -981,6 +981,22 @@ const InlineMediaEditor: React.FC<{
       </div>
     );
   }
+  if (block.type === 'pco_giving_form') {
+    return (
+      <div className="space-y-3 p-3">
+        <div>
+          <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Giving URL</label>
+          <input type="url" value={c.url || ''} onChange={e => onUpdate({ ...c, url: e.target.value })} placeholder="https://..." title="Giving URL"
+            className="w-full text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+        </div>
+        <div>
+          <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Button Text</label>
+          <input type="text" value={c.text || ''} onChange={e => onUpdate({ ...c, text: e.target.value })} placeholder="Give Online" title="Button Text"
+            className="w-full text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+        </div>
+      </div>
+    );
+  }
   return null;
 };
 
@@ -1045,7 +1061,7 @@ const EmbedBlockEditor: React.FC<{ block: EmailBlock; onUpdate: (content: any) =
 
 // ─── Sortable canvas block ────────────────────────────────────────────────────
 
-const INLINE_EDITABLE = new Set(['text', 'header', 'html', 'image', 'video', 'button', 'file', 'embedded_note', 'embedded_poll', 'embedded_form']);
+const INLINE_EDITABLE = new Set(['text', 'header', 'html', 'image', 'video', 'button', 'file', 'embedded_note', 'embedded_poll', 'embedded_form', 'pco_giving_form']);
 
 const SortableCanvasBlock: React.FC<{
   block: EmailBlock;
@@ -1420,6 +1436,17 @@ const PCO_PICK_CONFIG: Record<PcoPickType, {
         rawPlan: item
       };
     }
+  },
+  pco_form: {
+    label: 'Form',
+    icon: <ClipboardList size={14} />,
+    fetch: async (churchId) => pcoService.getForms(churchId),
+    map: (item) => ({
+      id: item.id,
+      name: item.attributes?.name || 'Untitled Form',
+      description: item.attributes?.description || 'No description',
+      url: item.attributes?.public_url || '#'
+    })
   }
 };
 
@@ -1990,7 +2017,7 @@ export const EmailBuilder: React.FC<EmailBuilderProps> = ({
             <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Planning Center</span>
           </div>
           <div className="space-y-1.5">
-            {(['pco_registration', 'pco_group', 'pco_event', 'pco_service_plan'] as PcoPickType[]).map(type => {
+            {(['pco_registration', 'pco_group', 'pco_event', 'pco_service_plan', 'pco_form'] as PcoPickType[]).map(type => {
               const cfg = PCO_PICK_CONFIG[type];
               const isOpen = quickPickType === type;
               return (
