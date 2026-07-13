@@ -67,7 +67,8 @@ export const CanvaPickerModal: React.FC<CanvaPickerModalProps> = ({ churchId, on
         .replace(/\//g, '_')
         .replace(/=+$/, '');
         
-    document.cookie = `canva_pkce=${verifier}; path=/; max-age=3600; SameSite=Lax`;
+    // Firebase Hosting strips all cookies except __session
+    document.cookie = `__session=${verifier}; path=/; max-age=3600; SameSite=Lax`;
 
     // Open OAuth window
     const clientId = import.meta.env.VITE_CANVA_CLIENT_ID || 'OC-AZ9dHwB8GH1_'; 

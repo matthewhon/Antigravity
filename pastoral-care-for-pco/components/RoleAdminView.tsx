@@ -5479,7 +5479,8 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         .replace(/\//g, '_')
                                         .replace(/=+$/, '');
                                         
-                                    document.cookie = `canva_pkce=${verifier}; path=/; max-age=3600; SameSite=Lax`;
+                                    // Firebase Hosting strips all cookies except __session
+                                    document.cookie = `__session=${verifier}; path=/; max-age=3600; SameSite=Lax`;
 
                                     const clientId = import.meta.env.VITE_CANVA_CLIENT_ID || 'OC-AZ9dHwB8GH1_'; 
                                     const redirectUri = encodeURIComponent(`${window.location.origin}/api/canva/oauth/callback`);

@@ -39,13 +39,13 @@ export const handleCanvaOAuthCallback = async (req: any, res: any): Promise<void
         // Basic Auth using base64(client_id:client_secret)
         const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
 
-        // Parse cookie
+        // Parse cookie - Firebase Hosting strips all cookies except __session
         const cookieHeader = req.headers.cookie || '';
-        const match = cookieHeader.match(/canva_pkce=([^;]+)/);
+        const match = cookieHeader.match(/__session=([^;]+)/);
         const codeVerifier = match ? match[1] : '';
 
         if (!codeVerifier) {
-            log.warn('Missing canva_pkce cookie in OAuth callback', 'system', {}, 'system');
+            log.warn('Missing __session cookie in OAuth callback', 'system', {}, 'system');
         }
 
         const tokenResponse = await fetch('https://api.canva.com/rest/v1/oauth/token', {
