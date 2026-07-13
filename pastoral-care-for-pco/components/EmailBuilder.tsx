@@ -1015,6 +1015,21 @@ const InlineMediaEditor: React.FC<{
       </div>
     );
   }
+  if (block.type === 'html') {
+    return (
+      <div className="space-y-3 p-3">
+        <div>
+          <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Raw HTML</label>
+          <textarea
+            value={c.html || ''}
+            onChange={e => onUpdate({ ...c, html: e.target.value })}
+            placeholder="<div>Your HTML here</div>"
+            className="w-full h-40 text-xs font-mono border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          />
+        </div>
+      </div>
+    );
+  }
   if (block.type === 'pco_form') {
     return (
       <div className="space-y-3 p-3">
@@ -1140,7 +1155,7 @@ const SortableCanvasBlock: React.FC<{
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: block.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 };
   const isEditable = INLINE_EDITABLE.has(block.type);
-  const isTextBlock = ['text', 'header', 'html'].includes(block.type);
+  const isTextBlock = ['text', 'header'].includes(block.type);
 
   return (
     <div
@@ -1303,8 +1318,8 @@ const ColumnBlockRenderer: React.FC<{
           <div className="space-y-2 mb-2">
             {cell.blocks.map(mb => {
               const isSelected = selectedMiniId === mb.id;
-              const isTextLike = ['text', 'header', 'html'].includes(mb.type);
-              const isMediaLike = ['image', 'video', 'button', 'file'].includes(mb.type);
+              const isTextLike = ['text', 'header'].includes(mb.type);
+              const isMediaLike = ['image', 'video', 'button', 'file', 'html'].includes(mb.type);
               const asMiniBlock: EmailBlock = { id: mb.id, type: mb.type as BlockType, content: mb.content };
 
               return (
@@ -1996,7 +2011,7 @@ export const EmailBuilder: React.FC<EmailBuilderProps> = ({
 
   const activeBlock = blocks.find(b => b.id === activeId);
   const selectedBlock = blocks.find(b => b.id === selectedId) ?? null;
-  const selectedIsTextBlock = selectedBlock && ['text', 'header', 'html'].includes(selectedBlock.type);
+  const selectedIsTextBlock = selectedBlock && ['text', 'header'].includes(selectedBlock.type);
 
   // Handle AI insert: replace selected text block OR append a new one
   const handleAiInsert = (html: string, replaceSelected: boolean) => {
