@@ -566,37 +566,57 @@ export const EmailPreview: React.FC<Props> = ({ blocks = [], settings, churchLog
             {block.type === 'pco_form' && (block.content?.displayMode === 'link' ? (
               <PcoContentCard block={block} primaryColor={settings.primaryColor} />
             ) : (
-              <div style={{ borderRadius: 12, overflow: 'hidden', marginBottom: 4, background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                {block.content?.url ? (
-                  <iframe
-                    src={block.content.url + (block.content.url.includes('?') ? '&modal=true' : '?modal=true')}
-                    style={{ width: '100%', height: 750, border: 'none' }}
-                    title="Planning Center Form"
-                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-top-navigation-by-user-activation"
-                  />
-                ) : (
-                  <div style={{ padding: '40px 20px', textAlign: 'center', color: '#64748b' }}>
-                    Please select a form in the builder.
-                  </div>
-                )}
-              </div>
+              <>
+                <div className="block md:hidden">
+                  <PcoContentCard block={block} primaryColor={settings.primaryColor} />
+                </div>
+                <div className="hidden md:block" style={{ borderRadius: 12, overflow: 'hidden', marginBottom: 4, background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                  {block.content?.url ? (
+                    <iframe
+                      src={block.content.url + (block.content.url.includes('?') ? '&modal=true' : '?modal=true')}
+                      style={{ width: '100%', height: 750, border: 'none' }}
+                      title="Planning Center Form"
+                      sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-top-navigation-by-user-activation"
+                    />
+                  ) : (
+                    <div style={{ padding: '40px 20px', textAlign: 'center', color: '#64748b' }}>
+                      Please select a form in the builder.
+                    </div>
+                  )}
+                </div>
+              </>
             ))}
 
             {block.type === 'pco_giving_form' && (
-              <div style={{ borderRadius: 12, overflow: 'hidden', marginBottom: 4, background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                {block.content?.url ? (
-                  <iframe
-                    src={block.content.url + (block.content.url.includes('?') ? '&modal=true' : '?modal=true')}
-                    style={{ width: '100%', height: 750, border: 'none' }}
-                    title="Giving Form"
-                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-top-navigation-by-user-activation"
-                  />
-                ) : (
-                  <div style={{ padding: '40px 20px', textAlign: 'center', color: '#64748b' }}>
-                    Please configure the Giving URL in the builder.
-                  </div>
-                )}
-              </div>
+              <>
+                <div className="block md:hidden mb-4">
+                  <a href={block.content?.url || '#'} target="_blank" rel="noopener noreferrer" style={{ display: 'block', textDecoration: 'none' }}>
+                    <div style={{ border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden', background: '#fff', padding: '16px', textAlign: 'center' }}>
+                      <div style={{ marginBottom: 12 }}>
+                        <span style={{ fontSize: 32 }}>💝</span>
+                      </div>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: '#1e293b', marginBottom: 8 }}>Give Online</div>
+                      <div style={{ display: 'inline-block', padding: '10px 24px', background: settings.primaryColor || '#4f46e5', color: '#fff', borderRadius: 8, fontSize: 14, fontWeight: 600 }}>
+                        {block.content?.text || 'Give Now'}
+                      </div>
+                    </div>
+                  </a>
+                </div>
+                <div className="hidden md:block" style={{ borderRadius: 12, overflow: 'hidden', marginBottom: 4, background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                  {block.content?.url ? (
+                    <iframe
+                      src={block.content.url + (block.content.url.includes('?') ? '&modal=true' : '?modal=true')}
+                      style={{ width: '100%', height: 750, border: 'none' }}
+                      title="Giving Form"
+                      sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-top-navigation-by-user-activation"
+                    />
+                  ) : (
+                    <div style={{ padding: '40px 20px', textAlign: 'center', color: '#64748b' }}>
+                      Please configure the Giving URL in the builder.
+                    </div>
+                  )}
+                </div>
+              </>
             )}
 
             {block.type === 'pco_service_plan' && (
