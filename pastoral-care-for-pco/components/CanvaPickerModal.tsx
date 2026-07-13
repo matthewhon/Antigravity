@@ -72,11 +72,14 @@ export const CanvaPickerModal: React.FC<CanvaPickerModalProps> = ({ churchId, on
 
     // Open OAuth window
     const clientId = import.meta.env.VITE_CANVA_CLIENT_ID || 'OC-AZ9dHwB8GH1_'; 
-    const redirectUri = encodeURIComponent(`${window.location.origin}/api/canva/oauth/callback`);
-    const state = encodeURIComponent(churchId);
+    const redirectUri = `${window.location.origin}/api/canva/oauth/callback`;
+    
+    const stateObj = { churchId, redirectUri };
+    const state = encodeURIComponent(JSON.stringify(stateObj));
+    
     const scopes = encodeURIComponent('design:content:read design:meta:read');
     
-    const oauthUrl = `https://www.canva.com/api/oauth/authorize?response_type=code&client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scopes}&state=${state}&code_challenge=${challenge}&code_challenge_method=s256`;
+    const oauthUrl = `https://www.canva.com/api/oauth/authorize?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&state=${state}&code_challenge=${challenge}&code_challenge_method=s256`;
     
     // Open in popup
     const width = 600;

@@ -32,9 +32,23 @@ export const handleCanvaOAuthCallback = async (req: any, res: any): Promise<void
             } catch (e) {}
         }
 
+        let churchId = state;
+        let frontendRedirectUri = '';
+
+        try {
+            // Check if state is JSON
+            const stateObj = JSON.parse(decodeURIComponent(state));
+            if (stateObj.churchId) churchId = stateObj.churchId;
+            if (stateObj.redirectUri) frontendRedirectUri = stateObj.redirectUri;
+        } catch (e) {
+            // Not JSON, use raw state
+        }
+
         const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
         const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost:8080';
-        const redirectUri = `${protocol}://${host}/api/canva/oauth/callback`;
+        
+        // Use the exact redirect_uri the frontend generated to prevent OAuth mismatch
+        const redirectUri = frontendRedirectUri || `${protocol}://${host}/api/canva/oauth/callback`;
 
         // Basic Auth using base64(client_id:client_secret)
         const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
@@ -69,8 +83,6 @@ export const handleCanvaOAuthCallback = async (req: any, res: any): Promise<void
         }
 
         // We assume state contains a churchId and/or userId to link the token
-        const churchId = state; // Simplification, ensure you pass state when initiating OAuth
-        
         if (churchId) {
             await db.collection('churches').doc(churchId).collection('integrations').doc('canva').set({
                 accessToken: tokenData.access_token,
