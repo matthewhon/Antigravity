@@ -1815,7 +1815,7 @@ const EmailAIPanel: React.FC<{
 // ─── Main EmailBuilder ────────────────────────────────────────────────────────
 
 export const EmailBuilder: React.FC<EmailBuilderProps> = ({
-  blocks, setBlocks, onImportPco, onOpenPastoralCare, onOpenDataChart, onOpenSettings, churchId = '',
+  blocks = [], setBlocks, onImportPco, onOpenPastoralCare, onOpenDataChart, onOpenSettings, churchId = '',
   campaignSubject, churchName, context = 'email',
 }) => {
   const [selectedId, setSelectedId] = useState<string | null>(null);

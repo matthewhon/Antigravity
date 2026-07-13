@@ -470,7 +470,7 @@ const SOCIAL_LINKS: { key: keyof TemplateSettings; label: string; color: string;
 
 // ─── Main Preview Component ───────────────────────────────────────────────────
 
-export const EmailPreview: React.FC<Props> = ({ blocks, settings, churchLogoUrl, contentType = 'blocks', content }) => {
+export const EmailPreview: React.FC<Props> = ({ blocks = [], settings, churchLogoUrl, contentType = 'blocks', content }) => {
   useEffect(() => {
     ensureProseStyles();
     if (blocks.some(b => b.type === 'pco_groups_widget' || b.type === 'pco_registrations_widget')) {
