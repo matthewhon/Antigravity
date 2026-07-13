@@ -1512,7 +1512,71 @@ Return ONLY the JSON object, no markdown, no explanation:`;
       }
       try {
         if (process.env.NODE_ENV === 'production') {
-          res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+          const indexPath = path.join(__dirname, 'dist', 'index.html');
+          
+          const bulletinMatch = req.path.match(/^\/bulletin\/(latest\/[^\/]+|[^\/]+\/[^\/]+)$/);
+          if (bulletinMatch) {
+            try {
+              let html = await fs.promises.readFile(indexPath, 'utf-8');
+              const parts = req.path.split('/').filter(Boolean);
+              const db = getDb();
+              let bulletinData = null;
+              let churchId = '';
+
+              if (parts[1] === 'latest') {
+                churchId = parts[2];
+                const snapshot = await db.collection('digital_bulletins')
+                  .where('churchId', '==', churchId)
+                  .where('status', '==', 'published')
+                  .orderBy('publishedAt', 'desc')
+                  .limit(1)
+                  .get();
+                if (!snapshot.empty) {
+                  bulletinData = snapshot.docs[0].data();
+                }
+              } else {
+                churchId = parts[1];
+                const bulletinId = parts[2];
+                if (bulletinId) {
+                  const doc = await db.collection('digital_bulletins').doc(bulletinId).get();
+                  if (doc.exists) {
+                    const data = doc.data();
+                    if (data?.churchId === churchId) {
+                      bulletinData = data;
+                    }
+                  }
+                }
+              }
+
+              if (bulletinData && churchId) {
+                const churchDoc = await db.collection('churches').doc(churchId).get();
+                const churchName = churchDoc.exists ? churchDoc.data()?.name || '' : '';
+                const logoUrl = churchDoc.exists ? churchDoc.data()?.logoUrl || '' : '';
+
+                const title = bulletinData.title || 'Digital Bulletin';
+                const fullTitle = churchName ? `${churchName} - ${title}` : title;
+                const description = 'Check out our latest updates and service plan!';
+                
+                const ogTags = `
+    <meta property="og:title" content="${fullTitle.replace(/"/g, '&quot;')}">
+    <meta property="og:description" content="${description}">
+    ${logoUrl ? `<meta property="og:image" content="${logoUrl}">` : ''}
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="${fullTitle.replace(/"/g, '&quot;')}">
+    <meta name="twitter:description" content="${description}">
+    ${logoUrl ? `<meta name="twitter:image" content="${logoUrl}">` : ''}
+`;
+                html = html.replace('</head>', `${ogTags}</head>`);
+              }
+              return res.send(html);
+            } catch (err) {
+              console.error('Error serving dynamic index.html:', err);
+              // Fallback below
+            }
+          }
+
+          return res.sendFile(indexPath);
         } else {
           // Dev logic for Vite...
           next(); 
