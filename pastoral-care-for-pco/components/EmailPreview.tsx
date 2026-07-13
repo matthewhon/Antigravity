@@ -559,8 +559,25 @@ export const EmailPreview: React.FC<Props> = ({ blocks = [], settings, churchLog
               );
             })()}
 
-            {(block.type === 'pco_registration' || block.type === 'pco_group' || block.type === 'pco_event' || block.type === 'pco_form' || block.type === 'pco_announcement') && (
+            {(block.type === 'pco_registration' || block.type === 'pco_group' || block.type === 'pco_event' || block.type === 'pco_announcement') && (
               <PcoContentCard block={block} primaryColor={settings.primaryColor} />
+            )}
+
+            {block.type === 'pco_form' && (
+              <div style={{ borderRadius: 12, overflow: 'hidden', marginBottom: 4, background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                {block.content?.url ? (
+                  <iframe
+                    src={block.content.url + (block.content.url.includes('?') ? '&modal=true' : '?modal=true')}
+                    style={{ width: '100%', height: 750, border: 'none' }}
+                    title="Planning Center Form"
+                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-top-navigation-by-user-activation"
+                  />
+                ) : (
+                  <div style={{ padding: '40px 20px', textAlign: 'center', color: '#64748b' }}>
+                    Please select a form in the builder.
+                  </div>
+                )}
+              </div>
             )}
 
             {block.type === 'pco_giving_form' && (
