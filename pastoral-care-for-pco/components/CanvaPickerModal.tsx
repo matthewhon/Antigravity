@@ -54,14 +54,28 @@ export const CanvaPickerModal: React.FC<CanvaPickerModalProps> = ({ churchId, on
     }
   };
 
-  const handleConnectCanva = () => {
+  const handleConnectCanva = async () => {
+    // Generate PKCE
+    const array = new Uint32Array(28);
+    window.crypto.getRandomValues(array);
+    const verifier = Array.from(array, dec => ('0' + dec.toString(16)).substr(-2)).join('');
+    const encoder = new TextEncoder();
+    const data = encoder.encode(verifier);
+    const digest = await window.crypto.subtle.digest('SHA-256', data);
+    const challenge = btoa(String.fromCharCode(...new Uint8Array(digest)))
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+        
+    document.cookie = `canva_pkce=${verifier}; path=/; max-age=3600; SameSite=Lax`;
+
     // Open OAuth window
     const clientId = import.meta.env.VITE_CANVA_CLIENT_ID || 'OC-AZ9dHwB8GH1_'; 
     const redirectUri = encodeURIComponent(`${window.location.origin}/api/canva/oauth/callback`);
     const state = encodeURIComponent(churchId);
     const scopes = encodeURIComponent('design:content:read design:meta:read');
     
-    const oauthUrl = `https://www.canva.com/api/oauth/authorize?response_type=code&client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scopes}&state=${state}`;
+    const oauthUrl = `https://www.canva.com/api/oauth/authorize?response_type=code&client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scopes}&state=${state}&code_challenge=${challenge}&code_challenge_method=s256`;
     
     // Open in popup
     const width = 600;

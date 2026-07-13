@@ -18,7 +18,7 @@ const DEFAULT_API_URL = 'https://api.pastoralcare.barnabassoftware.com';
 
 
 export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings: initialSettings, onSave, onRecalculateBenchmarks }) => {
-  const [activeTab, setActiveTab] = useState<'Configuration' | 'Tenants' | 'Users' | 'Logging' | 'Planning Center' | 'Reports'>('Configuration');
+  const [activeTab, setActiveTab] = useState<'Configuration' | 'Tenants' | 'Users' | 'Logging' | 'Integrations' | 'Reports'>('Configuration');
   const [settings, setSettings] = useState<SystemSettings>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -339,7 +339,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
             </div>
             
             <div className="flex bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl gap-1 overflow-x-auto">
-                {['Configuration', 'Tenants', 'Users', 'Logging', 'Planning Center', 'Reports'].map(tab => (
+                {['Configuration', 'Tenants', 'Users', 'Logging', 'Integrations', 'Reports'].map(tab => (
                     <button 
                         key={tab}
                         onClick={() => setActiveTab(tab as any)}
@@ -1330,9 +1330,10 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
             </div>
         )}
 
-        {activeTab === 'Planning Center' && (
+        {activeTab === 'Integrations' && (
+            <div className="space-y-6">
             <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] border border-slate-100 dark:border-slate-800 shadow-sm">
-                <h3 className="text-xl font-black text-slate-900 dark:text-white mb-8">Planning Center Integration</h3>
+                <h3 className="text-xl font-black text-slate-900 dark:text-white mb-8">Planning Center</h3>
                 <div className="flex gap-4">
                     <button 
                         onClick={async () => {
@@ -1371,6 +1372,70 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                         Subscribe to Webhooks
                     </button>
                 </div>
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] border border-slate-100 dark:border-slate-800 shadow-sm">
+                <h3 className="text-xl font-black text-slate-900 dark:text-white mb-8">Canva</h3>
+                <div className="flex gap-4">
+                    <button 
+                        onClick={async () => {
+                            if (churches.length === 0) {
+                                setMessage({ type: 'error', text: 'No tenant selected.' });
+                                return;
+                            }
+                            
+                            // Generate PKCE
+                            const array = new Uint32Array(28);
+                            window.crypto.getRandomValues(array);
+                            const verifier = Array.from(array, dec => ('0' + dec.toString(16)).substr(-2)).join('');
+                            const encoder = new TextEncoder();
+                            const data = encoder.encode(verifier);
+                            const digest = await window.crypto.subtle.digest('SHA-256', data);
+                            const challenge = btoa(String.fromCharCode(...new Uint8Array(digest)))
+                                .replace(/\+/g, '-')
+                                .replace(/\//g, '_')
+                                .replace(/=+$/, '');
+                                
+                            document.cookie = `canva_pkce=${verifier}; path=/; max-age=3600; SameSite=Lax`;
+
+                            const churchId = churches[0].id;
+                            const clientId = import.meta.env.VITE_CANVA_CLIENT_ID || 'OC-AZ9dHwB8GH1_'; 
+                            const redirectUri = encodeURIComponent(`${window.location.origin}/api/canva/oauth/callback`);
+                            const state = encodeURIComponent(churchId);
+                            const scopes = encodeURIComponent('design:content:read design:meta:read');
+                            
+                            const oauthUrl = `https://www.canva.com/api/oauth/authorize?response_type=code&client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scopes}&state=${state}&code_challenge=${challenge}&code_challenge_method=s256`;
+                            
+                            const width = 600;
+                            const height = 700;
+                            const left = window.screenX + (window.innerWidth - width) / 2;
+                            const top = window.screenY + (window.innerHeight - height) / 2;
+                            window.open(oauthUrl, 'CanvaAuth', `width=${width},height=${height},left=${left},top=${top}`);
+                        }}
+                        className="bg-[#00c4cc] text-white px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-[#00b3ba] transition-all"
+                    >
+                        Connect Canva
+                    </button>
+
+                    <button 
+                        onClick={async () => {
+                            if (churches.length === 0) return;
+                            if (!window.confirm("Are you sure you want to disconnect Canva? Users will no longer be able to import designs.")) return;
+                            try {
+                                setMessage({ type: 'success', text: 'Disconnecting Canva...' });
+                                const churchId = churches[0].id;
+                                await firestore.db.collection('churches').doc(churchId).collection('integrations').doc('canva').delete();
+                                setMessage({ type: 'success', text: 'Successfully disconnected Canva.' });
+                            } catch (e: any) {
+                                setMessage({ type: 'error', text: 'Failed to disconnect: ' + e.message });
+                            }
+                        }}
+                        className="bg-red-50 text-red-600 px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-red-100 transition-all border border-red-200"
+                    >
+                        Disconnect Canva
+                    </button>
+                </div>
+            </div>
             </div>
         )}
         {activeTab === 'Logging' && (
