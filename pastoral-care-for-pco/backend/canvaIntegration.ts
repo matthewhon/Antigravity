@@ -17,9 +17,24 @@ export const handleCanvaOAuthCallback = async (req: any, res: any): Promise<void
     }
 
     try {
-        const clientId = process.env.CANVA_CLIENT_ID;
-        const clientSecret = process.env.CANVA_CLIENT_SECRET;
-        const redirectUri = `${process.env.PUBLIC_APP_URL || 'http://localhost:8080'}/api/canva/oauth/callback`;
+        let clientId = process.env.CANVA_CLIENT_ID;
+        let clientSecret = process.env.CANVA_CLIENT_SECRET;
+
+        // Fallback for local development if dotenv is not loaded
+        if (!clientId || !clientSecret) {
+            try {
+                const fs = await import('fs');
+                const envLocal = fs.readFileSync('.env.local', 'utf8');
+                const idMatch = envLocal.match(/CANVA_CLIENT_ID=(.*)/);
+                const secretMatch = envLocal.match(/CANVA_CLIENT_SECRET=(.*)/);
+                if (idMatch && !clientId) clientId = idMatch[1].trim();
+                if (secretMatch && !clientSecret) clientSecret = secretMatch[1].trim();
+            } catch (e) {}
+        }
+
+        const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+        const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost:8080';
+        const redirectUri = `${protocol}://${host}/api/canva/oauth/callback`;
 
         // Basic Auth using base64(client_id:client_secret)
         const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
