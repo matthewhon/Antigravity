@@ -188,6 +188,20 @@ export const pcoService = {
         const data = await pcoFetch(churchId, `https://api.planningcenteronline.com/calendar/v2/events?per_page=100&filter=future`);
         return safeData(data);
     },
+    async getAnnouncements(churchId: string): Promise<any[]> {
+        if (isSimulated(churchId)) {
+            return [
+                { id: 'ann_1', type: 'Announcement', attributes: { title: 'VBS Registration Now Open', summary: 'Sign up your kids for Vacation Bible School today.', published_at: '2026-07-10T09:00:00Z' } },
+                { id: 'ann_2', type: 'Announcement', attributes: { title: 'Midweek Service Cancelled', summary: 'Due to inclement weather, midweek service is cancelled.', published_at: '2026-07-12T15:00:00Z' } }
+            ];
+        }
+        try {
+            const data = await pcoFetch(churchId, `https://api.planningcenteronline.com/publishing/v2/announcements?per_page=100`);
+            return safeData(data);
+        } catch (e: any) {
+            throw e;
+        }
+    },
     async getTeams(churchId: string): Promise<any[]> {
         if (isSimulated(churchId)) {
             return [

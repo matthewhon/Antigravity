@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { EmailBlock, ColumnLayout } from './EmailBuilder';
 import { TemplateSettings, ServicePlanSnapshot } from '../types';
 import { AnalyticsWidgetBlock, AnalyticsWidgetId } from './DataChartSelector';
-import { CalendarDays, Users, ClipboardList, Image as ImageIcon } from 'lucide-react';
+import { CalendarDays, Users, ClipboardList, Image as ImageIcon, Megaphone } from 'lucide-react';
 
 // ─── YouTube helper ───────────────────────────────────────────────────────────
 
@@ -413,7 +413,7 @@ const PcoServicePlanCard = ({ block, primaryColor, textColor }: { block: EmailBl
 // Rich card for PCO Registration / Group / Calendar event blocks
 const PcoContentCard = ({ block, primaryColor }: { block: EmailBlock; primaryColor: string }) => {
   const c = block.content || {};
-  const Icon = block.type === 'pco_group' ? Users : (block.type === 'pco_registration' || block.type === 'pco_form') ? ClipboardList : CalendarDays;
+  const Icon = block.type === 'pco_group' ? Users : (block.type === 'pco_registration' || block.type === 'pco_form') ? ClipboardList : block.type === 'pco_announcement' ? Megaphone : CalendarDays;
   // Strip tags helper for plain-text contexts
   const stripTags = (html: string) => html.replace(/<[^>]*>/g, '').trim();
   return (
@@ -559,7 +559,7 @@ export const EmailPreview: React.FC<Props> = ({ blocks = [], settings, churchLog
               );
             })()}
 
-            {(block.type === 'pco_registration' || block.type === 'pco_group' || block.type === 'pco_event' || block.type === 'pco_form') && (
+            {(block.type === 'pco_registration' || block.type === 'pco_group' || block.type === 'pco_event' || block.type === 'pco_form' || block.type === 'pco_announcement') && (
               <PcoContentCard block={block} primaryColor={settings.primaryColor} />
             )}
 

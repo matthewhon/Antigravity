@@ -16,7 +16,7 @@ import {
   Minus, Video, Code, Users, Calendar, ClipboardList, GripVertical, Trash2,
   Copy, ChevronRight, ChevronDown, Palette, AlignLeft, AlignCenter, AlignRight, LayoutGrid, Plus,
   AtSign, Search, Loader2, X, ChevronUp, Bold, Italic, List, ListOrdered, Link, Upload, Images,
-  Sparkles, Send, RotateCcw, Check, ChevronLeft, MessageSquare, FileText, Heart
+  Sparkles, Send, RotateCcw, Check, ChevronLeft, MessageSquare, FileText, Heart, Megaphone
 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -24,7 +24,7 @@ import {
 export type BlockType =
   | 'text' | 'header' | 'image' | 'button' | 'file' | 'divider' | 'video' | 'html'
   | 'pco_group' | 'pco_registration' | 'pco_event' | 'pco_service_plan' | 'pco_form'
-  | 'pco_groups_widget' | 'pco_registrations_widget'
+  | 'pco_groups_widget' | 'pco_registrations_widget' | 'pco_announcement'
   | 'pastoral_care_chart' | 'data_chart'
   | 'columns'
   // Bulletin-only embedded blocks
@@ -119,7 +119,8 @@ const BlockThumbnail: React.FC<{ block: EmailBlock }> = ({ block }) => {
       return <div className="text-xs font-mono text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-900 rounded p-2 line-clamp-2">{c.html || ''}</div>;
     case 'pco_registration':
     case 'pco_group':
-    case 'pco_event': {
+    case 'pco_event':
+    case 'pco_announcement': {
       const stripTags = (html: string) => html?.replace(/<[^>]*>/g, '').trim() || '';
       return (
         <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden bg-white dark:bg-slate-800">
@@ -133,7 +134,11 @@ const BlockThumbnail: React.FC<{ block: EmailBlock }> = ({ block }) => {
             />
           ) : (
             <div className="w-full h-16 bg-gradient-to-r from-indigo-100 to-indigo-200 dark:from-indigo-900/30 dark:to-indigo-800/30 flex items-center justify-center">
-              <Calendar size={20} className="text-indigo-400" />
+              {block.type === 'pco_announcement' ? (
+                <Megaphone size={20} className="text-indigo-400" />
+              ) : (
+                <Calendar size={20} className="text-indigo-400" />
+              )}
             </div>
           )}
           {/* Content */}
@@ -1443,7 +1448,7 @@ const PCO_PICK_CONFIG: Record<PcoPickType, {
     fetch: async (churchId) => pcoService.getForms(churchId),
     map: (item) => ({
       id: item.id,
-      name: item.attributes?.name || 'Untitled Form',
+      name: item.attributes?.title || item.attributes?.name || 'Untitled Form',
       description: item.attributes?.description || 'No description',
       url: item.attributes?.public_url || '#'
     })

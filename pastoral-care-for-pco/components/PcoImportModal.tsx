@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { X, Search, Loader2, CalendarDays, Users, ClipboardList, CheckSquare, Square } from 'lucide-react';
+import { X, Search, Loader2, CalendarDays, Users, ClipboardList, CheckSquare, Square, Megaphone } from 'lucide-react';
 import { pcoService } from '../services/pcoService';
 import { EmailBlock } from './EmailBuilder';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type PcoTab = 'registrations' | 'groups' | 'calendar';
+type PcoTab = 'registrations' | 'groups' | 'calendar' | 'announcements';
 
 interface PcoItem {
   id: string;
@@ -81,10 +81,21 @@ const mapCalendar = (item: any): PcoItem => ({
   raw: item
 });
 
+const mapAnnouncement = (item: any): PcoItem => ({
+  id: item.id,
+  name: item.attributes?.title || 'Unnamed Announcement',
+  description: item.attributes?.summary || item.attributes?.content || '',
+  date: formatDate(item.attributes?.published_at || item.attributes?.created_at),
+  imageUrl: firstImageUrl(item.attributes),
+  meta: 'Announcement',
+  raw: item
+});
+
 // Build an EmailBlock from a selected item
 const buildBlock = (tab: PcoTab, item: PcoItem, selected: boolean): EmailBlock => {
   const type = tab === 'registrations' ? 'pco_registration' :
                tab === 'groups'        ? 'pco_group' :
+               tab === 'announcements' ? 'pco_announcement' :
                                          'pco_event';
   return {
     id: `pco_${item.id}_${Date.now()}`,
@@ -161,13 +172,13 @@ const ItemCard: React.FC<{
 export const PcoImportModal: React.FC<Props> = ({ churchId, onInsert, onClose }) => {
   const [tab, setTab] = useState<PcoTab>('registrations');
   const [items, setItems] = useState<Record<PcoTab, PcoItem[]>>({
-    registrations: [], groups: [], calendar: []
+    registrations: [], groups: [], calendar: [], announcements: []
   });
   const [loading, setLoading] = useState<Record<PcoTab, boolean>>({
-    registrations: false, groups: false, calendar: false
+    registrations: false, groups: false, calendar: false, announcements: false
   });
   const [errors, setErrors] = useState<Record<PcoTab, string>>({
-    registrations: '', groups: '', calendar: ''
+    registrations: '', groups: '', calendar: '', announcements: ''
   });
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
@@ -189,6 +200,9 @@ export const PcoImportModal: React.FC<Props> = ({ churchId, onInsert, onClose })
         } else if (tab === 'groups') {
           raw = await pcoService.getGroups(churchId);
           setItems(p => ({ ...p, groups: (raw || []).map(mapGroup) }));
+        } else if (tab === 'announcements') {
+          raw = await pcoService.getAnnouncements(churchId);
+          setItems(p => ({ ...p, announcements: (raw || []).map(mapAnnouncement) }));
         } else {
           raw = await pcoService.getEvents(churchId);
           setItems(p => ({ ...p, calendar: (raw || []).map(mapCalendar) }));
@@ -214,7 +228,7 @@ export const PcoImportModal: React.FC<Props> = ({ churchId, onInsert, onClose })
   const handleInsert = () => {
     const newBlocks: EmailBlock[] = [];
     // Maintain insertion order by tab
-    (['registrations', 'groups', 'calendar'] as PcoTab[]).forEach(t => {
+    (['registrations', 'groups', 'calendar', 'announcements'] as PcoTab[]).forEach(t => {
       items[t].filter(i => selected.has(i.id)).forEach(i => {
         newBlocks.push(buildBlock(t, i, true));
       });
@@ -230,6 +244,7 @@ export const PcoImportModal: React.FC<Props> = ({ churchId, onInsert, onClose })
     registrations: { label: 'Registrations', icon: <ClipboardList size={14} /> },
     groups:        { label: 'Groups',        icon: <Users size={14} /> },
     calendar:      { label: 'Calendar',      icon: <CalendarDays size={14} /> },
+    announcements: { label: 'Announcements', icon: <Megaphone size={14} /> },
   };
 
   return (
