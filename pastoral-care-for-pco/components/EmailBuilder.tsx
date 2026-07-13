@@ -239,6 +239,18 @@ const BlockThumbnail: React.FC<{ block: EmailBlock }> = ({ block }) => {
           <ClipboardList size={14} /> Form: {c.title || c.itemId || 'Select a form…'}
         </div>
       );
+    case 'pco_form':
+      return (
+        <div className="rounded-xl border border-emerald-200 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 p-3 text-sm text-emerald-700 dark:text-emerald-300 flex items-center gap-2">
+          <ClipboardList size={14} /> Planning Center Form: {c.title || c.name || c.itemId || 'Select a form…'}
+        </div>
+      );
+    case 'pco_giving_form':
+      return (
+        <div className="rounded-xl border border-rose-200 dark:border-rose-700 bg-rose-50 dark:bg-rose-900/20 p-3 text-sm text-rose-700 dark:text-rose-300 flex items-center gap-2">
+          <Heart size={14} /> Giving Form: {c.url ? 'Configured' : 'Needs configuration'}
+        </div>
+      );
     default:
       return <div className="text-xs text-slate-400">{block.type}</div>;
   }
