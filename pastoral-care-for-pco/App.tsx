@@ -34,6 +34,7 @@ import { PublicNoteView } from './components/PublicNoteView';
 import { PublicFormView } from './components/PublicFormView';
 import { PublicCalendarView } from './components/PublicCalendarView';
 import { PublicContactView } from './components/PublicContactView';
+import { PublicBulletinView } from './components/PublicBulletinView';
 import { ToolsView } from './components/ToolsView';
 import { SmsWorkflowsManager } from './components/MessagingModule';
 import MobileSmsLayout from './components/MobileSmsLayout';
@@ -99,6 +100,7 @@ const App: React.FC = () => {
      if (path.startsWith('/tools/unsubscribers')) return 'tools-unsubscribers';
      if (path.startsWith('/tools/qrcodes')) return 'tools-qrcodes';
      if (path.startsWith('/tools/notes')) return 'tools-notes';
+     if (path.startsWith('/tools/bulletin')) return 'tools-bulletin';
      if (path.startsWith('/tools/workflows')) return 'tools-workflows';
      if (path.startsWith('/tools/files')) return 'tools-files';
      if (path.startsWith('/tools/sms/inbox')) return 'tools-sms-inbox';
@@ -530,6 +532,7 @@ const App: React.FC = () => {
           if (v === 'tools-workflows') return false;
           if (v === 'tools-forms') return false;
           if (v === 'tools-notes') return false;
+          if (v === 'tools-bulletin') return false;
       }
       
       // ── pastoral-contact role check (non-Starter) ──
@@ -585,7 +588,7 @@ const App: React.FC = () => {
       let resolvedView = newView;
       
       if (newView === 'tools') {
-          const toolViews = ['tools-emails', 'tools-sms-inbox', 'tools-workflows', 'tools-polls', 'tools-notes', 'tools-files', 'tools-website', 'tools-qrcodes', 'tools-unsubscribers', 'tools-forms'];
+          const toolViews = ['tools-emails', 'tools-sms-inbox', 'tools-workflows', 'tools-polls', 'tools-notes', 'tools-files', 'tools-website', 'tools-qrcodes', 'tools-unsubscribers', 'tools-forms', 'tools-bulletin'];
           const availableTool = toolViews.find(tv => hasPermission(tv));
           resolvedView = availableTool || 'dashboard';
       }
@@ -637,6 +640,7 @@ const App: React.FC = () => {
               'tools-notes': '/tools/notes',
               'tools-files': '/tools/files',
               'tools-forms': '/tools/forms',
+              'tools-bulletin': '/tools/bulletin',
               'tools-website': '/tools/website',
               'tools-qrcodes': '/tools/qrcodes',
               'tools-unsubscribers': '/tools/unsubscribers'
@@ -910,10 +914,16 @@ const App: React.FC = () => {
     return <PublicNoteView noteId={noteMatch[1]} />;
   }
 
-  // ─── Public Form Route (no auth required) ──────────────────────────────────
+  // ── Public Form Route (no auth required) ──────────────────────────────────
   const formMatch = window.location.pathname.match(/^\/form\/([^/]+)\/([^/]+)/);
   if (formMatch) {
     return <PublicFormView churchId={formMatch[1]} formId={formMatch[2]} />;
+  }
+
+  // ── Public Bulletin Route (no auth required) ───────────────────────────
+  const bulletinMatch = window.location.pathname.match(/^\/bulletin\/([^/]+)/);
+  if (bulletinMatch) {
+    return <PublicBulletinView bulletinId={bulletinMatch[1]} />;
   }
 
   // ─── Public Calendar Route (no auth required) ──────────────────────────────────
@@ -1157,6 +1167,7 @@ const App: React.FC = () => {
                 <Route path="/tools/unsubscribers" element={<ToolsView churchId={church!.id} church={church!} currentUserId={user!.id} currentUser={user!} onUpdateChurch={(updates) => { firestore.updateChurch(church!.id, updates); setChurch({ ...church!, ...updates }); }} activePage="unsubscribers" />} />
                 <Route path="/tools/qrcodes" element={<ToolsView churchId={church!.id} church={church!} currentUserId={user!.id} currentUser={user!} onUpdateChurch={(updates) => { firestore.updateChurch(church!.id, updates); setChurch({ ...church!, ...updates }); }} activePage="qrcodes" />} />
                 <Route path="/tools/notes" element={<ToolsView churchId={church!.id} church={church!} currentUserId={user!.id} currentUser={user!} onUpdateChurch={(updates) => { firestore.updateChurch(church!.id, updates); setChurch({ ...church!, ...updates }); }} activePage="notes" />} />
+                <Route path="/tools/bulletin" element={<ToolsView churchId={church!.id} church={church!} currentUserId={user!.id} currentUser={user!} onUpdateChurch={(updates) => { firestore.updateChurch(church!.id, updates); setChurch({ ...church!, ...updates }); }} activePage="bulletin" />} />
                 <Route path="/tools/files" element={<ToolsView churchId={church!.id} church={church!} currentUserId={user!.id} currentUser={user!} onUpdateChurch={(updates) => { firestore.updateChurch(church!.id, updates); setChurch({ ...church!, ...updates }); }} activePage="files" />} />
                 <Route path="/tools/forms" element={<ToolsView churchId={church!.id} church={church!} currentUserId={user!.id} currentUser={user!} onUpdateChurch={(updates) => { firestore.updateChurch(church!.id, updates); setChurch({ ...church!, ...updates }); }} activePage="forms" />} />
                 <Route path="/tools/workflows" element={<SmsWorkflowsManager churchId={church!.id} />} />

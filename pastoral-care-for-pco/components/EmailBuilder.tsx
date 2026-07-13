@@ -16,7 +16,7 @@ import {
   Minus, Video, Code, Users, Calendar, ClipboardList, GripVertical, Trash2,
   Copy, ChevronRight, ChevronDown, Palette, AlignLeft, AlignCenter, AlignRight, LayoutGrid, Plus,
   AtSign, Search, Loader2, X, ChevronUp, Bold, Italic, List, ListOrdered, Link, Upload, Images,
-  Sparkles, Send, RotateCcw, Check, ChevronLeft, MessageSquare
+  Sparkles, Send, RotateCcw, Check, ChevronLeft, MessageSquare, FileText
 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -26,7 +26,9 @@ export type BlockType =
   | 'pco_group' | 'pco_registration' | 'pco_event' | 'pco_service_plan'
   | 'pco_groups_widget' | 'pco_registrations_widget'
   | 'pastoral_care_chart' | 'data_chart'
-  | 'columns';
+  | 'columns'
+  // Bulletin-only embedded blocks
+  | 'embedded_note' | 'embedded_poll' | 'embedded_form';
 
 export interface ColumnCell {
   id: string;
@@ -52,6 +54,8 @@ interface EmailBuilderProps {
   churchId?: string;
   campaignSubject?: string;
   churchName?: string;
+  /** 'email' (default) hides the embedded_note/poll/form palette; 'bulletin' shows them */
+  context?: 'email' | 'bulletin';
 }
 
 // ─── Block definitions for palette ───────────────────────────────────────────
@@ -209,6 +213,25 @@ const BlockThumbnail: React.FC<{ block: EmailBlock }> = ({ block }) => {
         <div className="flex items-center gap-1.5 text-xs text-slate-400">
           <LayoutGrid size={12} />
           <span>Column layout · {block.content?.layout || '2'} columns</span>
+        </div>
+      );
+    // ─── Bulletin-only embedded blocks ────────────────────────────────────────
+    case 'embedded_note':
+      return (
+        <div className="rounded-xl border border-indigo-200 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900/20 p-3 text-sm text-indigo-700 dark:text-indigo-300 flex items-center gap-2">
+          <FileText size={14} /> Note: {c.title || c.itemId || 'Select a note…'}
+        </div>
+      );
+    case 'embedded_poll':
+      return (
+        <div className="rounded-xl border border-violet-200 dark:border-violet-700 bg-violet-50 dark:bg-violet-900/20 p-3 text-sm text-violet-700 dark:text-violet-300 flex items-center gap-2">
+          <List size={14} /> Poll: {c.title || c.itemId || 'Select a poll…'}
+        </div>
+      );
+    case 'embedded_form':
+      return (
+        <div className="rounded-xl border border-emerald-200 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 p-3 text-sm text-emerald-700 dark:text-emerald-300 flex items-center gap-2">
+          <ClipboardList size={14} /> Form: {c.title || c.itemId || 'Select a form…'}
         </div>
       );
     default:
@@ -961,9 +984,68 @@ const InlineMediaEditor: React.FC<{
   return null;
 };
 
+// ─── Inline embedded-item picker (bulletin context) ──────────────────────────
+
+const EmbedBlockEditor: React.FC<{ block: EmailBlock; onUpdate: (content: any) => void; churchId?: string }> = ({ block, onUpdate, churchId }) => {
+  const [items, setItems] = useState<{ id: string; title: string }[]>([]);
+  const [loading, setLoading] = useState(true);
+  const c = block.content || {};
+
+  useEffect(() => {
+    if (!churchId) { setLoading(false); return; }
+    const load = async () => {
+      try {
+        if (block.type === 'embedded_note') {
+          const data = await firestore.getNotes(churchId);
+          setItems(data.map(n => ({ id: n.id, title: n.title })));
+        } else if (block.type === 'embedded_poll') {
+          const data = await firestore.getPolls(churchId);
+          setItems(data.map(p => ({ id: p.id, title: p.title })));
+        } else if (block.type === 'embedded_form') {
+          const data = await firestore.getForms(churchId);
+          setItems(data.map(f => ({ id: f.id, title: f.title })));
+        }
+      } catch { /* non-fatal */ } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [block.type, churchId]);
+
+  const typeLabel = block.type === 'embedded_note' ? 'Note' : block.type === 'embedded_poll' ? 'Poll' : 'Form';
+
+  return (
+    <div className="space-y-3 p-3">
+      <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Select {typeLabel}</label>
+      {loading ? (
+        <div className="text-xs text-slate-400">Loading…</div>
+      ) : items.length === 0 ? (
+        <div className="text-xs text-slate-400">No {typeLabel.toLowerCase()}s found.</div>
+      ) : (
+        <select
+          value={c.itemId || ''}
+          onChange={e => {
+            const found = items.find(i => i.id === e.target.value);
+            onUpdate({ ...c, itemId: e.target.value, title: found?.title || '' });
+          }}
+          className="w-full text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+        >
+          <option value="">— Choose a {typeLabel.toLowerCase()} —</option>
+          {items.map(item => (
+            <option key={item.id} value={item.id}>{item.title}</option>
+          ))}
+        </select>
+      )}
+      {c.itemId && (
+        <div className="text-[11px] text-slate-400">ID: {c.itemId}</div>
+      )}
+    </div>
+  );
+};
+
 // ─── Sortable canvas block ────────────────────────────────────────────────────
 
-const INLINE_EDITABLE = new Set(['text', 'header', 'html', 'image', 'video', 'button', 'file']);
+const INLINE_EDITABLE = new Set(['text', 'header', 'html', 'image', 'video', 'button', 'file', 'embedded_note', 'embedded_poll', 'embedded_form']);
 
 const SortableCanvasBlock: React.FC<{
   block: EmailBlock;
@@ -1007,6 +1089,8 @@ const SortableCanvasBlock: React.FC<{
           <div className="p-3">
             {isTextBlock ? (
               <InlineTextEditor block={block} onUpdate={onUpdate} churchId={churchId} />
+            ) : ['embedded_note', 'embedded_poll', 'embedded_form'].includes(block.type) ? (
+              <EmbedBlockEditor block={block} onUpdate={onUpdate} churchId={churchId} />
             ) : (
               <InlineMediaEditor block={block} onUpdate={onUpdate} churchId={churchId} />
             )}
@@ -1732,7 +1816,7 @@ const EmailAIPanel: React.FC<{
 
 export const EmailBuilder: React.FC<EmailBuilderProps> = ({
   blocks, setBlocks, onImportPco, onOpenPastoralCare, onOpenDataChart, onOpenSettings, churchId = '',
-  campaignSubject, churchName,
+  campaignSubject, churchName, context = 'email',
 }) => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -1967,6 +2051,35 @@ export const EmailBuilder: React.FC<EmailBuilderProps> = ({
             Insert Data Chart
           </button>
         </SidebarSection>
+
+        {/* Bulletin-only: Embed Content section */}
+        {context === 'bulletin' && (
+          <SidebarSection title="Embed Content" icon={<FileText size={14} />}>
+            <div className="space-y-1.5">
+              {([
+                { type: 'embedded_note'  as BlockType, label: 'Church Note', icon: <FileText size={13} />, color: 'indigo' },
+                { type: 'embedded_poll'  as BlockType, label: 'Poll',        icon: <List size={13} />,     color: 'violet' },
+                { type: 'embedded_form'  as BlockType, label: 'Form',        icon: <ClipboardList size={13} />, color: 'emerald' },
+              ]).map(({ type, label, icon }) => (
+                <button
+                  key={type}
+                  onClick={() => {
+                    const newBlock: EmailBlock = {
+                      id: `block_${Date.now()}_${Math.random().toString(36).slice(2,5)}`,
+                      type,
+                      content: { itemId: '', title: '' },
+                    };
+                    setBlocks(prev => [...prev, newBlock]);
+                    setSelectedId(newBlock.id);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition"
+                >
+                  {icon} {label}
+                </button>
+              ))}
+            </div>
+          </SidebarSection>
+        )}
       </div>
 
       {/* ── Canvas ── */}

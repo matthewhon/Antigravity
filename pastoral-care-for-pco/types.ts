@@ -2049,3 +2049,25 @@ export interface OutreachSlot {
     followUpNotes?: { note: string; addedAt: number }[];
 }
 
+// ─── Digital Bulletin ──────────────────────────────────────────────────────────
+
+export type BulletinStatus = 'draft' | 'published';
+
+export interface DigitalBulletin {
+    id: string;                           // `bulletin_${Date.now()}_${random}`
+    churchId: string;
+    title: string;                        // e.g. "Sunday Bulletin – July 13, 2026"
+    status: BulletinStatus;
+    /** Block content — reuses EmailBlock[] from EmailBuilder.
+     *  Embedded items use block types: 'embedded_note' | 'embedded_poll' | 'embedded_form'
+     *  with content: { itemId: string; title?: string }
+     */
+    blocks: any[];
+    templateSettings?: TemplateSettings;  // same branding controls as EmailCampaign
+    /** Which email campaign was used as the starting point (if any) */
+    sourceCampaignId?: string | null;
+    publishedAt?: number | null;
+    createdBy: string;                    // userId
+    createdAt: number;
+    updatedAt: number;
+}

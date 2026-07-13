@@ -27,7 +27,7 @@ import {
     PcoRegistrationAttendee, PcoRegistrationCampus, PcoCampus,
     Poll, PollResponse, RiskChangeRecord, ChurchNote, StatusChangeRecord,
     WeatherRecord, PcoCheckInRecord, CareFollowUpLog,
-    OutreachSession, OutreachSlot
+    OutreachSession, OutreachSlot, DigitalBulletin
 } from '../types';
 import { calculateServicesAnalytics, calculateAggregatedStats } from './analyticsService';
 
@@ -1745,6 +1745,72 @@ class FirestoreService {
       console.warn('getPersonOutreachSlots error:', e);
       return [];
     }
+  }
+
+  // --- Forms (pco_forms collection) ---
+
+  async getForms(churchId: string): Promise<{ id: string; title: string; churchId: string }[]> {
+    try {
+      const q = query(collection(db, 'pco_forms'), where('churchId', '==', churchId));
+      const snap = await getDocs(q);
+      return snap.docs.map(d => {
+        const data = d.data();
+        return { id: d.id, title: data.title || 'Untitled Form', churchId: data.churchId };
+      });
+    } catch (e) {
+      console.error('[FirestoreService] getForms failed:', e);
+      return [];
+    }
+  }
+
+  // --- Digital Bulletins ---
+
+  async getBulletins(churchId: string): Promise<DigitalBulletin[]> {
+    try {
+      const q = query(collection(db, 'digital_bulletins'), where('churchId', '==', churchId));
+      const snapshot = await getDocs(q);
+      return snapshot.docs
+        .map(d => d.data() as DigitalBulletin)
+        .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    } catch (e) {
+      console.error('[FirestoreService] getBulletins failed:', e);
+      return [];
+    }
+  }
+
+  async getBulletin(bulletinId: string): Promise<DigitalBulletin | null> {
+    try {
+      const docSnap = await getDoc(doc(db, 'digital_bulletins', bulletinId));
+      return docSnap.exists() ? (docSnap.data() as DigitalBulletin) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  async saveBulletin(bulletin: DigitalBulletin): Promise<void> {
+    try {
+      const safe = JSON.parse(JSON.stringify(bulletin));
+      await setDoc(doc(db, 'digital_bulletins', bulletin.id), safe);
+    } catch (e) {
+      console.error('[FirestoreService] saveBulletin failed:', e);
+      throw e;
+    }
+  }
+
+  async updateBulletin(bulletinId: string, updates: Partial<DigitalBulletin>): Promise<void> {
+    try {
+      const safe = JSON.parse(JSON.stringify({ ...updates, updatedAt: Date.now() }));
+      await updateDoc(doc(db, 'digital_bulletins', bulletinId), safe);
+    } catch (e) {
+      console.error('[FirestoreService] updateBulletin failed:', e);
+      throw e;
+    }
+  }
+
+  async deleteBulletin(bulletinId: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, 'digital_bulletins', bulletinId));
+    } catch (e) { this.handleFirestoreError(e); }
   }
 }
 
