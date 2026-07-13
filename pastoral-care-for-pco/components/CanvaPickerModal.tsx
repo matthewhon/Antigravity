@@ -55,39 +55,48 @@ export const CanvaPickerModal: React.FC<CanvaPickerModalProps> = ({ churchId, on
   };
 
   const handleConnectCanva = async () => {
-    // Generate PKCE
-    const array = new Uint32Array(28);
-    window.crypto.getRandomValues(array);
-    const verifier = Array.from(array, dec => ('0' + dec.toString(16)).substr(-2)).join('');
-    const encoder = new TextEncoder();
-    const data = encoder.encode(verifier);
-    const digest = await window.crypto.subtle.digest('SHA-256', data);
-    const challenge = btoa(String.fromCharCode(...new Uint8Array(digest)))
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=+$/, '');
-        
-    // Firebase Hosting strips all cookies except __session
-    document.cookie = `__session=${verifier}; path=/; max-age=3600; SameSite=Lax`;
-
-    // Open OAuth window
-    const clientId = import.meta.env.VITE_CANVA_CLIENT_ID || 'OC-AZ9dHwB8GH1_'; 
-    const redirectUri = `${window.location.origin}/api/canva/oauth/callback`;
-    
-    const stateObj = { churchId, redirectUri };
-    const state = encodeURIComponent(JSON.stringify(stateObj));
-    
-    const scopes = encodeURIComponent('design:content:read design:meta:read');
-    
-    const oauthUrl = `https://www.canva.com/api/oauth/authorize?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&state=${state}&code_challenge=${challenge}&code_challenge_method=s256`;
-    
-    // Open in popup
+    // Open popup IMMEDIATELY to preserve user-gesture (before any async work)
     const width = 600;
     const height = 700;
     const left = window.screenX + (window.innerWidth - width) / 2;
     const top = window.screenY + (window.innerHeight - height) / 2;
-    
-    const authWindow = window.open(oauthUrl, 'CanvaAuth', `width=${width},height=${height},left=${left},top=${top}`);
+    const authWindow = window.open('about:blank', 'CanvaAuth', `width=${width},height=${height},left=${left},top=${top}`);
+
+    try {
+      // Generate PKCE
+      const array = new Uint32Array(28);
+      window.crypto.getRandomValues(array);
+      const verifier = Array.from(array, dec => ('0' + dec.toString(16)).substr(-2)).join('');
+      const encoder = new TextEncoder();
+      const data = encoder.encode(verifier);
+      const digest = await window.crypto.subtle.digest('SHA-256', data);
+      const challenge = btoa(String.fromCharCode(...new Uint8Array(digest)))
+          .replace(/\+/g, '-')
+          .replace(/\//g, '_')
+          .replace(/=+$/, '');
+          
+      // Firebase Hosting strips all cookies except __session
+      document.cookie = `__session=${verifier}; path=/; max-age=3600; SameSite=Lax`;
+
+      const clientId = import.meta.env.VITE_CANVA_CLIENT_ID || 'OC-AZ9dHwB8GH1_'; 
+      const redirectUri = `${window.location.origin}/api/canva/oauth/callback`;
+      
+      const stateObj = { churchId, redirectUri };
+      const state = encodeURIComponent(JSON.stringify(stateObj));
+      
+      const scopes = encodeURIComponent('design:content:read design:meta:read');
+      
+      const oauthUrl = `https://www.canva.com/api/oauth/authorize?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&state=${state}&code_challenge=${challenge}&code_challenge_method=s256`;
+      
+      // Navigate the already-open popup to the OAuth URL
+      if (authWindow) {
+        authWindow.location.href = oauthUrl;
+      }
+    } catch (e: any) {
+      authWindow?.close();
+      alert('Failed to initiate connection: ' + e.message);
+      return;
+    }
     
     // Check periodically if window closed to refresh
     const checkInterval = setInterval(() => {

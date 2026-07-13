@@ -24,6 +24,8 @@ steps:
     - '300s'
     - '--min-instances'
     - '1'
+    - '--update-env-vars'
+    - 'CANVA_CLIENT_ID=${_CANVA_CLIENT_ID}'
 
 serviceAccount: 'projects/$PROJECT_ID/serviceAccounts/511453050214-compute@developer.gserviceaccount.com'
 
@@ -33,6 +35,7 @@ options:
 substitutions:
   _SERVICE_NAME: pastoral-care-for-pco
   _REGION: us-central1
+  _CANVA_CLIENT_ID: 'OC-AZ9dHwB8GH1_'
 
 images:
   - 'gcr.io/$PROJECT_ID/${_SERVICE_NAME}'

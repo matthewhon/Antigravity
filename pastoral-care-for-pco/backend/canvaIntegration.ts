@@ -9,13 +9,20 @@ const CANVA_API_BASE = 'https://api.canva.com/rest/v1';
 export const handleCanvaOAuthCallback = async (req: any, res: any): Promise<void> => {
     const db = getDb();
     const log = createServerLogger(db);
-    const { code, state } = req.query;
+    const { code, state, error: oauthError, error_description } = req.query;
+
+    // 1. Check if Canva returned an error (user denied, etc.)
+    if (oauthError) {
+        log.warn(`[CanvaIntegration] OAuth error from Canva: ${oauthError} - ${error_description}`, 'system', { oauthError, error_description }, 'system');
+        return res.status(400).send(`<html><body><h3>Canva Authorization Failed</h3><p>${error_description || oauthError}</p><script>setTimeout(()=>window.close(),3000)</script></body></html>`);
+    }
 
     if (!code) {
         return res.status(400).send('Missing authorization code');
     }
 
     try {
+        // 2. Load credentials
         let clientId = process.env.CANVA_CLIENT_ID;
         let clientSecret = process.env.CANVA_CLIENT_SECRET;
 
@@ -28,37 +35,56 @@ export const handleCanvaOAuthCallback = async (req: any, res: any): Promise<void
                 const secretMatch = envLocal.match(/CANVA_CLIENT_SECRET=(.*)/);
                 if (idMatch && !clientId) clientId = idMatch[1].trim();
                 if (secretMatch && !clientSecret) clientSecret = secretMatch[1].trim();
-            } catch (e) {}
+            } catch (e) {
+                log.warn('[CanvaIntegration] .env.local fallback failed, relying on process.env only', 'system', {}, 'system');
+            }
         }
 
+        if (!clientId || !clientSecret) {
+            log.error('[CanvaIntegration] CANVA_CLIENT_ID or CANVA_CLIENT_SECRET is not set. Set these as Cloud Run environment variables.', 'system', { hasClientId: !!clientId, hasClientSecret: !!clientSecret }, 'system');
+            return res.status(500).send('<html><body><h3>Server Configuration Error</h3><p>Canva credentials are not configured on the server. Please contact your administrator.</p><script>setTimeout(()=>window.close(),5000)</script></body></html>');
+        }
+
+        // 3. Parse state
         let churchId = state;
         let frontendRedirectUri = '';
 
         try {
-            // Check if state is JSON
             const stateObj = JSON.parse(decodeURIComponent(state));
             if (stateObj.churchId) churchId = stateObj.churchId;
             if (stateObj.redirectUri) frontendRedirectUri = stateObj.redirectUri;
         } catch (e) {
-            // Not JSON, use raw state
+            // Not JSON, use raw state as churchId
         }
 
+        // 4. Determine redirect_uri
         const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
         const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost:8080';
-        
-        // Use the exact redirect_uri the frontend generated to prevent OAuth mismatch
         const redirectUri = frontendRedirectUri || `${protocol}://${host}/api/canva/oauth/callback`;
 
-        // Basic Auth using base64(client_id:client_secret)
-        const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
-
-        // Parse cookie - Firebase Hosting strips all cookies except __session
+        // 5. Parse PKCE verifier from cookie
         const cookieHeader = req.headers.cookie || '';
-        const match = cookieHeader.match(/__session=([^;]+)/);
-        const codeVerifier = match ? match[1] : '';
+        const cookieMatch = cookieHeader.match(/__session=([^;]+)/);
+        const codeVerifier = cookieMatch ? cookieMatch[1] : '';
+
+        log.info(`[CanvaIntegration] OAuth callback: churchId=${churchId}, hasCode=true, hasVerifier=${!!codeVerifier}, redirectUri=${redirectUri}`, 'system', {}, 'system');
 
         if (!codeVerifier) {
-            log.warn('Missing __session cookie in OAuth callback', 'system', {}, 'system');
+            log.warn('[CanvaIntegration] Missing __session cookie (PKCE verifier). The cookie may have been stripped by Firebase Hosting or the browser blocked it.', 'system', { cookieHeader: cookieHeader.substring(0, 100) }, 'system');
+        }
+
+        // 6. Exchange authorization code for tokens
+        const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+
+        const tokenBody: Record<string, string> = {
+            grant_type: 'authorization_code',
+            code: code.toString(),
+            redirect_uri: redirectUri,
+        };
+
+        // Only include code_verifier if we actually have one
+        if (codeVerifier) {
+            tokenBody.code_verifier = codeVerifier;
         }
 
         const tokenResponse = await fetch('https://api.canva.com/rest/v1/oauth/token', {
@@ -67,21 +93,23 @@ export const handleCanvaOAuthCallback = async (req: any, res: any): Promise<void
                 'Authorization': `Basic ${credentials}`,
                 'Content-Type': 'application/x-www-form-urlencoded',
             },
-            body: new URLSearchParams({
-                grant_type: 'authorization_code',
-                code: code.toString(),
-                redirect_uri: redirectUri,
-                code_verifier: codeVerifier,
-            }),
+            body: new URLSearchParams(tokenBody),
         });
 
         const tokenData = await tokenResponse.json();
 
         if (!tokenResponse.ok) {
-            throw new Error(`Canva OAuth Error: ${JSON.stringify(tokenData)}`);
+            log.error(`[CanvaIntegration] Token exchange failed: ${JSON.stringify(tokenData)}`, 'system', {
+                status: tokenResponse.status,
+                error: tokenData.error,
+                error_description: tokenData.error_description,
+                redirectUri,
+                hasVerifier: !!codeVerifier,
+            }, 'system');
+            throw new Error(`Canva token exchange failed (${tokenResponse.status}): ${tokenData.error_description || tokenData.error || JSON.stringify(tokenData)}`);
         }
 
-        // We assume state contains a churchId and/or userId to link the token
+        // 7. Store tokens in Firestore
         if (churchId) {
             await db.collection('churches').doc(churchId).collection('integrations').doc('canva').set({
                 accessToken: tokenData.access_token,
@@ -89,13 +117,14 @@ export const handleCanvaOAuthCallback = async (req: any, res: any): Promise<void
                 expiresAt: Date.now() + (tokenData.expires_in * 1000),
                 updatedAt: Date.now()
             });
+            log.info(`[CanvaIntegration] Successfully connected Canva for church ${churchId}`, 'system', {}, 'system');
         }
 
-        // Close the popup or redirect to a success page
-        res.send(`<script>window.close();</script>`);
+        // 8. Close the popup
+        res.send(`<html><body><p>Connected! This window will close automatically...</p><script>window.close();</script></body></html>`);
     } catch (error: any) {
-        log.error(`[CanvaIntegration] OAuth Callback Error: ${error.message}`, 'system', { error: error.message }, 'system');
-        res.status(500).send('Internal Server Error during Canva Authentication');
+        log.error(`[CanvaIntegration] OAuth Callback Error: ${error.message}`, 'system', { error: error.message, stack: error.stack?.substring(0, 500) }, 'system');
+        res.status(500).send(`<html><body><h3>Canva Authentication Error</h3><p>${error.message}</p><script>setTimeout(()=>window.close(),5000)</script></body></html>`);
     }
 };
 

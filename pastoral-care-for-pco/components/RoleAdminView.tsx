@@ -5466,6 +5466,13 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                     <div className="flex flex-wrap gap-4">
                         <button 
                             onClick={async () => {
+                                // Open popup IMMEDIATELY to preserve user-gesture (before any async work)
+                                const width = 600;
+                                const height = 700;
+                                const left = window.screenX + (window.innerWidth - width) / 2;
+                                const top = window.screenY + (window.innerHeight - height) / 2;
+                                const authWindow = window.open('about:blank', 'CanvaAuth', `width=${width},height=${height},left=${left},top=${top}`);
+
                                 try {
                                     // Generate PKCE
                                     const array = new Uint32Array(28);
@@ -5492,12 +5499,12 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                     
                                     const oauthUrl = `https://www.canva.com/api/oauth/authorize?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&state=${state}&code_challenge=${challenge}&code_challenge_method=s256`;
                                     
-                                    const width = 600;
-                                    const height = 700;
-                                    const left = window.screenX + (window.innerWidth - width) / 2;
-                                    const top = window.screenY + (window.innerHeight - height) / 2;
-                                    window.open(oauthUrl, 'CanvaAuth', `width=${width},height=${height},left=${left},top=${top}`);
+                                    // Navigate the already-open popup to the OAuth URL
+                                    if (authWindow) {
+                                        authWindow.location.href = oauthUrl;
+                                    }
                                 } catch (e: any) {
+                                    authWindow?.close();
                                     alert('Failed to initiate connection: ' + e.message);
                                 }
                             }}

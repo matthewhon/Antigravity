@@ -27,6 +27,8 @@ steps:
     - '1'
     - '--project'
     - '${_PROJECT_ID}'
+    - '--update-env-vars'
+    - 'CANVA_CLIENT_ID=${_CANVA_CLIENT_ID}'
 
 options:
   logging: CLOUD_LOGGING_ONLY
@@ -35,6 +37,7 @@ substitutions:
   _PROJECT_ID: pastoral-care-for-pco
   _SERVICE_NAME: pastoral-care-for-pco
   _REGION: us-central1
+  _CANVA_CLIENT_ID: 'OC-AZ9dHwB8GH1_'
 
 images:
   - 'gcr.io/${_PROJECT_ID}/${_SERVICE_NAME}'
