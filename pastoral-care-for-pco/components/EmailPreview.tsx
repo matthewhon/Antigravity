@@ -564,15 +564,19 @@ export const EmailPreview: React.FC<Props> = ({ blocks = [], settings, churchLog
             )}
 
             {block.type === 'pco_giving_form' && (
-              <div style={{ background: '#fdf2f8', border: '1px solid #fbcfe8', borderRadius: 12, padding: '24px 20px', textAlign: 'center', marginBottom: 4 }}>
-                <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 48, height: 48, borderRadius: '50%', background: '#fce7f3', color: '#db2777', marginBottom: 12 }}>
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
-                </div>
-                <h3 style={{ margin: '0 0 8px 0', fontSize: 18, color: '#9d174d', fontWeight: 700 }}>Give Online</h3>
-                <p style={{ margin: '0 0 16px 0', fontSize: 14, color: '#be185d', lineHeight: 1.4 }}>Support our ministry easily and securely through Church Center.</p>
-                <a href={block.content?.url || '#'} style={{ display: 'inline-block', padding: '10px 24px', background: '#db2777', color: '#fff', borderRadius: 8, textDecoration: 'none', fontSize: 14, fontWeight: 700, boxShadow: '0 2px 4px rgba(219,39,119,0.2)' }}>
-                  {block.content?.text || 'Give Now'}
-                </a>
+              <div style={{ borderRadius: 12, overflow: 'hidden', marginBottom: 4, background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                {block.content?.url ? (
+                  <iframe
+                    src={block.content.url + (block.content.url.includes('?') ? '&modal=true' : '?modal=true')}
+                    style={{ width: '100%', height: 750, border: 'none' }}
+                    title="Giving Form"
+                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-top-navigation-by-user-activation"
+                  />
+                ) : (
+                  <div style={{ padding: '40px 20px', textAlign: 'center', color: '#64748b' }}>
+                    Please configure the Giving URL in the builder.
+                  </div>
+                )}
               </div>
             )}
 
