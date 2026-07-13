@@ -266,14 +266,16 @@ export const BulletinManager: React.FC<BulletinManagerProps> = ({
 
   // ─── Auto-save blocks ─────────────────────────────────────────────────────
 
-  const handleBlocksChange = useCallback(async (blocks: EmailBlock[]) => {
+  const handleBlocksChange = useCallback(async (action: React.SetStateAction<EmailBlock[]>) => {
     if (!activeBulletin) return;
-    const updated = { ...activeBulletin, blocks, updatedAt: Date.now() };
+    const currentBlocks = activeBulletin.blocks || [];
+    const newBlocks = typeof action === 'function' ? action(currentBlocks) : action;
+    const updated = { ...activeBulletin, blocks: newBlocks, updatedAt: Date.now() };
     setActiveBulletin(updated);
     setBulletins(prev => prev.map(b => b.id === updated.id ? updated : b));
     try {
       setSaving(true);
-      await firestore.updateBulletin(activeBulletin.id, { blocks, updatedAt: Date.now() });
+      await firestore.updateBulletin(activeBulletin.id, { blocks: newBlocks, updatedAt: Date.now() });
     } catch {
       showToast('Auto-save failed.', 'error');
     } finally {
