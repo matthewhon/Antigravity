@@ -4,7 +4,53 @@ import { v4 as uuidv4 } from 'uuid';
 
 const CANVA_API_BASE = 'https://api.canva.com/rest/v1';
 
-// ─── OAuth 2.0 Endpoints ──────────────────────────────────────────────────────
+// ─── Credential Helper ────────────────────────────────────────────────────────
+
+/**
+ * Reads Canva credentials from Firestore system/settings (primary source),
+ * with fallbacks to process.env and .env.local for local development.
+ */
+async function getCanvaCredentials(db: any): Promise<{ clientId: string; clientSecret: string }> {
+    // 1. Primary: Read from Firestore system/settings
+    const settingsDoc = await db.doc('system/settings').get();
+    const settings = settingsDoc.exists ? settingsDoc.data() : {};
+    let clientId = settings?.canvaClientId;
+    let clientSecret = settings?.canvaClientSecret;
+
+    if (clientId && clientSecret) {
+        return { clientId, clientSecret };
+    }
+
+    // 2. Fallback: process.env
+    if (!clientId) clientId = process.env.CANVA_CLIENT_ID;
+    if (!clientSecret) clientSecret = process.env.CANVA_CLIENT_SECRET;
+
+    if (clientId && clientSecret) {
+        return { clientId, clientSecret };
+    }
+
+    // 3. Fallback: .env.local (local dev only)
+    try {
+        const fs = await import('fs');
+        const envLocal = fs.readFileSync('.env.local', 'utf8');
+        if (!clientId) {
+            const match = envLocal.match(/CANVA_CLIENT_ID=(.*)/);
+            if (match) clientId = match[1].trim();
+        }
+        if (!clientSecret) {
+            const match = envLocal.match(/CANVA_CLIENT_SECRET=(.*)/);
+            if (match) clientSecret = match[1].trim();
+        }
+    } catch (e) {
+        // .env.local not available
+    }
+
+    if (!clientId || !clientSecret) {
+        throw new Error('Canva credentials not configured. Set them in App Settings → Configuration → Canva Integration.');
+    }
+
+    return { clientId, clientSecret };
+}
 
 export const handleCanvaOAuthCallback = async (req: any, res: any): Promise<void> => {
     const db = getDb();
@@ -22,28 +68,8 @@ export const handleCanvaOAuthCallback = async (req: any, res: any): Promise<void
     }
 
     try {
-        // 2. Load credentials
-        let clientId = process.env.CANVA_CLIENT_ID;
-        let clientSecret = process.env.CANVA_CLIENT_SECRET;
-
-        // Fallback for local development if dotenv is not loaded
-        if (!clientId || !clientSecret) {
-            try {
-                const fs = await import('fs');
-                const envLocal = fs.readFileSync('.env.local', 'utf8');
-                const idMatch = envLocal.match(/CANVA_CLIENT_ID=(.*)/);
-                const secretMatch = envLocal.match(/CANVA_CLIENT_SECRET=(.*)/);
-                if (idMatch && !clientId) clientId = idMatch[1].trim();
-                if (secretMatch && !clientSecret) clientSecret = secretMatch[1].trim();
-            } catch (e) {
-                log.warn('[CanvaIntegration] .env.local fallback failed, relying on process.env only', 'system', {}, 'system');
-            }
-        }
-
-        if (!clientId || !clientSecret) {
-            log.error('[CanvaIntegration] CANVA_CLIENT_ID or CANVA_CLIENT_SECRET is not set. Set these as Cloud Run environment variables.', 'system', { hasClientId: !!clientId, hasClientSecret: !!clientSecret }, 'system');
-            return res.status(500).send('<html><body><h3>Server Configuration Error</h3><p>Canva credentials are not configured on the server. Please contact your administrator.</p><script>setTimeout(()=>window.close(),5000)</script></body></html>');
-        }
+        // 2. Load credentials from Firestore system/settings
+        const { clientId, clientSecret } = await getCanvaCredentials(db);
 
         // 3. Parse state
         let churchId = state;
@@ -142,24 +168,7 @@ async function getValidCanvaToken(db: any, churchId: string, integrationData: an
         throw new Error('No refresh token available');
     }
 
-    let clientId = process.env.CANVA_CLIENT_ID;
-    let clientSecret = process.env.CANVA_CLIENT_SECRET;
-
-    if (!clientId || !clientSecret) {
-        try {
-            const fs = await import('fs');
-            const envLocal = fs.readFileSync('.env.local', 'utf8');
-            if (!clientId) {
-                const match = envLocal.match(/CANVA_CLIENT_ID=(.*)/);
-                if (match) clientId = match[1].trim();
-            }
-            if (!clientSecret) {
-                const match = envLocal.match(/CANVA_CLIENT_SECRET=(.*)/);
-                if (match) clientSecret = match[1].trim();
-            }
-        } catch (e) {}
-    }
-
+    const { clientId, clientSecret } = await getCanvaCredentials(db);
     const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
 
     const tokenResponse = await fetch('https://api.canva.com/rest/v1/oauth/token', {

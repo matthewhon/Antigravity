@@ -459,6 +459,32 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                         </div>
                     </div>
 
+                    {/* Canva Integration */}
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm lg:col-span-2">
+                        <div className="flex items-center gap-3 mb-1">
+                            <div className="w-8 h-8 rounded-xl bg-[#00c4cc]/10 flex items-center justify-center">
+                                <span className="text-base">🎨</span>
+                            </div>
+                            <h3 className="text-sm font-black text-slate-900 dark:text-white">Canva Integration</h3>
+                            {settings.canvaClientId && settings.canvaClientSecret ? (
+                                <span className="text-[10px] font-black bg-[#00c4cc] text-white px-3 py-1 rounded-full ml-auto">CONFIGURED ✓</span>
+                            ) : (
+                                <span className="text-[10px] font-black bg-amber-500 text-white px-3 py-1 rounded-full ml-auto">NEEDS CREDENTIALS</span>
+                            )}
+                        </div>
+                        <p className="text-[10px] text-slate-400 mb-5 leading-relaxed">Global Canva Connect API credentials. Get these from <a href="https://www.canva.dev/console" target="_blank" rel="noopener noreferrer" className="underline text-indigo-400 hover:text-indigo-300">developers.canva.com</a>.</p>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Client ID</label>
+                                <input type="text" aria-label="Canva Client ID" placeholder="OC-..." value={settings.canvaClientId || ''} onChange={e => handleChange('canvaClientId', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-[#00c4cc]" />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Client Secret</label>
+                                <input type="password" aria-label="Canva Client Secret" placeholder="cnvca..." value={settings.canvaClientSecret || ''} onChange={e => handleChange('canvaClientSecret', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-[#00c4cc]" />
+                            </div>
+                        </div>
+                    </div>
+
                 </div>{/* end Row 1 */}
 
                 {/* ── Email Delivery (full-width) ──────────────────────────────── */}

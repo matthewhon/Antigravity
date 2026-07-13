@@ -646,6 +646,11 @@ export interface SystemSettings {
     // -- Weather (Visual Crossing) -----------------------------------------------
     /** Visual Crossing Weather API key — used for attendance prediction feature */
     weatherApiKey?: string;
+    // -- Canva Integration -------------------------------------------------------
+    /** Canva Connect API Client ID — from developers.canva.com */
+    canvaClientId?: string;
+    /** Canva Connect API Client Secret — from developers.canva.com */
+    canvaClientSecret?: string;
 }
 
 export interface TemplateSettings {

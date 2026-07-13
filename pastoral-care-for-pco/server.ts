@@ -1617,6 +1617,49 @@ Return ONLY the JSON object, no markdown, no explanation:`;
       } catch (e) {
         console.warn('[SmsScheduler] Could not start scheduler:', e);
       }
+      
+      // Auto-initialize default Canva credentials in Firestore if they don't exist yet
+      try {
+        const db = getDb();
+        const docRef = db.doc('system/settings');
+        docRef.get().then((docSnap: any) => {
+          const currentData = docSnap.exists ? docSnap.data() : {};
+          if (!currentData.canvaClientId || !currentData.canvaClientSecret) {
+            let clientId = process.env.CANVA_CLIENT_ID;
+            let clientSecret = process.env.CANVA_CLIENT_SECRET;
+
+            if (!clientId || !clientSecret) {
+              try {
+                // Try reading from .env.local for local dev
+                const envPath = path.join(process.cwd(), '.env.local');
+                if (fs.existsSync(envPath)) {
+                  const envLocal = fs.readFileSync(envPath, 'utf8');
+                  const idMatch = envLocal.match(/CANVA_CLIENT_ID=(.*)/);
+                  const secretMatch = envLocal.match(/CANVA_CLIENT_SECRET=(.*)/);
+                  if (idMatch && !clientId) clientId = idMatch[1].trim();
+                  if (secretMatch && !clientSecret) clientSecret = secretMatch[1].trim();
+                }
+              } catch (e) {}
+            }
+
+            if (clientId && clientSecret) {
+              console.log('[CanvaInit] Initializing default Canva credentials in Firestore system/settings...');
+              docRef.set({
+                canvaClientId: clientId,
+                canvaClientSecret: clientSecret
+              }, { merge: true }).then(() => {
+                console.log('[CanvaInit] Default Canva credentials initialized successfully.');
+              }).catch((e: any) => {
+                console.error('[CanvaInit] Failed to write default Canva credentials:', e);
+              });
+            }
+          }
+        }).catch((e: any) => {
+          console.error('[CanvaInit] Failed to check existing Canva credentials:', e);
+        });
+      } catch (e) {
+        console.error('[CanvaInit] Unexpected error during Canva init:', e);
+      }
     });
 
   } catch (error) {
