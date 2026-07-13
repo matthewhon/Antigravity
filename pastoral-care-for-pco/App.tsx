@@ -921,6 +921,10 @@ const App: React.FC = () => {
   }
 
   // ── Public Bulletin Route (no auth required) ───────────────────────────
+  const latestBulletinMatch = window.location.pathname.match(/^\/bulletin\/latest\/([^/]+)/);
+  if (latestBulletinMatch) {
+    return <PublicBulletinView latestForChurchId={latestBulletinMatch[1]} />;
+  }
   const bulletinMatch = window.location.pathname.match(/^\/bulletin\/([^/]+)/);
   if (bulletinMatch) {
     return <PublicBulletinView bulletinId={bulletinMatch[1]} />;

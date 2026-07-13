@@ -3,6 +3,7 @@ import { DigitalBulletin, ChurchNote, Poll } from '../types';
 import { EmailPreview } from './EmailPreview';
 import { EmailBlock } from './EmailBuilder';
 import { TemplateSettings } from '../types';
+import { PublicFormView } from './PublicFormView';
 
 // ─── Default template settings ────────────────────────────────────────────────
 
@@ -308,7 +309,15 @@ const EmbeddedPoll: React.FC<{ itemId: string }> = ({ itemId }) => {
 
 // ─── Embedded Form Block ──────────────────────────────────────────────────────
 
-const EmbeddedForm: React.FC<{ itemId: string; churchId: string }> = ({ itemId, churchId }) => {
+const EmbeddedForm: React.FC<{ itemId: string; churchId: string; displayMode?: string }> = ({ itemId, churchId, displayMode }) => {
+  if (displayMode === 'embed') {
+    return (
+      <div style={{ borderRadius: 14, overflow: 'hidden', border: '1px solid #e2e8f0', background: '#fff' }}>
+        <PublicFormView churchId={churchId} formId={itemId} isEmbedded={true} />
+      </div>
+    );
+  }
+
   // Render as a link-out to the existing PublicFormView to keep parity with existing form logic
   const formUrl = `${window.location.origin}/form/${churchId}/${itemId}`;
   return (
@@ -379,7 +388,7 @@ const BulletinBlockRenderer: React.FC<{ blocks: EmailBlock[]; settings: Template
           return <EmbeddedPoll key={i} itemId={c.itemId || ''} />;
         }
         if (block.type === 'embedded_form') {
-          return <EmbeddedForm key={i} itemId={c.itemId || ''} churchId={churchId} />;
+          return <EmbeddedForm key={i} itemId={c.itemId || ''} churchId={churchId} displayMode={c.displayMode} />;
         }
         return null;
       })}
@@ -389,7 +398,7 @@ const BulletinBlockRenderer: React.FC<{ blocks: EmailBlock[]; settings: Template
 
 // ─── Main Public Bulletin View ─────────────────────────────────────────────────
 
-export const PublicBulletinView: React.FC<{ bulletinId: string }> = ({ bulletinId }) => {
+export const PublicBulletinView: React.FC<{ bulletinId?: string; latestForChurchId?: string }> = ({ bulletinId, latestForChurchId }) => {
   const [bulletin, setBulletin] = useState<DigitalBulletin | null>(null);
   const [churchName, setChurchName] = useState('');
   const [churchLogoUrl, setChurchLogoUrl] = useState<string | undefined>();
@@ -400,7 +409,13 @@ export const PublicBulletinView: React.FC<{ bulletinId: string }> = ({ bulletinI
     const load = async () => {
       try {
         const { firestore } = await import('../services/firestoreService');
-        const data = await firestore.getBulletin(bulletinId);
+        let data: DigitalBulletin | null = null;
+        if (latestForChurchId) {
+          data = await firestore.getLatestPublishedBulletin(latestForChurchId);
+        } else if (bulletinId) {
+          data = await firestore.getBulletin(bulletinId);
+        }
+
         if (!data) { setLoadState('not_found'); return; }
         if (data.status !== 'published') { setLoadState('draft'); return; }
         setBulletin(data);
@@ -415,7 +430,7 @@ export const PublicBulletinView: React.FC<{ bulletinId: string }> = ({ bulletinI
       }
     };
     load();
-  }, [bulletinId]);
+  }, [bulletinId, latestForChurchId]);
 
   const handleCopyLink = async () => {
     try {

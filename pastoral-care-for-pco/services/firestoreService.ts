@@ -1755,7 +1755,7 @@ class FirestoreService {
       const snap = await getDocs(q);
       return snap.docs.map(d => {
         const data = d.data();
-        return { id: d.id, title: data.title || 'Untitled Form', churchId: data.churchId };
+        return { id: d.id, title: data.name || data.title || 'Untitled Form', churchId: data.churchId };
       });
     } catch (e) {
       console.error('[FirestoreService] getForms failed:', e);
@@ -1783,6 +1783,19 @@ class FirestoreService {
       const docSnap = await getDoc(doc(db, 'digital_bulletins', bulletinId));
       return docSnap.exists() ? (docSnap.data() as DigitalBulletin) : null;
     } catch (e) {
+      return null;
+    }
+  }
+
+  async getLatestPublishedBulletin(churchId: string): Promise<DigitalBulletin | null> {
+    try {
+      const bulletins = await this.getBulletins(churchId);
+      const published = bulletins
+        .filter(b => b.status === 'published')
+        .sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0));
+      return published.length > 0 ? published[0] : null;
+    } catch (e) {
+      console.error('[FirestoreService] getLatestPublishedBulletin failed:', e);
       return null;
     }
   }

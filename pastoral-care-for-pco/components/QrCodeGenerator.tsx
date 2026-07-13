@@ -7,7 +7,7 @@ import {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type QrType = 'url' | 'email' | 'phone' | 'sms' | 'vcard' | 'wifi' | 'text';
+type QrType = 'url' | 'email' | 'phone' | 'sms' | 'vcard' | 'wifi' | 'text' | 'bulletin';
 
 interface SavedQr {
   id: string;
@@ -25,7 +25,7 @@ interface QrTypeOption {
   icon: React.ReactNode;
   label: string;
   placeholder: string;
-  buildValue: (fields: Record<string, string>) => string;
+  buildValue: (fields: Record<string, string>, churchId?: string) => string;
   fields: { key: string; label: string; placeholder: string; type?: string }[];
 }
 
@@ -130,6 +130,14 @@ const QR_TYPES: QrTypeOption[] = [
     buildValue: (f) => f.text || '',
     fields: [{ key: 'text', label: 'Text Content', placeholder: 'Join us Sundays at 9am & 11am!' }],
   },
+  {
+    type: 'bulletin',
+    icon: <Globe size={15} />,
+    label: 'Latest Bulletin',
+    placeholder: '',
+    buildValue: (f, churchId) => `${window.location.origin}/bulletin/latest/${churchId || 'default'}`,
+    fields: [],
+  },
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -221,7 +229,7 @@ const QrCodeGenerator: React.FC<{ churchId?: string }> = ({ churchId }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const typeConfig = QR_TYPES.find(t => t.type === selectedType)!;
-  const qrValue = typeConfig.buildValue(fields);
+  const qrValue = typeConfig.buildValue(fields, churchId);
 
   // ── Derived ────────────────────────────────────────────────────────────────
   const filteredSaved = search.trim()
@@ -246,8 +254,12 @@ const QrCodeGenerator: React.FC<{ churchId?: string }> = ({ churchId }) => {
     const cfg = QR_TYPES.find(t => t.type === q.type)!;
     // Best-effort: put value into first field key so preview renders correctly
     // For simple types (url, phone, text, sms) this works fine.
-    const firstKey = cfg.fields[0].key;
-    setFields({ [firstKey]: q.value });
+    const firstKey = cfg.fields[0]?.key;
+    if (firstKey) {
+      setFields({ [firstKey]: q.value });
+    } else {
+      setFields({});
+    }
   }, []);
 
   // ── Save current ──────────────────────────────────────────────────────────
@@ -527,6 +539,11 @@ const QrCodeGenerator: React.FC<{ churchId?: string }> = ({ churchId }) => {
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide">
                   {typeConfig.label} Details
                 </label>
+                {typeConfig.fields.length === 0 && (
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    This QR code type is fully automatic and requires no configuration.
+                  </p>
+                )}
                 {typeConfig.fields.map(f => (
                   <div key={f.key}>
                     <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">{f.label}</label>
@@ -746,6 +763,7 @@ const QrCodeGenerator: React.FC<{ churchId?: string }> = ({ churchId }) => {
                 {selectedType === 'vcard' && '👤 Share a digital contact card for your pastor or staff.'}
                 {selectedType === 'text'  && '📝 Encode any plain text — service times, addresses, announcements.'}
                 {selectedType === 'phone' && '📞 Link directly to call your church phone number.'}
+                {selectedType === 'bulletin' && '📰 Always links to your most recently published Digital Bulletin.'}
               </p>
             </div>
           </div>

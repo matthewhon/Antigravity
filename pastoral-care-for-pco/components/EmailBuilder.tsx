@@ -998,6 +998,24 @@ const InlineMediaEditor: React.FC<{
       </div>
     );
   }
+  if (block.type === 'pco_form') {
+    return (
+      <div className="space-y-3 p-3">
+        <div className="text-[11px] text-slate-500 mb-2 font-semibold">Planning Center Form: {c.name || 'Untitled'}</div>
+        <div>
+          <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Display Mode</label>
+          <select
+            value={c.displayMode || 'embed'}
+            onChange={e => onUpdate({ ...c, displayMode: e.target.value })}
+            className="w-full text-xs border border-slate-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          >
+            <option value="link">Button Link (Email Safe)</option>
+            <option value="embed">Fully Embedded (Bulletins Only)</option>
+          </select>
+        </div>
+      </div>
+    );
+  }
   if (block.type === 'pco_giving_form') {
     return (
       <div className="space-y-3 p-3">
@@ -1070,7 +1088,19 @@ const EmbedBlockEditor: React.FC<{ block: EmailBlock; onUpdate: (content: any) =
         </select>
       )}
       {c.itemId && (
-        <div className="text-[11px] text-slate-400">ID: {c.itemId}</div>
+        <div className="flex items-center justify-between mt-2">
+          <div className="text-[11px] text-slate-400">ID: {c.itemId}</div>
+          {block.type === 'embedded_form' && (
+            <select
+              value={c.displayMode || 'link'}
+              onChange={e => onUpdate({ ...c, displayMode: e.target.value })}
+              className="text-[11px] border border-slate-200 dark:border-slate-600 rounded px-1.5 py-0.5 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 focus:outline-none"
+            >
+              <option value="link">Button Link</option>
+              <option value="embed">Fully Embedded</option>
+            </select>
+          )}
+        </div>
       )}
     </div>
   );
@@ -1078,7 +1108,7 @@ const EmbedBlockEditor: React.FC<{ block: EmailBlock; onUpdate: (content: any) =
 
 // ─── Sortable canvas block ────────────────────────────────────────────────────
 
-const INLINE_EDITABLE = new Set(['text', 'header', 'html', 'image', 'video', 'button', 'file', 'embedded_note', 'embedded_poll', 'embedded_form', 'pco_giving_form']);
+const INLINE_EDITABLE = new Set(['text', 'header', 'html', 'image', 'video', 'button', 'file', 'embedded_note', 'embedded_poll', 'embedded_form', 'pco_giving_form', 'pco_form']);
 
 const SortableCanvasBlock: React.FC<{
   block: EmailBlock;

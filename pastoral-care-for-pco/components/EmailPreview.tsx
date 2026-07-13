@@ -563,7 +563,9 @@ export const EmailPreview: React.FC<Props> = ({ blocks = [], settings, churchLog
               <PcoContentCard block={block} primaryColor={settings.primaryColor} />
             )}
 
-            {block.type === 'pco_form' && (
+            {block.type === 'pco_form' && (block.content?.displayMode === 'link' ? (
+              <PcoContentCard block={block} primaryColor={settings.primaryColor} />
+            ) : (
               <div style={{ borderRadius: 12, overflow: 'hidden', marginBottom: 4, background: '#f8fafc', border: '1px solid #e2e8f0' }}>
                 {block.content?.url ? (
                   <iframe
@@ -578,7 +580,7 @@ export const EmailPreview: React.FC<Props> = ({ blocks = [], settings, churchLog
                   </div>
                 )}
               </div>
-            )}
+            ))}
 
             {block.type === 'pco_giving_form' && (
               <div style={{ borderRadius: 12, overflow: 'hidden', marginBottom: 4, background: '#f8fafc', border: '1px solid #e2e8f0' }}>

@@ -6,9 +6,10 @@ import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebas
 interface PublicFormViewProps {
   churchId: string;
   formId: string;
+  isEmbedded?: boolean;
 }
 
-export const PublicFormView: React.FC<PublicFormViewProps> = ({ churchId, formId }) => {
+export const PublicFormView: React.FC<PublicFormViewProps> = ({ churchId, formId, isEmbedded }) => {
   const [config, setConfig] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -344,14 +345,14 @@ export const PublicFormView: React.FC<PublicFormViewProps> = ({ churchId, formId
 
   return (
     <div 
-      className="min-h-screen w-full overflow-y-auto flex items-center justify-center py-12 px-6 transition-all duration-300"
-      style={{ backgroundColor: themeStyles.backgroundColor + '1A', color: themeStyles.textColor }}
+      className={isEmbedded ? "w-full transition-all duration-300" : "min-h-screen w-full overflow-y-auto flex items-center justify-center py-12 px-6 transition-all duration-300"}
+      style={{ backgroundColor: isEmbedded ? 'transparent' : themeStyles.backgroundColor + '1A', color: themeStyles.textColor }}
     >
       <div 
-        className="w-full max-w-2xl border border-slate-200/80 dark:border-slate-800 rounded-3xl p-8 lg:p-10 shadow-xl relative overflow-hidden transition-colors"
-        style={{ backgroundColor: themeStyles.backgroundColor, color: themeStyles.textColor }}
+        className={isEmbedded ? "w-full relative overflow-hidden transition-colors" : "w-full max-w-2xl border border-slate-200/80 dark:border-slate-800 rounded-3xl p-8 lg:p-10 shadow-xl relative overflow-hidden transition-colors"}
+        style={{ backgroundColor: isEmbedded ? 'transparent' : themeStyles.backgroundColor, color: themeStyles.textColor }}
       >
-        <div className="absolute top-0 left-0 right-0 h-1.5" style={{ backgroundColor: themeStyles.primaryColor }} />
+        {!isEmbedded && <div className="absolute top-0 left-0 right-0 h-1.5" style={{ backgroundColor: themeStyles.primaryColor }} />}
 
         {themeStyles.showLogo && (themeStyles.logoUrl || config?.churchLogoUrl) && (
           <div className="flex justify-center mt-4 mb-6">
