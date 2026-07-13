@@ -64,6 +64,7 @@ interface EmailBuilderProps {
 const BLOCK_DEFS: { type: BlockType; label: string; icon: React.ReactNode; default: any }[] = [
   { type: 'text',    label: 'Text',    icon: <Type size={20} />,            default: { text: '<p>Start typing…</p>' } },
   { type: 'image',   label: 'Image',   icon: <ImageIcon size={20} />,       default: { src: '' } },
+  { type: 'image',   label: 'Canva',   icon: <ImageIcon size={20} className="text-[#00c4cc]" />, default: { src: '', autoOpenCanva: true } },
   { type: 'button',  label: 'Button',  icon: <MousePointerClick size={20} />, default: { text: 'Click Here', url: '#', align: 'center', size: 'medium', borderRadius: 'rounded', color: '', textColor: '#ffffff' } },
   { type: 'file',    label: 'File',    icon: <File size={20} />,            default: { name: 'document.pdf', url: '#' } },
   { type: 'divider', label: 'Divider', icon: <Minus size={20} />,           default: {} },
@@ -735,13 +736,20 @@ const InlineMediaEditor: React.FC<{
   onUpdate: (content: any) => void;
   churchId?: string;
 }> = ({ block, onUpdate, churchId }) => {
+  const c = block.content || {};
   const [showLibrary, setShowLibrary] = useState(false);
-  const [showCanva, setShowCanva] = useState(false);
+  const [showCanva, setShowCanva] = useState(!!c.autoOpenCanva);
   const imageUpload = useUpload('email_images');
   const fileUpload = useUpload('email_files');
   const imgInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const c = block.content || {};
+
+  useEffect(() => {
+    // If block was dropped as a Canva block, clear the flag so it doesn't auto-open again on next render
+    if (c.autoOpenCanva) {
+      onUpdate({ ...c, autoOpenCanva: false });
+    }
+  }, []);
 
   if (block.type === 'image') {
     return (
@@ -1941,9 +1949,8 @@ export const EmailBuilder: React.FC<EmailBuilderProps> = ({
     return [...prev, newBlock];
   };
 
-  const addBlock = (type: BlockType, insertAfterIndex?: number) => {
-    const def = BLOCK_DEFS.find(d => d.type === type);
-    const newBlock: EmailBlock = { id: `block_${Date.now()}_${Math.random().toString(36).slice(2,5)}`, type, content: def?.default || {} };
+  const addBlock = (def: typeof BLOCK_DEFS[number], insertAfterIndex?: number) => {
+    const newBlock: EmailBlock = { id: `block_${Date.now()}_${Math.random().toString(36).slice(2,5)}`, type: def.type, content: def.default || {} };
     setBlocks(prev => insertBlockHelper(prev, newBlock, insertAfterIndex));
     setSelectedId(newBlock.id);
     return newBlock;
@@ -2024,7 +2031,7 @@ export const EmailBuilder: React.FC<EmailBuilderProps> = ({
             {BLOCK_DEFS.map(def => (
               <button
                 key={def.type}
-                onClick={() => addBlock(def.type)}
+                onClick={() => addBlock(def)}
                 className="flex flex-col items-center gap-1.5 p-3 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-700 dark:hover:text-indigo-300 text-slate-600 dark:text-slate-400 transition group border border-transparent hover:border-indigo-200 dark:hover:border-indigo-700"
               >
                 <span className="group-hover:scale-110 transition">{def.icon}</span>
@@ -2157,13 +2164,8 @@ export const EmailBuilder: React.FC<EmailBuilderProps> = ({
                 <button
                   key={type}
                   onClick={() => {
-                    const newBlock: EmailBlock = {
-                      id: `block_${Date.now()}_${Math.random().toString(36).slice(2,5)}`,
-                      type,
-                      content: { itemId: '', title: '' },
-                    };
-                    setBlocks(prev => insertBlockHelper(prev, newBlock));
-                    setSelectedId(newBlock.id);
+                    const def = BLOCK_DEFS.find(b => b.type === type);
+                    if (def) addBlock(def);
                   }}
                   className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition"
                 >
@@ -2205,7 +2207,7 @@ export const EmailBuilder: React.FC<EmailBuilderProps> = ({
                       {BLOCK_DEFS.map(def => (
                         <button
                           key={def.type}
-                          onClick={() => { addBlock(def.type); setAddingBlockAtIndex(null); }}
+                          onClick={() => { addBlock(def); setAddingBlockAtIndex(null); }}
                           className="flex flex-col items-center gap-1.5 p-3 w-16 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-700 dark:hover:text-indigo-300 text-slate-600 dark:text-slate-400 transition"
                         >
                           {def.icon}
@@ -2246,7 +2248,7 @@ export const EmailBuilder: React.FC<EmailBuilderProps> = ({
                             {BLOCK_DEFS.map(def => (
                               <button
                                 key={def.type}
-                                onClick={() => { addBlock(def.type, idx); setAddingBlockAtIndex(null); }}
+                                onClick={() => { addBlock(def, idx); setAddingBlockAtIndex(null); }}
                                 className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 transition"
                                 title={`Add ${def.label}`}
                               >
