@@ -5510,7 +5510,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                             onClick={async () => {
                                 if (!window.confirm("Are you sure you want to disconnect Canva? Users will no longer be able to import designs.")) return;
                                 try {
-                                    await firestore.db.collection('churches').doc(churchId).collection('integrations').doc('canva').delete();
+                                    await firestore.disconnectCanva(churchId);
                                     alert('Successfully disconnected Canva.');
                                 } catch (e: any) {
                                     alert('Failed to disconnect: ' + e.message);

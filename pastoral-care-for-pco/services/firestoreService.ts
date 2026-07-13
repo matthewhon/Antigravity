@@ -168,6 +168,14 @@ class FirestoreService {
     }
   }
 
+  async disconnectCanva(churchId: string) {
+    try {
+      await deleteDoc(doc(db, 'churches', churchId, 'integrations', 'canva'));
+    } catch (e) {
+      this.handleFirestoreError(e);
+    }
+  }
+
   /**
    * Persists the computed active people count to the Church document.
    * Called after computeActivePeopleCount() returns a result.
