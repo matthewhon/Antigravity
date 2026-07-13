@@ -118,7 +118,12 @@ const BlockThumbnail: React.FC<{ block: EmailBlock }> = ({ block }) => {
         </div>
       );
     case 'html':
-      return <div className="text-xs font-mono text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-900 rounded p-2 line-clamp-2">{c.html || ''}</div>;
+      return (
+        <div
+          className="pointer-events-none"
+          dangerouslySetInnerHTML={{ __html: c.html || '' }}
+        />
+      );
     case 'pco_registration':
     case 'pco_group':
     case 'pco_event':
@@ -1268,6 +1273,9 @@ const MiniBlockView: React.FC<{ b: { id: string; type: string; content: any } }>
         <span style={{ background: btnBg, color: btnTc, borderRadius: btnRad, padding: '4px 12px', fontSize: 12, fontWeight: 600, display: 'inline-block' }}>{c.text || 'Button'}</span>
       </div>
     );
+  }
+  if (b.type === 'html') {
+    return <div className="pointer-events-none" dangerouslySetInnerHTML={{ __html: c.html || '' }} />;
   }
   return null;
 };

@@ -157,6 +157,9 @@ const MiniBlockPreview: React.FC<{ b: { id: string; type: string; content: any }
       </div>
     );
   }
+  if (b.type === 'html') {
+    return <div dangerouslySetInnerHTML={{ __html: c.html || '' }} />;
+  }
   return null;
 };
 
