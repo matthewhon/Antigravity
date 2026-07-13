@@ -2104,6 +2104,7 @@ export const EmailBuilder: React.FC<EmailBuilderProps> = ({
                 { type: 'embedded_note'  as BlockType, label: 'Church Note', icon: <FileText size={13} />, color: 'indigo' },
                 { type: 'embedded_poll'  as BlockType, label: 'Poll',        icon: <List size={13} />,     color: 'violet' },
                 { type: 'embedded_form'  as BlockType, label: 'Form',        icon: <ClipboardList size={13} />, color: 'emerald' },
+                { type: 'pco_giving_form' as BlockType, label: 'Giving Form', icon: <Heart size={13} />, color: 'rose' },
               ]).map(({ type, label, icon }) => (
                 <button
                   key={type}

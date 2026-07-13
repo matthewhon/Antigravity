@@ -609,11 +609,25 @@ export const BulletinManager: React.FC<BulletinManagerProps> = ({
           />
         )}
         {showDataChart && (
-          <DataChartSelector
-            churchId={churchId}
-            onInsert={handleInsertDataChart}
-            onClose={() => setShowDataChart(false)}
-          />
+          <>
+            <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-40" onClick={() => setShowDataChart(false)} />
+            <div className="fixed top-0 left-0 h-full w-[320px] bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 z-50 flex flex-col shadow-2xl overflow-hidden animate-in slide-in-from-left">
+              <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-800 shrink-0">
+                <h3 className="font-semibold text-slate-800 dark:text-slate-200">Insert Data Chart</h3>
+                <button onClick={() => setShowDataChart(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><X size={16} /></button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4">
+                <DataChartSelector
+                  churchId={churchId}
+                  onInsert={(...args) => {
+                    handleInsertDataChart(...args);
+                    setShowDataChart(false);
+                  }}
+                  onClose={() => setShowDataChart(false)}
+                />
+              </div>
+            </div>
+          </>
         )}
         {showPcoImport && (
           <PcoImportModal
