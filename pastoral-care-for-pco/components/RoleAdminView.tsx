@@ -985,7 +985,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   const { campuses } = useTenantData();
   const [users, setUsers] = useState<User[]>([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'Team' | 'Organization' | 'Planning Center' | 'Community' | 'Widget Directory' | 'Risk Profiles' | 'Subscription' | 'Mail Settings' | 'SMS' | 'Grow Integration'>('Team');
+  const [activeTab, setActiveTab] = useState<'Team' | 'Organization' | 'Planning Center' | 'Community' | 'Widget Directory' | 'Risk Profiles' | 'Subscription' | 'Mail Settings' | 'SMS' | 'Grow Integration' | 'Canva'>('Team');
 
   // Delete Organization modal state
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -1777,7 +1777,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
             </div>
             
             <div className="flex flex-row lg:flex-col gap-2 overflow-x-auto lg:overflow-visible pb-4 lg:pb-0 no-scrollbar border-b lg:border-b-0 border-slate-200 dark:border-slate-800">
-                {['Team', 'Organization', 'Planning Center', 'Community', 'Mail Settings', 'SMS', 'Grow Integration', 'Widget Directory', 'Risk Profiles', 'Subscription'].map(tab => (
+                {['Team', 'Organization', 'Planning Center', 'Community', 'Mail Settings', 'SMS', 'Grow Integration', 'Canva', 'Widget Directory', 'Risk Profiles', 'Subscription'].map(tab => (
                     <button 
                         key={tab}
                         onClick={() => setActiveTab(tab as any)}
@@ -5445,6 +5445,80 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                 }}
                 onCancel={() => setShowTermsModal(false)}
             />
+        )}
+        {activeTab === 'Canva' && (
+            <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] border border-slate-100 dark:border-slate-800 shadow-sm max-w-4xl mx-auto space-y-8 animate-fade-in-up">
+                <div className="flex items-center gap-4 mb-4">
+                    <div className="w-12 h-12 rounded-2xl bg-[#00c4cc]/10 flex items-center justify-center">
+                        <span className="text-2xl text-[#00c4cc]">🎨</span>
+                    </div>
+                    <div>
+                        <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tighter">Canva Integration</h3>
+                        <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mt-1">Connect your Canva account to easily import designs.</p>
+                    </div>
+                </div>
+
+                <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-2xl border border-slate-100 dark:border-slate-800">
+                    <p className="text-sm font-medium text-slate-700 dark:text-slate-300 leading-relaxed mb-6">
+                        Once connected, anyone building Emails or Digital Bulletins in this workspace will be able to launch Canva, pick a design, and import it directly as a high-quality image block.
+                    </p>
+                    
+                    <div className="flex flex-wrap gap-4">
+                        <button 
+                            onClick={async () => {
+                                try {
+                                    // Generate PKCE
+                                    const array = new Uint32Array(28);
+                                    window.crypto.getRandomValues(array);
+                                    const verifier = Array.from(array, dec => ('0' + dec.toString(16)).substr(-2)).join('');
+                                    const encoder = new TextEncoder();
+                                    const data = encoder.encode(verifier);
+                                    const digest = await window.crypto.subtle.digest('SHA-256', data);
+                                    const challenge = btoa(String.fromCharCode(...new Uint8Array(digest)))
+                                        .replace(/\+/g, '-')
+                                        .replace(/\//g, '_')
+                                        .replace(/=+$/, '');
+                                        
+                                    document.cookie = `canva_pkce=${verifier}; path=/; max-age=3600; SameSite=Lax`;
+
+                                    const clientId = import.meta.env.VITE_CANVA_CLIENT_ID || 'OC-AZ9dHwB8GH1_'; 
+                                    const redirectUri = encodeURIComponent(`${window.location.origin}/api/canva/oauth/callback`);
+                                    const state = encodeURIComponent(churchId);
+                                    const scopes = encodeURIComponent('design:content:read design:meta:read');
+                                    
+                                    const oauthUrl = `https://www.canva.com/api/oauth/authorize?response_type=code&client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scopes}&state=${state}&code_challenge=${challenge}&code_challenge_method=s256`;
+                                    
+                                    const width = 600;
+                                    const height = 700;
+                                    const left = window.screenX + (window.innerWidth - width) / 2;
+                                    const top = window.screenY + (window.innerHeight - height) / 2;
+                                    window.open(oauthUrl, 'CanvaAuth', `width=${width},height=${height},left=${left},top=${top}`);
+                                } catch (e: any) {
+                                    alert('Failed to initiate connection: ' + e.message);
+                                }
+                            }}
+                            className="bg-[#00c4cc] text-white px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-[#00b3ba] transition-all shadow-sm hover:shadow active:scale-95"
+                        >
+                            Connect Canva
+                        </button>
+
+                        <button 
+                            onClick={async () => {
+                                if (!window.confirm("Are you sure you want to disconnect Canva? Users will no longer be able to import designs.")) return;
+                                try {
+                                    await firestore.db.collection('churches').doc(churchId).collection('integrations').doc('canva').delete();
+                                    alert('Successfully disconnected Canva.');
+                                } catch (e: any) {
+                                    alert('Failed to disconnect: ' + e.message);
+                                }
+                            }}
+                            className="bg-white dark:bg-slate-800 text-red-600 px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-red-50 dark:hover:bg-red-900/20 transition-all border border-red-200 dark:border-red-900 shadow-sm active:scale-95"
+                        >
+                            Disconnect
+                        </button>
+                    </div>
+                </div>
+            </div>
         )}
         </div>
     </div>
