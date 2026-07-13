@@ -1,6 +1,5 @@
 import { getDb, getStorage } from './firebase.js';
 import { createServerLogger } from '../services/logService.js';
-import fetch from 'node-fetch'; // assuming node-fetch or native fetch is available
 import { v4 as uuidv4 } from 'uuid';
 
 const CANVA_API_BASE = 'https://api.canva.com/rest/v1';
@@ -100,6 +99,69 @@ export const handleCanvaOAuthCallback = async (req: any, res: any): Promise<void
     }
 };
 
+// ─── Token Refresh Helper ─────────────────────────────────────────────────────
+
+async function getValidCanvaToken(db: any, churchId: string, integrationData: any): Promise<string> {
+    const { accessToken, refreshToken, expiresAt } = integrationData;
+    
+    // If token is valid for more than 5 minutes, return it
+    if (Date.now() < expiresAt - 5 * 60 * 1000) {
+        return accessToken;
+    }
+
+    if (!refreshToken) {
+        throw new Error('No refresh token available');
+    }
+
+    let clientId = process.env.CANVA_CLIENT_ID;
+    let clientSecret = process.env.CANVA_CLIENT_SECRET;
+
+    if (!clientId || !clientSecret) {
+        try {
+            const fs = await import('fs');
+            const envLocal = fs.readFileSync('.env.local', 'utf8');
+            if (!clientId) {
+                const match = envLocal.match(/CANVA_CLIENT_ID=(.*)/);
+                if (match) clientId = match[1].trim();
+            }
+            if (!clientSecret) {
+                const match = envLocal.match(/CANVA_CLIENT_SECRET=(.*)/);
+                if (match) clientSecret = match[1].trim();
+            }
+        } catch (e) {}
+    }
+
+    const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+
+    const tokenResponse = await fetch('https://api.canva.com/rest/v1/oauth/token', {
+        method: 'POST',
+        headers: {
+            'Authorization': `Basic ${credentials}`,
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+            grant_type: 'refresh_token',
+            refresh_token: refreshToken,
+        }),
+    });
+
+    const tokenData = await tokenResponse.json();
+
+    if (!tokenResponse.ok) {
+        throw new Error(`Canva Token Refresh Error: ${JSON.stringify(tokenData)}`);
+    }
+
+    // Save new tokens
+    await db.collection('churches').doc(churchId).collection('integrations').doc('canva').update({
+        accessToken: tokenData.access_token,
+        refreshToken: tokenData.refresh_token,
+        expiresAt: Date.now() + (tokenData.expires_in * 1000),
+        updatedAt: Date.now()
+    });
+
+    return tokenData.access_token;
+}
+
 // ─── Designs Endpoints ────────────────────────────────────────────────────────
 
 export const handleGetCanvaDesigns = async (req: any, res: any): Promise<void> => {
@@ -114,7 +176,8 @@ export const handleGetCanvaDesigns = async (req: any, res: any): Promise<void> =
             return res.status(401).json({ error: 'Canva not connected' });
         }
 
-        const { accessToken } = integrationDoc.data()!;
+        const integrationData = integrationDoc.data()!;
+        const accessToken = await getValidCanvaToken(db, churchId, integrationData);
 
         // Fetch user designs and shared designs
         const canvaRes = await fetch(`${CANVA_API_BASE}/designs?ownership=any`, {
@@ -125,8 +188,7 @@ export const handleGetCanvaDesigns = async (req: any, res: any): Promise<void> =
 
         if (!canvaRes.ok) {
             if (canvaRes.status === 401) {
-                // Token likely expired, handle refresh token logic here in production
-                return res.status(401).json({ error: 'Canva token expired' });
+                return res.status(401).json({ error: 'Canva token expired and could not be refreshed' });
             }
             throw new Error(`Canva API Error: ${await canvaRes.text()}`);
         }
@@ -151,7 +213,8 @@ export const handleTriggerCanvaExport = async (req: any, res: any): Promise<void
         const integrationDoc = await db.collection('churches').doc(churchId).collection('integrations').doc('canva').get();
         if (!integrationDoc.exists) return res.status(401).json({ error: 'Canva not connected' });
         
-        const { accessToken } = integrationDoc.data()!;
+        const integrationData = integrationDoc.data()!;
+        const accessToken = await getValidCanvaToken(db, churchId, integrationData);
 
         const exportRes = await fetch(`${CANVA_API_BASE}/exports`, {
             method: 'POST',
@@ -188,7 +251,8 @@ export const handlePollCanvaExport = async (req: any, res: any): Promise<void> =
         const integrationDoc = await db.collection('churches').doc(churchId).collection('integrations').doc('canva').get();
         if (!integrationDoc.exists) return res.status(401).json({ error: 'Canva not connected' });
         
-        const { accessToken } = integrationDoc.data()!;
+        const integrationData = integrationDoc.data()!;
+        const accessToken = await getValidCanvaToken(db, churchId, integrationData);
 
         const exportRes = await fetch(`${CANVA_API_BASE}/exports/${jobId}`, {
             headers: {
@@ -212,7 +276,8 @@ export const handlePollCanvaExport = async (req: any, res: any): Promise<void> =
             // Fetch the image from Canva
             const imageRes = await fetch(imageUrl);
             if (!imageRes.ok) throw new Error(`Failed to download image from Canva`);
-            const imageBuffer = await imageRes.buffer();
+            const arrayBuffer = await imageRes.arrayBuffer();
+            const imageBuffer = Buffer.from(arrayBuffer);
 
             // Upload to Firebase Storage
             const storage = getStorage();
