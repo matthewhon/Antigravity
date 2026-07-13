@@ -31,6 +31,7 @@ import { startSmsCampaignScheduler } from './backend/smsCampaignScheduler';
 import { startServicesReminderScheduler, runServicesReminderScanner } from './backend/servicesReminderScheduler';
 import { workflowEnrollList, workflowEnrollPreview, workflowForceScan, getWorkflowStepCounts, workflowReSyncHandler } from './backend/workflowEnrollEndpoint';
 import { handleGrowDailyEmail, setupGrowIntegration, requestGrowAccess, getGrowStatus } from './backend/growIntegration';
+import { handleCanvaOAuthCallback, handleGetCanvaDesigns, handleTriggerCanvaExport, handlePollCanvaExport } from './backend/canvaIntegration.js';
 import { getVapidPublicKey, savePushSubscription, removePushSubscription } from './backend/webPushService';
 import { handleFileProxy } from './backend/fileProxy';
 import { videoProcessingQueue } from './services/jobQueue.js';
@@ -320,6 +321,12 @@ async function startServer() {
     // Grow permission / auto-connect flow
     app.post('/api/integrations/grow/request-access', express.json(), requestGrowAccess);
     app.get('/api/integrations/grow/status', getGrowStatus);
+
+    // Canva Integration
+    app.get('/api/canva/oauth/callback', handleCanvaOAuthCallback);
+    app.get('/api/canva/designs', handleGetCanvaDesigns);
+    app.post('/api/canva/exports', express.json(), handleTriggerCanvaExport);
+    app.get('/api/canva/exports/:jobId', handlePollCanvaExport);
 
     // ─── Public Widget Sync Endpoints ───────────────────────────────
     app.get('/api/public/groups/:churchId', getPublicGroups);

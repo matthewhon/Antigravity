@@ -11,6 +11,7 @@ import { firestore } from '../services/firestoreService';
 import { pcoService } from '../services/pcoService';
 import { generateEmailContent } from '../services/geminiService';
 import { AnalyticsWidgetBlock, AnalyticsWidgetId } from './DataChartSelector';
+import { CanvaPickerModal } from './CanvaPickerModal';
 import {
   Type, Heading as HeadingIcon, Image as ImageIcon, MousePointerClick, File,
   Minus, Video, Code, Users, Calendar, ClipboardList, GripVertical, Trash2,
@@ -735,6 +736,7 @@ const InlineMediaEditor: React.FC<{
   churchId?: string;
 }> = ({ block, onUpdate, churchId }) => {
   const [showLibrary, setShowLibrary] = useState(false);
+  const [showCanva, setShowCanva] = useState(false);
   const imageUpload = useUpload('email_images');
   const fileUpload = useUpload('email_files');
   const imgInputRef = useRef<HTMLInputElement>(null);
@@ -771,6 +773,12 @@ const InlineMediaEditor: React.FC<{
           >
             <Images size={13} /> Library
           </button>
+          <button
+            onClick={() => setShowCanva(true)}
+            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-800 text-indigo-700 dark:text-indigo-400 transition"
+          >
+            <ImageIcon size={13} /> Canva
+          </button>
         </div>
 
         {/* URL input */}
@@ -791,6 +799,7 @@ const InlineMediaEditor: React.FC<{
         </div>
 
         {showLibrary && <MediaLibraryPicker onPick={url => { onUpdate({ ...c, src: url }); setShowLibrary(false); }} onClose={() => setShowLibrary(false)} />}
+        {showCanva && <CanvaPickerModal churchId={churchId || ''} onSelectImage={url => { onUpdate({ ...c, src: url }); setShowCanva(false); }} onClose={() => setShowCanva(false)} />}
       </div>
     );
   }
