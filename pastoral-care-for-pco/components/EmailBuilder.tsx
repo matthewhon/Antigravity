@@ -2099,13 +2099,10 @@ export const EmailBuilder: React.FC<EmailBuilderProps> = ({
             <button onClick={onOpenPastoralCare} className="w-full text-left px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 text-xs text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition">
               Insert Pastoral Care Chart
             </button>
+            <button onClick={onOpenDataChart} className="w-full text-left px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 text-xs text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition">
+              Insert Data Chart
+            </button>
           </div>
-        </SidebarSection>
-
-        <SidebarSection title="Analytics Charts" icon={<AlignLeft size={14} />}>
-          <button onClick={onOpenDataChart} className="w-full text-left px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 text-xs text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition">
-            Insert Data Chart
-          </button>
         </SidebarSection>
 
         {/* Bulletin-only: Embed Content section */}
