@@ -78,6 +78,7 @@ const noteTypeEmoji: Record<string, string> = {
 interface EnrichedRow {
     person: PcoPerson;
     lastNote: PastoralNote | null;
+    lastTouchpoint: PastoralNote | null;
     noteCount: number;
     daysSinceContact: number; // 9999 = never
     urgencyScore: number;
@@ -109,10 +110,11 @@ function exportToCSV(rows: EnrichedRow[], filename: string) {
     const headers = [
         'Name', 'Email', 'Phone', 'Membership', 'Status',
         'Risk Category', 'Risk Score',
-        'Last Care Contact', 'Contact Type', 'Days Since Contact', 'Notes Count',
-        'Last Note', 'All Notes', 'Followed Up Recently', 'Birthday', 'Anniversary',
+        'Last Care Contact', 'Contact Type', 'Days Since Contact',
+        'Last Touchpoint', 'Touchpoint Type',
+        'Notes Count', 'Last Note', 'All Notes', 'Followed Up Recently', 'Birthday', 'Anniversary',
     ];
-    const csvRows = rows.map(({ person, lastNote, daysSinceContact, noteCount, allNotes, followedUpRecently }) => {
+    const csvRows = rows.map(({ person, lastNote, lastTouchpoint, daysSinceContact, noteCount, allNotes, followedUpRecently }) => {
         const notesStr = allNotes.map(n => `[${formatDate(n.date)} - ${n.type}] ${n.content}`).join('\n\n');
         return [
             escapeCsvCell(person.name),
@@ -125,6 +127,8 @@ function exportToCSV(rows: EnrichedRow[], filename: string) {
             escapeCsvCell(lastNote?.date),
             escapeCsvCell(lastNote?.type),
             escapeCsvCell(daysSinceContact === 9999 ? 'Never' : daysSinceContact),
+            escapeCsvCell(lastTouchpoint?.date),
+            escapeCsvCell(lastTouchpoint?.tags?.includes('no-answer') ? 'No Answer' : lastTouchpoint?.type),
             escapeCsvCell(noteCount),
             escapeCsvCell(lastNote?.content),
             escapeCsvCell(notesStr),
@@ -324,10 +328,20 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
         return m;
     }, [notes]);
 
+    const lastTouchpointMap = useMemo(() => {
+        const m = new Map<string, PastoralNote>();
+        notes.forEach(n => {
+            const raw = n.personId;
+            const bare = raw.includes('_') ? raw.split('_').slice(1).join('_') : raw;
+            if (!m.has(raw))  m.set(raw,  n);
+            if (!m.has(bare)) m.set(bare, n);
+        });
+        return m;
+    }, [notes]);
+
     const noteCountMap = useMemo(() => {
         const m = new Map<string, number>();
         notes.forEach(n => {
-            if (n.tags?.includes('no-answer')) return; // skip no-answers
             const raw  = n.personId;
             const bare = raw.includes('_') ? raw.split('_').slice(1).join('_') : raw;
             m.set(raw,  (m.get(raw)  || 0) + 1);
@@ -360,6 +374,7 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
             .filter(p => p.status?.toLowerCase() !== 'inactive')
             .map(person => {
                 const lastNote = lastNoteMap.get(person.id) ?? null;
+                const lastTouchpoint = lastTouchpointMap.get(person.id) ?? null;
                 const noteCount = noteCountMap.get(person.id) ?? 0;
                 const raw = lastNote ? daysSince(lastNote.date) : null;
                 const days = raw ?? 9999;
@@ -369,9 +384,9 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
                 const followedUpRecently = !!(logEntry?.followedUpAt && (now - logEntry.followedUpAt) < SEVEN_DAYS_MS);
                 const dismissed = !!(logEntry?.dismissedAt);
                 const allNotes = allNotesMap.get(person.id) || [];
-                return { person, lastNote, noteCount, daysSinceContact: days, urgencyScore: urgency, followedUpRecently, dismissed, allNotes };
+                return { person, lastNote, lastTouchpoint, noteCount, daysSinceContact: days, urgencyScore: urgency, followedUpRecently, dismissed, allNotes };
             });
-    }, [peopleData, lastNoteMap, noteCountMap, followUpMap, allNotesMap]);
+    }, [peopleData, lastNoteMap, lastTouchpointMap, noteCountMap, followUpMap, allNotesMap]);
 
     // --- Filter rows ---
     const filteredRows = useMemo(() => {
@@ -670,7 +685,7 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
                                         No people match your current filters.
                                     </td>
                                 </tr>
-                            ) : sortedRows.map(({ person, lastNote, noteCount, daysSinceContact, urgencyScore, followedUpRecently, dismissed }) => {
+                            ) : sortedRows.map(({ person, lastNote, lastTouchpoint, noteCount, daysSinceContact, urgencyScore, followedUpRecently, dismissed }) => {
                                 const category = person.riskProfile?.category ?? 'Disconnected';
                                 const score = person.riskProfile?.score ?? 0;
                                 const isFormOpen = activeFormPersonId === person.id;
@@ -752,7 +767,14 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
 
                                             {/* Last Contact */}
                                             <td className="p-2 text-center text-[11px] font-bold text-slate-600 dark:text-slate-300 whitespace-nowrap">
-                                                {lastNote ? formatDate(lastNote.date) : <span className="text-rose-400 font-black text-[10px]">Never</span>}
+                                                <div>
+                                                    {lastNote ? formatDate(lastNote.date) : <span className="text-rose-400 font-black text-[10px]">Never</span>}
+                                                </div>
+                                                {lastTouchpoint && lastTouchpoint.tags?.includes('no-answer') && (
+                                                    <div className="text-[9px] text-rose-500/80 font-black mt-0.5" title={`Last attempt: ${lastTouchpoint.content || 'No Answer'}`}>
+                                                        📵 No Answer: {formatDate(lastTouchpoint.date)}
+                                                    </div>
+                                                )}
                                             </td>
 
                                             {/* Type */}
