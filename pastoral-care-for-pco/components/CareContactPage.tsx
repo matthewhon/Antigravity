@@ -312,15 +312,19 @@ const SessionModal: React.FC<SessionModalProps> = ({ groups = [], memberStatuses
 
     const handleSave = () => {
         if (!name.trim()) return;
-        const absenteeSince = absenteeSinceDate ? new Date(absenteeSinceDate).getTime() : undefined;
+        const filters: OutreachSession['filters'] = {
+            riskCategories: riskCats,
+            membershipStatuses: membershipSels,
+        };
+        if (absenteeGroupIds.length > 0) {
+            filters.absenteeGroupIds = absenteeGroupIds;
+        }
+        if (absenteeSinceDate) {
+            filters.absenteeSince = new Date(absenteeSinceDate).getTime();
+        }
         onSave({ 
             name: name.trim(), 
-            filters: { 
-                riskCategories: riskCats, 
-                membershipStatuses: membershipSels,
-                absenteeGroupIds: absenteeGroupIds.length > 0 ? absenteeGroupIds : undefined,
-                absenteeSince
-            } 
+            filters
         });
     };
 

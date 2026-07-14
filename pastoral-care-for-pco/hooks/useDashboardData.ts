@@ -16,18 +16,22 @@ export function useRiskEnrichedPeople(
     riskSettings?: RiskSettings
 ) {
     return useMemo(() => {
-        const groupMemberMap = new Set<string>();
+        const personGroupsMap = new Map<string, string[]>();
         if (groups) {
             groups.forEach(g => {
                 if (g.memberIds) {
-                    g.memberIds.forEach(mid => groupMemberMap.add(mid));
+                    g.memberIds.forEach(mid => {
+                        const list = personGroupsMap.get(mid) || [];
+                        list.push(g.id);
+                        personGroupsMap.set(mid, list);
+                    });
                 }
             });
         }
 
         const peopleWithGroups = people.map(p => ({
             ...p,
-            groupIds: groupMemberMap.has(p.id) ? ['exists'] : [] 
+            groupIds: personGroupsMap.get(p.id) || [] 
         }));
 
         if (!peopleWithGroups || peopleWithGroups.length === 0) return [];
