@@ -1619,13 +1619,18 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                     }
                   >
                       <div className="space-y-4 overflow-y-auto max-h-[500px] pr-2 custom-scrollbar">
-                          {notes.map(note => (
-                              <CareNoteCard 
-                                key={note.id} 
-                                note={note} 
-                                onRemove={note.isOutreach ? undefined : () => firestore.deletePastoralNote(note.id).then(() => setNotes(notes.filter(n => n.id !== note.id)))} 
-                              />
-                          ))}
+                          {notes.map(note => {
+                              const person = peopleData?.allPeople.find(p => p.id === note.personId);
+                              return (
+                                  <CareNoteCard 
+                                    key={note.id} 
+                                    note={note} 
+                                    phone={person?.phone}
+                                    email={person?.email}
+                                    onRemove={note.isOutreach ? undefined : () => firestore.deletePastoralNote(note.id).then(() => setNotes(notes.filter(n => n.id !== note.id)))} 
+                                  />
+                              );
+                          })}
                           {notes.length === 0 && (
                               <div className="py-10 text-center text-slate-400 text-xs font-bold">No care notes yet.</div>
                           )}

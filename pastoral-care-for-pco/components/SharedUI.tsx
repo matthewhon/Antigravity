@@ -229,7 +229,12 @@ export const PersonList: React.FC<{ people: PcoPerson[]; type: string }> = ({ pe
   </div>
 );
 
-export const CareNoteCard: React.FC<{ note: PastoralNote; onRemove?: () => void }> = ({ note, onRemove }) => {
+export const CareNoteCard: React.FC<{ 
+    note: PastoralNote; 
+    phone?: string; 
+    email?: string; 
+    onRemove?: () => void; 
+}> = ({ note, phone, email, onRemove }) => {
     const typeColors: any = {
         Visit: 'bg-indigo-50 text-indigo-600 border-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-400',
         Call: 'bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400',
@@ -251,7 +256,31 @@ export const CareNoteCard: React.FC<{ note: PastoralNote; onRemove?: () => void 
                     </span>
                     <span className="text-[10px] font-bold text-slate-400">{new Date(note.date).toLocaleDateString()}</span>
                 </div>
-                <span className="text-[10px] font-black text-slate-900 dark:text-white truncate max-w-[120px]">{note.personName}</span>
+                <div className="flex flex-col items-end text-right">
+                    <button
+                        onClick={() => window.dispatchEvent(new CustomEvent('openPersonProfile', { detail: note.personId }))}
+                        className="text-[10px] font-black text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 hover:underline cursor-pointer truncate max-w-[150px] transition-colors"
+                        title="Open profile"
+                    >
+                        {note.personName}
+                    </button>
+                    {(phone || email) ? (
+                        <div className="text-[9px] text-slate-400 dark:text-slate-500 mt-0.5 flex flex-col items-end gap-0.5">
+                            {phone && (
+                                <a href={`tel:${phone}`} className="hover:underline hover:text-slate-600 dark:hover:text-slate-300">
+                                    {phone}
+                                </a>
+                            )}
+                            {email && (
+                                <a href={`mailto:${email}`} className="hover:underline hover:text-slate-600 dark:hover:text-slate-300 truncate max-w-[150px]" title={email}>
+                                    {email}
+                                </a>
+                            )}
+                        </div>
+                    ) : (
+                        <span className="text-[9px] text-slate-300 dark:text-slate-600 italic mt-0.5">No contact info</span>
+                    )}
+                </div>
             </div>
             <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed mb-4">{note.content}</p>
             <div className="flex justify-between items-center pt-4 border-t border-slate-50 dark:border-slate-800">

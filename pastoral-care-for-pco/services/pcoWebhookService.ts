@@ -52,8 +52,8 @@ async function pcoFetch(churchId: string, endpoint: string, method: string = 'GE
  * }
  */
 export const initializeWebhooks = async (churchId: string) => {
-    // The user explicitly requested this exact webhook URL for all production sites
-    const webhookUrl = 'https://pastoralcare.barnabassoftware.com/pco/webhook';
+    // The user explicitly requested this exact webhook URL for all production sites, appended with churchId to ensure uniqueness
+    const webhookUrl = `https://pastoralcare.barnabassoftware.com/pco/webhook?churchId=${churchId}`;
 
     // PCO Webhooks v2 event topic names
     const topics = [
