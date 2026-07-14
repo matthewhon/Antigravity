@@ -1638,7 +1638,7 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
 
                                                     // All-time history for this person
                                                     const history = personHistory.get(person.id) ?? [];
-                                                    const mostRecent = history[0];
+                                                    const mostRecent = history.find(h => h.status === 'contacted');
                                                     const isExpanded = expandedPersonId === person.id;
 
                                                     return (
@@ -1657,7 +1657,7 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                                                             {person.name.slice(0, 2)}
                                                                         </div>
                                                                     )}
-                                                                    <span className={`text-xs font-bold ${isContacted || onCooldown ? 'line-through text-slate-400' : 'text-slate-900 dark:text-white'}`}>
+                                                                    <span className={`text-xs font-bold ${isContacted ? 'line-through text-slate-400' : 'text-slate-900 dark:text-white'}`}>
                                                                         {person.name}
                                                                     </span>
                                                                 </div>
@@ -1671,7 +1671,7 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                                             <td className="p-2.5 text-[10px] font-medium whitespace-nowrap">
                                                                 {mostRecent ? (
                                                                     <div className="flex items-center gap-1.5">
-                                                                        <span className={`${mostRecent.status === 'contacted' ? 'text-emerald-600' : 'text-rose-500'}`}>
+                                                                        <span className="text-emerald-600">
                                                                             {timeSince(mostRecent.completedAt ?? mostRecent.assignedAt)}
                                                                         </span>
                                                                         <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 text-[8px] font-black" title={`${history.length} total contact attempt${history.length !== 1 ? 's' : ''}`}>

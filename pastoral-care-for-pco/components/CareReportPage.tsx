@@ -315,6 +315,7 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
     const lastNoteMap = useMemo(() => {
         const m = new Map<string, PastoralNote>();
         notes.forEach(n => {
+            if (n.tags?.includes('no-answer')) return; // skip no-answers
             const raw = n.personId;
             const bare = raw.includes('_') ? raw.split('_').slice(1).join('_') : raw;
             if (!m.has(raw))  m.set(raw,  n);
@@ -326,6 +327,7 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
     const noteCountMap = useMemo(() => {
         const m = new Map<string, number>();
         notes.forEach(n => {
+            if (n.tags?.includes('no-answer')) return; // skip no-answers
             const raw  = n.personId;
             const bare = raw.includes('_') ? raw.split('_').slice(1).join('_') : raw;
             m.set(raw,  (m.get(raw)  || 0) + 1);
