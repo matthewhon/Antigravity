@@ -739,32 +739,27 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
             }
         }
 
-        // Tier 0: never attempted in any session — sort most at-risk (lowest score) first
-        // Tier 1: attempted but never successfully contacted — oldest attempt first
-        // Tier 2: successfully contacted at least once — oldest successful contact first
+        // Tier 0: never contacted in any session (never attempted or only attempted with no-answer)
+        // Tier 1: successfully contacted at least once
         //
-        // This ensures volunteers always call the neediest / longest-forgotten people first.
+        // Within Tier 0, we prioritize the most at-risk (lowest score) first.
+        // Within Tier 1, we prioritize those with the longest time since contacted (oldest successful contact first).
         const tierOf = (p: typeof eligible[0]) => {
-            if (lastContactedAt.has(p.id)) return 2;  // reached before
-            if (lastAttemptedAt.has(p.id)) return 1;  // tried but no answer
-            return 0;                                  // brand new, never tried
+            if (lastContactedAt.has(p.id)) return 1;  // reached before
+            return 0;                                  // never contacted
         };
 
         return eligible
             .sort((a, b) => {
                 const ta = tierOf(a);
                 const tb = tierOf(b);
-                if (ta !== tb) return ta - tb; // lower tier = higher priority
+                if (ta !== tb) return ta - tb; // never contacted first
 
                 if (ta === 0) {
-                    // Both never tried — most at-risk (lowest score) first
+                    // Both never contacted — sort by risk score asc (most at-risk first)
                     return (a.riskProfile?.score ?? 0) - (b.riskProfile?.score ?? 0);
                 }
-                if (ta === 1) {
-                    // Both attempted-only — oldest attempt first
-                    return (lastAttemptedAt.get(a.id) ?? 0) - (lastAttemptedAt.get(b.id) ?? 0);
-                }
-                // Both previously contacted — oldest successful contact first
+                // Both previously contacted — oldest successful contact first (longest time since contacted)
                 return (lastContactedAt.get(a.id) ?? 0) - (lastContactedAt.get(b.id) ?? 0);
             })
             .map(p => ({
