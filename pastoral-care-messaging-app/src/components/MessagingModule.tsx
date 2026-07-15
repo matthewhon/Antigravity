@@ -2789,24 +2789,22 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                     <div className={`max-w-[75%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${msg.direction === 'outbound' ? 'bg-violet-600 text-white rounded-br-sm' : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-bl-sm'}`}>
                                         <p className="whitespace-pre-wrap break-words">{msg.body}</p>
                                         {msg.mediaUrls && msg.mediaUrls.length > 0 && (
-                                            <div className="mt-2 space-y-1.5">
+                                            <div className="mt-2 flex flex-wrap gap-2">
                                                 {msg.mediaUrls.map((url, i) => {
                                                     const isImage = /\.(jpg|jpeg|png|gif|webp|heic)(\?|$)/i.test(url)
                                                         || url.includes('storage.googleapis.com')
                                                         || /image\//i.test(url);
                                                     return isImage ? (
-                                                        <a key={i} href={url} target="_blank" rel="noopener noreferrer" title="View full image">
+                                                        <a key={i} href={url} target="_blank" rel="noopener noreferrer" title="View full image" className="block w-24 h-24 sm:w-32 sm:h-32 overflow-hidden rounded-xl border border-white/20 dark:border-slate-600 bg-slate-100 dark:bg-slate-900 shrink-0">
                                                             <img
                                                                 src={url}
                                                                 alt={`MMS attachment ${i + 1}`}
-                                                                className="max-w-full rounded-xl border border-white/20 dark:border-slate-600 object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                                                                style={{ maxHeight: 300 }}
+                                                                className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
                                                                 onError={(e) => {
-                                                                    // If image fails, swap to a plain link
                                                                     const parent = (e.target as HTMLImageElement).closest('a');
                                                                     if (parent) {
                                                                         parent.textContent = `📎 Media ${i + 1}`;
-                                                                        parent.className = 'block text-xs underline opacity-70';
+                                                                        parent.className = 'block text-xs underline opacity-70 w-auto h-auto border-0 bg-transparent';
                                                                     }
                                                                 }}
                                                             />
