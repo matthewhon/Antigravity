@@ -2965,10 +2965,34 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                     <div className={`max-w-[75%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${msg.direction === 'outbound' ? 'bg-violet-600 text-white rounded-br-sm' : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-bl-sm'}`}>
                                         <p className="whitespace-pre-wrap break-words">{msg.body}</p>
                                         {msg.mediaUrls && msg.mediaUrls.length > 0 && (
-                                            <div className="mt-2 space-y-1">
-                                                {msg.mediaUrls.map((url, i) => (
-                                                    <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="block text-xs underline opacity-70">Media {i + 1}</a>
-                                                ))}
+                                            <div className="mt-2 space-y-1.5">
+                                                {msg.mediaUrls.map((url, i) => {
+                                                    const isImage = /\.(jpg|jpeg|png|gif|webp|heic)(\?|$)/i.test(url)
+                                                        || url.includes('storage.googleapis.com')
+                                                        || /image\//i.test(url);
+                                                    return isImage ? (
+                                                        <a key={i} href={url} target="_blank" rel="noopener noreferrer" title="View full image">
+                                                            <img
+                                                                src={url}
+                                                                alt={`MMS attachment ${i + 1}`}
+                                                                className="max-w-full rounded-xl border border-white/20 dark:border-slate-600 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                                                                style={{ maxHeight: 300 }}
+                                                                onError={(e) => {
+                                                                    const parent = (e.target as HTMLImageElement).closest('a');
+                                                                    if (parent) {
+                                                                        parent.textContent = `📎 Media ${i + 1}`;
+                                                                        parent.className = 'block text-xs underline opacity-70';
+                                                                    }
+                                                                }}
+                                                            />
+                                                        </a>
+                                                    ) : (
+                                                        <a key={i} href={url} target="_blank" rel="noopener noreferrer"
+                                                            className="flex items-center gap-1 text-xs underline opacity-80 hover:opacity-100">
+                                                            📎 Attachment {i + 1}
+                                                        </a>
+                                                    );
+                                                })}
                                             </div>
                                         )}
                                         <div className={`text-[10px] mt-1 flex items-center gap-1 flex-wrap ${msg.direction === 'outbound' ? 'text-violet-200' : 'text-slate-400'}`}>
