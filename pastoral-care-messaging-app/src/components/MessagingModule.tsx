@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { db as firebaseDb } from '../services/firebase';
@@ -2024,6 +2024,9 @@ const SmsInbox: React.FC<{
     const [loadingMsgs, setLoadingMsgs] = useState(false);
     const [isSending, setIsSending] = useState(false);
     const [search, setSearch] = useState('');
+    const [limitCount, setLimitCount] = useState(100);
+    const [searchedConversations, setSearchedConversations] = useState<SmsConversation[]>([]);
+    const [searchLoading, setSearchLoading] = useState(false);
     const [showUnreadOnly, setShowUnreadOnly] = useState(false);
     const [showComposer, setShowComposer] = useState(false);
 
@@ -2068,7 +2071,7 @@ const SmsInbox: React.FC<{
             collection(firebaseDb, 'smsConversations'),
             where('churchId', '==', churchId),
             orderBy('lastMessageAt', 'desc'),
-            limit(100)
+            limit(limitCount)
         );
         const unsub = onSnapshot(baseQ, snap => {
             const all = snap.docs.map(d => ({ id: d.id, ...d.data() } as SmsConversation));
@@ -2098,7 +2101,113 @@ const SmsInbox: React.FC<{
             setConversations(filtered);
         });
         return unsub;
-    }, [churchId, twilioNumberId, allowedNumberIds, defaultNumberId, isDefaultNumber, currentUser.roles]);
+    }, [churchId, twilioNumberId, allowedNumberIds, defaultNumberId, isDefaultNumber, currentUser.roles, limitCount]);
+
+    // Search all conversations (including non-recent ones) by querying the people collection and fetching matches
+    useEffect(() => {
+        const queryTerm = search.trim();
+        if (queryTerm.length < 2) {
+            setSearchedConversations([]);
+            return;
+        }
+
+        const delayDebounceFn = setTimeout(async () => {
+            setSearchLoading(true);
+            try {
+                const resultsMap = new Map<string, SmsConversation>();
+
+                // 1. Search the people collection for matches by name or phone
+                const col = collection(firebaseDb, 'people');
+                const isPhone = /^[\d\s+()\-]{4,}$/.test(queryTerm);
+                const qLower = queryTerm.toLowerCase();
+                const qCleanPhone = queryTerm.replace(/\D/g, '');
+
+                const queries: Promise<any>[] = [];
+                if (isPhone) {
+                    queries.push(
+                        getDocs(query(col, where('churchId', '==', churchId), where('phone', '>=', queryTerm), where('phone', '<=', queryTerm + '\uffff'), limit(20)))
+                    );
+                } else {
+                    const qCap = queryTerm.charAt(0).toUpperCase() + queryTerm.slice(1).toLowerCase();
+                    queries.push(
+                        getDocs(query(col, where('churchId', '==', churchId), where('name', '>=', queryTerm), where('name', '<=', queryTerm + '\uffff'), limit(20))),
+                        getDocs(query(col, where('churchId', '==', churchId), where('name', '>=', qCap), where('name', '<=', qCap + '\uffff'), limit(20))),
+                        getDocs(query(col, where('churchId', '==', churchId), where('nameLower', '>=', qLower), where('nameLower', '<=', qLower + '\uffff'), limit(20)))
+                    );
+                }
+
+                const searchSnapshots = await Promise.allSettled(queries);
+                const matchedPhones = new Set<string>();
+
+                // If the queryTerm itself is a potential phone number, add it
+                if (isPhone && qCleanPhone.length >= 7) {
+                    matchedPhones.add(queryTerm.startsWith('+') ? queryTerm : `+1${qCleanPhone}`);
+                }
+
+                searchSnapshots.forEach(r => {
+                    if (r.status !== 'fulfilled') return;
+                    r.value.docs.forEach((d: any) => {
+                        const p = d.data();
+                        if (p.phone) {
+                            const cleaned = p.phone.trim();
+                            if (cleaned) matchedPhones.add(cleaned);
+                        }
+                    });
+                });
+
+                // 2. Fetch conversations for all matched phone numbers
+                if (matchedPhones.size > 0) {
+                    const fetchPromises: Promise<any>[] = [];
+                    const phonesArray = Array.from(matchedPhones).slice(0, 10); // Limit to top 10 numbers to avoid excessive reads
+
+                    phonesArray.forEach(phone => {
+                        const phoneClean = phone.replace(/\+/g, '');
+                        // Construct all possible conversation document paths/IDs
+                        const ids: string[] = [];
+                        if (twilioNumberId) {
+                            ids.push(`${churchId}_${twilioNumberId}_${phoneClean}`);
+                        }
+                        if (allowedNumberIds && allowedNumberIds.length > 0) {
+                            allowedNumberIds.forEach(numId => {
+                                ids.push(`${churchId}_${numId}_${phoneClean}`);
+                            });
+                        }
+                        ids.push(`${churchId}_${phoneClean}`); // legacy fallback
+
+                        ids.forEach(id => {
+                            fetchPromises.push(
+                                getDoc(doc(firebaseDb, 'smsConversations', id))
+                            );
+                        });
+                    });
+
+                    const docSnapshots = await Promise.allSettled(fetchPromises);
+                    docSnapshots.forEach(r => {
+                        if (r.status === 'fulfilled' && r.value.exists()) {
+                            const data = r.value.data() as SmsConversation;
+                            if (data.churchId === churchId) {
+                                const convNumberId = (data as any).smsNumberId || (data as any).inboxId || data.twilioNumberId || null;
+                                const userHasAccess = !convNumberId || (allowedNumberIds || []).includes(convNumberId);
+                                const matchesActiveNumber = !twilioNumberId || convNumberId === twilioNumberId || (convNumberId === null && isDefaultNumber);
+
+                                if (userHasAccess && matchesActiveNumber) {
+                                    resultsMap.set(r.value.id, { id: r.value.id, ...data });
+                                }
+                            }
+                        }
+                    });
+                }
+
+                setSearchedConversations(Array.from(resultsMap.values()));
+            } catch (err) {
+                console.error("Error searching all conversations:", err);
+            } finally {
+                setSearchLoading(false);
+            }
+        }, 400);
+
+        return () => clearTimeout(delayDebounceFn);
+    }, [search, churchId, twilioNumberId, allowedNumberIds, isDefaultNumber]);
 
     // Load messages for active conversation
     useEffect(() => {
@@ -2257,9 +2366,38 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
         }
     };
 
-    const totalUnread = conversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
+    const handleSidebarScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        const target = e.currentTarget;
+        if (target.scrollHeight - target.scrollTop <= target.clientHeight + 50) {
+            setLimitCount(prev => prev + 100);
+        }
+    };
 
-    const filtered = conversations.filter(c => {
+    // Merge conversations from onSnapshot subscription and search results, avoiding duplicates
+    const allConversations = useMemo(() => {
+        const seen = new Set<string>();
+        const merged: SmsConversation[] = [];
+
+        conversations.forEach(c => {
+            if (!seen.has(c.id)) {
+                seen.add(c.id);
+                merged.push(c);
+            }
+        });
+
+        searchedConversations.forEach(c => {
+            if (!seen.has(c.id)) {
+                seen.add(c.id);
+                merged.push(c);
+            }
+        });
+
+        return merged.sort((a, b) => b.lastMessageAt - a.lastMessageAt);
+    }, [conversations, searchedConversations]);
+
+    const totalUnread = allConversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
+
+    const filtered = allConversations.filter(c => {
         const matchSearch = !search || c.phoneNumber.includes(search) || (c.personName || '').toLowerCase().includes(search.toLowerCase());
         const matchTag = !tagFilter || (c.tags || []).includes(tagFilter);
         const matchUnread = !showUnreadOnly || (c.unreadCount || 0) > 0;
@@ -2455,7 +2593,10 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                         })}
                     </div>
                 </div>
-                <div className="flex-1 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-700/60">
+                <div
+                    className="flex-1 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-700/60"
+                    onScroll={handleSidebarScroll}
+                >
                     {filtered.length === 0 && (
                         <div className="text-center py-12 text-slate-400">
                             <MessageCircle size={28} className="mx-auto mb-2 opacity-40" />
