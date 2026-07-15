@@ -2282,14 +2282,14 @@ const SmsInbox: React.FC<{
                     const docSnapshots = await Promise.allSettled(fetchPromises);
                     docSnapshots.forEach(r => {
                         if (r.status === 'fulfilled' && r.value.exists()) {
-                            const data = r.value.data() as SmsConversation;
-                            if (data.churchId === churchId) {
-                                const convNumberId = (data as any).smsNumberId || (data as any).inboxId || data.twilioNumberId || null;
+                            const rawData = r.value.data() || {};
+                            if (rawData.churchId === churchId) {
+                                const convNumberId = rawData.smsNumberId || rawData.inboxId || rawData.twilioNumberId || null;
                                 const userHasAccess = !convNumberId || (allowedNumberIds || []).includes(convNumberId);
                                 const matchesActiveNumber = !twilioNumberId || convNumberId === twilioNumberId || (convNumberId === null && isDefaultNumber);
 
                                 if (userHasAccess && matchesActiveNumber) {
-                                    resultsMap.set(r.value.id, { id: r.value.id, ...data });
+                                    resultsMap.set(r.value.id, { id: r.value.id, ...rawData } as SmsConversation);
                                 }
                             }
                         }
