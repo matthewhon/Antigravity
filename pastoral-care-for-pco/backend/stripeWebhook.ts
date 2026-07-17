@@ -27,8 +27,14 @@ function buildReceiptHtml(opts: {
     periodStart: string;    // formatted date string
     periodEnd: string;      // formatted date string
     invoiceUrl: string;     // Stripe-hosted PDF URL
+    isSubscription?: boolean;
 }): string {
-    const { churchName, planName, planPrice, amount, invoiceNumber, periodStart, periodEnd, invoiceUrl } = opts;
+    const { churchName, planName, planPrice, amount, invoiceNumber, periodStart, periodEnd, invoiceUrl, isSubscription = true } = opts;
+    const thankYouText = isSubscription
+        ? `Hi <strong>${churchName}</strong>, thank you for your subscription! Your payment was processed successfully.`
+        : `Hi <strong>${churchName}</strong>, thank you for your payment! It has been processed successfully.`;
+    const label = isSubscription ? 'Plan' : 'Description';
+    const planDisplay = planPrice ? `${planName} — ${planPrice}` : planName;
     return `<!DOCTYPE html>
 <html>
 <head>
@@ -54,7 +60,7 @@ function buildReceiptHtml(opts: {
           <td style="padding:36px 40px;">
 
             <p style="margin:0 0 24px;font-size:15px;color:#334155;line-height:1.6;">
-              Hi <strong>${churchName}</strong>, thank you for your subscription! Your payment was processed successfully.
+              ${thankYouText}
             </p>
 
             <!-- Receipt box -->
@@ -63,8 +69,8 @@ function buildReceiptHtml(opts: {
                 <td style="padding:20px 24px;border-bottom:1px solid #e2e8f0;">
                   <table width="100%" cellpadding="0" cellspacing="0">
                     <tr>
-                      <td style="font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">Plan</td>
-                      <td align="right" style="font-size:15px;font-weight:800;color:#1e293b;">${planName} — ${planPrice}</td>
+                      <td style="font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">${label}</td>
+                      <td align="right" style="font-size:15px;font-weight:800;color:#1e293b;">${planDisplay}</td>
                     </tr>
                   </table>
                 </td>
@@ -210,12 +216,9 @@ export const handleStripeWebhook = async (req: any, res: any) => {
             break;
         }
 
-        // ── Monthly invoice paid → send receipt ───────────────────────────────
+        // ── Invoice paid → send receipt (subscription and one-off) ───────────
         case 'invoice.paid': {
             const invoice = event.data.object as Stripe.Invoice;
-
-            // Only send for subscription invoices (not one-off)
-            if (!(invoice as any).subscription) break;
 
             try {
                 const customerId = typeof invoice.customer === 'string'
@@ -270,8 +273,14 @@ export const handleStripeWebhook = async (req: any, res: any) => {
                 const invoiceUrl  = (invoice as any).hosted_invoice_url || 'https://billing.stripe.com';
                 const invoiceNum  = invoice.number || invoice.id;
 
-                const planName  = PLAN_NAMES[planId]  || 'Premium';
-                const planPrice = PLAN_PRICES[planId] || '';
+                const isSubscription = !!(invoice as any).subscription;
+                let planName = PLAN_NAMES[planId] || 'Premium';
+                let planPrice = PLAN_PRICES[planId] || '';
+
+                if (!isSubscription) {
+                    planName = invoice.lines?.data?.map(line => line.description).filter(Boolean).join(', ') || 'One-Time Charge';
+                    planPrice = '';
+                }
 
                 // Get email config from system settings (provider-aware)
                 const emailProvider = settings.emailProvider || 'sendgrid';
@@ -299,6 +308,7 @@ export const handleStripeWebhook = async (req: any, res: any) => {
                     invoiceNumber: invoiceNum,
                     periodStart, periodEnd,
                     invoiceUrl,
+                    isSubscription,
                 });
 
                 const provider = await resolveEmailProvider(db);
@@ -344,7 +354,9 @@ export const handleStripeWebhook = async (req: any, res: any) => {
                 await provider.send([{
                     to:      toEmail,
                     from:    { email: fromEmail, name: fromName },
-                    subject: `✅ Receipt: ${planName} Plan — ${amountPaid} – Pastoral Care for PCO`,
+                    subject: isSubscription
+                        ? `✅ Receipt: ${planName} Plan — ${amountPaid} – Pastoral Care for PCO`
+                        : `✅ Receipt: ${planName} — ${amountPaid} – Pastoral Care for PCO`,
                     html,
                 }], {
                     apiKey: sgKey,
