@@ -2048,8 +2048,7 @@ currentUser, onUpdateChurch, activePage, smsTab, mobileSmsUrl, activeNumberId, o
 
   return (
     <div className="flex flex-col h-full relative">
-      {/* ─── Tab Switcher - only shown in legacy embedded mode ──────────── */}
-      {!activePage && (
+      {/* ─── Tab Switcher ────────────────────────────────────────────────── */}
       <div className="shrink-0 flex items-center gap-1 px-5 pt-4 pb-0 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 overflow-x-auto no-scrollbar">
         <button
           onClick={() => setActiveTab('website')}
@@ -2163,7 +2162,6 @@ currentUser, onUpdateChurch, activePage, smsTab, mobileSmsUrl, activeNumberId, o
           ✨ Church Helper
         </button>
       </div>
-      )}
 
       {/* ─── Website Tab ───────────────────────────────────────────────── */}
       {effectiveTab === 'website' && (
