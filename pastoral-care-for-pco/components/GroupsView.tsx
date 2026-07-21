@@ -49,6 +49,12 @@ const TOOLTIP_STYLE = {
     boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
 };
 
+// Score → RAG pill classes (Tailwind-safe: explicit strings, no dynamic interpolation)
+const healthPillClass = (s: number) =>
+    s >= 80 ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400'
+  : s >= 60 ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400'
+  : 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400';
+
 const GroupsView: React.FC<GroupsViewProps> = ({ 
   data, 
   pcoConnected, 
@@ -289,6 +295,102 @@ const GroupsView: React.FC<GroupsViewProps> = ({
           if (t >= cutoff) days[new Date(h.date).getDay()].count++;
       }));
       return days;
+  }, [activeGroups]);
+
+  // ── Tier 2 ──────────────────────────────────────────────────────────────────
+
+  // Health Factor Breakdown — church-wide average of the 4 health sub-scores
+  const healthFactors = useMemo(() => {
+      const active = enrichedGroups.filter(g => !g.archivedAt && g.health);
+      const n = active.length || 1;
+      const sum = active.reduce((acc, g) => {
+          acc.attendance += g.health.breakdown.attendance;
+          acc.retention  += g.health.breakdown.retention;
+          acc.leadership += g.health.breakdown.leadership;
+          acc.engagement += g.health.breakdown.engagement;
+          return acc;
+      }, { attendance: 0, retention: 0, leadership: 0, engagement: 0 });
+      return [
+          { name: 'Attendance', score: Math.round(sum.attendance / n) },
+          { name: 'Retention',  score: Math.round(sum.retention / n) },
+          { name: 'Leadership', score: Math.round(sum.leadership / n) },
+          { name: 'Engagement', score: Math.round(sum.engagement / n) },
+      ];
+  }, [enrichedGroups]);
+
+  // Performance by Group Type — count, avg size, avg health per type
+  const typePerformance = useMemo(() => {
+      const map = new Map<string, { type: string; groups: number; members: number; healthSum: number }>();
+      enrichedGroups.filter(g => !g.archivedAt).forEach(g => {
+          const key = g.groupTypeName || 'Uncategorized';
+          if (!map.has(key)) map.set(key, { type: key, groups: 0, members: 0, healthSum: 0 });
+          const e = map.get(key)!;
+          e.groups++;
+          e.members += g.membersCount || 0;
+          e.healthSum += g.health?.score || 0;
+      });
+      return Array.from(map.values())
+          .map(e => ({ type: e.type, groups: e.groups, avgSize: e.groups ? Math.round(e.members / e.groups) : 0, avgHealth: e.groups ? Math.round(e.healthSum / e.groups) : 0 }))
+          .sort((a, b) => b.groups - a.groups);
+  }, [enrichedGroups]);
+
+  // Visitor Engagement — visitor volume + top welcoming groups (last 90 days)
+  const visitorStats = useMemo(() => {
+      const cutoff = Date.now() - 90 * 24 * 60 * 60 * 1000;
+      let visitors = 0, members = 0;
+      const perGroup: { name: string; visitors: number }[] = [];
+      activeGroups.forEach(g => {
+          let gv = 0;
+          (g.attendanceHistory || []).forEach(h => {
+              if (new Date(h.date).getTime() >= cutoff) {
+                  visitors += h.visitors || 0;
+                  members  += h.members || 0;
+                  gv += h.visitors || 0;
+              }
+          });
+          if (gv > 0) perGroup.push({ name: g.name, visitors: gv });
+      });
+      const total = visitors + members;
+      return {
+          visitors,
+          pct: total > 0 ? (visitors / total) * 100 : 0,
+          topGroups: perGroup.sort((a, b) => b.visitors - a.visitors).slice(0, 6),
+      };
+  }, [activeGroups]);
+
+  // Leader Load — members under each leader across active groups
+  const leaderLoad = useMemo(() => {
+      const map = new Map<string, { id: string; members: number; groups: number }>();
+      activeGroups.forEach(g => {
+          (g.leaderIds || []).forEach(lid => {
+              if (!map.has(lid)) map.set(lid, { id: lid, members: 0, groups: 0 });
+              const e = map.get(lid)!;
+              e.members += g.membersCount || 0;
+              e.groups++;
+          });
+      });
+      const list = Array.from(map.values())
+          .map(e => {
+              const person = getPersonDetails(e.id);
+              return { ...e, name: person?.name || 'Unknown Leader', avatar: person?.avatar || null };
+          })
+          .sort((a, b) => b.members - a.members);
+      return { list, overloaded: list.filter(l => l.members > 12).length };
+  }, [activeGroups, peopleData]);
+
+  // Groups by Campus — coverage per campus (multi-campus tenants)
+  const campusBreakdown = useMemo(() => {
+      const map = new Map<string, { campus: string; groups: number; members: number }>();
+      activeGroups.forEach(g => {
+          const key = g.campusName || 'Unassigned';
+          if (!map.has(key)) map.set(key, { campus: key, groups: 0, members: 0 });
+          const e = map.get(key)!;
+          e.groups++;
+          e.members += g.membersCount || 0;
+      });
+      return Array.from(map.values())
+          .map(e => ({ ...e, avgSize: e.groups ? Math.round(e.members / e.groups) : 0 }))
+          .sort((a, b) => b.groups - a.groups);
   }, [activeGroups]);
 
   const handleGenerateRiskAnalysis = async () => {
@@ -931,6 +1033,157 @@ const GroupsView: React.FC<GroupsViewProps> = ({
                       </WidgetWrapper>
                   </div>
               );
+          case 'groups_health_factors':
+              return (
+                  <div key="groups_health_factors" className="col-span-1">
+                      <WidgetWrapper title="Health Factors" onRemove={() => handleRemoveWidget(id)} source="Group Health">
+                          <div className="flex flex-col justify-center h-full gap-5 py-2">
+                              {healthFactors.map(f => {
+                                  const color = f.score >= 80 ? '#10b981' : f.score >= 60 ? '#f59e0b' : '#f43f5e';
+                                  return (
+                                      <div key={f.name}>
+                                          <div className="flex justify-between items-center mb-1.5">
+                                              <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{f.name}</span>
+                                              <span className="text-sm font-black text-slate-900 dark:text-white tabular-nums">{f.score}</span>
+                                          </div>
+                                          <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2.5 overflow-hidden">
+                                              <div className="h-full rounded-full transition-all duration-1000 ease-out" style={{ width: `${f.score}%`, backgroundColor: color }}></div>
+                                          </div>
+                                      </div>
+                                  );
+                              })}
+                          </div>
+                      </WidgetWrapper>
+                  </div>
+              );
+          case 'groups_type_performance':
+              return (
+                  <div key="groups_type_performance" className="col-span-1 lg:col-span-2">
+                      <WidgetWrapper title="Performance by Type" onRemove={() => handleRemoveWidget(id)} source="PCO Groups">
+                          <div className="overflow-x-auto max-h-72 custom-scrollbar">
+                              <table className="w-full text-left">
+                                  <thead className="bg-slate-50 dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 sticky top-0 z-10">
+                                      <tr>
+                                          <th className="p-3 text-[11px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide">Type</th>
+                                          <th className="p-3 text-[11px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide text-center">Groups</th>
+                                          <th className="p-3 text-[11px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide text-center">Avg Size</th>
+                                          <th className="p-3 text-[11px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide text-right">Avg Health</th>
+                                      </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
+                                      {typePerformance.length > 0 ? typePerformance.map(t => (
+                                          <tr key={t.type} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                              <td className="p-3"><span className="text-xs font-bold text-slate-900 dark:text-white">{t.type}</span></td>
+                                              <td className="p-3 text-center"><span className="text-xs font-black text-slate-900 dark:text-white tabular-nums">{t.groups}</span></td>
+                                              <td className="p-3 text-center"><span className="text-xs font-bold text-slate-600 dark:text-slate-300 tabular-nums">{t.avgSize}</span></td>
+                                              <td className="p-3 text-right"><span className={`text-[11px] font-black px-2 py-1 rounded tabular-nums ${healthPillClass(t.avgHealth)}`}>{t.avgHealth}</span></td>
+                                          </tr>
+                                      )) : (
+                                          <tr><td colSpan={4} className="p-6 text-center text-slate-400 text-xs italic">No group data available.</td></tr>
+                                      )}
+                                  </tbody>
+                              </table>
+                          </div>
+                      </WidgetWrapper>
+                  </div>
+              );
+          case 'groups_visitor_funnel':
+              return (
+                  <div key="groups_visitor_funnel" className="col-span-1">
+                      <WidgetWrapper title="Visitor Engagement" onRemove={() => handleRemoveWidget(id)} source="Group Events · 90d">
+                          <div className="flex flex-col h-full">
+                              <div className="flex items-end gap-3 mb-1">
+                                  <span className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter tabular-nums">{visitorStats.visitors.toLocaleString()}</span>
+                                  <span className="text-[11px] font-medium text-slate-400 mb-1.5 leading-tight">visitors welcomed<br/>({Math.round(visitorStats.pct)}% of attendance)</span>
+                              </div>
+                              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mt-5 mb-2">Top Welcoming Groups</p>
+                              <div className="space-y-2 overflow-y-auto custom-scrollbar max-h-40 pr-1">
+                                  {visitorStats.topGroups.length > 0 ? visitorStats.topGroups.map(g => (
+                                      <div key={g.name} className="flex justify-between items-center p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
+                                          <span className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">{g.name}</span>
+                                          <span className="text-[11px] font-black text-amber-500 tabular-nums shrink-0 ml-2">{g.visitors}</span>
+                                      </div>
+                                  )) : (
+                                      <p className="text-xs text-slate-400 font-bold text-center py-6">No visitor data logged.</p>
+                                  )}
+                              </div>
+                          </div>
+                      </WidgetWrapper>
+                  </div>
+              );
+          case 'groups_leader_load':
+              return (
+                  <div key="groups_leader_load" className="col-span-1">
+                      <WidgetWrapper
+                          title="Leader Load"
+                          onRemove={() => handleRemoveWidget(id)}
+                          source="Group Leaders"
+                          headerControl={
+                              <span className={`text-[11px] font-bold px-2 py-0.5 rounded tabular-nums ${leaderLoad.overloaded > 0 ? 'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400' : 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400'}`}>
+                                  {leaderLoad.overloaded} over
+                              </span>
+                          }
+                      >
+                          {leaderLoad.list.length > 0 ? (
+                              <div className="space-y-2 max-h-72 overflow-y-auto custom-scrollbar pr-1">
+                                  {leaderLoad.list.slice(0, 40).map(l => (
+                                      <div key={l.id} className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
+                                          <div className="w-8 h-8 shrink-0 rounded-full overflow-hidden bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center text-xs font-black text-indigo-500 dark:text-indigo-400">
+                                              {l.avatar ? <img src={l.avatar} alt="" className="w-full h-full object-cover" /> : l.name.charAt(0)}
+                                          </div>
+                                          <div className="min-w-0 flex-1">
+                                              <p className="text-xs font-bold text-slate-800 dark:text-white truncate">{l.name}</p>
+                                              <p className="text-[11px] text-slate-400">{l.groups} group{l.groups > 1 ? 's' : ''}</p>
+                                          </div>
+                                          <span className={`text-xs font-black tabular-nums shrink-0 ${l.members > 12 ? 'text-amber-500' : 'text-slate-500 dark:text-slate-300'}`}>{l.members}</span>
+                                      </div>
+                                  ))}
+                              </div>
+                          ) : (
+                              <div className="h-full flex items-center justify-center text-slate-400 text-xs font-bold">No leaders assigned.</div>
+                          )}
+                      </WidgetWrapper>
+                  </div>
+              );
+          case 'groups_by_campus': {
+              const multiCampus = campusBreakdown.length > 1;
+              return (
+                  <div key="groups_by_campus" className="col-span-1 lg:col-span-2">
+                      <WidgetWrapper title="Groups by Campus" onRemove={() => handleRemoveWidget(id)} source="PCO Groups">
+                          {multiCampus ? (
+                              <div className="overflow-x-auto max-h-72 custom-scrollbar">
+                                  <table className="w-full text-left">
+                                      <thead className="bg-slate-50 dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 sticky top-0 z-10">
+                                          <tr>
+                                              <th className="p-3 text-[11px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide">Campus</th>
+                                              <th className="p-3 text-[11px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide text-center">Groups</th>
+                                              <th className="p-3 text-[11px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide text-center">Members</th>
+                                              <th className="p-3 text-[11px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide text-right">Avg Size</th>
+                                          </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
+                                          {campusBreakdown.map(c => (
+                                              <tr key={c.campus} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                                  <td className="p-3"><span className="text-xs font-bold text-slate-900 dark:text-white">{c.campus}</span></td>
+                                                  <td className="p-3 text-center"><span className="text-xs font-black text-slate-900 dark:text-white tabular-nums">{c.groups}</span></td>
+                                                  <td className="p-3 text-center"><span className="text-xs font-bold text-slate-600 dark:text-slate-300 tabular-nums">{c.members.toLocaleString()}</span></td>
+                                                  <td className="p-3 text-right"><span className="text-xs font-bold text-slate-600 dark:text-slate-300 tabular-nums">{c.avgSize}</span></td>
+                                              </tr>
+                                          ))}
+                                      </tbody>
+                                  </table>
+                              </div>
+                          ) : (
+                              <div className="h-full flex flex-col items-center justify-center text-center p-6 gap-2">
+                                  <span className="text-4xl grayscale opacity-30">🏢</span>
+                                  <p className="text-xs font-bold text-slate-400 dark:text-slate-500">Single-campus church</p>
+                                  <p className="text-[11px] text-slate-400 max-w-xs">A per-campus breakdown appears once groups are assigned to multiple campuses.</p>
+                              </div>
+                          )}
+                      </WidgetWrapper>
+                  </div>
+              );
+          }
           case 'event_attendance':
               const totalMembers = eventAttendanceData.reduce((acc, curr) => acc + curr.Members, 0);
               const totalVisitors = eventAttendanceData.reduce((acc, curr) => acc + curr.Visitors, 0);
@@ -1350,7 +1603,8 @@ const GroupsView: React.FC<GroupsViewProps> = ({
               let spanClass = "col-span-1";
               if (id === 'groups_stats') spanClass = "col-span-1 md:col-span-2 lg:col-span-4";
               if (id === 'groups_ai_agent' || id === 'groups_risk_agent' || id === 'event_attendance' || id === 'groups_age_demographics'
-                  || id === 'groups_action_center' || id === 'groups_size_distribution' || id === 'groups_net_growth' || id === 'groups_meeting_days') spanClass = "col-span-1 lg:col-span-2";
+                  || id === 'groups_action_center' || id === 'groups_size_distribution' || id === 'groups_net_growth' || id === 'groups_meeting_days'
+                  || id === 'groups_type_performance' || id === 'groups_by_campus') spanClass = "col-span-1 lg:col-span-2";
               if (id === 'group_info') spanClass = "col-span-1 lg:col-span-4";
               
               return (
