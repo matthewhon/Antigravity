@@ -98,7 +98,7 @@ async function processCampaign(db: any, log: any, campaign: any): Promise<void> 
 
     // Fetch PCO list members (paginated)
     let allPeople: any[] = [];
-    let nextUrl: string | null = `https://api.planningcenteronline.com/people/v2/lists/${pcoListId}/people?per_page=100&include=phone_numbers,emails`;
+    let nextUrl: string | null = `https://api.planningcenteronline.com/people/v2/lists/${pcoListId}/people?per_page=100&include=phone_numbers,emails,addresses`;
     while (nextUrl) {
         try {
             const data = await fetchFromPco(churchId, nextUrl);
@@ -147,8 +147,8 @@ async function processPersonForCampaign(
     const included    = pcoPerson._included || [];
 
     // Resolve phone and email from PCO includes
-    const phones = included.filter((i: any) => i.type === 'PhoneNumber' && pcoPerson.relationships?.phone_numbers?.data?.some((r: any) => r.id === i.id));
-    const emails  = included.filter((i: any) => i.type === 'Email' && pcoPerson.relationships?.emails?.data?.some((r: any) => r.id === i.id));
+    const phones = included.filter((i: any) => i.type === 'PhoneNumber' && (!pcoPerson.relationships?.phone_numbers?.data || pcoPerson.relationships.phone_numbers.data.some((r: any) => r.id === i.id)));
+    const emails  = included.filter((i: any) => i.type === 'Email' && (!pcoPerson.relationships?.emails?.data || pcoPerson.relationships.emails.data.some((r: any) => r.id === i.id)));
     const mobilePhone = phones.find((p: any) => p.attributes?.location === 'Mobile') || phones[0];
     const primaryEmail = emails.find((e: any) => e.attributes?.primary) || emails[0];
 
