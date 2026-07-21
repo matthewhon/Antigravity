@@ -18,9 +18,16 @@ const POLL_INTERVAL_MS = 60_000;
 
 // ─── Outreach message builder ─────────────────────────────────────────────────
 
-function buildIntroMessage(campaign: any, personName: string, churchName: string, pcoValues: Record<string, string> = {}): string {
-    const rawTemplate = campaign.messaging?.introMessage || 
-        `Hi {{first_name}}! This is {{church_name}}. We're updating our church directory and would love to confirm a few details: {{fields_list}}. Reply to get started! Reply STOP to opt out.`;
+function buildIntroMessage(campaign: any, personName: string, churchName: string, pcoValues: Record<string, string> = {}, sessionId: string = ''): string {
+    const isFormLinkMode = campaign.mode === 'form_link';
+    const baseUrl = process.env.API_BASE_URL || 'https://pastoralcare.barnabassoftware.com';
+    const formLink = sessionId ? `${baseUrl}/form/${campaign.churchId}/${sessionId}` : `${baseUrl}/form/${campaign.churchId}/update`;
+
+    const rawTemplate = campaign.messaging?.introMessage || (
+        isFormLinkMode
+            ? `Hi {{first_name}}! This is {{church_name}}. Please take a moment to update your info for our church directory using this link: ${formLink}`
+            : `Hi {{first_name}}! This is {{church_name}}. We're updating our church directory and would love to confirm a few details: {{fields_list}}. Reply to get started! Reply STOP to opt out.`
+    );
 
     const fieldLabels = (campaign.fieldsToCollect || []).map((f: any) => f.label).join(', ');
     const firstName = personName.split(' ')[0] || personName;
@@ -278,7 +285,7 @@ async function sendOutreach(
     const intervalDays = schedule?.intervalDays || 3;
     const nextScheduledAt = Date.now() + intervalDays * 24 * 60 * 60 * 1000;
 
-    const message = buildIntroMessage(campaign, session.personName, churchName, session.existingPcoData || {});
+    const message = buildIntroMessage(campaign, session.personName, churchName, session.existingPcoData || {}, sessionId);
     let sent = false;
 
     // Prefer SMS; fall back to email

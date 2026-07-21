@@ -46,6 +46,7 @@ interface InfoCampaign {
     status: 'active' | 'paused' | 'complete' | 'draft';
     fieldsToCollect: FieldSpec[];
     fieldBehavior?: 'confirm_all' | 'only_blank';
+    mode?: 'conversational' | 'form_link';
     existingFieldValues?: Record<string, Record<string, string>>;
     channels: { sms: boolean; email: boolean; smsNumberId?: string };
     schedule: { startDate?: string; intervalDays: number; maxAttempts: number; sendWindowStart: string; sendWindowEnd: string };
@@ -219,6 +220,7 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
     const [pcoListName, setPcoListName] = useState(existing?.pcoListName || '');
     const [selectedFields, setSelectedFields] = useState<string[]>(existing?.fieldsToCollect.map(f => f.key) || ['phone_mobile', 'email_primary', 'address_home']);
     const [fieldBehavior, setFieldBehavior] = useState<'confirm_all' | 'only_blank'>(existing?.fieldBehavior || 'confirm_all');
+    const [mode, setMode] = useState<'conversational' | 'form_link'>(existing?.mode || 'conversational');
     const [smsEnabled, setSmsEnabled] = useState(existing?.channels?.sms ?? true);
     const [emailEnabled, setEmailEnabled] = useState(existing?.channels?.email ?? true);
     const [startDate, setStartDate] = useState(existing?.schedule?.startDate || new Date().toISOString().split('T')[0]);
@@ -255,9 +257,14 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
             return;
         }
 
-        const isConfirm = fieldBehavior === 'confirm_all';
         const churchNameTag = '{{church_name}}';
         const firstNameTag = '{{first_name}}';
+
+        if (mode === 'form_link') {
+            setIntroMessage(`Hi ${firstNameTag}! This is ${churchNameTag}. Please take a quick moment to update your info for our church directory using this secure link: {{form_link}} - Thank you!`);
+            return;
+        }
+        const isConfirm = fieldBehavior === 'confirm_all';
 
         if (isConfirm) {
             if (selectedFields.length === 1) {
@@ -397,6 +404,49 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
                             </div>
                         </div>
                     ))}
+                </div>
+            </div>
+
+            {/* Outreach Interaction Mode */}
+            <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Outreach Interaction Mode</label>
+                <div className="grid grid-cols-2 gap-3">
+                    <label className={`flex flex-col p-3.5 rounded-xl border cursor-pointer transition ${mode === 'conversational' ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' : 'border-slate-200 dark:border-slate-700'}`}>
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="radio"
+                                name="outreachMode"
+                                value="conversational"
+                                checked={mode === 'conversational'}
+                                onChange={() => setMode('conversational')}
+                                className="text-emerald-600 focus:ring-emerald-500"
+                            />
+                            <span className={`text-sm font-semibold ${mode === 'conversational' ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-800 dark:text-slate-200'}`}>
+                                🤖 AI Conversation
+                            </span>
+                        </div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 pl-5">
+                            Member updates info naturally by chatting with the AI agent over SMS or email.
+                        </p>
+                    </label>
+                    <label className={`flex flex-col p-3.5 rounded-xl border cursor-pointer transition ${mode === 'form_link' ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' : 'border-slate-200 dark:border-slate-700'}`}>
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="radio"
+                                name="outreachMode"
+                                value="form_link"
+                                checked={mode === 'form_link'}
+                                onChange={() => setMode('form_link')}
+                                className="text-emerald-600 focus:ring-emerald-500"
+                            />
+                            <span className={`text-sm font-semibold ${mode === 'form_link' ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-800 dark:text-slate-200'}`}>
+                                📋 Update Form Link
+                            </span>
+                        </div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 pl-5">
+                            Sends member a secure, direct web link using {"{{form_link}}"} to fill out their updated details.
+                        </p>
+                    </label>
                 </div>
             </div>
 
@@ -544,6 +594,7 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
                             { tag: '{{mobile_phone}}', label: 'Mobile Phone' },
                             { tag: '{{birthday}}', label: 'Birthday' },
                             { tag: '{{fields_list}}', label: 'Fields List' },
+                            { tag: '{{form_link}}', label: 'Form Link' },
                         ].map(t => (
                             <button
                                 key={t.tag}
