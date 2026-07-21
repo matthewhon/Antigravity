@@ -171,6 +171,8 @@ async function processPersonForCampaign(
     if (attrs.graduation_year) pcoValues['graduation_year'] = String(attrs.graduation_year);
     if (attrs.school) pcoValues['school'] = attrs.school;
     if (attrs.membership) pcoValues['membership'] = attrs.membership;
+    if (attrs.first_name) pcoValues['first_name'] = attrs.first_name;
+    if (attrs.last_name) pcoValues['last_name'] = attrs.last_name;
 
     // Address
     const addresses = included.filter((i: any) => i.type === 'Address');
