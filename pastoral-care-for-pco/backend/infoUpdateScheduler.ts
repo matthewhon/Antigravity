@@ -216,6 +216,24 @@ async function processPersonForCampaign(
         return;
     }
 
+    // Guard: if in 'only_blank' mode and person already has all requested fields filled, mark complete immediately without outreach
+    if (behavior === 'only_blank' && initialRemainingFields.length === 0) {
+        log.info(`[InfoUpdateScheduler] ${personName} already has all requested fields filled — skipping outreach`, 'system', { churchId, campaignId, pcoPersonId }, churchId);
+        const sessionId = `ius_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        await db.collection('people_info_sessions').doc(sessionId).set({
+            id: sessionId, campaignId, churchId, pcoPersonId, personName,
+            phoneE164: phoneE164 || null, emailAddress: emailAddr || null,
+            conversationHistory: [], collectedData: {}, existingPcoData: pcoValues,
+            remainingFields: [], status: 'complete', attemptCount: 0,
+            completedAt: Date.now()
+        });
+        await db.collection('people_info_campaigns').doc(campaignId).update({
+            'stats.total': FieldValue.increment(1),
+            'stats.complete': FieldValue.increment(1)
+        });
+        return;
+    }
+
     // Create new session
     const sessionId = `ius_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     const newSession = {
