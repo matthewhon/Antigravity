@@ -1,9 +1,9 @@
 
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { GroupsDashboardData, GlobalStats, PeopleDashboardData, PcoPerson, GroupRiskSettings } from '../types';
-import { 
+import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
-  BarChart, Bar, XAxis, YAxis, CartesianGrid
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, ReferenceLine
 } from 'recharts';
 import WidgetsController from './WidgetsController';
 import { GROUPS_WIDGETS } from '../constants/widgetRegistry';
@@ -177,6 +177,119 @@ const GroupsView: React.FC<GroupsViewProps> = ({
           return { ...g, health };
       });
   }, [data?.allGroups, peopleData, groupRiskSettings]);
+
+  // ── Active (non-archived) groups — shared base for the new widgets ──────────
+  const activeGroups = useMemo(
+      () => (data?.allGroups || []).filter(g => !g.archivedAt),
+      [data?.allGroups]
+  );
+
+  // Unique set of people enrolled in at least one active group
+  const activeMemberIds = useMemo(() => {
+      const set = new Set<string>();
+      activeGroups.forEach(g => g.memberIds?.forEach(mid => set.add(mid)));
+      return set;
+  }, [activeGroups]);
+
+  // Connection Rate — % of the congregation in a group
+  const connectionStats = useMemo(() => {
+      const total = peopleData?.allPeople.length || 0;
+      const connected = peopleData
+          ? peopleData.allPeople.filter(p => activeMemberIds.has(p.id)).length
+          : activeMemberIds.size;
+      const rate = total > 0 ? (connected / total) * 100 : 0;
+      return { connected, total, unconnected: Math.max(0, total - connected), rate };
+  }, [peopleData, activeMemberIds]);
+
+  // Health Distribution — Thriving / Warning / Critical counts across active groups
+  const healthDistribution = useMemo(() => {
+      const counts = { Thriving: 0, Warning: 0, Critical: 0 };
+      enrichedGroups.forEach(g => {
+          if (!g.archivedAt && g.health) counts[g.health.status]++;
+      });
+      return counts;
+  }, [enrichedGroups]);
+
+  // Action Center — leaderless, inactive ("dark"), and over-capacity groups
+  const actionItems = useMemo(() => {
+      const leaderless: typeof activeGroups = [];
+      const dark: typeof activeGroups = [];
+      const overCapacity: typeof activeGroups = [];
+      const now = Date.now();
+      const DARK_MS = 21 * 24 * 60 * 60 * 1000; // 3 weeks
+      activeGroups.forEach(g => {
+          const leaders = g.leaderIds?.length || 0;
+          if (leaders === 0) leaderless.push(g);
+          else if ((g.membersCount || 0) / leaders > 12) overCapacity.push(g);
+
+          const latest = (g.attendanceHistory || []).reduce(
+              (mx, h) => Math.max(mx, new Date(h.date).getTime()), 0
+          );
+          if ((g.membersCount || 0) > 0 && (latest === 0 || now - latest > DARK_MS)) dark.push(g);
+      });
+      return { leaderless, dark, overCapacity };
+  }, [activeGroups]);
+
+  // Unconnected People — congregation members not in any active group (newest first)
+  const unconnectedPeople = useMemo(() => {
+      if (!peopleData) return [];
+      return peopleData.allPeople
+          .filter(p => !activeMemberIds.has(p.id))
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [peopleData, activeMemberIds]);
+
+  // Group Size Distribution — histogram of active groups by member count
+  const sizeDistribution = useMemo(() => {
+      const buckets = [
+          { range: '1–5',   min: 1,  max: 5,        count: 0 },
+          { range: '6–10',  min: 6,  max: 10,       count: 0 },
+          { range: '11–15', min: 11, max: 15,       count: 0 },
+          { range: '16–20', min: 16, max: 20,       count: 0 },
+          { range: '21+',   min: 21, max: Infinity, count: 0 },
+      ];
+      activeGroups.forEach(g => {
+          const n = g.membersCount || 0;
+          if (n <= 0) return;
+          const b = buckets.find(b => n >= b.min && n <= b.max);
+          if (b) b.count++;
+      });
+      return buckets.map(b => ({ range: b.range, count: b.count }));
+  }, [activeGroups]);
+
+  // Net Group Growth — new vs archived groups over the last 6 months
+  const netGrowthData = useMemo(() => {
+      const now = new Date();
+      const months: { key: string; label: string; newCount: number; closedCount: number }[] = [];
+      for (let i = 5; i >= 0; i--) {
+          const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          months.push({ key: `${d.getFullYear()}-${d.getMonth()}`, label: d.toLocaleDateString(undefined, { month: 'short' }), newCount: 0, closedCount: 0 });
+      }
+      const idx = new Map(months.map((m, i) => [m.key, i]));
+      (data?.allGroups || []).forEach(g => {
+          if (g.createdAt) {
+              const d = new Date(g.createdAt);
+              const k = `${d.getFullYear()}-${d.getMonth()}`;
+              if (idx.has(k)) months[idx.get(k)!].newCount++;
+          }
+          if (g.archivedAt) {
+              const d = new Date(g.archivedAt);
+              const k = `${d.getFullYear()}-${d.getMonth()}`;
+              if (idx.has(k)) months[idx.get(k)!].closedCount++;
+          }
+      });
+      return months.map(m => ({ label: m.label, New: m.newCount, Closed: -m.closedCount, Net: m.newCount - m.closedCount }));
+  }, [data?.allGroups]);
+
+  // Meetings by Day of Week — logged group events per weekday (last 90 days)
+  const meetingDays = useMemo(() => {
+      const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => ({ day: d, count: 0 }));
+      const cutoff = Date.now() - 90 * 24 * 60 * 60 * 1000;
+      activeGroups.forEach(g => (g.attendanceHistory || []).forEach(h => {
+          const t = new Date(h.date).getTime();
+          if (t >= cutoff) days[new Date(h.date).getDay()].count++;
+      }));
+      return days;
+  }, [activeGroups]);
 
   const handleGenerateRiskAnalysis = async () => {
       if (!enrichedGroups.length) return;
@@ -615,6 +728,209 @@ const GroupsView: React.FC<GroupsViewProps> = ({
                       </div>
                   </div>
               );
+          case 'groups_connection_rate':
+              return (
+                  <div key="groups_connection_rate" className="col-span-1">
+                      <WidgetWrapper title="Connection Rate" onRemove={() => handleRemoveWidget(id)} source="Groups & People">
+                          {peopleData ? (
+                              <div className="flex flex-col h-full justify-center">
+                                  <div className="flex items-end gap-3">
+                                      <span className="text-5xl font-black text-slate-900 dark:text-white tracking-tighter tabular-nums">{Math.round(connectionStats.rate)}%</span>
+                                      <span className="text-[11px] font-medium text-slate-400 mb-2 leading-tight">of the congregation<br/>is in a group</span>
+                                  </div>
+                                  <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-3 mt-5 overflow-hidden">
+                                      <div className="bg-indigo-500 h-full rounded-full transition-all duration-1000 ease-out" style={{ width: `${Math.min(100, connectionStats.rate)}%` }}></div>
+                                  </div>
+                                  <div className="flex justify-between mt-5">
+                                      <div>
+                                          <p className="text-xl font-black text-indigo-600 dark:text-indigo-400 tabular-nums">{connectionStats.connected.toLocaleString()}</p>
+                                          <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Connected</p>
+                                      </div>
+                                      <div className="text-right">
+                                          <p className="text-xl font-black text-rose-500 dark:text-rose-400 tabular-nums">{connectionStats.unconnected.toLocaleString()}</p>
+                                          <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Unconnected</p>
+                                      </div>
+                                  </div>
+                              </div>
+                          ) : (
+                              <div className="h-full flex items-center justify-center text-slate-400 text-xs font-bold">People data required.</div>
+                          )}
+                      </WidgetWrapper>
+                  </div>
+              );
+          case 'groups_health_distribution': {
+              const hd = [
+                  { name: 'Thriving', value: healthDistribution.Thriving, color: '#10b981' },
+                  { name: 'Warning',  value: healthDistribution.Warning,  color: '#f59e0b' },
+                  { name: 'Critical', value: healthDistribution.Critical, color: '#f43f5e' },
+              ].filter(d => d.value > 0);
+              const totalHealth = healthDistribution.Thriving + healthDistribution.Warning + healthDistribution.Critical;
+              return (
+                  <div key="groups_health_distribution" className="col-span-1">
+                      <WidgetWrapper title="Health Distribution" onRemove={() => handleRemoveWidget(id)} source="Group Health">
+                          <div className="h-64 relative">
+                              {totalHealth > 0 ? (
+                                  <>
+                                      <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={1}>
+                                          <PieChart>
+                                              <Pie data={hd} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                                                  {hd.map((d, i) => <Cell key={`h-${i}`} fill={d.color} />)}
+                                              </Pie>
+                                              <Tooltip contentStyle={TOOLTIP_STYLE} itemStyle={{ color: '#fff' }} />
+                                              <Legend layout="vertical" verticalAlign="middle" align="right" iconType="circle" wrapperStyle={{ fontSize: '11px', fontWeight: 'bold', color: axisColor }} />
+                                          </PieChart>
+                                      </ResponsiveContainer>
+                                      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pr-20">
+                                          <span className="text-3xl font-black text-slate-900 dark:text-white tabular-nums">{totalHealth}</span>
+                                          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Groups</span>
+                                      </div>
+                                  </>
+                              ) : (
+                                  <div className="h-full flex items-center justify-center text-slate-400 text-xs font-bold">No health data available.</div>
+                              )}
+                          </div>
+                      </WidgetWrapper>
+                  </div>
+              );
+          }
+          case 'groups_action_center': {
+              const sevClass: Record<string, string> = {
+                  rose:   'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400',
+                  amber:  'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400',
+                  indigo: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400',
+              };
+              const rows = [
+                  { color: 'rose',   label: 'Leaderless Groups', desc: 'No leader assigned',        items: actionItems.leaderless },
+                  { color: 'amber',  label: 'Inactive (3+ wks)', desc: 'No recent meeting logged',   items: actionItems.dark },
+                  { color: 'indigo', label: 'Needs an Apprentice', desc: 'Over 12 members per leader', items: actionItems.overCapacity },
+              ];
+              return (
+                  <div key="groups_action_center" className="col-span-1 lg:col-span-2">
+                      <WidgetWrapper title="Action Center" onRemove={() => handleRemoveWidget(id)} source="Group Health">
+                          <div className="space-y-3">
+                              {rows.map(r => (
+                                  <div key={r.label} className="flex items-center gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
+                                      <span className={`w-11 h-11 shrink-0 rounded-xl flex items-center justify-center text-lg font-black tabular-nums ${sevClass[r.color]}`}>{r.items.length}</span>
+                                      <div className="min-w-0 flex-1">
+                                          <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{r.label}</p>
+                                          <p className="text-[11px] font-medium text-slate-400 truncate">
+                                              {r.items.length > 0
+                                                  ? r.items.slice(0, 3).map(g => g.name).join(' · ') + (r.items.length > 3 ? ` +${r.items.length - 3} more` : '')
+                                                  : r.desc}
+                                          </p>
+                                      </div>
+                                  </div>
+                              ))}
+                          </div>
+                      </WidgetWrapper>
+                  </div>
+              );
+          }
+          case 'groups_size_distribution':
+              return (
+                  <div key="groups_size_distribution" className="col-span-1 lg:col-span-2">
+                      <WidgetWrapper title="Group Size Distribution" onRemove={() => handleRemoveWidget(id)} source="PCO Groups">
+                          <div className="h-64">
+                              <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={1}>
+                                  <BarChart data={sizeDistribution}>
+                                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
+                                      <XAxis dataKey="range" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: axisColor }} />
+                                      <YAxis axisLine={false} tickLine={false} allowDecimals={false} tick={{ fontSize: 11, fill: axisColor }} />
+                                      <Tooltip cursor={{ fill: currentTheme === 'dark' ? '#334155' : '#f8fafc' }} contentStyle={TOOLTIP_STYLE} itemStyle={{ color: '#fff' }} formatter={(v: number) => [`${v} groups`]} />
+                                      <Bar dataKey="count" radius={[4, 4, 0, 0]} barSize={44}>
+                                          {sizeDistribution.map((_, i) => (
+                                              <Cell key={`s-${i}`} fill={i === 0 ? '#f43f5e' : i === sizeDistribution.length - 1 ? '#f59e0b' : '#6366f1'} />
+                                          ))}
+                                      </Bar>
+                                  </BarChart>
+                              </ResponsiveContainer>
+                          </div>
+                          <p className="text-[11px] font-medium text-slate-400 mt-2 text-center">Rose = at risk of closing · Amber = ready to multiply</p>
+                      </WidgetWrapper>
+                  </div>
+              );
+          case 'groups_net_growth':
+              return (
+                  <div key="groups_net_growth" className="col-span-1 lg:col-span-2">
+                      <WidgetWrapper title="Net Group Growth" onRemove={() => handleRemoveWidget(id)} source="PCO Groups · 6 mo">
+                          <div className="h-64">
+                              <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={1}>
+                                  <BarChart data={netGrowthData} stackOffset="sign">
+                                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
+                                      <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: axisColor }} />
+                                      <YAxis axisLine={false} tickLine={false} allowDecimals={false} tick={{ fontSize: 11, fill: axisColor }} />
+                                      <Tooltip cursor={{ fill: currentTheme === 'dark' ? '#334155' : '#f8fafc' }} contentStyle={TOOLTIP_STYLE} itemStyle={{ color: '#fff' }} formatter={(v: number, name) => [Math.abs(v), name]} />
+                                      <Legend iconType="circle" wrapperStyle={{ fontSize: '11px', fontWeight: 'bold', color: axisColor }} />
+                                      <ReferenceLine y={0} stroke={axisColor} strokeOpacity={0.4} />
+                                      <Bar dataKey="New" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                                      <Bar dataKey="Closed" fill="#f43f5e" radius={[4, 4, 0, 0]} />
+                                  </BarChart>
+                              </ResponsiveContainer>
+                          </div>
+                      </WidgetWrapper>
+                  </div>
+              );
+          case 'groups_meeting_days':
+              return (
+                  <div key="groups_meeting_days" className="col-span-1 lg:col-span-2">
+                      <WidgetWrapper title="Meetings by Day" onRemove={() => handleRemoveWidget(id)} source="Group Events · 90d">
+                          <div className="h-64">
+                              <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={1}>
+                                  <BarChart data={meetingDays}>
+                                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
+                                      <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: axisColor }} />
+                                      <YAxis axisLine={false} tickLine={false} allowDecimals={false} tick={{ fontSize: 11, fill: axisColor }} />
+                                      <Tooltip cursor={{ fill: currentTheme === 'dark' ? '#334155' : '#f8fafc' }} contentStyle={TOOLTIP_STYLE} itemStyle={{ color: '#fff' }} formatter={(v: number) => [`${v} meetings`]} />
+                                      <Bar dataKey="count" fill="#8b5cf6" radius={[4, 4, 0, 0]} barSize={32} />
+                                  </BarChart>
+                              </ResponsiveContainer>
+                          </div>
+                      </WidgetWrapper>
+                  </div>
+              );
+          case 'groups_unconnected':
+              return (
+                  <div key="groups_unconnected" className="col-span-1">
+                      <WidgetWrapper
+                          title="Unconnected People"
+                          onRemove={() => handleRemoveWidget(id)}
+                          source="Not in any group"
+                          headerControl={
+                              <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-rose-50 text-rose-600 dark:bg-rose-900/20 dark:text-rose-400 tabular-nums">{unconnectedPeople.length}</span>
+                          }
+                      >
+                          {peopleData ? (
+                              unconnectedPeople.length > 0 ? (
+                                  <div className="space-y-2 max-h-72 overflow-y-auto custom-scrollbar pr-1">
+                                      {unconnectedPeople.slice(0, 50).map(p => (
+                                          <button
+                                              key={p.id}
+                                              onClick={() => window.dispatchEvent(new CustomEvent('openPersonProfile', { detail: p.id }))}
+                                              className="w-full flex items-center gap-3 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 hover:border-indigo-200 dark:hover:border-indigo-800 transition-colors text-left"
+                                          >
+                                              <div className="w-8 h-8 shrink-0 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-black text-slate-400">
+                                                  {p.avatar ? <img src={p.avatar} alt="" className="w-full h-full object-cover" /> : p.name.charAt(0)}
+                                              </div>
+                                              <div className="min-w-0 flex-1">
+                                                  <p className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">{p.name}</p>
+                                                  <p className="text-[11px] text-slate-400 truncate">{p.membership || 'Guest'}</p>
+                                              </div>
+                                              <span className="text-[11px] font-medium text-slate-400 shrink-0">{new Date(p.createdAt).toLocaleDateString(undefined, { month: 'short', year: '2-digit' })}</span>
+                                          </button>
+                                      ))}
+                                      {unconnectedPeople.length > 50 && (
+                                          <p className="text-[11px] font-medium text-slate-400 text-center pt-2">+{(unconnectedPeople.length - 50).toLocaleString()} more</p>
+                                      )}
+                                  </div>
+                              ) : (
+                                  <div className="py-12 text-center text-slate-400 text-xs font-bold">Everyone is connected! 🎉</div>
+                              )
+                          ) : (
+                              <div className="h-full flex items-center justify-center text-slate-400 text-xs font-bold">People data required.</div>
+                          )}
+                      </WidgetWrapper>
+                  </div>
+              );
           case 'event_attendance':
               const totalMembers = eventAttendanceData.reduce((acc, curr) => acc + curr.Members, 0);
               const totalVisitors = eventAttendanceData.reduce((acc, curr) => acc + curr.Visitors, 0);
@@ -1033,7 +1349,8 @@ const GroupsView: React.FC<GroupsViewProps> = ({
               if (id === 'groups_stats') return null;
               let spanClass = "col-span-1";
               if (id === 'groups_stats') spanClass = "col-span-1 md:col-span-2 lg:col-span-4";
-              if (id === 'groups_ai_agent' || id === 'groups_risk_agent' || id === 'event_attendance' || id === 'groups_age_demographics') spanClass = "col-span-1 lg:col-span-2";
+              if (id === 'groups_ai_agent' || id === 'groups_risk_agent' || id === 'event_attendance' || id === 'groups_age_demographics'
+                  || id === 'groups_action_center' || id === 'groups_size_distribution' || id === 'groups_net_growth' || id === 'groups_meeting_days') spanClass = "col-span-1 lg:col-span-2";
               if (id === 'group_info') spanClass = "col-span-1 lg:col-span-4";
               
               return (

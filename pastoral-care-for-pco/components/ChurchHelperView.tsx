@@ -644,7 +644,24 @@ function CampaignDetail({ campaign, onBack }: { campaign: InfoCampaign; onBack: 
                         <h2 className="text-xl font-bold text-slate-900 dark:text-white">{campaign.name}</h2>
                         <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">PCO list · {campaign.pcoListName || campaign.pcoListId}</p>
                     </div>
-                    <StatusBadge status={campaign.status} />
+                    <div className="flex items-center gap-3">
+                        <StatusBadge status={campaign.status} />
+                        {campaign.status === 'active' && (
+                            <button
+                                type="button"
+                                onClick={async () => {
+                                    setLoading(true);
+                                    try {
+                                        await fetch(`/api/info-update-campaigns/${campaign.id}/trigger`, { method: 'POST' });
+                                    } catch { /* ignore */ }
+                                    await loadSessions();
+                                }}
+                                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition shadow-sm flex items-center gap-1.5"
+                            >
+                                🔄 Trigger Sync
+                            </button>
+                        )}
+                    </div>
                 </div>
                 {/* Stats cards */}
                 <div className="mt-4 grid grid-cols-5 gap-3">

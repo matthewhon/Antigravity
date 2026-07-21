@@ -66,7 +66,7 @@ function buildIntroMessage(campaign: any, personName: string, churchName: string
 
 // ─── Per-campaign processing ──────────────────────────────────────────────────
 
-async function processCampaign(db: any, log: any, campaign: any): Promise<void> {
+export async function processCampaign(db: any, log: any, campaign: any): Promise<void> {
     const { id: campaignId, churchId, pcoListId, schedule, channels } = campaign;
 
     // Load church info (name + timezone)

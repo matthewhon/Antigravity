@@ -38,6 +38,7 @@ import { videoProcessingQueue } from './services/jobQueue.js';
 import { listForms, saveForm, deleteForm, getPublicForm, submitForm, syncAllSubmissions } from './backend/pcoForms.js';
 import { emailServicePlan } from './backend/servicePlanEmail.js';
 import { startInfoUpdateScheduler } from './backend/infoUpdateScheduler';
+import { createServerLogger } from './services/logService';
 
 // Fix for bundled CJS environment
 const __dirname = process.cwd();
@@ -374,6 +375,17 @@ async function startServer() {
         const db = getDb();
         try {
             await (db as any).collection('people_info_campaigns').doc(req.params.id).update(req.body);
+            res.json({ success: true });
+        } catch (e: any) { res.status(500).json({ error: e.message }); }
+    });
+    app.post('/api/info-update-campaigns/:id/trigger', async (req: any, res: any) => {
+        const db = getDb();
+        try {
+            const snap = await (db as any).collection('people_info_campaigns').doc(req.params.id).get();
+            if (!snap.exists) return res.status(404).json({ error: 'Campaign not found' });
+            const campaign = { id: snap.id, ...snap.data() };
+            const { processCampaign } = await import('./backend/infoUpdateScheduler.js');
+            await (processCampaign as any)(db, createServerLogger(db as any), campaign);
             res.json({ success: true });
         } catch (e: any) { res.status(500).json({ error: e.message }); }
     });
