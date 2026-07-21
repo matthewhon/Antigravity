@@ -25,48 +25,48 @@ function buildIntroMessage(campaign: any, personName: string, churchName: string
 
     const rawTemplate = campaign.messaging?.introMessage || (
         isFormLinkMode
-            ? `Hi {{first_name}}! This is {{church_name}}. Please take a moment to update your info for our church directory using this link: ${formLink}`
+            ? `Hi {{first_name}}! This is {{church_name}}. Please take a moment to update your info for our church directory using this link: {{form_link}}`
             : `Hi {{first_name}}! This is {{church_name}}. We're updating our church directory and would love to confirm a few details: {{fields_list}}. Reply to get started! Reply STOP to opt out.`
     );
 
     const fieldLabels = (campaign.fieldsToCollect || []).map((f: any) => f.label).join(', ');
     const firstName = personName.split(' ')[0] || personName;
 
-    let message = rawTemplate
-        .replace(/\{\{name\}\}/gi, personName)
-        .replace(/\{\{first_name\}\}/gi, firstName)
-        .replace(/\{\{full_name\}\}/gi, personName)
-        .replace(/\{\{church_name\}\}/gi, churchName)
-        .replace(/\{\{fields_list\}\}/gi, fieldLabels);
-
-    // Merge field tags: {{phone_mobile}}, {{email_primary}}, {{address_home}}, {{birthdate}}, etc.
-    const fieldTagMap: Record<string, string> = {
-        phone_mobile: 'mobile_phone',
-        phone_home: 'home_phone',
-        email_primary: 'email',
-        address_home: 'address',
-        birthdate: 'birthday',
-        anniversary: 'anniversary',
-        marital_status: 'marital_status',
-        gender: 'gender',
-        graduation_year: 'graduation_year',
-        school: 'school',
-        membership: 'membership',
-        emergency_contact: 'emergency_contact',
+    // Direct mapping dictionary for standard & special merge tags
+    const tagMap: Record<string, string> = {
+        name: personName,
+        first_name: firstName,
+        full_name: personName,
+        church_name: churchName,
+        fields_list: fieldLabels,
+        form_link: formLink,
+        address: pcoValues['address_home'] || '(not on file)',
+        address_home: pcoValues['address_home'] || '(not on file)',
+        email: pcoValues['email_primary'] || '(not on file)',
+        email_primary: pcoValues['email_primary'] || '(not on file)',
+        mobile_phone: pcoValues['phone_mobile'] || '(not on file)',
+        phone_mobile: pcoValues['phone_mobile'] || '(not on file)',
+        home_phone: pcoValues['phone_home'] || '(not on file)',
+        phone_home: pcoValues['phone_home'] || '(not on file)',
+        birthday: pcoValues['birthdate'] || '(not on file)',
+        birthdate: pcoValues['birthdate'] || '(not on file)',
+        anniversary: pcoValues['anniversary'] || '(not on file)',
+        marital_status: pcoValues['marital_status'] || '(not on file)',
+        gender: pcoValues['gender'] || '(not on file)',
+        graduation_year: pcoValues['graduation_year'] || '(not on file)',
+        school: pcoValues['school'] || '(not on file)',
+        membership: pcoValues['membership'] || '(not on file)',
+        emergency_contact: pcoValues['emergency_contact'] || '(not on file)',
     };
 
-    for (const [key, val] of Object.entries(pcoValues)) {
-        const valStr = val || '(not on file)';
-        // Match both exact key {{phone_mobile}} and friendly tag {{mobile_phone}} / {{address}} / {{email}}
-        message = message.replace(new RegExp(`\{\{${key}\}\}`, 'gi'), valStr);
-        const alias = fieldTagMap[key];
-        if (alias) {
-            message = message.replace(new RegExp(`\{\{${alias}\}\}`, 'gi'), valStr);
-        }
+    let message = rawTemplate;
+    for (const [tag, val] of Object.entries(tagMap)) {
+        const re = new RegExp(`\\{\\{${tag}\\\}\\`, 'gi');
+        message = message.replace(re, val);
     }
 
-    // Replace any un-matched field tags with (not on file)
-    message = message.replace(/\{\{[a-z0-9_]+\}\}/gi, '(not on file)');
+    // Replace any remaining un-matched field tags with (not on file)
+    message = message.replace(/\\{\\{[a-z0-9_]+\}\\}/gi, '(not on file)');
 
     return message;
 }
