@@ -242,6 +242,44 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
         setSelectedFields(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
     };
 
+    const handleSuggestMessage = () => {
+        const selectedSpecs = FIELD_CATALOG.filter(f => selectedFields.includes(f.key));
+        const fieldNames = selectedSpecs.map(f => f.label);
+        
+        if (fieldNames.length === 0) {
+            alert('Please select at least one field to collect first.');
+            return;
+        }
+
+        const isConfirm = fieldBehavior === 'confirm_all';
+        const churchNameTag = '{{church_name}}';
+        const firstNameTag = '{{first_name}}';
+
+        if (isConfirm) {
+            if (selectedFields.length === 1) {
+                const fKey = selectedFields[0];
+                const tagMap: Record<string, string> = {
+                    address_home: '{{address}}',
+                    email_primary: '{{email}}',
+                    phone_mobile: '{{mobile_phone}}',
+                    birthdate: '{{birthday}}',
+                };
+                const tag = tagMap[fKey] || `{{${fKey}}}`;
+                const label = fieldNames[0];
+                setIntroMessage(`Hi ${firstNameTag}! This is ${churchNameTag}. We are confirming directory details. Is your current ${label.toLowerCase()} still ${tag}? Reply YES to confirm or send us your updated info.`);
+            } else {
+                setIntroMessage(`Hi ${firstNameTag}! This is ${churchNameTag}. We are updating our directory and confirming contact info (${fieldNames.join(', ')}). Reply to get started — it only takes a minute! Reply STOP to opt out.`);
+            }
+        } else {
+            // Only blank / missing mode
+            if (selectedFields.length === 1) {
+                setIntroMessage(`Hi ${firstNameTag}! This is ${churchNameTag}. We noticed we don't have your ${fieldNames[0].toLowerCase()} in our church directory. Would you mind replying with it so we can update our records?`);
+            } else {
+                setIntroMessage(`Hi ${firstNameTag}! This is ${churchNameTag}. We're updating our church directory and noticed a few missing details (${fieldNames.join(', ')}). Reply to help us complete your profile!`);
+            }
+        }
+    };
+
     const handleSave = (status: 'active' | 'draft') => {
         const list = pcoLists.find(l => l.id === pcoListId);
         onSave({
@@ -437,7 +475,13 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
                     <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
                         Custom Intro Message <span className="font-normal text-slate-400">(optional)</span>
                     </label>
-                    <span className="text-xs text-slate-400">Merge tags supported</span>
+                    <button
+                        type="button"
+                        onClick={handleSuggestMessage}
+                        className="flex items-center gap-1.5 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition shadow-sm"
+                    >
+                        🪄 Suggest Message
+                    </button>
                 </div>
                 <textarea
                     value={introMessage}
