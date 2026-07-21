@@ -13,7 +13,7 @@ import {
 } from 'recharts';
 import WidgetsController from './WidgetsController';
 import { DASHBOARD_WIDGETS } from '../constants/widgetRegistry';
-import { WidgetWrapper, StatCard } from './SharedUI';
+import { WidgetWrapper, StatCard, EYEBROW, Eyebrow, Meta } from './SharedUI';
 import { RiskDistributionWidget } from './RiskWidgets';
 import { calculateChurchRisk, DEFAULT_CHURCH_RISK_SETTINGS, calculateAggregateGroupHealth } from '../services/riskService';
 import { PastorAIView } from './PastorAIView';
@@ -218,7 +218,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ activePeopleCount,
                               <div className="w-10 h-10 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl flex items-center justify-center text-xl">✨</div>
                               <div>
                                   <h3 className="font-black text-lg tracking-tight text-slate-900 dark:text-white">Executive Briefing</h3>
-                                  <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-500 dark:text-indigo-400">AI Analysis</p>
+                                  <p className="text-[11px] font-bold uppercase tracking-wider text-indigo-500 dark:text-indigo-400">AI Analysis</p>
                               </div>
                           </div>
 
@@ -242,8 +242,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ activePeopleCount,
                       
                       {globalInsights && (
                           <div className="relative z-10 mt-6 pt-6 border-t border-slate-100 dark:border-slate-700 flex justify-between items-center">
-                              <span className="text-[10px] text-slate-400 dark:text-slate-500">Generated just now</span>
-                              <button onClick={onGenerateInsights} disabled={isGeneratingInsights} className="text-[10px] font-black uppercase tracking-widest text-indigo-500 dark:text-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-300 transition-colors flex items-center gap-2">
+                              <Meta>Generated just now</Meta>
+                              <button onClick={onGenerateInsights} disabled={isGeneratingInsights} className="text-[11px] font-bold uppercase tracking-wider text-indigo-500 dark:text-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-300 transition-colors flex items-center gap-2">
                                   <span>↻</span> Refresh
                               </button>
                           </div>
@@ -262,17 +262,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ activePeopleCount,
                                   <div className="flex items-center gap-2">
                                       <h3 className="text-xl font-black">{churchName || censusData.locationName}</h3>
                                   </div>
-                                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Primary Ministry Context</p>
+                                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Primary Ministry Context</p>
                               </div>
                           </div>
                           <div className="grid grid-cols-2 gap-8">
                               <div>
-                                  <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-1">Population</p>
-                                  <p className="text-3xl font-black">{censusData.totalPopulation.toLocaleString()}</p>
+                                  <p className="text-[11px] font-bold uppercase text-slate-400 tracking-wider mb-1.5">Population</p>
+                                  <p className="text-3xl font-black tabular-nums">{censusData.totalPopulation.toLocaleString()}</p>
                               </div>
                               <div>
-                                  <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-1">Median Income</p>
-                                  <p className="text-3xl font-black text-emerald-400">${censusData.economics?.medianHouseholdIncome?.toLocaleString() || 'N/A'}</p>
+                                  <p className="text-[11px] font-bold uppercase text-slate-400 tracking-wider mb-1.5">Median Income</p>
+                                  <p className="text-3xl font-black text-emerald-400 tabular-nums">${censusData.economics?.medianHouseholdIncome?.toLocaleString() || 'N/A'}</p>
                               </div>
                           </div>
                       </div>
@@ -308,8 +308,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ activePeopleCount,
               return groupsData ? (
                   <div className="bg-white dark:bg-slate-800 p-8 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm h-full flex flex-col">
                       <div className="flex justify-between items-center mb-6">
-                          <h4 className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">Groups Health</h4>
-                          <button onClick={() => handleRemoveWidget(id)} className="text-slate-300 dark:text-slate-600 hover:text-rose-500 transition-colors">✕</button>
+                          <h4 className={EYEBROW}>Groups Health</h4>
+                          <button onClick={() => handleRemoveWidget(id)} aria-label="Remove widget" className="text-slate-300 dark:text-slate-600 hover:text-rose-500 transition-colors">✕</button>
                       </div>
 
                       <div className="flex flex-col items-center justify-center flex-1 mb-6">
@@ -333,8 +333,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ activePeopleCount,
 
                       <div className="space-y-2">
                           {groupHealth.factors.map(f => (
-                              <div key={f.name} className="flex justify-between items-center text-[10px]">
-                                  <span className="font-bold text-slate-500 dark:text-slate-400">{f.name}</span>
+                              <div key={f.name} className="flex justify-between items-center text-xs">
+                                  <span className="font-semibold text-slate-500 dark:text-slate-400">{f.name}</span>
                                   <span className={`font-black uppercase ${
                                       f.status === 'good' ? 'text-emerald-500 dark:text-emerald-400' : 
                                       f.status === 'warning' ? 'text-amber-500 dark:text-amber-400' : 'text-rose-500 dark:text-rose-400'
@@ -350,25 +350,25 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ activePeopleCount,
               return servicesData ? (
                   <div className="bg-white dark:bg-slate-800 p-8 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm h-full flex flex-col">
                       <div className="flex justify-between items-center mb-6">
-                          <h4 className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">Services</h4>
-                          <button onClick={() => handleRemoveWidget(id)} className="text-slate-300 dark:text-slate-600 hover:text-rose-500 transition-colors">✕</button>
+                          <h4 className={EYEBROW}>Services</h4>
+                          <button onClick={() => handleRemoveWidget(id)} aria-label="Remove widget" className="text-slate-300 dark:text-slate-600 hover:text-rose-500 transition-colors">✕</button>
                       </div>
                       
                       <div className="flex-1 flex items-center justify-center">
                           <div className="text-center">
-                              <p className="text-5xl font-black text-slate-900 dark:text-white tracking-tighter">{servicesData.stats.uniqueVolunteers}</p>
-                              <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-2">Active Volunteers</p>
+                              <p className="text-5xl font-black text-slate-900 dark:text-white tracking-tighter tabular-nums">{servicesData.stats.uniqueVolunteers}</p>
+                              <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mt-2">Active Volunteers</p>
                           </div>
                       </div>
                       
                       <div className="mt-6 pt-6 border-t border-slate-50 dark:border-slate-800 grid grid-cols-2 gap-4">
                           <div>
-                              <p className="text-xl font-black text-emerald-600 dark:text-emerald-400">{servicesData.stats.positionsFilled}</p>
-                              <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase">Filled</p>
+                              <p className="text-xl font-black text-emerald-600 dark:text-emerald-400 tabular-nums">{servicesData.stats.positionsFilled}</p>
+                              <p className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wide">Filled</p>
                           </div>
                           <div className="text-right">
-                              <p className="text-xl font-black text-rose-500 dark:text-rose-400">{servicesData.stats.positionsOpen}</p>
-                              <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase">Openings</p>
+                              <p className="text-xl font-black text-rose-500 dark:text-rose-400 tabular-nums">{servicesData.stats.positionsOpen}</p>
+                              <p className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wide">Openings</p>
                           </div>
                       </div>
                   </div>
@@ -377,8 +377,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ activePeopleCount,
               return (
                   <div className="bg-white dark:bg-slate-800 p-8 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm h-full flex flex-col">
                       <div className="flex justify-between items-center mb-6">
-                          <h4 className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">Church Health</h4>
-                          <button onClick={() => handleRemoveWidget(id)} className="text-slate-300 dark:text-slate-600 hover:text-rose-500 transition-colors">✕</button>
+                          <h4 className={EYEBROW}>Church Health</h4>
+                          <button onClick={() => handleRemoveWidget(id)} aria-label="Remove widget" className="text-slate-300 dark:text-slate-600 hover:text-rose-500 transition-colors">✕</button>
                       </div>
 
                       <div className="flex flex-col items-center justify-center flex-1 mb-6">
@@ -398,8 +398,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ activePeopleCount,
 
                       <div className="space-y-2">
                           {churchHealth.factors.map(f => (
-                              <div key={f.name} className="flex justify-between items-center text-[10px]">
-                                  <span className="font-bold text-slate-500 dark:text-slate-400">{f.name}</span>
+                              <div key={f.name} className="flex justify-between items-center text-xs">
+                                  <span className="font-semibold text-slate-500 dark:text-slate-400">{f.name}</span>
                                   <span className={`font-black uppercase ${
                                       f.status === 'good' ? 'text-emerald-500 dark:text-emerald-400' : 
                                       f.status === 'warning' ? 'text-amber-500 dark:text-amber-400' : 'text-rose-500 dark:text-rose-400'
@@ -505,10 +505,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ activePeopleCount,
                   <div className="bg-white dark:bg-slate-800 p-8 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm h-full flex flex-col">
                       <div className="flex justify-between items-center mb-6">
                           <div>
-                              <h4 className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">Last Week Stats</h4>
-                              <p className="text-[9px] font-bold text-indigo-400 uppercase tracking-widest mt-1">Vs Previous Week</p>
+                              <h4 className={EYEBROW}>Last Week Stats</h4>
+                              <p className="text-[11px] font-semibold text-indigo-400 uppercase tracking-wider mt-1">Vs Previous Week</p>
                           </div>
-                          <button onClick={() => handleRemoveWidget(id)} className="text-slate-300 dark:text-slate-600 hover:text-rose-500 transition-colors">✕</button>
+                          <button onClick={() => handleRemoveWidget(id)} aria-label="Remove widget" className="text-slate-300 dark:text-slate-600 hover:text-rose-500 transition-colors">✕</button>
                       </div>
 
                       <div className="flex-1 flex flex-col justify-center">
@@ -551,10 +551,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ activePeopleCount,
                   <div className="bg-white dark:bg-slate-800 p-8 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm h-full flex flex-col">
                       <div className="flex justify-between items-center mb-6">
                           <div>
-                              <h4 className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">Church Progress</h4>
-                              <p className="text-[9px] font-bold text-indigo-400 uppercase tracking-widest mt-1">Last 30 Days</p>
+                              <h4 className={EYEBROW}>Church Progress</h4>
+                              <p className="text-[11px] font-semibold text-indigo-400 uppercase tracking-wider mt-1">Last 30 Days</p>
                           </div>
-                          <button onClick={() => handleRemoveWidget(id)} className="text-slate-300 dark:text-slate-600 hover:text-rose-500 transition-colors">✕</button>
+                          <button onClick={() => handleRemoveWidget(id)} aria-label="Remove widget" className="text-slate-300 dark:text-slate-600 hover:text-rose-500 transition-colors">✕</button>
                       </div>
 
                       <div className="flex-1 flex flex-col justify-center">
@@ -671,7 +671,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ activePeopleCount,
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
             <h3 className="text-4xl font-black tracking-tighter text-slate-900 dark:text-white">Dashboard</h3>
-            <p className="text-slate-400 dark:text-slate-500 font-medium uppercase text-[10px] tracking-widest mt-1">Executive Overview</p>
+            <Eyebrow className="block mt-1.5">Executive Overview</Eyebrow>
           </div>
           <div className="flex items-center gap-4">
               {!pcoConnected && (

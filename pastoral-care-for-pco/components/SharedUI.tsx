@@ -3,6 +3,45 @@ import React from 'react';
 import { differenceInYears, parseISO, isValid } from 'date-fns';
 import { LifecycleDonor, PcoPerson, PastoralNote, PrayerRequest } from '../types';
 
+/* ════════════════════════════════════════════════════════════════════════════
+   Typography primitives — the app-wide type scale.
+
+   Prefer these over ad-hoc `text-[9px] font-black uppercase tracking-widest`.
+
+     Eyebrow    11px  small-caps label   ← the ONLY place ALL-CAPS belongs
+     Meta       11px  footnote / source / caption
+     CardTitle  16px  card & widget heading (sentence case)
+     StatValue  30px  large stat number
+
+   Rule of thumb: hierarchy comes from size + weight, not from making every
+   label uppercase-black. Keep body text ≥ 12px for legibility.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/** Shared class for the small-caps accent label (also used inline for headings). */
+export const EYEBROW = 'text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400 dark:text-slate-500';
+
+type TextProps = { children: React.ReactNode; className?: string };
+
+/** Small-caps section label — the one place ALL-CAPS tracking is appropriate. */
+export const Eyebrow: React.FC<TextProps> = ({ children, className = '' }) => (
+  <span className={`${EYEBROW} ${className}`}>{children}</span>
+);
+
+/** Footnote / source / caption. Calm, sentence case, not shouting. */
+export const Meta: React.FC<TextProps> = ({ children, className = '' }) => (
+  <span className={`text-[11px] font-medium text-slate-400 dark:text-slate-500 ${className}`}>{children}</span>
+);
+
+/** Card / widget heading. Sentence case; emphasis from weight, not caps. */
+export const CardTitle: React.FC<TextProps> = ({ children, className = '' }) => (
+  <h4 className={`text-base font-bold text-slate-800 dark:text-slate-100 tracking-tight ${className}`}>{children}</h4>
+);
+
+/** Large stat number. */
+export const StatValue: React.FC<TextProps> = ({ children, className = '' }) => (
+  <p className={`text-3xl font-black tracking-tight tabular-nums ${className}`}>{children}</p>
+);
+
 interface WidgetWrapperProps {
     title: string; 
     onRemove: () => void; 
@@ -17,19 +56,19 @@ export const WidgetWrapper: React.FC<WidgetWrapperProps> = ({ title, onRemove, c
   <div className="bg-white dark:bg-slate-800 p-8 print:p-4 rounded-3xl print:rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm print:shadow-none relative group hover:border-indigo-100 dark:hover:border-slate-600 transition-colors flex flex-col h-full print:break-inside-avoid">
     <div className="flex justify-between items-center mb-8 print:mb-2">
       <div className="flex flex-col">
-        <h4 className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">{title}</h4>
+        <h4 className={EYEBROW}>{title}</h4>
         {locationName && (
             <div className="flex items-center gap-2 mt-1">
-                <span className="text-[9px] font-bold text-indigo-500 dark:text-indigo-400 uppercase tracking-widest">{locationName}</span>
+                <span className="text-[10px] font-bold text-indigo-500 dark:text-indigo-400 uppercase tracking-wider">{locationName}</span>
                 {isDefault && (
-                    <span className="text-[8px] font-black bg-indigo-500 text-white px-1.5 py-0.5 rounded uppercase tracking-tighter">Default</span>
+                    <span className="text-[9px] font-bold bg-indigo-500 text-white px-1.5 py-0.5 rounded uppercase tracking-wide">Default</span>
                 )}
             </div>
         )}
       </div>
       <div className="flex items-center gap-3 print:hidden">
           {headerControl}
-          <button onClick={onRemove} title="Remove widget" className="text-slate-300 dark:text-slate-600 hover:text-rose-500 dark:hover:text-rose-500 transition-colors">
+          <button onClick={onRemove} title="Remove widget" aria-label="Remove widget" className="text-slate-300 dark:text-slate-600 hover:text-rose-500 dark:hover:text-rose-500 transition-colors">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
           </button>
       </div>
@@ -39,7 +78,7 @@ export const WidgetWrapper: React.FC<WidgetWrapperProps> = ({ title, onRemove, c
     </div>
     {source && (
         <div className="mt-8 print:mt-2 flex justify-end items-center gap-1 border-t border-slate-50 dark:border-slate-800 pt-4 print:pt-2">
-            <span className="text-[8px] font-bold text-slate-300 dark:text-slate-600 uppercase tracking-widest">Source: {source}</span>
+            <Meta className="text-[10px] opacity-80">Source: {source}</Meta>
         </div>
     )}
   </div>
@@ -61,14 +100,14 @@ export const StatCard: React.FC<{ label: string; value: string; color: string; s
 
   return (
     <div className={`p-6 print:p-3 rounded-3xl print:rounded-lg border ${colorMap[color] || colorMap.indigo} ${printClass} flex flex-col justify-between h-full transition-colors duration-300`}>
-      <p className="text-[9px] font-black uppercase tracking-widest opacity-60 mb-1">{label}</p>
+      <span className={`${EYEBROW} !text-current opacity-70 block mb-1`}>{label}</span>
       <div>
-        <p className="text-4xl print:text-xl font-black tracking-tighter">{value}</p>
-        {subValue && <p className="text-[9px] font-bold opacity-60 uppercase tracking-wide mt-1">{subValue}</p>}
+        <p className="text-4xl print:text-xl font-black tracking-tighter tabular-nums">{value}</p>
+        {subValue && <span className="text-[11px] font-medium opacity-70 block mt-1">{subValue}</span>}
       </div>
       {source && (
         <div className="relative z-10 mt-auto pt-2 text-right border-t border-black/5 dark:border-white/5 mt-4 print:hidden">
-             <span className="text-[8px] font-bold opacity-40 uppercase tracking-widest">Source: {source}</span>
+             <span className="text-[10px] font-medium opacity-50">Source: {source}</span>
         </div>
       )}
     </div>
@@ -83,15 +122,15 @@ export const CensusCard: React.FC<{
     isDefault?: boolean;
 }> = ({ title, onRemove, children, locationName, isDefault }) => (
     <div className="bg-white dark:bg-slate-800 p-8 print:p-4 rounded-3xl print:rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm print:shadow-none h-full flex flex-col group relative print:break-inside-avoid">
-        <button onClick={onRemove} className="absolute top-6 right-6 text-slate-300 dark:text-slate-600 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100 z-10 print:hidden">✕</button>
+        <button onClick={onRemove} aria-label="Remove widget" className="absolute top-6 right-6 text-slate-300 dark:text-slate-600 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100 z-10 print:hidden">✕</button>
         <div className="flex justify-between items-center mb-6 print:mb-2">
             <div className="flex flex-col">
-                <h4 className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">{title}</h4>
+                <h4 className={EYEBROW}>{title}</h4>
                 {locationName && (
                     <div className="flex items-center gap-2 mt-1">
-                        <span className="text-[9px] font-bold text-indigo-500 dark:text-indigo-400 uppercase tracking-widest">{locationName}</span>
+                        <span className="text-[10px] font-bold text-indigo-500 dark:text-indigo-400 uppercase tracking-wider">{locationName}</span>
                         {isDefault && (
-                            <span className="text-[8px] font-black bg-indigo-500 text-white px-1.5 py-0.5 rounded uppercase tracking-tighter">Default</span>
+                            <span className="text-[9px] font-bold bg-indigo-500 text-white px-1.5 py-0.5 rounded uppercase tracking-wide">Default</span>
                         )}
                     </div>
                 )}
