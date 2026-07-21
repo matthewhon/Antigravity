@@ -1680,7 +1680,7 @@ Return ONLY the JSON object, no markdown, no explanation:`;
         startBillingScheduler(db as any);
         startSmsCampaignScheduler(db as any);
         startServicesReminderScheduler(db as any);
-        startInfoUpdateScheduler(db as any, log);
+        startInfoUpdateScheduler(db as any, createServerLogger(db as any));
       } catch (e) {
         console.warn('[SmsScheduler] Could not start scheduler:', e);
       }
