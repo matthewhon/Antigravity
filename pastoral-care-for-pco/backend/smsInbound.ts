@@ -543,6 +543,23 @@ export const handleInboundSms = async (req: any, res: any) => {
             return res.status(200).send('<Response></Response>');
         }
 
+        // ── Church Helper: route to info-update agent if active session found ──
+        // This check runs BEFORE keyword/campaign processing so info-update
+        // conversations get clean, uninterrupted handling.
+        try {
+            const { findActiveInfoSessionBySms, handleInfoUpdateReply } = await import('./infoUpdateAgent.js');
+            const infoSession = await findActiveInfoSessionBySms(db, churchId, from);
+            if (infoSession) {
+                log.info(`[Inbound SMS] Routing to Church Helper agent — session ${infoSession.id}`, 'system', { churchId, from }, churchId);
+                await handleInfoUpdateReply(db, log, infoSession, extractLatestMessage(body), 'sms');
+                res.set('Content-Type', 'text/xml');
+                return res.status(200).send('<Response></Response>');
+            }
+        } catch (e: any) {
+            log.warn(`[Inbound SMS] Church Helper routing check failed: ${e.message}`, 'system', { churchId, from }, churchId);
+            // Fall through to normal processing on any error
+        }
+
         if (upperBody === 'START' || upperBody === 'UNSTOP' || upperBody === 'YES') {
             // Contact re-opted-in â€” clear our Firestore opt-out record so sends resume
             const optOutId = convIdKeyword;
@@ -567,22 +584,7 @@ export const handleInboundSms = async (req: any, res: any) => {
             mediaUrls = await rehostSignalWireMedia(rawMediaUrls, churchId);
         }
 
-        // ── Church Helper: route to info-update agent if active session found ──
-        // This check runs BEFORE keyword/campaign processing so info-update
-        // conversations get clean, uninterrupted handling.
-        try {
-            const { findActiveInfoSessionBySms, handleInfoUpdateReply } = await import('./infoUpdateAgent.js');
-            const infoSession = await findActiveInfoSessionBySms(db, churchId, from);
-            if (infoSession) {
-                log.info(`[Inbound SMS] Routing to Church Helper agent — session ${infoSession.id}`, 'system', { churchId, from }, churchId);
-                await handleInfoUpdateReply(db, log, infoSession, extractLatestMessage(body), 'sms');
-                res.set('Content-Type', 'text/xml');
-                return res.status(200).send('<Response></Response>');
-            }
-        } catch (e: any) {
-            log.warn(`[Inbound SMS] Church Helper routing check failed: ${e.message}`, 'system', { churchId, from }, churchId);
-            // Fall through to normal processing on any error
-        }
+
 
         // 3. Find or create the SmsConversation
 
