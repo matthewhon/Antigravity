@@ -56,6 +56,7 @@ export const GroupsPage: React.FC<GroupsPageProps> = ({
                     groupRiskSettings={church.groupRiskSettings}
                     hideArchived={hideArchived}
                     onToggleHideArchived={setHideArchived}
+                    churchId={church.id}
                 />
             )}
 

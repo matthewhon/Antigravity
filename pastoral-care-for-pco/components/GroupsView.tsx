@@ -1,5 +1,5 @@
 
-import React, { useMemo, useState, useRef } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { GroupsDashboardData, GlobalStats, PeopleDashboardData, PcoPerson, GroupRiskSettings } from '../types';
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
@@ -10,6 +10,7 @@ import { GROUPS_WIDGETS } from '../constants/widgetRegistry';
 import { WidgetWrapper, StatCard } from './SharedUI';
 import { generateGroupsStrategy, generateGroupRiskAnalysis } from '../services/geminiService';
 import { calculateGroupHealth, DEFAULT_GROUP_RISK_SETTINGS } from '../services/riskService';
+import { pcoService } from '../services/pcoService';
 
 interface GroupsViewProps {
   data: GroupsDashboardData;
@@ -27,6 +28,7 @@ interface GroupsViewProps {
   groupRiskSettings?: GroupRiskSettings;
   hideArchived?: boolean;
   onToggleHideArchived?: (val: boolean) => void;
+  churchId?: string;
 }
 
 type EventAttendanceFilterType = 'This Week' | 'Last Week' | 'This Month' | 'Last Month' | 'Last Quarter';
@@ -62,7 +64,8 @@ const GroupsView: React.FC<GroupsViewProps> = ({
   peopleData,
   groupRiskSettings,
   hideArchived,
-  onToggleHideArchived
+  onToggleHideArchived,
+  churchId
 }) => {
   const [eventAttendanceFilter, setEventAttendanceFilter] = useState<EventAttendanceFilterType>('Last Month');
   const [groupInfoFilter, setGroupInfoFilter] = useState<GroupInfoFilterType>('Last Month');
@@ -74,6 +77,26 @@ const GroupsView: React.FC<GroupsViewProps> = ({
   // Risk AI State
   const [isAnalyzingRisk, setIsAnalyzingRisk] = useState(false);
   const [riskReport, setRiskReport] = useState('');
+
+  const [pcoLists, setPcoLists] = useState<{ id: string; name: string; totalPeople: number }[]>([]);
+  const [selectedListId, setSelectedListId] = useState<string>('');
+  const [isLoadingLists, setIsLoadingLists] = useState(false);
+
+  useEffect(() => {
+      if (pcoConnected && churchId) {
+          setIsLoadingLists(true);
+          pcoService.getPeopleLists(churchId).then(raw => {
+              const lists = (raw || []).map((l: any) => ({
+                  id: l.id,
+                  name: l.attributes?.name || 'Unnamed',
+                  totalPeople: l.attributes?.total_people || 0
+              })).sort((a: any, b: any) => a.name.localeCompare(b.name));
+              setPcoLists(lists);
+          }).finally(() => {
+              setIsLoadingLists(false);
+          });
+      }
+  }, [churchId, pcoConnected]);
 
   const availableWidgets = useMemo(() => {
     if (!allowedWidgetIds) return GROUPS_WIDGETS;
@@ -544,15 +567,36 @@ const GroupsView: React.FC<GroupsViewProps> = ({
 
                             <div>
                                 <div className="flex justify-between items-end mb-3">
-                                    <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Participation Rate</span>
+                                    <div className="flex flex-col gap-1">
+                                        <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Participation Rate</span>
+                                        <select 
+                                            value={selectedListId} 
+                                            onChange={(e) => setSelectedListId(e.target.value)}
+                                            className="bg-slate-50 dark:bg-slate-900 border-none text-[10px] text-slate-500 rounded-lg py-1 px-2 w-full max-w-[160px] cursor-pointer outline-none focus:ring-1 focus:ring-indigo-500"
+                                            title="Select a list to determine the participation rate denominator"
+                                        >
+                                            <option value="">Default (Enrolled)</option>
+                                            {pcoLists.map(l => (
+                                                <option key={l.id} value={l.id}>{l.name} ({l.totalPeople})</option>
+                                            ))}
+                                        </select>
+                                    </div>
                                     <span className="text-3xl font-black text-slate-900 dark:text-white">
-                                        {Math.round((data.stats.averageAttendance / (data.stats.totalEnrollment || 1)) * 100)}%
+                                        {(() => {
+                                            const selectedList = pcoLists.find(l => l.id === selectedListId);
+                                            const denominator = selectedList ? selectedList.totalPeople : data.stats.totalEnrollment;
+                                            return Math.round((data.stats.averageAttendance / (denominator || 1)) * 100);
+                                        })()}%
                                     </span>
                                 </div>
                                 <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-6 overflow-hidden border border-slate-200 dark:border-slate-600">
                                     <div 
                                         className="bg-indigo-500 h-full rounded-full transition-all duration-1000 ease-out shadow-sm" 
-                                        style={{width: `${Math.min(100, (data.stats.averageAttendance / (data.stats.totalEnrollment || 1)) * 100)}%`}}
+                                        style={{width: `${Math.min(100, (() => {
+                                            const selectedList = pcoLists.find(l => l.id === selectedListId);
+                                            const denominator = selectedList ? selectedList.totalPeople : data.stats.totalEnrollment;
+                                            return (data.stats.averageAttendance / (denominator || 1)) * 100;
+                                        })())}%`}}
                                     ></div>
                                 </div>
                             </div>
