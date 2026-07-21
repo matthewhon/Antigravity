@@ -463,7 +463,16 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
                 <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Schedule & Kickoff</label>
                 <div className="grid grid-cols-4 gap-3">
                     <div className="space-y-1">
-                        <p className="text-xs text-slate-500 dark:text-slate-400">Kickoff Date</p>
+                        <div className="flex items-center justify-between">
+                            <p className="text-xs text-slate-500 dark:text-slate-400">Kickoff Date</p>
+                            <button
+                                type="button"
+                                onClick={() => setStartDate(new Date().toISOString().split('T')[0])}
+                                className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
+                            >
+                                ⚡ Immediately
+                            </button>
+                        </div>
                         <input
                             type="date"
                             value={startDate}
