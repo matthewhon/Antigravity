@@ -462,6 +462,103 @@ const ServicesView: React.FC<ServicesViewProps> = ({
       return Array.from(names);
   }, [filteredCheckinTrends]);
 
+  // ── Tier 1 analytics — attendance growth, guests, digital split ─────────────
+  // Uses the full check-in trend history (independent of the check-in chart's
+  // period selector) so the KPIs always compare last 30 days vs the prior 30.
+  const attendanceAnalytics = useMemo(() => {
+      const trends = (data?.checkIns?.trends || []) as any[];
+      const dayMs = 24 * 60 * 60 * 1000;
+      const now = Date.now();
+      const inPersonOf = (t: any) => (t.regulars || 0) + (t.guests || 0) + (t.volunteers || 0) + ((t.customHeadcounts || []).reduce((s: number, c: any) => s + (c.total || 0), 0));
+      const digitalOf = (t: any) => t.digitalCheckins || 0;
+
+      let recentTotal = 0, priorTotal = 0, recentGuests = 0, priorGuests = 0, recentDigital = 0, recentInPerson = 0;
+      const weekly: { weeksAgo: number; label: string; total: number }[] = [];
+      for (let w = 7; w >= 0; w--) weekly.push({ weeksAgo: w, label: w === 0 ? 'This wk' : `${w}w`, total: 0 });
+
+      trends.forEach(t => {
+          const time = new Date(t.isoDate || t.date).getTime();
+          if (isNaN(time)) return;
+          const ageDays = (now - time) / dayMs;
+          const total = inPersonOf(t) + digitalOf(t);
+          if (ageDays >= 0 && ageDays < 30) {
+              recentTotal += total; recentGuests += (t.guests || 0);
+              recentDigital += digitalOf(t); recentInPerson += inPersonOf(t);
+          } else if (ageDays >= 30 && ageDays < 60) {
+              priorTotal += total; priorGuests += (t.guests || 0);
+          }
+          if (ageDays >= 0 && ageDays < 56) {
+              const bucket = weekly.find(b => b.weeksAgo === Math.floor(ageDays / 7));
+              if (bucket) bucket.total += total;
+          }
+      });
+
+      const pct = (a: number, b: number) => (b > 0 ? ((a - b) / b) * 100 : 0);
+      return {
+          recentTotal, totalGrowth: pct(recentTotal, priorTotal), hasPrior: priorTotal > 0,
+          recentGuests, guestGrowth: pct(recentGuests, priorGuests), hasPriorGuests: priorGuests > 0,
+          guestPct: recentTotal > 0 ? (recentGuests / recentTotal) * 100 : 0,
+          recentDigital, recentInPerson,
+          digitalPct: (recentDigital + recentInPerson) > 0 ? (recentDigital / (recentDigital + recentInPerson)) * 100 : 0,
+          weekly,
+      };
+  }, [data?.checkIns?.trends]);
+
+  // Volunteer health & serving frequency (from per-person servingStats)
+  const volunteerStats = useMemo(() => {
+      const vols = people.filter(p => p.servingStats && (p.servingStats.last90DaysCount || 0) > 0);
+      const dist: Record<'Low' | 'Medium' | 'High', number> = { Low: 0, Medium: 0, High: 0 };
+      const freq = [
+          { range: '1×',   min: 1, max: 1,        count: 0 },
+          { range: '2–3×', min: 2, max: 3,        count: 0 },
+          { range: '4–6×', min: 4, max: 6,        count: 0 },
+          { range: '7+×',  min: 7, max: Infinity, count: 0 },
+      ];
+      vols.forEach(p => {
+          const lvl = p.servingStats!.riskLevel;
+          if (dist[lvl] !== undefined) dist[lvl]++;
+          const n = p.servingStats!.last90DaysCount || 0;
+          const b = freq.find(b => n >= b.min && n <= b.max);
+          if (b) b.count++;
+      });
+      return { total: vols.length, dist, freq: freq.map(b => ({ range: b.range, count: b.count })) };
+  }, [people]);
+
+  // Unscheduled volunteers — served in the last 90 days but have no upcoming service
+  const unscheduledVolunteers = useMemo(() => {
+      const now = Date.now();
+      return people
+          .filter(p => {
+              const ss = p.servingStats;
+              if (!ss || (ss.last90DaysCount || 0) === 0) return false;
+              if (!ss.nextServiceDate) return true;
+              return new Date(ss.nextServiceDate).getTime() < now;
+          })
+          .sort((a, b) => (b.servingStats?.last90DaysCount || 0) - (a.servingStats?.last90DaysCount || 0));
+  }, [people]);
+
+  // Team fill rate — confirmed vs still-needed positions per team across upcoming plans
+  const teamFillRate = useMemo(() => {
+      const map = new Map<string, { team: string; filled: number; needed: number }>();
+      (data?.futurePlans || []).forEach(p => {
+          (p.teamMembers || []).forEach(m => {
+              const t = m.teamName || 'Unassigned';
+              if (!map.has(t)) map.set(t, { team: t, filled: 0, needed: 0 });
+              const status = (m.status || '').toLowerCase();
+              if (status === 'confirmed' || status === 'c') map.get(t)!.filled++;
+          });
+          (p.neededPositions || []).forEach(np => {
+              const t = np.teamName || 'Unassigned';
+              if (!map.has(t)) map.set(t, { team: t, filled: 0, needed: 0 });
+              map.get(t)!.needed += np.quantity || 0;
+          });
+      });
+      return Array.from(map.values())
+          .map(e => { const total = e.filled + e.needed; return { ...e, total, rate: total > 0 ? (e.filled / total) * 100 : 100 }; })
+          .filter(e => e.total > 0)
+          .sort((a, b) => a.rate - b.rate);
+  }, [data?.futurePlans]);
+
 
   if (!pcoConnected) {
     return (
@@ -1370,6 +1467,217 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                     </WidgetWrapper>
                 </div>
             );
+        case 'attendance_growth': {
+            const a = attendanceAnalytics;
+            const up = a.totalGrowth >= 0;
+            return (
+                <div key="attendance_growth" className="col-span-1">
+                    <WidgetWrapper title="Attendance Growth" onRemove={() => handleRemoveWidget('attendance_growth')} source="Check-Ins · 30d">
+                        <div className="flex flex-col h-full">
+                            <div className="flex items-end gap-3 mb-1">
+                                <span className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter tabular-nums">{a.recentTotal.toLocaleString()}</span>
+                                {a.hasPrior && (
+                                    <span className={`mb-1.5 text-[11px] font-black px-2 py-0.5 rounded tabular-nums ${up ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400' : 'bg-rose-50 text-rose-600 dark:bg-rose-900/20 dark:text-rose-400'}`}>{up ? '▲' : '▼'} {Math.abs(a.totalGrowth).toFixed(0)}%</span>
+                                )}
+                            </div>
+                            <p className="text-[11px] font-medium text-slate-400 mb-3">total check-ins · vs prior 30 days</p>
+                            <div className="flex-1 min-h-0">
+                                <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={1}>
+                                    <BarChart data={a.weekly} margin={{ top: 8, right: 4, left: -20, bottom: 0 }}>
+                                        <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: axisColor }} interval={0} />
+                                        <YAxis hide />
+                                        <Tooltip cursor={{ fill: currentTheme === 'dark' ? '#334155' : '#f8fafc' }} contentStyle={TOOLTIP_STYLE} itemStyle={{ color: '#fff' }} formatter={(v: number) => [v.toLocaleString(), 'Check-ins']} />
+                                        <Bar dataKey="total" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+                    </WidgetWrapper>
+                </div>
+            );
+        }
+        case 'first_time_guests': {
+            const a = attendanceAnalytics;
+            const up = a.guestGrowth >= 0;
+            return (
+                <div key="first_time_guests" className="col-span-1">
+                    <WidgetWrapper title="First-Time Guests" onRemove={() => handleRemoveWidget('first_time_guests')} source="Check-Ins · 30d">
+                        <div className="flex flex-col h-full justify-center gap-4">
+                            <div className="flex items-end gap-3">
+                                <span className="text-5xl font-black text-slate-900 dark:text-white tracking-tighter tabular-nums">{a.recentGuests.toLocaleString()}</span>
+                                {a.hasPriorGuests && (
+                                    <span className={`mb-2 text-[11px] font-black px-2 py-0.5 rounded tabular-nums ${up ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400' : 'bg-rose-50 text-rose-600 dark:bg-rose-900/20 dark:text-rose-400'}`}>{up ? '▲' : '▼'} {Math.abs(a.guestGrowth).toFixed(0)}%</span>
+                                )}
+                            </div>
+                            <p className="text-[11px] font-medium text-slate-400 -mt-2">guests welcomed · vs prior 30 days</p>
+                            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center">
+                                <span className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Share of Attendance</span>
+                                <span className="text-xl font-black text-amber-500 tabular-nums">{a.guestPct.toFixed(1)}%</span>
+                            </div>
+                        </div>
+                    </WidgetWrapper>
+                </div>
+            );
+        }
+        case 'digital_vs_physical': {
+            const a = attendanceAnalytics;
+            const pie = [
+                { name: 'In-Person', value: a.recentInPerson, color: '#6366f1' },
+                { name: 'Digital',   value: a.recentDigital,  color: '#06b6d4' },
+            ].filter(d => d.value > 0);
+            const tot = a.recentInPerson + a.recentDigital;
+            return (
+                <div key="digital_vs_physical" className="col-span-1">
+                    <WidgetWrapper title="Digital vs In-Person" onRemove={() => handleRemoveWidget('digital_vs_physical')} source="Check-Ins · 30d">
+                        <div className="h-64 relative">
+                            {tot > 0 ? (
+                                <>
+                                    <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={1}>
+                                        <PieChart>
+                                            <Pie data={pie} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                                                {pie.map((d, i) => <Cell key={`d-${i}`} fill={d.color} />)}
+                                            </Pie>
+                                            <Tooltip contentStyle={TOOLTIP_STYLE} itemStyle={{ color: '#fff' }} />
+                                            <Legend layout="vertical" verticalAlign="middle" align="right" iconType="circle" wrapperStyle={{ fontSize: '11px', fontWeight: 'bold', color: axisColor }} />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pr-24">
+                                        <span className="text-2xl font-black text-cyan-500 tabular-nums">{a.digitalPct.toFixed(0)}%</span>
+                                        <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Digital</span>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="h-full flex items-center justify-center text-slate-400 text-xs font-bold">No check-in data.</div>
+                            )}
+                        </div>
+                    </WidgetWrapper>
+                </div>
+            );
+        }
+        case 'volunteer_health': {
+            const d = volunteerStats.dist;
+            const pie = [
+                { name: 'Sustainable', value: d.Low,    color: '#10b981' },
+                { name: 'Moderate',    value: d.Medium, color: '#f59e0b' },
+                { name: 'High Load',   value: d.High,   color: '#f43f5e' },
+            ].filter(x => x.value > 0);
+            return (
+                <div key="volunteer_health" className="col-span-1">
+                    <WidgetWrapper title="Volunteer Health" onRemove={() => handleRemoveWidget('volunteer_health')} source="Serving Load · 90d">
+                        <div className="h-64 relative">
+                            {volunteerStats.total > 0 ? (
+                                <>
+                                    <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={1}>
+                                        <PieChart>
+                                            <Pie data={pie} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                                                {pie.map((x, i) => <Cell key={`v-${i}`} fill={x.color} />)}
+                                            </Pie>
+                                            <Tooltip contentStyle={TOOLTIP_STYLE} itemStyle={{ color: '#fff' }} />
+                                            <Legend layout="vertical" verticalAlign="middle" align="right" iconType="circle" wrapperStyle={{ fontSize: '11px', fontWeight: 'bold', color: axisColor }} />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pr-24">
+                                        <span className="text-3xl font-black text-slate-900 dark:text-white tabular-nums">{volunteerStats.total}</span>
+                                        <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Serving</span>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="h-full flex items-center justify-center text-slate-400 text-xs font-bold">No serving data available.</div>
+                            )}
+                        </div>
+                    </WidgetWrapper>
+                </div>
+            );
+        }
+        case 'serving_frequency':
+            return (
+                <div key="serving_frequency" className="col-span-1 lg:col-span-2">
+                    <WidgetWrapper title="Serving Frequency" onRemove={() => handleRemoveWidget('serving_frequency')} source="Serving Load · 90d">
+                        <div className="h-64">
+                            <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={1}>
+                                <BarChart data={volunteerStats.freq}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
+                                    <XAxis dataKey="range" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: axisColor }} />
+                                    <YAxis axisLine={false} tickLine={false} allowDecimals={false} tick={{ fontSize: 11, fill: axisColor }} />
+                                    <Tooltip cursor={{ fill: currentTheme === 'dark' ? '#334155' : '#f8fafc' }} contentStyle={TOOLTIP_STYLE} itemStyle={{ color: '#fff' }} formatter={(v: number) => [`${v} people`]} />
+                                    <Bar dataKey="count" radius={[4, 4, 0, 0]} barSize={48}>
+                                        {volunteerStats.freq.map((_, i) => <Cell key={`f-${i}`} fill={i >= 3 ? '#f43f5e' : i >= 2 ? '#f59e0b' : '#6366f1'} />)}
+                                    </Bar>
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                        <p className="text-[11px] font-medium text-slate-400 mt-2 text-center">Amber / Rose = frequent servers at risk of burnout</p>
+                    </WidgetWrapper>
+                </div>
+            );
+        case 'unscheduled_volunteers':
+            return (
+                <div key="unscheduled_volunteers" className="col-span-1">
+                    <WidgetWrapper
+                        title="Unscheduled Volunteers"
+                        onRemove={() => handleRemoveWidget('unscheduled_volunteers')}
+                        source="No upcoming service"
+                        headerControl={
+                            <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400 tabular-nums">{unscheduledVolunteers.length}</span>
+                        }
+                    >
+                        {unscheduledVolunteers.length > 0 ? (
+                            <div className="space-y-2 max-h-72 overflow-y-auto custom-scrollbar pr-1">
+                                {unscheduledVolunteers.slice(0, 50).map(p => (
+                                    <button
+                                        key={p.id}
+                                        onClick={() => window.dispatchEvent(new CustomEvent('openPersonProfile', { detail: p.id }))}
+                                        className="w-full flex items-center gap-3 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 hover:border-indigo-200 dark:hover:border-indigo-800 transition-colors text-left"
+                                    >
+                                        <div className="w-8 h-8 shrink-0 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-black text-slate-400">
+                                            {p.avatar ? <img src={p.avatar} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : p.name.charAt(0)}
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-xs font-bold text-slate-800 dark:text-white truncate">{p.name}</p>
+                                            <p className="text-[11px] text-slate-400">served {p.servingStats?.last90DaysCount || 0}× in 90d</p>
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="h-full flex flex-col items-center justify-center text-center py-10">
+                                <div className="text-3xl mb-2">✅</div>
+                                <p className="text-xs font-bold text-slate-500 dark:text-slate-400">All volunteers are scheduled.</p>
+                            </div>
+                        )}
+                    </WidgetWrapper>
+                </div>
+            );
+        case 'team_fill_rate':
+            return (
+                <div key="team_fill_rate" className="col-span-1 lg:col-span-2">
+                    <WidgetWrapper title="Team Fill Rate" onRemove={() => handleRemoveWidget('team_fill_rate')} source="Upcoming Plans">
+                        {teamFillRate.length > 0 ? (
+                            <div className="space-y-3 max-h-80 overflow-y-auto custom-scrollbar pr-1">
+                                {teamFillRate.map(t => {
+                                    const color = t.rate >= 90 ? '#10b981' : t.rate >= 70 ? '#f59e0b' : '#f43f5e';
+                                    return (
+                                        <div key={t.team}>
+                                            <div className="flex justify-between items-center mb-1.5">
+                                                <span className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">{t.team}</span>
+                                                <span className="text-[11px] font-medium text-slate-400 shrink-0 ml-2 tabular-nums">{t.filled}/{t.total} · {Math.round(t.rate)}%</span>
+                                            </div>
+                                            <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2.5 overflow-hidden">
+                                                <div className="h-full rounded-full transition-all duration-700 ease-out" style={{ width: `${t.rate}%`, backgroundColor: color }}></div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <div className="h-full flex flex-col items-center justify-center text-center py-10">
+                                <div className="text-3xl mb-2">🎉</div>
+                                <p className="text-xs font-bold text-slate-500 dark:text-slate-400">All upcoming positions filled.</p>
+                            </div>
+                        )}
+                    </WidgetWrapper>
+                </div>
+            );
         default: return null;
     }
   }
@@ -1469,7 +1777,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                 if (id === 'services_stats') return null;
                 let spanClass = "col-span-1";
                 if (['services_stats', 'checkin_history', 'teams', 'services_teams_list'].includes(id)) spanClass = "col-span-1 md:col-span-2 lg:col-span-4";
-                else if (['staffing_needs', 'upcoming_plans_list', 'top_songs', 'positions', 'events', 'team_roster', 'burnout_watchlist'].includes(id)) spanClass = "col-span-1 lg:col-span-2";
+                else if (['staffing_needs', 'upcoming_plans_list', 'top_songs', 'positions', 'events', 'team_roster', 'burnout_watchlist', 'serving_frequency', 'team_fill_rate'].includes(id)) spanClass = "col-span-1 lg:col-span-2";
                 
                 return (
                     <div

@@ -83,8 +83,14 @@ export const GROUPS_WIDGETS: WidgetDefinition[] = [
 
 export const SERVICES_OVERVIEW_WIDGETS: WidgetDefinition[] = [
     { id: 'services_stats', label: 'Services Stats', icon: '📊' },
+    { id: 'attendance_growth', label: 'Attendance Growth', icon: '📈' },
+    { id: 'first_time_guests', label: 'First-Time Guests', icon: '🙌' },
+    { id: 'volunteer_health', label: 'Volunteer Health', icon: '❤️‍🩹' },
+    { id: 'team_fill_rate', label: 'Team Fill Rate', icon: '🪑' },
     { id: 'upcoming_plans_list', label: 'Upcoming Plans', icon: '📅' },
     { id: 'staffing_needs', label: 'Staffing Needs', icon: '🚨' },
+    { id: 'serving_frequency', label: 'Serving Frequency', icon: '🔁' },
+    { id: 'unscheduled_volunteers', label: 'Unscheduled Volunteers', icon: '🪑' },
     { id: 'top_songs', label: 'Top Songs', icon: '🎵' },
     { id: 'positions', label: 'Positions', icon: '🪑' },
     { id: 'checkin_history', label: 'Check-ins', icon: '✅' },
@@ -92,6 +98,9 @@ export const SERVICES_OVERVIEW_WIDGETS: WidgetDefinition[] = [
 
 export const SERVICES_ATTENDANCE_WIDGETS: WidgetDefinition[] = [
     { id: 'checkin_history', label: 'Check-ins', icon: '✅' },
+    { id: 'attendance_growth', label: 'Attendance Growth', icon: '📈' },
+    { id: 'first_time_guests', label: 'First-Time Guests', icon: '🙌' },
+    { id: 'digital_vs_physical', label: 'Digital vs In-Person', icon: '💻' },
     { id: 'events', label: 'Events', icon: '📅' },
     { id: 'services_stats', label: 'Services Stats', icon: '📊' },
 ];
@@ -99,7 +108,11 @@ export const SERVICES_ATTENDANCE_WIDGETS: WidgetDefinition[] = [
 export const SERVICES_TEAMS_WIDGETS: WidgetDefinition[] = [
     { id: 'services_teams_list', label: 'Teams Directory', icon: '📋' },
     { id: 'team_roster', label: 'Team Roster', icon: '👥' },
-    { id: 'burnout_watchlist', label: 'Burnout Watchlist (>2x Weekly)', icon: '🔥' }
+    { id: 'burnout_watchlist', label: 'Burnout Watchlist (>2x Weekly)', icon: '🔥' },
+    { id: 'volunteer_health', label: 'Volunteer Health', icon: '❤️‍🩹' },
+    { id: 'serving_frequency', label: 'Serving Frequency', icon: '🔁' },
+    { id: 'unscheduled_volunteers', label: 'Unscheduled Volunteers', icon: '🪑' },
+    { id: 'team_fill_rate', label: 'Team Fill Rate', icon: '🪑' },
 ];
 
 export const GIVING_WIDGETS: WidgetDefinition[] = [
@@ -228,12 +241,12 @@ export const getRoleBasedDefaults = (roles: string[]): Record<string, string[]> 
             : ['groups_connection_rate', 'groups_health_distribution', 'groups_health', 'groups_stats', 'event_attendance'],
         // Services
         services_overview: isServices || isPastor
-            ? ['services_stats', 'upcoming_plans_list', 'staffing_needs', 'checkin_history']
-            : ['services_stats', 'upcoming_plans_list'],
-        services_attendance: ['checkin_history', 'events', 'services_stats'],
+            ? ['services_stats', 'attendance_growth', 'first_time_guests', 'volunteer_health', 'team_fill_rate', 'upcoming_plans_list', 'staffing_needs', 'checkin_history']
+            : ['services_stats', 'attendance_growth', 'first_time_guests', 'upcoming_plans_list'],
+        services_attendance: ['checkin_history', 'attendance_growth', 'first_time_guests', 'digital_vs_physical', 'events', 'services_stats'],
         services_teams: isServices
-            ? ['services_teams_list', 'burnout_watchlist', 'team_roster']
-            : ['services_teams_list'],
+            ? ['services_teams_list', 'volunteer_health', 'burnout_watchlist', 'serving_frequency', 'team_roster']
+            : ['services_teams_list', 'volunteer_health'],
         // Giving
         giving_overview: isGiving || isPastor
             ? ['keyMetrics', 'budgetProgress', 'trendsComparison', 'funds', 'topGivers', 'donorLifecycle', 'givingByStatus', 'averageGiving']
@@ -262,10 +275,10 @@ export const getDefaultWidgets = (view: string): string[] => {
         case 'people_households': return ['householdSummary', 'householdComp', 'householdSize'];
         case 'people_risk': return ['riskDistribution', 'atRiskList'];
         case 'groups': return ['groups_ai_agent', 'groups_connection_rate', 'groups_health_distribution', 'groups_action_center', 'groups_health', 'groups_stats', 'event_attendance', 'groups_gender'];
-        case 'services': return ['services_stats', 'upcoming_plans_list', 'staffing_needs', 'checkin_history'];
-        case 'services_overview': return ['services_stats', 'upcoming_plans_list', 'staffing_needs', 'checkin_history'];
-        case 'services_attendance': return ['checkin_history', 'events', 'services_stats'];
-        case 'services_teams': return ['services_teams_list', 'burnout_watchlist', 'team_roster'];
+        case 'services': return ['services_stats', 'attendance_growth', 'first_time_guests', 'volunteer_health', 'team_fill_rate', 'upcoming_plans_list', 'staffing_needs', 'checkin_history'];
+        case 'services_overview': return ['services_stats', 'attendance_growth', 'first_time_guests', 'volunteer_health', 'team_fill_rate', 'upcoming_plans_list', 'staffing_needs', 'checkin_history'];
+        case 'services_attendance': return ['checkin_history', 'attendance_growth', 'first_time_guests', 'digital_vs_physical', 'events', 'services_stats'];
+        case 'services_teams': return ['services_teams_list', 'volunteer_health', 'burnout_watchlist', 'serving_frequency', 'team_roster'];
         case 'giving': return ['keyMetrics', 'trendsComparison', 'funds'];
         case 'giving_overview': return ['keyMetrics', 'trendsComparison', 'funds', 'givingByStatus', 'averageGiving'];
         case 'giving_donor': return ['topGivers', 'demographics', 'donorLifecycle'];
