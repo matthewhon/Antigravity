@@ -578,6 +578,7 @@ const Layout: React.FC<LayoutProps> = ({
                         { view: 'tools-qrcodes',       icon: '🔲', label: 'QR Codes'      },
                         { view: 'tools-files',         icon: '📁', label: 'Files'         },
                         { view: 'tools-forms',         icon: '📄', label: 'Forms'         },
+                        { view: 'tools-church-helper', icon: '✨', label: 'Church Helper'  },
                         { view: 'tools-unsubscribers', icon: '🛋️',  label: 'Unsubscribers' },
                       ].filter(item => hasPermission(item.view)).map(item => (
                         <button
