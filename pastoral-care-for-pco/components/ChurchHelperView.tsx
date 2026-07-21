@@ -13,6 +13,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Church, User } from '../types';
 import { pcoService } from '../services/pcoService';
+import { firestore } from '../services/firestoreService';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -212,6 +213,8 @@ interface CampaignFormProps {
 
 function CampaignForm({ churchId, church, existing, onSave, onCancel }: CampaignFormProps) {
     const [name, setName] = useState(existing?.name || '');
+    const [isSaving, setIsSaving] = useState(false);
+    const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [pcoListId, setPcoListId] = useState(existing?.pcoListId || '');
     const [pcoListName, setPcoListName] = useState(existing?.pcoListName || '');
     const [selectedFields, setSelectedFields] = useState<string[]>(existing?.fieldsToCollect.map(f => f.key) || ['phone_mobile', 'email_primary', 'address_home']);
@@ -280,19 +283,40 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
         }
     };
 
-    const handleSave = (status: 'active' | 'draft') => {
-        const list = pcoLists.find(l => l.id === pcoListId);
-        onSave({
-            name,
-            pcoListId,
-            pcoListName: list?.attributes?.name || pcoListName,
-            status,
-            fieldsToCollect: FIELD_CATALOG.filter(f => selectedFields.includes(f.key)),
-            fieldBehavior,
-            channels: { sms: smsEnabled, email: emailEnabled },
-            schedule: { intervalDays, maxAttempts, sendWindowStart, sendWindowEnd },
-            messaging: introMessage ? { introMessage } : undefined,
-        });
+    const handleSave = async (status: 'active' | 'draft') => {
+        setErrorMsg(null);
+        if (!name.trim()) {
+            setErrorMsg('Please enter a campaign name.');
+            return;
+        }
+        if (status === 'active' && !pcoListId) {
+            setErrorMsg('Please select a PCO List.');
+            return;
+        }
+        if (status === 'active' && selectedFields.length === 0) {
+            setErrorMsg('Please select at least one field to collect.');
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            const list = pcoLists.find(l => l.id === pcoListId);
+            await onSave({
+                name: name.trim(),
+                pcoListId,
+                pcoListName: list?.attributes?.name || pcoListName,
+                status,
+                fieldsToCollect: FIELD_CATALOG.filter(f => selectedFields.includes(f.key)),
+                fieldBehavior,
+                channels: { sms: smsEnabled, email: emailEnabled },
+                schedule: { intervalDays, maxAttempts, sendWindowStart, sendWindowEnd },
+                messaging: introMessage ? { introMessage } : undefined,
+            });
+        } catch (e: any) {
+            setErrorMsg(e.message || 'Failed to save campaign.');
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const FIELD_GROUPS = [
@@ -515,24 +539,43 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
                 </div>
             </div>
 
+            {/* Validation Error Feedback */}
+            {errorMsg && (
+                <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-xs font-semibold text-red-600 dark:text-red-400 flex items-center gap-2">
+                    <span>⚠️</span>
+                    <span>{errorMsg}</span>
+                </div>
+            )}
+
             {/* Buttons */}
             <div className="flex gap-3 pt-2">
                 <button
+                    type="button"
                     onClick={() => handleSave('active')}
-                    disabled={!name || !pcoListId || selectedFields.length === 0}
-                    className="flex-1 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl transition"
+                    disabled={isSaving}
+                    className="flex-1 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl transition flex items-center justify-center gap-2 shadow-sm"
                 >
-                    ✨ Save & Activate
+                    {isSaving ? (
+                        <>
+                            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                            Saving…
+                        </>
+                    ) : (
+                        '✨ Save & Activate'
+                    )}
                 </button>
                 <button
+                    type="button"
                     onClick={() => handleSave('draft')}
-                    disabled={!name}
+                    disabled={isSaving}
                     className="py-2.5 px-4 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm font-semibold rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition disabled:opacity-50"
                 >
                     Save Draft
                 </button>
                 <button
+                    type="button"
                     onClick={onCancel}
+                    disabled={isSaving}
                     className="py-2.5 px-4 text-slate-500 dark:text-slate-400 text-sm font-semibold rounded-xl hover:text-slate-700 dark:hover:text-slate-200 transition"
                 >
                     Cancel
@@ -551,9 +594,8 @@ function CampaignDetail({ campaign, onBack }: { campaign: InfoCampaign; onBack: 
 
     const loadSessions = useCallback(async () => {
         try {
-            const res = await fetch(`/api/info-update-sessions?campaignId=${campaign.id}`);
-            const data = await res.json();
-            setSessions(Array.isArray(data) ? data : []);
+            const data = await firestore.getInfoSessions(campaign.id);
+            setSessions(data || []);
         } catch { setSessions([]); }
         setLoading(false);
     }, [campaign.id]);
@@ -562,9 +604,9 @@ function CampaignDetail({ campaign, onBack }: { campaign: InfoCampaign; onBack: 
 
     const handleRetry = async (sessionId: string) => {
         try {
-            await fetch(`/api/info-update-sessions/${sessionId}/retry`, { method: 'POST' });
+            await firestore.retryInfoSession(sessionId);
             await loadSessions();
-        } catch { /* ignore */ }
+        } catch (e) { console.error('Retry failed', e); }
     };
 
     const stats = campaign.stats;
@@ -694,51 +736,45 @@ export function ChurchHelperView({ churchId, church, currentUser }: {
 
     const loadCampaigns = useCallback(async () => {
         try {
-            const res = await fetch(`/api/info-update-campaigns?churchId=${churchId}`);
-            const data = await res.json();
-            setCampaigns(Array.isArray(data) ? data : []);
-        } catch { setCampaigns([]); }
+            const data = await firestore.getInfoCampaigns(churchId);
+            setCampaigns(data || []);
+        } catch (e) { console.error('Failed to load campaigns:', e); setCampaigns([]); }
         setLoading(false);
     }, [churchId]);
 
     useEffect(() => { loadCampaigns(); }, [loadCampaigns]);
 
     const handleSaveCampaign = async (formData: Partial<InfoCampaign>) => {
-        try {
-            if (editingCampaign) {
-                await fetch(`/api/info-update-campaigns/${editingCampaign.id}`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(formData),
-                });
-            } else {
-                await fetch('/api/info-update-campaigns', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ...formData, churchId }),
-                });
-            }
-            setShowForm(false);
-            setEditingCampaign(null);
-            await loadCampaigns();
-        } catch (e) { console.error('Failed to save campaign', e); }
+        if (editingCampaign) {
+            await firestore.updateInfoCampaign(editingCampaign.id, formData);
+        } else {
+            const id = `pic_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+            const campaign = {
+                id,
+                churchId,
+                ...formData,
+                status: formData.status || 'active',
+                createdAt: Date.now(),
+                stats: { total: 0, pending: 0, inProgress: 0, complete: 0, failed: 0, maxAttempts: 0 }
+            };
+            await firestore.saveInfoCampaign(campaign);
+        }
+        setShowForm(false);
+        setEditingCampaign(null);
+        await loadCampaigns();
     };
 
     const handlePauseResume = async (campaign: InfoCampaign, e: React.MouseEvent) => {
         e.stopPropagation();
         const newStatus = campaign.status === 'active' ? 'paused' : 'active';
-        await fetch(`/api/info-update-campaigns/${campaign.id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: newStatus }),
-        });
+        await firestore.updateInfoCampaign(campaign.id, { status: newStatus });
         await loadCampaigns();
     };
 
     const handleDelete = async (campaign: InfoCampaign, e: React.MouseEvent) => {
         e.stopPropagation();
         if (!window.confirm(`Delete "${campaign.name}"? This cannot be undone.`)) return;
-        await fetch(`/api/info-update-campaigns/${campaign.id}`, { method: 'DELETE' });
+        await firestore.deleteInfoCampaign(campaign.id);
         await loadCampaigns();
     };
 

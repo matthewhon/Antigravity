@@ -1808,6 +1808,79 @@ class FirestoreService {
     }
   }
 
+  // --- Church Helper (Info Update Campaigns & Sessions) ---
+
+  async getInfoCampaigns(churchId: string): Promise<any[]> {
+    try {
+      const q = query(
+        collection(db, 'people_info_campaigns'),
+        where('churchId', '==', churchId)
+      );
+      const snap = await getDocs(q);
+      const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      list.sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0));
+      return list;
+    } catch (e) {
+      console.error('[FirestoreService] getInfoCampaigns failed:', e);
+      return [];
+    }
+  }
+
+  async saveInfoCampaign(campaign: any): Promise<void> {
+    try {
+      const safe = JSON.parse(JSON.stringify(campaign));
+      await setDoc(doc(db, 'people_info_campaigns', campaign.id), safe);
+    } catch (e) {
+      console.error('[FirestoreService] saveInfoCampaign failed:', e);
+      throw e;
+    }
+  }
+
+  async updateInfoCampaign(campaignId: string, updates: any): Promise<void> {
+    try {
+      const safe = JSON.parse(JSON.stringify(updates));
+      await updateDoc(doc(db, 'people_info_campaigns', campaignId), safe);
+    } catch (e) {
+      console.error('[FirestoreService] updateInfoCampaign failed:', e);
+      throw e;
+    }
+  }
+
+  async deleteInfoCampaign(campaignId: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, 'people_info_campaigns', campaignId));
+    } catch (e) {
+      console.error('[FirestoreService] deleteInfoCampaign failed:', e);
+      throw e;
+    }
+  }
+
+  async getInfoSessions(campaignId: string): Promise<any[]> {
+    try {
+      const q = query(
+        collection(db, 'people_info_sessions'),
+        where('campaignId', '==', campaignId)
+      );
+      const snap = await getDocs(q);
+      return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (e) {
+      console.error('[FirestoreService] getInfoSessions failed:', e);
+      return [];
+    }
+  }
+
+  async retryInfoSession(sessionId: string): Promise<void> {
+    try {
+      await updateDoc(doc(db, 'people_info_sessions', sessionId), {
+        status: 'pending',
+        nextScheduledAt: 0
+      });
+    } catch (e) {
+      console.error('[FirestoreService] retryInfoSession failed:', e);
+      throw e;
+    }
+  }
+
   async saveBulletin(bulletin: DigitalBulletin): Promise<void> {
     try {
       const safe = JSON.parse(JSON.stringify(bulletin));
