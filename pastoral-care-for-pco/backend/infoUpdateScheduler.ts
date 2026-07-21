@@ -18,12 +18,50 @@ const POLL_INTERVAL_MS = 60_000;
 
 // ─── Outreach message builder ─────────────────────────────────────────────────
 
-function buildIntroMessage(campaign: any, personName: string, churchName: string): string {
-    if (campaign.messaging?.introMessage) {
-        return campaign.messaging.introMessage.replace('{{name}}', personName);
-    }
+function buildIntroMessage(campaign: any, personName: string, churchName: string, pcoValues: Record<string, string> = {}): string {
+    const rawTemplate = campaign.messaging?.introMessage || 
+        `Hi {{first_name}}! This is {{church_name}}. We're updating our church directory and would love to confirm a few details: {{fields_list}}. Reply to get started! Reply STOP to opt out.`;
+
     const fieldLabels = (campaign.fieldsToCollect || []).map((f: any) => f.label).join(', ');
-    return `Hi ${personName}! This is ${churchName}. We're updating our church directory and would love to confirm a few details: ${fieldLabels}. Reply to get started — it only takes a minute! Reply STOP to opt out.`;
+    const firstName = personName.split(' ')[0] || personName;
+
+    let message = rawTemplate
+        .replace(/\{\{name\}\}/gi, personName)
+        .replace(/\{\{first_name\}\}/gi, firstName)
+        .replace(/\{\{full_name\}\}/gi, personName)
+        .replace(/\{\{church_name\}\}/gi, churchName)
+        .replace(/\{\{fields_list\}\}/gi, fieldLabels);
+
+    // Merge field tags: {{phone_mobile}}, {{email_primary}}, {{address_home}}, {{birthdate}}, etc.
+    const fieldTagMap: Record<string, string> = {
+        phone_mobile: 'mobile_phone',
+        phone_home: 'home_phone',
+        email_primary: 'email',
+        address_home: 'address',
+        birthdate: 'birthday',
+        anniversary: 'anniversary',
+        marital_status: 'marital_status',
+        gender: 'gender',
+        graduation_year: 'graduation_year',
+        school: 'school',
+        membership: 'membership',
+        emergency_contact: 'emergency_contact',
+    };
+
+    for (const [key, val] of Object.entries(pcoValues)) {
+        const valStr = val || '(not on file)';
+        // Match both exact key {{phone_mobile}} and friendly tag {{mobile_phone}} / {{address}} / {{email}}
+        message = message.replace(new RegExp(`\{\{${key}\}\}`, 'gi'), valStr);
+        const alias = fieldTagMap[key];
+        if (alias) {
+            message = message.replace(new RegExp(`\{\{${alias}\}\}`, 'gi'), valStr);
+        }
+    }
+
+    // Replace any un-matched field tags with (not on file)
+    message = message.replace(/\{\{[a-z0-9_]+\}\}/gi, '(not on file)');
+
+    return message;
 }
 
 // ─── Per-campaign processing ──────────────────────────────────────────────────
@@ -107,6 +145,38 @@ async function processPersonForCampaign(
     const phoneE164  = mobilePhone?.attributes?.number ? normaliseE164(mobilePhone.attributes.number) : null;
     const emailAddr  = primaryEmail?.attributes?.address?.toLowerCase().trim() || null;
 
+    // Extract current values for all candidate fields from PCO person attributes & includes
+    const pcoValues: Record<string, string> = {};
+    if (phoneE164) pcoValues['phone_mobile'] = mobilePhone?.attributes?.number || '';
+    const homePhone = phones.find((p: any) => p.attributes?.location === 'Home');
+    if (homePhone?.attributes?.number) pcoValues['phone_home'] = homePhone.attributes.number;
+    if (emailAddr) pcoValues['email_primary'] = primaryEmail?.attributes?.address || '';
+
+    // Standard PCO person attributes
+    const attrs = pcoPerson.attributes || {};
+    if (attrs.birthdate) pcoValues['birthdate'] = attrs.birthdate;
+    if (attrs.anniversary) pcoValues['anniversary'] = attrs.anniversary;
+    if (attrs.marital_status) pcoValues['marital_status'] = attrs.marital_status;
+    if (attrs.gender) pcoValues['gender'] = attrs.gender;
+    if (attrs.graduation_year) pcoValues['graduation_year'] = String(attrs.graduation_year);
+    if (attrs.school) pcoValues['school'] = attrs.school;
+    if (attrs.membership) pcoValues['membership'] = attrs.membership;
+
+    // Address
+    const addresses = included.filter((i: any) => i.type === 'Address');
+    if (addresses.length > 0) {
+        const addr = addresses[0].attributes || {};
+        const fullAddr = [addr.street, addr.city, addr.state, addr.zip].filter(Boolean).join(', ');
+        if (fullAddr) pcoValues['address_home'] = fullAddr;
+    }
+
+    // Determine initial remaining fields based on campaign fieldBehavior ('confirm_all' vs 'only_blank')
+    const behavior = campaign.fieldBehavior || 'confirm_all';
+    const allFieldKeys = (fieldsToCollect || []).map((f: any) => f.key);
+    const initialRemainingFields = behavior === 'only_blank'
+        ? allFieldKeys.filter((key: string) => !pcoValues[key] || !pcoValues[key].trim())
+        : allFieldKeys;
+
     // Check for existing session
     const existingSnap = await db.collection('people_info_sessions')
         .where('campaignId', '==', campaignId)
@@ -148,7 +218,8 @@ async function processPersonForCampaign(
         emailAddress: emailAddr || null,
         conversationHistory: [],
         collectedData: {},
-        remainingFields: (fieldsToCollect || []).map((f: any) => f.key),
+        existingPcoData: pcoValues,
+        remainingFields: initialRemainingFields,
         status: 'pending',
         attemptCount: 0,
         lastContactedAt: null,
@@ -177,7 +248,7 @@ async function sendOutreach(
     const intervalDays = schedule?.intervalDays || 3;
     const nextScheduledAt = Date.now() + intervalDays * 24 * 60 * 60 * 1000;
 
-    const message = buildIntroMessage(campaign, session.personName, churchName);
+    const message = buildIntroMessage(campaign, session.personName, churchName, session.existingPcoData || {});
     let sent = false;
 
     // Prefer SMS; fall back to email

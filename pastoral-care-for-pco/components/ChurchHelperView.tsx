@@ -44,6 +44,8 @@ interface InfoCampaign {
     pcoListName?: string;
     status: 'active' | 'paused' | 'complete' | 'draft';
     fieldsToCollect: FieldSpec[];
+    fieldBehavior?: 'confirm_all' | 'only_blank';
+    existingFieldValues?: Record<string, Record<string, string>>;
     channels: { sms: boolean; email: boolean; smsNumberId?: string };
     schedule: { intervalDays: number; maxAttempts: number; sendWindowStart: string; sendWindowEnd: string };
     messaging?: { introMessage?: string };
@@ -213,6 +215,7 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
     const [pcoListId, setPcoListId] = useState(existing?.pcoListId || '');
     const [pcoListName, setPcoListName] = useState(existing?.pcoListName || '');
     const [selectedFields, setSelectedFields] = useState<string[]>(existing?.fieldsToCollect.map(f => f.key) || ['phone_mobile', 'email_primary', 'address_home']);
+    const [fieldBehavior, setFieldBehavior] = useState<'confirm_all' | 'only_blank'>(existing?.fieldBehavior || 'confirm_all');
     const [smsEnabled, setSmsEnabled] = useState(existing?.channels?.sms ?? true);
     const [emailEnabled, setEmailEnabled] = useState(existing?.channels?.email ?? true);
     const [intervalDays, setIntervalDays] = useState(existing?.schedule?.intervalDays ?? 3);
@@ -247,6 +250,7 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
             pcoListName: list?.attributes?.name || pcoListName,
             status,
             fieldsToCollect: FIELD_CATALOG.filter(f => selectedFields.includes(f.key)),
+            fieldBehavior,
             channels: { sms: smsEnabled, email: emailEnabled },
             schedule: { intervalDays, maxAttempts, sendWindowStart, sendWindowEnd },
             messaging: introMessage ? { introMessage } : undefined,
@@ -333,6 +337,49 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
                 </div>
             </div>
 
+            {/* Field Value Behavior */}
+            <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Field Questioning Mode</label>
+                <div className="grid grid-cols-2 gap-3">
+                    <label className={`flex flex-col p-3 rounded-xl border cursor-pointer transition ${fieldBehavior === 'confirm_all' ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' : 'border-slate-200 dark:border-slate-700'}`}>
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="radio"
+                                name="fieldBehavior"
+                                value="confirm_all"
+                                checked={fieldBehavior === 'confirm_all'}
+                                onChange={() => setFieldBehavior('confirm_all')}
+                                className="text-emerald-600 focus:ring-emerald-500"
+                            />
+                            <span className={`text-sm font-semibold ${fieldBehavior === 'confirm_all' ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-800 dark:text-slate-200'}`}>
+                                Confirm Existing Info
+                            </span>
+                        </div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 pl-5">
+                            Ask members to confirm their current info on file, or collect it if missing.
+                        </p>
+                    </label>
+                    <label className={`flex flex-col p-3 rounded-xl border cursor-pointer transition ${fieldBehavior === 'only_blank' ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' : 'border-slate-200 dark:border-slate-700'}`}>
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="radio"
+                                name="fieldBehavior"
+                                value="only_blank"
+                                checked={fieldBehavior === 'only_blank'}
+                                onChange={() => setFieldBehavior('only_blank')}
+                                className="text-emerald-600 focus:ring-emerald-500"
+                            />
+                            <span className={`text-sm font-semibold ${fieldBehavior === 'only_blank' ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-800 dark:text-slate-200'}`}>
+                                Ask Only If Blank
+                            </span>
+                        </div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 pl-5">
+                            Only prompt members for selected fields that are currently empty in Planning Center.
+                        </p>
+                    </label>
+                </div>
+            </div>
+
             {/* Channel toggles */}
             <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Outreach Channels</label>
@@ -384,17 +431,44 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
                 </div>
             </div>
 
-            {/* Intro message override */}
-            <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Custom Intro Message <span className="font-normal text-slate-400">(optional)</span></label>
+                        {/* Intro message override */}
+            <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                        Custom Intro Message <span className="font-normal text-slate-400">(optional)</span>
+                    </label>
+                    <span className="text-xs text-slate-400">Merge tags supported</span>
+                </div>
                 <textarea
                     value={introMessage}
                     onChange={e => setIntroMessage(e.target.value)}
-                    rows={3}
-                    placeholder="Hi {{name}}! This is [Church Name]. We're updating our directory and would love to confirm a few things…"
+                    rows={4}
+                    placeholder="Hi {{first_name}}! This is {{church_name}}. Is your current home address still {{address}}? Reply YES to confirm or send your new address."
                     className="w-full px-3.5 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
                 />
-                <p className="text-xs text-slate-400">Use {'{{name}}'} as a placeholder for the person's first name.</p>
+                <div>
+                    <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Available Merge Tags (click to insert):</p>
+                    <div className="flex flex-wrap gap-1.5">
+                        {[
+                            { tag: '{{first_name}}', label: 'First Name' },
+                            { tag: '{{church_name}}', label: 'Church Name' },
+                            { tag: '{{address}}', label: 'Home Address' },
+                            { tag: '{{email}}', label: 'Primary Email' },
+                            { tag: '{{mobile_phone}}', label: 'Mobile Phone' },
+                            { tag: '{{birthday}}', label: 'Birthday' },
+                            { tag: '{{fields_list}}', label: 'Fields List' },
+                        ].map(t => (
+                            <button
+                                key={t.tag}
+                                type="button"
+                                onClick={() => setIntroMessage(prev => (prev ? prev + ' ' : '') + t.tag)}
+                                className="px-2 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 hover:border-emerald-300 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono text-emerald-700 dark:text-emerald-400 transition"
+                            >
+                                {t.tag} <span className="font-sans text-[10px] text-slate-400">({t.label})</span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
             </div>
 
             {/* Buttons */}

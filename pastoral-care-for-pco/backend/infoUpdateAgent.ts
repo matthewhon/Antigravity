@@ -60,15 +60,18 @@ async function callGeminiForConversation(params: {
     personName: string;
     fieldsToCollect: FieldSpec[];
     collectedData: Record<string, string>;
+    existingPcoData?: Record<string, string>;
     remainingFields: string[];
     conversationHistory: { role: string; text: string }[];
     latestMessage: string;
 }): Promise<{ replyText: string; extractedFields: Record<string, string> }> {
-    const { churchName, personName, fieldsToCollect, collectedData, remainingFields, conversationHistory, latestMessage } = params;
+    const { churchName, personName, fieldsToCollect, collectedData, existingPcoData = {}, remainingFields, conversationHistory, latestMessage } = params;
 
-    const remainingLabels = remainingFields.map(key => {
+    const remainingDetails = remainingFields.map(key => {
         const spec = fieldsToCollect.find(f => f.key === key);
-        return spec ? spec.label : key;
+        const label = spec ? spec.label : key;
+        const currentVal = existingPcoData[key];
+        return currentVal ? `${label} (currently on file: "${currentVal}")` : `${label} (currently empty)`;
     });
     const collectedSummary = Object.entries(collectedData)
         .map(([key, val]) => {
@@ -79,8 +82,16 @@ async function callGeminiForConversation(params: {
 
     const systemInstruction = `You are a friendly assistant for ${churchName}. You are helping update contact information for the church directory for ${personName}.
 
-Fields still needed: ${remainingLabels.length > 0 ? remainingLabels.join(', ') : 'NONE — all collected!'}
-Fields already collected: ${collectedSummary}
+Fields still needed / to confirm: ${remainingDetails.length > 0 ? remainingDetails.join('; ') : 'NONE — all completed!'}
+Fields already updated in this session: ${collectedSummary}
+
+Rules:
+- Be warm, brief, and conversational (this is an SMS/email thread).
+- Ask ONLY ONE field at a time — the first one in the "still needed" list.
+- If a field has a value currently on file, ask them to confirm if it is still correct or if they'd like to update it (e.g. "We currently have your address as [value]. Is that still correct?").
+- If the member confirms that an existing value is correct (e.g., "yes", "that's correct", "same"), extract and confirm that value.
+- When a person provides new or confirmed information, acknowledge it clearly in your reply before moving on.
+- If all fields are collected or confirmed, thank them warmly and tell them their info is up to date. Do NOT ask more questions.
 
 Rules:
 - Be warm, brief, and conversational (this is an SMS/email thread).
@@ -225,6 +236,7 @@ export async function handleInfoUpdateReply(
             personName: session.personName,
             fieldsToCollect,
             collectedData,
+            existingPcoData: session.existingPcoData || {},
             remainingFields,
             conversationHistory,
             latestMessage: inboundText,
