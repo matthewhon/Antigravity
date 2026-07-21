@@ -1,11 +1,17 @@
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import {
+  LayoutDashboard, Globe, Users, FolderKanban, Music, HandCoins, HeartHandshake,
+  TrendingUp, Wrench, SlidersHorizontal, Home, AlertTriangle, FileText, Palette,
+  MapPin, User as UserIcon, Calendar, Smartphone, BarChart3, Briefcase, Church as ChurchIcon,
+  Building2, Phone, ClipboardList, Pencil, Settings, Mail, MessageSquare, Zap,
+  Newspaper, StickyNote, QrCode, Folder, Sparkles, UserMinus, ChevronDown, LogOut,
+  type LucideIcon,
+} from 'lucide-react';
 import { Church, User } from '../types';
 import UserProfileModal from './UserProfileModal';
 import { AppLogo } from './AppLogo';
 import { useTenantData } from '../contexts/TenantDataContext';
-
-
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -26,15 +32,45 @@ interface LayoutProps {
   noPadding?: boolean;
 }
 
-const Layout: React.FC<LayoutProps> = ({ 
-  children, 
-  church, 
-  allChurches, 
-  onSwitchChurch, 
-  user, 
-  onLogout, 
-  currentView, 
-  onNavigate, 
+// ── Nav model ────────────────────────────────────────────────────────────────
+// A single ordered list drives the top nav. `link` entries navigate directly;
+// `menu` entries open a hover/click dropdown. Everything below is derived from
+// this config so there is exactly one code path for triggers and panels.
+interface NavLeaf {
+  view: string;
+  icon: LucideIcon;
+  label: string;
+  /** Custom active test; defaults to an exact match on `view`. */
+  activeMatch?: (currentView: string) => boolean;
+}
+interface NavLink {
+  kind: 'link';
+  key: string;
+  view: string;
+  icon: LucideIcon;
+  label: string;
+  highlight?: 'amber';
+}
+interface NavMenuConfig {
+  kind: 'menu';
+  key: string;
+  icon: LucideIcon;
+  label: string;
+  /** Trigger is highlighted when the current view starts with this prefix. */
+  prefix: string;
+  items: NavLeaf[];
+}
+type NavEntry = NavLink | NavMenuConfig;
+
+const Layout: React.FC<LayoutProps> = ({
+  children,
+  church,
+  allChurches,
+  onSwitchChurch,
+  user,
+  onLogout,
+  currentView,
+  onNavigate,
   hasPermission,
   onRefreshUser,
   isSyncing,
@@ -45,20 +81,11 @@ const Layout: React.FC<LayoutProps> = ({
   const { campuses, selectedCampusId, setSelectedCampusId } = useTenantData();
 
   const [isEditingProfile, setIsEditingProfile] = useState(false);
-  const [metricsOpen, setMetricsOpen] = useState(false);
-  const metricsRef = useRef<HTMLDivElement>(null);
-  const [careOpen, setCareOpen] = useState(false);
-  const careRef = useRef<HTMLDivElement>(null);
-  const [peopleOpen, setPeopleOpen] = useState(false);
-  const peopleRef = useRef<HTMLDivElement>(null);
-  const [groupsOpen, setGroupsOpen] = useState(false);
-  const groupsRef = useRef<HTMLDivElement>(null);
-  const [servicesOpen, setServicesOpen] = useState(false);
-  const servicesRef = useRef<HTMLDivElement>(null);
-  const [givingOpen, setGivingOpen] = useState(false);
-  const givingRef = useRef<HTMLDivElement>(null);
-  const [toolsOpen, setToolsOpen] = useState(false);
-  const toolsRef = useRef<HTMLDivElement>(null);
+
+  // -- Dropdown state (single open menu at a time) --
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const triggerRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // -- Nav scrollbar state --
   const navRef = useRef<HTMLDivElement>(null);
@@ -86,57 +113,167 @@ const Layout: React.FC<LayoutProps> = ({
     };
   }, [checkScroll]);
 
-  const handleNavButtonClick = (e: React.MouseEvent, view: string, isOpen: boolean, setter: (v: boolean) => void) => {
+  // ── Dropdown open/close ──────────────────────────────────────────────────
+  // The panels are fixed-position with an 8px gap below the trigger. Without a
+  // close delay, moving the mouse across that gap fires onMouseLeave and closes
+  // the menu before the cursor reaches the panel. A single shared 150ms timer
+  // debounces the close and also handles moving directly between two triggers.
+  const cancelClose = useCallback(() => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+  }, []);
+  const openNow = useCallback((key: string) => {
+    cancelClose();
+    setOpenMenu(key);
+  }, [cancelClose]);
+  const scheduleClose = useCallback(() => {
+    cancelClose();
+    closeTimer.current = setTimeout(() => setOpenMenu(null), 150);
+  }, [cancelClose]);
+
+  // Close on Escape for keyboard users.
+  useEffect(() => {
+    if (!openMenu) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpenMenu(null); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [openMenu]);
+
+  const handleTriggerClick = (e: React.MouseEvent, key: string) => {
+    // Touch / keyboard activation (no pointer coords) opens the menu instead of
+    // treating the trigger as a plain link.
     const isTouchOrKeyboard = e.detail === 0 || ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
-    if (isTouchOrKeyboard && !isOpen) {
+    if (isTouchOrKeyboard && openMenu !== key) {
       e.preventDefault();
-      setPeopleOpen(false);
-      setGroupsOpen(false);
-      setServicesOpen(false);
-      setGivingOpen(false);
-      setCareOpen(false);
-      setMetricsOpen(false);
-      setToolsOpen(false);
-      setter(true);
+      openNow(key);
     } else {
-      onNavigate(view);
-      setter(false);
+      onNavigate(key);
+      setOpenMenu(null);
     }
   };
 
-  // ── Close-delay timers ──────────────────────────────────────────────────────
-  // The dropdown panels are fixed-position with an 8px gap below the trigger.
-  // Without a delay, moving the mouse from the button across that gap fires
-  // onMouseLeave and closes the menu before the cursor reaches the panel.
-  // A 150ms debounce gives the mouse enough time to cross the gap.
-  const closeTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
-  const scheduleClose = (key: string, setter: (v: boolean) => void) => {
-    closeTimers.current[key] = setTimeout(() => setter(false), 150);
-  };
-  const cancelClose = (key: string) => {
-    clearTimeout(closeTimers.current[key]);
-  };
-
-  const getDropdownStyle = (ref: React.RefObject<HTMLDivElement>) => {
-    if (!ref.current) return {};
-    const rect = ref.current.getBoundingClientRect();
-    return { top: `${rect.bottom + 8}px`, left: `${rect.left}px` };
+  const navigateFromMenu = (view: string) => {
+    onNavigate(view);
+    setOpenMenu(null);
   };
 
   if (!user) return null;
 
   const isSystemAdmin = user.roles.includes('System Administration');
+  const smsEnabled = !!church?.smsSettings?.smsEnabled;
+  const isStarter = church.subscription?.status === 'active' && church.subscription?.planId === 'starter';
+
+  // ── Build the nav config ────────────────────────────────────────────────
+  const navEntries: NavEntry[] = useMemo(() => {
+    const entries: NavEntry[] = [];
+
+    if (hasPermission('dashboard')) {
+      entries.push({ kind: 'link', key: 'dashboard', view: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' });
+    }
+    if (isSystemAdmin) {
+      entries.push({ kind: 'link', key: 'global-admin', view: 'global-admin', icon: Globe, label: 'Global', highlight: 'amber' });
+    }
+    if (hasPermission('people')) {
+      entries.push({
+        kind: 'menu', key: 'people', icon: Users, label: 'People', prefix: 'people',
+        items: [
+          { view: 'people',            icon: LayoutDashboard, label: 'Overview'      },
+          { view: 'people-households', icon: Home,            label: 'Households'    },
+          { view: 'people-risk',       icon: AlertTriangle,   label: 'Risk Profiles' },
+          { view: 'people-reports',    icon: FileText,        label: 'Reports'       },
+        ],
+      });
+    }
+    if (hasPermission('groups')) {
+      entries.push({
+        kind: 'menu', key: 'groups', icon: FolderKanban, label: 'Groups', prefix: 'groups',
+        items: [
+          { view: 'groups',         icon: LayoutDashboard, label: 'Overview' },
+          { view: 'groups-reports', icon: FileText,        label: 'Reports'  },
+        ],
+      });
+    }
+    if (hasPermission('services')) {
+      entries.push({
+        kind: 'menu', key: 'services', icon: Music, label: 'Services', prefix: 'services',
+        items: [
+          { view: 'services',            icon: Palette,   label: 'Overview'   },
+          { view: 'services-attendance', icon: MapPin,    label: 'Attendance' },
+          { view: 'services-teams',      icon: UserIcon,  label: 'Teams'      },
+          { view: 'services-plans',      icon: Calendar,  label: 'Plans'      },
+          ...(smsEnabled ? [{ view: 'services-reminders', icon: Smartphone, label: 'Reminders' }] : []),
+        ],
+      });
+    }
+    if (hasPermission('giving')) {
+      entries.push({
+        kind: 'menu', key: 'giving', icon: HandCoins, label: 'Giving', prefix: 'giving',
+        items: [
+          { view: 'giving',         icon: BarChart3, label: 'Overview' },
+          { view: 'giving-donor',   icon: Users,     label: 'Donors'   },
+          { view: 'giving-budgets', icon: Briefcase, label: 'Budgets'  },
+          { view: 'giving-reports', icon: FileText,  label: 'Reports'  },
+        ],
+      });
+    }
+    if (hasPermission('pastoral')) {
+      entries.push({
+        kind: 'menu', key: 'pastoral', icon: HeartHandshake, label: 'Care', prefix: 'pastoral',
+        items: [
+          { view: 'pastoral',            icon: ChurchIcon,    label: 'Church'     },
+          { view: 'pastoral-membership', icon: Users,         label: 'Membership' },
+          { view: 'pastoral-community',  icon: Building2,     label: 'Community'  },
+          { view: 'pastoral-care',       icon: HeartHandshake, label: 'Care'      },
+          { view: 'pastoral-calendar',   icon: Calendar,      label: 'Calendar'   },
+          // Calling (Contact) is hidden for Starter plan subscribers
+          ...(isStarter ? [] : [{ view: 'pastoral-contact', icon: Phone, label: 'Contact' }]),
+          { view: 'pastoral-reports',    icon: ClipboardList, label: 'Reports'    },
+        ],
+      });
+    }
+    if (hasPermission('metrics')) {
+      entries.push({
+        kind: 'menu', key: 'metrics', icon: TrendingUp, label: 'Metrics', prefix: 'metrics',
+        items: [
+          { view: 'metrics',          icon: BarChart3, label: 'Dashboard'  },
+          { view: 'metrics-input',    icon: Pencil,    label: 'Input Data' },
+          { view: 'metrics-settings', icon: Settings,  label: 'Configure'  },
+        ],
+      });
+    }
+    if (hasPermission('tools')) {
+      const toolItems: NavLeaf[] = [
+        { view: 'tools-emails',        icon: Mail,          label: 'Emails'        },
+        { view: 'tools-sms-inbox',     icon: MessageSquare, label: 'SMS',          activeMatch: v => v.startsWith('tools-sms') },
+        { view: 'tools-workflows',     icon: Zap,           label: 'Workflows'     },
+        { view: 'tools-polls',         icon: BarChart3,     label: 'Polls'         },
+        { view: 'tools-bulletin',      icon: Newspaper,     label: 'Bulletins'     },
+        { view: 'tools-notes',         icon: StickyNote,    label: 'Notes'         },
+        { view: 'tools-website',       icon: Globe,         label: 'Website'       },
+        { view: 'tools-qrcodes',       icon: QrCode,        label: 'QR Codes'      },
+        { view: 'tools-files',         icon: Folder,        label: 'Files'         },
+        { view: 'tools-forms',         icon: FileText,      label: 'Forms'         },
+        { view: 'tools-church-helper', icon: Sparkles,      label: 'Church Helper' },
+        { view: 'tools-unsubscribers', icon: UserMinus,     label: 'Unsubscribers' },
+      ].filter(item => hasPermission(item.view));
+      entries.push({ kind: 'menu', key: 'tools', icon: Wrench, label: 'Tools', prefix: 'tools', items: toolItems });
+    }
+    if (isSystemAdmin) {
+      entries.push({ kind: 'link', key: 'app-settings', view: 'app-settings', icon: SlidersHorizontal, label: 'App Config' });
+    }
+
+    return entries;
+  }, [hasPermission, isSystemAdmin, smsEnabled, isStarter]);
 
   return (
     <div className="flex flex-col h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
-      
+
       {/* Top Navigation Bar */}
       <header className="bg-slate-900 dark:bg-black text-white shadow-xl z-50 flex-none print:hidden">
         <div className="flex items-center justify-between px-4 lg:px-6 py-3 gap-4">
-            
+
             {/* Logo & Title */}
-            <div 
-                className="flex items-center gap-3 cursor-pointer shrink-0 hover:opacity-90 transition-opacity" 
+            <div
+                className="flex items-center gap-3 cursor-pointer shrink-0 hover:opacity-90 transition-opacity"
                 onClick={() => onNavigate('dashboard')}
             >
                 <AppLogo size={36} />
@@ -149,477 +286,108 @@ const Layout: React.FC<LayoutProps> = ({
             {/* Main Navigation - Horizontal Scrollable */}
             <div className="relative flex-1 min-w-0">
               {/* Left scroll shadow/gradient indicator */}
-              <div 
+              <div
                 className={`absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-slate-900 dark:from-black to-transparent pointer-events-none z-10 transition-opacity duration-300 ${
                   showLeftScroll ? 'opacity-100' : 'opacity-0'
-                }`} 
+                }`}
               />
               {/* Right scroll shadow/gradient indicator */}
-              <div 
+              <div
                 className={`absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-slate-900 dark:from-black to-transparent pointer-events-none z-10 transition-opacity duration-300 ${
                   showRightScroll ? 'opacity-100' : 'opacity-0'
-                }`} 
+                }`}
               />
-              <nav 
+              <nav
                 ref={navRef}
                 className="flex-1 flex items-center gap-1.5 overflow-x-auto no-scrollbar mask-linear-fade px-2"
               >
-                
-                {hasPermission('dashboard') && (
-                  <NavItem 
-                    icon="📊" 
-                    label="Dashboard" 
-                    active={currentView === 'dashboard'} 
-                    onClick={() => onNavigate('dashboard')} 
-                  />
-                )}
-
-                {isSystemAdmin && (
-                  <NavItem 
-                    icon="🌍" 
-                    label="Global" 
-                    active={currentView === 'global-admin'} 
-                    onClick={() => onNavigate('global-admin')} 
-                    highlight="amber"
-                  />
-                )}
-
-                {hasPermission('people') && (
-                  <div
-                    ref={peopleRef}
-                    className="relative shrink-0"
-                    onMouseEnter={() => { cancelClose('people'); setPeopleOpen(true); }}
-                    onMouseLeave={() => scheduleClose('people', setPeopleOpen)}
-                    onFocus={() => { cancelClose('people'); setPeopleOpen(true); }}
-                    onBlur={() => scheduleClose('people', setPeopleOpen)}
-                  >
-                    <button
-                      onClick={(e) => handleNavButtonClick(e, 'people', peopleOpen, setPeopleOpen)}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all border ${
-                        currentView.startsWith('people')
-                          ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 ring-1 ring-indigo-500 border-transparent'
-                          : 'text-slate-400 border-transparent hover:bg-slate-800 hover:text-white hover:border-slate-700'
-                      }`}
+                {navEntries.map(entry =>
+                  entry.kind === 'link' ? (
+                    <NavItem
+                      key={entry.key}
+                      icon={entry.icon}
+                      label={entry.label}
+                      active={currentView === entry.view}
+                      onClick={() => onNavigate(entry.view)}
+                      highlight={entry.highlight}
+                    />
+                  ) : (
+                    <div
+                      key={entry.key}
+                      ref={el => { triggerRefs.current[entry.key] = el; }}
+                      className="relative shrink-0"
+                      onMouseEnter={() => openNow(entry.key)}
+                      onMouseLeave={scheduleClose}
+                      onFocus={() => openNow(entry.key)}
+                      onBlur={scheduleClose}
                     >
-                      <span className="text-base">👥</span>
-                      <span className="text-[10px] font-black uppercase tracking-widest">People</span>
-                      <svg className="w-3 h-3 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M6 9l6 6 6-6"/></svg>
-                    </button>
-                  </div>
-                )}
-
-
-
-                {hasPermission('groups') && (
-                  <div
-                    ref={groupsRef}
-                    className="relative shrink-0"
-                    onMouseEnter={() => { cancelClose('groups'); setGroupsOpen(true); }}
-                    onMouseLeave={() => scheduleClose('groups', setGroupsOpen)}
-                    onFocus={() => { cancelClose('groups'); setGroupsOpen(true); }}
-                    onBlur={() => scheduleClose('groups', setGroupsOpen)}
-                  >
-                    <button
-                      onClick={(e) => handleNavButtonClick(e, 'groups', groupsOpen, setGroupsOpen)}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all border ${
-                        currentView.startsWith('groups')
-                          ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 ring-1 ring-indigo-500 border-transparent'
-                          : 'text-slate-400 border-transparent hover:bg-slate-800 hover:text-white hover:border-slate-700'
-                      }`}
-                    >
-                      <span className="text-base">📂</span>
-                      <span className="text-[10px] font-black uppercase tracking-widest">Groups</span>
-                      <svg className="w-3 h-3 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M6 9l6 6 6-6"/></svg>
-                    </button>
-                  </div>
-                )}
-
-                {hasPermission('services') && (
-                  <div
-                    ref={servicesRef}
-                    className="relative shrink-0"
-                    onMouseEnter={() => { cancelClose('services'); setServicesOpen(true); }}
-                    onMouseLeave={() => scheduleClose('services', setServicesOpen)}
-                    onFocus={() => { cancelClose('services'); setServicesOpen(true); }}
-                    onBlur={() => scheduleClose('services', setServicesOpen)}
-                  >
-                    <button
-                      onClick={(e) => handleNavButtonClick(e, 'services', servicesOpen, setServicesOpen)}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all border ${
-                        currentView.startsWith('services')
-                          ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 ring-1 ring-indigo-500 border-transparent'
-                          : 'text-slate-400 border-transparent hover:bg-slate-800 hover:text-white hover:border-slate-700'
-                      }`}
-                    >
-                      <span className="text-base">🎹</span>
-                      <span className="text-[10px] font-black uppercase tracking-widest">Services</span>
-                      <svg className="w-3 h-3 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M6 9l6 6 6-6"/></svg>
-                    </button>
-                  </div>
-                )}
-
-                {hasPermission('giving') && (
-                  <div
-                    ref={givingRef}
-                    className="relative shrink-0"
-                    onMouseEnter={() => { cancelClose('giving'); setGivingOpen(true); }}
-                    onMouseLeave={() => scheduleClose('giving', setGivingOpen)}
-                    onFocus={() => { cancelClose('giving'); setGivingOpen(true); }}
-                    onBlur={() => scheduleClose('giving', setGivingOpen)}
-                  >
-                    <button
-                      onClick={(e) => handleNavButtonClick(e, 'giving', givingOpen, setGivingOpen)}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all border ${
-                        currentView.startsWith('giving')
-                          ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 ring-1 ring-indigo-500 border-transparent'
-                          : 'text-slate-400 border-transparent hover:bg-slate-800 hover:text-white hover:border-slate-700'
-                      }`}
-                    >
-                      <span className="text-base">💰</span>
-                      <span className="text-[10px] font-black uppercase tracking-widest">Giving</span>
-                      <svg className="w-3 h-3 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M6 9l6 6 6-6"/></svg>
-                    </button>
-                  </div>
-                )}
-
-                {hasPermission('pastoral') && (
-                  <div
-                    ref={careRef}
-                    className="relative shrink-0"
-                    onMouseEnter={() => { cancelClose('care'); setCareOpen(true); }}
-                    onMouseLeave={() => scheduleClose('care', setCareOpen)}
-                    onFocus={() => { cancelClose('care'); setCareOpen(true); }}
-                    onBlur={() => scheduleClose('care', setCareOpen)}
-                  >
-                    <button
-                      onClick={(e) => handleNavButtonClick(e, 'pastoral', careOpen, setCareOpen)}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all border ${
-                        currentView.startsWith('pastoral')
-                          ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 ring-1 ring-indigo-500 border-transparent'
-                          : 'text-slate-400 border-transparent hover:bg-slate-800 hover:text-white hover:border-slate-700'
-                      }`}
-                    >
-                      <span className="text-base">🕊️</span>
-                      <span className="text-[10px] font-black uppercase tracking-widest">Care</span>
-                      <svg className="w-3 h-3 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M6 9l6 6 6-6"/></svg>
-                    </button>
-                  </div>
-                )}
-
-                {hasPermission('metrics') && (
-                  <div
-                    ref={metricsRef}
-                    className="relative shrink-0"
-                    onMouseEnter={() => { cancelClose('metrics'); setMetricsOpen(true); }}
-                    onMouseLeave={() => scheduleClose('metrics', setMetricsOpen)}
-                    onFocus={() => { cancelClose('metrics'); setMetricsOpen(true); }}
-                    onBlur={() => scheduleClose('metrics', setMetricsOpen)}
-                  >
-                    <button
-                      onClick={(e) => handleNavButtonClick(e, 'metrics', metricsOpen, setMetricsOpen)}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all border ${
-                        currentView.startsWith('metrics')
-                          ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 ring-1 ring-indigo-500 border-transparent'
-                          : 'text-slate-400 border-transparent hover:bg-slate-800 hover:text-white hover:border-slate-700'
-                      }`}
-                    >
-                      <span className="text-base">📈</span>
-                      <span className="text-[10px] font-black uppercase tracking-widest">Metrics</span>
-                      <svg className="w-3 h-3 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M6 9l6 6 6-6"/></svg>
-                    </button>
-                  </div>
-                )}
-
-                {/* Metrics dropdown — rendered via fixed position to escape overflow-x-auto clipping */}
-                {metricsOpen && hasPermission('metrics') && (
-                  <div
-                    className="nav-dropdown-panel animate-in fade-in slide-in-from-top-2 duration-150 ease-out" ref={el => el && Object.assign(el.style, getDropdownStyle(metricsRef))}
-                    onMouseEnter={() => { cancelClose('metrics'); setMetricsOpen(true); }}
-                    onMouseLeave={() => scheduleClose('metrics', setMetricsOpen)}
-                    onFocus={() => { cancelClose('metrics'); setMetricsOpen(true); }}
-                    onBlur={() => scheduleClose('metrics', setMetricsOpen)}
-                  >
-                    <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl shadow-black/40 p-2 flex flex-col gap-1 min-w-[180px]">
-                      {[
-                        { view: 'metrics',          icon: '📊', label: 'Dashboard'  },
-                        { view: 'metrics-input',    icon: '✏️',  label: 'Input Data' },
-                        { view: 'metrics-settings', icon: '⚙️',  label: 'Configure'  },
-                      ].map(item => (
-                        <button
-                          key={item.view}
-                          onClick={() => { onNavigate(item.view); setMetricsOpen(false); }}
-                          className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest w-full text-left transition-all ${
-                            currentView === item.view
-                              ? 'bg-indigo-600 text-white'
-                              : 'text-slate-300 hover:bg-slate-700 hover:text-white'
-                          }`}
-                        >
-                          <span className="text-sm">{item.icon}</span>
-                          {item.label}
-                        </button>
-                      ))}
+                      <button
+                        onClick={(e) => handleTriggerClick(e, entry.key)}
+                        aria-haspopup="menu"
+                        aria-expanded={openMenu === entry.key}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all border ${
+                          currentView.startsWith(entry.prefix)
+                            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 ring-1 ring-indigo-500 border-transparent'
+                            : 'text-slate-400 border-transparent hover:bg-slate-800 hover:text-white hover:border-slate-700'
+                        }`}
+                      >
+                        <entry.icon size={17} strokeWidth={2.5} className="shrink-0" />
+                        <span className="text-[10px] font-black uppercase tracking-widest">{entry.label}</span>
+                        <ChevronDown className="w-3 h-3 opacity-60" strokeWidth={3} />
+                      </button>
                     </div>
-                  </div>
+                  )
                 )}
-
-                {/* Care dropdown — fixed position to escape overflow-x-auto clipping */}
-                {careOpen && hasPermission('pastoral') && (
-                  <div
-                    className="nav-dropdown-panel animate-in fade-in slide-in-from-top-2 duration-150 ease-out" ref={el => el && Object.assign(el.style, getDropdownStyle(careRef))}
-                    onMouseEnter={() => { cancelClose('care'); setCareOpen(true); }}
-                    onMouseLeave={() => scheduleClose('care', setCareOpen)}
-                    onFocus={() => { cancelClose('care'); setCareOpen(true); }}
-                    onBlur={() => scheduleClose('care', setCareOpen)}
-                  >
-                    <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl shadow-black/40 p-2 flex flex-col gap-1 min-w-[180px]">
-                      {[
-                        { view: 'pastoral',            icon: '⛪',  label: 'Church'     },
-                        { view: 'pastoral-membership', icon: '👥', label: 'Membership'  },
-                        { view: 'pastoral-community',  icon: '🏙️', label: 'Community'  },
-                        { view: 'pastoral-care',       icon: '🕊️', label: 'Care'       },
-                        { view: 'pastoral-calendar',   icon: '📅', label: 'Calendar'   },
-                        // Calling (Contact) is hidden for Starter plan subscribers
-                        ...(church.subscription?.status === 'active' && church.subscription?.planId === 'starter'
-                          ? []
-                          : [{ view: 'pastoral-contact', icon: '📞', label: 'Contact' }]),
-                        { view: 'pastoral-reports',    icon: '📋', label: 'Reports'    },
-                      ].map(item => (
-                        <button
-                          key={item.view}
-                          onClick={() => { onNavigate(item.view); setCareOpen(false); }}
-                          className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest w-full text-left transition-all ${
-                            currentView === item.view
-                              ? 'bg-indigo-600 text-white'
-                              : 'text-slate-300 hover:bg-slate-700 hover:text-white'
-                          }`}
-                        >
-                          <span className="text-sm">{item.icon}</span>
-                          {item.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-
-                {/* People dropdown */}
-                {peopleOpen && hasPermission('people') && (
-                  <div
-                    className="nav-dropdown-panel animate-in fade-in slide-in-from-top-2 duration-150 ease-out" ref={el => el && Object.assign(el.style, getDropdownStyle(peopleRef))}
-                    onMouseEnter={() => { cancelClose('people'); setPeopleOpen(true); }}
-                    onMouseLeave={() => scheduleClose('people', setPeopleOpen)}
-                    onFocus={() => { cancelClose('people'); setPeopleOpen(true); }}
-                    onBlur={() => scheduleClose('people', setPeopleOpen)}
-                  >
-                    <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl shadow-black/40 p-2 flex flex-col gap-1 min-w-[180px]">
-                      {[
-                        { view: 'people',            icon: '📊', label: 'Overview'   },
-                        { view: 'people-households', icon: '🏠', label: 'Households' },
-                        { view: 'people-risk',       icon: '⚠️', label: 'Risk Profiles' },
-                        { view: 'people-reports',    icon: '📄', label: 'Reports'    },
-                      ].map(item => (
-                        <button
-                          key={item.view}
-                          onClick={() => { onNavigate(item.view); setPeopleOpen(false); }}
-                          className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest w-full text-left transition-all ${
-                            currentView === item.view
-                              ? 'bg-indigo-600 text-white'
-                              : 'text-slate-300 hover:bg-slate-700 hover:text-white'
-                          }`}
-                        >
-                          <span className="text-sm">{item.icon}</span>
-                          {item.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Groups dropdown */}
-                {groupsOpen && hasPermission('groups') && (
-                  <div
-                    className="nav-dropdown-panel animate-in fade-in slide-in-from-top-2 duration-150 ease-out" ref={el => el && Object.assign(el.style, getDropdownStyle(groupsRef))}
-                    onMouseEnter={() => { cancelClose('groups'); setGroupsOpen(true); }}
-                    onMouseLeave={() => scheduleClose('groups', setGroupsOpen)}
-                    onFocus={() => { cancelClose('groups'); setGroupsOpen(true); }}
-                    onBlur={() => scheduleClose('groups', setGroupsOpen)}
-                  >
-                    <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl shadow-black/40 p-2 flex flex-col gap-1 min-w-[180px]">
-                      {[
-                        { view: 'groups',         icon: '📊', label: 'Overview' },
-                        { view: 'groups-reports', icon: '📄', label: 'Reports'  },
-                      ].map(item => (
-                        <button
-                          key={item.view}
-                          onClick={() => { onNavigate(item.view); setGroupsOpen(false); }}
-                          className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest w-full text-left transition-all ${
-                            currentView === item.view
-                              ? 'bg-indigo-600 text-white'
-                              : 'text-slate-300 hover:bg-slate-700 hover:text-white'
-                          }`}
-                        >
-                          <span className="text-sm">{item.icon}</span>
-                          {item.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Services dropdown */}
-                {servicesOpen && hasPermission('services') && (
-                  <div
-                    className="nav-dropdown-panel animate-in fade-in slide-in-from-top-2 duration-150 ease-out" ref={el => el && Object.assign(el.style, getDropdownStyle(servicesRef))}
-                    onMouseEnter={() => { cancelClose('services'); setServicesOpen(true); }}
-                    onMouseLeave={() => scheduleClose('services', setServicesOpen)}
-                    onFocus={() => { cancelClose('services'); setServicesOpen(true); }}
-                    onBlur={() => scheduleClose('services', setServicesOpen)}
-                  >
-                    <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl shadow-black/40 p-2 flex flex-col gap-1 min-w-[180px]">
-                      {[
-                        { view: 'services',            icon: '🎨', label: 'Overview'    },
-                        { view: 'services-attendance', icon: '📌', label: 'Attendance' },
-                        { view: 'services-teams',      icon: '👤', label: 'Teams'      },
-                        { view: 'services-plans',      icon: '📅', label: 'Plans'      },
-                        ...(church?.smsSettings?.smsEnabled ? [{ view: 'services-reminders', icon: '📱', label: 'Reminders' }] : []),
-                      ].map(item => (
-                        <button
-                          key={item.view}
-                          onClick={() => { onNavigate(item.view); setServicesOpen(false); }}
-                          className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest w-full text-left transition-all ${
-                            currentView === item.view
-                              ? 'bg-indigo-600 text-white'
-                              : 'text-slate-300 hover:bg-slate-700 hover:text-white'
-                          }`}
-                        >
-                          <span className="text-sm">{item.icon}</span>
-                          {item.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Giving dropdown */}
-                {givingOpen && hasPermission('giving') && (
-                  <div
-                    className="nav-dropdown-panel animate-in fade-in slide-in-from-top-2 duration-150 ease-out" ref={el => el && Object.assign(el.style, getDropdownStyle(givingRef))}
-                    onMouseEnter={() => { cancelClose('giving'); setGivingOpen(true); }}
-                    onMouseLeave={() => scheduleClose('giving', setGivingOpen)}
-                    onFocus={() => { cancelClose('giving'); setGivingOpen(true); }}
-                    onBlur={() => scheduleClose('giving', setGivingOpen)}
-                  >
-                    <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl shadow-black/40 p-2 flex flex-col gap-1 min-w-[180px]">
-                      {[
-                        { view: 'giving',            icon: '📊', label: 'Overview'   },
-                        { view: 'giving-donor',      icon: '👥', label: 'Donors'     },
-                        { view: 'giving-budgets',    icon: '💼', label: 'Budgets'    },
-                        { view: 'giving-reports',    icon: '📄', label: 'Reports'    },
-                      ].map(item => (
-                        <button
-                          key={item.view}
-                          onClick={() => { onNavigate(item.view); setGivingOpen(false); }}
-                          className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest w-full text-left transition-all ${
-                            currentView === item.view
-                              ? 'bg-indigo-600 text-white'
-                              : 'text-slate-300 hover:bg-slate-700 hover:text-white'
-                          }`}
-                        >
-                          <span className="text-sm">{item.icon}</span>
-                          {item.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {hasPermission('tools') && (
-                  <div
-                    ref={toolsRef}
-                    className="relative shrink-0"
-                    onMouseEnter={() => { cancelClose('tools'); setToolsOpen(true); }}
-                    onMouseLeave={() => scheduleClose('tools', setToolsOpen)}
-                    onFocus={() => { cancelClose('tools'); setToolsOpen(true); }}
-                    onBlur={() => scheduleClose('tools', setToolsOpen)}
-                  >
-                    <button
-                      onClick={(e) => handleNavButtonClick(e, 'tools', toolsOpen, setToolsOpen)}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all border ${
-                        currentView.startsWith('tools')
-                          ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 ring-1 ring-indigo-500 border-transparent'
-                          : 'text-slate-400 border-transparent hover:bg-slate-800 hover:text-white hover:border-slate-700'
-                      }`}
-                    >
-                      <span className="text-base">🧰</span>
-                      <span className="text-[10px] font-black uppercase tracking-widest">Tools</span>
-                      <svg className="w-3 h-3 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M6 9l6 6 6-6"/></svg>
-                    </button>
-                  </div>
-                )}
-
-                {/* Tools dropdown — fixed position to escape overflow clipping */}
-                {toolsOpen && hasPermission('tools') && (
-                  <div
-                    className="nav-dropdown-panel animate-in fade-in slide-in-from-top-2 duration-150 ease-out" ref={el => el && Object.assign(el.style, getDropdownStyle(toolsRef))}
-                    onMouseEnter={() => { cancelClose('tools'); setToolsOpen(true); }}
-                    onMouseLeave={() => scheduleClose('tools', setToolsOpen)}
-                    onFocus={() => { cancelClose('tools'); setToolsOpen(true); }}
-                    onBlur={() => scheduleClose('tools', setToolsOpen)}
-                  >
-                    <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl shadow-black/40 p-2 flex flex-col gap-1 min-w-[180px]">
-                      {[
-                        { view: 'tools-emails',        icon: '📧', label: 'Emails'        },
-                        { view: 'tools-sms-inbox',     icon: '💬', label: 'SMS'           },
-                        { view: 'tools-workflows',     icon: '⚡', label: 'Workflows'    },
-                        { view: 'tools-polls',         icon: '📊', label: 'Polls'         },
-                        { view: 'tools-bulletin',      icon: '📰', label: 'Bulletins'     },
-                        { view: 'tools-notes',         icon: '📝', label: 'Notes'         },
-                        { view: 'tools-website',       icon: '🌐', label: 'Website'       },
-                        { view: 'tools-qrcodes',       icon: '🔲', label: 'QR Codes'      },
-                        { view: 'tools-files',         icon: '📁', label: 'Files'         },
-                        { view: 'tools-forms',         icon: '📄', label: 'Forms'         },
-                        { view: 'tools-church-helper', icon: '✨', label: 'Church Helper'  },
-                        { view: 'tools-unsubscribers', icon: '🛋️',  label: 'Unsubscribers' },
-                      ].filter(item => hasPermission(item.view)).map(item => (
-                        <button
-                          key={item.view}
-                          onClick={() => { onNavigate(item.view); setToolsOpen(false); }}
-                          className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest w-full text-left transition-all ${
-                            currentView === item.view
-                              || (item.view === 'tools-sms-inbox' && currentView.startsWith('tools-sms'))
-                              || (item.view === 'tools-workflows' && currentView === 'tools-workflows')
-                              ? 'bg-indigo-600 text-white'
-                              : 'text-slate-300 hover:bg-slate-700 hover:text-white'
-                          }`}
-                        >
-                          <span className="text-sm">{item.icon}</span>
-                          {item.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-
-                {isSystemAdmin && (
-                  <NavItem 
-                    icon="🛠️" 
-                    label="App Config" 
-                    active={currentView === 'app-settings'} 
-                    onClick={() => onNavigate('app-settings')} 
-                  />
-                )}
-             </nav>
+              </nav>
             </div>
+
+            {/* Active dropdown panel — one shared, fixed-position node that escapes
+                the nav's overflow-x-auto clipping. Positioned under its trigger. */}
+            {(() => {
+              const entry = navEntries.find(e => e.kind === 'menu' && e.key === openMenu) as NavMenuConfig | undefined;
+              const trigger = openMenu ? triggerRefs.current[openMenu] : null;
+              if (!entry || !trigger) return null;
+              const rect = trigger.getBoundingClientRect();
+              return (
+                <div
+                  role="menu"
+                  className="nav-dropdown-panel animate-in fade-in slide-in-from-top-2 duration-150 ease-out"
+                  ref={el => { if (el) { el.style.top = `${rect.bottom + 8}px`; el.style.left = `${rect.left}px`; } }}
+                  onMouseEnter={cancelClose}
+                  onMouseLeave={scheduleClose}
+                >
+                  <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl shadow-black/40 p-2 flex flex-col gap-1 min-w-[180px]">
+                    {entry.items.map(item => {
+                      const active = item.activeMatch ? item.activeMatch(currentView) : currentView === item.view;
+                      return (
+                        <button
+                          key={item.view}
+                          role="menuitem"
+                          onClick={() => navigateFromMenu(item.view)}
+                          className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest w-full text-left transition-all ${
+                            active
+                              ? 'bg-indigo-600 text-white'
+                              : 'text-slate-300 hover:bg-slate-700 hover:text-white'
+                          }`}
+                        >
+                          <item.icon size={15} strokeWidth={2.5} className="shrink-0" />
+                          {item.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Right Side: User Controls */}
             <div className="flex items-center gap-3 shrink-0">
-                
+
                 {/* Context Switcher (Admin Only) */}
                 {isSystemAdmin && allChurches && allChurches.length > 0 && (
                     <div className="hidden xl:block mr-2">
-                        <select 
-                            value={church.id} 
+                        <select
+                            value={church.id}
                             onChange={(e) => onSwitchChurch?.(e.target.value)}
                             className="bg-slate-800 text-white border border-slate-700 text-[10px] font-black uppercase tracking-widest py-1.5 rounded-lg px-3 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer max-w-[140px] truncate"
                             title="Switch Tenant Context"
@@ -634,7 +402,7 @@ const Layout: React.FC<LayoutProps> = ({
                 {/* Campus Selector (Multi-Campus Enabled) */}
                 {church.multiCampusEnabled && campuses && campuses.length > 0 && (() => {
                     const isRestricted = user.allowedCampuses && user.allowedCampuses.length > 0 && !user.roles.includes('Church Admin');
-                    const allowedCampusesList = isRestricted 
+                    const allowedCampusesList = isRestricted
                         ? campuses.filter(c => user.allowedCampuses?.includes(c.pcoId))
                         : campuses;
 
@@ -670,24 +438,23 @@ const Layout: React.FC<LayoutProps> = ({
                     <button
                         onClick={() => onNavigate('settings')}
                         title="Settings"
+                        aria-label="Settings"
                         className={`w-8 h-8 flex items-center justify-center rounded-full border transition-all ${
                             currentView === 'settings'
                                 ? 'bg-indigo-600 border-indigo-500 text-white'
                                 : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700'
                         }`}
                     >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <circle cx="12" cy="12" r="3"/>
-                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-                        </svg>
+                        <Settings size={14} strokeWidth={2.5} />
                     </button>
                 )}
 
                 {/* Profile Button */}
-                <button 
+                <button
                     onClick={() => setIsEditingProfile(true)}
                     className="flex items-center gap-2 pl-1 pr-1 py-1 rounded-full bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-colors group"
                     title="Edit Profile"
+                    aria-label="Edit profile"
                 >
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black shadow-lg ${isSystemAdmin ? 'bg-amber-500 text-white' : 'bg-indigo-600 text-white'}`}>
                         {user.name?.charAt(0) || '?'}
@@ -698,12 +465,13 @@ const Layout: React.FC<LayoutProps> = ({
                 </button>
 
                 {/* Logout Button */}
-                <button 
+                <button
                     onClick={onLogout}
                     className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-800 hover:bg-rose-900/50 text-slate-400 hover:text-rose-400 border border-slate-700 hover:border-rose-900 transition-all"
                     title="Sign Out"
+                    aria-label="Sign out"
                 >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                    <LogOut size={14} strokeWidth={2.5} />
                 </button>
             </div>
         </div>
@@ -713,7 +481,7 @@ const Layout: React.FC<LayoutProps> = ({
       <main className={`flex-1 print:overflow-visible bg-slate-50 dark:bg-slate-950 transition-colors duration-300 relative ${
         noPadding ? 'overflow-hidden flex flex-col min-h-0' : 'overflow-y-auto scroll-smooth'
       }`}>
-        
+
         {/* Page Context Header (Sticky) */}
         <div className="bg-white/80 dark:bg-slate-900/80 border-b border-slate-100 dark:border-slate-800 px-6 lg:px-10 py-4 sticky top-0 z-40 flex justify-between items-center backdrop-blur-md print:hidden transition-colors duration-300">
           <div className="flex items-center gap-4">
@@ -730,8 +498,8 @@ const Layout: React.FC<LayoutProps> = ({
             <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all ${
                 isSyncing
                 ? 'bg-blue-50 text-blue-600 border-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-900/30'
-                : church.pcoConnected 
-                    ? 'bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-900/30' 
+                : church.pcoConnected
+                    ? 'bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-900/30'
                     : 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'
             }`}>
               {isSyncing ? (
@@ -801,11 +569,11 @@ const Layout: React.FC<LayoutProps> = ({
 
       {/* User Profile Modal */}
       {isEditingProfile && (
-          <UserProfileModal 
-            user={user} 
+          <UserProfileModal
+            user={user}
             church={church}
-            onClose={() => setIsEditingProfile(false)} 
-            onUpdate={() => onRefreshUser && onRefreshUser()} 
+            onClose={() => setIsEditingProfile(false)}
+            onUpdate={() => onRefreshUser && onRefreshUser()}
           />
       )}
     </div>
@@ -813,16 +581,16 @@ const Layout: React.FC<LayoutProps> = ({
 };
 
 interface NavItemProps {
-  icon: string;
+  icon: LucideIcon;
   label: string;
   active?: boolean;
   onClick: () => void;
-  highlight?: 'indigo' | 'amber' | 'emerald';
+  highlight?: 'amber' | 'emerald';
 }
 
-const NavItem: React.FC<NavItemProps> = ({ icon, label, active, onClick, highlight = 'indigo' }) => {
+const NavItem: React.FC<NavItemProps> = ({ icon: Icon, label, active, onClick, highlight }) => {
   let activeClass = 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 ring-1 ring-indigo-500 border-transparent';
-  
+
   if (highlight === 'amber') {
       activeClass = 'bg-amber-500 text-white shadow-lg shadow-amber-500/30 ring-1 ring-amber-400 border-transparent';
   } else if (highlight === 'emerald') {
@@ -830,15 +598,15 @@ const NavItem: React.FC<NavItemProps> = ({ icon, label, active, onClick, highlig
   }
 
   return (
-    <button 
+    <button
       onClick={onClick}
       className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all shrink-0 border ${
-        active 
-        ? activeClass 
+        active
+        ? activeClass
         : 'text-slate-400 border-transparent hover:bg-slate-800 hover:text-white hover:border-slate-700'
       }`}
     >
-      <span className="text-base">{icon}</span>
+      <Icon size={17} strokeWidth={2.5} className="shrink-0" />
       <span className="text-[10px] font-black uppercase tracking-widest">{label}</span>
     </button>
   );
