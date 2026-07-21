@@ -268,6 +268,34 @@ export const handlePostmarkWebhook = async (req: any, res: any): Promise<void> =
             return;
         }
 
+        // ── Inbound Email handling (Church Helper routing) ───────────────────
+        if ((payload as any).RecordType === 'InboundEmail' || ((payload as any).From && (payload as any).TextBody)) {
+            const inbound = payload as any;
+            const fromEmail = (inbound.From || inbound.FromFull?.Email || '').toLowerCase().trim();
+            const textBody = (inbound.TextBody || inbound.StrippedTextReply || '').trim();
+
+            if (fromEmail && textBody) {
+                try {
+                    const { findActiveInfoSessionByEmail, handleInfoUpdateReply } = await import('./infoUpdateAgent.js');
+                    // Find active info session across any church matching this sender's email
+                    const snap = await db.collection('people_info_sessions')
+                        .where('emailAddress', '==', fromEmail)
+                        .where('status', 'in', ['pending', 'in_progress'])
+                        .limit(1)
+                        .get();
+
+                    if (!snap.empty) {
+                        const session = { id: snap.docs[0].id, ...snap.docs[0].data() };
+                        log.info(`[PostmarkWebhook] Inbound email routed to Church Helper agent — session ${session.id}`, 'system', { churchId: session.churchId, fromEmail }, session.churchId);
+                        await handleInfoUpdateReply(db, log, session, textBody, 'email');
+                        return;
+                    }
+                } catch (e: any) {
+                    log.warn(`[PostmarkWebhook] Church Helper inbound email routing failed: ${e.message}`, 'system', { fromEmail }, 'system');
+                }
+            }
+        }
+
         // All other record types (Open, Click, Delivery) — ignore silently
     } catch (e: any) {
         log.error(

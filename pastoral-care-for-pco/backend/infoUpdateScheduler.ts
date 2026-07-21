@@ -301,11 +301,17 @@ async function sendOutreach(
 
     if (!sent && channels?.email && emailAddr) {
         try {
-            const apiBase = process.env.API_BASE_URL || 'http://localhost:3000';
-            await fetch(`${apiBase}/api/info-update/send-email-reply`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ churchId, to: emailAddr, personName: session.personName, body: message, campaignName: campaign.name }),
+            const { sendEmail: _sendEmail } = await import('./sendEmail.js');
+            await (_sendEmail as any)({
+                req: {
+                    body: {
+                        churchId,
+                        to: [emailAddr],
+                        subject: `${campaign.name || 'Church Helper'} — Info Update`,
+                        htmlBody: `<p>${message.replace(/\n/g, '<br>')}</p>`,
+                    }
+                },
+                res: { json: () => {}, status: () => ({ json: () => {} }) }
             });
             sent = true;
             log.info(`[InfoUpdateScheduler] Sent email outreach to ${session.personName}`, 'system', { churchId, sessionId }, churchId);
