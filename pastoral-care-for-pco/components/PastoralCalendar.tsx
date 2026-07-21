@@ -168,7 +168,7 @@ export const PastoralCalendar: React.FC<PastoralCalendarProps> = ({ people, head
                     <button onClick={prev} title="Previous" className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
                     </button>
-                    <button onClick={() => setCurrentDate(new Date())} className="px-4 py-2 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 text-xs font-black uppercase tracking-widest rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors">
+                    <button onClick={() => setCurrentDate(new Date())} className="px-4 py-2 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 text-xs font-bold uppercase tracking-wide rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors">
                         Today
                     </button>
                     <button onClick={next} title="Next" className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
@@ -183,7 +183,7 @@ export const PastoralCalendar: React.FC<PastoralCalendarProps> = ({ people, head
                     {/* Weekday Headers for Month View */}
                     {viewMode === 'month' && ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
                         <div key={day} className="p-4 text-center border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{day}</span>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{day}</span>
                         </div>
                     ))}
 
@@ -197,7 +197,7 @@ export const PastoralCalendar: React.FC<PastoralCalendarProps> = ({ people, head
                             return (
                                 <div key={day.toString()} className="flex border-b border-slate-100 dark:border-slate-800 p-6 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
                                     <div className="w-32 flex-shrink-0">
-                                        <p className={`text-sm font-bold uppercase tracking-widest mb-1 ${isToday ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'}`}>
+                                        <p className={`text-sm font-bold uppercase tracking-wide mb-1 ${isToday ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'}`}>
                                             {format(day, 'EEEE')}
                                         </p>
                                         <div className={`text-3xl font-black ${isToday ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-900 dark:text-white'}`}>
@@ -219,13 +219,13 @@ export const PastoralCalendar: React.FC<PastoralCalendarProps> = ({ people, head
                                                                      `${event.years} years ago`}
                                                                 </span>
                                                                 {event.type === 'birthday' && (event.years ?? 99) < 18 && (
-                                                                    <span className="text-[9px] font-black bg-rose-500 text-white px-1.5 py-0.5 rounded-full uppercase tracking-wider">
+                                                                    <span className="text-[11px] font-bold bg-rose-500 text-white px-1.5 py-0.5 rounded-full uppercase tracking-wider">
                                                                         Age {event.years}
                                                                     </span>
                                                                 )}
                                                             </p>
                                                             {event.householdName && (
-                                                                <p className="text-[10px] font-bold opacity-60 uppercase tracking-widest mt-0.5">
+                                                                <p className="text-[10px] font-bold opacity-60 uppercase tracking-wide mt-0.5">
                                                                     {event.householdName} Household
                                                                 </p>
                                                             )}

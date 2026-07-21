@@ -163,7 +163,7 @@ export const PublicNoteView: React.FC<{ noteId: string }> = ({ noteId }) => {
           {/* Church + date meta */}
           <div className="flex items-center justify-between mb-7 flex-wrap gap-2">
             {churchName && (
-              <div className="pnv-church-pill inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold text-indigo-700 uppercase tracking-widest">
+              <div className="pnv-church-pill inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold text-indigo-700 uppercase tracking-wide">
                 <span>⛪</span> {churchName}
               </div>
             )}

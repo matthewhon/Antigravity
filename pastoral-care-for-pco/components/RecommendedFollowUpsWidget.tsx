@@ -141,11 +141,11 @@ const FollowUpRow: React.FC<FollowUpRowProps> = ({ item, isDone, onMarkFollowedU
                         {item.personName}
                     </p>
                     {isDone ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wide bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 whitespace-nowrap">
                             <Check size={8} strokeWidth={3} /> Followed Up
                         </span>
                     ) : (
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wide whitespace-nowrap ${meta.badgeBg} ${meta.badgeText}`}>
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wide whitespace-nowrap ${meta.badgeBg} ${meta.badgeText}`}>
                             {meta.emoji} {meta.label}
                         </span>
                     )}
@@ -157,19 +157,19 @@ const FollowUpRow: React.FC<FollowUpRowProps> = ({ item, isDone, onMarkFollowedU
                 {(item.memberStatus || item.email || item.phone) && (
                     <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                         {item.memberStatus && (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 whitespace-nowrap">
                                 <User size={8} strokeWidth={2.5} />
                                 {item.memberStatus}
                             </span>
                         )}
                         {item.email && (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 truncate max-w-[140px]">
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 truncate max-w-[140px]">
                                 <Mail size={8} strokeWidth={2} className="flex-shrink-0" />
                                 <span className="truncate">{item.email}</span>
                             </span>
                         )}
                         {item.phone && (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 whitespace-nowrap">
                                 <Phone size={8} strokeWidth={2} />
                                 {item.phone}
                             </span>
@@ -517,7 +517,7 @@ export const RecommendedFollowUpsWidget: React.FC<RecommendedFollowUpsWidgetProp
                             <button
                                 key={f.key}
                                 onClick={() => setActiveFilter(f.key)}
-                                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
+                                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wide transition-all ${
                                     isActive
                                         ? 'bg-indigo-600 text-white shadow-sm'
                                         : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
@@ -525,7 +525,7 @@ export const RecommendedFollowUpsWidget: React.FC<RecommendedFollowUpsWidgetProp
                             >
                                 {f.label}
                                 {count != null && (
-                                    <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-black ${
+                                    <span className={`px-1.5 py-0.5 rounded-full text-[11px] font-black ${
                                         isActive ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
                                     }`}>
                                         {count}
@@ -564,7 +564,7 @@ export const RecommendedFollowUpsWidget: React.FC<RecommendedFollowUpsWidgetProp
 
                 {/* Footer stats */}
                 {(filteredActive.length > 0 || followedUpItems.length > 0) && (
-                    <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest text-center">
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wide text-center">
                         {filteredActive.length > 0
                             ? `${filteredActive.length} need${filteredActive.length === 1 ? 's' : ''} attention`
                             : ''}
@@ -578,7 +578,7 @@ export const RecommendedFollowUpsWidget: React.FC<RecommendedFollowUpsWidgetProp
                     <details className="group/done">
                         <summary className="cursor-pointer list-none flex items-center gap-2 py-1">
                             <div className="flex-1 h-px bg-slate-100 dark:bg-slate-800" />
-                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 select-none flex items-center gap-1.5 whitespace-nowrap">
+                            <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 select-none flex items-center gap-1.5 whitespace-nowrap">
                                 <Check size={10} strokeWidth={3} className="text-emerald-500" />
                                 {followedUpItems.length} Followed Up
                                 <span className="text-slate-300 dark:text-slate-600 group-open/done:rotate-180 transition-transform inline-block">▾</span>

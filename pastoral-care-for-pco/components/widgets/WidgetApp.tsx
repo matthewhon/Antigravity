@@ -283,7 +283,7 @@ function RegistrationsWidget({ churchId, layout, color, gridCols, dateFilter, ta
               <h3 className="font-bold text-lg text-slate-900 dark:text-slate-100 mb-1 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">{e.name || 'Unnamed Event'}</h3>
               <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-3 mb-4">{e.description?.replace(/<[^>]+>/g, '').replace(/&amp;nbsp;|&nbsp;/g, ' ').trim() || 'No description provided.'}</p>
               <div className="mt-auto pt-4 flex items-center justify-between border-t border-slate-100 dark:border-slate-800">
-                <span className="text-xs text-slate-500 font-bold uppercase tracking-widest">{e.startsAt ? new Date(e.startsAt).toLocaleDateString() : ''}</span>
+                <span className="text-xs text-slate-500 font-bold uppercase tracking-wide">{e.startsAt ? new Date(e.startsAt).toLocaleDateString() : ''}</span>
                 <span className={`text-sm font-bold text-${color}-600 dark:text-${color}-400`}>Details →</span>
               </div>
             </div>
@@ -306,7 +306,7 @@ function RegistrationsWidget({ churchId, layout, color, gridCols, dateFilter, ta
             <h3 className="font-bold text-lg text-slate-900 dark:text-slate-100 mb-1 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">{e.name || 'Unnamed Event'}</h3>
             <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2">{e.description?.replace(/<[^>]+>/g, '').replace(/&amp;nbsp;|&nbsp;/g, ' ').trim() || 'No description provided.'}</p>
             <div className="mt-auto pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-              <span className="text-xs text-slate-500 font-bold uppercase tracking-widest">{e.startsAt ? new Date(e.startsAt).toLocaleDateString() : ''}</span>
+              <span className="text-xs text-slate-500 font-bold uppercase tracking-wide">{e.startsAt ? new Date(e.startsAt).toLocaleDateString() : ''}</span>
               <span className={`px-4 py-1.5 rounded-lg text-xs font-bold text-white bg-${color}-500 group-hover:bg-${color}-600 transition`}>
                 Details
               </span>
@@ -369,7 +369,7 @@ function EventsWidget({ churchId, layout, color, gridCols, imageRatio, maxItems 
         <div className="grid grid-cols-7 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
                 <div key={day} className="p-2 text-center">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{day}</span>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{day}</span>
                 </div>
             ))}
         </div>

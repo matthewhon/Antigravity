@@ -164,17 +164,17 @@ export const SubscriptionSettingsView: React.FC<SubscriptionSettingsViewProps> =
                 <div>
                     <h3 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Subscription & Billing</h3>
                     <div className="flex items-center gap-2 mt-2">
-                        <span className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase tracking-widest">Current Status:</span>
+                        <span className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wide">Current Status:</span>
                         {currentPlanId ? (
-                            <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${isPastDue ? 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400' : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400'}`}>
+                            <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wide ${isPastDue ? 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400' : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400'}`}>
                                 {isPastDue ? 'Past Due' : `${currentPlan?.name || 'Premium'} Plan`}
                             </span>
                         ) : isTrialActive ? (
-                            <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400">
+                            <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400">
                                 Free Trial ({daysLeftInTrial} days left)
                             </span>
                         ) : (
-                            <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                            <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
                                 Free Tier
                             </span>
                         )}
@@ -190,7 +190,7 @@ export const SubscriptionSettingsView: React.FC<SubscriptionSettingsViewProps> =
                     <div className="flex gap-3 flex-wrap justify-end">
                         <button
                             onClick={() => setShowUpgrade(v => !v)}
-                            className={`px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all border ${
+                            className={`px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-wide transition-all border ${
                                 showUpgrade
                                 ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700'
                                 : 'bg-white dark:bg-slate-900 border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20'
@@ -201,14 +201,14 @@ export const SubscriptionSettingsView: React.FC<SubscriptionSettingsViewProps> =
                         <button
                             onClick={handleManage}
                             disabled={isManaging}
-                            className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
+                            className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-6 py-3 rounded-xl font-bold text-[10px] uppercase tracking-wide hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
                         >
                             {isManaging ? 'Loading...' : 'Billing Portal'}
                         </button>
                         <button
                             onClick={handleCancel}
                             disabled={isManaging}
-                            className="bg-white dark:bg-slate-850 border border-rose-100 dark:border-rose-900 text-rose-500 dark:text-rose-400 px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-all"
+                            className="bg-white dark:bg-slate-850 border border-rose-100 dark:border-rose-900 text-rose-500 dark:text-rose-400 px-6 py-3 rounded-xl font-bold text-[10px] uppercase tracking-wide hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-all"
                         >
                             Cancel
                         </button>
@@ -229,7 +229,7 @@ export const SubscriptionSettingsView: React.FC<SubscriptionSettingsViewProps> =
 
                     {/* Count + labels */}
                     <div className="flex-1 text-center md:text-left">
-                        <p className="text-xs font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-1">
+                        <p className="text-xs font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1">
                             Active Congregation
                         </p>
                         <div className="flex items-baseline gap-3 justify-center md:justify-start">
@@ -280,7 +280,7 @@ export const SubscriptionSettingsView: React.FC<SubscriptionSettingsViewProps> =
                         <button
                             onClick={() => handleRecalculate(false)}
                             disabled={isCalculating}
-                            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-indigo-200 dark:shadow-indigo-900/40"
+                            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-3 rounded-xl font-bold text-[10px] uppercase tracking-wide transition-all shadow-lg shadow-indigo-200 dark:shadow-indigo-900/40"
                         >
                             {isCalculating ? (
                                 <>
@@ -319,7 +319,7 @@ export const SubscriptionSettingsView: React.FC<SubscriptionSettingsViewProps> =
                         </div>
                         <button
                             onClick={() => setShowUpgrade(true)}
-                            className="flex-shrink-0 px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-[10px] uppercase tracking-widest rounded-2xl transition-all shadow-lg shadow-amber-300/40 dark:shadow-amber-900/40 whitespace-nowrap"
+                            className="flex-shrink-0 px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-[10px] uppercase tracking-wide rounded-2xl transition-all shadow-lg shadow-amber-300/40 dark:shadow-amber-900/40 whitespace-nowrap"
                         >
                             Upgrade Now →
                         </button>
@@ -345,7 +345,7 @@ export const SubscriptionSettingsView: React.FC<SubscriptionSettingsViewProps> =
                         </div>
                         <button
                             onClick={() => setShowUpgrade(true)}
-                            className="flex-shrink-0 px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-[10px] uppercase tracking-widest rounded-2xl transition-all shadow-lg shadow-amber-300/40 dark:shadow-amber-900/40 whitespace-nowrap"
+                            className="flex-shrink-0 px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-[10px] uppercase tracking-wide rounded-2xl transition-all shadow-lg shadow-amber-300/40 dark:shadow-amber-900/40 whitespace-nowrap"
                         >
                             Upgrade Now →
                         </button>
@@ -534,7 +534,7 @@ export const SubscriptionSettingsView: React.FC<SubscriptionSettingsViewProps> =
                             </p>
                         </div>
                         <div className="bg-white/20 px-6 py-3 rounded-xl backdrop-blur-sm border border-white/10">
-                            <span className="block text-[10px] font-bold uppercase tracking-widest opacity-80">Expires On</span>
+                            <span className="block text-[10px] font-bold uppercase tracking-wide opacity-80">Expires On</span>
                             <span className="text-lg font-black">{new Date(trialEndsAt).toLocaleDateString()}</span>
                         </div>
                     </div>
@@ -546,7 +546,7 @@ export const SubscriptionSettingsView: React.FC<SubscriptionSettingsViewProps> =
             {(!currentPlanId || showUpgrade) && (
                 <div>
                     {currentPlanId && showUpgrade && (
-                        <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-4 text-center">
+                        <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-4 text-center">
                             Select a new plan — Stripe will handle proration automatically
                         </p>
                     )}
@@ -569,22 +569,22 @@ export const SubscriptionSettingsView: React.FC<SubscriptionSettingsViewProps> =
                                     }`}
                                 >
                                     {isCurrent && (
-                                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-[10px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full shadow-lg">
+                                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-[10px] font-bold uppercase tracking-wide px-4 py-1.5 rounded-full shadow-lg">
                                             Current Plan
                                         </div>
                                     )}
                                     {!isCurrent && isRecommended && !currentPlanId && (
-                                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-indigo-500 to-violet-500 text-white text-[10px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full shadow-lg">
+                                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-indigo-500 to-violet-500 text-white text-[10px] font-bold uppercase tracking-wide px-4 py-1.5 rounded-full shadow-lg">
                                             Most Popular
                                         </div>
                                     )}
                                     {!isCurrent && isUpgrade && (
-                                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-indigo-500 to-violet-500 text-white text-[10px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full shadow-lg">
+                                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-indigo-500 to-violet-500 text-white text-[10px] font-bold uppercase tracking-wide px-4 py-1.5 rounded-full shadow-lg">
                                             ⬆ Upgrade
                                         </div>
                                     )}
                                     {!isCurrent && isDowngrade && (
-                                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-slate-600 text-slate-200 text-[10px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full shadow-md">
+                                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-slate-600 text-slate-200 text-[10px] font-bold uppercase tracking-wide px-4 py-1.5 rounded-full shadow-md">
                                             ⬇ Downgrade
                                         </div>
                                     )}
@@ -609,7 +609,7 @@ export const SubscriptionSettingsView: React.FC<SubscriptionSettingsViewProps> =
                                     <button
                                         onClick={() => !isCurrent && handleSubscribe(plan.id)}
                                         disabled={!!processingPlanId || isCurrent}
-                                        className={`w-full py-4 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${
+                                        className={`w-full py-4 rounded-xl font-black text-xs uppercase tracking-wide transition-all ${
                                             isCurrent
                                                 ? 'bg-white/20 text-white cursor-default opacity-60'
                                                 : isUpgrade
@@ -644,7 +644,7 @@ export const SubscriptionSettingsView: React.FC<SubscriptionSettingsViewProps> =
             )}
 
             <div className="bg-slate-50 dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 text-center transition-colors">
-                <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Secure Payment Processing</p>
+                <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-1">Secure Payment Processing</p>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
                     Payments are processed securely by Stripe. We do not store your credit card information.
                     <br/>Have a coupon code? You can apply it on the checkout page.

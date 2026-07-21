@@ -462,7 +462,7 @@ export const FileManager: React.FC<FileManagerProps> = ({
                               </span>
                             )}
                           </div>
-                          <div className="text-[11px] text-slate-400 uppercase tracking-widest mt-0.5">
+                          <div className="text-[11px] text-slate-400 uppercase tracking-wide mt-0.5">
                             {file.mimeType}
                           </div>
                         </div>

@@ -370,7 +370,7 @@ export const PublicFormView: React.FC<PublicFormViewProps> = ({ churchId, formId
               <CheckCircle size={32} className="text-emerald-500" />
             </div>
             <div className="space-y-2">
-              <h2 className="text-2xl font-black tracking-wide uppercase">Thank you!</h2>
+              <h2 className="text-2xl font-bold tracking-wide uppercase">Thank you!</h2>
               <p className="text-sm text-slate-500 dark:text-slate-450 max-w-md mx-auto leading-relaxed">
                 Your information has been successfully received. We appreciate your connection!
               </p>
@@ -396,7 +396,7 @@ export const PublicFormView: React.FC<PublicFormViewProps> = ({ churchId, formId
         ) : (
           <div>
             <div className="mb-8">
-              <h1 className="text-2xl font-black uppercase tracking-wide mb-2" style={{ color: themeStyles.textColor }}>{config.name}</h1>
+              <h1 className="text-2xl font-bold uppercase tracking-wide mb-2" style={{ color: themeStyles.textColor }}>{config.name}</h1>
               {config.description && (
                 <p className="text-sm text-slate-550 dark:text-slate-450 leading-relaxed">{config.description}</p>
               )}
@@ -432,7 +432,7 @@ export const PublicFormView: React.FC<PublicFormViewProps> = ({ churchId, formId
 
                 return (
                   <div key={field.id} className="space-y-1.5">
-                    <label className="block text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                       {field.label} {isRequired && <span className="text-red-500">*</span>}
                     </label>
 

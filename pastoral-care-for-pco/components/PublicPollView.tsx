@@ -536,7 +536,7 @@ export const PublicPollView: React.FC<PublicPollViewProps> = ({ pollId }) => {
             }`}
           >
             <div className="mb-4">
-              <span className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Question {idx + 1}</span>
+              <span className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide">Question {idx + 1}</span>
               <h2 className="text-base font-semibold text-slate-900 dark:text-white mt-0.5">
                 {q.text}
                 {q.required && <span className="text-red-500 ml-1">*</span>}

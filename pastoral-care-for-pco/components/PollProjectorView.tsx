@@ -412,7 +412,7 @@ export const PollProjectorView: React.FC<PollProjectorViewProps> = ({ pollId }) 
             <div className="space-y-10">
               {/* Question text */}
               <div>
-                <div className="text-violet-400 text-sm font-bold uppercase tracking-widest mb-3">
+                <div className="text-violet-400 text-sm font-bold uppercase tracking-wide mb-3">
                   Question {localActiveIndex + 1} of {questions.length}
                 </div>
                 <h1 className="text-4xl lg:text-5xl font-black text-white leading-tight">

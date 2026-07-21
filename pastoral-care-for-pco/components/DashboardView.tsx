@@ -232,7 +232,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ activePeopleCount,
                                   <button 
                                       onClick={onGenerateInsights}
                                       disabled={isGeneratingInsights}
-                                      className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-indigo-200 dark:shadow-none hover:bg-indigo-700 transition-all disabled:opacity-50"
+                                      className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-wide shadow-lg shadow-indigo-200 dark:shadow-none hover:bg-indigo-700 transition-all disabled:opacity-50"
                                   >
                                       {isGeneratingInsights ? 'Analyzing...' : 'Generate Insights'}
                                   </button>
@@ -321,7 +321,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ activePeopleCount,
                           }`}>
                               <span className="text-4xl font-black">{groupHealth.score}</span>
                           </div>
-                          <p className={`text-sm font-black uppercase tracking-widest ${
+                          <p className={`text-sm font-bold uppercase tracking-wide ${
                               groupHealth.color === 'emerald' ? 'text-emerald-600 dark:text-emerald-400' : 
                               groupHealth.color === 'amber' ? 'text-amber-500 dark:text-amber-400' : 
                               groupHealth.color === 'slate' ? 'text-slate-500 dark:text-slate-400' :
@@ -335,7 +335,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ activePeopleCount,
                           {groupHealth.factors.map(f => (
                               <div key={f.name} className="flex justify-between items-center text-xs">
                                   <span className="font-semibold text-slate-500 dark:text-slate-400">{f.name}</span>
-                                  <span className={`font-black uppercase ${
+                                  <span className={`font-bold uppercase ${
                                       f.status === 'good' ? 'text-emerald-500 dark:text-emerald-400' : 
                                       f.status === 'warning' ? 'text-amber-500 dark:text-amber-400' : 'text-rose-500 dark:text-rose-400'
                                   }`}>
@@ -388,7 +388,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ activePeopleCount,
                           }`}>
                               <span className="text-4xl font-black">{churchHealth.score}</span>
                           </div>
-                          <p className={`text-sm font-black uppercase tracking-widest ${
+                          <p className={`text-sm font-bold uppercase tracking-wide ${
                               churchHealth.color === 'emerald' ? 'text-emerald-600 dark:text-emerald-400' : 
                               churchHealth.color === 'amber' ? 'text-amber-500 dark:text-amber-400' : 'text-rose-500 dark:text-rose-400'
                           }`}>
@@ -400,7 +400,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ activePeopleCount,
                           {churchHealth.factors.map(f => (
                               <div key={f.name} className="flex justify-between items-center text-xs">
                                   <span className="font-semibold text-slate-500 dark:text-slate-400">{f.name}</span>
-                                  <span className={`font-black uppercase ${
+                                  <span className={`font-bold uppercase ${
                                       f.status === 'good' ? 'text-emerald-500 dark:text-emerald-400' : 
                                       f.status === 'warning' ? 'text-amber-500 dark:text-amber-400' : 'text-rose-500 dark:text-rose-400'
                                   }`}>
@@ -677,7 +677,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ activePeopleCount,
               {!pcoConnected && (
                   <button 
                       onClick={onConnectPco}
-                      className="bg-amber-500 hover:bg-amber-600 text-white px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-amber-200 dark:shadow-amber-900/20"
+                      className="bg-amber-500 hover:bg-amber-600 text-white px-6 py-2.5 rounded-xl font-bold text-[10px] uppercase tracking-wide transition-all shadow-lg shadow-amber-200 dark:shadow-amber-900/20"
                   >
                       Connect Planning Center
                   </button>
@@ -686,7 +686,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ activePeopleCount,
               <button
                   onClick={toggleShowAI}
                   title={showAI ? 'Hide AI Assistant' : 'Show AI Assistant'}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border shadow-sm ${
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-[10px] font-bold uppercase tracking-wide transition-all border shadow-sm ${
                       showAI
                           ? 'bg-indigo-600 text-white border-indigo-600 shadow-indigo-200 dark:shadow-none'
                           : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-indigo-300 hover:text-indigo-600'

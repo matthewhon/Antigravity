@@ -80,24 +80,24 @@ const BatchCard: React.FC<{ batch: BatchEntry; isServiceDay: boolean }> = ({ bat
                         <div key={fund.fundName} className="flex items-center justify-between px-3 py-1.5">
                             <div className="flex items-center gap-2 min-w-0">
                                 <span className="w-1 h-1 rounded-full bg-emerald-400 shrink-0" />
-                                <span className="text-[9px] font-semibold text-emerald-700 dark:text-emerald-400 truncate">
+                                <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 truncate">
                                     {fund.fundName}
                                 </span>
-                                <span className="text-[8px] text-slate-400 dark:text-slate-500 whitespace-nowrap shrink-0">
+                                <span className="text-[10px] text-slate-400 dark:text-slate-500 whitespace-nowrap shrink-0">
                                     {fund.donorCount} {fund.donorCount === 1 ? 'gift' : 'gifts'}
                                 </span>
                             </div>
-                            <span className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 shrink-0 ml-2">
+                            <span className="text-[11px] font-black text-emerald-600 dark:text-emerald-400 shrink-0 ml-2">
                                 {fmtAmt(fund.amount)}
                             </span>
                         </div>
                     ))}
                     {multiFund && (
                         <div className="flex items-center justify-between px-3 py-1.5 bg-emerald-100/40 dark:bg-emerald-800/20">
-                            <span className="text-[9px] font-black text-emerald-800 dark:text-emerald-300 uppercase tracking-wider">
+                            <span className="text-[11px] font-bold text-emerald-800 dark:text-emerald-300 uppercase tracking-wider">
                                 Total
                             </span>
-                            <span className="text-[9px] font-black text-emerald-800 dark:text-emerald-300">
+                            <span className="text-[11px] font-black text-emerald-800 dark:text-emerald-300">
                                 {fmtAmt(batch.totalAmount)}
                             </span>
                         </div>
@@ -299,10 +299,10 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
             {/* Header */}
             <div className="relative z-10 flex items-center justify-between mb-5">
                 <div>
-                    <h4 className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">
+                    <h4 className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.14em]">
                         Church Timeline
                     </h4>
-                    <p className="text-[9px] font-bold text-indigo-400 uppercase tracking-widest mt-0.5">
+                    <p className="text-[11px] font-bold text-indigo-400 uppercase tracking-wide mt-0.5">
                         Last 15 Days · Services &amp; Giving Batches · Most Recent First
                     </p>
                 </div>
@@ -347,7 +347,7 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
                                                 ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/40'
                                                 : 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-100 dark:border-indigo-800/40'
                                     }`}>
-                                        <span className={`text-[7px] font-black uppercase tracking-widest ${
+                                        <span className={`text-[7px] font-black uppercase tracking-wide ${
                                             isFirst ? 'text-indigo-200' : day.isGivingOnly ? 'text-emerald-500' : 'text-rose-500'
                                         }`}>
                                             {day.monthAbbr}
@@ -380,7 +380,7 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
                                                             </span>
                                                         </div>
                                                         {svc.time && (
-                                                            <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 whitespace-nowrap shrink-0">
+                                                            <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500 whitespace-nowrap shrink-0">
                                                                 {svc.time}
                                                             </span>
                                                         )}
@@ -393,13 +393,13 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
                                         {!day.isGivingOnly && (
                                             <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
                                                 {day.totalHeadcount > 0 ? (
-                                                    <span className="inline-flex items-center gap-1 bg-violet-50 dark:bg-violet-900/20 border border-violet-100 dark:border-violet-800/30 px-2 py-0.5 rounded-lg text-[9px]">
+                                                    <span className="inline-flex items-center gap-1 bg-violet-50 dark:bg-violet-900/20 border border-violet-100 dark:border-violet-800/30 px-2 py-0.5 rounded-lg text-[11px]">
                                                         <span>👥</span>
                                                         <span className="font-black text-violet-700 dark:text-violet-400">{day.totalHeadcount.toLocaleString()}</span>
                                                         <span className="text-violet-400 dark:text-violet-500 font-medium">attended</span>
                                                     </span>
                                                 ) : (
-                                                    <span className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded-lg text-[9px] text-slate-400">
+                                                    <span className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded-lg text-[11px] text-slate-400">
                                                         <span>👥</span>
                                                         <span>No headcount</span>
                                                     </span>
@@ -407,7 +407,7 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
                                                 {(() => {
                                                     const v = day.services.reduce((s, sv) => s + sv.volunteersScheduled, 0);
                                                     return v > 0 ? (
-                                                        <span className="inline-flex items-center gap-1 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800/30 px-2 py-0.5 rounded-lg text-[9px]">
+                                                        <span className="inline-flex items-center gap-1 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800/30 px-2 py-0.5 rounded-lg text-[11px]">
                                                             <span>🙋</span>
                                                             <span className="font-black text-amber-700 dark:text-amber-400">{v}</span>
                                                             <span className="text-amber-400 dark:text-amber-500 font-medium">volunteers</span>
@@ -439,7 +439,7 @@ export const ServicesTimelineWidget: React.FC<ServicesTimelineWidgetProps> = ({
 
             {/* Legend */}
             {!isEmpty && (
-                <div className="relative z-10 mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/50 flex flex-wrap gap-3 text-[8px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                <div className="relative z-10 mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/50 flex flex-wrap gap-3 text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">
                     <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-violet-400" /> Headcount</span>
                     <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> Giving</span>
                     <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-amber-400" /> Volunteers</span>

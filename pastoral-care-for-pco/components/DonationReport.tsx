@@ -741,7 +741,7 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                 <div className="ml-auto">
                     <button
                         onClick={handleExport}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-xl font-bold text-xs uppercase tracking-widest transition-colors flex items-center gap-2"
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-xl font-bold text-xs uppercase tracking-wide transition-colors flex items-center gap-2"
                     >
                         <span>Download CSV</span>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -761,7 +761,7 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                     <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
-                        className={`px-5 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                        className={`px-5 py-2 rounded-xl text-xs font-black uppercase tracking-wide transition-all ${
                             activeTab === tab.id
                                 ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
                                 : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
@@ -778,7 +778,7 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                         <div>
                             <h3 className="text-lg font-black text-slate-900 dark:text-white">Donor Concentration & Risk Planning</h3>
-                            <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1">
+                            <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide mt-1">
                                 Understand giving distribution and the financial impact of losing key contributors
                             </p>
                         </div>
@@ -804,7 +804,7 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                                 ].map((card, i) => (
                                     <div key={i} className="p-5 rounded-2xl bg-slate-50/60 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800/80 flex flex-col justify-between space-y-3">
                                         <div>
-                                            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{card.title}</span>
+                                            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide">{card.title}</span>
                                             <p className="text-2xl font-black text-slate-900 dark:text-white mt-1 font-mono">
                                                 ${card.data.sum.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                                             </p>
@@ -824,7 +824,7 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
 
                             {/* Cumulative Distribution Stacked Bar */}
                             <div className="space-y-3 pt-2">
-                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Cumulative Distribution Bar</span>
+                                <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">Cumulative Distribution Bar</span>
                                 <div className="h-4 flex rounded-full overflow-hidden bg-slate-100 dark:bg-slate-700/60">
                                     {donorConcentration.segments.map((seg, i) => (
                                         <div
@@ -858,7 +858,7 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                                     <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-955/20 border border-amber-100 dark:border-amber-900/30 flex items-start gap-3">
                                         <span className="text-base">⚠️</span>
                                         <div className="space-y-1">
-                                            <p className="text-xs font-black text-amber-800 dark:text-amber-400 uppercase tracking-wider">High Dependency Risk</p>
+                                            <p className="text-xs font-bold text-amber-800 dark:text-amber-400 uppercase tracking-wider">High Dependency Risk</p>
                                             <p className="text-xs text-amber-700 dark:text-amber-300/80 leading-relaxed font-medium">
                                                 The top 10 givers contribute <strong className="text-amber-900 dark:text-amber-300">{donorConcentration.top10.pct.toFixed(1)}%</strong> of your total giving (${donorConcentration.top10.sum.toLocaleString(undefined, { maximumFractionDigits: 0 })}). Your organization is highly sensitive to the loss or reduction of any of these top contributors. Consider strategies to diversify and expand your active donor base to mitigate this dependency risk.
                                             </p>
@@ -868,7 +868,7 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                                     <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-955/20 border border-emerald-100 dark:border-emerald-900/30 flex items-start gap-3">
                                         <span className="text-base">✅</span>
                                         <div className="space-y-1">
-                                            <p className="text-xs font-black text-emerald-800 dark:text-emerald-400 uppercase tracking-wider">Healthy Giving Distribution</p>
+                                            <p className="text-xs font-bold text-emerald-800 dark:text-emerald-400 uppercase tracking-wider">Healthy Giving Distribution</p>
                                             <p className="text-xs text-emerald-700 dark:text-emerald-300/80 leading-relaxed font-medium">
                                                 The top 10 givers contribute <strong className="text-emerald-900 dark:text-emerald-300">{donorConcentration.top10.pct.toFixed(1)}%</strong> of your total giving. A well-distributed donor base ensures that financial viability is not overly dependent on a few key contributors, reducing your overall organizational risk.
                                             </p>
@@ -888,22 +888,22 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                         <table className="w-full text-left border-collapse">
                             <thead>
                                 <tr className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800">
-                                    <th className="p-4 text-[10px] font-black uppercase tracking-widest text-slate-400 cursor-pointer hover:text-indigo-500"
+                                    <th className="p-4 text-[10px] font-bold uppercase tracking-wide text-slate-400 cursor-pointer hover:text-indigo-500"
                                         onClick={() => setSort({ field: 'name', direction: sort.field === 'name' && sort.direction === 'asc' ? 'desc' : 'asc' })}>
                                         Donor Name {sort.field === 'name' && (sort.direction === 'asc' ? '↑' : '↓')}
                                     </th>
-                                    <th className="p-4 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right cursor-pointer hover:text-indigo-500"
+                                    <th className="p-4 text-[10px] font-bold uppercase tracking-wide text-slate-400 text-right cursor-pointer hover:text-indigo-500"
                                         onClick={() => setSort({ field: 'totalAmount', direction: sort.field === 'totalAmount' && sort.direction === 'asc' ? 'desc' : 'asc' })}>
                                         Total Given {sort.field === 'totalAmount' && (sort.direction === 'asc' ? '↑' : '↓')}
                                     </th>
-                                    <th className="p-4 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right cursor-pointer hover:text-indigo-500"
+                                    <th className="p-4 text-[10px] font-bold uppercase tracking-wide text-slate-400 text-right cursor-pointer hover:text-indigo-500"
                                         onClick={() => setSort({ field: 'lastGiftDate', direction: sort.field === 'lastGiftDate' && sort.direction === 'asc' ? 'desc' : 'asc' })}>
                                         Last Gift {sort.field === 'lastGiftDate' && (sort.direction === 'asc' ? '↑' : '↓')}
                                     </th>
                                     {buckets.map(b => (
-                                        <th key={b} className="p-4 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right whitespace-nowrap">{b}</th>
+                                        <th key={b} className="p-4 text-[10px] font-bold uppercase tracking-wide text-slate-400 text-right whitespace-nowrap">{b}</th>
                                     ))}
-                                    <th className="p-4 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right whitespace-nowrap">% of Total</th>
+                                    <th className="p-4 text-[10px] font-bold uppercase tracking-wide text-slate-400 text-right whitespace-nowrap">% of Total</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
@@ -945,7 +945,7 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                     <div className="bg-white dark:bg-slate-800 rounded-[2rem] border border-slate-100 dark:border-slate-700 shadow-sm p-8">
                         <div className="mb-6">
                             <h3 className="text-lg font-black text-slate-900 dark:text-white">Giving by Age Group Over Time</h3>
-                            <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1">
+                            <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide mt-1">
                                 Total given per age demographic · {filters.interval} buckets
                             </p>
                         </div>
@@ -987,11 +987,11 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                                     <table className="w-full text-left border-collapse">
                                         <thead>
                                             <tr className="border-b border-slate-100 dark:border-slate-700">
-                                                <th className="pb-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Age Group</th>
+                                                <th className="pb-3 text-[10px] font-bold uppercase tracking-wide text-slate-400">Age Group</th>
                                                 {buckets.map(b => (
-                                                    <th key={b} className="pb-3 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right whitespace-nowrap">{b}</th>
+                                                    <th key={b} className="pb-3 text-[10px] font-bold uppercase tracking-wide text-slate-400 text-right whitespace-nowrap">{b}</th>
                                                 ))}
-                                                <th className="pb-3 text-[10px] font-black uppercase tracking-widest text-emerald-500 text-right">Total</th>
+                                                <th className="pb-3 text-[10px] font-bold uppercase tracking-wide text-emerald-500 text-right">Total</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
@@ -1033,7 +1033,7 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                     <div className="bg-white dark:bg-slate-800 rounded-[2rem] border border-slate-100 dark:border-slate-700 shadow-sm p-8">
                         <div className="mb-6">
                             <h3 className="text-lg font-black text-slate-900 dark:text-white">Giving by Donor Status Over Time</h3>
-                            <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1">
+                            <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide mt-1">
                                 Total given per lifecycle status · {filters.interval} buckets
                             </p>
                         </div>
@@ -1073,7 +1073,7 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
 
                                 {/* Trend lines (% share) */}
                                 <div className="mt-8">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">Share of Giving (%) Over Time</p>
+                                    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-4">Share of Giving (%) Over Time</p>
                                     <div className="h-48">
                                         <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={1}>
                                             <LineChart
@@ -1108,11 +1108,11 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                                     <table className="w-full text-left border-collapse">
                                         <thead>
                                             <tr className="border-b border-slate-100 dark:border-slate-700">
-                                                <th className="pb-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Status</th>
+                                                <th className="pb-3 text-[10px] font-bold uppercase tracking-wide text-slate-400">Status</th>
                                                 {buckets.map(b => (
-                                                    <th key={b} className="pb-3 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right whitespace-nowrap">{b}</th>
+                                                    <th key={b} className="pb-3 text-[10px] font-bold uppercase tracking-wide text-slate-400 text-right whitespace-nowrap">{b}</th>
                                                 ))}
-                                                <th className="pb-3 text-[10px] font-black uppercase tracking-widest text-emerald-500 text-right">Total</th>
+                                                <th className="pb-3 text-[10px] font-bold uppercase tracking-wide text-emerald-500 text-right">Total</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
@@ -1165,14 +1165,14 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                             <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-8">
                                 <div>
                                     <h3 className="text-lg font-black text-slate-900 dark:text-white">Average Giving by Fund</h3>
-                                    <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1">
+                                    <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide mt-1">
                                         Avg weekly giving per fund · {Math.round(totalWeeks)} weeks
                                     </p>
                                     <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">{filters.startDate} – {filters.endDate}</p>
                                 </div>
                                 {hasFunds && (
                                     <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Avg / Week (All Funds)</p>
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Avg / Week (All Funds)</p>
                                         <p className="text-3xl font-black text-indigo-600 dark:text-indigo-400">
                                             ${overallAvgPerWeek.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                                         </p>
@@ -1191,7 +1191,7 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                                 </div>
                             ) : (
                                 <div className="space-y-4">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                                    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">
                                         Avg / Week by Fund — {filters.startDate} to {filters.endDate}
                                     </p>
                                     {fundData
@@ -1213,7 +1213,7 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                                                                     ${f.avgPerWeek.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                                                                     <span className="text-xs font-semibold text-slate-400">/wk</span>
                                                                 </span>
-                                                                <p className="text-[9px] text-slate-400 dark:text-slate-500 text-right">
+                                                                <p className="text-[11px] text-slate-400 dark:text-slate-500 text-right">
                                                                     ${f.totalGiven.toLocaleString(undefined, { maximumFractionDigits: 0 })} total
                                                                 </p>
                                                             </div>
@@ -1252,14 +1252,14 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                             <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-8">
                                 <div>
                                     <h3 className="text-lg font-black text-slate-900 dark:text-white">Giving by Label</h3>
-                                    <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1">
+                                    <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide mt-1">
                                         Total giving per label
                                     </p>
                                     <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">{filters.startDate} – {filters.endDate}</p>
                                 </div>
                                 {hasLabels && (
                                     <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Given</p>
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Total Given</p>
                                         <p className="text-3xl font-black text-indigo-600 dark:text-indigo-400">
                                             ${overallTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </p>
@@ -1275,7 +1275,7 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                                 </div>
                             ) : (
                                 <div className="space-y-6">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                                    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">
                                         Total Given by Label — {filters.startDate} to {filters.endDate}
                                     </p>
                                     {labelData

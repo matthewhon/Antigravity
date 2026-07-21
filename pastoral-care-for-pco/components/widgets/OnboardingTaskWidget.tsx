@@ -98,7 +98,7 @@ export const OnboardingTaskWidget = ({ onRemove }: { onRemove?: () => void }) =>
     <WidgetWrapper title="Setup Guide" onRemove={onRemove} source="Onboarding">
       <div className="p-5 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800">
         <div className="mb-5">
-          <div className="flex justify-between text-[11px] font-black uppercase text-slate-500 tracking-wider mb-2">
+          <div className="flex justify-between text-[11px] font-bold uppercase text-slate-500 tracking-wider mb-2">
             <span>Onboarding Progress</span>
             <span className="text-indigo-600 dark:text-indigo-400">{progressPercent}%</span>
           </div>

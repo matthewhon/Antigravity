@@ -1228,12 +1228,12 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                       {/* Stats bar */}
                       {geocodeProgress !== null && (
                           <div className="mt-3 flex flex-wrap items-center gap-2">
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-[10px] font-black text-indigo-700 dark:text-indigo-300 uppercase tracking-wider">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-[10px] font-bold text-indigo-700 dark:text-indigo-300 uppercase tracking-wider">
                                   <span className="w-2 h-2 rounded-full bg-indigo-500 inline-block" />
                                   {geocodeProgress.plotted.toLocaleString()} plotted
                               </span>
                               {geocodeProgress.ungeocoded > 0 && (
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-900/20 text-[10px] font-black text-amber-700 dark:text-amber-300 uppercase tracking-wider" title="Run a PCO sync or use 'Geocode Addresses' in App Config to resolve these.">
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-900/20 text-[10px] font-bold text-amber-700 dark:text-amber-300 uppercase tracking-wider" title="Run a PCO sync or use 'Geocode Addresses' in App Config to resolve these.">
                                       <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />
                                       {geocodeProgress.ungeocoded.toLocaleString()} pending geocode
                                   </span>
@@ -1331,7 +1331,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                   <WidgetWrapper title="Missional Gap" onRemove={() => handleRemoveWidget(id)} source="Census vs Church" locationName={locationName} isDefault={isDefault}>
                       <div className="h-full flex flex-col justify-center items-center text-center p-4">
                           <span className="text-4xl font-black text-indigo-600 dark:text-indigo-400 mb-2">{gap.toLocaleString()}</span>
-                          <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Unreached Residents</p>
+                          <p className="text-xs text-slate-400 font-bold uppercase tracking-wide">Unreached Residents</p>
                       </div>
                   </WidgetWrapper>
               );
@@ -1369,19 +1369,19 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                                   <div className="flex items-center gap-2">
                                       <h3 className="text-xl font-black">{locationName || displayCensus.locationName}</h3>
                                       {isDefault && (
-                                          <span className="bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest">Default</span>
+                                          <span className="bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide">Default</span>
                                       )}
                                   </div>
-                                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Primary Ministry Context</p>
+                                  <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Primary Ministry Context</p>
                               </div>
                           </div>
                           <div className="grid grid-cols-2 gap-8">
                               <div>
-                                  <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-1">Population</p>
+                                  <p className="text-[10px] font-bold uppercase text-slate-500 tracking-wide mb-1">Population</p>
                                   <p className="text-3xl font-black">{displayCensus.totalPopulation.toLocaleString()}</p>
                               </div>
                               <div>
-                                  <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-1">Median Income</p>
+                                  <p className="text-[10px] font-bold uppercase text-slate-500 tracking-wide mb-1">Median Income</p>
                                   <p className="text-3xl font-black text-emerald-400">${displayCensus.economics?.medianHouseholdIncome?.toLocaleString() || 'N/A'}</p>
                               </div>
                           </div>
@@ -1404,10 +1404,10 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                                   <div className="flex items-center gap-2">
                                       <h3 className="text-lg font-black text-white tracking-tight">Missional Strategist</h3>
                                       {isDefault && (
-                                          <span className="bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest">Default</span>
+                                          <span className="bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide">Default</span>
                                       )}
                                   </div>
-                                  <p className="text-[10px] font-bold text-indigo-300 uppercase tracking-widest">AI Community Analysis {locationName ? `(${locationName})` : ''}</p>
+                                  <p className="text-[10px] font-bold text-indigo-300 uppercase tracking-wide">AI Community Analysis {locationName ? `(${locationName})` : ''}</p>
                               </div>
                           </div>
                       </div>
@@ -1423,7 +1423,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                                   <button 
                                       onClick={handleGenerateStrategy}
                                       disabled={isAnalyzing}
-                                      className="bg-white text-indigo-900 px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-indigo-50 transition-all disabled:opacity-50"
+                                      className="bg-white text-indigo-900 px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-wide shadow-xl hover:bg-indigo-50 transition-all disabled:opacity-50"
                                   >
                                       {isAnalyzing ? 'Analyzing Census...' : 'Generate Strategy'}
                                   </button>
@@ -1464,7 +1464,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                   <CensusCard title="Commute Context" onRemove={() => handleRemoveWidget(id)} locationName={locationName} isDefault={isDefault}>
                       <div className="flex flex-col items-center justify-center h-full text-center">
                           <span className="text-3xl font-black text-slate-700 dark:text-white">{displayCensus.commute.longCommuteRate.toFixed(1)}%</span>
-                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Commute &gt; 30m</span>
+                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wide mt-1">Commute &gt; 30m</span>
                           <div className="w-full bg-slate-100 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden mt-3">
                               <div className="pastoral-bar-fill" style={{ '--bar-w': `${Math.min(100, displayCensus.commute.longCommuteRate)}%` } as React.CSSProperties}></div>
                           </div>
@@ -1477,7 +1477,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                   <CensusCard title="Education Level" onRemove={() => handleRemoveWidget(id)} locationName={locationName} isDefault={isDefault}>
                       <div className="flex flex-col items-center justify-center h-full text-center">
                           <span className="text-3xl font-black text-indigo-600 dark:text-indigo-400">{displayCensus.education.bachelorsPlus.toFixed(1)}%</span>
-                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Bachelor's Degree+</span>
+                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wide mt-1">Bachelor's Degree+</span>
                       </div>
                   </CensusCard>
               );
@@ -1503,7 +1503,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                   <CensusCard title="Housing Vacancy" onRemove={() => handleRemoveWidget(id)} locationName={locationName} isDefault={isDefault}>
                       <div className="flex flex-col items-center justify-center h-full text-center">
                           <span className="text-3xl font-black text-amber-500">{displayCensus.housing.vacancyRate.toFixed(1)}%</span>
-                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Vacant Units</span>
+                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wide mt-1">Vacant Units</span>
                       </div>
                   </CensusCard>
               );
@@ -1536,7 +1536,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                   <CensusCard title="Family Structure" onRemove={() => handleRemoveWidget(id)} locationName={locationName} isDefault={isDefault}>
                       <div className="flex flex-col items-center justify-center h-full text-center">
                           <span className="text-3xl font-black text-rose-500">{displayCensus.families.singleParentRate.toFixed(1)}%</span>
-                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Single Parent Homes</span>
+                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wide mt-1">Single Parent Homes</span>
                       </div>
                   </CensusCard>
               );
@@ -1594,8 +1594,8 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                               <div key={i} className="flex items-start gap-3 p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl border border-indigo-100 dark:border-indigo-900/30">
                                   <span className="text-xl">{sig.icon}</span>
                                   <div>
-                                      <p className="text-[10px] font-black text-indigo-900 dark:text-indigo-300 uppercase tracking-wide mb-0.5">{sig.title}</p>
-                                      <p className="text-[9px] text-indigo-700 dark:text-indigo-400 leading-snug">{sig.desc}</p>
+                                      <p className="text-[10px] font-bold text-indigo-900 dark:text-indigo-300 uppercase tracking-wide mb-0.5">{sig.title}</p>
+                                      <p className="text-[11px] text-indigo-700 dark:text-indigo-400 leading-snug">{sig.desc}</p>
                                   </div>
                               </div>
                           ))}
@@ -1612,7 +1612,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                     headerControl={
                         <button 
                             onClick={() => setIsAddingNote(true)}
-                            className="text-[9px] font-black uppercase tracking-widest text-indigo-600 hover:text-indigo-700"
+                            className="text-[11px] font-bold uppercase tracking-wide text-indigo-600 hover:text-indigo-700"
                         >
                             + New Entry
                         </button>
@@ -1646,7 +1646,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                     headerControl={
                         <button 
                             onClick={() => setIsAddingPrayer(true)}
-                            className="text-[9px] font-black uppercase tracking-widest text-indigo-600 hover:text-indigo-700"
+                            className="text-[11px] font-bold uppercase tracking-wide text-indigo-600 hover:text-indigo-700"
                         >
                             + New Request
                         </button>
@@ -1685,7 +1685,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                               <div key={n.id} className="p-4 bg-rose-50 dark:bg-rose-900/20 rounded-2xl border border-rose-100 dark:border-rose-900/30 flex justify-between items-center">
                                   <div>
                                       <p className="text-xs font-black text-slate-900 dark:text-white">{n.personName}</p>
-                                      <p className="text-[10px] font-bold text-rose-600 uppercase tracking-widest mt-0.5">Due: {new Date(n.followUpDate!).toLocaleDateString()}</p>
+                                      <p className="text-[10px] font-bold text-rose-600 uppercase tracking-wide mt-0.5">Due: {new Date(n.followUpDate!).toLocaleDateString()}</p>
                                   </div>
                                   <button 
                                     onClick={() => {
@@ -1716,7 +1716,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                               </div>
                               <div>
                                   <h3 className="text-lg font-black text-white tracking-tight">Care Advisor</h3>
-                                  <p className="text-[10px] font-bold text-emerald-300 uppercase tracking-widest">AI Pastoral Support</p>
+                                  <p className="text-[10px] font-bold text-emerald-300 uppercase tracking-wide">AI Pastoral Support</p>
                               </div>
                           </div>
                       </div>
@@ -1732,7 +1732,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                                   <button 
                                       onClick={handleGenerateCareAdvice}
                                       disabled={isGeneratingCare}
-                                      className="bg-white text-emerald-900 px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-indigo-50 transition-all disabled:opacity-50"
+                                      className="bg-white text-emerald-900 px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-wide shadow-xl hover:bg-indigo-50 transition-all disabled:opacity-50"
                                   >
                                       {isGeneratingCare ? 'Consulting...' : 'Get Advice'}
                                   </button>
@@ -1777,19 +1777,19 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h3 className="text-4xl font-black tracking-tighter text-slate-900 dark:text-white">Pastoral Care</h3>
-          <p className="text-slate-400 dark:text-slate-500 font-medium uppercase text-[10px] tracking-widest mt-1">Shepherding & Community Context</p>
+          <p className="text-slate-400 dark:text-slate-500 font-medium uppercase text-[10px] tracking-wide mt-1">Shepherding & Community Context</p>
         </div>
         
         <div className="flex items-center gap-4">
 
             {activeTab === 'Community' && church.communityLocations && church.communityLocations.length > 0 && (
                 <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl">
-                    <span className="text-[8px] font-black uppercase tracking-widest text-slate-400 px-2">Location:</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400 px-2">Location:</span>
                     <select 
                         title="Select community location"
                         value={selectedLocationId || ''} 
                         onChange={(e) => setSelectedLocationId(e.target.value)}
-                        className="bg-white dark:bg-slate-700 text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl border-none outline-none text-indigo-600 dark:text-indigo-300"
+                        className="bg-white dark:bg-slate-700 text-[10px] font-bold uppercase tracking-wide px-4 py-2 rounded-xl border-none outline-none text-indigo-600 dark:text-indigo-300"
                     >
                         {church.communityLocations.map(loc => (
                             <option key={loc.id} value={loc.id}>{loc.name}</option>
@@ -1801,7 +1801,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
             {activeTab === 'Community' && (
                 <div className="flex items-center gap-2">
                     {isFetchingAllCensus && (
-                        <span className="text-[10px] font-bold text-indigo-500 animate-pulse uppercase tracking-widest">Updating Census Data...</span>
+                        <span className="text-[10px] font-bold text-indigo-500 animate-pulse uppercase tracking-wide">Updating Census Data...</span>
                     )}
                 </div>
             )}
@@ -1851,7 +1851,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                   headerControl={
                       <button 
                           onClick={() => setIsEmbedModalOpen(true)}
-                          className="bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 px-4 py-2 rounded-xl text-xs font-black tracking-widest shadow-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors flex items-center gap-2 border border-slate-200 dark:border-slate-700 uppercase"
+                          className="bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 px-4 py-2 rounded-xl text-xs font-bold tracking-wide shadow-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors flex items-center gap-2 border border-slate-200 dark:border-slate-700 uppercase"
                       >
                           <span>🔗</span> Embed
                       </button>
@@ -1936,7 +1936,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                   
                   <div className="space-y-4">
                       <div>
-                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Search Person (Required)</label>
+                          <label className="text-[10px] font-bold uppercase tracking-wide text-slate-400 block mb-2">Search Person (Required)</label>
                           <PersonSearchCombobox 
                               people={peopleData?.allPeople || []}
                               value={newNote.personId || ''}
@@ -1947,7 +1947,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
 
                       <div className="grid grid-cols-2 gap-4">
                           <div>
-                              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Type</label>
+                              <label className="text-[10px] font-bold uppercase tracking-wide text-slate-400 block mb-2">Type</label>
                               <select 
                                 title="Care entry type"
                                 value={newNote.type} 
@@ -1963,7 +1963,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                               </select>
                           </div>
                           <div>
-                              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Date</label>
+                              <label className="text-[10px] font-bold uppercase tracking-wide text-slate-400 block mb-2">Date</label>
                               <input 
                                 type="date" 
                                 title="Entry date"
@@ -1975,7 +1975,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                       </div>
 
                       <div>
-                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Content</label>
+                          <label className="text-[10px] font-bold uppercase tracking-wide text-slate-400 block mb-2">Content</label>
                           <textarea 
                             value={newNote.content} 
                             onChange={(e) => setNewNote({...newNote, content: e.target.value})}
@@ -1985,7 +1985,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                       </div>
 
                       <div>
-                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Follow-up Date (Optional)</label>
+                          <label className="text-[10px] font-bold uppercase tracking-wide text-slate-400 block mb-2">Follow-up Date (Optional)</label>
                           <input 
                             type="date" 
                             title="Follow-up date"
@@ -1997,7 +1997,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
 
                       <button 
                         onClick={handleSaveNote}
-                        className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl hover:bg-indigo-700 transition-all mt-4"
+                        className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold uppercase tracking-wide text-xs shadow-xl hover:bg-indigo-700 transition-all mt-4"
                       >
                           Save Entry
                       </button>
@@ -2016,7 +2016,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                   
                   <div className="space-y-4">
                       <div>
-                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Person Name</label>
+                          <label className="text-[10px] font-bold uppercase tracking-wide text-slate-400 block mb-2">Person Name</label>
                           <PersonSearchCombobox 
                               people={peopleData?.allPeople || []}
                               value={newPrayer.personId || ''}
@@ -2028,7 +2028,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                       </div>
 
                       <div>
-                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Request</label>
+                          <label className="text-[10px] font-bold uppercase tracking-wide text-slate-400 block mb-2">Request</label>
                           <textarea 
                             value={newPrayer.request} 
                             onChange={(e) => setNewPrayer({...newPrayer, request: e.target.value})}
@@ -2047,13 +2047,13 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                           />
                           <div>
                               <p className="text-xs font-black text-slate-900 dark:text-white">Public Request</p>
-                              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Visible to the whole team</p>
+                              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Visible to the whole team</p>
                           </div>
                       </div>
 
                       <button 
                         onClick={handleSavePrayer}
-                        className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl hover:bg-indigo-700 transition-all mt-4"
+                        className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold uppercase tracking-wide text-xs shadow-xl hover:bg-indigo-700 transition-all mt-4"
                       >
                           Submit Request
                       </button>
@@ -2085,7 +2085,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                               navigator.clipboard.writeText(`<iframe src="https://pastoralcare.barnabassoftware.com/embed/calendar/${church.id}" width="100%" height="800px" frameborder="0" style="border:none; border-radius: 12px; overflow:hidden;" scrolling="no"></iframe>`);
                               alert('Copied to clipboard!');
                           }}
-                          className="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-indigo-200 dark:shadow-none hover:bg-indigo-700 transition-all"
+                          className="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-bold uppercase tracking-wide text-xs shadow-xl shadow-indigo-200 dark:shadow-none hover:bg-indigo-700 transition-all"
                       >
                           Copy Code
                       </button>

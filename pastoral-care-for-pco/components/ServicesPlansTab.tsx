@@ -162,7 +162,7 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h3 className="text-4xl font-black tracking-tighter text-slate-900 dark:text-white">Service Plans</h3>
-          <p className="text-slate-400 dark:text-slate-500 font-medium uppercase text-[10px] tracking-widest mt-1">
+          <p className="text-slate-400 dark:text-slate-500 font-medium uppercase text-[10px] tracking-wide mt-1">
             Order of Service, Schedule Roster &amp; Staffing Needs
           </p>
         </div>
@@ -171,7 +171,7 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
           <button 
             onClick={onSync}
             disabled={isSyncing}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 font-black text-[10px] uppercase tracking-widest hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors disabled:opacity-50 cursor-pointer"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 font-bold text-[10px] uppercase tracking-wide hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors disabled:opacity-50 cursor-pointer"
           >
             <span className={isSyncing ? 'animate-spin' : ''}>↻</span>
             <span>{isSyncing ? 'Syncing...' : 'Sync Plans'}</span>
@@ -187,7 +187,7 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
           
           {/* Filters Card */}
           <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl p-6 shadow-sm space-y-4">
-            <h4 className="text-xs font-black uppercase text-slate-400 dark:text-slate-400 tracking-wider">Filters</h4>
+            <h4 className="text-xs font-bold uppercase text-slate-400 dark:text-slate-400 tracking-wider">Filters</h4>
             
             {/* Service Type Filter */}
             <div className="space-y-1">
@@ -233,7 +233,7 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
             <div className="flex gap-2 pt-2">
               <button 
                 onClick={() => { setStartDate(todayStr); setEndDate(defaultEndStr); }}
-                className="flex-1 text-[9px] font-black uppercase tracking-widest text-indigo-500 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 rounded-lg py-1.5 transition-colors"
+                className="flex-1 text-[11px] font-bold uppercase tracking-wide text-indigo-500 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 rounded-lg py-1.5 transition-colors"
               >
                 Next 30 Days
               </button>
@@ -244,7 +244,7 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
                   setStartDate(todayStr);
                   setEndDate(end.toISOString().split('T')[0]);
                 }}
-                className="flex-1 text-[9px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 rounded-lg py-1.5 transition-colors"
+                className="flex-1 text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 rounded-lg py-1.5 transition-colors"
               >
                 Next 90 Days
               </button>
@@ -254,7 +254,7 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
           {/* Plans List Card */}
           <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl p-6 shadow-sm flex flex-col max-h-[600px]">
             <div className="flex justify-between items-center mb-4">
-              <h4 className="text-xs font-black uppercase text-slate-400 dark:text-slate-400 tracking-wider">
+              <h4 className="text-xs font-bold uppercase text-slate-400 dark:text-slate-400 tracking-wider">
                 Upcoming Plans ({filteredPlans.length})
               </h4>
             </div>
@@ -290,7 +290,7 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
                       <div className="flex items-start gap-4">
                         {/* Calendar Icon Date */}
                         <div className="w-12 h-12 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm flex flex-col items-center justify-center shrink-0">
-                          <span className="text-[8px] font-black text-rose-500 uppercase tracking-widest leading-none">
+                          <span className="text-[10px] font-bold text-rose-500 uppercase tracking-wide leading-none">
                             {planDate.toLocaleDateString(undefined, { month: 'short' })}
                           </span>
                           <span className="text-lg font-black text-slate-900 dark:text-white leading-none mt-0.5">
@@ -308,14 +308,14 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
                               {plan.seriesTitle}
                             </p>
                           )}
-                          <p className="text-[9px] text-slate-400 dark:text-slate-400 font-medium mt-1">
+                          <p className="text-[11px] text-slate-400 dark:text-slate-400 font-medium mt-1">
                             ⏰ {planDate.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
                           </p>
                         </div>
                       </div>
 
                       {/* Small staffing stats */}
-                      <div className="mt-3 flex items-center justify-between text-[8px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-400">
+                      <div className="mt-3 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">
                         <span>Staffing Load</span>
                         <span className={neededCount > 0 ? 'text-rose-500' : 'text-emerald-500'}>
                           {neededCount > 0 ? `${neededCount} Slots Needed` : 'Fully Staffed'}
@@ -350,11 +350,11 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
               <div className="flex flex-col md:flex-row md:items-start justify-between pb-6 border-b border-slate-150 dark:border-slate-800 gap-4">
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-[10px] font-black uppercase bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded-md border border-indigo-100 dark:border-indigo-900/30">
+                    <span className="text-[10px] font-bold uppercase bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded-md border border-indigo-100 dark:border-indigo-900/30">
                       {selectedPlan.serviceTypeName}
                     </span>
                     {selectedPlan.seriesTitle && (
-                      <span className="text-[10px] font-black uppercase bg-rose-50 dark:bg-rose-900/10 text-rose-500 px-2 py-0.5 rounded-md border border-rose-100/50 dark:border-rose-900/20">
+                      <span className="text-[10px] font-bold uppercase bg-rose-50 dark:bg-rose-900/10 text-rose-500 px-2 py-0.5 rounded-md border border-rose-100/50 dark:border-rose-900/20">
                         Series: {selectedPlan.seriesTitle}
                       </span>
                     )}
@@ -362,7 +362,7 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
                   <h4 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight mt-2">
                     {selectedPlan.title || 'Service Plan'}
                   </h4>
-                  <p className="text-xs font-bold text-slate-400 dark:text-slate-400 uppercase tracking-widest mt-1">
+                  <p className="text-xs font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wide mt-1">
                     🗓️ {getPlanDate(selectedPlan).toLocaleDateString(undefined, { 
                       weekday: 'long', 
                       year: 'numeric', 
@@ -385,7 +385,7 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
                       <span className="block text-2xl font-black text-indigo-600 dark:text-indigo-400 leading-none">
                         {selectedPlan.items?.length || 0}
                       </span>
-                      <span className="text-[8px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider">Plan Items</span>
+                      <span className="text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider">Plan Items</span>
                     </div>
                     <div className="h-8 w-px bg-slate-200 dark:bg-slate-700" />
                     <div className="text-center">
@@ -394,7 +394,7 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
                       }`}>
                         {selectedPlan.positionsNeeded || 0}
                       </span>
-                      <span className="text-[8px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider">Needed Slots</span>
+                      <span className="text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider">Needed Slots</span>
                     </div>
                   </div>
 
@@ -406,8 +406,8 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
                         disabled={!selectedPlan || rosterCount === 0}
                         title={rosterCount === 0 ? 'No roster members' : `Email all ${rosterCount} scheduled people`}
                         className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl
-                          bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-black text-[10px]
-                          uppercase tracking-widest hover:from-indigo-700 hover:to-violet-700
+                          bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold text-[10px]
+                          uppercase tracking-wide hover:from-indigo-700 hover:to-violet-700
                           transition-all shadow-lg shadow-indigo-500/30 disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -420,7 +420,7 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
                         onClick={() => { openEmailModal(); setShowCustomEmail(true); }}
                         title="Send to a specific email address"
                         className="px-4 py-2.5 rounded-xl border-2 border-indigo-300 dark:border-indigo-700
-                          text-indigo-600 dark:text-indigo-400 font-black text-[10px] uppercase tracking-widest
+                          text-indigo-600 dark:text-indigo-400 font-bold text-[10px] uppercase tracking-wide
                           hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
                       >
                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -491,7 +491,7 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
                                 {/* Timeline Node */}
                                 <div className="absolute -left-[23px] top-6 w-3 h-3 rounded-full border-2 border-white dark:border-slate-900 bg-slate-350 dark:bg-slate-600 group-hover:bg-indigo-400 transition-colors" />
                                 <div className="pl-1">
-                                  <h5 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider">
+                                  <h5 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">
                                     {item.title}
                                   </h5>
                                   {item.description && (
@@ -523,10 +523,10 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
                                 <div className="flex items-start justify-between gap-4">
                                   <div className="min-w-0">
                                     <div className="flex items-center gap-2">
-                                      <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider">
+                                      <span className="text-[11px] font-bold uppercase text-slate-400 tracking-wider">
                                         Item {idx + 1}
                                       </span>
-                                      <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded-md ${
+                                      <span className={`text-[10px] font-black uppercase px-1.5 py-0.5 rounded-md ${
                                         isSong 
                                           ? 'bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300' 
                                           : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
@@ -580,7 +580,7 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
 
                         return Object.entries(teamsMap).map(([teamName, members]) => (
                           <div key={teamName} className="space-y-2">
-                            <h5 className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-wider">
+                            <h5 className="text-[10px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wider">
                               📁 {teamName} ({members.length})
                             </h5>
                             
@@ -619,12 +619,12 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
                                         <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
                                           {m.name}
                                         </p>
-                                        <p className="text-[9px] text-slate-400 truncate">
+                                        <p className="text-[11px] text-slate-400 truncate">
                                           {m.teamPositionName || 'Volunteer'}
                                         </p>
                                       </div>
                                     </div>
-                                    <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-md ${badgeClass}`}>
+                                    <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${badgeClass}`}>
                                       {status === 'C' ? 'Confirmed' : status === 'U' || status === 'Pending' ? 'Pending' : status === 'D' ? 'Declined' : status}
                                     </span>
                                   </div>
@@ -658,7 +658,7 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
                               <h6 className="text-xs font-black text-rose-700 dark:text-rose-300">
                                 {np.teamName}
                               </h6>
-                              <p className="text-[9px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-bold mt-0.5">
+                              <p className="text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-bold mt-0.5">
                                 Unfilled Slot
                               </p>
                             </div>
@@ -679,13 +679,13 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
                     {/* Service Plan Notes if available */}
                     {selectedPlan.planNotes && selectedPlan.planNotes.length > 0 && (
                       <div className="mt-8 border-t border-slate-100 dark:border-slate-800 pt-6">
-                        <h5 className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-wider mb-3">
+                        <h5 className="text-[10px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wider mb-3">
                           📝 Service Notes
                         </h5>
                         <div className="space-y-3">
                           {selectedPlan.planNotes.map((note, i) => (
                             <div key={i} className="p-4 bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl">
-                              <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider">{note.category}</span>
+                              <span className="text-[11px] font-bold uppercase text-slate-400 tracking-wider">{note.category}</span>
                               <p className="text-[10px] text-slate-650 dark:text-slate-350 font-medium mt-1 whitespace-pre-wrap">{note.content}</p>
                             </div>
                           ))}
@@ -725,7 +725,7 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
             <div className="bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 p-6 pb-8">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-indigo-200 mb-1">Service Plan</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-indigo-200 mb-1">Service Plan</p>
                   <h2 className="text-xl font-black text-white leading-tight">
                     {selectedPlan.serviceTypeName || 'Service Plan'}
                   </h2>
@@ -761,7 +761,7 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
                   </p>
                   <button
                     onClick={closeEmailModal}
-                    className="mt-6 px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-colors"
+                    className="mt-6 px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-xs uppercase tracking-wide hover:bg-indigo-700 transition-colors"
                   >
                     Done
                   </button>
@@ -773,7 +773,7 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
                   <div className="flex gap-2 mb-6 p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl">
                     <button
                       onClick={() => setShowCustomEmail(false)}
-                      className={`flex-1 py-2 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${
+                      className={`flex-1 py-2 rounded-xl font-black text-xs uppercase tracking-wide transition-all ${
                         !showCustomEmail
                           ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm'
                           : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
@@ -783,7 +783,7 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
                     </button>
                     <button
                       onClick={() => setShowCustomEmail(true)}
-                      className={`flex-1 py-2 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${
+                      className={`flex-1 py-2 rounded-xl font-black text-xs uppercase tracking-wide transition-all ${
                         showCustomEmail
                           ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm'
                           : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
@@ -816,7 +816,7 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
                         onClick={() => sendPlanEmail(true)}
                         disabled={isSending}
                         className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white
-                          font-black text-sm uppercase tracking-widest hover:from-indigo-700 hover:to-violet-700
+                          font-bold text-sm uppercase tracking-wide hover:from-indigo-700 hover:to-violet-700
                           transition-all shadow-lg shadow-indigo-500/30 disabled:opacity-50 flex items-center justify-center gap-2"
                       >
                         {isSending ? (
@@ -836,7 +836,7 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
                     /* Custom email panel */
                     <div className="space-y-4">
                       <div>
-                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-2">
+                        <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2">
                           Email Address
                         </label>
                         <input
@@ -864,7 +864,7 @@ export const ServicesPlansTab: React.FC<ServicesPlansTabProps> = ({
                         onClick={() => sendPlanEmail(false, emailInput)}
                         disabled={isSending || !emailInput.includes('@')}
                         className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white
-                          font-black text-sm uppercase tracking-widest hover:from-indigo-700 hover:to-violet-700
+                          font-bold text-sm uppercase tracking-wide hover:from-indigo-700 hover:to-violet-700
                           transition-all shadow-lg shadow-indigo-500/30 disabled:opacity-50 flex items-center justify-center gap-2"
                       >
                         {isSending ? (

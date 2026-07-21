@@ -762,7 +762,7 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
                     <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1 flex items-center gap-1.5">
                       From Email
                       {isLockedMode && (
-                        <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full tracking-wide ${
+                        <span className={`text-[11px] font-black px-1.5 py-0.5 rounded-full tracking-wide ${
                           isCustomMode
                             ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400'
                             : 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'

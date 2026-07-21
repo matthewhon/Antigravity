@@ -368,7 +368,7 @@ const GroupsView: React.FC<GroupsViewProps> = ({
     return (
       <div className="bg-white dark:bg-slate-850 rounded-[5rem] p-48 text-center border-4 border-dashed border-slate-100 dark:border-slate-800 animate-in zoom-in">
         <div className="text-[140px] mb-14 grayscale opacity-20 drop-shadow-2xl">📂</div>
-        <h3 className="text-5xl font-black text-slate-900 dark:text-white mb-8 tracking-tighter uppercase">Connection Required</h3>
+        <h3 className="text-5xl font-bold text-slate-900 dark:text-white mb-8 tracking-tighter uppercase">Connection Required</h3>
         <p className="text-slate-400 max-w-lg mx-auto font-medium text-2xl leading-relaxed">
           Connect Planning Center to unlock Groups analytics and engagement metrics.
         </p>
@@ -394,7 +394,7 @@ const GroupsView: React.FC<GroupsViewProps> = ({
                                   </div>
                                   <div>
                                       <h3 className="text-lg font-black text-violet-900 dark:text-violet-300 tracking-tight">Risk Consultant</h3>
-                                      <p className="text-[10px] font-bold text-violet-500 dark:text-violet-400 uppercase tracking-widest">Health Diagnostic & Triage</p>
+                                      <p className="text-[10px] font-bold text-violet-500 dark:text-violet-400 uppercase tracking-wide">Health Diagnostic & Triage</p>
                                   </div>
                               </div>
                           </div>
@@ -413,7 +413,7 @@ const GroupsView: React.FC<GroupsViewProps> = ({
                                       <button 
                                           onClick={handleGenerateRiskAnalysis}
                                           disabled={isAnalyzingRisk}
-                                          className="bg-violet-600 text-white px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-violet-700 transition-all disabled:opacity-50 flex items-center gap-2"
+                                          className="bg-violet-600 text-white px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-wide shadow-xl hover:bg-violet-700 transition-all disabled:opacity-50 flex items-center gap-2"
                                       >
                                           {isAnalyzingRisk ? (
                                               <>
@@ -446,7 +446,7 @@ const GroupsView: React.FC<GroupsViewProps> = ({
                                   </div>
                                   <div>
                                       <h3 className="text-lg font-black text-orange-900 dark:text-orange-300 tracking-tight">Activate Agent</h3>
-                                      <p className="text-[10px] font-bold text-orange-500 dark:text-orange-400 uppercase tracking-widest">Strategies for 100% Participation</p>
+                                      <p className="text-[10px] font-bold text-orange-500 dark:text-orange-400 uppercase tracking-wide">Strategies for 100% Participation</p>
                                   </div>
                               </div>
                           </div>
@@ -465,7 +465,7 @@ const GroupsView: React.FC<GroupsViewProps> = ({
                                       <button 
                                           onClick={handleGenerateStrategy}
                                           disabled={isAnalyzing}
-                                          className="bg-orange-600 text-white px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-orange-700 transition-all disabled:opacity-50 flex items-center gap-2"
+                                          className="bg-orange-600 text-white px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-wide shadow-xl hover:bg-orange-700 transition-all disabled:opacity-50 flex items-center gap-2"
                                       >
                                           {isAnalyzing ? (
                                               <>
@@ -546,29 +546,29 @@ const GroupsView: React.FC<GroupsViewProps> = ({
                   <div key="groups_health" className="col-span-1 lg:col-span-2">
                       <div className="bg-white dark:bg-slate-800 p-8 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm h-full flex flex-col justify-between relative">
                             <div className="flex justify-between items-center mb-6">
-                                <h4 className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">Groups Health</h4>
+                                <h4 className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.14em]">Groups Health</h4>
                                 <button onClick={() => handleRemoveWidget(id)} className="absolute top-6 right-6 text-slate-300 dark:text-slate-600 hover:text-rose-500 transition-colors z-20">✕</button>
                             </div>
                             
                             <div className="grid grid-cols-3 gap-4 mb-8">
                                 <div>
                                     <p className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter">{data.stats.totalGroups}</p>
-                                    <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1">Active</p>
+                                    <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide mt-1">Active</p>
                                 </div>
                                 <div className="text-center">
                                     <p className="text-4xl font-black text-indigo-600 dark:text-indigo-400 tracking-tighter">{data.stats.totalEnrollment}</p>
-                                    <p className="text-[10px] font-bold text-indigo-300 dark:text-indigo-700 uppercase tracking-widest mt-1">Enrolled</p>
+                                    <p className="text-[10px] font-bold text-indigo-300 dark:text-indigo-700 uppercase tracking-wide mt-1">Enrolled</p>
                                 </div>
                                 <div className="text-right">
                                     <p className="text-4xl font-black text-cyan-600 dark:text-cyan-400 tracking-tighter">{avgLeaderAge}</p>
-                                    <p className="text-[10px] font-bold text-cyan-300 dark:text-cyan-700 uppercase tracking-widest mt-1">Avg Leader Age</p>
+                                    <p className="text-[10px] font-bold text-cyan-300 dark:text-cyan-700 uppercase tracking-wide mt-1">Avg Leader Age</p>
                                 </div>
                             </div>
 
                             <div>
                                 <div className="flex justify-between items-end mb-3">
                                     <div className="flex flex-col gap-1">
-                                        <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Participation Rate</span>
+                                        <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide">Participation Rate</span>
                                         <select 
                                             value={selectedListId} 
                                             onChange={(e) => setSelectedListId(e.target.value)}
@@ -630,7 +630,7 @@ const GroupsView: React.FC<GroupsViewProps> = ({
                               <select 
                                   value={eventAttendanceFilter} 
                                   onChange={(e) => setEventAttendanceFilter(e.target.value as EventAttendanceFilterType)}
-                                  className="bg-slate-100 dark:bg-slate-800 border-none text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 rounded-lg py-1 px-2 cursor-pointer outline-none focus:ring-2 focus:ring-indigo-500"
+                                  className="bg-slate-100 dark:bg-slate-800 border-none text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 rounded-lg py-1 px-2 cursor-pointer outline-none focus:ring-2 focus:ring-indigo-500"
                               >
                                   <option value="This Week">This Week</option>
                                   <option value="Last Week">Last Week</option>
@@ -645,15 +645,15 @@ const GroupsView: React.FC<GroupsViewProps> = ({
                                   <>
                                       <div className="flex gap-6 mb-4 px-2">
                                           <div>
-                                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total</p>
+                                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Total</p>
                                               <p className="text-xl font-black text-slate-900 dark:text-white">{totalAttendance.toLocaleString()}</p>
                                           </div>
                                           <div>
-                                              <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Members</p>
+                                              <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wide">Members</p>
                                               <p className="text-xl font-black text-indigo-600 dark:text-indigo-400">{totalMembers.toLocaleString()}</p>
                                           </div>
                                           <div>
-                                              <p className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">Visitors</p>
+                                              <p className="text-[10px] font-bold text-amber-400 uppercase tracking-wide">Visitors</p>
                                               <p className="text-xl font-black text-amber-500 dark:text-amber-400">{totalVisitors.toLocaleString()}</p>
                                           </div>
                                       </div>
@@ -679,7 +679,7 @@ const GroupsView: React.FC<GroupsViewProps> = ({
                               ) : (
                                   <div className="h-full flex flex-col items-center justify-center text-slate-400">
                                       <p className="text-xs font-bold mb-2">No event data found for {eventAttendanceFilter}.</p>
-                                      <button onClick={onSyncGroups} className="text-[10px] font-black uppercase tracking-widest text-indigo-500 hover:text-indigo-600 border border-indigo-100 px-3 py-1.5 rounded-lg transition-colors">
+                                      <button onClick={onSyncGroups} className="text-[10px] font-bold uppercase tracking-wide text-indigo-500 hover:text-indigo-600 border border-indigo-100 px-3 py-1.5 rounded-lg transition-colors">
                                           Sync Recent Attendance
                                       </button>
                                   </div>
@@ -708,7 +708,7 @@ const GroupsView: React.FC<GroupsViewProps> = ({
                               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pr-14">
                                   {totalGenderCount > 0 ? (
                                       <>
-                                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ratio</span>
+                                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Ratio</span>
                                           <span className="text-xl font-black text-slate-900 dark:text-white">
                                               {Math.round((groupsGenderData.find(d => d.name === 'Male')?.value || 0) / totalGenderCount * 100)}% M
                                           </span>
@@ -750,9 +750,9 @@ const GroupsView: React.FC<GroupsViewProps> = ({
                                   <div key={group.id} className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800">
                                       <div>
                                           <p className="text-xs font-bold text-slate-900 dark:text-white">{group.name}</p>
-                                          <p className="text-[9px] text-slate-400">{group.groupTypeName}</p>
+                                          <p className="text-[11px] text-slate-400">{group.groupTypeName}</p>
                                       </div>
-                                      <span className="text-[9px] font-black bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 px-2 py-1 rounded">
+                                      <span className="text-[11px] font-black bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 px-2 py-1 rounded">
                                           {new Date(group.createdAt).toLocaleDateString()}
                                       </span>
                                   </div>
@@ -872,7 +872,7 @@ const GroupsView: React.FC<GroupsViewProps> = ({
                               <select 
                                   value={groupInfoFilter} 
                                   onChange={(e) => setGroupInfoFilter(e.target.value as GroupInfoFilterType)}
-                                  className="bg-slate-100 dark:bg-slate-800 border-none text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 rounded-lg py-1 px-2 cursor-pointer outline-none focus:ring-2 focus:ring-indigo-500"
+                                  className="bg-slate-100 dark:bg-slate-800 border-none text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 rounded-lg py-1 px-2 cursor-pointer outline-none focus:ring-2 focus:ring-indigo-500"
                               >
                                   <option>Current Month</option>
                                   <option>Last Month</option>
@@ -884,11 +884,11 @@ const GroupsView: React.FC<GroupsViewProps> = ({
                               <table className="w-full text-left">
                                   <thead className="bg-slate-50 dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 sticky top-0 z-10">
                                       <tr>
-                                          <th className="p-3 text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">Group Name</th>
-                                          <th className="p-3 text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">Leader</th>
-                                          <th className="p-3 text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest text-center">Total Members</th>
-                                          <th className="p-3 text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest text-center">Health</th>
-                                          <th className="p-3 text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest text-right">Avg Attendance</th>
+                                          <th className="p-3 text-[11px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide">Group Name</th>
+                                          <th className="p-3 text-[11px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide">Leader</th>
+                                          <th className="p-3 text-[11px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide text-center">Total Members</th>
+                                          <th className="p-3 text-[11px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide text-center">Health</th>
+                                          <th className="p-3 text-[11px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide text-right">Avg Attendance</th>
                                       </tr>
                                   </thead>
                                   <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
@@ -900,7 +900,7 @@ const GroupsView: React.FC<GroupsViewProps> = ({
                                                   </td>
                                                   <td className="p-3">
                                                       <div className="flex items-center gap-2">
-                                                          <div className="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-[8px] font-black overflow-hidden flex-shrink-0">
+                                                          <div className="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-[10px] font-black overflow-hidden flex-shrink-0">
                                                               {group.leaderAvatar ? (
                                                                   <img src={group.leaderAvatar} alt={group.leader} className="w-full h-full object-cover" />
                                                               ) : (
@@ -914,7 +914,7 @@ const GroupsView: React.FC<GroupsViewProps> = ({
                                                       <span className="text-xs font-black text-slate-900 dark:text-white">{group.members ?? 0}</span>
                                                   </td>
                                                   <td className="p-3 text-center">
-                                                      <span className={`text-[9px] font-black uppercase px-2 py-1 rounded tracking-wider ${
+                                                      <span className={`text-[11px] font-black uppercase px-2 py-1 rounded tracking-wider ${
                                                           group.health.status === 'Thriving' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400' :
                                                           group.health.status === 'Warning' ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' :
                                                           'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400'
@@ -925,7 +925,7 @@ const GroupsView: React.FC<GroupsViewProps> = ({
                                                   <td className="p-3 text-right">
                                                       <div className="flex items-center justify-end gap-2">
                                                           <span className="text-xs font-black text-slate-900 dark:text-white">{group.avg}</span>
-                                                          <span className={`text-[9px] font-bold ${group.trend > 0 ? 'text-emerald-500' : group.trend < 0 ? 'text-rose-500' : 'text-slate-400'}`}>
+                                                          <span className={`text-[11px] font-bold ${group.trend > 0 ? 'text-emerald-500' : group.trend < 0 ? 'text-rose-500' : 'text-slate-400'}`}>
                                                               {group.trend > 0 ? '↑' : group.trend < 0 ? '↓' : '–'}
                                                               {Math.abs(group.trend) > 0 ? Math.abs(group.trend) : ''}
                                                           </span>
@@ -988,14 +988,14 @@ const GroupsView: React.FC<GroupsViewProps> = ({
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h3 className="text-4xl font-black tracking-tighter text-slate-900 dark:text-white">Groups Analytics</h3>
-          <p className="text-slate-400 dark:text-slate-500 font-medium uppercase text-[10px] tracking-widest mt-1">Small Group Health & Participation</p>
+          <p className="text-slate-400 dark:text-slate-500 font-medium uppercase text-[10px] tracking-wide mt-1">Small Group Health & Participation</p>
         </div>
         
         <div className="flex gap-4 items-center">
             {onToggleHideArchived && (
                 <button
                     onClick={() => onToggleHideArchived(!hideArchived)}
-                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-colors ${
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-wide transition-colors ${
                         hideArchived
                             ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400'
                             : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
@@ -1010,7 +1010,7 @@ const GroupsView: React.FC<GroupsViewProps> = ({
                 <button 
                     onClick={onSyncGroups}
                     disabled={isSyncing}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 font-black text-[10px] uppercase tracking-widest hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors disabled:opacity-50"
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 font-bold text-[10px] uppercase tracking-wide hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors disabled:opacity-50"
                 >
                     <span className={isSyncing ? 'animate-spin' : ''}>↻</span>
                     <span>{isSyncing ? 'Syncing (Deep Scan)...' : 'Groups Sync'}</span>

@@ -830,12 +830,12 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
       return (
         <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
           <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2.5">
-            <p className="text-[11px] font-bold text-emerald-100 uppercase tracking-widest">Key Financial Overview</p>
+            <p className="text-[11px] font-bold text-emerald-100 uppercase tracking-wide">Key Financial Overview</p>
           </div>
           <div className="bg-white dark:bg-slate-800 px-4 py-4">
             <div className="flex items-end justify-between mb-4">
               <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Giving</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Total Giving</p>
                 <p className="text-3xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight mt-0.5">{fmt(data.totalGiving, true)}</p>
               </div>
               {growth !== null && (
@@ -851,7 +851,7 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
                 { label: 'Avg Gift', value: fmt(data.averageGift, true), color: 'text-violet-600 dark:text-violet-400' },
               ].map(s => (
                 <div key={s.label}>
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{s.label}</p>
+                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">{s.label}</p>
                   <p className={`text-xl font-black ${s.color} mt-0.5`}>{s.value}</p>
                 </div>
               ))}
@@ -867,7 +867,7 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
       return (
         <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
           <div className="bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2.5">
-            <p className="text-[11px] font-bold text-indigo-100 uppercase tracking-widest">Fund Performance</p>
+            <p className="text-[11px] font-bold text-indigo-100 uppercase tracking-wide">Fund Performance</p>
           </div>
           <div className="bg-white dark:bg-slate-800 px-4 py-3 space-y-2">
             {funds.map((f, i) => (
@@ -898,7 +898,7 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
       return (
         <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
           <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-2.5">
-            <p className="text-[11px] font-bold text-amber-100 uppercase tracking-widest">Donor Lifecycle</p>
+            <p className="text-[11px] font-bold text-amber-100 uppercase tracking-wide">Donor Lifecycle</p>
           </div>
           <div className="bg-white dark:bg-slate-800 px-4 py-3 space-y-2">
             {rows.map(r => (
@@ -927,12 +927,12 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
       return (
         <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
           <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-2.5">
-            <p className="text-[11px] font-bold text-indigo-100 uppercase tracking-widest">People Overview</p>
+            <p className="text-[11px] font-bold text-indigo-100 uppercase tracking-wide">People Overview</p>
           </div>
           <div className="bg-white dark:bg-slate-800 px-4 py-4 grid grid-cols-2 gap-4">
             {stats.map(s => (
               <div key={s.label}>
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{s.label}</p>
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">{s.label}</p>
                 <p className={`text-2xl font-black ${s.color} mt-0.5`}>{s.value}</p>
               </div>
             ))}
@@ -947,7 +947,7 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
       return (
         <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
           <div className="bg-gradient-to-r from-pink-500 to-rose-500 px-4 py-2.5">
-            <p className="text-[11px] font-bold text-pink-100 uppercase tracking-widest">Age Distribution</p>
+            <p className="text-[11px] font-bold text-pink-100 uppercase tracking-wide">Age Distribution</p>
           </div>
           <div className="bg-white dark:bg-slate-800 px-4 py-3 space-y-2">
             {rows.map(r => (
@@ -973,7 +973,7 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
       return (
         <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
           <div className="bg-gradient-to-r from-pink-500 to-indigo-500 px-4 py-2.5">
-            <p className="text-[11px] font-bold text-pink-100 uppercase tracking-widest">Gender Breakdown</p>
+            <p className="text-[11px] font-bold text-pink-100 uppercase tracking-wide">Gender Breakdown</p>
           </div>
           <div className="bg-white dark:bg-slate-800 px-4 py-3 space-y-2">
             {rows.map(r => (
@@ -999,7 +999,7 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
       return (
         <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
           <div className="bg-gradient-to-r from-slate-600 to-slate-800 px-4 py-2.5">
-            <p className="text-[11px] font-bold text-slate-200 uppercase tracking-widest">Membership Status</p>
+            <p className="text-[11px] font-bold text-slate-200 uppercase tracking-wide">Membership Status</p>
           </div>
           <div className="bg-white dark:bg-slate-800 px-4 py-3 space-y-2">
             {rows.map((r, i) => (
@@ -1029,7 +1029,7 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
       return (
         <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
           <div className="bg-gradient-to-r from-indigo-600 to-cyan-600 px-4 py-2.5">
-            <p className="text-[11px] font-bold text-indigo-100 uppercase tracking-widest">Donor Acquisition</p>
+            <p className="text-[11px] font-bold text-indigo-100 uppercase tracking-wide">Donor Acquisition</p>
           </div>
           <div className="bg-white dark:bg-slate-800 px-4 py-3 space-y-2">
             {rows.map(r => (
@@ -1066,7 +1066,7 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
           <div className="bg-gradient-to-r from-emerald-600 to-green-600 px-4 py-2.5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[11px] font-bold text-emerald-100 uppercase tracking-widest">Cumulative Giving (YTD)</p>
+                <p className="text-[11px] font-bold text-emerald-100 uppercase tracking-wide">Cumulative Giving (YTD)</p>
                 {data.fundFilter && <p className="text-[10px] text-emerald-200 mt-0.5">{data.fundFilter}</p>}
               </div>
               <div className="text-right">
@@ -1090,7 +1090,7 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
               <div className="flex items-center gap-1.5">
                 <span className={`text-xs font-black ${pctColor}`}>{pctOfYtdBudget}%</span>
                 {statusLabel && (
-                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+                  <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded-full ${
                     pctOfYtdBudget >= 100 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
                     pctOfYtdBudget >= 80  ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
                     'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
@@ -1140,13 +1140,13 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
         <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
           <div className="bg-gradient-to-r from-pink-500 to-rose-500 px-4 py-2.5">
             <div className="flex items-center justify-between">
-              <p className="text-[11px] font-bold text-pink-100 uppercase tracking-widest">Upcoming Birthdays</p>
+              <p className="text-[11px] font-bold text-pink-100 uppercase tracking-wide">Upcoming Birthdays</p>
               <span className="text-xs font-bold text-pink-100">Next 30 days</span>
             </div>
             {listFilter && (
               <div className="flex items-center gap-1 mt-1">
                 <List size={9} className="text-pink-200" />
-                <span className="text-[9px] text-pink-200 font-medium truncate">{listFilter}</span>
+                <span className="text-[11px] text-pink-200 font-medium truncate">{listFilter}</span>
               </div>
             )}
           </div>
@@ -1175,13 +1175,13 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
         <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
           <div className="bg-gradient-to-r from-violet-500 to-purple-600 px-4 py-2.5">
             <div className="flex items-center justify-between">
-              <p className="text-[11px] font-bold text-violet-100 uppercase tracking-widest">Upcoming Anniversaries</p>
+              <p className="text-[11px] font-bold text-violet-100 uppercase tracking-wide">Upcoming Anniversaries</p>
               <span className="text-xs font-bold text-violet-100">Next 30 days</span>
             </div>
             {listFilter && (
               <div className="flex items-center gap-1 mt-1">
                 <List size={9} className="text-violet-200" />
-                <span className="text-[9px] text-violet-200 font-medium truncate">{listFilter}</span>
+                <span className="text-[11px] text-violet-200 font-medium truncate">{listFilter}</span>
               </div>
             )}
           </div>
@@ -1220,7 +1220,7 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
         <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
           {/* Header */}
           <div className="bg-gradient-to-r from-teal-600 to-emerald-600 px-4 py-2.5 flex items-center justify-between">
-            <p className="text-[11px] font-bold text-teal-100 uppercase tracking-widest">Budget Progress</p>
+            <p className="text-[11px] font-bold text-teal-100 uppercase tracking-wide">Budget Progress</p>
             <span className="text-[10px] font-bold text-teal-200">{year}</span>
           </div>
           <div className="bg-white dark:bg-slate-800 px-4 py-4 space-y-4">
@@ -1228,13 +1228,13 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
             {totalBudget > 0 && (
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Overall</span>
+                  <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Overall</span>
                   <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${badgeCls(totalPct)}`}>{totalPct}%</span>
                 </div>
                 <div className="h-4 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
                   <div className="bar-fill-color" style={{ '--bar-w': `${totalPct}%`, '--bar-color': barColor(totalPct) } as React.CSSProperties} />
                 </div>
-                <div className="flex justify-between text-[9px] text-slate-400">
+                <div className="flex justify-between text-[11px] text-slate-400">
                   <span>{fmt(totalActual, true)} raised</span>
                   <span>{fmt(totalBudget, true)} goal</span>
                 </div>
@@ -1246,8 +1246,8 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-semibold text-slate-700 dark:text-slate-300 truncate max-w-[55%]">{f.name}</span>
                   <div className="flex items-center gap-1.5">
-                    <span className={`text-[9px] font-black px-1 py-0.5 rounded ${badgeCls(f.pct)}`}>{f.pct}%</span>
-                    <span className="text-[9px] text-slate-400">{fmt(f.actual, true)} / {fmt(f.budget, true)}</span>
+                    <span className={`text-[11px] font-black px-1 py-0.5 rounded ${badgeCls(f.pct)}`}>{f.pct}%</span>
+                    <span className="text-[11px] text-slate-400">{fmt(f.actual, true)} / {fmt(f.budget, true)}</span>
                   </div>
                 </div>
                 <div className="h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
@@ -1270,14 +1270,14 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
         <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
           {/* Header */}
           <div className="bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2.5 flex items-center justify-between">
-            <p className="text-[11px] font-bold text-indigo-100 uppercase tracking-widest">Last Week by Fund</p>
+            <p className="text-[11px] font-bold text-indigo-100 uppercase tracking-wide">Last Week by Fund</p>
             <span className="text-[10px] font-bold text-indigo-200">{weekLabel}</span>
           </div>
           <div className="bg-white dark:bg-slate-800 px-4 py-4 space-y-3">
             {/* Week total */}
             {weekTotal > 0 && (
               <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-700">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Week Total</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Week Total</span>
                 <span className="text-lg font-black text-emerald-600 dark:text-emerald-400">{fmt(weekTotal, true)}</span>
               </div>
             )}
@@ -1291,7 +1291,7 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span className="text-[10px] font-black text-slate-900 dark:text-white">{fmt(f.amount, true)}</span>
-                    <span className="text-[9px] text-slate-400">{f.pct}%</span>
+                    <span className="text-[11px] text-slate-400">{f.pct}%</span>
                   </div>
                 </div>
                 <div className="h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full">
@@ -1312,7 +1312,7 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
       return (
         <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
           <div className="bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2.5 flex items-center justify-between">
-            <p className="text-[11px] font-bold text-indigo-100 uppercase tracking-widest">Church Progress</p>
+            <p className="text-[11px] font-bold text-indigo-100 uppercase tracking-wide">Church Progress</p>
             <span className="text-[10px] font-bold text-indigo-200">Last 30 Days</span>
           </div>
           <div className="bg-white dark:bg-slate-800 px-4 py-3 space-y-3">
@@ -1345,7 +1345,7 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
       return (
         <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
           <div className="bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 py-2.5 flex items-center justify-between">
-            <p className="text-[11px] font-bold text-violet-100 uppercase tracking-widest">Upcoming Registrations</p>
+            <p className="text-[11px] font-bold text-violet-100 uppercase tracking-wide">Upcoming Registrations</p>
             <span className="text-xs font-bold text-violet-200">{events.length} event{events.length !== 1 ? 's' : ''}</span>
           </div>
           <div className="bg-white dark:bg-slate-800 px-4 py-2">
@@ -1361,8 +1361,8 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
                     <p className="text-xs font-black text-slate-900 dark:text-white">
                       {fmt(e.signupCount)}{e.signupLimit ? ` / ${fmt(e.signupLimit)}` : ''}
                     </p>
-                    {e.isFull && <span className="text-[9px] font-bold text-rose-600 dark:text-rose-400 uppercase">Full</span>}
-                    {!e.isFull && e.waitlistedCount > 0 && <span className="text-[9px] font-bold text-amber-600 dark:text-amber-400 uppercase">{e.waitlistedCount} waitlisted</span>}
+                    {e.isFull && <span className="text-[11px] font-bold text-rose-600 dark:text-rose-400 uppercase">Full</span>}
+                    {!e.isFull && e.waitlistedCount > 0 && <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400 uppercase">{e.waitlistedCount} waitlisted</span>}
                   </div>
                 </div>
                 {e.fillPct !== null && (
@@ -1383,21 +1383,21 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
       return (
         <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
           <div className="bg-gradient-to-r from-indigo-600 to-blue-600 px-4 py-2.5 flex items-center justify-between">
-            <p className="text-[11px] font-bold text-indigo-100 uppercase tracking-widest">Group Attendance</p>
+            <p className="text-[11px] font-bold text-indigo-100 uppercase tracking-wide">Group Attendance</p>
             <span className="text-[10px] font-bold text-indigo-200">{data.period || 'This Month'}</span>
           </div>
           <div className="bg-white dark:bg-slate-800 px-4 py-3">
             <div className="flex gap-6 mb-3">
               <div>
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Total</p>
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">Total</p>
                 <p className="text-xl font-black text-slate-900 dark:text-white">{fmt(data.periodTotal || 0)}</p>
               </div>
               <div>
-                <p className="text-[9px] font-bold text-indigo-400 uppercase tracking-widest">Members</p>
+                <p className="text-[11px] font-bold text-indigo-400 uppercase tracking-wide">Members</p>
                 <p className="text-xl font-black text-indigo-600 dark:text-indigo-400">{fmt(data.periodMembers || 0)}</p>
               </div>
               <div>
-                <p className="text-[9px] font-bold text-amber-400 uppercase tracking-widest">Visitors</p>
+                <p className="text-[11px] font-bold text-amber-400 uppercase tracking-wide">Visitors</p>
                 <p className="text-xl font-black text-amber-500 dark:text-amber-400">{fmt(data.periodVisitors || 0)}</p>
               </div>
             </div>
@@ -1424,7 +1424,7 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
       return (
         <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
           <div className="bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2.5 flex items-center justify-between">
-            <p className="text-[11px] font-bold text-violet-100 uppercase tracking-widest">Events</p>
+            <p className="text-[11px] font-bold text-violet-100 uppercase tracking-wide">Events</p>
             <span className="text-[10px] font-bold text-violet-200">{data.period || 'This Month'}</span>
           </div>
           <div className="bg-white dark:bg-slate-800 px-4 py-2">
@@ -1446,7 +1446,7 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
                       <p className="text-xs font-black text-emerald-600 dark:text-emerald-400">
                         {fmt(e.total)} Total
                       </p>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase">
+                      <p className="text-[11px] font-bold text-slate-400 uppercase">
                         {checkinsCount} In • {e.headcount || 0} HC
                       </p>
                     </div>
@@ -1473,7 +1473,7 @@ export const AnalyticsWidgetBlock: React.FC<{ widgetId: AnalyticsWidgetId; data:
           {/* Header */}
           <div className="bg-gradient-to-r from-emerald-600 to-cyan-600 px-4 py-2.5 flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-bold text-emerald-100 uppercase tracking-widest">Average Giving</p>
+              <p className="text-[11px] font-bold text-emerald-100 uppercase tracking-wide">Average Giving</p>
               <p className="text-[10px] text-emerald-200 mt-0.5">Last 12 Weeks</p>
             </div>
             <div className="text-right">

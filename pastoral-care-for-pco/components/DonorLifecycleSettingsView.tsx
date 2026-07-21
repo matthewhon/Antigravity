@@ -45,12 +45,12 @@ const DonorLifecycleSettingsView: React.FC<DonorLifecycleSettingsViewProps> = ({
       <div className="flex justify-between items-center mb-8">
         <div>
             <h3 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Donor Lifecycle Definitions</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase tracking-widest mt-1">Configure criteria for donor categorization</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wide mt-1">Configure criteria for donor categorization</p>
         </div>
         <button 
             onClick={handleSave}
             disabled={!isDirty}
-            className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-200"
+            className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-wide hover:bg-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-200"
         >
             Save Criteria
         </button>
@@ -66,7 +66,7 @@ const DonorLifecycleSettingsView: React.FC<DonorLifecycleSettingsViewProps> = ({
                     <p className="text-[10px] text-slate-400 dark:text-slate-500">First-time gift</p>
                 </div>
             </div>
-            <label className="block text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-2">Within Last (Days)</label>
+            <label className="block text-[11px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide mb-2">Within Last (Days)</label>
             <input 
                 type="number" 
                 value={localSettings.newDonorDays}
@@ -86,7 +86,7 @@ const DonorLifecycleSettingsView: React.FC<DonorLifecycleSettingsViewProps> = ({
             </div>
             <div className="space-y-4">
                 <div>
-                    <label className="block text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-2">Gift Within (Days)</label>
+                    <label className="block text-[11px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide mb-2">Gift Within (Days)</label>
                     <input 
                         type="number" 
                         value={localSettings.activeWindowDays}
@@ -95,7 +95,7 @@ const DonorLifecycleSettingsView: React.FC<DonorLifecycleSettingsViewProps> = ({
                     />
                 </div>
                 <div>
-                    <label className="block text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-2">Min # Gifts in Period</label>
+                    <label className="block text-[11px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide mb-2">Min # Gifts in Period</label>
                     <input 
                         type="number" 
                         min="1"
@@ -116,14 +116,14 @@ const DonorLifecycleSettingsView: React.FC<DonorLifecycleSettingsViewProps> = ({
                     <p className="text-[10px] text-slate-400 dark:text-slate-500">Inconsistent</p>
                 </div>
             </div>
-            <label className="block text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-2">Gift Within (Days)</label>
+            <label className="block text-[11px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide mb-2">Gift Within (Days)</label>
             <input 
                 type="number" 
                 value={localSettings.occasionalWindowDays}
                 onChange={(e) => handleChange('occasionalWindowDays', e.target.value)}
                 className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-black text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
             />
-            <p className="text-[9px] text-slate-400 dark:text-slate-500 mt-2 italic">Givers who don't meet Active frequency but are in this window.</p>
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-2 italic">Givers who don't meet Active frequency but are in this window.</p>
         </div>
 
         {/* Lapsed / Inactive */}
@@ -135,14 +135,14 @@ const DonorLifecycleSettingsView: React.FC<DonorLifecycleSettingsViewProps> = ({
                     <p className="text-[10px] text-slate-400 dark:text-slate-500">Before Inactive</p>
                 </div>
             </div>
-            <label className="block text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-2">Becomes Inactive (Days)</label>
+            <label className="block text-[11px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide mb-2">Becomes Inactive (Days)</label>
             <input 
                 type="number" 
                 value={localSettings.lapsedWindowDays || 365}
                 onChange={(e) => handleChange('lapsedWindowDays', e.target.value)}
                 className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-black text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
             />
-            <p className="text-[9px] text-slate-400 dark:text-slate-500 mt-2 italic">Gifts older than this are considered Inactive.</p>
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-2 italic">Gifts older than this are considered Inactive.</p>
         </div>
 
         {/* Recovered */}
@@ -154,7 +154,7 @@ const DonorLifecycleSettingsView: React.FC<DonorLifecycleSettingsViewProps> = ({
                     <p className="text-[10px] text-slate-400 dark:text-slate-500">Returned after lapse</p>
                 </div>
             </div>
-            <label className="block text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-2">After Gap of (Days)</label>
+            <label className="block text-[11px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide mb-2">After Gap of (Days)</label>
             <input 
                 type="number" 
                 value={localSettings.recoveredGapDays}

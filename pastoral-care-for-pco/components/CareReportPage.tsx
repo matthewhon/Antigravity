@@ -189,7 +189,7 @@ const InlineContactForm: React.FC<InlineContactFormProps> = ({ person, onSave, o
                     <div className="flex items-center gap-2">
                         {person.avatar
                             ? <img src={person.avatar} alt={person.name} className="w-6 h-6 rounded-full object-cover" />
-                            : <div className="w-6 h-6 rounded-full bg-indigo-200 dark:bg-indigo-800 flex items-center justify-center text-[9px] font-black text-indigo-700 dark:text-indigo-300">{person.name.substring(0, 2).toUpperCase()}</div>
+                            : <div className="w-6 h-6 rounded-full bg-indigo-200 dark:bg-indigo-800 flex items-center justify-center text-[11px] font-black text-indigo-700 dark:text-indigo-300">{person.name.substring(0, 2).toUpperCase()}</div>
                         }
                         <span className="text-xs font-black text-slate-700 dark:text-slate-200">
                             Log Contact — <span className="text-indigo-600 dark:text-indigo-400">{person.name}</span>
@@ -199,13 +199,13 @@ const InlineContactForm: React.FC<InlineContactFormProps> = ({ person, onSave, o
                     <div className="flex flex-wrap gap-3 items-start">
                         {/* Contact type picker */}
                         <div className="flex flex-col gap-1.5">
-                            <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Contact Type</span>
+                            <span className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Contact Type</span>
                             <div className="flex flex-wrap gap-1">
                                 {NOTE_TYPES.map(t => (
                                     <button
                                         key={t}
                                         onClick={() => setContactType(t)}
-                                        className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
+                                        className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wide transition-all ${
                                             contactType === t
                                                 ? 'bg-indigo-600 text-white'
                                                 : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:border-indigo-400 hover:text-indigo-600'
@@ -219,7 +219,7 @@ const InlineContactForm: React.FC<InlineContactFormProps> = ({ person, onSave, o
 
                         {/* Note textarea */}
                         <div className="flex-1 min-w-[240px] flex flex-col gap-1.5">
-                            <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Note (optional)</span>
+                            <span className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Note (optional)</span>
                             <textarea
                                 value={content}
                                 onChange={e => setContent(e.target.value)}
@@ -235,14 +235,14 @@ const InlineContactForm: React.FC<InlineContactFormProps> = ({ person, onSave, o
                             <button
                                 onClick={handleSave}
                                 disabled={saving || !content.trim()}
-                                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-[10px] font-black uppercase tracking-widest transition-all"
+                                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-[10px] font-bold uppercase tracking-wide transition-all"
                             >
                                 {saving ? <span className="animate-spin text-xs">⏳</span> : <Send size={11} />}
                                 {saving ? 'Saving…' : 'Save'}
                             </button>
                             <button
                                 onClick={onCancel}
-                                className="flex items-center gap-1 px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 dark:hover:bg-slate-700 transition-all"
+                                className="flex items-center gap-1 px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 text-[10px] font-bold uppercase tracking-wide hover:bg-slate-50 dark:hover:bg-slate-700 transition-all"
                             >
                                 <X size={11} /> Cancel
                             </button>
@@ -449,7 +449,7 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
     const ThCol: React.FC<{ label: string; col: SortKey; className?: string }> = ({ label, col, className }) => (
         <th
             onClick={() => handleSort(col)}
-            className={`p-2 text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 dark:border-slate-800 cursor-pointer select-none hover:text-indigo-500 transition-colors whitespace-nowrap ${className ?? ''}`}
+            className={`p-2 text-[10px] font-black uppercase tracking-wide text-slate-400 border-b border-slate-100 dark:border-slate-800 cursor-pointer select-none hover:text-indigo-500 transition-colors whitespace-nowrap ${className ?? ''}`}
         >
             {label}<SortIcon col={col} active={sortKey} dir={sortDir} />
         </th>
@@ -470,7 +470,7 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
         return (
             <div className="py-20 flex flex-col items-center gap-3 text-slate-400">
                 <div className="animate-spin text-3xl">⏳</div>
-                <p className="text-sm font-bold uppercase tracking-widest">Loading people data…</p>
+                <p className="text-sm font-bold uppercase tracking-wide">Loading people data…</p>
             </div>
         );
     }
@@ -482,24 +482,24 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
             <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
                     <h2 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">Care Report</h2>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mt-0.5">
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mt-0.5">
                         Who needs to be contacted — and when did we last reach out?
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
                     <button
                         onClick={() => setFiltersOpen(f => !f)}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wide transition-all ${
                             filtersOpen
                                 ? 'bg-indigo-600 text-white'
                                 : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
                         }`}
                     >
-                        <Filter size={13} /> Filters {hasActiveFilter && <span className="bg-white/30 text-white px-1.5 py-0.5 rounded-full text-[9px]">ON</span>}
+                        <Filter size={13} /> Filters {hasActiveFilter && <span className="bg-white/30 text-white px-1.5 py-0.5 rounded-full text-[11px]">ON</span>}
                     </button>
                     <button
                         onClick={() => exportToCSV(sortedRows, 'care-report')}
-                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-widest transition-all shadow-sm"
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold uppercase tracking-wide transition-all shadow-sm"
                     >
                         <Download size={13} /> Export CSV
                     </button>
@@ -517,7 +517,7 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
                 ].map(card => (
                     <div key={card.label} className={`p-4 rounded-2xl border ${card.bg} flex flex-col gap-1`}>
                         <p className={`text-2xl font-black ${card.color}`}>{card.value}</p>
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{card.label}</p>
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{card.label}</p>
                     </div>
                 ))}
             </div>
@@ -528,7 +528,7 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
                     <div className="flex flex-wrap gap-3 items-end">
                         {/* Search */}
                         <div className="flex-1 min-w-[180px]">
-                            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Search</label>
+                            <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Search</label>
                             <div className="relative">
                                 <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                                 <input
@@ -543,13 +543,13 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
 
                         {/* Risk */}
                         <div>
-                            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Risk</label>
+                            <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Risk</label>
                             <div className="flex gap-1">
                                 {(['all', 'Healthy', 'At Risk', 'Disconnected'] as const).map(v => (
                                     <button
                                         key={v}
                                         onClick={() => setRiskFilter(v)}
-                                        className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
+                                        className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wide transition-all ${
                                             riskFilter === v
                                                 ? v === 'Healthy' ? 'bg-emerald-500 text-white'
                                                 : v === 'At Risk' ? 'bg-amber-500 text-white'
@@ -566,11 +566,11 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
 
                         {/* Membership */}
                         <div>
-                            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Membership</label>
+                            <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Membership</label>
                             <select
                                 value={membershipFilter}
                                 onChange={e => setMembershipFilter(e.target.value)}
-                                className="bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[10px] font-black uppercase rounded-xl px-3 py-2 outline-none border border-slate-100 dark:border-slate-700 focus:ring-2 focus:ring-indigo-400 transition-all"
+                                className="bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[10px] font-bold uppercase rounded-xl px-3 py-2 outline-none border border-slate-100 dark:border-slate-700 focus:ring-2 focus:ring-indigo-400 transition-all"
                             >
                                 <option value="all">All</option>
                                 {membershipOptions.map(m => <option key={m} value={m}>{m}</option>)}
@@ -579,7 +579,7 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
 
                         {/* Last Contact */}
                         <div>
-                            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Last Contact</label>
+                            <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Last Contact</label>
                             <div className="flex gap-1 flex-wrap">
                                 {([
                                     { v: 'all', label: 'All' },
@@ -591,7 +591,7 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
                                     <button
                                         key={v}
                                         onClick={() => setLastContactFilter(v)}
-                                        className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
+                                        className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wide transition-all ${
                                             lastContactFilter === v ? 'bg-indigo-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
                                         }`}
                                     >
@@ -603,13 +603,13 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
 
                         {/* Has Notes */}
                         <div>
-                            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Notes</label>
+                            <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Notes</label>
                             <div className="flex gap-1">
                                 {([{ v: 'all', label: 'All' }, { v: 'has', label: 'Has Notes' }, { v: 'none', label: 'No Notes' }] as const).map(({ v, label }) => (
                                     <button
                                         key={v}
                                         onClick={() => setHasNotesFilter(v)}
-                                        className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
+                                        className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wide transition-all ${
                                             hasNotesFilter === v ? 'bg-indigo-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
                                         }`}
                                     >
@@ -621,10 +621,10 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
 
                         {/* Upcoming */}
                         <div>
-                            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Celebrations</label>
+                            <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Celebrations</label>
                             <button
                                 onClick={() => setUpcomingOnly(u => !u)}
-                                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
+                                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wide transition-all ${
                                     upcomingOnly ? 'bg-pink-500 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
                                 }`}
                             >
@@ -634,10 +634,10 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
 
                         {/* Show cleared */}
                         <div>
-                            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Cleared</label>
+                            <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Cleared</label>
                             <button
                                 onClick={() => setShowDismissed(d => !d)}
-                                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
+                                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wide transition-all ${
                                     showDismissed ? 'bg-emerald-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
                                 }`}
                             >
@@ -649,7 +649,7 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
                         {hasActiveFilter && (
                             <button
                                 onClick={resetFilters}
-                                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-all border border-rose-200 dark:border-rose-900/40"
+                                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wide text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-all border border-rose-200 dark:border-rose-900/40"
                             >
                                 <X size={11} /> Clear Filters
                             </button>
@@ -669,13 +669,13 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
                                 <ThCol label="Score" col="riskScore" />
                                 <ThCol label="Membership" col="membership" />
                                 <ThCol label="Last Contact" col="lastContact" />
-                                <th className="p-2 text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 dark:border-slate-800 whitespace-nowrap">Type</th>
+                                <th className="p-2 text-[10px] font-bold uppercase tracking-wide text-slate-400 border-b border-slate-100 dark:border-slate-800 whitespace-nowrap">Type</th>
                                 <ThCol label="Days Since" col="daysSince" />
                                 <ThCol label="Notes" col="notesCount" />
                                 <ThCol label="Urgency" col="urgency" />
-                                <th className="p-2 text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 dark:border-slate-800 whitespace-nowrap">Birthday</th>
-                                <th className="p-2 text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 dark:border-slate-800 whitespace-nowrap">Anniversary</th>
-                                <th className="p-2 text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 dark:border-slate-800 text-right pr-4 whitespace-nowrap">Actions</th>
+                                <th className="p-2 text-[10px] font-bold uppercase tracking-wide text-slate-400 border-b border-slate-100 dark:border-slate-800 whitespace-nowrap">Birthday</th>
+                                <th className="p-2 text-[10px] font-bold uppercase tracking-wide text-slate-400 border-b border-slate-100 dark:border-slate-800 whitespace-nowrap">Anniversary</th>
+                                <th className="p-2 text-[10px] font-bold uppercase tracking-wide text-slate-400 border-b border-slate-100 dark:border-slate-800 text-right pr-4 whitespace-nowrap">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -743,9 +743,9 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
                                                             title={`Open ${person.name}'s profile`}
                                                             className="text-sm font-bold text-slate-900 dark:text-white truncate max-w-[140px] hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors text-left"
                                                         >{person.name}</button>
-                                                            {followedUpRecently && <span className="text-[9px] font-black uppercase tracking-wide bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 px-1.5 py-0.5 rounded-full whitespace-nowrap">✓ Contacted</span>}
-                                                            {dismissed && <span className="text-[9px] font-black uppercase tracking-wide bg-slate-100 dark:bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded-full whitespace-nowrap">Cleared</span>}
-                                                            {isOverdue && !followedUpRecently && !dismissed && <span className="text-[9px] font-black uppercase tracking-wide bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded-full whitespace-nowrap">⚠️ Overdue</span>}
+                                                            {followedUpRecently && <span className="text-[11px] font-bold uppercase tracking-wide bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 px-1.5 py-0.5 rounded-full whitespace-nowrap">✓ Contacted</span>}
+                                                            {dismissed && <span className="text-[11px] font-bold uppercase tracking-wide bg-slate-100 dark:bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded-full whitespace-nowrap">Cleared</span>}
+                                                            {isOverdue && !followedUpRecently && !dismissed && <span className="text-[11px] font-bold uppercase tracking-wide bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded-full whitespace-nowrap">⚠️ Overdue</span>}
                                                         </div>
                                                         <p className="text-[10px] text-slate-400 truncate max-w-[160px]">{person.phone || person.email || 'No Contact Info'}</p>
                                                     </div>
@@ -754,7 +754,7 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
 
                                             {/* Risk */}
                                             <td className="p-2 text-center">
-                                                <span className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wide whitespace-nowrap ${riskBadge}`}>{category}</span>
+                                                <span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wide whitespace-nowrap ${riskBadge}`}>{category}</span>
                                             </td>
 
                                             {/* Score */}
@@ -771,7 +771,7 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
                                                     {lastNote ? formatDate(lastNote.date) : <span className="text-rose-400 font-black text-[10px]">Never</span>}
                                                 </div>
                                                 {lastTouchpoint && lastTouchpoint.tags?.includes('no-answer') && (
-                                                    <div className="text-[9px] text-rose-500/80 font-black mt-0.5" title={`Last attempt: ${lastTouchpoint.content || 'No Answer'}`}>
+                                                    <div className="text-[11px] text-rose-500/80 font-black mt-0.5" title={`Last attempt: ${lastTouchpoint.content || 'No Answer'}`}>
                                                         📵 No Answer: {formatDate(lastTouchpoint.date)}
                                                     </div>
                                                 )}
@@ -902,7 +902,7 @@ export const CareReportPage: React.FC<CareReportPageProps> = ({
 
                 {/* Footer */}
                 <div className="px-4 py-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
                         {sortedRows.length} of {allRows.length} people
                         {stats.dismissed > 0 && !showDismissed && (
                             <button onClick={() => setShowDismissed(true)} className="ml-3 text-emerald-500 hover:underline">{stats.dismissed} cleared (show)</button>

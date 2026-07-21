@@ -642,7 +642,7 @@ const PollEditor: React.FC<{
 
         {/* Right: Settings */}
         <div className="w-72 shrink-0 border-l border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 overflow-y-auto p-5 space-y-5">
-          <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Poll Settings</h3>
+          <h3 className="text-xs font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">Poll Settings</h3>
 
           <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 divide-y divide-slate-100 dark:divide-slate-700/50 px-4">
             <Toggle
@@ -680,7 +680,7 @@ const PollEditor: React.FC<{
 
           {/* ─── SMS Voting ─── */}
           <div>
-            <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-3 flex items-center gap-1.5">
+            <h3 className="text-xs font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-3 flex items-center gap-1.5">
               <MessageSquare size={11} /> SMS Text-to-Vote
             </h3>
             <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 space-y-3">
@@ -741,7 +741,7 @@ const PollEditor: React.FC<{
 
           {/* ─── Live Projector ─── */}
           <div>
-            <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-3 flex items-center gap-1.5">
+            <h3 className="text-xs font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-3 flex items-center gap-1.5">
               <Tv2 size={11} /> Live Display
             </h3>
             <div className="space-y-2">

@@ -133,18 +133,18 @@ export const CarePeopleListWidget: React.FC<CarePeopleListWidgetProps> = ({
             <div className="flex flex-col h-[600px]">
                 <div className="flex justify-between items-center mb-4 px-2">
                     <div className="flex items-center gap-2">
-                        <label className="text-[10px] font-black uppercase text-slate-400">Membership:</label>
+                        <label className="text-[10px] font-bold uppercase text-slate-400">Membership:</label>
                         <select 
                             value={memberStatusFilter}
                             onChange={(e) => { setMemberStatusFilter(e.target.value); setPage(1); }}
-                            className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[10px] font-black uppercase rounded-lg px-2 py-1 outline-none border-none"
+                            className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[10px] font-bold uppercase rounded-lg px-2 py-1 outline-none border-none"
                         >
                             {memberStatuses.map(s => (
                                 <option key={s} value={s}>{s}</option>
                             ))}
                         </select>
                     </div>
-                    <div className="text-[10px] font-black uppercase text-slate-400">
+                    <div className="text-[10px] font-bold uppercase text-slate-400">
                         Total: {filteredPeople.length} People
                     </div>
                 </div>
@@ -153,16 +153,16 @@ export const CarePeopleListWidget: React.FC<CarePeopleListWidgetProps> = ({
                     <table className="w-full text-left border-collapse">
                         <thead className="sticky top-0 bg-white dark:bg-slate-850 z-10">
                             <tr>
-                                <th className="p-2 text-[10px] font-black uppercase text-slate-400 border-b border-slate-100 dark:border-slate-800">Person</th>
-                                <th className="p-2 text-[10px] font-black uppercase text-slate-400 border-b border-slate-100 dark:border-slate-800 text-center">Status</th>
-                                <th className="p-2 text-[10px] font-black uppercase text-slate-400 border-b border-slate-100 dark:border-slate-800 text-center">Score</th>
-                                <th className="p-2 text-[10px] font-black uppercase text-slate-400 border-b border-slate-100 dark:border-slate-800 text-center">Attend</th>
-                                <th className="p-2 text-[10px] font-black uppercase text-slate-400 border-b border-slate-100 dark:border-slate-800 text-center">Group</th>
-                                <th className="p-2 text-[10px] font-black uppercase text-slate-400 border-b border-slate-100 dark:border-slate-800 text-center">Serve</th>
-                                <th className="p-2 text-[10px] font-black uppercase text-slate-400 border-b border-slate-100 dark:border-slate-800 text-center">Give</th>
-                                <th className="p-2 text-[10px] font-black uppercase text-slate-400 border-b border-slate-100 dark:border-slate-800 text-center">Member</th>
-                                <th className="p-2 text-[10px] font-black uppercase text-slate-400 border-b border-slate-100 dark:border-slate-800 text-center">Birthday</th>
-                                <th className="p-2 text-[10px] font-black uppercase text-slate-400 border-b border-slate-100 dark:border-slate-800 text-center">Anniversary</th>
+                                <th className="p-2 text-[10px] font-bold uppercase text-slate-400 border-b border-slate-100 dark:border-slate-800">Person</th>
+                                <th className="p-2 text-[10px] font-bold uppercase text-slate-400 border-b border-slate-100 dark:border-slate-800 text-center">Status</th>
+                                <th className="p-2 text-[10px] font-bold uppercase text-slate-400 border-b border-slate-100 dark:border-slate-800 text-center">Score</th>
+                                <th className="p-2 text-[10px] font-bold uppercase text-slate-400 border-b border-slate-100 dark:border-slate-800 text-center">Attend</th>
+                                <th className="p-2 text-[10px] font-bold uppercase text-slate-400 border-b border-slate-100 dark:border-slate-800 text-center">Group</th>
+                                <th className="p-2 text-[10px] font-bold uppercase text-slate-400 border-b border-slate-100 dark:border-slate-800 text-center">Serve</th>
+                                <th className="p-2 text-[10px] font-bold uppercase text-slate-400 border-b border-slate-100 dark:border-slate-800 text-center">Give</th>
+                                <th className="p-2 text-[10px] font-bold uppercase text-slate-400 border-b border-slate-100 dark:border-slate-800 text-center">Member</th>
+                                <th className="p-2 text-[10px] font-bold uppercase text-slate-400 border-b border-slate-100 dark:border-slate-800 text-center">Birthday</th>
+                                <th className="p-2 text-[10px] font-bold uppercase text-slate-400 border-b border-slate-100 dark:border-slate-800 text-center">Anniversary</th>
                             </tr>
                         </thead>
                         <tbody className="text-sm border-b border-slate-100 dark:border-slate-800">
@@ -206,7 +206,7 @@ export const CarePeopleListWidget: React.FC<CarePeopleListWidgetProps> = ({
                                             </div>
                                         </td>
                                         <td className="p-2 text-center">
-                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wide whitespace-nowrap ${statusBadgeClass}`}>
+                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wide whitespace-nowrap ${statusBadgeClass}`}>
                                                 {category}
                                             </span>
                                         </td>
@@ -214,24 +214,24 @@ export const CarePeopleListWidget: React.FC<CarePeopleListWidgetProps> = ({
                                             <span className={`font-black ${scoreColor}`}>{rawScore}</span>
                                         </td>
                                         <td className="p-2 text-center text-xs font-bold text-slate-600 dark:text-slate-300">
-                                            {calculateFactorScore(person, 'attendance')}<span className="text-[9px] text-slate-400">/{settings.weights.attendance}</span>
+                                            {calculateFactorScore(person, 'attendance')}<span className="text-[11px] text-slate-400">/{settings.weights.attendance}</span>
                                         </td>
                                         <td className="p-2 text-center text-xs font-bold text-slate-600 dark:text-slate-300">
-                                            {calculateFactorScore(person, 'groups')}<span className="text-[9px] text-slate-400">/{settings.weights.groups}</span>
+                                            {calculateFactorScore(person, 'groups')}<span className="text-[11px] text-slate-400">/{settings.weights.groups}</span>
                                         </td>
                                         <td className="p-2 text-center">
                                             <div className="text-xs font-bold text-slate-600 dark:text-slate-300">
-                                                {calculateFactorScore(person, 'serving')}<span className="text-[9px] text-slate-400">/{settings.weights.serving}</span>
+                                                {calculateFactorScore(person, 'serving')}<span className="text-[11px] text-slate-400">/{settings.weights.serving}</span>
                                             </div>
-                                            <div className="text-[9px] text-slate-400 mt-1 whitespace-nowrap" title="Confirmed services in last 90 days / average per week">
+                                            <div className="text-[11px] text-slate-400 mt-1 whitespace-nowrap" title="Confirmed services in last 90 days / average per week">
                                                 {person.servingStats?.last90DaysCount || 0}x ({person.servingStats?.timesPerWeek || 0}/wk)
                                             </div>
                                         </td>
                                         <td className="p-2 text-center text-xs font-bold text-slate-600 dark:text-slate-300">
-                                            {calculateFactorScore(person, 'giving')}<span className="text-[9px] text-slate-400">/{settings.weights.giving}</span>
+                                            {calculateFactorScore(person, 'giving')}<span className="text-[11px] text-slate-400">/{settings.weights.giving}</span>
                                         </td>
                                         <td className="p-2 text-center text-xs font-bold text-slate-600 dark:text-slate-300">
-                                            {calculateFactorScore(person, 'membership')}<span className="text-[9px] text-slate-400">/{settings.weights.membership}</span>
+                                            {calculateFactorScore(person, 'membership')}<span className="text-[11px] text-slate-400">/{settings.weights.membership}</span>
                                         </td>
                                         <td className="p-2 text-center">
                                             {(() => {

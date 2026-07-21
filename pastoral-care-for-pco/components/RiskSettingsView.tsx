@@ -57,12 +57,12 @@ const RiskSettingsView: React.FC<RiskSettingsViewProps> = ({ settings, onSave })
       <div className="flex justify-between items-center mb-8">
         <div>
             <h3 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Member Risk Profile Configuration</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase tracking-widest mt-1">Define Individual Health Criteria</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wide mt-1">Define Individual Health Criteria</p>
         </div>
         <button 
             onClick={handleSave}
             disabled={!isDirty}
-            className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-200"
+            className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-wide hover:bg-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-200"
         >
             Save Configuration
         </button>
@@ -181,7 +181,7 @@ const RiskSettingsView: React.FC<RiskSettingsViewProps> = ({ settings, onSave })
             </div>
 
             <div className="mt-8 p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl border border-indigo-100 dark:border-indigo-900/30">
-                <p className="text-[10px] font-bold text-indigo-800 dark:text-indigo-300 uppercase tracking-widest mb-1">Note</p>
+                <p className="text-[10px] font-bold text-indigo-800 dark:text-indigo-300 uppercase tracking-wide mb-1">Note</p>
                 <p className="text-xs text-indigo-600 dark:text-indigo-400 leading-relaxed">
                     Changes to weights and thresholds will trigger a re-calculation of all people profiles next time the dashboard loads.
                 </p>
@@ -196,7 +196,7 @@ const WeightSlider: React.FC<{ label: string; description: string; value: number
     <div>
         <div className="flex justify-between items-end mb-2">
             <div>
-                <span className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-wide block">{label}</span>
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide block">{label}</span>
                 <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">{description}</span>
             </div>
             <span className="text-lg font-black text-slate-900 dark:text-white bg-slate-50 dark:bg-slate-700 px-3 py-1 rounded-lg border border-slate-100 dark:border-slate-600">{value}</span>

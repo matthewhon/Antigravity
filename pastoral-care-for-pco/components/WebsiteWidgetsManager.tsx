@@ -215,21 +215,21 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
                  {type === 'events' && (
                    <button onClick={() => setLayout('month')} className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border transition ${layout==='month'?'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-400':'border-slate-200 text-slate-500 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
                      <LayoutGrid size={20} />
-                     <span className="text-[10px] uppercase font-bold tracking-widest">Month</span>
+                     <span className="text-[10px] uppercase font-bold tracking-wide">Month</span>
                    </button>
                  )}
                  <button onClick={() => setLayout('grid')} className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border transition ${layout==='grid'?'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-400':'border-slate-200 text-slate-500 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
                    <LayoutGrid size={20} />
-                   <span className="text-[10px] uppercase font-bold tracking-widest">{(type === 'registrations' || type === 'events' || type === 'forms') ? 'Tiles' : 'Grid'}</span>
+                   <span className="text-[10px] uppercase font-bold tracking-wide">{(type === 'registrations' || type === 'events' || type === 'forms') ? 'Tiles' : 'Grid'}</span>
                  </button>
                  <button onClick={() => setLayout('list')} className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border transition ${layout==='list'?'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-400':'border-slate-200 text-slate-500 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
                    <MonitorPlay size={20} />
-                   <span className="text-[10px] uppercase font-bold tracking-widest">{(type === 'registrations' || type === 'events' || type === 'forms') ? 'Detailed' : 'List'}</span>
+                   <span className="text-[10px] uppercase font-bold tracking-wide">{(type === 'registrations' || type === 'events' || type === 'forms') ? 'Detailed' : 'List'}</span>
                  </button>
                  {type === 'registrations' && (
                    <button onClick={() => setLayout('simplified_list')} className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border transition ${layout==='simplified_list'?'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-400':'border-slate-200 text-slate-500 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
                      <MonitorPlay size={20} />
-                     <span className="text-[10px] uppercase font-bold tracking-widest">Simple</span>
+                     <span className="text-[10px] uppercase font-bold tracking-wide">Simple</span>
                    </button>
                  )}
                </div>
@@ -490,7 +490,7 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
              {/* Live Preview Pane */}
              <div className="flex-1 p-6 flex flex-col">
                  <div className="flex items-center justify-between mb-3 text-slate-500 dark:text-slate-400">
-                    <span className="text-xs font-bold tracking-widest uppercase">Live Preview</span>
+                    <span className="text-xs font-bold tracking-wide uppercase">Live Preview</span>
                  </div>
                  <div className={`flex-1 rounded-2xl border-4 border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xl bg-white dark:bg-slate-900 flex items-center justify-center ${layout === 'list' && type !== 'popup' ? 'max-w-3xl mx-auto w-full' : 'w-full'}`}>
                     {type === 'popup' ? (
@@ -516,7 +516,7 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
                 
               {type === 'popup' ? (
                 <div className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-4 rounded-xl relative group">
-                    <span className="absolute top-0 right-0 -translate-y-1/2 translate-x-2 bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-400 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest">HTML Embed</span>
+                    <span className="absolute top-0 right-0 -translate-y-1/2 translate-x-2 bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-400 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide">HTML Embed</span>
                     <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2 mb-2">
                         <Code size={16} className="text-slate-400" />
                         Pop Up Link Snippet
@@ -535,7 +535,7 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
               ) : (
                 <div className="flex items-start gap-4">
                     <div className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-4 rounded-xl relative group">
-                        <span className="absolute top-0 right-0 -translate-y-1/2 translate-x-2 bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-400 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest">Recommended</span>
+                        <span className="absolute top-0 right-0 -translate-y-1/2 translate-x-2 bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-400 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide">Recommended</span>
                         <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2 mb-2">
                             <Code size={16} className="text-slate-400" />
                             Script Embed

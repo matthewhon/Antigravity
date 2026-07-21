@@ -37,7 +37,7 @@ const MetricCard: React.FC<{
     sub?: string;
 }> = ({ label, value, valueColor = 'text-slate-900 dark:text-white', sub }) => (
     <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-5 flex flex-col gap-3 shadow-sm">
-        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</span>
+        <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}</span>
         <span className={`text-4xl font-black leading-none ${valueColor}`}>{value}</span>
         {sub && <span className="text-[10px] text-slate-400 font-semibold">{sub}</span>}
     </div>
@@ -211,13 +211,13 @@ export const CohortAnalytics: React.FC<CohortAnalyticsProps> = ({
                     </div>
                     {/* Colour legend */}
                     <div className="hidden sm:flex items-center gap-2 shrink-0">
-                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Low</span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Low</span>
                         <div className="flex gap-0.5">
                             {[0.08, 0.22, 0.38, 0.55, 0.72, 0.88].map((a, i) => (
                                 <div key={i} className="w-5 h-4 rounded" style={{ backgroundColor: `rgba(99,102,241,${a})` }} />
                             ))}
                         </div>
-                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">High</span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">High</span>
                     </div>
                 </div>
 
@@ -225,10 +225,10 @@ export const CohortAnalytics: React.FC<CohortAnalyticsProps> = ({
                     <table className="w-full border-collapse" style={{ minWidth: '720px' }}>
                         <thead>
                             <tr className="bg-slate-50 dark:bg-slate-850">
-                                <th className="sticky left-0 bg-slate-50 dark:bg-slate-850 z-10 px-6 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400 whitespace-nowrap">Cohort</th>
-                                <th className="px-4 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400 whitespace-nowrap">Size</th>
+                                <th className="sticky left-0 bg-slate-50 dark:bg-slate-850 z-10 px-6 py-3 text-left text-[10px] font-bold uppercase tracking-wide text-slate-400 whitespace-nowrap">Cohort</th>
+                                <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-wide text-slate-400 whitespace-nowrap">Size</th>
                                 {Array.from({ length: 13 }, (_, i) => (
-                                    <th key={i} className="px-3 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400 whitespace-nowrap">
+                                    <th key={i} className="px-3 py-3 text-center text-[10px] font-bold uppercase tracking-wide text-slate-400 whitespace-nowrap">
                                         {i === 0 ? 'M0' : `M${i}`}
                                     </th>
                                 ))}
@@ -403,13 +403,13 @@ export const CohortAnalytics: React.FC<CohortAnalyticsProps> = ({
                                         <div className="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-950/40 flex items-center justify-center text-xs font-black text-indigo-600 dark:text-indigo-400 shrink-0">
                                             {person.name.charAt(0).toUpperCase()}
                                         </div>
-                                        <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest ${riskBadge(person.riskCategory)}`}>
+                                        <span className={`px-2 py-0.5 rounded-lg text-[11px] font-black uppercase tracking-wide ${riskBadge(person.riskCategory)}`}>
                                             {person.riskCategory}
                                         </span>
                                     </div>
                                     <div>
                                         <p className="text-xs font-black text-slate-800 dark:text-slate-200 leading-snug">{person.name}</p>
-                                        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mt-0.5">{person.membership}</p>
+                                        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mt-0.5">{person.membership}</p>
                                     </div>
                                     <div className="flex items-center gap-1.5 mt-auto">
                                         <svg className="w-3 h-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

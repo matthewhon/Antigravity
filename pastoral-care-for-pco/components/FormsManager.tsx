@@ -838,7 +838,7 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
       {!isEditing && !isSubmissionsView && (
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2 uppercase tracking-wide">
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2 uppercase tracking-wide">
               <FormInput className="text-indigo-600 dark:text-indigo-400" /> Planning Center Web Forms
             </h1>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
@@ -878,7 +878,7 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
                   <div>
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <h3 className="font-bold text-slate-900 dark:text-white text-base truncate">{form.name}</h3>
-                      <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full ${
+                      <span className={`text-[10px] font-black uppercase tracking-wide px-2.5 py-0.5 rounded-full ${
                         form.isActive !== false 
                           ? 'bg-emerald-50 text-emerald-600 border border-emerald-100 dark:bg-emerald-950/20' 
                           : 'bg-slate-100 text-slate-550 dark:bg-slate-800 dark:text-slate-400'
@@ -981,7 +981,7 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
               <ArrowLeft size={16} /> Back to dashboard
             </button>
             <div className="flex items-center gap-3">
-              <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full ${
+              <span className={`text-[10px] font-black uppercase tracking-wide px-2.5 py-0.5 rounded-full ${
                 isActive 
                   ? 'bg-emerald-50 text-emerald-600 border border-emerald-100 dark:bg-emerald-950/20' 
                   : 'bg-slate-100 text-slate-550 dark:bg-slate-800 dark:text-slate-400'
@@ -1093,11 +1093,11 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
                             </p>
                           ) : (
                             <div className="space-y-1.5 w-full">
-                              <label className="text-[10px] font-bold text-slate-550 dark:text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                              <label className="text-[10px] font-bold text-slate-550 dark:text-slate-400 uppercase tracking-wide flex items-center gap-1">
                                 {field.label || 'Unnamed Field'} 
                                 {isRequired && <span className="text-red-500 font-black">*</span>}
                                 {field.mapToPco && field.mapToPco !== 'none' && (
-                                  <span className="text-[8px] bg-slate-100 dark:bg-slate-800 text-slate-500 px-1 py-0.5 rounded font-normal lowercase font-sans ml-1.5">
+                                  <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-500 px-1 py-0.5 rounded font-normal lowercase font-sans ml-1.5">
                                     → PCO {field.mapToPco}
                                   </span>
                                 )}
@@ -1239,7 +1239,7 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
               {activeTab === 'toolbox' && (
                 <div className="bg-slate-50 dark:bg-slate-950 rounded-2xl p-5 border border-slate-200 dark:border-slate-850 space-y-4">
                   <div>
-                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-500">Toolbox</h4>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">Toolbox</h4>
                     <p className="text-[11px] text-slate-400 mt-0.5">Drag fields to the canvas or click to insert at bottom.</p>
                   </div>
 
@@ -1289,7 +1289,7 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
               {activeTab === 'pco' && (
                 <div className="bg-slate-50 dark:bg-slate-950 rounded-2xl p-5 border border-slate-200 dark:border-slate-850 space-y-4">
                   <div>
-                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-500">Planning Center Fields</h4>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">Planning Center Fields</h4>
                     <p className="text-[11px] text-slate-400 mt-0.5">Drag fields to the canvas or click to insert a pre-mapped field.</p>
                   </div>
 
@@ -1329,7 +1329,7 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
                       return (
                         <div className="space-y-4">
                           <div>
-                            <h4 className="text-xs font-black uppercase tracking-wider text-slate-500">Configure Field</h4>
+                            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">Configure Field</h4>
                             <p className="text-[10px] text-slate-400 font-mono mt-0.5">{field.type} / #{field.id}</p>
                           </div>
 
@@ -1452,7 +1452,7 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
                 <div className="space-y-6">
                   {/* Styling Colors & Logo */}
                   <div className="bg-slate-50 dark:bg-slate-950 rounded-2xl p-5 border border-slate-200 dark:border-slate-850 space-y-4">
-                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-500 border-b border-slate-150 pb-1.5">Form Themes & Logo</h4>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-150 pb-1.5">Form Themes & Logo</h4>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-[10px] font-bold text-slate-650 uppercase mb-1">Accent Color</label>
@@ -1555,7 +1555,7 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
 
                   {/* General Configuration & Automations */}
                   <div className="bg-slate-50 dark:bg-slate-950 rounded-2xl p-5 border border-slate-200 dark:border-slate-850 space-y-4">
-                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-500 border-b border-slate-150 pb-1.5">Settings & Actions</h4>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-150 pb-1.5">Settings & Actions</h4>
                     
                     <div className="flex items-center gap-2 pb-1.5">
                       <input
@@ -1649,13 +1649,13 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
                   {/* Share & Embed Options */}
                   {activeForm && (
                     <div className="bg-slate-50 dark:bg-slate-950 rounded-2xl p-5 border border-slate-200 dark:border-slate-850 space-y-4">
-                      <h4 className="text-xs font-black uppercase tracking-wider text-slate-500 border-b border-slate-150 pb-1.5 flex items-center gap-1">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-150 pb-1.5 flex items-center gap-1">
                         <Globe size={14} className="text-indigo-500" /> Share & Embed
                       </h4>
                       
                       <div className="space-y-3">
                         <div>
-                          <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1">Direct Link</label>
+                          <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Direct Link</label>
                           <div className="flex gap-1.5">
                             <input type="text" readOnly value={getPublicLink(activeForm.id)} className="flex-1 text-[10px] border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-900" />
                             <button type="button" onClick={() => handleCopy(getPublicLink(activeForm.id), 'url')} className="px-2.5 py-1.5 text-[10px] font-bold text-slate-700 bg-white border border-slate-200 rounded-lg">
@@ -1668,7 +1668,7 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
                         </div>
 
                         <div>
-                          <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1">Embed Code (iframe)</label>
+                          <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Embed Code (iframe)</label>
                           <textarea readOnly rows={2} value={getEmbedCode(activeForm.id)} className="w-full text-[10px] font-mono border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-900 outline-none" />
                           <button type="button" onClick={() => handleCopy(getEmbedCode(activeForm.id), 'embed')} className="w-full py-1 text-[10px] font-bold text-slate-700 bg-white border border-slate-200 rounded-lg mt-1">
                             {copiedId === `embed-${getEmbedCode(activeForm.id)}` ? 'Copied Embed Code!' : 'Copy Embed Code'}
@@ -1677,7 +1677,7 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
 
                         {/* QR Code */}
                         <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex flex-col items-center">
-                          <label className="text-[9px] font-bold text-slate-500 uppercase mb-2">QR Code</label>
+                          <label className="text-[11px] font-bold text-slate-500 uppercase mb-2">QR Code</label>
                           <div className="bg-white p-1 rounded-lg border border-slate-100 mb-2">
                             <canvas ref={qrCanvasRef} className="w-24 h-24 block" />
                           </div>

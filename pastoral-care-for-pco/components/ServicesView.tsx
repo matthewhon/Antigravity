@@ -467,7 +467,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
     return (
       <div className="bg-white dark:bg-slate-850 rounded-[5rem] p-48 text-center border-4 border-dashed border-slate-100 dark:border-slate-800 animate-in zoom-in">
         <div className="text-[140px] mb-14 grayscale opacity-20 drop-shadow-2xl">🎹</div>
-        <h3 className="text-5xl font-black text-slate-900 dark:text-white mb-8 tracking-tighter uppercase">Connection Required</h3>
+        <h3 className="text-5xl font-bold text-slate-900 dark:text-white mb-8 tracking-tighter uppercase">Connection Required</h3>
         <p className="text-slate-400 max-w-lg mx-auto font-medium text-2xl leading-relaxed">
           Connect Planning Center to unlock Services analytics and scheduling metrics.
         </p>
@@ -538,11 +538,11 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                             <div className="flex justify-between items-start mb-3 pb-2 border-b border-slate-200 dark:border-slate-800">
                                                 <div>
                                                     <h5 className="font-black text-xs text-slate-900 dark:text-white">{plan.serviceTypeName}</h5>
-                                                    <p className="text-[9px] text-slate-500 dark:text-slate-400 font-medium">
+                                                    <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
                                                         {displayDate.toLocaleDateString(undefined, {weekday: 'short', month: 'short', day: 'numeric'})} • {displayDate.toLocaleTimeString(undefined, {hour: 'numeric', minute:'2-digit'})}
                                                     </p>
                                                 </div>
-                                                <span className={`text-[9px] font-black uppercase px-2 py-1 rounded ${
+                                                <span className={`text-[11px] font-black uppercase px-2 py-1 rounded ${
                                                     (plan.positionsNeeded || 0) > 0 
                                                     ? 'text-rose-500 bg-rose-100 dark:bg-rose-900/20' 
                                                     : 'text-amber-500 bg-amber-100 dark:bg-amber-900/20'
@@ -554,17 +554,17 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                             <div className="grid grid-cols-2 gap-4">
                                                 {/* Pending Section */}
                                                 <div>
-                                                    <p className="text-[9px] font-bold text-amber-500 uppercase tracking-widest mb-2">Pending Responses ({pendingMembers.length})</p>
+                                                    <p className="text-[11px] font-bold text-amber-500 uppercase tracking-wide mb-2">Pending Responses ({pendingMembers.length})</p>
                                                     {pendingMembers.length > 0 ? (
                                                         <div className="space-y-1.5">
                                                             {pendingMembers.map((m, idx) => (
                                                                 <div key={idx} className="flex items-center gap-2">
-                                                                    <div className="w-5 h-5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center text-[8px] font-black">
+                                                                    <div className="w-5 h-5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center text-[10px] font-black">
                                                                         ?
                                                                     </div>
                                                                     <div className="min-w-0">
                                                                         <p className="text-[10px] font-bold text-slate-700 dark:text-slate-300 truncate">{m.name}</p>
-                                                                        <p className="text-[8px] text-slate-400 truncate">
+                                                                        <p className="text-[10px] text-slate-400 truncate">
                                                                             {[m.teamName, m.teamPositionName].filter(Boolean).filter((val, i, arr) => arr.indexOf(val) === i).join(' • ')}
                                                                         </p>
                                                                     </div>
@@ -572,13 +572,13 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                                             ))}
                                                         </div>
                                                     ) : (
-                                                        <p className="text-[9px] text-slate-400 italic">No pending requests.</p>
+                                                        <p className="text-[11px] text-slate-400 italic">No pending requests.</p>
                                                     )}
                                                 </div>
 
                                                 {/* Open Positions Section */}
                                                 <div>
-                                                    <p className="text-[9px] font-bold text-rose-500 uppercase tracking-widest mb-2">Open Positions</p>
+                                                    <p className="text-[11px] font-bold text-rose-500 uppercase tracking-wide mb-2">Open Positions</p>
                                                     {openPositions.length > 0 ? (
                                                         <div className="space-y-1.5">
                                                             {Object.values(openPositions.reduce((acc, op) => {
@@ -589,10 +589,10 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                                                 const filledCount = plan.teamMembers?.filter(m => m.teamName === op.teamName && (m.status === 'Confirmed' || m.status === 'C')).length || 0;
                                                                 return (
                                                                 <div key={idx} className="flex justify-between items-center bg-white dark:bg-slate-800 px-2 py-1 rounded border border-slate-100 dark:border-slate-700">
-                                                                    <span className="text-[9px] font-medium text-slate-600 dark:text-slate-400 truncate max-w-[80px]" title={op.teamName}>{op.teamName}</span>
+                                                                    <span className="text-[11px] font-medium text-slate-600 dark:text-slate-400 truncate max-w-[80px]" title={op.teamName}>{op.teamName}</span>
                                                                     <div className="flex gap-1 items-center">
-                                                                        {filledCount > 0 && <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-1.5 py-0.5 rounded" title={`${filledCount} Confirmed`}>{filledCount} Filled</span>}
-                                                                        <span className="text-[9px] font-black text-rose-500 bg-rose-50 dark:bg-rose-900/20 px-1.5 py-0.5 rounded" title={`${op.quantity} Needed`}>{op.quantity} Open</span>
+                                                                        {filledCount > 0 && <span className="text-[11px] font-black text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-1.5 py-0.5 rounded" title={`${filledCount} Confirmed`}>{filledCount} Filled</span>}
+                                                                        <span className="text-[11px] font-black text-rose-500 bg-rose-50 dark:bg-rose-900/20 px-1.5 py-0.5 rounded" title={`${op.quantity} Needed`}>{op.quantity} Open</span>
                                                                     </div>
                                                                 </div>
                                                                 );
@@ -600,11 +600,11 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                                         </div>
                                                     ) : genericOpenCount > 0 ? (
                                                         <div className="flex items-center gap-2">
-                                                            <div className="w-5 h-5 rounded-full bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 flex items-center justify-center text-[9px] font-black">!</div>
+                                                            <div className="w-5 h-5 rounded-full bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 flex items-center justify-center text-[11px] font-black">!</div>
                                                             <p className="text-[10px] font-medium text-slate-600 dark:text-slate-400">{genericOpenCount} Unfilled Slots</p>
                                                         </div>
                                                     ) : (
-                                                        <p className="text-[9px] text-emerald-500 font-bold">All positions filled!</p>
+                                                        <p className="text-[11px] text-emerald-500 font-bold">All positions filled!</p>
                                                     )}
                                                 </div>
                                             </div>
@@ -634,7 +634,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                 title="Filter upcoming plans"
                                 value={upcomingPlansFilter} 
                                 onChange={(e) => setUpcomingPlansFilter(e.target.value as any)}
-                                className="bg-slate-100 dark:bg-slate-800 border-none text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 rounded-lg py-1 px-2 cursor-pointer outline-none focus:ring-2 focus:ring-indigo-500"
+                                className="bg-slate-100 dark:bg-slate-800 border-none text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 rounded-lg py-1 px-2 cursor-pointer outline-none focus:ring-2 focus:ring-indigo-500"
                             >
                                 <option value="7 Days">Next 7 Days</option>
                                 <option value="14 Days">Next 14 Days</option>
@@ -683,7 +683,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                                             return (
                                                                 <div className="flex items-center gap-2 shrink-0">
                                                                     <div className="flex flex-col items-center justify-center w-12 h-12 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm">
-                                                                        <span className="text-[9px] font-black text-rose-500 uppercase tracking-wider">
+                                                                        <span className="text-[11px] font-bold text-rose-500 uppercase tracking-wider">
                                                                             {displayDate.toLocaleDateString(undefined, { month: 'short' })}
                                                                         </span>
                                                                         <span className="text-lg font-black text-slate-900 dark:text-white leading-none">
@@ -693,7 +693,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                                                     {w && (
                                                                         <div className="flex flex-col items-center gap-0.5" title={w.conditions || 'Weather forecast'}>
                                                                             <span className="text-base leading-none">{getWeatherEmoji(w.icon, w.conditions)}</span>
-                                                                            <span className="text-[8px] font-bold text-slate-400 dark:text-slate-500 leading-none whitespace-nowrap">
+                                                                            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 leading-none whitespace-nowrap">
                                                                                 {Math.round(w.tempHigh)}° / {Math.round(w.tempLow)}°
                                                                             </span>
                                                                         </div>
@@ -712,7 +712,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                                                     <span>⏰</span> {displayDate.toLocaleTimeString(undefined, {hour: 'numeric', minute:'2-digit'})}
                                                                 </span>
                                                                 {plan.seriesTitle && (
-                                                                    <span className="text-[9px] font-bold bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-1.5 py-0.5 rounded border border-indigo-100 dark:border-indigo-800/50 truncate max-w-[150px]">
+                                                                    <span className="text-[11px] font-bold bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-1.5 py-0.5 rounded border border-indigo-100 dark:border-indigo-800/50 truncate max-w-[150px]">
                                                                         {plan.seriesTitle}
                                                                     </span>
                                                                 )}
@@ -722,7 +722,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
 
                                                     {/* Status Badge */}
                                                     <div className="text-right">
-                                                        <span className={`text-[10px] font-black px-2 py-1 rounded-lg uppercase tracking-widest ${
+                                                        <span className={`text-[10px] font-black px-2 py-1 rounded-lg uppercase tracking-wide ${
                                                             neededCount > 0 
                                                             ? 'bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400' 
                                                             : 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400'
@@ -736,8 +736,8 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                                 <div className="flex items-center gap-4 pl-16">
                                                     <div className="flex-1">
                                                         <div className="flex justify-between items-end mb-1">
-                                                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Staffing</span>
-                                                            <span className="text-[9px] font-black text-slate-600 dark:text-slate-300">{fillPercent}%</span>
+                                                            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">Staffing</span>
+                                                            <span className="text-[11px] font-black text-slate-600 dark:text-slate-300">{fillPercent}%</span>
                                                         </div>
                                                         <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden flex">
                                                             <div className="h-full bg-emerald-500" style={{ width: `${(confirmed / totalCapacity) * 100}%` }}></div>
@@ -758,7 +758,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                                 <div className="bg-white dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800 p-4 pl-20 animate-in slide-in-from-top-2 duration-200">
                                                     {plan.neededPositions && plan.neededPositions.length > 0 && (
                                                         <div className="mb-4">
-                                                            <p className="text-[9px] font-black uppercase text-rose-500 tracking-widest mb-2">Needs Attention</p>
+                                                            <p className="text-[11px] font-bold uppercase text-rose-500 tracking-wide mb-2">Needs Attention</p>
                                                             <div className="flex flex-wrap gap-2">
                                                                 {Object.values(plan.neededPositions.reduce((acc, np) => {
                                                                     if (!acc[np.teamName]) acc[np.teamName] = { teamName: np.teamName, quantity: 0 };
@@ -780,7 +780,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                                     
                                                     {membersList.length > 0 ? (
                                                         <div>
-                                                            <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-2">Team Status</p>
+                                                            <p className="text-[11px] font-bold uppercase text-slate-400 tracking-wide mb-2">Team Status</p>
                                                             <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                                                                 {membersList.map((m, i) => {
                                                                     const displayStatus = m.status === 'C' ? 'Confirmed' : m.status === 'U' ? 'Unconfirmed' : m.status === 'D' ? 'Declined' : m.status;
@@ -790,7 +790,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                                                     <div key={i} className="flex items-center justify-between text-[10px]">
                                                                         <div className="min-w-0 mr-2">
                                                                             <p className="text-slate-600 dark:text-slate-300 truncate font-medium">{m.name}</p>
-                                                                            <p className="text-[8px] text-slate-400 truncate">
+                                                                            <p className="text-[10px] text-slate-400 truncate">
                                                                                 {[m.teamName, m.teamPositionName].filter(Boolean).filter((val, i, arr) => arr.indexOf(val) === i).join(' • ')}
                                                                             </p>
                                                                         </div>
@@ -835,12 +835,12 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                             </div>
                                             <div className="min-w-0">
                                                 <p className="text-xs font-bold text-slate-900 dark:text-white truncate" title={song.title}>{song.title}</p>
-                                                <p className="text-[9px] text-slate-400 truncate">{song.author}</p>
+                                                <p className="text-[11px] text-slate-400 truncate">{song.author}</p>
                                             </div>
                                         </div>
                                         <div className="text-right shrink-0">
                                             <span className="text-xs font-black text-indigo-600 dark:text-indigo-400">{song.count}</span>
-                                            <p className="text-[8px] text-slate-400 uppercase">Times</p>
+                                            <p className="text-[10px] text-slate-400 uppercase">Times</p>
                                         </div>
                                     </div>
                                 ))
@@ -863,7 +863,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                         <WidgetWrapper title={`Position Breakdown (${positionFilterLabel})`} onRemove={() => handleRemoveWidget('positions')} source="PCO Services Plans">
                             <div className="h-full flex flex-col items-center justify-center text-center p-6">
                                 <div className="text-4xl mb-4 grayscale opacity-20">📅</div>
-                                <p className="text-slate-400 font-bold text-sm uppercase tracking-widest">No Plans Found</p>
+                                <p className="text-slate-400 font-bold text-sm uppercase tracking-wide">No Plans Found</p>
                                 <p className="text-xs text-slate-400 mt-2">No service plans found for {positionFilterLabel.toLowerCase()} to analyze.</p>
                             </div>
                         </WidgetWrapper>
@@ -880,7 +880,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                 <span className="text-3xl font-black text-emerald-600 dark:text-emerald-400">
                                     {positionBreakdownStats.confirmed}
                                 </span>
-                                <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-600/70 dark:text-emerald-400/70 mt-1">Confirmed</span>
+                                <span className="text-[10px] font-bold uppercase tracking-wide text-emerald-600/70 dark:text-emerald-400/70 mt-1">Confirmed</span>
                             </div>
 
                             {/* Pending */}
@@ -888,7 +888,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                 <span className="text-3xl font-black text-amber-500 dark:text-amber-400">
                                     {positionBreakdownStats.pending}
                                 </span>
-                                <span className="text-[10px] font-bold uppercase tracking-widest text-amber-500/70 dark:text-amber-400/70 mt-1">Pending</span>
+                                <span className="text-[10px] font-bold uppercase tracking-wide text-amber-500/70 dark:text-amber-400/70 mt-1">Pending</span>
                             </div>
 
                             {/* Declined */}
@@ -896,7 +896,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                 <span className="text-3xl font-black text-rose-500 dark:text-rose-400">
                                     {positionBreakdownStats.declined}
                                 </span>
-                                <span className="text-[10px] font-bold uppercase tracking-widest text-rose-500/70 dark:text-rose-400/70 mt-1">Declined</span>
+                                <span className="text-[10px] font-bold uppercase tracking-wide text-rose-500/70 dark:text-rose-400/70 mt-1">Declined</span>
                             </div>
 
                             {/* Still Needed */}
@@ -904,7 +904,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                 <span className="text-3xl font-black text-slate-600 dark:text-slate-300">
                                     {positionBreakdownStats.open}
                                 </span>
-                                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mt-1">Still Needed</span>
+                                <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mt-1">Still Needed</span>
                             </div>
                         </div>
                         <div className="mt-4 space-y-2">
@@ -965,7 +965,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                 title="Filter check-in period"
                                 value={checkinFilter} 
                                 onChange={(e) => setCheckinFilter(e.target.value as CheckinTrendFilter)}
-                                className="bg-slate-100 dark:bg-slate-800 border-none text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 rounded-lg py-1 px-2 cursor-pointer outline-none focus:ring-2 focus:ring-indigo-500"
+                                className="bg-slate-100 dark:bg-slate-800 border-none text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 rounded-lg py-1 px-2 cursor-pointer outline-none focus:ring-2 focus:ring-indigo-500"
                             >
                                 <option value="Last 30 Days">Last 30 Days</option>
                                 <option value="Current Week">Current Week</option>
@@ -1029,7 +1029,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                         {/* Grand total footer */}
                         {filteredCheckinTrends.length > 0 && (
                             <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700 flex flex-wrap gap-x-4 gap-y-1">
-                                <span className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Period Total:</span>
+                                <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Period Total:</span>
                                 <span className="text-[10px] font-bold text-indigo-500">Regulars: {grandRegulars.toLocaleString()}</span>
                                 <span className="text-[10px] font-bold text-amber-500">Guests: {grandGuests.toLocaleString()}</span>
                                 <span className="text-[10px] font-bold text-emerald-500">Volunteers: {grandVolunteers.toLocaleString()}</span>
@@ -1055,7 +1055,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                             <select 
                                 value={checkinFilter} 
                                 onChange={(e) => setCheckinFilter(e.target.value as CheckinTrendFilter)}
-                                className="bg-slate-100 dark:bg-slate-800 border-none text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 rounded-lg py-1 px-2 cursor-pointer outline-none focus:ring-2 focus:ring-indigo-500"
+                                className="bg-slate-100 dark:bg-slate-800 border-none text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 rounded-lg py-1 px-2 cursor-pointer outline-none focus:ring-2 focus:ring-indigo-500"
                             >
                                 <option value="Last 30 Days">Last 30 Days</option>
                                 <option value="Current Week">Current Week</option>
@@ -1071,12 +1071,12 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                             <table className="w-full text-left">
                                 <thead className="bg-slate-50 dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 sticky top-0 z-10">
                                     <tr>
-                                        <th className="p-3 text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">Event Name</th>
-                                        <th className="p-3 text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">Time</th>
-                                        <th className="p-3 text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest text-center text-sky-500 dark:text-sky-400">Weather</th>
-                                        <th className="p-3 text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest text-right text-indigo-600 dark:text-indigo-400">Check-Ins</th>
-                                        <th className="p-3 text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest text-right text-violet-600 dark:text-violet-400">Headcount</th>
-                                        <th className="p-3 text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest text-right">Total</th>
+                                        <th className="p-3 text-[11px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide">Event Name</th>
+                                        <th className="p-3 text-[11px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide">Time</th>
+                                        <th className="p-3 text-[11px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide text-center text-sky-500 dark:text-sky-400">Weather</th>
+                                        <th className="p-3 text-[11px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide text-right text-indigo-600 dark:text-indigo-400">Check-Ins</th>
+                                        <th className="p-3 text-[11px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide text-right text-violet-600 dark:text-violet-400">Headcount</th>
+                                        <th className="p-3 text-[11px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide text-right">Total</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
@@ -1101,7 +1101,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                                         {evtWeather ? (
                                                             <div className="flex flex-col items-center gap-0.5" title={evtWeather.conditions || 'Weather'}>
                                                                 <span className="text-base leading-none">{getWeatherEmoji(evtWeather.icon, evtWeather.conditions)}</span>
-                                                                <span className="text-[8px] font-bold text-slate-400 dark:text-slate-500 leading-none whitespace-nowrap">
+                                                                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 leading-none whitespace-nowrap">
                                                                     {Math.round(evtWeather.tempHigh)}° / {Math.round(evtWeather.tempLow)}°
                                                                 </span>
                                                             </div>
@@ -1142,11 +1142,11 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                             <table className="w-full text-left">
                                 <thead className="bg-slate-50 dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 sticky top-0 z-10">
                                     <tr>
-                                        <th className="p-4 text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">Team Name</th>
-                                        <th className="p-4 text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">Leaders</th>
-                                        <th className="p-4 text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest text-center">Members</th>
-                                        <th className="p-4 text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest text-center">Actively Serving</th>
-                                        <th className="p-4 text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest text-right">Action</th>
+                                        <th className="p-4 text-[11px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide">Team Name</th>
+                                        <th className="p-4 text-[11px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide">Leaders</th>
+                                        <th className="p-4 text-[11px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide text-center">Members</th>
+                                        <th className="p-4 text-[11px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide text-center">Actively Serving</th>
+                                        <th className="p-4 text-[11px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide text-right">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
@@ -1173,7 +1173,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                                         <span className="inline-flex items-center justify-center bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 px-3 py-1 rounded-full text-xs font-black">
                                                             {totalMembers}
                                                         </span>
-                                                        <span className="text-[8px] text-slate-400 mt-1 uppercase tracking-wider font-bold">
+                                                        <span className="text-[10px] text-slate-400 mt-1 uppercase tracking-wider font-bold">
                                                             Roster
                                                         </span>
                                                     </div>
@@ -1183,13 +1183,13 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                                         <span className="inline-flex items-center justify-center bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 px-3 py-1 rounded-full text-xs font-black">
                                                             {activeMembers}
                                                         </span>
-                                                        <span className="text-[8px] text-slate-400 mt-1 uppercase tracking-wider font-bold">Serving Now</span>
+                                                        <span className="text-[10px] text-slate-400 mt-1 uppercase tracking-wider font-bold">Serving Now</span>
                                                     </div>
                                                 </td>
                                                 <td className="p-4 text-right">
                                                     <button 
                                                         onClick={() => setSelectedTeamId(team.id)}
-                                                        className="text-[10px] font-bold uppercase tracking-widest text-indigo-600 dark:text-indigo-400 hover:underline"
+                                                        className="text-[10px] font-bold uppercase tracking-wide text-indigo-600 dark:text-indigo-400 hover:underline"
                                                     >
                                                         View Roster
                                                     </button>
@@ -1224,7 +1224,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                             <select 
                                 value={selectedTeamId || ''} 
                                 onChange={(e) => setSelectedTeamId(e.target.value)}
-                                className="bg-slate-100 dark:bg-slate-800 border-none text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 rounded-lg py-1 px-2 cursor-pointer outline-none focus:ring-2 focus:ring-indigo-500 max-w-[150px]"
+                                className="bg-slate-100 dark:bg-slate-800 border-none text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 rounded-lg py-1 px-2 cursor-pointer outline-none focus:ring-2 focus:ring-indigo-500 max-w-[150px]"
                             >
                                 <option value="">Select Team...</option>
                                 {data.teams.map(t => (
@@ -1249,12 +1249,12 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                                     )}
                                                     <div>
                                                         <p className="text-xs font-bold text-slate-900 dark:text-white">{p?.name}</p>
-                                                        <p className="text-[9px] text-slate-400">{p?.email || 'No Email'}</p>
+                                                        <p className="text-[11px] text-slate-400">{p?.email || 'No Email'}</p>
                                                     </div>
                                                 </div>
                                                 <div className="text-right flex flex-col items-end gap-1">
                                                     {p?.servingStats?.riskLevel === 'High' && (
-                                                        <span className="inline-flex items-center gap-1 bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider">
+                                                        <span className="inline-flex items-center gap-1 bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider">
                                                             🔥 High Risk
                                                         </span>
                                                     )}
@@ -1262,7 +1262,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                             </div>
                                             {expandedRosterPersonId === p.id && (
                                                 <div className="p-3 bg-white dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-700 animate-in slide-in-from-top-2">
-                                                    <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Recent Services (Last 90d)</p>
+                                                    <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">Recent Services (Last 90d)</p>
                                                     {p?.servingStats?.recentServices && p.servingStats.recentServices.length > 0 ? (
                                                         <div className="space-y-1.5">
                                                             {p.servingStats.recentServices.map((rs, i) => (
@@ -1332,12 +1332,12 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                                                 <span className="block text-lg font-black text-rose-600 dark:text-rose-400 leading-none">
                                                     {p.servingStats?.last90DaysCount || 0}
                                                 </span>
-                                                <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">Services (90d)</span>
+                                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Services (90d)</span>
                                             </div>
                                         </div>
                                         {expandedBurnoutPersonId === p.id && (
                                             <div className="p-3 bg-white dark:bg-slate-800/50 border-t border-rose-100 dark:border-rose-900/30 animate-in slide-in-from-top-2">
-                                                <p className="text-[10px] font-black uppercase text-rose-400 tracking-widest mb-2">Recent Services (Last 90d)</p>
+                                                <p className="text-[10px] font-bold uppercase text-rose-400 tracking-wide mb-2">Recent Services (Last 90d)</p>
                                                 {p?.servingStats?.recentServices && p.servingStats.recentServices.length > 0 ? (
                                                     <div className="space-y-1.5">
                                                         {p.servingStats.recentServices.map((rs, i) => (
@@ -1403,7 +1403,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h3 className="text-4xl font-black tracking-tighter text-slate-900 dark:text-white">Services Analytics</h3>
-          <p className="text-slate-400 dark:text-slate-500 font-medium uppercase text-[10px] tracking-widest mt-1">Plan, Schedule, & Worship Insights</p>
+          <p className="text-slate-400 dark:text-slate-500 font-medium uppercase text-[10px] tracking-wide mt-1">Plan, Schedule, & Worship Insights</p>
         </div>
         
         <div className="flex gap-4 items-center">
@@ -1411,7 +1411,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                 <button 
                     onClick={handleServiceSync}
                     disabled={isServicesSyncing || isSyncing}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 font-black text-[10px] uppercase tracking-widest hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors disabled:opacity-50"
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 font-bold text-[10px] uppercase tracking-wide hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors disabled:opacity-50"
                 >
                     <span className={isServicesSyncing ? 'animate-spin' : ''}>↻</span>
                     <span>{isServicesSyncing ? 'Syncing...' : 'Service Sync'}</span>
@@ -1422,7 +1422,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                 <button 
                     onClick={handleCheckInsSync}
                     disabled={isCheckInsSyncing || isSyncing}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 font-black text-[10px] uppercase tracking-widest hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-colors disabled:opacity-50"
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 font-bold text-[10px] uppercase tracking-wide hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-colors disabled:opacity-50"
                 >
                     <span className={isCheckInsSyncing ? 'animate-spin' : ''}>↻</span>
                     <span>{isCheckInsSyncing ? 'Syncing...' : 'Check-ins Sync'}</span>
@@ -1431,7 +1431,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
 
 
             <div className="flex items-center bg-white dark:bg-slate-800 p-1.5 rounded-xl border border-slate-200 dark:border-slate-700">
-                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest pl-2 pr-2">Period</span>
+                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide pl-2 pr-2">Period</span>
                 <select 
                     value={filter} 
                     onChange={(e) => onFilterChange(e.target.value as ServicesFilter)}
@@ -1459,7 +1459,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
           <div className="h-96 flex items-center justify-center">
               <div className="text-center">
                   <div className="text-4xl mb-4 animate-bounce">🎹</div>
-                  <p className="text-slate-400 font-bold text-sm uppercase tracking-widest">Analyzing Plans...</p>
+                  <p className="text-slate-400 font-bold text-sm uppercase tracking-wide">Analyzing Plans...</p>
               </div>
           </div>
       ) : (

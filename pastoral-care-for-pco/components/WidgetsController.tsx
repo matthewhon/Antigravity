@@ -86,7 +86,7 @@ const WidgetsController: React.FC<WidgetsControllerProps> = ({
       {/* Trigger Button */}
       <button 
         onClick={() => setIsOpen(true)}
-        className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border shadow-sm ${isOpen ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-indigo-300 hover:text-indigo-600'}`}
+        className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-wide transition-all border shadow-sm ${isOpen ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-indigo-300 hover:text-indigo-600'}`}
       >
         <span>Customize Layout</span>
         <span className="text-lg">⚙️</span>
@@ -108,7 +108,7 @@ const WidgetsController: React.FC<WidgetsControllerProps> = ({
                 <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-white dark:bg-slate-900 z-10">
                     <div>
                         <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">Dashboard Layout</h3>
-                        <p className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1">Manage & Reorder Widgets</p>
+                        <p className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide mt-1">Manage & Reorder Widgets</p>
                     </div>
                     <button 
                         onClick={() => setIsOpen(false)}
@@ -121,7 +121,7 @@ const WidgetsController: React.FC<WidgetsControllerProps> = ({
                 {/* Theme Selector (Optional) */}
                 {onUpdateTheme && (
                     <div className="px-6 pt-6 pb-2 border-b border-slate-100 dark:border-slate-800">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Interface Theme</p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-3">Interface Theme</p>
                         <div className="grid grid-cols-2 gap-3 mb-4">
                             <button
                                 onClick={() => onUpdateTheme('traditional')}
@@ -165,7 +165,7 @@ const WidgetsController: React.FC<WidgetsControllerProps> = ({
                     {/* LIBRARY TAB: Directory with Toggles */}
                     {activeTab === 'library' && (
                         <div className="space-y-3">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Available Widgets Directory</p>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-4">Available Widgets Directory</p>
                             {availableWidgets.map((widget) => {
                                 const isEnabled = visibleWidgets.includes(widget.id);
                                 return (
@@ -197,7 +197,7 @@ const WidgetsController: React.FC<WidgetsControllerProps> = ({
                     {/* ORGANIZE TAB: Drag and Drop */}
                     {activeTab === 'organize' && (
                         <div className="space-y-3">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Drag to Reorder Active Widgets</p>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-4">Drag to Reorder Active Widgets</p>
                             {activeWidgetDefs.map((widget, index) => (
                                 <div 
                                     key={widget.id}
@@ -238,7 +238,7 @@ const WidgetsController: React.FC<WidgetsControllerProps> = ({
                                     <p className="text-sm font-bold text-slate-400">No widgets active.</p>
                                     <button 
                                         onClick={() => setActiveTab('library')}
-                                        className="text-xs font-black text-indigo-600 dark:text-indigo-400 mt-2 uppercase tracking-wider hover:underline"
+                                        className="text-xs font-bold text-indigo-600 dark:text-indigo-400 mt-2 uppercase tracking-wider hover:underline"
                                     >
                                         Go to Library to add some
                                     </button>
@@ -250,7 +250,7 @@ const WidgetsController: React.FC<WidgetsControllerProps> = ({
 
                 {/* Footer / Status */}
                 <div className="p-6 bg-slate-50 dark:bg-slate-800 border-t border-slate-100 dark:border-slate-700">
-                    <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+                    <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide">
                         <span>{activeWidgetDefs.length} Active Widgets</span>
                         <span>{availableWidgets.length - activeWidgetDefs.length} Hidden</span>
                     </div>

@@ -735,7 +735,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
 
                     {/* Campaign name */}
                     <div>
-                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">Campaign Name</label>
+                        <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-2">Campaign Name</label>
                         <input
                             type="text"
                             value={local.name}
@@ -747,7 +747,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
 
                     {/* Channel Toggle */}
                     <div>
-                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">Broadcast Type</label>
+                        <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-2">Broadcast Type</label>
                         <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
                             <button
                                 onClick={() => update({ channelType: 'sms' })}
@@ -766,7 +766,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
 
                     {/* Recipients */}
                     <div>
-                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">Recipients</label>
+                        <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-2">Recipients</label>
                         {/* Tab toggle */}
                         <div className="flex rounded-xl overflow-hidden border border-slate-200 dark:border-slate-600 mb-3">
                             {(['lists', 'groups'] as const).map(tab => (
@@ -834,7 +834,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                     {local.channelType !== 'email' && (
                         <div className="bg-slate-50 dark:bg-slate-900/30 p-3 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-3 mt-4">
                             <div>
-                                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-1.5">Campaign Type</label>
+                                <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1.5">Campaign Type</label>
                                 <select
                                     title="Campaign Type"
                                     className="w-full text-xs border border-slate-200 dark:border-slate-600 rounded-xl px-2.5 py-1.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 font-bold"
@@ -854,7 +854,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
 
                             {local.campaignType === 'event_registration' && (
                                 <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-1.5">PCO Event Signup</label>
+                                    <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1.5">PCO Event Signup</label>
                                     {loadingSignups ? (
                                         <div className="flex items-center gap-2 text-xs text-slate-400"><Loader2 size={11} className="animate-spin" /> Loading Events...</div>
                                     ) : (
@@ -878,7 +878,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                     {/* Analytics (readonly for sent campaigns) */}
                     {local.status === 'sent' && (
                         <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 space-y-3">
-                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Send Results</p>
+                            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Send Results</p>
                             <div className="grid grid-cols-2 gap-3">
                                 {[
                                     { label: 'Sent', value: local.deliveredCount ?? '—', color: 'text-emerald-600' },
@@ -888,7 +888,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                 ].map(s => (
                                     <div key={s.label} className="text-center p-2 bg-slate-50 dark:bg-slate-900/50 rounded-xl">
                                         <p className={`text-xl font-black ${s.color}`}>{s.value}</p>
-                                        <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-widest">{s.label}</p>
+                                        <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wide">{s.label}</p>
                                     </div>
                                 ))}
                             </div>
@@ -905,7 +905,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                             {local.channelType === 'email' ? (
                                 <>
                                     <div className="mb-4">
-                                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">Email Subject</label>
+                                        <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-2">Email Subject</label>
                                         <input
                                             type="text"
                                             value={local.emailSubject || ''}
@@ -915,14 +915,14 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                         />
                                     </div>
                                     <div className="flex items-center justify-between mb-2">
-                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Email Body</label>
+                                        <label className="text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">Email Body</label>
                                     </div>
                                     <SimpleRichTextEditor value={local.body || ''} onChange={body => update({ body })} />
                                 </>
                             ) : (
                                 <>
                                     <div className="flex items-center justify-between mb-2">
-                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Message</label>
+                                        <label className="text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">Message</label>
                                         <span className={`text-xs font-bold ${segments > 3 ? 'text-red-500' : segments > 1 ? 'text-amber-600' : 'text-slate-400'}`}>
                                             {local.body?.length ?? 0} chars • {segments} segment{segments !== 1 ? 's' : ''}
                                         </span>
@@ -971,7 +971,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                             </button>
                                             {showLinkDlg && (
                                                 <div className="absolute top-full left-0 mt-1 z-30 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-3 w-72">
-                                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Insert Link URL</p>
+                                                    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2">Insert Link URL</p>
                                                     <div className="flex gap-2">
                                                         <input
                                                             type="url"
@@ -1070,7 +1070,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                                     {showAiPanel && (
                                         <div className="mt-3 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700 rounded-2xl p-4">
                                             <div className="flex items-center justify-between mb-2">
-                                                <span className="text-[10px] font-black uppercase tracking-widest text-violet-500 flex items-center gap-1.5"><Sparkles size={11} /> AI Suggestion</span>
+                                                <span className="text-[10px] font-bold uppercase tracking-wide text-violet-500 flex items-center gap-1.5"><Sparkles size={11} /> AI Suggestion</span>
                                                 <button onClick={() => setShowAiPanel(false)} title="Dismiss AI suggestion" className="text-violet-400 hover:text-violet-600"><X size={14} /></button>
                                             </div>
                                             {aiLoading ? (
@@ -1108,7 +1108,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
 
                         {/* Merge tag quick-inserts */}
                         <div>
-                            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Merge Tags</label>
+                            <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2">Merge Tags</label>
                             <div className="flex flex-wrap gap-2">
                                 {ALL_MERGE_TAGS.map(({ tag, label }) => (
                                     <button
@@ -1128,7 +1128,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
 
                         {/* Phone preview */}
                         <div>
-                            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">Preview</label>
+                            <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-3">Preview</label>
                             <div className="bg-slate-100 dark:bg-slate-800 rounded-3xl p-4 max-w-[260px] shadow-inner">
                                 {imageUrl && (
                                     <div className="mb-2 rounded-xl overflow-hidden max-w-[220px]">
@@ -1644,7 +1644,7 @@ const NewMessageComposer: React.FC<{
 
                     {/* Recipient Mode */}
                     <div>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Send To</p>
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2">Send To</p>
                         <div className="grid grid-cols-3 gap-2">
                             {([
                                 { key: 'individual', icon: <UserCheck size={16} />, label: 'Individual' },
@@ -1669,7 +1669,7 @@ const NewMessageComposer: React.FC<{
                     {/* Individual ... PCO person search */}
                     {mode === 'individual' && (
                         <div className="space-y-3">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">Recipient</label>
+                            <label className="text-[10px] font-bold uppercase tracking-wide text-slate-400 block">Recipient</label>
 
                             {/* Selected person card */}
                             {selectedPerson ? (
@@ -1790,7 +1790,7 @@ const NewMessageComposer: React.FC<{
                     {/* PCO List picker */}
                     {mode === 'list' && (
                         <div>
-                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Select Planning Center List</label>
+                            <label className="text-[10px] font-bold uppercase tracking-wide text-slate-400 block mb-2">Select Planning Center List</label>
                             {selectedList ? (
                                 <div className="flex items-center justify-between p-3 bg-violet-50 dark:bg-violet-900/20 border-2 border-violet-500 rounded-2xl">
                                     <div>
@@ -1831,7 +1831,7 @@ const NewMessageComposer: React.FC<{
                     {/* PCO Group picker */}
                     {mode === 'group' && (
                         <div>
-                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Select Planning Center Group</label>
+                            <label className="text-[10px] font-bold uppercase tracking-wide text-slate-400 block mb-2">Select Planning Center Group</label>
                             {selectedGroup ? (
                                 <div className="flex items-center justify-between p-3 bg-violet-50 dark:bg-violet-900/20 border-2 border-violet-500 rounded-2xl">
                                     <div>
@@ -1872,7 +1872,7 @@ const NewMessageComposer: React.FC<{
                     {/* Message editor */}
                     <div>
                         <div className="flex items-center justify-between mb-1.5">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Message</label>
+                            <label className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Message</label>
                             <span className={`text-[10px] font-semibold ${charLeft < 0 ? 'text-red-500' : charLeft < 50 ? 'text-amber-500' : 'text-slate-400'
                                 }`}>
                                 {body.length}/{MAX_CHARS} ... {segCount} segment{segCount !== 1 ? 's' : ''}
@@ -1914,7 +1914,7 @@ const NewMessageComposer: React.FC<{
                                 ><Link size={12} /> Link</button>
                                 {showLinkDlgNM && (
                                     <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-3 w-72">
-                                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Insert Link URL</p>
+                                        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2">Insert Link URL</p>
                                         <div className="flex gap-2">
                                             <input type="url" value={linkUrlNM} onChange={e => setLinkUrlNM(e.target.value)}
                                                 placeholder="https://example.com"
@@ -1956,7 +1956,7 @@ const NewMessageComposer: React.FC<{
                             <div className="mt-3 border-2 border-violet-200 dark:border-violet-700 rounded-2xl overflow-hidden">
                                 <div className="flex border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
                                     {(['upload', 'url'] as const).map(tab => (
-                                        <button key={tab} type="button" onClick={() => setImageTab(tab)} className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest transition ${imageTab === tab ? 'text-violet-600 dark:text-violet-300 border-b-2 border-violet-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>{tab === 'upload' ? '\uD83D\uDCC1 Upload File' : '\uD83D\uDD17 Paste URL'}</button>
+                                        <button key={tab} type="button" onClick={() => setImageTab(tab)} className={`flex-1 py-2 text-[10px] font-black uppercase tracking-wide transition ${imageTab === tab ? 'text-violet-600 dark:text-violet-300 border-b-2 border-violet-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>{tab === 'upload' ? '\uD83D\uDCC1 Upload File' : '\uD83D\uDD17 Paste URL'}</button>
                                     ))}
                                 </div>
                                 <div className="p-4 bg-white dark:bg-slate-900 space-y-3">
@@ -1999,7 +1999,7 @@ const NewMessageComposer: React.FC<{
                         {showAiPanelNM && (
                             <div className="mt-3 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700 rounded-2xl p-3">
                                 <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[10px] font-black uppercase tracking-widest text-violet-500 flex items-center gap-1"><Sparkles size={10} /> AI Suggestion</span>
+                                    <span className="text-[10px] font-bold uppercase tracking-wide text-violet-500 flex items-center gap-1"><Sparkles size={10} /> AI Suggestion</span>
                                     <button onClick={() => setShowAiPanelNM(false)} title="Dismiss" className="text-violet-400 hover:text-violet-600"><X size={13} /></button>
                                 </div>
                                 {aiLoadingNM ? (
@@ -2026,7 +2026,7 @@ const NewMessageComposer: React.FC<{
                         {/* Merge tags hint */}
                         {mode !== 'individual' && (
                             <div className="mt-2">
-                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Merge Tags</p>
+                                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1.5">Merge Tags</p>
                                 <div className="flex flex-wrap gap-1.5">
                                     {ALL_MERGE_TAGS.map(({ tag, label }) => (
                                         <button key={tag} type="button" title={`Insert ${label}`}
@@ -2725,7 +2725,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                         </h2>
                         <button
                             onClick={() => setShowComposer(true)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition shadow-sm"
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-[10px] font-bold uppercase tracking-wide transition shadow-sm"
                         >
                             <Plus size={12} /> New
                         </button>
@@ -2841,7 +2841,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                                 {conv.unreadCount}
                                             </span>
                                         )}
-                                        {conv.isOptedOut && <span className="text-[9px] text-red-500 font-bold">OPT-OUT</span>}
+                                        {conv.isOptedOut && <span className="text-[11px] text-red-500 font-bold">OPT-OUT</span>}
                                     </div>
                                 </div>
                             </button>
@@ -2919,7 +2919,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                         className="absolute right-0 top-full mt-2 z-40 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-3 w-56"
                                         onClick={e => e.stopPropagation()}
                                     >
-                                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Tag This Conversation</p>
+                                        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2">Tag This Conversation</p>
                                         <div className="space-y-1">
                                             {tags.map(t => {
                                                 const isOn = (activeConv.tags || []).includes(t.id);
@@ -3020,7 +3020,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                         {/* AI Suggested Replies panel */}
                         {smsAgentEnabled && userCanUseAiAgent && !activeConv.isOptedOut && aiSuggestions.length > 0 && (
                             <div className="mb-3 space-y-2">
-                                <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-violet-500">
+                                <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-violet-500">
                                     <Sparkles size={10} /> AI Suggested Replies
                                 </div>
                                 {aiSuggestions.map(sug => (
@@ -3310,21 +3310,21 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, churchId, pcoLists
 
                 {/* Keyword trigger */}
                 <div className="mb-4">
-                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Trigger Word</label>
+                    <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2">Trigger Word</label>
                     <input
                         type="text"
                         value={keyword}
                         onChange={e => setKeyword(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
                         placeholder="YOUTH"
                         maxLength={30}
-                        className="w-full text-xl font-black tracking-widest border-2 border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-violet-600 dark:text-violet-300 focus:outline-none focus:border-violet-500"
+                        className="w-full text-xl font-black tracking-wide border-2 border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 text-violet-600 dark:text-violet-300 focus:outline-none focus:border-violet-500"
                     />
                     <p className="text-[10px] text-slate-400 mt-1">Letters &amp; numbers only, no spaces. Stored as UPPERCASE.</p>
                 </div>
 
                 {/* Action Type */}
                 <div className="mb-4">
-                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Action Type</label>
+                    <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2">Action Type</label>
                     <select
                         value={actionType}
                         onChange={e => setActionType(e.target.value as SmsKeywordAction)}
@@ -3347,7 +3347,7 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, churchId, pcoLists
                 {actionType === 'event_registration' && (
                     <>
                         <div className="mb-4 bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 rounded-2xl p-4">
-                            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">PCO Event Signup</label>
+                            <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2">PCO Event Signup</label>
                             {loadingSignups ? (
                                 <div className="flex items-center gap-2 text-sm text-slate-400"><Loader2 size={13} className="animate-spin" /> Loading signups...</div>
                             ) : (
@@ -3386,7 +3386,7 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, churchId, pcoLists
                 {/* Auto-reply message */}
                 <div className="mb-4">
                     <div className="flex items-center justify-between mb-2">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                        <label className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
                             {actionType === 'static' ? 'Auto-Reply Message' : 'Prefix Message (Optional)'}
                         </label>
                         <span className={`text-xs font-bold ${segs > 3 ? 'text-red-500' : segs > 1 ? 'text-amber-600' : 'text-slate-400'}`}>
@@ -3416,7 +3416,7 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, churchId, pcoLists
 
                 {/* Optional PCO list */}
                 <div className="mb-4">
-                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Add to PCO List (optional)</label>
+                    <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2">Add to PCO List (optional)</label>
                     <p className="text-[10px] text-slate-400 mb-2">When a match occurs, automatically add the sender to this Planning Center list.</p>
                     {loadingLists ? (
                         <div className="flex items-center gap-2 text-sm text-slate-400"><Loader2 size={13} className="animate-spin" /> Loading...</div>
@@ -3438,7 +3438,7 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, churchId, pcoLists
                 {/* Link to Poll (Phase 3) */}
                 {polls.length > 0 && (
                     <div className="mb-4">
-                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Link to Poll (optional)</label>
+                        <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2">Link to Poll (optional)</label>
                         <p className="text-[10px] text-slate-400 mb-2">When this keyword matches, the poll participation link is automatically appended to the auto-reply message.</p>
                         <select
                             value={linkedPollId}
@@ -3461,7 +3461,7 @@ const KeywordModal: React.FC<KeywordModalProps> = ({ initial, churchId, pcoLists
                 {/* Phone number scope */}
                 {allSmsNumbers.length > 1 && (
                     <div className="mb-5">
-                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">
+                        <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">
                             Active Phone Lines
                         </label>
                         <p className="text-[10px] text-slate-400 mb-2">
@@ -3624,7 +3624,7 @@ const AddSubscriberModal: React.FC<{
                         <p className="text-sm font-black text-slate-900 dark:text-white">Add Subscriber</p>
                         <p className="text-[10px] text-slate-500">
                             Manually subscribe someone to{' '}
-                            <span className="font-black text-violet-600 tracking-widest">{keyword.keyword}</span>
+                            <span className="font-black text-violet-600 tracking-wide">{keyword.keyword}</span>
                         </p>
                     </div>
                     <button onClick={onClose} className="ml-auto p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition">
@@ -4053,7 +4053,7 @@ const SmsKeywordsManager: React.FC<{
                                                 >
                                                     <div className="flex items-start gap-3">
                                                         {/* Keyword badge */}
-                                                        <div className={`shrink-0 px-2.5 py-1.5 rounded-xl text-sm font-black tracking-widest self-start ${kw.isActive ? 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-200' : 'bg-slate-100 dark:bg-slate-700 text-slate-400 line-through'}`}>
+                                                        <div className={`shrink-0 px-2.5 py-1.5 rounded-xl text-sm font-black tracking-wide self-start ${kw.isActive ? 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-200' : 'bg-slate-100 dark:bg-slate-700 text-slate-400 line-through'}`}>
                                                             {kw.keyword}
                                                         </div>
 
@@ -4084,7 +4084,7 @@ const SmsKeywordsManager: React.FC<{
                                                         <div className="flex items-center gap-2 shrink-0">
                                                             <div className="text-center hidden sm:block">
                                                                 <p className="text-lg font-black text-violet-600 dark:text-violet-300">{kw.matchCount}</p>
-                                                                <p className="text-[10px] text-slate-400 uppercase tracking-widest">matches</p>
+                                                                <p className="text-[10px] text-slate-400 uppercase tracking-wide">matches</p>
                                                             </div>
                                                             {/* Add Subscriber button */}
                                                             <button
@@ -4321,7 +4321,7 @@ const SmsKeywordsManager: React.FC<{
                         {/* Clarifying reply customisation ... only visible when enabled & admin */}
                         {isAdmin && prayerEnabled && (
                             <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4">
-                                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">
+                                <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">
                                     Clarifying Reply Message
                                 </label>
                                 <p className="text-[10px] text-slate-400 mb-3">
@@ -4480,7 +4480,7 @@ const SmsKeywordsManager: React.FC<{
                         </h3>
 
                         <div className="mb-4">
-                            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Tag Name</label>
+                            <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2">Tag Name</label>
                             <input
                                 type="text"
                                 value={tagName}
@@ -4493,7 +4493,7 @@ const SmsKeywordsManager: React.FC<{
                         </div>
 
                         <div className="mb-4">
-                            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Emoji (optional)</label>
+                            <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2">Emoji (optional)</label>
                             <input
                                 type="text"
                                 value={tagEmoji}
@@ -4505,7 +4505,7 @@ const SmsKeywordsManager: React.FC<{
                         </div>
 
                         <div className="mb-4">
-                            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Color</label>
+                            <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2">Color</label>
                             <div className="flex gap-2 flex-wrap">
                                 {(Object.keys(TAG_COLOR_MAP) as SmsTag['color'][]).map(color => {
                                     const c = TAG_COLOR_MAP[color];
@@ -4534,7 +4534,7 @@ const SmsKeywordsManager: React.FC<{
 
                         {/* Auto-reply message */}
                         <div className="mb-6">
-                            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">
+                            <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">
                                 Auto-Reply Message <span className="text-slate-300 dark:text-slate-600 normal-case font-normal tracking-normal">(optional)</span>
                             </label>
                             <p className="text-[10px] text-slate-400 mb-2">When this tag is applied to a conversation, automatically send this SMS reply to the contact.</p>
@@ -4584,7 +4584,7 @@ const SmsKeywordsManager: React.FC<{
                                 <div className="px-4 pt-3 pb-4 space-y-4 bg-white dark:bg-slate-900">
                                     {/* Trigger phrases */}
                                     <div>
-                                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">
+                                        <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">
                                             Trigger Phrases
                                         </label>
                                         <p className="text-[10px] text-slate-400 mb-2">
@@ -4612,7 +4612,7 @@ const SmsKeywordsManager: React.FC<{
                                     {/* Phone number scope */}
                                     {allSmsNumbers.length > 1 && (
                                         <div>
-                                            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">
+                                            <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">
                                                 Active Phone Lines
                                             </label>
                                             <p className="text-[10px] text-slate-400 mb-2">
@@ -4644,7 +4644,7 @@ const SmsKeywordsManager: React.FC<{
                                                             <Phone size={12} className="text-slate-400 shrink-0" />
                                                             <span className="flex-1 text-left truncate">{num.friendlyLabel}</span>
                                                             {num.isDefault && (
-                                                                <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Default</span>
+                                                                <span className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Default</span>
                                                             )}
                                                         </button>
                                                     );
@@ -4660,7 +4660,7 @@ const SmsKeywordsManager: React.FC<{
 
                                     {/* Clarifying reply */}
                                     <div>
-                                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">
+                                        <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">
                                             Clarifying Reply <span className="text-slate-300 dark:text-slate-600 normal-case font-normal tracking-normal">(optional)</span>
                                         </label>
                                         <p className="text-[10px] text-slate-400 mb-2">
@@ -4757,7 +4757,7 @@ const StatCard: React.FC<{
                 )}
             </div>
             <p className="text-2xl font-black text-slate-900 dark:text-white mb-0.5">{value}</p>
-            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-widest">{label}</p>
+            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">{label}</p>
             {sub && <p className="text-xs text-slate-400 mt-1">{sub}</p>}
         </div>
     );
@@ -4959,7 +4959,7 @@ const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[]; smsNu
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 {/* Monthly volume bars */}
                 <div className="lg:col-span-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
-                    <p className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4">Monthly Volume (last 6 months)</p>
+                    <p className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-4">Monthly Volume (last 6 months)</p>
                     {monthlyData.every(m => m.sent === 0) ? (
                         <div className="flex flex-col items-center justify-center h-40 text-slate-400">
                             <Activity size={28} className="mb-2 opacity-30" />
@@ -5017,7 +5017,7 @@ const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[]; smsNu
             {/* Campaign performance table */}
             <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
                 <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
-                    <p className="text-xs font-black uppercase tracking-widest text-slate-400">Campaign Performance</p>
+                    <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Campaign Performance</p>
                     <span className="text-xs text-slate-400">{periodCampaigns.length} campaigns</span>
                 </div>
                 {periodCampaigns.length === 0 ? (
@@ -5079,7 +5079,7 @@ const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[]; smsNu
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {/* Opt-out breakdown */}
                 <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
-                    <p className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4">Compliance Health</p>
+                    <p className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-4">Compliance Health</p>
                     <div className="space-y-3">
                         {[
                             {
@@ -5117,7 +5117,7 @@ const SmsAnalytics: React.FC<{ churchId: string; campaigns: SmsCampaign[]; smsNu
 
                 {/* Quick stats */}
                 <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
-                    <p className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4">Quick Stats</p>
+                    <p className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-4">Quick Stats</p>
                     <div className="space-y-3">
                         {[
                             { label: 'Avg. recipients per campaign', value: summary && summary.totalBulk > 0 ? Math.round(summary.totalSent / summary.totalBulk).toLocaleString() : '...' },
@@ -5211,7 +5211,7 @@ const StaffStepEditor: React.FC<{
             </div>
             {/* Who to notify */}
             <div>
-                <p className='text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5'>Notify</p>
+                <p className='text-[10px] font-black uppercase tracking-wide text-slate-400 mb-1.5'>Notify</p>
                 <div className='flex rounded-xl overflow-hidden border border-slate-200 dark:border-slate-600'>
                     {(['individuals', 'list', 'group'] as const).map(t => (
                         <button key={t} type='button' onClick={() => onChange({ staffTargetType: t })}
@@ -5241,7 +5241,7 @@ const StaffStepEditor: React.FC<{
             {/* PCO List */}
             {targetType === 'list' && (
                 <div>
-                    <label className='block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5'>PCO List</label>
+                    <label className='block text-[10px] font-black uppercase tracking-wide text-slate-400 mb-1.5'>PCO List</label>
                     <select value={step.staffListId || ''} onChange={e => { const l = pcoLists.find(x => x.id === e.target.value); onChange({ staffListId: e.target.value || null, staffListName: l?.name || null }); }} title='Staff PCO list' className='w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-400 text-slate-900 dark:text-white'>
                         <option value=''>- Select a list -</option>
                         {pcoLists.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
@@ -5252,7 +5252,7 @@ const StaffStepEditor: React.FC<{
             {/* PCO Group */}
             {targetType === 'group' && (
                 <div>
-                    <label className='block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5'>PCO Group</label>
+                    <label className='block text-[10px] font-black uppercase tracking-wide text-slate-400 mb-1.5'>PCO Group</label>
                     <select value={step.staffGroupId || ''} onChange={e => { const g = pcoGroups.find(x => x.id === e.target.value); onChange({ staffGroupId: e.target.value || null, staffGroupName: g?.name || null }); }} title='Staff PCO group' className='w-full text-sm border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-400 text-slate-900 dark:text-white'>
                         <option value=''>- Select a group -</option>
                         {pcoGroups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
@@ -5384,12 +5384,12 @@ const DelayNodeCard: React.FC<{
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 min-w-0">
                     <Clock size={14} className="text-amber-500 shrink-0" />
-                    <span className="text-xs font-black uppercase tracking-widest text-amber-600 dark:text-amber-400 shrink-0">
+                    <span className="text-xs font-bold uppercase tracking-wide text-amber-600 dark:text-amber-400 shrink-0">
                         {isRepeating ? 'Repeat' : 'Wait'}
                     </span>
                     <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold truncate">{summary}</span>
                     {isRepeating && (
-                        <span className="shrink-0 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300">
+                        <span className="shrink-0 text-[11px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300">
                             Recurring
                         </span>
                     )}
@@ -5542,7 +5542,7 @@ const DelayNodeCard: React.FC<{
 
             <div className="pt-1 border-t border-amber-200 dark:border-amber-700">
                 <div className="flex items-center justify-between mb-2">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wide text-amber-600 dark:text-amber-400 flex items-center gap-1">
                         <RefreshCw size={10} /> Recurrence
                     </span>
                     <div className="flex rounded-lg overflow-hidden border border-amber-200 dark:border-amber-700 text-[10px] font-bold">
@@ -5627,7 +5627,7 @@ const DelayNodeCard: React.FC<{
                 {/* End condition row ... only shown when recurrence is active */}
                 {isRepeating && repeatDays.length > 0 && (
                     <div className="mt-3 pt-2 border-t border-violet-100 dark:border-violet-800 space-y-2">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-violet-500">Stop after</p>
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-violet-500">Stop after</p>
                         <div className="flex items-center gap-2 flex-wrap">
                             {/* Count */}
                             <label className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
@@ -5721,7 +5721,7 @@ const BranchNodeCard: React.FC<{
             <div className="flex items-center justify-between px-4 py-3 bg-blue-50 dark:bg-blue-950/30 border-b border-blue-200 dark:border-blue-700">
                 <div className="flex items-center gap-2 min-w-0">
                     <GitBranch size={14} className="text-blue-500 shrink-0" />
-                    <span className="text-xs font-black uppercase tracking-widest text-blue-600 dark:text-blue-400 shrink-0">Branch</span>
+                    <span className="text-xs font-bold uppercase tracking-wide text-blue-600 dark:text-blue-400 shrink-0">Branch</span>
                     <span className="text-xs text-slate-400 shrink-0">...</span>
                     <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 truncate">IF: {conditionSummary()}</span>
                 </div>
@@ -5741,7 +5741,7 @@ const BranchNodeCard: React.FC<{
                 <div className="p-4 space-y-4">
                     {/* Condition editor */}
                     <div className="space-y-3">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Condition (IF)</p>
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Condition (IF)</p>
                         {/* Condition type picker */}
                         <div className="flex rounded-xl overflow-hidden border border-slate-200 dark:border-slate-600">
                             {([
@@ -5790,7 +5790,7 @@ const BranchNodeCard: React.FC<{
                         <div className="space-y-2">
                             <div className="flex items-center gap-1.5">
                                 <CheckCircle size={12} className="text-emerald-500" />
-                                <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400">Then (True)</span>
+                                <span className="text-[10px] font-bold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">Then (True)</span>
                             </div>
                             <div className="p-2 border border-emerald-200 dark:border-emerald-800 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/10 space-y-2 min-h-[60px]">
                                 {node.thenNodes.map((an, i) => (
@@ -5815,7 +5815,7 @@ const BranchNodeCard: React.FC<{
                         <div className="space-y-2">
                             <div className="flex items-center gap-1.5">
                                 <Circle size={12} className="text-slate-400" />
-                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Else (False)</span>
+                                <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Else (False)</span>
                             </div>
                             <div className="p-2 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800/50 space-y-2 min-h-[60px]">
                                 {node.elseNodes.map((an, i) => (
@@ -5891,7 +5891,7 @@ const WorkflowMmsUploader: React.FC<{
 
     return (
         <div className="space-y-2">
-            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400">Image (MMS)</label>
+            <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400">Image (MMS)</label>
             {/* Upload button + URL input row */}
             <div className="flex gap-2 items-center">
                 <input
@@ -6106,7 +6106,7 @@ const ActionNodeCard: React.FC<{
             {/* Channel picker ... full layout for normal steps, compact for sub-steps inside branches */}
             {!isSubStep ? (
                 <div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Channel</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1.5">Channel</p>
                     <div className="flex rounded-t-xl overflow-hidden border border-b-0 border-slate-200 dark:border-slate-600">
                         {(['sms', 'mms', 'email'] as WorkflowChannelType[]).map(ch => (
                             <button key={ch} type="button" onClick={() => onChange({ channelType: ch })}
@@ -6122,7 +6122,7 @@ const ActionNodeCard: React.FC<{
                                 title={`Use ${CHANNEL_CONFIG[ch].label} channel`}
                                 className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-bold transition border-r last:border-r-0 border-slate-200 dark:border-slate-600 ${channel === ch ? CHANNEL_CONFIG[ch].color : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-600'}`}>
                                 {CHANNEL_CONFIG[ch].icon} {CHANNEL_CONFIG[ch].label}
-                                {(ch === 'staff_sms' || ch === 'staff_email') && <span className="text-[8px] opacity-60 ml-0.5">(internal)</span>}
+                                {(ch === 'staff_sms' || ch === 'staff_email') && <span className="text-[10px] opacity-60 ml-0.5">(internal)</span>}
                             </button>
                         ))}
                     </div>
@@ -6141,7 +6141,7 @@ const ActionNodeCard: React.FC<{
             {channel === 'sms' && (
                 <div>
                     <div className="flex items-center justify-between mb-1.5">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Message</label>
+                        <label className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Message</label>
                         <span className={`text-[10px] font-bold ${segs > 3 ? 'text-red-500' : segs > 1 ? 'text-amber-600' : 'text-slate-400'
                             }`}>{step.message.length} chars • {segs} seg{segs !== 1 ? 's' : ''}</span>
                     </div>
@@ -6210,7 +6210,7 @@ const ActionNodeCard: React.FC<{
                 <div className="space-y-3">
                     <div>
                         <div className="flex items-center justify-between mb-1.5">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Message</label>
+                            <label className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Message</label>
                             <span className={`text-[10px] font-bold ${segs > 3 ? 'text-red-500' : segs > 1 ? 'text-amber-600' : 'text-slate-400'
                                 }`}>{step.message.length} chars • {segs} seg{segs !== 1 ? 's' : ''}</span>
                         </div>
@@ -6265,7 +6265,7 @@ const ActionNodeCard: React.FC<{
                         <span>Email steps are sent using your church's Email settings (from name, address, template). The recipient must have an email on file in Planning Center.</span>
                     </div>
                     <div>
-                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Subject Line</label>
+                        <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1.5">Subject Line</label>
                         <input
                             type="text"
                             value={step.emailSubject || ''}
@@ -6276,7 +6276,7 @@ const ActionNodeCard: React.FC<{
                     </div>
                     <div>
                         <div className="flex items-center justify-between mb-1.5">
-                            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Email Body</label>
+                            <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1.5">Email Body</label>
                             <span className="text-[10px] text-slate-400">{(step.emailBody || '').length} chars</span>
                         </div>
                         <textarea
@@ -6317,7 +6317,7 @@ const ActionNodeCard: React.FC<{
                     {(step.emailSubject?.trim() || step.emailBody?.trim()) && (
                         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
                             <div className="bg-slate-50 dark:bg-slate-800 px-4 py-2 border-b border-slate-200 dark:border-slate-700">
-                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Preview</p>
+                                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-0.5">Preview</p>
                                 <p className="text-xs font-bold text-slate-700 dark:text-slate-200">{step.emailSubject?.replace('{firstName}', 'John') || '(no subject)'}</p>
                             </div>
                             <div className="px-4 py-3 text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
@@ -6370,7 +6370,7 @@ const AiDraftPreview: React.FC<{ draft: AiWorkflowDraft; onRegenerate: () => voi
         <div className="space-y-4">
             <div className="flex items-center justify-between">
                 <div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Generated Workflow</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-0.5">Generated Workflow</p>
                     <h3 className="font-black text-slate-900 dark:text-white text-base">{draft.name}</h3>
                     {draft.description && <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{draft.description}</p>}
                 </div>
@@ -6611,7 +6611,7 @@ const GuidedBuilderTab: React.FC<{
                             <p className={`text-[10px] ${subColor}`}>{d.name}</p>
                         </div>
                         {applied && (
-                            <span className="flex items-center gap-1 text-[10px] font-black uppercase tracking-wide text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-700 px-2 py-0.5 rounded-full">
+                            <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-700 px-2 py-0.5 rounded-full">
                                 ✓ Saved
                             </span>
                         )}
@@ -6629,7 +6629,7 @@ const GuidedBuilderTab: React.FC<{
                                             : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700'
                                     }`}>
                                         <div className="flex items-center gap-2 mb-1.5">
-                                            <span className="w-5 h-5 rounded-full bg-violet-600 text-white text-[9px] font-black flex items-center justify-center shrink-0">{i + 1}</span>
+                                            <span className="w-5 h-5 rounded-full bg-violet-600 text-white text-[11px] font-black flex items-center justify-center shrink-0">{i + 1}</span>
                                             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase ${chBadge[s.channelType] ?? chBadge.sms}`}>{chLabel[s.channelType] ?? s.channelType}</span>
                                             <span className="text-slate-400 text-[10px]">{delay}</span>
                                         </div>
@@ -6683,7 +6683,7 @@ const GuidedBuilderTab: React.FC<{
         return (
             <div className="space-y-5">
                 <div className="text-center">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Two Workflows Generated</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Two Workflows Generated</p>
                     <h3 className="text-base font-black text-slate-900 dark:text-white">Apply each workflow to the editor</h3>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Apply each one separately — the editor loads one workflow at a time.</p>
                 </div>
@@ -6773,7 +6773,7 @@ const GuidedBuilderTab: React.FC<{
         <div className="space-y-6">
             {/* Progress bar */}
             <div className="space-y-1.5">
-                <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-400">
+                <div className="flex justify-between text-[10px] font-bold uppercase tracking-wide text-slate-400">
                     <span>Step {step} of {TOTAL_STEPS}</span>
                     <span>{Math.round((step / TOTAL_STEPS) * 100)}%</span>
                 </div>
@@ -6796,7 +6796,7 @@ const GuidedBuilderTab: React.FC<{
             {step === 1 && (
                 <div className="space-y-5">
                     <div>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Step 1</p>
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Step 1</p>
                         <h3 className="text-base font-black text-slate-900 dark:text-white">Tell me about the event</h3>
                     </div>
 
@@ -6957,7 +6957,7 @@ const GuidedBuilderTab: React.FC<{
             {step === 2 && (
                 <div className="space-y-5">
                     <div>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Step 2</p>
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Step 2</p>
                         <h3 className="text-base font-black text-slate-900 dark:text-white">How many messages?</h3>
                     </div>
 
@@ -7042,7 +7042,7 @@ const GuidedBuilderTab: React.FC<{
             {step === 3 && (
                 <div className="space-y-4">
                     <div>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Step 3</p>
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Step 3</p>
                         <h3 className="text-base font-black text-slate-900 dark:text-white">What tone should these messages have?</h3>
                         <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Be as specific as you like. This guides every word the AI writes.</p>
                     </div>
@@ -7085,7 +7085,7 @@ const GuidedBuilderTab: React.FC<{
             {step === 4 && (
                 <div className="space-y-5">
                     <div>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Step 4</p>
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Step 4</p>
                         <h3 className="text-base font-black text-slate-900 dark:text-white">Staff follow-up alert?</h3>
                         <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Automatically notify your pastor or staff team during the workflow.</p>
                     </div>
@@ -7162,7 +7162,7 @@ const GuidedBuilderTab: React.FC<{
             {step === 5 && (
                 <div className="space-y-4">
                     <div>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Step 5</p>
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Step 5</p>
                         <h3 className="text-base font-black text-slate-900 dark:text-white">Anything specific to include?</h3>
                         <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Optional — the AI will handle everything, but you can guide it here.</p>
                     </div>
@@ -7177,7 +7177,7 @@ const GuidedBuilderTab: React.FC<{
 
                     {/* Summary card */}
                     <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 space-y-2 text-xs">
-                        <p className="font-black text-[10px] uppercase tracking-widest text-slate-400 mb-2">Summary</p>
+                        <p className="font-bold text-[10px] uppercase tracking-wide text-slate-400 mb-2">Summary</p>
                         <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
                             <div><span className="text-slate-500">Event:</span> <span className="font-semibold text-slate-800 dark:text-slate-200">{eventDisplayName || '—'}</span></div>
                             <div><span className="text-slate-500">Date:</span> <span className="font-semibold text-slate-800 dark:text-slate-200">{eventDisplayDate || '—'}</span></div>
@@ -7272,7 +7272,7 @@ const CustomPromptTab: React.FC<{
     return (
         <div className="space-y-5">
             <div>
-                <label className="block text-xs font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">Describe Your Workflow</label>
+                <label className="block text-xs font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-2">Describe Your Workflow</label>
                 <textarea
                     rows={5}
                     value={prompt}
@@ -7286,7 +7286,7 @@ const CustomPromptTab: React.FC<{
 
             {!loading && (
                 <div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Try an example</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2">Try an example</p>
                     <div className="space-y-2">
                         {EXAMPLE_PROMPTS.map((ep, i) => (
                             <button
@@ -7816,7 +7816,7 @@ const WorkflowEditor: React.FC<{
 
                     {/* Name + description */}
                     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 space-y-4">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Workflow Details</p>
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Workflow Details</p>
                         <div>
                             <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Name</label>
                             <input
@@ -7868,7 +7868,7 @@ const WorkflowEditor: React.FC<{
 
                     {/* Trigger */}
                     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 space-y-4">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Trigger</p>
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Trigger</p>
                         <p className="text-xs text-slate-500 dark:text-slate-400">What event starts enrolling a contact into this workflow?</p>
 
                         {/* Row 1 ... basic triggers */}
@@ -8121,7 +8121,7 @@ const WorkflowEditor: React.FC<{
                     {/* Workflow Nodes */}
                     <div className="space-y-3">
                         <div className="flex items-center justify-between">
-                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
                                 Sequence ({nodes.filter(n => n.nodeType === 'action').length} step{nodes.filter(n => n.nodeType === 'action').length !== 1 ? 's' : ''})
                             </p>
                             {/* 3-button add toolbar (top) */}
@@ -8552,7 +8552,7 @@ const WorkflowTestDrawer: React.FC<WorkflowTestDrawerProps> = ({
                     
                     {/* Mock inputs section */}
                     <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-slate-200 dark:border-slate-700 space-y-3">
-                        <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
                             <Settings size={12} /> Simulation Inputs
                         </h4>
                         
@@ -8675,7 +8675,7 @@ const WorkflowTestDrawer: React.FC<WorkflowTestDrawerProps> = ({
                     {/* Timeline visualization */}
                     <div className="space-y-4">
                         <div className="flex items-center justify-between">
-                            <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
                                 <Clock size={12} /> Simulated Flow Timeline
                             </h4>
                             {timeline.length > 0 && (
@@ -8739,7 +8739,7 @@ const WorkflowTestDrawer: React.FC<WorkflowTestDrawerProps> = ({
                                                 {/* Meta Info */}
                                                 <div className="flex items-center justify-between gap-2 mb-2">
                                                     <div className="flex items-center gap-2">
-                                                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${getChannelBadgeColor(ch)}`}>
+                                                        <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${getChannelBadgeColor(ch)}`}>
                                                             {getChannelLabel(ch)}
                                                         </span>
                                                         <span className="text-[10px] text-slate-400 italic">
@@ -8749,23 +8749,23 @@ const WorkflowTestDrawer: React.FC<WorkflowTestDrawerProps> = ({
                                                     
                                                     {/* Status Badge */}
                                                     {isSent && (
-                                                        <span className="flex items-center gap-1 text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-0.5 rounded-full shrink-0">
+                                                        <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-0.5 rounded-full shrink-0">
                                                             <CheckCircle size={10} /> Dispatched
                                                         </span>
                                                     )}
                                                     {isCurrent && (
-                                                        <span className="flex items-center gap-1 text-[9px] font-bold text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/30 px-2 py-0.5 rounded-full shrink-0 animate-pulse">
+                                                        <span className="flex items-center gap-1 text-[11px] font-bold text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/30 px-2 py-0.5 rounded-full shrink-0 animate-pulse">
                                                             <Loader2 size={10} className="animate-spin" /> Simulating...
                                                         </span>
                                                     )}
                                                     {isQueued && (
-                                                        <span className="flex items-center gap-1 text-[9px] font-bold text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-900/30 px-2 py-0.5 rounded-full shrink-0">
+                                                        <span className="flex items-center gap-1 text-[11px] font-bold text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-900/30 px-2 py-0.5 rounded-full shrink-0">
                                                             <Clock size={10} /> Queued
                                                         </span>
                                                     )}
                                                 </div>
 
-                                                <h5 className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                                                <h5 className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
                                                     Scheduled Time
                                                 </h5>
                                                 <p className="text-xs font-bold text-slate-700 dark:text-slate-200 mb-3 flex items-center gap-1.5">
@@ -8773,7 +8773,7 @@ const WorkflowTestDrawer: React.FC<WorkflowTestDrawerProps> = ({
                                                     {formatSimDate(item.scheduledMs)}
                                                 </p>
 
-                                                <h5 className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                                                <h5 className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
                                                     To Recipient
                                                 </h5>
                                                 <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-3">
@@ -8900,7 +8900,7 @@ const EnrollmentPane: React.FC<{
                 {/* Enroll form */}
                 <div className="p-5 space-y-3 border-b border-slate-200 dark:border-slate-700 shrink-0">
                     <div>
-                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Phone Number</label>
+                        <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1.5">Phone Number</label>
                         <input
                             type="tel"
                             value={phone}
@@ -8910,7 +8910,7 @@ const EnrollmentPane: React.FC<{
                         />
                     </div>
                     <div>
-                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Name <span className="font-normal opacity-60">(optional)</span></label>
+                        <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1.5">Name <span className="font-normal opacity-60">(optional)</span></label>
                         <input
                             type="text"
                             value={name}
@@ -9118,7 +9118,7 @@ const BulkEnrollFromListModal: React.FC<{
                                 <div className="flex items-center gap-2 text-slate-400 text-xs py-2"><Loader2 size={13} className="animate-spin" /> Loading PCO Lists...</div>
                             ) : (
                                 <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">PCO List</label>
+                                    <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1.5">PCO List</label>
                                     <select
                                         value={selectedListId}
                                         onChange={e => { setSelectedListId(e.target.value); setResult(null); setErrMsg(''); }}
@@ -9137,7 +9137,7 @@ const BulkEnrollFromListModal: React.FC<{
                                 <div className="flex items-center gap-2 text-slate-400 text-xs py-2"><Loader2 size={13} className="animate-spin" /> Loading PCO Groups...</div>
                             ) : (
                                 <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">PCO Group</label>
+                                    <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1.5">PCO Group</label>
                                     <select
                                         value={selectedGroupId}
                                         onChange={e => { setSelectedGroupId(e.target.value); setResult(null); setErrMsg(''); }}
@@ -9546,7 +9546,7 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
                                                         const ch = s.channelType ?? 'sms';
                                                         const cfg = CHANNEL_CONFIG[ch];
                                                         return (
-                                                            <span key={si} className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${cfg.badge}`}>
+                                                            <span key={si} className={`text-[11px] font-bold px-1.5 py-0.5 rounded-full ${cfg.badge}`}>
                                                                 {cfg.label}
                                                             </span>
                                                         );
@@ -9571,17 +9571,17 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
                                         <div className="text-right hidden sm:block">
                                             <button onClick={() => setViewingEnrollments(wf)} className="group/enroll flex flex-col items-end hover:bg-violet-50 dark:hover:bg-violet-900/20 px-2 py-1 rounded-lg transition-colors">
                                                 <p className="text-lg font-black text-violet-600 dark:text-violet-300 group-hover/enroll:text-violet-700 dark:group-hover/enroll:text-violet-200 transition-colors">{wf.enrolledCount}</p>
-                                                <p className="text-[10px] text-slate-400 uppercase tracking-widest group-hover/enroll:text-violet-500 transition-colors">enrolled</p>
+                                                <p className="text-[10px] text-slate-400 uppercase tracking-wide group-hover/enroll:text-violet-500 transition-colors">enrolled</p>
                                             </button>
                                         </div>
                                         <div className="text-right hidden sm:block">
                                             <p className="text-lg font-black text-emerald-600">{wf.completedCount}</p>
-                                            <p className="text-[10px] text-slate-400 uppercase tracking-widest">done</p>
+                                            <p className="text-[10px] text-slate-400 uppercase tracking-wide">done</p>
                                         </div>
                                         {stepCountsMap[wf.id]?.totalActive > 0 && (
                                             <div className="text-right hidden sm:block">
                                                 <p className="text-lg font-black text-amber-500">{stepCountsMap[wf.id].totalActive}</p>
-                                                <p className="text-[10px] text-slate-400 uppercase tracking-widest">active</p>
+                                                <p className="text-[10px] text-slate-400 uppercase tracking-wide">active</p>
                                             </div>
                                         )}
 
@@ -9673,7 +9673,7 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
                                                     {i > 0 && (
                                                         <div className="flex items-center gap-1 shrink-0">
                                                             <div className="h-px w-4 bg-violet-200 dark:bg-violet-800" />
-                                                            <span className="text-[9px] text-slate-400 whitespace-nowrap">
+                                                            <span className="text-[11px] text-slate-400 whitespace-nowrap">
                                                                 {(() => {
                                                                     const st = step.scheduleType ?? 'relative';
                                                                     if (st === 'day_of_week') return DOW_LABELS_SHORT[step.scheduleDayOfWeek ?? 1];
@@ -9693,7 +9693,7 @@ export const SmsWorkflowsManager: React.FC<{ churchId: string }> = ({ churchId }
                                                     <div className="flex flex-col items-center gap-0.5 shrink-0">
                                                         <div className="w-6 h-6 rounded-full bg-violet-600 text-white text-[10px] font-black flex items-center justify-center">{i + 1}</div>
                                                         {countAtStep > 0 && (
-                                                            <span className="text-[9px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                                                            <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 px-1.5 py-0.5 rounded-full whitespace-nowrap">
                                                                 👤 {countAtStep}
                                                             </span>
                                                         )}
@@ -10078,7 +10078,7 @@ const SmsSetupWizard: React.FC<{
                                     <button
                                         key={mode}
                                         onClick={() => { setSearchMode(mode); setError(''); }}
-                                        className={`flex-1 py-2 text-xs font-black uppercase tracking-widest transition ${searchMode === mode
+                                        className={`flex-1 py-2 text-xs font-black uppercase tracking-wide transition ${searchMode === mode
                                                 ? 'bg-violet-600 text-white'
                                                 : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'
                                             }`}
@@ -10091,7 +10091,7 @@ const SmsSetupWizard: React.FC<{
                             {searchMode === 'city-state' && (
                                 <div className="space-y-3">
                                     <div>
-                                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">City <span className="font-normal normal-case">(optional)</span></label>
+                                        <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1.5">City <span className="font-normal normal-case">(optional)</span></label>
                                         <input
                                             type="text"
                                             value={city}
@@ -10103,7 +10103,7 @@ const SmsSetupWizard: React.FC<{
                                         <p className="text-[10px] text-slate-400 mt-1">Leave blank to search across the whole state.</p>
                                     </div>
                                     <div>
-                                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">State <span className="text-red-400">*</span></label>
+                                        <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1.5">State <span className="text-red-400">*</span></label>
                                         <select
                                             value={stateAbbr}
                                             onChange={e => setStateAbbr(e.target.value)}
@@ -10121,7 +10121,7 @@ const SmsSetupWizard: React.FC<{
 
                             {searchMode === 'area-code' && (
                                 <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Area Code (3 digits)</label>
+                                    <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1.5">Area Code (3 digits)</label>
                                     <input
                                         type="text"
                                         maxLength={3}
@@ -10129,14 +10129,14 @@ const SmsSetupWizard: React.FC<{
                                         onChange={e => setAreaCode(e.target.value.replace(/\D/g, ''))}
                                         onKeyDown={e => e.key === 'Enter' && canSearch && fetchNumbers()}
                                         placeholder="e.g. 615"
-                                        className="w-full text-2xl font-black border-2 border-slate-200 dark:border-slate-600 rounded-2xl px-5 py-4 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500 tracking-widest"
+                                        className="w-full text-2xl font-black border-2 border-slate-200 dark:border-slate-600 rounded-2xl px-5 py-4 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-violet-500 tracking-wide"
                                     />
                                 </div>
                             )}
 
                             {searchMode === 'ported' && (
                                 <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Ported Phone Number</label>
+                                    <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1.5">Ported Phone Number</label>
                                     <input
                                         type="tel"
                                         value={portedNumber}
@@ -10172,7 +10172,7 @@ const SmsSetupWizard: React.FC<{
                                 <div className="flex items-start justify-between gap-2 mb-1">
                                     <h2 className="text-xl font-black text-slate-900 dark:text-white">Pick a Number</h2>
                                     {numbers.length > 0 && (
-                                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-full shrink-0">
+                                        <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-full shrink-0">
                                             {numbers.length} found
                                         </span>
                                     )}
@@ -10263,7 +10263,7 @@ const SmsSetupWizard: React.FC<{
                                     <>
                                         {(mode === 'add-number' || searchMode === 'ported') && (
                                             <>
-                                                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Inbox Label (e.g. "Youth Line")</label>
+                                                <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2">Inbox Label (e.g. "Youth Line")</label>
                                                 <input
                                                     type="text"
                                                     value={friendlyLabel}
@@ -10273,7 +10273,7 @@ const SmsSetupWizard: React.FC<{
                                                 />
                                             </>
                                         )}
-                                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Sender Name (shown in message headers)</label>
+                                        <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2">Sender Name (shown in message headers)</label>
                                         <input
                                             type="text"
                                             value={senderName}
@@ -10482,10 +10482,10 @@ const NumberManager: React.FC<{
                                     <div className="flex items-center gap-2 flex-wrap">
                                         <span className="font-black text-sm text-slate-900 dark:text-white">{num.friendlyLabel}</span>
                                         {num.isDefault && (
-                                            <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300">Default</span>
+                                            <span className="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300">Default</span>
                                         )}
                                         {!num.smsEnabled && (
-                                            <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400">Disabled</span>
+                                            <span className="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400">Disabled</span>
                                         )}
                                     </div>
                                     <p className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">{num.phoneNumber}</p>
@@ -10536,7 +10536,7 @@ const NumberManager: React.FC<{
                             {isAdmin && editingId === num.id && (
                                 <div className="px-4 py-3 border-t border-slate-200 dark:border-slate-700 space-y-3 bg-white dark:bg-slate-900">
                                     <div>
-                                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Label</label>
+                                        <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Label</label>
                                         <input
                                             type="text"
                                             value={labelDraft}
@@ -10547,7 +10547,7 @@ const NumberManager: React.FC<{
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Sender Name</label>
+                                        <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Sender Name</label>
                                         <input
                                             type="text"
                                             value={senderDraft}
@@ -10557,7 +10557,7 @@ const NumberManager: React.FC<{
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">
+                                        <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2">
                                             <Lock size={10} className="inline mr-1" />
                                             Restrict to users (leave empty for all)
                                         </label>
@@ -10893,7 +10893,7 @@ Write the reply:`;
         multiline = false
     ) => (
         <div>
-            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-1.5">{label}</label>
+            <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1.5">{label}</label>
             {multiline ? (
                 <textarea
                     rows={3}
@@ -11020,7 +11020,7 @@ Write the reply:`;
                 {execAgentEnabled && (
                     <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700 space-y-4">
                         <div>
-                            <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">
+                            <label className="block text-xs font-bold uppercase tracking-wide text-slate-500 mb-2">
                                 Activation Keyword
                             </label>
                             <input
@@ -11034,7 +11034,7 @@ Write the reply:`;
                             <p className="text-[10px] text-slate-400 mt-1">If the incoming text starts with this phrase, it will route to the Executive AI (e.g. "AI Agent how many people gave today?").</p>
                         </div>
                         <div>
-                            <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">
+                            <label className="block text-xs font-bold uppercase tracking-wide text-slate-500 mb-2">
                                 Authorized PCO List
                             </label>
                         {loadingLists ? (
@@ -11151,7 +11151,7 @@ Write the reply:`;
                     {scanResult && (
                         <div className="space-y-3">
                             <div className="flex items-center justify-between">
-                                <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                                <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
                                     <CheckCircle size={10} /> Extracted from website
                                 </p>
                                 <button
@@ -11164,7 +11164,7 @@ Write the reply:`;
                             <div className="bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl p-4 space-y-2 max-h-64 overflow-y-auto">
                                 {Object.entries(scanResult).filter(([, v]) => v && String(v).trim()).map(([key, value]) => (
                                     <div key={key}>
-                                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{key}</p>
+                                        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{key}</p>
                                         <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">{String(value)}</p>
                                     </div>
                                 ))}
@@ -11209,7 +11209,7 @@ Write the reply:`;
                 </div>
                 {testOutput && (
                     <div className="space-y-2">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-violet-500">Agent Reply Preview</p>
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-violet-500">Agent Reply Preview</p>
                         <div className="bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700 rounded-xl p-4">
                             <p className="text-sm text-violet-900 dark:text-violet-100 leading-relaxed">{testOutput}</p>
                             <p className={`text-xs font-bold mt-2 ${testOutput.length > 160 ? 'text-amber-600' : 'text-emerald-600'}`}>

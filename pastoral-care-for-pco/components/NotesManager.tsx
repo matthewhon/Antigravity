@@ -334,7 +334,7 @@ const NoteCard: React.FC<{
         <div className="flex-1 min-w-0">
           {/* Status + timestamp */}
           <div className="flex items-center gap-2 mb-2">
-            <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border ${
+            <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full border ${
               isPublished
                 ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-700'
                 : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-600'
@@ -361,7 +361,7 @@ const NoteCard: React.FC<{
 
           {/* Author */}
           <div className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-500">
-            <div className="nm-avatar w-[18px] h-[18px] rounded-full flex items-center justify-center text-white text-[8px] font-extrabold shrink-0">
+            <div className="nm-avatar w-[18px] h-[18px] rounded-full flex items-center justify-center text-white text-[10px] font-extrabold shrink-0">
               {(note.authorName || 'A').charAt(0).toUpperCase()}
             </div>
             {note.authorName || 'Unknown'}

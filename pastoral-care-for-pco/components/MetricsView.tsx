@@ -510,7 +510,7 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
                     <WidgetWrapper title="Total Population" onRemove={() => handleRemoveWidget(id)} source="US Census">
                         <div className="flex flex-col justify-center items-center h-full py-8 text-center">
                             <span className="text-4xl font-black text-slate-850 dark:text-white tracking-tight">{censusData.totalPopulation.toLocaleString()}</span>
-                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2">Residents</span>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wide mt-2">Residents</span>
                         </div>
                     </WidgetWrapper>
                 );
@@ -520,7 +520,7 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
                     <WidgetWrapper title="Median Income" onRemove={() => handleRemoveWidget(id)} source="US Census">
                         <div className="flex flex-col justify-center items-center h-full py-8 text-center">
                             <span className="text-4xl font-black text-slate-850 dark:text-white tracking-tight">${censusData.economics?.medianHouseholdIncome?.toLocaleString() || 'N/A'}</span>
-                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2">Household Median</span>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wide mt-2">Household Median</span>
                         </div>
                     </WidgetWrapper>
                 );
@@ -530,7 +530,7 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
                     <WidgetWrapper title="Median Age" onRemove={() => handleRemoveWidget(id)} source="US Census">
                         <div className="flex flex-col justify-center items-center h-full py-8 text-center">
                             <span className="text-4xl font-black text-slate-850 dark:text-white tracking-tight">{censusData.demographics?.medianAge?.toFixed(1) || 'N/A'}</span>
-                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2">Years Old</span>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wide mt-2">Years Old</span>
                         </div>
                     </WidgetWrapper>
                 );
@@ -540,7 +540,7 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
                     <WidgetWrapper title="Poverty Rate" onRemove={() => handleRemoveWidget(id)} source="US Census">
                         <div className="flex flex-col justify-center items-center h-full py-8 text-center">
                             <span className="text-4xl font-black text-slate-850 dark:text-white tracking-tight">{censusData.economics?.povertyRate?.toFixed(1)}%</span>
-                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2">Below Poverty Line</span>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wide mt-2">Below Poverty Line</span>
                         </div>
                     </WidgetWrapper>
                 );
@@ -583,7 +583,7 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
                                 ) : (
                                     <div className="w-12 h-12 rounded-2xl bg-rose-600 text-white flex items-center justify-center font-black text-xl shadow-md shadow-rose-900/10">▶</div>
                                 )}
-                                <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-600 text-[8px] text-white font-bold ring-2 ring-white dark:ring-slate-850">✓</span>
+                                <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-600 text-[10px] text-white font-bold ring-2 ring-white dark:ring-slate-850">✓</span>
                             </div>
                             <div className="min-w-0 flex-1">
                                 <h5 className="text-sm font-black text-slate-900 dark:text-white truncate">
@@ -597,13 +597,13 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
 
                         {/* Subscribers Hero Stat */}
                         <div className="pt-1">
-                            <p className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Subscribers</p>
+                            <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-1">Subscribers</p>
                             <div className="flex items-baseline gap-2 flex-wrap">
                                 <span className="text-3xl font-black tracking-tight text-slate-900 dark:text-white leading-none">
                                     {subscribersCount.toLocaleString()}
                                 </span>
                                 {getSubscribersGrowth.weekly && (
-                                    <span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[9px] font-black ${getSubscribersGrowth.weekly.startsWith('-') ? 'bg-rose-100 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400' : 'bg-emerald-100 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400'}`}>
+                                    <span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[11px] font-black ${getSubscribersGrowth.weekly.startsWith('-') ? 'bg-rose-100 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400' : 'bg-emerald-100 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400'}`}>
                                         {getSubscribersGrowth.weekly.startsWith('-') ? '▼' : '▲'} {getSubscribersGrowth.weekly}
                                     </span>
                                 )}
@@ -612,7 +612,7 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
 
                         {/* Goal Progress Bar */}
                         <div className="space-y-1">
-                            <div className="flex justify-between text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                            <div className="flex justify-between text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
                                 <span>Milestone Goal Progress</span>
                                 <span>{milestoneProgress.toFixed(0)}%</span>
                             </div>
@@ -622,7 +622,7 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
                                     style={{ width: `${milestoneProgress}%` }}
                                 ></div>
                             </div>
-                            <div className="flex justify-between text-[8px] font-black text-slate-400/80 dark:text-slate-500/80 uppercase">
+                            <div className="flex justify-between text-[10px] font-bold text-slate-400/80 dark:text-slate-500/80 uppercase">
                                 <span>0</span>
                                 <span>{nextMilestone.toLocaleString()} Goals</span>
                             </div>
@@ -634,13 +634,13 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
                                 <p className="text-xs font-black text-slate-850 dark:text-white">
                                     {(ytSettings.youtubeViews || 0).toLocaleString()}
                                 </p>
-                                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tight mt-0.5">Total Views</p>
+                                <p className="text-[11px] text-slate-400 font-bold uppercase tracking-tight mt-0.5">Total Views</p>
                             </div>
                             <div className="bg-slate-50 dark:bg-slate-900/40 p-2.5 rounded-2xl border border-slate-100 dark:border-slate-800/80 flex flex-col justify-center">
                                 <p className="text-xs font-black text-slate-850 dark:text-white">
                                     {(ytSettings.youtubeVideos || 0).toLocaleString()}
                                 </p>
-                                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tight mt-0.5">Videos Published</p>
+                                <p className="text-[11px] text-slate-400 font-bold uppercase tracking-tight mt-0.5">Videos Published</p>
                             </div>
                         </div>
 
@@ -650,7 +650,7 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
                                 href={`https://youtube.com/${ytSettings.youtubeChannelName?.startsWith('@') ? ytSettings.youtubeChannelName : ''}`}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="flex-1 text-center bg-rose-600 hover:bg-rose-700 text-white font-black text-[9px] uppercase tracking-wider py-2.5 rounded-xl shadow-md shadow-rose-950/10 hover:shadow-rose-600/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                                className="flex-1 text-center bg-rose-600 hover:bg-rose-700 text-white font-bold text-[11px] uppercase tracking-wider py-2.5 rounded-xl shadow-md shadow-rose-950/10 hover:shadow-rose-600/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
                             >
                                 Open Channel
                             </a>
@@ -718,10 +718,10 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
                             </div>
                             
                             {/* Floating Stats on Thumbnail */}
-                            <div className="absolute bottom-2 left-2 px-2.5 py-1 rounded-lg backdrop-blur-md bg-black/60 text-white text-[9px] font-black uppercase tracking-wider flex items-center gap-1 shadow-sm">
+                            <div className="absolute bottom-2 left-2 px-2.5 py-1 rounded-lg backdrop-blur-md bg-black/60 text-white text-[11px] font-bold uppercase tracking-wider flex items-center gap-1 shadow-sm">
                                 👁️ {views.toLocaleString()}
                             </div>
-                            <div className="absolute top-2 right-2 px-2 py-0.5 rounded-lg bg-rose-600 text-white text-[8px] font-black uppercase tracking-widest shadow-sm">
+                            <div className="absolute top-2 right-2 px-2 py-0.5 rounded-lg bg-rose-600 text-white text-[10px] font-bold uppercase tracking-wide shadow-sm">
                                 Latest Upload
                             </div>
                         </a>
@@ -737,7 +737,7 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
                             >
                                 {video.title}
                             </a>
-                            <p className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider mt-1.5 flex items-center gap-1.5">
+                            <p className="text-[11px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider mt-1.5 flex items-center gap-1.5">
                                 <span>Published: {publishDate}</span>
                             </p>
                         </div>
@@ -748,19 +748,19 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
                                 <p className="text-xs font-black text-slate-850 dark:text-white">
                                     {likes.toLocaleString()}
                                 </p>
-                                <p className="text-[8px] text-slate-400 font-bold uppercase tracking-tight mt-0.5">Likes</p>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight mt-0.5">Likes</p>
                             </div>
                             <div className="p-2 bg-slate-50 dark:bg-slate-900/30 rounded-xl border border-slate-100/55 dark:border-slate-800/50">
                                 <p className="text-xs font-black text-slate-850 dark:text-white">
                                     {comments.toLocaleString()}
                                 </p>
-                                <p className="text-[8px] text-slate-400 font-bold uppercase tracking-tight mt-0.5">Comments</p>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight mt-0.5">Comments</p>
                             </div>
                             <div className="p-2 bg-rose-50/50 dark:bg-rose-950/20 rounded-xl border border-rose-100/30 dark:border-rose-900/20">
                                 <p className="text-xs font-black text-rose-600 dark:text-rose-400">
                                     {engagementRate.toFixed(1)}%
                                 </p>
-                                <p className="text-[8px] text-rose-500/80 font-bold uppercase tracking-tight mt-0.5">Engagement</p>
+                                <p className="text-[10px] text-rose-500/80 font-bold uppercase tracking-tight mt-0.5">Engagement</p>
                             </div>
                         </div>
                     </div>
@@ -778,7 +778,7 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
                         <h5 className="text-slate-900 dark:text-white font-black text-xl mb-1">
                             {censusData ? (censusData.totalPopulation - (peopleData?.stats.total || 0)).toLocaleString() : '---'}
                         </h5>
-                        <p className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Unreached Residents</p>
+                        <p className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide">Unreached Residents</p>
                     </div>
                 </WidgetWrapper>
             );
@@ -809,9 +809,9 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
                                     </div>
                                     <div className="text-right">
                                         {isMatch ? (
-                                            <div><p className="text-lg font-black text-emerald-600 dark:text-emerald-400">{reachPercentage.toFixed(2)}%</p><p className="text-[9px] font-bold text-emerald-400 dark:text-emerald-500 uppercase tracking-wider">Reach (City Pop)</p></div>
+                                            <div><p className="text-lg font-black text-emerald-600 dark:text-emerald-400">{reachPercentage.toFixed(2)}%</p><p className="text-[11px] font-bold text-emerald-400 dark:text-emerald-500 uppercase tracking-wider">Reach (City Pop)</p></div>
                                         ) : (
-                                            <div><p className="text-lg font-black text-slate-400 dark:text-slate-500">{densityPercentage.toFixed(1)}%</p><p className="text-[9px] font-bold text-slate-300 dark:text-slate-600 uppercase tracking-wider">Density (Church)</p></div>
+                                            <div><p className="text-lg font-black text-slate-400 dark:text-slate-500">{densityPercentage.toFixed(1)}%</p><p className="text-[11px] font-bold text-slate-300 dark:text-slate-600 uppercase tracking-wider">Density (Church)</p></div>
                                         )}
                                     </div>
                                 </div>
@@ -833,7 +833,7 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
                     title={ministry.name} 
                     onRemove={() => handleRemoveWidget(id)} 
                     source="Manual Entry"
-                    headerControl={<span className="text-[9px] font-black bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-2 py-1 rounded uppercase tracking-widest">{timeFilter} View</span>}
+                    headerControl={<span className="text-[11px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-2 py-1 rounded uppercase tracking-wide">{timeFilter} View</span>}
                 >
                     <div className="h-64 w-full">
                         {validDefs.length > 0 ? (
@@ -857,7 +857,7 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
                     {/* Totals Section */}
                     {validDefs.length > 0 && !ministry.id.toLowerCase().includes('youtube') && !ministry.name.toLowerCase().includes('youtube') && (
                         <div className="border-t border-slate-100 dark:border-slate-800 pt-4 mt-6 space-y-3">
-                            <h5 className="text-[9px] font-black text-slate-400 dark:text-slate-550 uppercase tracking-widest">Totals Overview</h5>
+                            <h5 className="text-[11px] font-bold text-slate-400 dark:text-slate-550 uppercase tracking-wide">Totals Overview</h5>
                             <div className="grid grid-cols-1 gap-2.5">
                                 {validDefs.map((def, idx) => {
                                     const mTotals = getTotalsForMinistry(ministry.id)[def.id] || { month: 0, year: 0, allTime: 0, type: def.type };
@@ -875,15 +875,15 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
                                             </div>
                                             <div className="flex gap-4 text-[10px] font-extrabold uppercase tracking-wide">
                                                 <div className="flex flex-col items-end">
-                                                    <span className="text-slate-400 dark:text-slate-500 text-[8px] tracking-wider">Month</span>
+                                                    <span className="text-slate-400 dark:text-slate-500 text-[10px] tracking-wider">Month</span>
                                                     <span className="text-slate-700 dark:text-slate-300 mt-0.5">{formatVal(mTotals.month)}</span>
                                                 </div>
                                                 <div className="flex flex-col items-end border-l border-slate-200 dark:border-slate-800 pl-4">
-                                                    <span className="text-slate-400 dark:text-slate-500 text-[8px] tracking-wider">Year</span>
+                                                    <span className="text-slate-400 dark:text-slate-500 text-[10px] tracking-wider">Year</span>
                                                     <span className="text-indigo-600 dark:text-indigo-400 mt-0.5">{formatVal(mTotals.year)}</span>
                                                 </div>
                                                 <div className="flex flex-col items-end border-l border-slate-200 dark:border-slate-800 pl-4">
-                                                    <span className="text-slate-400 dark:text-slate-500 text-[8px] tracking-wider">All Time</span>
+                                                    <span className="text-slate-400 dark:text-slate-500 text-[10px] tracking-wider">All Time</span>
                                                     <span className="text-emerald-600 dark:text-emerald-400 mt-0.5">{formatVal(mTotals.allTime)}</span>
                                                 </div>
                                             </div>
@@ -909,7 +909,7 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
             <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div>
                     <h3 className="text-4xl font-black tracking-tighter text-slate-900 dark:text-white">{pageTitle}</h3>
-                    <p className="text-slate-400 dark:text-slate-500 font-medium uppercase text-[10px] tracking-widest mt-1">{pageSubtitle}</p>
+                    <p className="text-slate-400 dark:text-slate-500 font-medium uppercase text-[10px] tracking-wide mt-1">{pageSubtitle}</p>
                 </div>
                 {activeTab === 'Dashboard' && onUpdateWidgets && (
                     <div className="flex items-center gap-4">
@@ -939,8 +939,8 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
                                     <div key={min.id} className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 group hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
                                         <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{min.name}</span>
                                         <div className="flex gap-2">
-                                            <button type="button" onClick={() => handleEditMinistry(min)} className="text-slate-400 dark:text-slate-500 hover:text-indigo-500 dark:hover:text-indigo-400 text-[10px] font-black uppercase transition-colors">Edit</button>
-                                            <button type="button" onClick={() => handleDeleteMinistry(min.id)} className="text-slate-400 dark:text-slate-500 hover:text-rose-500 dark:hover:text-rose-400 text-[10px] font-black uppercase transition-colors">Delete</button>
+                                            <button type="button" onClick={() => handleEditMinistry(min)} className="text-slate-400 dark:text-slate-500 hover:text-indigo-500 dark:hover:text-indigo-400 text-[10px] font-bold uppercase transition-colors">Edit</button>
+                                            <button type="button" onClick={() => handleDeleteMinistry(min.id)} className="text-slate-400 dark:text-slate-500 hover:text-rose-500 dark:hover:text-rose-400 text-[10px] font-bold uppercase transition-colors">Delete</button>
                                         </div>
                                     </div>
                                 ))}
@@ -971,8 +971,8 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
                                     const ministryName = ministries.find(m => m.id === def.ministryId)?.name || 'Unknown';
                                     return (
                                         <div key={def.id} className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 group hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
-                                            <div className="flex flex-col"><div className="flex items-center gap-2"><span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase ${def.type === 'currency' ? 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400' : 'bg-indigo-100 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400'}`}>{def.type === 'currency' ? '$' : '#'}</span><span className="text-xs font-bold text-slate-700 dark:text-slate-300">{def.name}</span></div><span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest ml-1">{ministryName}</span></div>
-                                            <div className="flex gap-2"><button type="button" onClick={() => handleEditDefinition(def)} className="text-slate-400 dark:text-slate-500 hover:text-indigo-500 dark:hover:text-indigo-400 text-[10px] font-black uppercase transition-colors">Edit</button><button type="button" onClick={() => handleDeleteDefinition(def.id)} className="text-slate-400 dark:text-slate-500 hover:text-rose-500 dark:hover:text-rose-400 text-[10px] font-black uppercase transition-colors">Delete</button></div>
+                                            <div className="flex flex-col"><div className="flex items-center gap-2"><span className={`px-2 py-0.5 rounded text-[11px] font-black uppercase ${def.type === 'currency' ? 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400' : 'bg-indigo-100 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400'}`}>{def.type === 'currency' ? '$' : '#'}</span><span className="text-xs font-bold text-slate-700 dark:text-slate-300">{def.name}</span></div><span className="text-[11px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wide ml-1">{ministryName}</span></div>
+                                            <div className="flex gap-2"><button type="button" onClick={() => handleEditDefinition(def)} className="text-slate-400 dark:text-slate-500 hover:text-indigo-500 dark:hover:text-indigo-400 text-[10px] font-bold uppercase transition-colors">Edit</button><button type="button" onClick={() => handleDeleteDefinition(def.id)} className="text-slate-400 dark:text-slate-500 hover:text-rose-500 dark:hover:text-rose-400 text-[10px] font-bold uppercase transition-colors">Delete</button></div>
                                         </div>
                                     );
                                 })}
@@ -986,8 +986,8 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
             {activeTab === 'Input' && (
                 <div className="max-w-2xl mx-auto bg-white dark:bg-slate-850 p-10 rounded-[3rem] border border-slate-100 dark:border-slate-800 shadow-xl transition-colors">
                     <div className="flex gap-4 mb-8">
-                        <div className="flex-1"><label className="block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-2">Date</label><input type="date" title="Entry Date" placeholder="Select date" value={inputDate} onChange={e => setInputDate(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"/></div>
-                        <div className="flex-1"><label className="block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-2">Ministry</label><select title="Select Ministry" value={selectedMinistryId} onChange={e => setSelectedMinistryId(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500">{ministries.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}{ministries.length === 0 && <option value="">No Ministries Configured</option>}</select></div>
+                        <div className="flex-1"><label className="block text-[10px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide mb-2">Date</label><input type="date" title="Entry Date" placeholder="Select date" value={inputDate} onChange={e => setInputDate(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"/></div>
+                        <div className="flex-1"><label className="block text-[10px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide mb-2">Ministry</label><select title="Select Ministry" value={selectedMinistryId} onChange={e => setSelectedMinistryId(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500">{ministries.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}{ministries.length === 0 && <option value="">No Ministries Configured</option>}</select></div>
                     </div>
                     <div className="space-y-6">
                         {activeDefinitions.length > 0 ? (
@@ -999,7 +999,7 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
                             ))
                         ) : (<div className="text-center p-8 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700"><p className="text-xs text-slate-400 dark:text-slate-500">{selectedMinistryId ? "No metrics configured for this ministry." : "Select a ministry."} Go to Settings to add some.</p></div>)}
                     </div>
-                    <div className="mt-8 flex justify-end"><button onClick={handleSaveEntry} disabled={isSavingEntry || !selectedMinistryId || activeDefinitions.length === 0} className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 disabled:opacity-50">{isSavingEntry ? 'Saving...' : 'Save Data'}</button></div>
+                    <div className="mt-8 flex justify-end"><button onClick={handleSaveEntry} disabled={isSavingEntry || !selectedMinistryId || activeDefinitions.length === 0} className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-bold text-xs uppercase tracking-wide hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 disabled:opacity-50">{isSavingEntry ? 'Saving...' : 'Save Data'}</button></div>
                 </div>
             )}
 
@@ -1007,10 +1007,10 @@ export const MetricsView: React.FC<MetricsViewPropsExtended> = ({ churchId, curr
                 <div className="space-y-8">
                     {/* Controls */}
                     <div className="flex justify-end items-center gap-4 bg-white dark:bg-slate-850 p-2 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm w-fit ml-auto transition-colors">
-                        <span className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest pl-3">Time Range</span>
+                        <span className="text-[10px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide pl-3">Time Range</span>
                         <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-xl">
                             {(['Week', 'Month', 'Quarter', 'Year'] as TimeFilter[]).map(tf => (
-                                <button key={tf} onClick={() => setTimeFilter(tf)} className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${timeFilter === tf ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-300' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}>{tf}</button>
+                                <button key={tf} onClick={() => setTimeFilter(tf)} className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-wide transition-all ${timeFilter === tf ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-300' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}>{tf}</button>
                             ))}
                         </div>
                     </div>

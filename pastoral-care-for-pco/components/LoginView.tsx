@@ -63,7 +63,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onRegister }) => {
         
         <div className="text-center mb-8">
             <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Welcome Back</h2>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-2">Sign in to your dashboard</p>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mt-2">Sign in to your dashboard</p>
         </div>
 
         {error && (
@@ -82,7 +82,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onRegister }) => {
 
         <form onSubmit={handleLogin} className="space-y-5">
             <div>
-                <label htmlFor="login-email" className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Email</label>
+                <label htmlFor="login-email" className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-2">Email</label>
                 <input 
                     id="login-email"
                     type="email" 
@@ -98,7 +98,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onRegister }) => {
 
             <div>
                 <div className="flex justify-between items-center mb-2">
-                    <label htmlFor="login-password" className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Password</label>
+                    <label htmlFor="login-password" className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide">Password</label>
                     <button 
                         type="button"
                         onClick={handleForgotPassword}
@@ -132,7 +132,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onRegister }) => {
             <button 
                 type="submit" 
                 disabled={loading}
-                className="w-full bg-indigo-600 text-white py-4 rounded-xl font-black uppercase tracking-widest text-xs hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 dark:shadow-none disabled:opacity-50 disabled:cursor-not-allowed mt-4"
+                className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold uppercase tracking-wide text-xs hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 dark:shadow-none disabled:opacity-50 disabled:cursor-not-allowed mt-4"
             >
                 {loading ? 'Signing In...' : 'Sign In'}
             </button>
@@ -146,7 +146,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onRegister }) => {
                     e.preventDefault();
                     onRegister();
                 }}
-                className="mt-2 inline-block text-xs font-black text-indigo-600 hover:text-indigo-800 transition-colors uppercase tracking-widest"
+                className="mt-2 inline-block text-xs font-bold text-indigo-600 hover:text-indigo-800 transition-colors uppercase tracking-wide"
             >
                 Create Organization
             </a>

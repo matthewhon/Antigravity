@@ -35,7 +35,7 @@ export const RiskDistributionWidget: React.FC<RiskProps> = ({ people, currentThe
   return (
     <div className="bg-white dark:bg-slate-850 p-8 rounded-[3rem] border border-slate-100 dark:border-slate-800 shadow-sm h-full flex flex-col transition-colors">
       <div className="flex justify-between items-center mb-6">
-        <h4 className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">Risk Distribution</h4>
+        <h4 className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.14em]">Risk Distribution</h4>
         <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-2 py-1 rounded font-bold">{total} Analyzed</span>
       </div>
       
@@ -88,7 +88,7 @@ export const RiskFactorsWidget: React.FC<RiskProps> = ({ people, currentTheme = 
     return (
         <div className="bg-white dark:bg-slate-850 p-8 rounded-[3rem] border border-slate-100 dark:border-slate-800 shadow-sm h-full flex flex-col transition-colors">
             <div className="flex justify-between items-center mb-6">
-                <h4 className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">Risk Factors</h4>
+                <h4 className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.14em]">Risk Factors</h4>
                 <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
             </div>
             
@@ -140,7 +140,7 @@ export const AtRiskListWidget: React.FC<RiskProps> = ({ people }) => {
   return (
     <div className="bg-white dark:bg-slate-850 p-8 rounded-[3rem] border border-slate-100 dark:border-slate-800 shadow-sm h-full flex flex-col transition-colors">
         <div className="flex justify-between items-center mb-6">
-            <h4 className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">Needs Attention</h4>
+            <h4 className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.14em]">Needs Attention</h4>
             <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></div>
         </div>
 
@@ -159,7 +159,7 @@ export const AtRiskListWidget: React.FC<RiskProps> = ({ people }) => {
                             <p className="text-xs font-black text-slate-900 dark:text-white truncate">{p.name}</p>
                             <div className="flex gap-1 flex-wrap mt-1">
                                 {p.riskProfile?.factors.map(f => (
-                                    <span key={f} className="text-[8px] bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded uppercase tracking-tight">
+                                    <span key={f} className="text-[10px] bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded uppercase tracking-tight">
                                         {f}
                                     </span>
                                 ))}
@@ -175,7 +175,7 @@ export const AtRiskListWidget: React.FC<RiskProps> = ({ people }) => {
         </div>
         
         <div className="mt-6 pt-4 border-t border-slate-50 dark:border-slate-800 text-right">
-            <button className="text-[10px] font-black uppercase tracking-widest text-indigo-500 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300">View Full List →</button>
+            <button className="text-[10px] font-bold uppercase tracking-wide text-indigo-500 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300">View Full List →</button>
         </div>
     </div>
   );
@@ -218,26 +218,26 @@ export const StatusChangesWidget: React.FC<RiskProps> = ({ recentRiskChanges = [
     return (
         <div className="bg-white dark:bg-slate-850 p-8 rounded-[3rem] border border-slate-100 dark:border-slate-800 shadow-sm h-full flex flex-col transition-colors">
             <div className="flex justify-between items-center mb-6">
-                <h4 className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">Status Changes (30d)</h4>
+                <h4 className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.14em]">Status Changes (30d)</h4>
             </div>
 
             <div className="grid grid-cols-3 gap-2 mb-6">
                 <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl p-3 text-center border border-emerald-100 dark:border-emerald-900/30">
                     <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400">+{improvedCount}</p>
-                    <p className="text-[8px] font-bold text-emerald-400 dark:text-emerald-500/80 uppercase tracking-widest mt-1">Improved</p>
+                    <p className="text-[10px] font-bold text-emerald-400 dark:text-emerald-500/80 uppercase tracking-wide mt-1">Improved</p>
                 </div>
                 <div className="bg-amber-50 dark:bg-amber-900/20 rounded-2xl p-3 text-center border border-amber-100 dark:border-amber-900/30">
                     <p className="text-2xl font-black text-amber-500 dark:text-amber-400">-{declinedCount}</p>
-                    <p className="text-[8px] font-bold text-amber-400 dark:text-amber-500/80 uppercase tracking-widest mt-1">Declined</p>
+                    <p className="text-[10px] font-bold text-amber-400 dark:text-amber-500/80 uppercase tracking-wide mt-1">Declined</p>
                 </div>
                 <div className="bg-rose-50 dark:bg-rose-900/20 rounded-2xl p-3 text-center border border-rose-100 dark:border-rose-900/30">
                     <p className="text-2xl font-black text-rose-500 dark:text-rose-400">-{disconnectedCount}</p>
-                    <p className="text-[8px] font-bold text-rose-400 dark:text-rose-500/80 uppercase tracking-widest mt-1">Dropped</p>
+                    <p className="text-[10px] font-bold text-rose-400 dark:text-rose-500/80 uppercase tracking-wide mt-1">Dropped</p>
                 </div>
             </div>
 
             <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2">
-                <p className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">Recent Movements</p>
+                <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-2">Recent Movements</p>
                 {recentMovements.length === 0 ? (
                     <div className="h-20 flex items-center justify-center text-center p-2">
                         <p className="text-[10px] text-slate-400 font-medium">No recent status changes</p>
@@ -257,13 +257,13 @@ export const StatusChangesWidget: React.FC<RiskProps> = ({ recentRiskChanges = [
                                 <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300 truncate max-w-[120px]">{m.name}</span>
                             </div>
                             <div className="text-right">
-                                <p className={`text-[9px] font-black uppercase tracking-wider ${
+                                <p className={`text-[11px] font-black uppercase tracking-wider ${
                                      m.changeType === 'improved' ? 'text-emerald-600 dark:text-emerald-400' : 
                                      m.changeType === 'declined' ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'
                                 }`}>
                                     {m.newCategory} {m.changeType === 'improved' ? '↗' : '↘'}
                                 </p>
-                                <p className="text-[8px] text-slate-400 uppercase font-medium mt-0.5">was {m.oldCategory}</p>
+                                <p className="text-[10px] text-slate-400 uppercase font-medium mt-0.5">was {m.oldCategory}</p>
                             </div>
                         </div>
                         {m.reasons && m.reasons.length > 0 && (
@@ -352,21 +352,21 @@ export const PeopleDirectoryWidget: React.FC<RiskProps> = ({ people }) => {
     return (
         <div className="bg-white dark:bg-slate-850 p-8 rounded-[3rem] border border-slate-100 dark:border-slate-800 shadow-sm h-full flex flex-col transition-colors min-h-[500px]">
             <div className="flex justify-between items-center mb-6">
-                <h4 className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">People Directory</h4>
+                <h4 className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.14em]">People Directory</h4>
             </div>
 
             <div className="flex-1 overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                     <thead>
                         <tr className="border-b border-slate-100 dark:border-slate-800">
-                            <th className="p-3 text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest min-w-[150px]">Name</th>
-                            <th className="p-3 text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest min-w-[120px]">Membership</th>
-                            <th className="p-3 text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest min-w-[100px]">Gender</th>
-                            <th className="p-3 text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest min-w-[100px]">Birthdate</th>
-                            <th className="p-3 text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest min-w-[120px]">Risk Profile</th>
-                            <th className="p-3 text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest min-w-[80px]">Score</th>
-                            <th className="p-3 text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest min-w-[120px]">Engagement</th>
-                            <th className="p-3 text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest text-right">Actions</th>
+                            <th className="p-3 text-[11px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide min-w-[150px]">Name</th>
+                            <th className="p-3 text-[11px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide min-w-[120px]">Membership</th>
+                            <th className="p-3 text-[11px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide min-w-[100px]">Gender</th>
+                            <th className="p-3 text-[11px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide min-w-[100px]">Birthdate</th>
+                            <th className="p-3 text-[11px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide min-w-[120px]">Risk Profile</th>
+                            <th className="p-3 text-[11px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide min-w-[80px]">Score</th>
+                            <th className="p-3 text-[11px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide min-w-[120px]">Engagement</th>
+                            <th className="p-3 text-[11px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide text-right">Actions</th>
                         </tr>
                         {/* Filter Row */}
                         <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30">
@@ -459,11 +459,11 @@ export const PeopleDirectoryWidget: React.FC<RiskProps> = ({ people }) => {
                                 </td>
                                 <td className="p-3">
                                     {p.membership ? (
-                                        <span className="text-[9px] font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                                        <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded uppercase tracking-wider">
                                             {p.membership}
                                         </span>
                                     ) : (
-                                        <span className="text-[9px] text-slate-300 italic">None</span>
+                                        <span className="text-[11px] text-slate-300 italic">None</span>
                                     )}
                                 </td>
                                 <td className="p-3">
@@ -481,7 +481,7 @@ export const PeopleDirectoryWidget: React.FC<RiskProps> = ({ people }) => {
                                     )}
                                 </td>
                                 <td className="p-3">
-                                    <span className={`px-2 py-1 rounded text-[9px] font-black uppercase tracking-wider ${
+                                    <span className={`px-2 py-1 rounded text-[11px] font-black uppercase tracking-wider ${
                                         p.riskProfile?.category === 'Healthy' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400' :
                                         p.riskProfile?.category === 'At Risk' ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400' :
                                         'bg-rose-100 text-rose-600 dark:bg-rose-900/20 dark:text-rose-400'
@@ -497,7 +497,7 @@ export const PeopleDirectoryWidget: React.FC<RiskProps> = ({ people }) => {
                                     </span>
                                 </td>
                                 <td className="p-3">
-                                    <span className={`text-[9px] font-bold uppercase tracking-wider ${
+                                    <span className={`text-[11px] font-bold uppercase tracking-wider ${
                                         p.engagementStatus === 'Core' ? 'text-indigo-600 dark:text-indigo-400' : 
                                         p.engagementStatus === 'Inactive' ? 'text-slate-400' : 'text-slate-600 dark:text-slate-300'
                                     }`}>
@@ -507,7 +507,7 @@ export const PeopleDirectoryWidget: React.FC<RiskProps> = ({ people }) => {
                                 <td className="p-3 text-right">
                                     <button 
                                         onClick={() => window.dispatchEvent(new CustomEvent('openPersonProfile', { detail: p.id }))}
-                                        className="text-[9px] font-black uppercase text-indigo-500 hover:text-indigo-600 tracking-widest"
+                                        className="text-[11px] font-bold uppercase text-indigo-500 hover:text-indigo-600 tracking-wide"
                                     >
                                         Profile
                                     </button>

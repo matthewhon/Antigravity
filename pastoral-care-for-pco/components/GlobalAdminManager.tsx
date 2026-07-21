@@ -81,7 +81,7 @@ export const GlobalAdminManager: React.FC = () => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
           <h3 className="text-2xl font-black text-slate-900 tracking-tight">System Administrators</h3>
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Manage global application access</p>
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mt-1">Manage global application access</p>
         </div>
       </div>
 
@@ -106,7 +106,7 @@ export const GlobalAdminManager: React.FC = () => {
                             </div>
                             <button 
                                 onClick={() => handleRemoveAdmin(admin)}
-                                className="text-slate-300 hover:text-rose-500 transition-colors p-2 text-xs font-bold uppercase tracking-widest"
+                                className="text-slate-300 hover:text-rose-500 transition-colors p-2 text-xs font-bold uppercase tracking-wide"
                                 title="Revoke Access"
                             >
                                 Revoke
@@ -125,7 +125,7 @@ export const GlobalAdminManager: React.FC = () => {
 
             <form onSubmit={handleAddAdmin} className="space-y-4">
                 <div>
-                    <label className="block text-[9px] font-black uppercase text-slate-400 tracking-widest mb-2">User Email</label>
+                    <label className="block text-[11px] font-bold uppercase text-slate-400 tracking-wide mb-2">User Email</label>
                     <input 
                         type="email" 
                         value={inviteEmail}
@@ -142,7 +142,7 @@ export const GlobalAdminManager: React.FC = () => {
                 <button 
                     type="submit" 
                     disabled={isProcessing || !inviteEmail}
-                    className="w-full bg-slate-900 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-800 transition-all disabled:opacity-50"
+                    className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold text-[10px] uppercase tracking-wide hover:bg-slate-800 transition-all disabled:opacity-50"
                 >
                     {isProcessing ? 'Verifying...' : 'Grant Access'}
                 </button>

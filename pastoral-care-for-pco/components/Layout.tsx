@@ -279,7 +279,7 @@ const Layout: React.FC<LayoutProps> = ({
                 <AppLogo size={36} />
                 <div className="hidden lg:block leading-tight">
                     <h1 className="font-black text-sm tracking-tight text-white">Pastoral Care</h1>
-                    <p className="text-[9px] text-slate-400 uppercase font-black tracking-widest">for PCO</p>
+                    <p className="text-[11px] text-slate-400 uppercase font-bold tracking-wide">for PCO</p>
                 </div>
             </div>
 
@@ -332,7 +332,7 @@ const Layout: React.FC<LayoutProps> = ({
                         }`}
                       >
                         <entry.icon size={17} strokeWidth={2.5} className="shrink-0" />
-                        <span className="text-[10px] font-black uppercase tracking-widest">{entry.label}</span>
+                        <span className="text-[10px] font-bold uppercase tracking-wide">{entry.label}</span>
                         <ChevronDown className="w-3 h-3 opacity-60" strokeWidth={3} />
                       </button>
                     </div>
@@ -364,7 +364,7 @@ const Layout: React.FC<LayoutProps> = ({
                           key={item.view}
                           role="menuitem"
                           onClick={() => navigateFromMenu(item.view)}
-                          className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest w-full text-left transition-all ${
+                          className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-wide w-full text-left transition-all ${
                             active
                               ? 'bg-indigo-600 text-white'
                               : 'text-slate-300 hover:bg-slate-700 hover:text-white'
@@ -389,7 +389,7 @@ const Layout: React.FC<LayoutProps> = ({
                         <select
                             value={church.id}
                             onChange={(e) => onSwitchChurch?.(e.target.value)}
-                            className="bg-slate-800 text-white border border-slate-700 text-[10px] font-black uppercase tracking-widest py-1.5 rounded-lg px-3 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer max-w-[140px] truncate"
+                            className="bg-slate-800 text-white border border-slate-700 text-[10px] font-bold uppercase tracking-wide py-1.5 rounded-lg px-3 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer max-w-[140px] truncate"
                             title="Switch Tenant Context"
                         >
                             {allChurches.map(c => (
@@ -409,7 +409,7 @@ const Layout: React.FC<LayoutProps> = ({
                     if (isRestricted && allowedCampusesList.length <= 1) {
                         const singleCampus = allowedCampusesList[0];
                         return singleCampus ? (
-                            <div className="bg-slate-800 border border-slate-700 text-slate-300 text-[10px] font-black uppercase tracking-wider py-1.5 px-3 rounded-lg flex items-center gap-1.5 max-w-[150px] truncate" title={`Restricted to ${singleCampus.name}`}>
+                            <div className="bg-slate-800 border border-slate-700 text-slate-300 text-[10px] font-bold uppercase tracking-wider py-1.5 px-3 rounded-lg flex items-center gap-1.5 max-w-[150px] truncate" title={`Restricted to ${singleCampus.name}`}>
                                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
                                 {singleCampus.name}
                             </div>
@@ -421,7 +421,7 @@ const Layout: React.FC<LayoutProps> = ({
                             <select
                                 value={selectedCampusId}
                                 onChange={(e) => setSelectedCampusId(e.target.value)}
-                                className="bg-slate-800 text-white border border-slate-700 text-[10px] font-black uppercase tracking-widest py-1.5 rounded-lg px-3 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer max-w-[150px] truncate"
+                                className="bg-slate-800 text-white border border-slate-700 text-[10px] font-bold uppercase tracking-wide py-1.5 rounded-lg px-3 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer max-w-[150px] truncate"
                                 title="Select Campus"
                             >
                                 {!isRestricted && <option value="all">All Campuses</option>}
@@ -485,17 +485,17 @@ const Layout: React.FC<LayoutProps> = ({
         {/* Page Context Header (Sticky) */}
         <div className="bg-white/80 dark:bg-slate-900/80 border-b border-slate-100 dark:border-slate-800 px-6 lg:px-10 py-4 sticky top-0 z-40 flex justify-between items-center backdrop-blur-md print:hidden transition-colors duration-300">
           <div className="flex items-center gap-4">
-            <h2 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-[0.2em]">
+            <h2 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-[0.14em]">
               {currentView.replace(/-/g, ' ')}
             </h2>
             {isSystemAdmin && (
-              <span className="hidden sm:inline-block text-[9px] font-black uppercase tracking-widest bg-amber-100 text-amber-600 px-2 py-0.5 rounded-full border border-amber-200">
+              <span className="hidden sm:inline-block text-[11px] font-bold uppercase tracking-wide bg-amber-100 text-amber-600 px-2 py-0.5 rounded-full border border-amber-200">
                 Global Admin Mode
               </span>
             )}
           </div>
           <div className="flex items-center gap-6">
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all ${
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wide border transition-all ${
                 isSyncing
                 ? 'bg-blue-50 text-blue-600 border-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-900/30'
                 : church.pcoConnected
@@ -607,7 +607,7 @@ const NavItem: React.FC<NavItemProps> = ({ icon: Icon, label, active, onClick, h
       }`}
     >
       <Icon size={17} strokeWidth={2.5} className="shrink-0" />
-      <span className="text-[10px] font-black uppercase tracking-widest">{label}</span>
+      <span className="text-[10px] font-bold uppercase tracking-wide">{label}</span>
     </button>
   );
 };

@@ -143,7 +143,7 @@ const ServicesRemindersTab: React.FC<Props> = ({ church, onUpdateChurch }) => {
                         </button>
                     )}
                     <div className="mb-4">
-                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-1.5">Timing</label>
+                        <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1.5">Timing</label>
                         <div className="flex items-center gap-3">
                             <input 
                                 type="number" 
@@ -156,7 +156,7 @@ const ServicesRemindersTab: React.FC<Props> = ({ church, onUpdateChurch }) => {
                         </div>
                     </div>
                     <div>
-                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-1.5">Message Template</label>
+                        <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1.5">Message Template</label>
                         <textarea 
                             className={`w-full h-24 px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-${color}-500 resize-none leading-relaxed`}
                             value={rem.messageTemplate}
@@ -176,7 +176,7 @@ const ServicesRemindersTab: React.FC<Props> = ({ church, onUpdateChurch }) => {
             {list.length < 5 && (
                 <button 
                     onClick={() => addReminder(role)}
-                    className={`flex items-center gap-2 text-xs font-black uppercase tracking-widest text-${color}-600 hover:text-${color}-700 dark:text-${color}-400 dark:hover:text-${color}-300 transition-colors`}
+                    className={`flex items-center gap-2 text-xs font-black uppercase tracking-wide text-${color}-600 hover:text-${color}-700 dark:text-${color}-400 dark:hover:text-${color}-300 transition-colors`}
                 >
                     <span className={`w-6 h-6 rounded-full bg-${color}-100 dark:bg-${color}-900/30 flex items-center justify-center text-lg leading-none`}>+</span>
                     Add another reminder
@@ -191,7 +191,7 @@ const ServicesRemindersTab: React.FC<Props> = ({ church, onUpdateChurch }) => {
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h3 className="text-3xl font-black tracking-tighter text-slate-900 dark:text-white">SMS Reminders</h3>
-          <p className="text-slate-400 dark:text-slate-500 font-medium uppercase text-[10px] tracking-widest mt-1">Automated Team Confirmations</p>
+          <p className="text-slate-400 dark:text-slate-500 font-medium uppercase text-[10px] tracking-wide mt-1">Automated Team Confirmations</p>
         </div>
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
           {runStatus === 'success' && (
@@ -208,7 +208,7 @@ const ServicesRemindersTab: React.FC<Props> = ({ church, onUpdateChurch }) => {
             onClick={handleRunNow}
             disabled={isRunning || !settings.enabled}
             title={!settings.enabled ? 'Enable reminders first' : 'Immediately run the reminder scan'}
-            className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border-2 border-emerald-500 text-emerald-600 dark:text-emerald-400 font-black text-xs uppercase tracking-widest hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border-2 border-emerald-500 text-emerald-600 dark:text-emerald-400 font-bold text-xs uppercase tracking-wide hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {isRunning ? (
               <>
@@ -223,7 +223,7 @@ const ServicesRemindersTab: React.FC<Props> = ({ church, onUpdateChurch }) => {
           <button
             onClick={handleSave}
             disabled={isSaving}
-            className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-indigo-600 text-white font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-600/30 disabled:opacity-50"
+            className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-indigo-600 text-white font-bold text-xs uppercase tracking-wide hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-600/30 disabled:opacity-50"
           >
             {isSaving ? 'Saving...' : 'Save Settings'}
           </button>
@@ -257,7 +257,7 @@ const ServicesRemindersTab: React.FC<Props> = ({ church, onUpdateChurch }) => {
             
             {/* Global Rules */}
             <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/30 p-6 rounded-2xl">
-                <h5 className="text-xs font-black uppercase tracking-widest text-amber-800 dark:text-amber-500 mb-4">Targeting Rules</h5>
+                <h5 className="text-xs font-bold uppercase tracking-wide text-amber-800 dark:text-amber-500 mb-4">Targeting Rules</h5>
                 
                 <label className="flex items-start gap-3 cursor-pointer group">
                     <div className="relative flex items-center pt-0.5">
@@ -337,7 +337,7 @@ const ServicesRemindersTab: React.FC<Props> = ({ church, onUpdateChurch }) => {
                             {/* Understaffed Warning */}
                             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-5 rounded-2xl">
                                 <div className="flex items-center justify-between mb-4">
-                                    <h6 className="text-xs font-black uppercase tracking-widest text-slate-700 dark:text-slate-300">Understaffed Warning</h6>
+                                    <h6 className="text-xs font-bold uppercase tracking-wide text-slate-700 dark:text-slate-300">Understaffed Warning</h6>
                                     <label className="relative inline-flex items-center cursor-pointer">
                                         <input 
                                             type="checkbox" 
@@ -364,7 +364,7 @@ const ServicesRemindersTab: React.FC<Props> = ({ church, onUpdateChurch }) => {
                             {/* Over-scheduled Warning */}
                             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-5 rounded-2xl">
                                 <div className="flex items-center justify-between mb-4">
-                                    <h6 className="text-xs font-black uppercase tracking-widest text-slate-700 dark:text-slate-300">Over-scheduled Warning</h6>
+                                    <h6 className="text-xs font-bold uppercase tracking-wide text-slate-700 dark:text-slate-300">Over-scheduled Warning</h6>
                                     <label className="relative inline-flex items-center cursor-pointer">
                                         <input 
                                             type="checkbox" 
@@ -470,7 +470,7 @@ const ServicesRemindersTab: React.FC<Props> = ({ church, onUpdateChurch }) => {
                             )}
 
                             <div className="mb-4">
-                                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-1.5">Trigger Timing</label>
+                                <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1.5">Trigger Timing</label>
                                 <div className="flex items-center gap-3">
                                     <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Escalate if still understaffed</span>
                                     <input 
@@ -489,7 +489,7 @@ const ServicesRemindersTab: React.FC<Props> = ({ church, onUpdateChurch }) => {
                             </div>
 
                             <div className="mb-4">
-                                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-1.5">Escalation Message</label>
+                                <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1.5">Escalation Message</label>
                                 <textarea 
                                     className="w-full h-20 px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-rose-500 resize-none leading-relaxed"
                                     value={rule.messageTemplate}
@@ -509,7 +509,7 @@ const ServicesRemindersTab: React.FC<Props> = ({ church, onUpdateChurch }) => {
                             </div>
 
                             <div>
-                                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-2">Contacts to Notify</label>
+                                <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2">Contacts to Notify</label>
                                 <div className="space-y-2">
                                     {(rule.contacts || []).map((contact, cIdx) => (
                                         <div key={cIdx} className="flex items-center gap-2">
@@ -562,7 +562,7 @@ const ServicesRemindersTab: React.FC<Props> = ({ church, onUpdateChurch }) => {
                                             rules[ruleIdx] = { ...rules[ruleIdx], contacts };
                                             updateSetting('escalationRules', rules);
                                         }}
-                                        className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-rose-600 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300 transition-colors pt-1"
+                                        className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wide text-rose-600 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300 transition-colors pt-1"
                                     >
                                         <span className="w-5 h-5 rounded-full bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center text-sm leading-none">+</span>
                                         Add Contact
@@ -578,7 +578,7 @@ const ServicesRemindersTab: React.FC<Props> = ({ church, onUpdateChurch }) => {
                                 const rules = [...(settings.escalationRules || []), { daysBefore: 1, messageTemplate: 'URGENT: {team_name} for {service_name} on {date} still needs {needed_count} more people.', contacts: [] }];
                                 updateSetting('escalationRules', rules);
                             }}
-                            className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-rose-600 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300 transition-colors"
+                            className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-rose-600 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300 transition-colors"
                         >
                             <span className="w-6 h-6 rounded-full bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center text-lg leading-none">+</span>
                             Add another escalation rule

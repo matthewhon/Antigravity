@@ -178,11 +178,11 @@ const BlockThumbnail: React.FC<{ block: EmailBlock }> = ({ block }) => {
       return (
         <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden bg-white dark:bg-slate-800 p-4 space-y-3 text-left">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[9px] font-black uppercase bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 px-1.5 py-0.5 rounded border border-indigo-100 dark:border-indigo-900/30">
+            <span className="text-[11px] font-bold uppercase bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 px-1.5 py-0.5 rounded border border-indigo-100 dark:border-indigo-900/30">
               {plan.serviceTypeName || 'Service Plan'}
             </span>
             {plan.seriesTitle && (
-              <span className="text-[9px] font-black uppercase bg-rose-50 dark:bg-rose-900/10 text-rose-500 px-1.5 py-0.5 rounded border border-rose-100/50 dark:border-rose-900/20">
+              <span className="text-[11px] font-bold uppercase bg-rose-50 dark:bg-rose-900/10 text-rose-500 px-1.5 py-0.5 rounded border border-rose-100/50 dark:border-rose-900/20">
                 Series: {plan.seriesTitle}
               </span>
             )}
@@ -191,14 +191,14 @@ const BlockThumbnail: React.FC<{ block: EmailBlock }> = ({ block }) => {
           {c.date && <div className="text-xs text-indigo-600 dark:text-indigo-400 font-medium">{c.date}</div>}
           
           <div className="text-[10px] text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-700/60 pt-2 space-y-1">
-            <div className="font-bold uppercase tracking-wider text-[8px] text-slate-400">Order of Service ({plan.items?.length || 0} items)</div>
-            <div className="truncate text-[9px] font-mono text-slate-600 dark:text-slate-400">
+            <div className="font-bold uppercase tracking-wider text-[10px] text-slate-400">Order of Service ({plan.items?.length || 0} items)</div>
+            <div className="truncate text-[11px] font-mono text-slate-600 dark:text-slate-400">
               {plan.items?.slice(0, 3).map((item: any) => item.title).join(' → ') || 'No items'}
               {(plan.items?.length || 0) > 3 && '...'}
             </div>
             
-            <div className="font-bold uppercase tracking-wider text-[8px] text-slate-400 mt-2">Open Positions ({plan.positionsNeeded || 0} needed)</div>
-            <div className="truncate text-[9px] font-mono text-rose-500">
+            <div className="font-bold uppercase tracking-wider text-[10px] text-slate-400 mt-2">Open Positions ({plan.positionsNeeded || 0} needed)</div>
+            <div className="truncate text-[11px] font-mono text-rose-500">
               {plan.neededPositions?.slice(0, 2).map((np: any) => `${np.quantity} ${np.teamName}`).join(', ') || (plan.positionsNeeded > 0 ? `${plan.positionsNeeded} positions` : 'Fully Staffed')}
             </div>
           </div>
@@ -845,7 +845,7 @@ const InlineMediaEditor: React.FC<{
               </div>
             </div>
             {/* YouTube badge */}
-            <div className="absolute bottom-2 right-2 bg-red-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded pointer-events-none tracking-wide">
+            <div className="absolute bottom-2 right-2 bg-red-600 text-white text-[11px] font-black px-1.5 py-0.5 rounded pointer-events-none tracking-wide">
               ▶ YouTube
             </div>
             {/* Remove button */}
@@ -1372,7 +1372,7 @@ const ColumnBlockRenderer: React.FC<{
                     {isSelected && (
                       <button
                         onClick={() => setSelectedMiniId(null)}
-                        className="px-1.5 py-0.5 bg-indigo-600 text-white rounded text-[9px] font-bold"
+                        className="px-1.5 py-0.5 bg-indigo-600 text-white rounded text-[11px] font-bold"
                       >
                         ✓ Done
                       </button>
@@ -1791,7 +1791,7 @@ const EmailAIPanel: React.FC<{
 
           {/* ── Tone selector ── */}
           <div className="px-3 pt-3 pb-1 shrink-0">
-            <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5">Tone</p>
+            <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-1.5">Tone</p>
             <div className="flex flex-wrap gap-1">
               {AI_TONES.map(t => (
                 <button
@@ -1918,7 +1918,7 @@ const EmailAIPanel: React.FC<{
                 <Send size={13} />
               </button>
             </div>
-            <p className="text-[9px] text-slate-400 dark:text-slate-500 mt-1 text-center">Enter to send · Shift+Enter for new line</p>
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1 text-center">Enter to send · Shift+Enter for new line</p>
           </div>
         </>
       )}

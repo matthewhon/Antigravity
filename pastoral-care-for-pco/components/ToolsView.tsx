@@ -973,7 +973,7 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
                     <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1 flex items-center gap-1.5">
                       From Email
                       {isLockedMode && (
-                        <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full tracking-wide ${
+                        <span className={`text-[11px] font-black px-1.5 py-0.5 rounded-full tracking-wide ${
                           isCustomMode
                             ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400'
                             : 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'
@@ -1143,7 +1143,7 @@ const EmailEditor: React.FC<EmailEditorProps> = ({
                       onChange={e => update({ content: e.target.value })}
                     />
                     <div>
-                      <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Merge Tags</label>
+                      <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2">Merge Tags</label>
                       <div className="flex flex-wrap gap-1.5">
                         {ALL_MERGE_TAGS.map(({ tag, label }) => (
                           <button
@@ -1701,7 +1701,7 @@ export const QuickSendModal: React.FC<{
               onChange={e => setContent(e.target.value)}
             />
             <div>
-              <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Merge Tags</label>
+              <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2">Merge Tags</label>
               <div className="flex flex-wrap gap-1.5">
                 {ALL_MERGE_TAGS.map(({ tag, label }) => (
                   <button
@@ -2344,7 +2344,7 @@ currentUser, onUpdateChurch, activePage, smsTab, mobileSmsUrl, activeNumberId, o
                 <a
                   href="/settings"
                   onClick={e => { e.preventDefault(); window.location.href = '/settings?tab=Subscription'; }}
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-sm font-black uppercase tracking-widest rounded-2xl transition-all shadow-lg shadow-indigo-500/25"
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-sm font-bold uppercase tracking-wide rounded-2xl transition-all shadow-lg shadow-indigo-500/25"
                 >
                   Upgrade to Growth →
                 </a>

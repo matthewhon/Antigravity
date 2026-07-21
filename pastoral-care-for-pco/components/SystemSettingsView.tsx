@@ -319,10 +319,10 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
             <div className="flex items-center gap-4">
                 <div>
                     <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter">System Configuration</h2>
-                    <p className="text-slate-400 dark:text-slate-500 font-medium uppercase text-[10px] tracking-widest mt-1">Global App Settings & Integrations</p>
+                    <p className="text-slate-400 dark:text-slate-500 font-medium uppercase text-[10px] tracking-wide mt-1">Global App Settings & Integrations</p>
                 </div>
                 {backendStatus === 'online' && (
-                    <span className="hidden md:inline-flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border border-emerald-100 dark:border-emerald-900/30">
+                    <span className="hidden md:inline-flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wide border border-emerald-100 dark:border-emerald-900/30">
                         <span className="relative flex h-2 w-2">
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                           <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
@@ -331,7 +331,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                     </span>
                 )}
                 {backendStatus === 'offline' && (
-                    <span className="hidden md:inline-flex items-center gap-1.5 bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border border-rose-100 dark:border-rose-900/30">
+                    <span className="hidden md:inline-flex items-center gap-1.5 bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wide border border-rose-100 dark:border-rose-900/30">
                         <span className="h-2 w-2 rounded-full bg-rose-500"></span>
                         Backend Offline
                     </span>
@@ -343,7 +343,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                     <button 
                         key={tab}
                         onClick={() => setActiveTab(tab as any)}
-                        className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === tab ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-300' : 'text-slate-500 dark:text-slate-400 hover:bg-white/50 dark:hover:bg-slate-700/50'}`}
+                        className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-wide transition-all whitespace-nowrap ${activeTab === tab ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-300' : 'text-slate-500 dark:text-slate-400 hover:bg-white/50 dark:hover:bg-slate-700/50'}`}
                     >
                         {tab}
                     </button>
@@ -365,10 +365,10 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                 <div className="bg-white dark:bg-slate-900 px-6 py-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col sm:flex-row sm:items-center gap-4">
                     <div className="flex items-center gap-3 flex-1">
                         <div>
-                            <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Backend API URL</p>
+                            <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wide">Backend API URL</p>
                             <p className="font-mono text-xs text-slate-600 dark:text-slate-300 mt-0.5 truncate">{settings.apiBaseUrl || DEFAULT_API_URL}</p>
                         </div>
-                        <span className={`ml-2 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border whitespace-nowrap ${backendStatus === 'online' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/30' : backendStatus === 'offline' ? 'bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 border-rose-100 dark:border-rose-900/30' : 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700'}`}>
+                        <span className={`ml-2 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wide px-2.5 py-1 rounded-full border whitespace-nowrap ${backendStatus === 'online' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/30' : backendStatus === 'offline' ? 'bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 border-rose-100 dark:border-rose-900/30' : 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700'}`}>
                             {backendStatus === 'online' && <span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span></span>}
                             {backendStatus === 'offline' && <span className="h-2 w-2 rounded-full bg-rose-500"></span>}
                             {backendStatus === 'checking' ? 'Checking…' : backendStatus}
@@ -385,7 +385,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                         <button onClick={testBackendConnection} disabled={isVerifying} className="bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 px-4 py-2 rounded-xl font-bold text-xs hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors disabled:opacity-50 whitespace-nowrap">
                             {isVerifying ? '…' : 'Test'}
                         </button>
-                        <button onClick={handleSave} disabled={isSaving} className="bg-indigo-600 text-white px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-700 transition-all disabled:opacity-50 whitespace-nowrap">
+                        <button onClick={handleSave} disabled={isSaving} className="bg-indigo-600 text-white px-4 py-2 rounded-xl font-bold text-[10px] uppercase tracking-wide hover:bg-indigo-700 transition-all disabled:opacity-50 whitespace-nowrap">
                             {isSaving ? 'Saving…' : 'Save All'}
                         </button>
                     </div>
@@ -400,15 +400,15 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                         <p className="text-[10px] text-slate-400 mb-5 leading-relaxed">Global OAuth app credentials shared across all tenants.</p>
                         <div className="space-y-4">
                             <div>
-                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Client ID</label>
+                                <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">Client ID</label>
                                 <input type="text" aria-label="Planning Center Client ID" placeholder="Enter PCO Client ID" value={settings.pcoClientId || ''} onChange={e => handleChange('pcoClientId', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" />
                             </div>
                             <div>
-                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Client Secret</label>
+                                <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">Client Secret</label>
                                 <input type="password" aria-label="Planning Center Client Secret" placeholder="Enter PCO Client Secret" value={settings.pcoClientSecret || ''} onChange={e => handleChange('pcoClientSecret', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" />
                             </div>
                             <div className="pt-2 mt-2 border-t border-slate-100 dark:border-slate-800">
-                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Note Category Name</label>
+                                <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">Note Category Name</label>
                                 <input
                                     type="text"
                                     aria-label="PCO Note Category Name"
@@ -417,7 +417,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                     onChange={e => handleChange('pcoNoteCategory', e.target.value)}
                                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
                                 />
-                                <p className="text-[9px] text-slate-400 mt-1.5 leading-relaxed">
+                                <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed">
                                     When a text or email is sent, a note is automatically logged to each recipient's PCO profile.
                                     This name must exactly match a category in{' '}
                                     <a href="https://people.planningcenteronline.com/note_categories" target="_blank" rel="noopener noreferrer" className="underline text-indigo-400 hover:text-indigo-300">
@@ -436,25 +436,25 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                         <p className="text-[10px] text-slate-400 mb-5 leading-relaxed">Geographic, demographic, and AI integrations.</p>
                         <div className="space-y-4">
                             <div>
-                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Google Maps API Key</label>
+                                <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">Google Maps API Key</label>
                                 <input type="text" value={settings.googleMapsApiKey || ''} onChange={e => handleChange('googleMapsApiKey', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="AIza..." />
                             </div>
                             <div>
-                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Census.gov API Key</label>
+                                <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">Census.gov API Key</label>
                                 <input type="text" aria-label="Census.gov API Key" placeholder="Enter Census.gov API key" value={settings.censusApiKey || ''} onChange={e => handleChange('censusApiKey', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" />
                             </div>
                             <div>
-                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">YouTube API Key</label>
+                                <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">YouTube API Key</label>
                                 <input type="password" aria-label="YouTube API Key" placeholder="Enter YouTube Data API key" value={settings.youtubeApiKey || ''} onChange={e => handleChange('youtubeApiKey', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" />
                             </div>
                             <div className="pt-2 mt-2 border-t border-slate-100 dark:border-slate-800">
-                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Gemini API Key (AI Features)</label>
+                                <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">Gemini API Key (AI Features)</label>
                                 <input type="password" aria-label="Gemini API Key" placeholder="AIza..." value={settings.geminiApiKey || ''} onChange={e => handleChange('geminiApiKey', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" />
                             </div>
                             <div className="pt-2 mt-2 border-t border-slate-100 dark:border-slate-800">
-                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Visual Crossing API Key (Weather)</label>
+                                <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">Visual Crossing API Key (Weather)</label>
                                 <input type="password" aria-label="Visual Crossing API Key" placeholder="Enter Visual Crossing API key" value={settings.weatherApiKey || ''} onChange={e => handleChange('weatherApiKey', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" />
-                                <p className="text-[9px] text-slate-400 mt-1.5">Get a free key at <a href="https://www.visualcrossing.com/account" target="_blank" rel="noopener noreferrer" className="underline text-indigo-400 hover:text-indigo-300">visualcrossing.com/account</a>. Powers attendance prediction and weather overlays.</p>
+                                <p className="text-[11px] text-slate-400 mt-1.5">Get a free key at <a href="https://www.visualcrossing.com/account" target="_blank" rel="noopener noreferrer" className="underline text-indigo-400 hover:text-indigo-300">visualcrossing.com/account</a>. Powers attendance prediction and weather overlays.</p>
                             </div>
                         </div>
                     </div>
@@ -475,11 +475,11 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                         <p className="text-[10px] text-slate-400 mb-5 leading-relaxed">Global Canva Connect API credentials. Get these from <a href="https://www.canva.dev/console" target="_blank" rel="noopener noreferrer" className="underline text-indigo-400 hover:text-indigo-300">developers.canva.com</a>.</p>
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Client ID</label>
+                                <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">Client ID</label>
                                 <input type="text" aria-label="Canva Client ID" placeholder="OC-..." value={settings.canvaClientId || ''} onChange={e => handleChange('canvaClientId', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-[#00c4cc]" />
                             </div>
                             <div>
-                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Client Secret</label>
+                                <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">Client Secret</label>
                                 <input type="password" aria-label="Canva Client Secret" placeholder="cnvca..." value={settings.canvaClientSecret || ''} onChange={e => handleChange('canvaClientSecret', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-[#00c4cc]" />
                             </div>
                         </div>
@@ -529,7 +529,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
 
                             {/* Left: Provider Toggle */}
                             <div className="lg:col-span-1">
-                                <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-3">Active Provider</p>
+                                <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-3">Active Provider</p>
                                 <div className="flex flex-col gap-3">
                                     <button
                                         id="email-provider-sendgrid"
@@ -547,7 +547,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                                 {(!settings.emailProvider || settings.emailProvider === 'sendgrid') && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
                                             </div>
                                             <span className="text-xs font-black text-slate-900 dark:text-white">SendGrid</span>
-                                            {settings.sendGridApiKey?.startsWith('SG.') && <span className="ml-auto text-[9px] font-black text-emerald-600 dark:text-emerald-400">✓ Configured</span>}
+                                            {settings.sendGridApiKey?.startsWith('SG.') && <span className="ml-auto text-[11px] font-black text-emerald-600 dark:text-emerald-400">✓ Configured</span>}
                                         </div>
                                         <p className="text-[10px] text-slate-400 pl-6 leading-relaxed">Subuser-per-tenant isolation. No separate billing required.</p>
                                     </button>
@@ -568,12 +568,12 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                                 {settings.emailProvider === 'postmark' && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
                                             </div>
                                             <span className="text-xs font-black text-slate-900 dark:text-white">Postmark</span>
-                                            {settings.postmarkApiKey && <span className="ml-auto text-[9px] font-black text-violet-600 dark:text-violet-400">✓ Configured</span>}
+                                            {settings.postmarkApiKey && <span className="ml-auto text-[11px] font-black text-violet-600 dark:text-violet-400">✓ Configured</span>}
                                         </div>
                                         <p className="text-[10px] text-slate-400 pl-6 leading-relaxed">Server-per-tenant isolation. Platform plan ($18/mo) required for custom domains.</p>
                                     </button>
                                 </div>
-                                <p className="text-[9px] text-slate-400 mt-3 leading-relaxed">
+                                <p className="text-[11px] text-slate-400 mt-3 leading-relaxed">
                                     Both sets of credentials are saved simultaneously. Switching providers is instant — no code deploy required.
                                 </p>
                             </div>
@@ -584,20 +584,20 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                             }`}>
                                 <div className="flex items-center gap-2 mb-1">
                                     <div className="w-1 h-4 rounded-full bg-emerald-500"></div>
-                                    <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">SendGrid Credentials</p>
-                                    {settings.emailProvider === 'postmark' && <span className="text-[9px] text-slate-400">(inactive)</span>}
+                                    <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wide">SendGrid Credentials</p>
+                                    {settings.emailProvider === 'postmark' && <span className="text-[11px] text-slate-400">(inactive)</span>}
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Master API Key</label>
+                                    <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">Master API Key</label>
                                     <input type="password" value={settings.sendGridApiKey || ''} onChange={e => handleChange('sendGridApiKey', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="SG.xxxxxxxxxxxxxxxx" />
-                                    <p className="text-[9px] text-slate-400 mt-1.5">Find in <a href="https://app.sendgrid.com/settings/api_keys" target="_blank" rel="noopener noreferrer" className="underline text-indigo-400 hover:text-indigo-300">SendGrid → Settings → API Keys</a>. Requires Full Access.</p>
+                                    <p className="text-[11px] text-slate-400 mt-1.5">Find in <a href="https://app.sendgrid.com/settings/api_keys" target="_blank" rel="noopener noreferrer" className="underline text-indigo-400 hover:text-indigo-300">SendGrid → Settings → API Keys</a>. Requires Full Access.</p>
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Fallback From Email</label>
+                                    <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">Fallback From Email</label>
                                     <input type="email" value={settings.sendGridFromEmail || ''} onChange={e => handleChange('sendGridFromEmail', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="noreply@pastoralcare.barnabassoftware.com" />
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Fallback From Name</label>
+                                    <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">Fallback From Name</label>
                                     <input type="text" value={settings.sendGridFromName || ''} onChange={e => handleChange('sendGridFromName', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Pastoral Care" />
                                 </div>
                             </div>
@@ -608,24 +608,24 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                             }`}>
                                 <div className="flex items-center gap-2 mb-1">
                                     <div className="w-1 h-4 rounded-full bg-violet-500"></div>
-                                    <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Postmark Credentials</p>
-                                    {settings.emailProvider !== 'postmark' && <span className="text-[9px] text-slate-400">(inactive)</span>}
+                                    <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wide">Postmark Credentials</p>
+                                    {settings.emailProvider !== 'postmark' && <span className="text-[11px] text-slate-400">(inactive)</span>}
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Account API Token</label>
+                                    <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">Account API Token</label>
                                     <input type="password" id="postmark-api-key" value={settings.postmarkApiKey || ''} onChange={e => handleChange('postmarkApiKey', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-violet-500" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
-                                    <p className="text-[9px] text-slate-400 mt-1.5">Find in <a href="https://account.postmarkapp.com/account/edit" target="_blank" rel="noopener noreferrer" className="underline text-violet-400 hover:text-violet-300">Postmark → Account → API Tokens</a>. This is the Account-level token (not a Server token).</p>
+                                    <p className="text-[11px] text-slate-400 mt-1.5">Find in <a href="https://account.postmarkapp.com/account/edit" target="_blank" rel="noopener noreferrer" className="underline text-violet-400 hover:text-violet-300">Postmark → Account → API Tokens</a>. This is the Account-level token (not a Server token).</p>
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Fallback From Email</label>
+                                    <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">Fallback From Email</label>
                                     <input type="email" id="postmark-from-email" value={settings.postmarkFromEmail || ''} onChange={e => handleChange('postmarkFromEmail', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-violet-500" placeholder="noreply@pastoralcare.barnabassoftware.com" />
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Fallback From Name</label>
+                                    <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">Fallback From Name</label>
                                     <input type="text" id="postmark-from-name" value={settings.postmarkFromName || ''} onChange={e => handleChange('postmarkFromName', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-violet-500" placeholder="Pastoral Care" />
                                 </div>
                                 <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
-                                    <p className="text-[9px] text-slate-500 leading-relaxed">
+                                    <p className="text-[11px] text-slate-500 leading-relaxed">
                                         💡 <strong>Platform plan</strong> ($18/mo) required for unlimited custom sending domains across all tenants. <a href="https://postmarkapp.com/pricing" target="_blank" rel="noopener noreferrer" className="underline text-violet-400 hover:text-violet-300">See pricing →</a>
                                     </p>
                                 </div>
@@ -644,9 +644,9 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                             <h3 className="text-sm font-black text-slate-900 dark:text-white">SignalWire SMS</h3>
                             <div className="flex items-center gap-2">
                                 {settings.signalwireProjectId && settings.signalwireApiToken && settings.signalwireSpaceUrl ? (
-                                    <span className="text-[9px] font-black bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">CONFIGURED</span>
+                                    <span className="text-[11px] font-black bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">CONFIGURED</span>
                                 ) : (
-                                    <span className="text-[9px] font-black bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/30">INCOMPLETE</span>
+                                    <span className="text-[11px] font-black bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/30">INCOMPLETE</span>
                                 )}
                                 <button
                                     onClick={async () => {
@@ -672,7 +672,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                         }
                                     }}
                                     disabled={isVerifying || !settings.signalwireProjectId || !settings.signalwireApiToken}
-                                    className="bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 px-3 py-1.5 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                    className="bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 px-3 py-1.5 rounded-xl font-bold text-[10px] uppercase tracking-wide hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
                                     {isVerifying ? 'Testing…' : 'Test Connection'}
                                 </button>
@@ -684,48 +684,48 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                         </p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Project ID</label>
+                                <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">Project ID</label>
                                 <input type="text" value={settings.signalwireProjectId || ''} onChange={e => handleChange('signalwireProjectId', e.target.value.trim())} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
-                                <p className="text-[9px] text-slate-400 mt-1">UUID — Dashboard → API → API Tokens.</p>
+                                <p className="text-[11px] text-slate-400 mt-1">UUID — Dashboard → API → API Tokens.</p>
                             </div>
                             <div>
-                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Space URL</label>
+                                <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">Space URL</label>
                                 <input type="text" value={settings.signalwireSpaceUrl || ''} onChange={e => handleChange('signalwireSpaceUrl', e.target.value.trim().replace(/^https?:\/\//, ''))} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="barnabassoftware.signalwire.com" />
-                                <p className="text-[9px] text-slate-400 mt-1">Your subdomain — no https://.</p>
+                                <p className="text-[11px] text-slate-400 mt-1">Your subdomain — no https://.</p>
                             </div>
                             <div>
-                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">API Token</label>
+                                <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">API Token</label>
                                 <input type="password" value={settings.signalwireApiToken || ''} onChange={e => handleChange('signalwireApiToken', e.target.value.trim())} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="PTxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" />
-                                <p className="text-[9px] text-slate-400 mt-1">Keep secret. Dashboard → API → API Tokens.</p>
+                                <p className="text-[11px] text-slate-400 mt-1">Keep secret. Dashboard → API → API Tokens.</p>
                             </div>
                             <div>
-                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Webhook Base URL</label>
+                                <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">Webhook Base URL</label>
                                 <input type="text" value={settings.smsWebhookBaseUrl || ''} onChange={e => handleChange('smsWebhookBaseUrl', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder={settings.apiBaseUrl || 'https://api.example.com'} />
-                                <p className="text-[9px] text-slate-400 mt-1">Defaults to Backend API URL. SignalWire posts callbacks here.</p>
+                                <p className="text-[11px] text-slate-400 mt-1">Defaults to Backend API URL. SignalWire posts callbacks here.</p>
                             </div>
                             <div className="sm:col-span-2">
                                 <div className="flex items-center gap-2 mb-2">
-                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest">Signing Key</label>
-                                    <span className="text-[9px] font-black bg-rose-500/10 text-rose-500 px-1.5 py-0.5 rounded-full border border-rose-500/20">REQUIRED for security</span>
+                                    <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide">Signing Key</label>
+                                    <span className="text-[11px] font-black bg-rose-500/10 text-rose-500 px-1.5 py-0.5 rounded-full border border-rose-500/20">REQUIRED for security</span>
                                 </div>
                                 <input type="password" value={settings.signalwireSigningKey || ''} onChange={e => handleChange('signalwireSigningKey', e.target.value.trim())} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="SK..." />
-                                <p className="text-[9px] text-slate-400 mt-1">
+                                <p className="text-[11px] text-slate-400 mt-1">
                                     Found in <a href="https://barnabassoftware.signalwire.com/credentials" target="_blank" rel="noopener noreferrer" className="underline text-indigo-400 hover:text-indigo-300">Dashboard &rarr; API &rarr; API Credentials &rarr; Signing Key</a>. Used to verify all inbound webhook requests.
                                 </p>
                             </div>
                         </div>
                         <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
                             <div className="flex items-center gap-2 mb-3">
-                                <span className="text-[11px] font-black uppercase text-slate-500 tracking-widest">10DLC Campaign Registration</span>
-                                <span className="text-[9px] bg-amber-500/10 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded-full border border-amber-500/20 font-bold">Required for outbound SMS</span>
+                                <span className="text-[11px] font-bold uppercase text-slate-500 tracking-wide">10DLC Campaign Registration</span>
+                                <span className="text-[11px] bg-amber-500/10 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded-full border border-amber-500/20 font-bold">Required for outbound SMS</span>
                             </div>
-                            <p className="text-[9px] text-slate-400 mb-3">
+                            <p className="text-[11px] text-slate-400 mb-3">
                                 Register <strong className="text-slate-600 dark:text-slate-300">Barnabas Software</strong> as a Brand and create a Campaign in the{' '}
                                 <a href="https://barnabassoftware.signalwire.com/messaging_campaigns" target="_blank" rel="noopener noreferrer" className="underline text-indigo-400 hover:text-indigo-300">SignalWire Dashboard &rarr; Messaging Campaigns</a>.
                                 {' '}Paste the resulting Campaign ID here. All newly provisioned church numbers will be auto-assigned to this campaign.
                             </p>
                             <div>
-                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Campaign ID (TCR)</label>
+                                <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">Campaign ID (TCR)</label>
                                 <input
                                     type="text"
                                     value={settings.signalwireCampaignId || ''}
@@ -733,7 +733,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
                                     placeholder="e.g. CXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
                                 />
-                                <p className="text-[9px] text-slate-400 mt-1">
+                                <p className="text-[11px] text-slate-400 mt-1">
                                     Found in Dashboard &rarr; Messaging Campaigns &rarr; Campaigns &rarr; click your campaign &rarr; Campaign ID.
                                     Once set, newly provisioned numbers are auto-submitted for carrier approval (takes up to 24h).
                                 </p>
@@ -741,8 +741,8 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                         </div>
                         {(settings.smsWebhookBaseUrl || settings.apiBaseUrl) && (
                             <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
-                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">Webhook URLs</label>
-                                <p className="text-[9px] text-slate-400 mb-3">Copy these URLs into your SignalWire space settings and Campaign Registry webhook settings.</p>
+                                <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-1">Webhook URLs</label>
+                                <p className="text-[11px] text-slate-400 mb-3">Copy these URLs into your SignalWire space settings and Campaign Registry webhook settings.</p>
                                 <div className="space-y-1.5">
                                     {[
                                         { path: '/api/messaging/inbound', label: 'Inbound Message Webhook' },
@@ -754,7 +754,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                         const url = base + path;
                                         return (
                                             <div key={path} className="flex flex-col gap-1">
-                                                <span className="text-[9px] font-bold text-slate-500">{label}</span>
+                                                <span className="text-[11px] font-bold text-slate-500">{label}</span>
                                                 <div className="bg-slate-100 dark:bg-slate-800 rounded-lg px-3 py-1.5 flex items-center justify-between gap-2">
                                                     <code className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 truncate">{url}</code>
                                                     <button onClick={() => navigator.clipboard.writeText(url)} className="text-slate-400 hover:text-indigo-500 transition-colors shrink-0 text-xs" title="Copy">📋</button>
@@ -766,15 +766,15 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                             </div>
                         )}
                         <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
-                            <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">Usage Estimate Pricing <span className="normal-case font-normal">(USD)</span></label>
-                            <p className="text-[9px] text-slate-400 mb-3">For in-app cost estimates only. Actual billing is in your SignalWire Dashboard.</p>
+                            <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-1">Usage Estimate Pricing <span className="normal-case font-normal">(USD)</span></label>
+                            <p className="text-[11px] text-slate-400 mb-3">For in-app cost estimates only. Actual billing is in your SignalWire Dashboard.</p>
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="block text-[9px] font-bold text-slate-500 mb-1">SMS per segment</label>
+                                    <label className="block text-[11px] font-bold text-slate-500 mb-1">SMS per segment</label>
                                     <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">$</span><input type="number" aria-label="SMS cost per segment in USD" placeholder="0.0079" step="0.0001" min="0" value={settings.smsSegmentCostUsd ?? 0.0079} onChange={e => handleChange('smsSegmentCostUsd', parseFloat(e.target.value) || 0.0079)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-7 pr-3 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" /></div>
                                 </div>
                                 <div>
-                                    <label className="block text-[9px] font-bold text-slate-500 mb-1">MMS per message</label>
+                                    <label className="block text-[11px] font-bold text-slate-500 mb-1">MMS per message</label>
                                     <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">$</span><input type="number" aria-label="MMS cost per message in USD" placeholder="0.0200" step="0.001" min="0" value={settings.smsMmsSegmentCostUsd ?? 0.02} onChange={e => handleChange('smsMmsSegmentCostUsd', parseFloat(e.target.value) || 0.02)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-7 pr-3 py-2 font-mono text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500" /></div>
                                 </div>
                             </div>
@@ -809,9 +809,9 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                         <div className="flex items-center gap-3">
                             <h3 className="text-base font-black">Stripe Billing</h3>
                             {isStripeConfigured ? (
-                                <span className="text-[9px] font-black bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">ACTIVE</span>
+                                <span className="text-[11px] font-black bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">ACTIVE</span>
                             ) : (
-                                <span className="text-[9px] font-black bg-rose-500/20 text-rose-400 px-2 py-0.5 rounded-full border border-rose-500/30">INCOMPLETE</span>
+                                <span className="text-[11px] font-black bg-rose-500/20 text-rose-400 px-2 py-0.5 rounded-full border border-rose-500/30">INCOMPLETE</span>
                             )}
                         </div>
                         <button onClick={verifyStripeConfig} disabled={isVerifying} className="text-[10px] font-bold text-slate-400 hover:text-white transition-colors disabled:opacity-50">
@@ -821,39 +821,39 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-4">
                             <div>
-                                <label className="block text-[10px] font-black uppercase text-slate-500 tracking-widest mb-2">Publishable Key</label>
+                                <label className="block text-[10px] font-bold uppercase text-slate-500 tracking-wide mb-2">Publishable Key</label>
                                 <input type="text" value={settings.stripePublishableKey || ''} onChange={e => handleChange('stripePublishableKey', e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="pk_live_..." />
                             </div>
                             <div>
-                                <label className="block text-[10px] font-black uppercase text-slate-500 tracking-widest mb-2">Secret Key</label>
+                                <label className="block text-[10px] font-bold uppercase text-slate-500 tracking-wide mb-2">Secret Key</label>
                                 <input type="password" value={settings.stripeSecretKey || ''} onChange={e => handleChange('stripeSecretKey', e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="sk_live_..." />
                             </div>
                             <div>
-                                <label className="block text-[10px] font-black uppercase text-slate-500 tracking-widest mb-2">Webhook Secret</label>
+                                <label className="block text-[10px] font-bold uppercase text-slate-500 tracking-wide mb-2">Webhook Secret</label>
                                 <input type="password" value={settings.stripeWebhookSecret || ''} onChange={e => handleChange('stripeWebhookSecret', e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 font-mono text-xs text-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="whsec_..." />
                             </div>
                         </div>
                         <div>
                             <div className="flex justify-between items-center mb-3">
-                                <label className="text-[10px] font-black uppercase text-indigo-400 tracking-widest">Plan Price IDs</label>
-                                {!arePricesConfigured && <span className="text-[9px] text-rose-400 font-bold">Missing IDs</span>}
+                                <label className="text-[10px] font-bold uppercase text-indigo-400 tracking-wide">Plan Price IDs</label>
+                                {!arePricesConfigured && <span className="text-[11px] text-rose-400 font-bold">Missing IDs</span>}
                             </div>
                             <div className="space-y-3">
                                 <div>
-                                    <label className="block text-[9px] font-bold text-slate-500 mb-1">Starter Plan</label>
+                                    <label className="block text-[11px] font-bold text-slate-500 mb-1">Starter Plan</label>
                                     <input type="text" value={settings.stripePriceIds?.starter || ''} onChange={e => setSettings(prev => ({ ...prev, stripePriceIds: { ...prev.stripePriceIds, starter: e.target.value } }))} className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 font-mono text-xs text-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="price_..." />
                                 </div>
                                 <div>
-                                    <label className="block text-[9px] font-bold text-slate-500 mb-1">Growth Plan</label>
+                                    <label className="block text-[11px] font-bold text-slate-500 mb-1">Growth Plan</label>
                                     <input type="text" value={settings.stripePriceIds?.growth || ''} onChange={e => setSettings(prev => ({ ...prev, stripePriceIds: { ...prev.stripePriceIds, growth: e.target.value } }))} className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 font-mono text-xs text-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="price_..." />
                                 </div>
                                 <div>
-                                    <label className="block text-[9px] font-bold text-slate-500 mb-1">Kingdom Plan</label>
+                                    <label className="block text-[11px] font-bold text-slate-500 mb-1">Kingdom Plan</label>
                                     <input type="text" value={settings.stripePriceIds?.kingdom || ''} onChange={e => setSettings(prev => ({ ...prev, stripePriceIds: { ...prev.stripePriceIds, kingdom: e.target.value } }))} className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 font-mono text-xs text-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="price_..." />
                                 </div>
                             </div>
                             <div className="pt-5 flex justify-end">
-                                <button onClick={handleSave} disabled={isSaving} className="bg-white text-slate-900 px-5 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-all disabled:opacity-50">
+                                <button onClick={handleSave} disabled={isSaving} className="bg-white text-slate-900 px-5 py-2 rounded-xl font-bold text-[10px] uppercase tracking-wide hover:bg-slate-200 transition-all disabled:opacity-50">
                                     {isSaving ? 'Saving...' : 'Save Billing Config'}
                                 </button>
                             </div>
@@ -881,10 +881,10 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                         <table className="w-full text-left">
                             <thead className="border-b border-slate-100 dark:border-slate-700">
                                 <tr>
-                                    <th className="p-4 text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">Name</th>
-                                    <th className="p-4 text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">ID</th>
-                                    <th className="p-4 text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">Subscription</th>
-                                    <th className="p-4 text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest text-right">Actions</th>
+                                    <th className="p-4 text-[10px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide">Name</th>
+                                    <th className="p-4 text-[10px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide">ID</th>
+                                    <th className="p-4 text-[10px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide">Subscription</th>
+                                    <th className="p-4 text-[10px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
@@ -900,7 +900,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                             </code>
                                         </td>
                                         <td className="p-4">
-                                            <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded ${
+                                            <span className={`text-[10px] font-black uppercase tracking-wide px-2 py-1 rounded ${
                                                 church.subscription?.status === 'active' 
                                                 ? 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400' 
                                                 : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
@@ -920,13 +920,13 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                                         setMessage({ type: 'error', text: `Failed to init webhooks for ${church.name}: ${e.message}` });
                                                     }
                                                 }}
-                                                className="text-[10px] font-black uppercase tracking-widest text-indigo-500 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 px-3 py-2 rounded-lg transition-colors"
+                                                className="text-[10px] font-bold uppercase tracking-wide text-indigo-500 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 px-3 py-2 rounded-lg transition-colors"
                                             >
                                                 Init Webhooks
                                             </button>
                                             <button 
                                                 onClick={() => handleDeleteTenant(church.id, church.name)}
-                                                className="text-[10px] font-black uppercase tracking-widest text-rose-500 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 px-3 py-2 rounded-lg transition-colors"
+                                                className="text-[10px] font-bold uppercase tracking-wide text-rose-500 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 px-3 py-2 rounded-lg transition-colors"
                                             >
                                                 Delete
                                             </button>
@@ -958,7 +958,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                     <div className="space-y-5">
                         {/* Tenant selector */}
                         <div>
-                            <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Select Tenant</label>
+                            <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">Select Tenant</label>
                             <select
                                 value={selectedGrowChurchId}
                                 onChange={e => {
@@ -983,11 +983,11 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                             <>
                                 {/* Secret field */}
                                 <div>
-                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">
+                                    <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-1">
                                         PASTORAL_CARE_API_SECRET
                                         <span className="ml-2 normal-case font-normal text-slate-400">(Grow App integration secret)</span>
                                     </label>
-                                    <p className="text-[9px] text-slate-400 mb-2 leading-relaxed">
+                                    <p className="text-[11px] text-slate-400 mb-2 leading-relaxed">
                                         Set this exact value as <code className="bg-slate-100 dark:bg-slate-700 px-1 rounded">PASTORAL_CARE_API_SECRET</code> in your Grow Application's integration settings.
                                         The Grow backend will include it in every request it sends to Pastoral Care.
                                     </p>
@@ -1072,7 +1072,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                                 setGrowSecretSaving(false);
                                             }
                                         }}
-                                        className="bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all disabled:opacity-50 shadow-sm"
+                                        className="bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-bold text-[10px] uppercase tracking-wide hover:bg-emerald-700 transition-all disabled:opacity-50 shadow-sm"
                                     >
                                         {growSecretSaving ? 'Savingâ€¦' : 'Save Secret to Tenant'}
                                     </button>
@@ -1080,7 +1080,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
 
                                 {/* Instructions callout */}
                                 <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-2xl p-5 space-y-2">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400">Setup Instructions for the Grow App</p>
+                                    <p className="text-[10px] font-bold uppercase tracking-wide text-indigo-600 dark:text-indigo-400">Setup Instructions for the Grow App</p>
                                     <ol className="text-[11px] text-slate-600 dark:text-slate-300 space-y-1.5 list-decimal list-inside leading-relaxed">
                                         <li>In the Grow Application, navigate to <strong>Settings â†’ Integrations</strong>.</li>
                                         <li>Find the <strong>Pastoral Care Integration</strong> section.</li>
@@ -1110,7 +1110,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                           <p className="text-[10px] text-slate-400 mt-0.5">Review and approve or reject Grow integration requests from your tenants.</p>
                         </div>
                         {pending.length > 0 && (
-                          <span className="ml-auto bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest">
+                          <span className="ml-auto bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wide">
                             {pending.length} Pending
                           </span>
                         )}
@@ -1131,9 +1131,9 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                 <p className="text-sm font-black text-slate-900 dark:text-white truncate">{church.name}</p>
                                 <p className="text-[10px] text-slate-400 font-mono">{church.id}</p>
                                 {req?.appName && <p className="text-[10px] text-slate-500 mt-0.5">App: <strong>{req.appName}</strong></p>}
-                                {req?.requestedAt && <p className="text-[9px] text-slate-400 mt-0.5">Requested: {new Date(req.requestedAt).toLocaleString()}</p>}
+                                {req?.requestedAt && <p className="text-[11px] text-slate-400 mt-0.5">Requested: {new Date(req.requestedAt).toLocaleString()}</p>}
                               </div>
-                              <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${
+                              <span className={`text-[10px] font-black uppercase tracking-wide px-3 py-1 rounded-full ${
                                 status === 'pending'  ? 'bg-amber-200 dark:bg-amber-800 text-amber-800 dark:text-amber-200' :
                                 status === 'approved' ? 'bg-emerald-200 dark:bg-emerald-800 text-emerald-800 dark:text-emerald-200' :
                                                         'bg-rose-200 dark:bg-rose-800 text-rose-800 dark:text-rose-200'
@@ -1145,14 +1145,14 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                   <button
                                     disabled={isProcessing}
                                     onClick={() => handleGrowRequest(church.id, 'approve')}
-                                    className="bg-emerald-600 text-white px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 disabled:opacity-50 transition-all"
+                                    className="bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold text-[10px] uppercase tracking-wide hover:bg-emerald-700 disabled:opacity-50 transition-all"
                                   >
                                     {isProcessing ? '…' : 'Approve'}
                                   </button>
                                   <button
                                     disabled={isProcessing}
                                     onClick={() => handleGrowRequest(church.id, 'reject')}
-                                    className="bg-rose-100 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-rose-200 dark:hover:bg-rose-900/30 disabled:opacity-50 transition-all"
+                                    className="bg-rose-100 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 px-4 py-2 rounded-xl font-bold text-[10px] uppercase tracking-wide hover:bg-rose-200 dark:hover:bg-rose-900/30 disabled:opacity-50 transition-all"
                                   >
                                     {isProcessing ? '…' : 'Reject'}
                                   </button>
@@ -1213,7 +1213,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                             }
                                         }
                                     }}
-                                    className="w-full bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-indigo-600 dark:text-indigo-400 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all"
+                                    className="w-full bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-indigo-600 dark:text-indigo-400 py-3 rounded-xl font-bold text-[10px] uppercase tracking-wide hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all"
                                 >
                                     Recalculate Benchmarks
                                 </button>
@@ -1236,7 +1236,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                 
                                 {/* Webhook Endpoint Display */}
                                 <div className="pt-4 border-t border-indigo-500/20">
-                                    <label className="block text-[10px] font-black uppercase text-indigo-400 tracking-widest mb-2">Webhook Endpoint</label>
+                                    <label className="block text-[10px] font-bold uppercase text-indigo-400 tracking-wide mb-2">Webhook Endpoint</label>
                                     <div className="bg-black/40 p-4 rounded-xl border border-indigo-500/30 flex items-center justify-between gap-4">
                                         <code className="text-xs font-mono text-emerald-400 truncate">https://pastoralcare.barnabassoftware.com/stripe</code>
                                         <button 
@@ -1266,7 +1266,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                             alert("All subscriptions have been reset.");
                                         }
                                     }}
-                                    className="w-full bg-rose-600 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-rose-700 transition-all shadow-lg"
+                                    className="w-full bg-rose-600 text-white py-3 rounded-xl font-bold text-[10px] uppercase tracking-wide hover:bg-rose-700 transition-all shadow-lg"
                                 >
                                     Reset All Subscriptions
                                 </button>
@@ -1290,11 +1290,11 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                     <table className="w-full text-left">
                         <thead className="border-b border-slate-100 dark:border-slate-700">
                             <tr>
-                                <th className="p-4 text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">Name</th>
-                                <th className="p-4 text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">Email</th>
-                                <th className="p-4 text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">Tenant Context</th>
-                                <th className="p-4 text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">Roles</th>
-                                <th className="p-4 text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest text-right">Last Login</th>
+                                <th className="p-4 text-[10px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide">Name</th>
+                                <th className="p-4 text-[10px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide">Email</th>
+                                <th className="p-4 text-[10px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide">Tenant Context</th>
+                                <th className="p-4 text-[10px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide">Roles</th>
+                                <th className="p-4 text-[10px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide text-right">Last Login</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
@@ -1312,12 +1312,12 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                             <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded">
                                                 {userChurch ? userChurch.name : 'Unknown / System'}
                                             </span>
-                                            {userChurch && <span className="text-[9px] text-slate-400 ml-2 font-mono">({userChurch.id})</span>}
+                                            {userChurch && <span className="text-[11px] text-slate-400 ml-2 font-mono">({userChurch.id})</span>}
                                         </td>
                                         <td className="p-4">
                                             <div className="flex flex-wrap gap-1">
                                                 {user.roles.map(r => (
-                                                    <span key={r} className="text-[8px] font-black uppercase border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 rounded text-slate-500 dark:text-slate-400">
+                                                    <span key={r} className="text-[10px] font-bold uppercase border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 rounded text-slate-500 dark:text-slate-400">
                                                         {r}
                                                     </span>
                                                 ))}
@@ -1327,7 +1327,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                             {user.lastLogin ? (
                                                 <div>
                                                     <p className="text-xs font-bold text-slate-700 dark:text-slate-300">{new Date(user.lastLogin).toLocaleDateString()}</p>
-                                                    <p className="text-[9px] text-slate-400">{new Date(user.lastLogin).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                                                    <p className="text-[11px] text-slate-400">{new Date(user.lastLogin).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
                                                 </div>
                                             ) : (
                                                 <span className="text-[10px] text-slate-400 italic">Never</span>
@@ -1373,7 +1373,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                             const url = `https://api.planningcenteronline.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=people%20services%20giving%20groups%20check_ins%20registrations%20calendar`;
                             window.location.href = url;
                         }}
-                        className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-all"
+                        className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-wide hover:bg-indigo-700 transition-all"
                     >
                         Authorize Planning Center
                     </button>
@@ -1393,7 +1393,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                 setMessage({ type: 'error', text: 'Failed to subscribe to webhooks: ' + e.message });
                             }
                         }}
-                        className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-emerald-700 transition-all"
+                        className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-wide hover:bg-emerald-700 transition-all"
                     >
                         Subscribe to Webhooks
                     </button>
@@ -1438,7 +1438,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                             const top = window.screenY + (window.innerHeight - height) / 2;
                             window.open(oauthUrl, 'CanvaAuth', `width=${width},height=${height},left=${left},top=${top}`);
                         }}
-                        className="bg-[#00c4cc] text-white px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-[#00b3ba] transition-all"
+                        className="bg-[#00c4cc] text-white px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-wide hover:bg-[#00b3ba] transition-all"
                     >
                         Connect Canva
                     </button>
@@ -1456,7 +1456,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                 setMessage({ type: 'error', text: 'Failed to disconnect: ' + e.message });
                             }
                         }}
-                        className="bg-red-50 text-red-600 px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-red-100 transition-all border border-red-200"
+                        className="bg-red-50 text-red-600 px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-wide hover:bg-red-100 transition-all border border-red-200"
                     >
                         Disconnect Canva
                     </button>
@@ -1476,7 +1476,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                         <button
                             onClick={loadLogs}
                             disabled={isLoading}
-                            className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-700 transition-all disabled:opacity-50 flex items-center gap-2"
+                            className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-bold text-[10px] uppercase tracking-wide hover:bg-indigo-700 transition-all disabled:opacity-50 flex items-center gap-2"
                         >
                             {isLoading ? (
                                 <><span className="animate-spin inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full"></span> Loading...</>
@@ -1490,7 +1490,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                             aria-label="Filter by tenant"
                             value={logFilter}
                             onChange={(e) => setLogFilter(e.target.value)}
-                            className="bg-slate-100 dark:bg-slate-800 border-none text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 rounded-lg py-2 px-3 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                            className="bg-slate-100 dark:bg-slate-800 border-none text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 rounded-lg py-2 px-3 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                         >
                             <option value="">All Tenants</option>
                             {churches.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -1500,7 +1500,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                             aria-label="Filter by log level"
                             value={logLevelFilter}
                             onChange={(e) => setLogLevelFilter(e.target.value as any)}
-                            className="bg-slate-100 dark:bg-slate-800 border-none text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 rounded-lg py-2 px-3 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                            className="bg-slate-100 dark:bg-slate-800 border-none text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 rounded-lg py-2 px-3 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                         >
                             <option value="">All Levels</option>
                             <option value="info">Info</option>
@@ -1512,7 +1512,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                             aria-label="Filter by log source"
                             value={logSourceFilter}
                             onChange={(e) => setLogSourceFilter(e.target.value)}
-                            className="bg-slate-100 dark:bg-slate-800 border-none text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 rounded-lg py-2 px-3 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                            className="bg-slate-100 dark:bg-slate-800 border-none text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 rounded-lg py-2 px-3 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                         >
                             <option value="">All Sources</option>
                             <option value="sync">Sync</option>
@@ -1559,11 +1559,11 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                         <table className="w-full text-left">
                             <thead className="bg-slate-50 dark:bg-slate-800 sticky top-0 z-10 border-b border-slate-100 dark:border-slate-700">
                                 <tr>
-                                    <th className="p-4 text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest w-44">Timestamp</th>
-                                    <th className="p-4 text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest w-20">Level</th>
-                                    <th className="p-4 text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest w-24">Source</th>
-                                    <th className="p-4 text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest w-36">Tenant</th>
-                                    <th className="p-4 text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">Message</th>
+                                    <th className="p-4 text-[10px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide w-44">Timestamp</th>
+                                    <th className="p-4 text-[10px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide w-20">Level</th>
+                                    <th className="p-4 text-[10px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide w-24">Source</th>
+                                    <th className="p-4 text-[10px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide w-36">Tenant</th>
+                                    <th className="p-4 text-[10px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide">Message</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
@@ -1606,13 +1606,13 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                                     </p>
                                                 </td>
                                                 <td className="p-4">
-                                                    <span className={`px-2 py-1 rounded text-[9px] font-black uppercase tracking-widest ${lvlBadge}`}>
+                                                    <span className={`px-2 py-1 rounded text-[11px] font-black uppercase tracking-wide ${lvlBadge}`}>
                                                         {log.level}
                                                     </span>
                                                 </td>
                                                 <td className="p-4">
                                                     {log.source && (
-                                                        <span className={`px-2 py-1 rounded text-[9px] font-black uppercase tracking-widest ${srcColor}`}>
+                                                        <span className={`px-2 py-1 rounded text-[11px] font-black uppercase tracking-wide ${srcColor}`}>
                                                             {log.source}
                                                         </span>
                                                     )}
@@ -1626,7 +1626,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                                                     <div className="flex items-start justify-between gap-2">
                                                         <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{log.message}</p>
                                                         {hasContext && (
-                                                            <span className="text-[9px] text-slate-400 shrink-0 mt-0.5">{isExpanded ? 'â–²' : 'â–¼'} details</span>
+                                                            <span className="text-[11px] text-slate-400 shrink-0 mt-0.5">{isExpanded ? 'â–²' : 'â–¼'} details</span>
                                                         )}
                                                     </div>
                                                 </td>

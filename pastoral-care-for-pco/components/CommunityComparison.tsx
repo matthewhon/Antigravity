@@ -125,25 +125,25 @@ export const CommunityComparison: React.FC<CommunityComparisonProps> = ({ people
                 {genderComparisonData.map(item => (
                     <div key={item.name}>
                         <div className="flex justify-between items-end mb-2">
-                            <span className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase">{item.name}</span>
+                            <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">{item.name}</span>
                         </div>
                         
                         {/* Comparison Bars */}
                         <div className="space-y-1">
                             <div className="flex items-center gap-2">
-                                <span className="text-[9px] font-bold text-indigo-500 dark:text-indigo-400 w-12 text-right">Church</span>
+                                <span className="text-[11px] font-bold text-indigo-500 dark:text-indigo-400 w-12 text-right">Church</span>
                                 <div className="flex-1 bg-slate-50 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
                                     <div className="h-full bg-indigo-500 rounded-full" style={{width: `${item.Church}%`}}></div>
                                 </div>
-                                <span className="text-[9px] font-bold text-slate-700 dark:text-slate-300 w-8">{item.Church.toFixed(0)}%</span>
+                                <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 w-8">{item.Church.toFixed(0)}%</span>
                             </div>
                             
                             <div className="flex items-center gap-2">
-                                <span className="text-[9px] font-bold text-slate-400 w-12 text-right">Area</span>
+                                <span className="text-[11px] font-bold text-slate-400 w-12 text-right">Area</span>
                                 <div className="flex-1 bg-slate-50 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
                                     <div className="h-full bg-slate-400 rounded-full" style={{width: `${item.Community}%`}}></div>
                                 </div>
-                                <span className="text-[9px] font-bold text-slate-700 dark:text-slate-300 w-8">{item.Community.toFixed(0)}%</span>
+                                <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 w-8">{item.Community.toFixed(0)}%</span>
                             </div>
                         </div>
                     </div>

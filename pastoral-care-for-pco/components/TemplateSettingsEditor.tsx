@@ -108,7 +108,7 @@ export const TemplateSettingsEditor: React.FC<Props> = ({
       {/* ── Church Logo ─────────────────────────────────────────── */}
       <div className="p-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-bold text-xs text-slate-500 dark:text-slate-400 uppercase tracking-widest">
+          <h3 className="font-bold text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">
             Church Logo
           </h3>
           {/* Show/hide toggle */}
@@ -138,7 +138,7 @@ export const TemplateSettingsEditor: React.FC<Props> = ({
                 onError={e => { (e.target as HTMLImageElement).style.opacity = '0.3'; }}
               />
               {settings.logoUrl && settings.logoUrl !== churchLogoUrl && (
-                <span className="absolute top-2 right-2 text-[9px] font-bold bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-300 px-1.5 py-0.5 rounded-full">
+                <span className="absolute top-2 right-2 text-[11px] font-bold bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-300 px-1.5 py-0.5 rounded-full">
                   Campaign override
                 </span>
               )}
@@ -247,7 +247,7 @@ export const TemplateSettingsEditor: React.FC<Props> = ({
 
       {/* ── Design ─────────────────────────────────────────────────── */}
       <div className="p-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm">
-        <h3 className="font-bold text-xs text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-4">Design</h3>
+        <h3 className="font-bold text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-4">Design</h3>
         <div className="grid grid-cols-2 gap-4">
           {(['primaryColor', 'textColor', 'backgroundColor', 'linkColor'] as const).map(key => (
             <div key={key}>
@@ -287,7 +287,7 @@ export const TemplateSettingsEditor: React.FC<Props> = ({
 
       {/* ── Footer ─────────────────────────────────────────────────── */}
       <div className="p-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm">
-        <h3 className="font-bold text-xs text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-4">Footer</h3>
+        <h3 className="font-bold text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-4">Footer</h3>
         <div>
           <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Footer Text</label>
           <textarea
@@ -302,7 +302,7 @@ export const TemplateSettingsEditor: React.FC<Props> = ({
       {/* ── Social Media ───────────────────────────────────────────── */}
       <div className="p-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-bold text-xs text-slate-500 dark:text-slate-400 uppercase tracking-widest">Social Media</h3>
+          <h3 className="font-bold text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">Social Media</h3>
           {/* Master toggle */}
           <button
             onClick={() => set('showSocialLinks', !settings.showSocialLinks)}

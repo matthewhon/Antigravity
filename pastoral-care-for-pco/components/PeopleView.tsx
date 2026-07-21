@@ -230,7 +230,7 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
     return (
       <div className="bg-white dark:bg-slate-850 rounded-[5rem] p-48 text-center border-4 border-dashed border-slate-100 dark:border-slate-800 animate-in zoom-in">
         <div className="text-[140px] mb-14 grayscale opacity-20 drop-shadow-2xl">👥</div>
-        <h3 className="text-5xl font-black text-slate-900 dark:text-white mb-8 tracking-tighter uppercase">Connection Required</h3>
+        <h3 className="text-5xl font-bold text-slate-900 dark:text-white mb-8 tracking-tighter uppercase">Connection Required</h3>
         <p className="text-slate-400 max-w-lg mx-auto font-medium text-2xl leading-relaxed">
           Connect Planning Center to unlock People analytics and insights.
         </p>
@@ -370,7 +370,7 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
                                 </ResponsiveContainer>
                                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                                     <span className="text-4xl font-black tracking-tighter text-slate-900 dark:text-white">{connection.connectedPct}%</span>
-                                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Connected</span>
+                                    <span className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Connected</span>
                                 </div>
                             </div>
                             {/* Breakdown bars */}
@@ -685,7 +685,7 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
                                 <button 
                                     onClick={onGenerateGeoInsights}
                                     disabled={isGeneratingGeo}
-                                    className="text-[10px] font-bold uppercase tracking-widest bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 px-3 py-1.5 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors disabled:opacity-50"
+                                    className="text-[10px] font-bold uppercase tracking-wide bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 px-3 py-1.5 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors disabled:opacity-50"
                                 >
                                     {isGeneratingGeo ? 'Analyzing...' : 'Generate Insights'}
                                 </button>
@@ -849,7 +849,7 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
                                         href={`https://people.planningcenteronline.com/households/${h.id}`}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="text-[10px] font-bold text-indigo-500 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 uppercase tracking-widest"
+                                        className="text-[10px] font-bold text-indigo-500 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 uppercase tracking-wide"
                                     >
                                         View
                                     </a>
@@ -956,11 +956,11 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
                                                     {/* Title + badges */}
                                                     <div className="flex items-center gap-1.5 flex-wrap">
                                                         <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{event.name}</p>
-                                                        {isFull && <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 uppercase tracking-widest shrink-0">Full</span>}
-                                                        {isClosed && !isFull && <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400 uppercase tracking-widest shrink-0">Closed</span>}
-                                                        {isAlmostFull && <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 uppercase tracking-widest shrink-0">Almost Full</span>}
+                                                        {isFull && <span className="px-1.5 py-0.5 rounded text-[11px] font-bold bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 uppercase tracking-wide shrink-0">Full</span>}
+                                                        {isClosed && !isFull && <span className="px-1.5 py-0.5 rounded text-[11px] font-bold bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400 uppercase tracking-wide shrink-0">Closed</span>}
+                                                        {isAlmostFull && <span className="px-1.5 py-0.5 rounded text-[11px] font-bold bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 uppercase tracking-wide shrink-0">Almost Full</span>}
                                                         {visibilityBadge && (
-                                                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-widest shrink-0 ${
+                                                            <span className={`px-1.5 py-0.5 rounded text-[11px] font-black uppercase tracking-wide shrink-0 ${
                                                                 visibilityBadge.color === 'amber'
                                                                     ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400'
                                                                     : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
@@ -1019,7 +1019,7 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
                                                         </div>
                                                     )}
                                                     {fillPct !== null && (
-                                                        <p className="text-[9px] text-slate-400 mt-0.5 font-mono">{fillPct}% capacity</p>
+                                                        <p className="text-[11px] text-slate-400 mt-0.5 font-mono">{fillPct}% capacity</p>
                                                     )}
                                                 </div>
 
@@ -1029,7 +1029,7 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
                                                         href={event.publicUrl}
                                                         target="_blank"
                                                         rel="noopener noreferrer"
-                                                        className="shrink-0 text-[10px] font-black uppercase tracking-widest text-indigo-500 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 mt-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                        className="shrink-0 text-[10px] font-bold uppercase tracking-wide text-indigo-500 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 mt-1 opacity-0 group-hover:opacity-100 transition-opacity"
                                                     >
                                                         View →
                                                     </a>
@@ -1056,7 +1056,7 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
           <h3 className="text-4xl font-black tracking-tighter text-slate-900 dark:text-white">
             {activePage === 'reports' ? 'Reports' : 'People Analytics'}
           </h3>
-          <p className="text-slate-400 dark:text-slate-500 font-medium uppercase text-[10px] tracking-widest mt-1">
+          <p className="text-slate-400 dark:text-slate-500 font-medium uppercase text-[10px] tracking-wide mt-1">
             {activePage === 'reports' ? 'Status Trends Over Time' : 'Demographics & Engagement'}
           </p>
         </div>
@@ -1066,7 +1066,7 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
                 <button 
                     onClick={onSync}
                     disabled={isSyncing}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 font-black text-[10px] uppercase tracking-widest hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors disabled:opacity-50"
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 font-bold text-[10px] uppercase tracking-wide hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors disabled:opacity-50"
                 >
                     <span className={isSyncing ? 'animate-spin' : ''}>↻</span>
                     <span>{isSyncing ? 'Refresh from PCO' : 'Refresh from PCO'}</span>

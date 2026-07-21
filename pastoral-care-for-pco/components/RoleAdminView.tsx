@@ -100,7 +100,7 @@ const PastoralCareTabSetupWizard: React.FC<{
         return (
             <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl ${c.bg}`}>
                 <span className={`w-2 h-2 rounded-full shrink-0 ${c.dot} ${status === 'checking' ? 'animate-pulse' : ''}`} />
-                <span className={`text-[10px] font-black uppercase tracking-widest ${c.text}`}>{label}</span>
+                <span className={`text-[10px] font-black uppercase tracking-wide ${c.text}`}>{label}</span>
                 <span className={`text-[10px] font-semibold ${c.text} ml-1`}>{c.label}</span>
             </div>
         );
@@ -130,11 +130,11 @@ const PastoralCareTabSetupWizard: React.FC<{
                             Pastoral Care Tab Setup
                         </p>
                         {isFullyReady ? (
-                            <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-emerald-600 text-white">
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-emerald-600 text-white">
                                 ✓ Ready
                             </span>
                         ) : (
-                            <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-violet-600 text-white">
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-violet-600 text-white">
                                 {isPartiallyDone ? '⚠ Partial' : 'Setup Required'}
                             </span>
                         )}
@@ -229,13 +229,13 @@ const PastoralCareTabSetupWizard: React.FC<{
                         <div className="text-xl">🔗</div>
                         <div className="flex-1">
                             <p className="text-[10px] font-bold text-slate-700 dark:text-slate-300">Open Planning Center People Settings</p>
-                            <p className="text-[9px] text-slate-400">Navigate there, then follow Steps 1 and 2 above.</p>
+                            <p className="text-[11px] text-slate-400">Navigate there, then follow Steps 1 and 2 above.</p>
                         </div>
                         <a
                             href="https://people.planningcenteronline.com/field_definitions"
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 bg-violet-600 hover:bg-violet-700 text-white text-[10px] font-black rounded-xl transition uppercase tracking-widest"
+                            className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 bg-violet-600 hover:bg-violet-700 text-white text-[10px] font-bold rounded-xl transition uppercase tracking-wide"
                         >
                             Open PCO
                             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -249,7 +249,7 @@ const PastoralCareTabSetupWizard: React.FC<{
                         <button
                             onClick={handleCheck}
                             disabled={isChecking || !church.pcoConnected}
-                            className="inline-flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition"
+                            className="inline-flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-[10px] font-bold uppercase tracking-wide rounded-xl transition"
                         >
                             {isChecking ? (
                                 <>
@@ -521,20 +521,20 @@ const SyncAreaButtons: React.FC<{ churchId: string; onSyncComplete: () => void }
                                 <span className="animate-spin inline-block w-3.5 h-3.5 border-2 border-indigo-400 border-t-transparent rounded-full shrink-0 mt-0.5"></span>
                             )}
                             {status.state === 'success' && (
-                                <span className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 shrink-0">✓ Done</span>
+                                <span className="text-[11px] font-black text-emerald-600 dark:text-emerald-400 shrink-0">✓ Done</span>
                             )}
                             {status.state === 'error' && (
-                                <span className="text-[9px] font-black text-rose-500 shrink-0">✕ Failed</span>
+                                <span className="text-[11px] font-black text-rose-500 shrink-0">✕ Failed</span>
                             )}
                         </div>
-                        <p className="text-[9px] text-slate-400 dark:text-slate-500 leading-snug mb-3">{area.description}</p>
+                        <p className="text-[11px] text-slate-400 dark:text-slate-500 leading-snug mb-3">{area.description}</p>
                         {status.state === 'error' && status.message && (
-                            <p className="text-[9px] text-rose-500 mb-2 leading-snug">{status.message}</p>
+                            <p className="text-[11px] text-rose-500 mb-2 leading-snug">{status.message}</p>
                         )}
                         <button
                             onClick={() => handleAreaSync(area)}
                             disabled={status.state === 'running'}
-                            className="w-full bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 disabled:opacity-50 text-indigo-600 dark:text-indigo-400 text-[9px] font-black uppercase tracking-widest py-2 rounded-xl transition-all"
+                            className="w-full bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 disabled:opacity-50 text-indigo-600 dark:text-indigo-400 text-[11px] font-bold uppercase tracking-wide py-2 rounded-xl transition-all"
                         >
                             {status.state === 'running' ? 'Syncing…' : 'Force Sync'}
                         </button>
@@ -654,7 +654,7 @@ const PortInRequestModal: React.FC<{
 
     // Shared styles
     const inputCn  = 'w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-colors';
-    const labelCn  = 'block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-1.5';
+    const labelCn  = 'block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-wide mb-1.5';
     const sectionCn = 'space-y-5';
 
     const STEPS = ['Contact & Numbers', 'Current Provider', 'Account Details', 'Documents & Submit'];
@@ -690,7 +690,7 @@ const PortInRequestModal: React.FC<{
                                         isDone   ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-300' :
                                                    'bg-slate-100 dark:bg-slate-800 text-slate-400'
                                     }`}>
-                                        <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black ${
+                                        <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[11px] font-black ${
                                             isActive ? 'bg-white/30 text-white' :
                                             isDone   ? 'bg-indigo-200 dark:bg-indigo-800 text-indigo-700 dark:text-indigo-200' :
                                                        'bg-slate-200 dark:bg-slate-700 text-slate-500'
@@ -757,7 +757,7 @@ const PortInRequestModal: React.FC<{
                                 <div className="flex items-start gap-3">
                                     <span className="text-xl shrink-0">📋</span>
                                     <div className="space-y-2">
-                                        <p className="text-[11px] font-black text-amber-900 dark:text-amber-200 uppercase tracking-widest">Coming from TextInChurch?</p>
+                                        <p className="text-[11px] font-bold text-amber-900 dark:text-amber-200 uppercase tracking-wide">Coming from TextInChurch?</p>
                                         <p className="text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed">
                                             TextInChurch uses Twilio as their carrier backend. To port your number, you'll need to <strong>contact TextInChurch support</strong> and request your <strong>Customer Service Record (CSR)</strong>. They can provide your Account Number, PIN, and the service address on file.
                                         </p>
@@ -1773,7 +1773,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
         <div className="w-full lg:w-64 shrink-0 lg:sticky lg:top-24 h-fit space-y-8">
             <div>
                 <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter">Settings</h2>
-                <p className="text-slate-400 dark:text-slate-500 font-medium uppercase text-[10px] tracking-widest mt-1">Manage & Configure</p>
+                <p className="text-slate-400 dark:text-slate-500 font-medium uppercase text-[10px] tracking-wide mt-1">Manage & Configure</p>
             </div>
             
             <div className="flex flex-row lg:flex-col gap-2 overflow-x-auto lg:overflow-visible pb-4 lg:pb-0 no-scrollbar border-b lg:border-b-0 border-slate-200 dark:border-slate-800">
@@ -1781,7 +1781,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                     <button 
                         key={tab}
                         onClick={() => setActiveTab(tab as any)}
-                        className={`text-left px-5 py-3.5 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${
+                        className={`text-left px-5 py-3.5 rounded-2xl text-[11px] font-black uppercase tracking-wide transition-all whitespace-nowrap ${
                             activeTab === tab 
                             ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-500/30' 
                             : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 border border-transparent'
@@ -1805,7 +1805,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                         </span>
                         <button 
                             onClick={handleAddMemberClick}
-                            className={`px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg ${
+                            className={`px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-wide transition-all shadow-lg ${
                                 users.length >= maxUsers 
                                 ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
                                 : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-200 dark:shadow-indigo-900/50'
@@ -1829,7 +1829,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         <p className="font-bold text-slate-900 dark:text-white text-sm">{u.name}</p>
                                         <p className="text-xs text-slate-400 dark:text-slate-500">{u.email}</p>
                                         {u.lastLogin && (
-                                            <p className="text-[9px] text-slate-400 dark:text-slate-600 mt-0.5 font-medium">
+                                            <p className="text-[11px] text-slate-400 dark:text-slate-600 mt-0.5 font-medium">
                                                 Last login: {new Date(u.lastLogin).toLocaleDateString()} {new Date(u.lastLogin).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                                             </p>
                                         )}
@@ -1837,7 +1837,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 </div>
                                 <div className="flex flex-wrap gap-2 flex-1">
                                     {u.roles.map(r => (
-                                        <span key={r} className="px-2 py-1 rounded text-[9px] font-bold uppercase tracking-widest bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400">
+                                        <span key={r} className="px-2 py-1 rounded text-[11px] font-bold uppercase tracking-wide bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400">
                                             {r}
                                         </span>
                                     ))}
@@ -1848,14 +1848,14 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         editingUserId === u.id ? (
                                             <button
                                                 onClick={() => setEditingUserId(null)}
-                                                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors px-4 py-2 text-[10px] font-black uppercase tracking-widest"
+                                                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors px-4 py-2 text-[10px] font-bold uppercase tracking-wide"
                                             >
                                                 Cancel
                                             </button>
                                         ) : (
                                             <button
                                                 onClick={() => handleStartEditRoles(u)}
-                                                className="text-indigo-500 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors px-4 py-2 text-[10px] font-black uppercase tracking-widest"
+                                                className="text-indigo-500 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors px-4 py-2 text-[10px] font-bold uppercase tracking-wide"
                                             >
                                                 Edit Roles
                                             </button>
@@ -1864,7 +1864,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                     {currentUser.id !== u.id && (
                                         <button
                                             onClick={() => handleRemoveUser(u.id)}
-                                            className="text-slate-300 dark:text-slate-600 hover:text-rose-500 dark:hover:text-rose-400 transition-colors px-4 py-2 text-[10px] font-black uppercase tracking-widest"
+                                            className="text-slate-300 dark:text-slate-600 hover:text-rose-500 dark:hover:text-rose-400 transition-colors px-4 py-2 text-[10px] font-bold uppercase tracking-wide"
                                         >
                                             Remove
                                         </button>
@@ -1875,7 +1875,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                             {/* ── Inline role editor (Church Admin only) ── */}
                             {editingUserId === u.id && (
                                 <div className="border-t border-slate-200 dark:border-slate-700 px-6 py-5 bg-white dark:bg-slate-900">
-                                    <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-4">Assign Roles — {u.name}</p>
+                                    <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-4">Assign Roles — {u.name}</p>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-5">
                                         {ALL_ROLES.map(role => {
                                             const checked = pendingRoles.includes(role);
@@ -1906,7 +1906,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                     {/* Campus Permissions (Multi-Campus Only) */}
                                     {church.multiCampusEnabled && campuses && campuses.length > 0 && (
                                         <div className="mt-6 mb-5">
-                                            <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3">Campus Permissions — {u.name}</p>
+                                            <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-3">Campus Permissions — {u.name}</p>
                                             {pendingRoles.includes('Church Admin') ? (
                                                 <p className="text-[10px] text-slate-400 dark:text-slate-500 italic">Church Admins always have access to all campuses.</p>
                                             ) : (
@@ -1940,13 +1940,13 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         <button
                                             onClick={() => handleSaveRoles(u.id)}
                                             disabled={isSavingRoles}
-                                            className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition shadow-lg"
+                                            className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-6 py-2.5 rounded-xl font-bold text-[10px] uppercase tracking-wide transition shadow-lg"
                                         >
                                             {isSavingRoles ? 'Saving…' : 'Save Roles'}
                                         </button>
                                         <button
                                             onClick={() => setEditingUserId(null)}
-                                            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-[10px] font-bold uppercase tracking-widest"
+                                            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-[10px] font-bold uppercase tracking-wide"
                                         >
                                             Cancel
                                         </button>
@@ -1976,7 +1976,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                         <button 
                             onClick={handleSaveOrgSettings}
                             disabled={isSaving}
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg disabled:opacity-50"
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold text-[10px] uppercase tracking-wide transition-all shadow-lg disabled:opacity-50"
                         >
                             {isSaving ? 'Saving...' : 'Save Changes'}
                         </button>
@@ -1987,14 +1987,14 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                     <div className="space-y-6">
                         {/* Read-Only Tenant ID */}
                         <div>
-                            <label className="block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-3">Tenant ID (Read Only)</label>
+                            <label className="block text-[10px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide mb-3">Tenant ID (Read Only)</label>
                             <div className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 font-mono text-xs text-slate-500 dark:text-slate-400 select-all transition-colors">
                                 {formData.id}
                             </div>
                         </div>
 
                         <div>
-                            <label className="block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-3">Church Name</label>
+                            <label className="block text-[10px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide mb-3">Church Name</label>
                             <input 
                                 type="text" 
                                 aria-label="Church Name"
@@ -2006,7 +2006,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                         </div>
 
                         <div>
-                            <label className="block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-3">Address</label>
+                            <label className="block text-[10px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide mb-3">Address</label>
                             <input 
                                 type="text" 
                                 value={formData.address || ''}
@@ -2018,7 +2018,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
 
                         <div className="grid grid-cols-3 gap-4">
                             <div className="col-span-1">
-                                <label className="block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-3">City</label>
+                                <label className="block text-[10px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide mb-3">City</label>
                                 <input 
                                     type="text" 
                                     aria-label="City"
@@ -2029,7 +2029,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 />
                             </div>
                             <div className="col-span-1">
-                                <label className="block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-3">State</label>
+                                <label className="block text-[10px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide mb-3">State</label>
                                 <input 
                                     type="text" 
                                     aria-label="State"
@@ -2040,7 +2040,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 />
                             </div>
                             <div className="col-span-1">
-                                <label className="block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-3">Zip</label>
+                                <label className="block text-[10px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide mb-3">Zip</label>
                                 <input 
                                     type="text" 
                                     aria-label="Zip Code"
@@ -2054,7 +2054,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
 
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-3">Phone</label>
+                                <label className="block text-[10px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide mb-3">Phone</label>
                                 <input 
                                     type="tel" 
                                     value={formData.phone || ''}
@@ -2064,7 +2064,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 />
                             </div>
                             <div>
-                                <label className="block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-3">Email</label>
+                                <label className="block text-[10px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide mb-3">Email</label>
                                 <input 
                                     type="email" 
                                     value={formData.email || ''}
@@ -2076,7 +2076,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                         </div>
 
                         <div>
-                            <label className="block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-3">Website</label>
+                            <label className="block text-[10px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide mb-3">Website</label>
                             <input 
                                 type="text" 
                                 aria-label="Website"
@@ -2094,7 +2094,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                             
                             {/* Geocode Addresses */}
                             <div className="mb-6 p-4 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700">
-                                <p className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-widest mb-1">Member Heatmap</p>
+                                <p className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wide mb-1">Member Heatmap</p>
                                 <p className="text-[10px] text-slate-400 dark:text-slate-500 mb-3 leading-relaxed">
                                     Geocode member addresses to power the cluster map on the Pastoral Care Membership tab.
                                     Only processes addresses that haven't been geocoded yet.
@@ -2124,7 +2124,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             }
                                         }}
                                         disabled={isGeocoding}
-                                        className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-md shadow-indigo-200 dark:shadow-none"
+                                        className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-2 rounded-xl font-bold text-[10px] uppercase tracking-wide transition-all shadow-md shadow-indigo-200 dark:shadow-none"
                                     >
                                         {isGeocoding ? (
                                             <>
@@ -2177,14 +2177,14 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
 
                             {/* YouTube Integration */}
                             <div className="mt-6 p-4 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700">
-                                <p className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-widest mb-1">YouTube Integration</p>
+                                <p className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wide mb-1">YouTube Integration</p>
                                 <p className="text-[10px] text-slate-400 dark:text-slate-500 mb-4 leading-relaxed">
                                     Link your YouTube channel to pull statistics and track growth metrics directly on the Metrics Dashboard.
                                 </p>
                                 
                                 <div className="space-y-4">
                                     <div>
-                                        <label className="block text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-1.5">YouTube Channel ID or URL</label>
+                                        <label className="block text-[11px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide mb-1.5">YouTube Channel ID or URL</label>
                                         <input 
                                             type="text" 
                                             value={formData.metricsSettings?.youtubeChannelId || ''}
@@ -2213,7 +2213,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                 type="button"
                                                 onClick={handleSyncYoutube}
                                                 disabled={isSyncingYoutube || !(formData.metricsSettings?.youtubeChannelId)}
-                                                className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-md shadow-indigo-200 dark:shadow-none"
+                                                className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-2 rounded-xl font-bold text-[10px] uppercase tracking-wide transition-all shadow-md shadow-indigo-200 dark:shadow-none"
                                             >
                                                 {isSyncingYoutube ? 'Syncing...' : '🔄 Sync YouTube Metrics'}
                                             </button>
@@ -2236,7 +2236,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                 )}
                                                 <div className="flex-1 min-w-0">
                                                     <p className="text-xs font-bold text-slate-850 dark:text-white truncate">{formData.metricsSettings.youtubeChannelName || 'Connected Channel'}</p>
-                                                    <p className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase">
+                                                    <p className="text-[11px] text-slate-400 dark:text-slate-500 font-bold uppercase">
                                                         Subscribers: {(formData.metricsSettings.youtubeSubscribers || 0).toLocaleString()} • Last Synced: {new Date(formData.metricsSettings.youtubeLastSynced).toLocaleString()}
                                                     </p>
                                                 </div>
@@ -2256,13 +2256,13 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                             <div className="space-y-3">
                                 <button 
                                     onClick={handleFlushData}
-                                    className="w-full bg-amber-100 dark:bg-amber-600/10 hover:bg-amber-200 dark:hover:bg-amber-600 text-amber-700 dark:text-amber-500 dark:hover:text-white border border-amber-200 dark:border-amber-600/50 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all"
+                                    className="w-full bg-amber-100 dark:bg-amber-600/10 hover:bg-amber-200 dark:hover:bg-amber-600 text-amber-700 dark:text-amber-500 dark:hover:text-white border border-amber-200 dark:border-amber-600/50 py-3 rounded-xl font-bold text-[10px] uppercase tracking-wide transition-all"
                                 >
                                     Flush Synced Data
                                 </button>
                                 <button 
                                     onClick={() => { setShowDeleteModal(true); setDeleteConfirmText(''); setDeleteError(null); }}
-                                    className="w-full bg-rose-100 dark:bg-rose-600/10 hover:bg-rose-200 dark:hover:bg-rose-600 text-rose-700 dark:text-rose-500 dark:hover:text-white border border-rose-200 dark:border-rose-600/50 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all"
+                                    className="w-full bg-rose-100 dark:bg-rose-600/10 hover:bg-rose-200 dark:hover:bg-rose-600 text-rose-700 dark:text-rose-500 dark:hover:text-white border border-rose-200 dark:border-rose-600/50 py-3 rounded-xl font-bold text-[10px] uppercase tracking-wide transition-all"
                                 >
                                     Delete Organization
                                 </button>
@@ -2297,7 +2297,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                     </p>
 
                                     <div className="bg-rose-50 dark:bg-rose-950/40 rounded-2xl border border-rose-200 dark:border-rose-800 p-4 mb-6">
-                                        <p className="text-[10px] font-black text-rose-700 dark:text-rose-400 uppercase tracking-widest mb-3">What will be deleted:</p>
+                                        <p className="text-[10px] font-bold text-rose-700 dark:text-rose-400 uppercase tracking-wide mb-3">What will be deleted:</p>
                                         <ul className="space-y-1">
                                             {['All People & Households', 'All Donation Records', 'All Groups & Service Plans', 'All Email & SMS Campaigns', 'All User Accounts (Firebase Auth)', 'Organization Settings & Configuration'].map(item => (
                                                 <li key={item} className="flex items-center gap-2 text-[11px] text-rose-700 dark:text-rose-300">
@@ -2308,7 +2308,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         </ul>
                                     </div>
 
-                                    <label className="block text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-widest mb-2">
+                                    <label className="block text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wide mb-2">
                                         Type <span className="text-rose-600 font-mono">DELETE</span> to confirm
                                     </label>
                                     <input
@@ -2331,7 +2331,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         <button
                                             onClick={() => setShowDeleteModal(false)}
                                             disabled={isDeleting}
-                                            className="flex-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all disabled:opacity-50"
+                                            className="flex-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 py-3 rounded-xl font-bold text-[10px] uppercase tracking-wide transition-all disabled:opacity-50"
                                         >
                                             Cancel
                                         </button>
@@ -2339,7 +2339,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             id="delete-org-confirm-btn"
                                             onClick={handleDeleteOrganization}
                                             disabled={deleteConfirmText !== 'DELETE' || isDeleting}
-                                            className="flex-1 bg-rose-600 hover:bg-rose-700 disabled:bg-rose-300 dark:disabled:bg-rose-900 disabled:cursor-not-allowed text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+                                            className="flex-1 bg-rose-600 hover:bg-rose-700 disabled:bg-rose-300 dark:disabled:bg-rose-900 disabled:cursor-not-allowed text-white py-3 rounded-xl font-bold text-[10px] uppercase tracking-wide transition-all flex items-center justify-center gap-2"
                                         >
                                             {isDeleting ? (
                                                 <>
@@ -2385,7 +2385,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         <p className="text-xs text-slate-500 dark:text-slate-400">{loc.city}, {loc.state} {loc.zip}</p>
                                     </div>
                                     {loc.isDefault && (
-                                        <span className="text-[8px] font-black uppercase bg-indigo-600 text-white px-2 py-0.5 rounded-full tracking-widest">Default</span>
+                                        <span className="text-[10px] font-bold uppercase bg-indigo-600 text-white px-2 py-0.5 rounded-full tracking-wide">Default</span>
                                     )}
                                 </div>
                                 
@@ -2411,10 +2411,10 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
 
                     {/* Add New Location Form */}
                     <div className="mt-10 pt-10 border-t border-slate-100 dark:border-slate-800">
-                        <h4 className="text-sm font-black text-slate-900 dark:text-white mb-6 uppercase tracking-widest">Add New Location</h4>
+                        <h4 className="text-sm font-bold text-slate-900 dark:text-white mb-6 uppercase tracking-wide">Add New Location</h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                             <div>
-                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Location Name</label>
+                                <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">Location Name</label>
                                 <input 
                                     type="text" 
                                     placeholder="Main Campus / North Side"
@@ -2423,7 +2423,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 />
                             </div>
                             <div>
-                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">City</label>
+                                <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">City</label>
                                 <input 
                                     type="text" 
                                     placeholder="City"
@@ -2432,7 +2432,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 />
                             </div>
                             <div>
-                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">State (2-letter)</label>
+                                <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">State (2-letter)</label>
                                 <input 
                                     type="text" 
                                     placeholder="ST"
@@ -2442,7 +2442,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 />
                             </div>
                             <div>
-                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Zip Code</label>
+                                <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">Zip Code</label>
                                 <input 
                                     type="text" 
                                     placeholder="12345"
@@ -2453,7 +2453,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                         </div>
                         <button 
                             onClick={handleAddLocation}
-                            className="mt-6 bg-indigo-600 text-white px-8 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 dark:shadow-none"
+                            className="mt-6 bg-indigo-600 text-white px-8 py-3 rounded-xl font-bold text-[10px] uppercase tracking-wide hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 dark:shadow-none"
                         >
                             Add Location
                         </button>
@@ -2469,9 +2469,9 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                         <div className="flex items-center gap-3">
                             <h3 className="text-2xl font-black text-slate-900 dark:text-white">Planning Center Integration</h3>
                             {formData.pcoConnected ? (
-                                <span className="bg-emerald-100 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 text-[10px] font-black uppercase px-2 py-1 rounded">Connected</span>
+                                <span className="bg-emerald-100 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold uppercase px-2 py-1 rounded">Connected</span>
                             ) : (
-                                <span className="bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[10px] font-black uppercase px-2 py-1 rounded">Not Connected</span>
+                                <span className="bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[10px] font-bold uppercase px-2 py-1 rounded">Not Connected</span>
                             )}
                         </div>
                         <p className="text-xs text-slate-400 dark:text-slate-500 mt-2 font-medium">Manage data synchronization and API connection.</p>
@@ -2480,13 +2480,13 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                         <div className="flex gap-3">
                             <button 
                                 onClick={() => onSync && onSync()}
-                                className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg"
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold text-[10px] uppercase tracking-wide transition-all shadow-lg"
                             >
                                 Sync Data Now
                             </button>
                             <button 
                                 onClick={handleDisconnectPco}
-                                className="bg-white dark:bg-slate-800 border border-rose-100 dark:border-rose-900 text-rose-500 dark:text-rose-400 px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all hover:bg-rose-50 dark:hover:bg-rose-900/20"
+                                className="bg-white dark:bg-slate-800 border border-rose-100 dark:border-rose-900 text-rose-500 dark:text-rose-400 px-6 py-3 rounded-xl font-bold text-[10px] uppercase tracking-wide transition-all hover:bg-rose-50 dark:hover:bg-rose-900/20"
                             >
                                 Disconnect
                             </button>
@@ -2494,7 +2494,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                     ) : (
                         <button 
                             onClick={handleConnectPco}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-4 rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-lg flex items-center gap-3"
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-4 rounded-xl font-bold text-xs uppercase tracking-wide transition-all shadow-lg flex items-center gap-3"
                         >
                             <span>🔗</span> Connect Planning Center
                         </button>
@@ -2507,7 +2507,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                             <h4 className="font-bold text-slate-900 dark:text-white mb-6 text-sm">Automated Sync Schedule</h4>
                             <div className="flex items-center gap-4">
                                 <div className="flex-1">
-                                    <label className="block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-2">Daily Time <span className="text-amber-500">(UTC)</span></label>
+                                    <label className="block text-[10px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide mb-2">Daily Time <span className="text-amber-500">(UTC)</span></label>
                                     <input 
                                         type="time"
                                         title="Daily sync time (UTC)"
@@ -2537,12 +2537,12 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                             </div>
                             <div className="mt-4 flex items-center justify-between">
                                 {formData.scheduledSyncTime ? (
-                                    <span className="inline-flex items-center gap-1.5 text-[9px] font-black uppercase text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded-full border border-emerald-100 dark:border-emerald-900/30">
+                                    <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded-full border border-emerald-100 dark:border-emerald-900/30">
                                         <span className="relative flex h-1.5 w-1.5"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span></span>
                                         Auto-sync enabled · {formData.scheduledSyncTime} UTC
                                     </span>
                                 ) : (
-                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Auto-sync disabled</span>
+                                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">Auto-sync disabled</span>
                                 )}
                                 <button 
                                     onClick={handleSaveOrgSettings}
@@ -2560,8 +2560,8 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 {formData.lastSyncTimestamp && (() => {
                                     const hoursSince = (Date.now() - formData.lastSyncTimestamp) / 3_600_000;
                                     return hoursSince > 25
-                                        ? <span className="text-[9px] font-black bg-rose-100 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 px-2 py-0.5 rounded-full border border-rose-200 dark:border-rose-800">⚠ Overdue ({Math.floor(hoursSince)}h ago)</span>
-                                        : <span className="text-[9px] font-black bg-emerald-100 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">✓ Recent</span>;
+                                        ? <span className="text-[11px] font-black bg-rose-100 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 px-2 py-0.5 rounded-full border border-rose-200 dark:border-rose-800">⚠ Overdue ({Math.floor(hoursSince)}h ago)</span>
+                                        : <span className="text-[11px] font-black bg-emerald-100 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">✓ Recent</span>;
                                 })()}
                             </div>
                             {formData.lastSyncTimestamp ? (
@@ -2586,7 +2586,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                         <div className="bg-slate-50 dark:bg-slate-800/50 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800">
                             <div className="flex justify-between items-center mb-6">
                                 <h4 className="font-bold text-slate-900 dark:text-white text-sm">Force Sync by Area</h4>
-                                <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Runs Immediately</span>
+                                <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide">Runs Immediately</span>
                             </div>
                             <SyncAreaButtons churchId={churchId} onSyncComplete={async () => { if (onSync) onSync(); }} />
                         </div>
@@ -2596,7 +2596,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                             <div className="flex justify-between items-start mb-2">
                                 <h4 className="font-bold text-indigo-900 dark:text-indigo-200 text-sm">Regular Attenders List</h4>
                                 {selectedListId && (
-                                    <span className="text-[9px] font-black bg-indigo-600 text-white px-2 py-0.5 rounded-full uppercase tracking-widest">
+                                    <span className="text-[11px] font-bold bg-indigo-600 text-white px-2 py-0.5 rounded-full uppercase tracking-wide">
                                         Active
                                     </span>
                                 )}
@@ -2616,7 +2616,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 <div className="space-y-4">
                                     <div className="flex items-center gap-2">
                                         <div className="flex-1">
-                                            <label className="block text-[10px] font-black uppercase text-indigo-600 dark:text-indigo-400 tracking-widest mb-2">
+                                            <label className="block text-[10px] font-bold uppercase text-indigo-600 dark:text-indigo-400 tracking-wide mb-2">
                                                 PCO People List
                                             </label>
                                             {isPcoListsLoading ? (
@@ -2688,7 +2688,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                     <button
                                         onClick={handleSaveRegularAttendersList}
                                         disabled={isSavingList}
-                                        className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-indigo-200 dark:shadow-none"
+                                        className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white py-3 rounded-xl font-bold text-[10px] uppercase tracking-wide transition-all shadow-lg shadow-indigo-200 dark:shadow-none"
                                     >
                                         {isSavingList ? 'Saving...' : 'Save Regular Attenders List'}
                                     </button>
@@ -2766,27 +2766,27 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                     <div>
                         <h3 className="text-xl font-black text-slate-900 dark:text-white">Widget Directory</h3>
-                        <p className="text-xs text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest mt-1">
+                        <p className="text-xs text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wide mt-1">
                             Enable or Disable widgets available to your team
                         </p>
                     </div>
                     <div className="flex gap-2">
                         <button 
                             onClick={handleEnableAllWidgets}
-                            className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 px-3 py-2 rounded-lg transition-colors"
+                            className="text-[10px] font-bold uppercase tracking-wide text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 px-3 py-2 rounded-lg transition-colors"
                         >
                             Enable All
                         </button>
                         <button 
                             onClick={handleDisableAllWidgets}
-                            className="text-[10px] font-black uppercase tracking-widest text-rose-500 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 px-3 py-2 rounded-lg transition-colors"
+                            className="text-[10px] font-bold uppercase tracking-wide text-rose-500 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 px-3 py-2 rounded-lg transition-colors"
                         >
                             Disable All
                         </button>
                         <button 
                             onClick={handleSaveOrgSettings}
                             disabled={isSaving}
-                            className="bg-indigo-600 text-white px-6 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg ml-2"
+                            className="bg-indigo-600 text-white px-6 py-2 rounded-xl font-bold text-[10px] uppercase tracking-wide hover:bg-indigo-700 transition-all shadow-lg ml-2"
                         >
                             {isSaving ? 'Saving...' : 'Save Changes'}
                         </button>
@@ -2798,7 +2798,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                         return (
                             <div key={category} className="space-y-4">
                                 <div className="flex items-center gap-3 pb-2 border-b border-slate-100 dark:border-slate-800">
-                                    <h4 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight">
+                                    <h4 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-tight">
                                         {category.replace('_', ' ').replace('pastoral', 'Pastoral')}
                                     </h4>
                                     <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
@@ -2842,12 +2842,12 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                         <p className={`text-xs font-bold ${isEnabled && !isForceDisabled ? 'text-indigo-900 dark:text-indigo-200' : 'text-slate-500 dark:text-slate-400'}`}>
                                                             {w.label}
                                                         </p>
-                                                        <p className="text-[9px] text-slate-400 font-mono mt-0.5">{w.id}</p>
+                                                        <p className="text-[11px] text-slate-400 font-mono mt-0.5">{w.id}</p>
                                                     </div>
                                                 </div>
                                                 
                                                 {isForceDisabled ? (
-                                                    <div className="text-[8px] font-bold text-slate-400 border border-slate-300 dark:border-slate-700 px-1.5 py-0.5 rounded">
+                                                    <div className="text-[10px] font-bold text-slate-400 border border-slate-300 dark:border-slate-700 px-1.5 py-0.5 rounded">
                                                         LOCKED
                                                     </div>
                                                 ) : (
@@ -2877,11 +2877,11 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
 
             const emailStatusBadge = () => {
                 const es = church.emailSettings;
-                if (!es) return <span className="text-[9px] font-black bg-slate-100 dark:bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full">Not Configured</span>;
-                if (es.mode === 'custom' && es.domainVerified) return <span className="text-[9px] font-black bg-emerald-100 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">✓ Custom Domain Verified</span>;
-                if (es.mode === 'custom') return <span className="text-[9px] font-black bg-amber-100 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800">Custom Domain — DNS Pending</span>;
-                if (es.mode === 'shared' && es.sharedPrefix) return <span className="text-[9px] font-black bg-indigo-100 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded-full border border-indigo-200 dark:border-indigo-800">✓ Shared Domain Active</span>;
-                return <span className="text-[9px] font-black bg-slate-100 dark:bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full">Not Configured</span>;
+                if (!es) return <span className="text-[11px] font-black bg-slate-100 dark:bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full">Not Configured</span>;
+                if (es.mode === 'custom' && es.domainVerified) return <span className="text-[11px] font-black bg-emerald-100 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">✓ Custom Domain Verified</span>;
+                if (es.mode === 'custom') return <span className="text-[11px] font-black bg-amber-100 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800">Custom Domain — DNS Pending</span>;
+                if (es.mode === 'shared' && es.sharedPrefix) return <span className="text-[11px] font-black bg-indigo-100 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded-full border border-indigo-200 dark:border-indigo-800">✓ Shared Domain Active</span>;
+                return <span className="text-[11px] font-black bg-slate-100 dark:bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full">Not Configured</span>;
             };
 
             const handleProvisionShared = async () => {
@@ -3061,7 +3061,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         {mailMode === 'shared' && <div className="w-2 h-2 bg-white rounded-full" />}
                                     </div>
                                     <span className="font-black text-sm text-slate-900 dark:text-white">Shared Subdomain</span>
-                                    <span className="text-[9px] font-black bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded-full">Fastest Setup</span>
+                                    <span className="text-[11px] font-black bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded-full">Fastest Setup</span>
                                 </div>
                                 <p className="text-xs text-slate-500 dark:text-slate-400 ml-8 leading-relaxed">
                                     Send as <code className="font-mono bg-slate-100 dark:bg-slate-800 px-1 rounded">you@{SHARED_DOMAIN}</code>. No DNS changes required — ready in seconds.
@@ -3072,7 +3072,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                             {planId === 'starter' ? (
                                 <div className="p-6 rounded-2xl border-2 border-slate-200 dark:border-slate-700 text-left opacity-70 cursor-not-allowed relative overflow-hidden">
                                     <div className="absolute top-3 right-3">
-                                        <span className="text-[9px] font-black bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded-full">Growth Plan</span>
+                                        <span className="text-[11px] font-black bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded-full">Growth Plan</span>
                                     </div>
                                     <div className="flex items-center gap-3 mb-2">
                                         <div className="w-5 h-5 rounded-full border-2 border-slate-300 dark:border-slate-600 flex items-center justify-center shrink-0">
@@ -3100,7 +3100,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         {mailMode === 'custom' && <div className="w-2 h-2 bg-white rounded-full" />}
                                     </div>
                                     <span className="font-black text-sm text-slate-900 dark:text-white">Custom Domain</span>
-                                    <span className="text-[9px] font-black bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 px-1.5 py-0.5 rounded-full">Full Brand Control</span>
+                                    <span className="text-[11px] font-black bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 px-1.5 py-0.5 rounded-full">Full Brand Control</span>
                                 </div>
                                 <p className="text-xs text-slate-500 dark:text-slate-400 ml-8 leading-relaxed">
                                     {mailWizardProvider === 'postmark'
@@ -3118,7 +3118,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                             <div className="space-y-6">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div>
-                                        <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Email Prefix</label>
+                                        <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">Email Prefix</label>
                                         <div className="flex items-center gap-0">
                                             <input
                                                 type="text"
@@ -3136,7 +3136,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         </p>
                                     </div>
                                     <div>
-                                        <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Display Name</label>
+                                        <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">Display Name</label>
                                         <input
                                             type="text"
                                             value={mailFromName}
@@ -3160,7 +3160,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                     <button
                                         onClick={handleProvisionShared}
                                         disabled={isMailSaving}
-                                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg disabled:opacity-50"
+                                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-bold text-[10px] uppercase tracking-wide transition-all shadow-lg disabled:opacity-50"
                                     >
                                         {isMailSaving ? 'Configuring…' : (church.emailSettings?.sendGridSubuserId || church.emailSettings?.postmarkServerToken) ? 'Update Email Settings' : 'Activate Shared Email'}
                                     </button>
@@ -3189,7 +3189,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                         <div>
-                                            <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Domain</label>
+                                            <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">Domain</label>
                                             <input
                                                 type="text"
                                                 value={mailCustomDomain}
@@ -3199,7 +3199,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">From Email</label>
+                                            <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">From Email</label>
                                             <input
                                                 type="email"
                                                 value={mailCustomFromEmail}
@@ -3209,7 +3209,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Display Name</label>
+                                            <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">Display Name</label>
                                             <input
                                                 type="text"
                                                 value={mailFromName}
@@ -3224,7 +3224,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         <button
                                             onClick={handleAuthenticateDomain}
                                             disabled={isMailSaving || !mailCustomDomain.trim()}
-                                            className="bg-violet-600 hover:bg-violet-700 text-white px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg disabled:opacity-40"
+                                            className="bg-violet-600 hover:bg-violet-700 text-white px-6 py-2.5 rounded-xl font-bold text-[10px] uppercase tracking-wide transition-all shadow-lg disabled:opacity-40"
                                         >
                                             {isMailSaving ? 'Requesting…' : (hasRecords || activeDomainId) ? 'Re-fetch DNS Records' : 'Get DNS Records'}
                                         </button>
@@ -3247,9 +3247,9 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                 <table className="w-full text-xs">
                                                     <thead className="bg-slate-100 dark:bg-slate-800">
                                                         <tr>
-                                                            <th className="px-4 py-2.5 text-left font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-[10px]">Type</th>
-                                                            <th className="px-4 py-2.5 text-left font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-[10px]">Host / Name</th>
-                                                            <th className="px-4 py-2.5 text-left font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-[10px]">Points To / Value</th>
+                                                            <th className="px-4 py-2.5 text-left font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide text-[10px]">Type</th>
+                                                            <th className="px-4 py-2.5 text-left font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide text-[10px]">Host / Name</th>
+                                                            <th className="px-4 py-2.5 text-left font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide text-[10px]">Points To / Value</th>
                                                             <th className="px-4 py-2.5"></th>
                                                         </tr>
                                                     </thead>
@@ -3314,7 +3314,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                 <button
                                                     onClick={handleVerifyDomain}
                                                     disabled={isMailSaving}
-                                                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg disabled:opacity-50"
+                                                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold text-[10px] uppercase tracking-wide transition-all shadow-lg disabled:opacity-50"
                                                 >
                                                     {isMailSaving ? 'Checking…' : 'Verify DNS'}
                                                 </button>
@@ -3336,7 +3336,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
 
                                         <div className="flex gap-3 items-end mb-4">
                                             <div className="flex-1">
-                                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1.5">Send Test To</label>
+                                                <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-1.5">Send Test To</label>
                                                 <input
                                                     type="email"
                                                     value={mailDiagEmail}
@@ -3348,7 +3348,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             <button
                                                 onClick={handleDiagnose}
                                                 disabled={isMailSaving || !mailDiagEmail.trim()}
-                                                className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg disabled:opacity-40 whitespace-nowrap"
+                                                className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold text-[10px] uppercase tracking-wide transition-all shadow-lg disabled:opacity-40 whitespace-nowrap"
                                             >
                                                 {isMailSaving ? 'Running…' : '🔍 Run Diagnostics'}
                                             </button>
@@ -3471,7 +3471,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             }
                                         }}
                                         disabled={isMailSaving}
-                                        className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-5 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg disabled:opacity-50"
+                                        className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-5 py-2 rounded-xl font-bold text-[10px] uppercase tracking-wide transition-all shadow-lg disabled:opacity-50"
                                     >
                                         {isMailSaving ? 'Saving...' : 'Save Additional Addresses'}
                                     </button>
@@ -3625,7 +3625,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
             };
 
             const inputCn = 'w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-colors';
-            const labelCn = 'block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-2';
+            const labelCn = 'block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-wide mb-2';
 
             return (
                 <div className="space-y-6">
@@ -3634,20 +3634,20 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
                             <div>
                                 <h3 className="text-xl font-black text-slate-900 dark:text-white">SMS Settings</h3>
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mt-1">
+                                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mt-1">
                                     Messaging Compliance &amp; Setup
                                 </p>
                             </div>
                             <div className="flex items-center gap-3 flex-wrap">
                                 {/* Terms badge */}
                                 {smsForm.termsAcceptedAt ? (
-                                    <span className="text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/25" title={`Terms accepted on ${new Date(smsForm.termsAcceptedAt).toLocaleString()}`}>
+                                    <span className="text-[11px] font-bold uppercase tracking-wide px-3 py-1.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/25" title={`Terms accepted on ${new Date(smsForm.termsAcceptedAt).toLocaleString()}`}>
                                         ✓ ToS Accepted
                                     </span>
                                 ) : (
                                     <button
                                         onClick={() => setShowTermsModal(true)}
-                                        className="text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/25 hover:bg-amber-500/20 transition"
+                                        className="text-[11px] font-bold uppercase tracking-wide px-3 py-1.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/25 hover:bg-amber-500/20 transition"
                                     >
                                         ⚠ ToS Not Accepted — Click to Review
                                     </button>
@@ -3655,7 +3655,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 {smsNumbers.length > 0 && (
                                     <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-1.5 rounded-full border border-emerald-100 dark:border-emerald-900/30">
                                         📱 {(smsNumbers.find((n: any) => n.isDefault) || smsNumbers[0])?.phoneNumber}
-                                        {smsNumbers.length > 1 && <span className="ml-1 text-[9px]">+{smsNumbers.length - 1} more</span>}
+                                        {smsNumbers.length > 1 && <span className="ml-1 text-[11px]">+{smsNumbers.length - 1} more</span>}
                                     </span>
                                 )}
                             </div>
@@ -3667,7 +3667,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 <button
                                     key={st}
                                     onClick={() => setSmsSubTab(st as any)}
-                                    className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${
+                                    className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-wide transition-all whitespace-nowrap ${
                                         smsSubTab === st
                                             ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-300'
                                             : 'text-slate-500 dark:text-slate-400 hover:bg-white/50 dark:hover:bg-slate-700/50'
@@ -3714,7 +3714,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                     <p className="text-[11px] text-slate-400">Shown as the sender name in outbound message logs. Does not change the phone number displayed to recipients.</p>
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1.5">Church / Sender Name</label>
+                                    <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-1.5">Church / Sender Name</label>
                                     <input
                                         type="text"
                                         value={(smsForm as any).senderName || ''}
@@ -3751,7 +3751,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 {smsForm.smsHoursEnabled && (
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-slate-100 dark:border-slate-800">
                                         <div>
-                                            <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1.5">Start Hour</label>
+                                            <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-1.5">Start Hour</label>
                                             <input
                                                 type="time"
                                                 value={smsForm.smsHoursStart || '09:00'}
@@ -3760,7 +3760,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1.5">End Hour</label>
+                                            <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-1.5">End Hour</label>
                                             <input
                                                 type="time"
                                                 value={smsForm.smsHoursEnd || '21:00'}
@@ -3769,7 +3769,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1.5">Time Zone</label>
+                                            <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-1.5">Time Zone</label>
                                             <select
                                                 title="SMS Time Zone"
                                                 value={smsForm.smsHoursTimeZone || Intl.DateTimeFormat().resolvedOptions().timeZone}
@@ -3827,7 +3827,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                     </div>
                                     <button
                                         onClick={() => setShowPortInModal(true)}
-                                        className="shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-violet-600 hover:bg-violet-700 text-white text-[11px] font-black uppercase tracking-widest transition-all shadow-lg shadow-violet-200 dark:shadow-violet-900/30 whitespace-nowrap"
+                                        className="shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-violet-600 hover:bg-violet-700 text-white text-[11px] font-bold uppercase tracking-wide transition-all shadow-lg shadow-violet-200 dark:shadow-violet-900/30 whitespace-nowrap"
                                     >
                                         Request Number Port →
                                     </button>
@@ -3847,7 +3847,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 <button
                                     onClick={handleSmsSave}
                                     disabled={isSmsSaving}
-                                    className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-8 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30"
+                                    className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-8 py-3 rounded-2xl font-bold text-[10px] uppercase tracking-wide transition-all shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30"
                                 >
                                     {isSmsSaving ? 'Saving…' : 'Save SMS Settings'}
                                 </button>
@@ -3867,7 +3867,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 <div className="space-y-5">
                                     <div>
                                         <div className="flex items-center gap-2 mb-2">
-                                            <span className="bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full">FIRST MSG</span>
+                                            <span className="bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-[11px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full">FIRST MSG</span>
                                             <label className={labelCn + ' mb-0'}>First Message Confirmation <span className="normal-case font-normal text-slate-400">(sent once per contact)</span></label>
                                         </div>
                                         <textarea
@@ -3878,7 +3878,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             rows={4}
                                             className={inputCn + ' resize-none'}
                                         />
-                                        <p className="text-[9px] text-slate-400 mt-1.5">Automatically sent as a follow-up message the <strong>first time</strong> your church texts any phone number. Required by TCPA for new contacts receiving marketing messages.</p>
+                                        <p className="text-[11px] text-slate-400 mt-1.5">Automatically sent as a follow-up message the <strong>first time</strong> your church texts any phone number. Required by TCPA for new contacts receiving marketing messages.</p>
                                     </div>
                                 </div>
                             </div>
@@ -3896,7 +3896,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 <button
                                     onClick={handleSmsSave}
                                     disabled={isSmsSaving}
-                                    className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-8 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30"
+                                    className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-8 py-3 rounded-2xl font-bold text-[10px] uppercase tracking-wide transition-all shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30"
                                 >
                                     {isSmsSaving ? 'Saving…' : 'Save SMS Settings'}
                                 </button>
@@ -3922,7 +3922,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                     <button
                                         onClick={handleCheckRegistrationStatus}
                                         disabled={isCheckingStatus}
-                                        className="text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-full border transition-all disabled:opacity-50 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/40"
+                                        className="text-[10px] font-bold uppercase tracking-wide px-4 py-2 rounded-full border transition-all disabled:opacity-50 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/40"
                                     >
                                         {isCheckingStatus ? '⏳ Checking…' : '🔄 Check Status'}
                                     </button>
@@ -3943,9 +3943,9 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                     <div className="flex flex-col gap-4 mb-8 bg-slate-50 dark:bg-slate-800/50 p-5 rounded-2xl border border-slate-100 dark:border-slate-700/50">
                                         <div className="grid grid-cols-2 gap-4">
                                             <div>
-                                                <p className="text-[10px] font-bold uppercase text-slate-400 tracking-widest mb-1">Brand Status</p>
+                                                <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-1">Brand Status</p>
                                                 <div className="flex items-center gap-2">
-                                                    <span className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-widest ${
+                                                    <span className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-wide ${
                                                         (regStatus.brand?.status || '').toUpperCase() === 'APPROVED' || (regStatus.brand?.status || '').toUpperCase() === 'VERIFIED' || (regStatus.brand?.status || '').toUpperCase() === 'COMPLETED' ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' :
                                                         (regStatus.brand?.status || '').toUpperCase() === 'PENDING' ? 'bg-amber-500/10 text-amber-600 border border-amber-500/20' :
                                                         regStatus.brand?.status ? 'bg-rose-500/10 text-rose-600 border border-rose-500/20' :
@@ -3957,9 +3957,9 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                 </div>
                                             </div>
                                             <div>
-                                                <p className="text-[10px] font-bold uppercase text-slate-400 tracking-widest mb-1">Campaign Status</p>
+                                                <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-1">Campaign Status</p>
                                                 <div className="flex items-center gap-2">
-                                                    <span className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-widest ${
+                                                    <span className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-wide ${
                                                         (regStatus.campaign?.status || '').toUpperCase() === 'APPROVED' || (regStatus.campaign?.status || '').toUpperCase() === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' :
                                                         (regStatus.campaign?.status || '').toUpperCase() === 'PENDING' || (regStatus.campaign?.status || '').includes('DCA') ? 'bg-amber-500/10 text-amber-600 border border-amber-500/20' :
                                                         regStatus.campaign?.status ? 'bg-rose-500/10 text-rose-600 border border-rose-500/20' :
@@ -3990,7 +3990,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         { (regStatus?.brand?.status || '').toUpperCase() === 'PENDING' && (
                                             <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-auto">
                                                 <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm px-4 py-2 rounded-full border border-amber-200 dark:border-amber-800 shadow-sm">
-                                                    <p className="text-[10px] font-black uppercase tracking-widest text-amber-700 dark:text-amber-400">
+                                                    <p className="text-[10px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400">
                                                         ⏳ Brand Registration Pending — Editing Disabled
                                                     </p>
                                                 </div>
@@ -4055,7 +4055,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         <button
                                             onClick={handleSubmitBrand}
                                             disabled={isSubmittingBrand || (regStatus?.brand?.status || '').toUpperCase() === 'PENDING'}
-                                            className="w-full mt-4 bg-violet-600 hover:bg-violet-700 text-white font-black text-xs uppercase tracking-widest py-3 rounded-xl transition-all disabled:opacity-50"
+                                            className="w-full mt-4 bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs uppercase tracking-wide py-3 rounded-xl transition-all disabled:opacity-50"
                                         >
                                             {isSubmittingBrand ? 'Submitting...' : (regStatus?.brand?.status || '').toUpperCase() === 'PENDING' ? 'Registration Pending' : 'Submit Brand'}
                                         </button>
@@ -4080,7 +4080,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                         { (regStatus?.campaign?.status || '').toUpperCase() === 'PENDING' && (
                                             <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-auto">
                                                 <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm px-4 py-2 rounded-full border border-amber-200 dark:border-amber-800 shadow-sm">
-                                                    <p className="text-[10px] font-black uppercase tracking-widest text-amber-700 dark:text-amber-400">
+                                                    <p className="text-[10px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400">
                                                         ⏳ Campaign Registration Pending — Editing Disabled
                                                     </p>
                                                 </div>
@@ -4092,7 +4092,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                 <h5 className="font-bold text-slate-800 dark:text-slate-200">Register Campaign</h5>
                                             </div>
                                             {regStatus?.brand?.id && (
-                                                <span className="text-[9px] font-mono bg-slate-100 dark:bg-slate-800 text-slate-400 px-2 py-0.5 rounded" title="Brand ID to be associated">
+                                                <span className="text-[11px] font-mono bg-slate-100 dark:bg-slate-800 text-slate-400 px-2 py-0.5 rounded" title="Brand ID to be associated">
                                                     Brand: {regStatus.brand.id.slice(0,8)}...
                                                 </span>
                                             )}
@@ -4195,7 +4195,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             <div className="space-y-4">
                                                 <div>
                                                     <div className="flex items-center gap-2 mb-2">
-                                                        <span className="bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full">STOP</span>
+                                                        <span className="bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 text-[11px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full">STOP</span>
                                                         <label className={labelCn + ' mb-0'}>Opt-Out Confirmation Message</label>
                                                     </div>
                                                     <textarea
@@ -4209,7 +4209,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                 </div>
                                                 <div>
                                                     <div className="flex items-center gap-2 mb-2">
-                                                        <span className="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full">START</span>
+                                                        <span className="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-[11px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full">START</span>
                                                         <label className={labelCn + ' mb-0'}>Opt-In Confirmation Message</label>
                                                     </div>
                                                     <textarea
@@ -4223,7 +4223,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                 </div>
                                                 <div>
                                                     <div className="flex items-center gap-2 mb-2">
-                                                        <span className="bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full">HELP</span>
+                                                        <span className="bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 text-[11px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full">HELP</span>
                                                         <label className={labelCn + ' mb-0'}>Help Response Message</label>
                                                     </div>
                                                     <textarea
@@ -4237,7 +4237,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                 </div>
                                                 <div>
                                                     <div className="flex items-center gap-2 mb-2">
-                                                        <span className="bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full">FIRST MSG</span>
+                                                        <span className="bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-[11px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full">FIRST MSG</span>
                                                         <label className={labelCn + ' mb-0'}>First Message Confirmation <span className="normal-case font-normal text-slate-400">(sent once per contact)</span></label>
                                                     </div>
                                                     <textarea
@@ -4248,7 +4248,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                         rows={3}
                                                         className={inputCn + ' resize-none'}
                                                     />
-                                                    <p className="text-[9px] text-slate-400 mt-1.5">Automatically sent as a follow-up message the <strong>first time</strong> your church texts any phone number. Leave blank to disable. Required by TCPA for new contacts receiving marketing messages.</p>
+                                                    <p className="text-[11px] text-slate-400 mt-1.5">Automatically sent as a follow-up message the <strong>first time</strong> your church texts any phone number. Leave blank to disable. Required by TCPA for new contacts receiving marketing messages.</p>
                                                 </div>
                                             </div>
 
@@ -4266,11 +4266,11 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                     <button
                                                         onClick={handleSaveKeywords}
                                                         disabled={isSavingKeywords}
-                                                        className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all"
+                                                        className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-6 py-2.5 rounded-xl font-bold text-[10px] uppercase tracking-wide transition-all"
                                                     >
                                                         {isSavingKeywords ? 'Saving…' : 'Save Keywords'}
                                                     </button>
-                                                    <p className="text-[9px] text-slate-400">Saves keyword replies locally. Use <strong>Submit Campaign</strong> below to register them with the carrier.</p>
+                                                    <p className="text-[11px] text-slate-400">Saves keyword replies locally. Use <strong>Submit Campaign</strong> below to register them with the carrier.</p>
                                                 </div>
                                             </div>
                                         </div>
@@ -4288,7 +4288,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                         </a>
                                                         <button 
                                                             onClick={() => setCampaignForm({...campaignForm, consentFormUrl: ''})}
-                                                            className="text-[10px] text-rose-500 font-bold uppercase tracking-widest hover:text-rose-600 px-2 py-1 bg-white dark:bg-slate-900 rounded shadow-sm border border-slate-200 dark:border-slate-700"
+                                                            className="text-[10px] text-rose-500 font-bold uppercase tracking-wide hover:text-rose-600 px-2 py-1 bg-white dark:bg-slate-900 rounded shadow-sm border border-slate-200 dark:border-slate-700"
                                                         >
                                                             Remove
                                                         </button>
@@ -4347,7 +4347,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             <button
                                                 onClick={handleSubmitCampaign}
                                                 disabled={isSubmittingCampaign || (regStatus?.campaign?.status || '').toUpperCase() === 'PENDING'}
-                                                className="w-full mt-4 bg-violet-600 hover:bg-violet-700 text-white font-black text-xs uppercase tracking-widest py-3 rounded-xl transition-all disabled:opacity-50"
+                                                className="w-full mt-4 bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs uppercase tracking-wide py-3 rounded-xl transition-all disabled:opacity-50"
                                             >
                                                 {isSubmittingCampaign ? 'Submitting...' : (regStatus?.campaign?.status || '').toUpperCase() === 'PENDING' ? 'Registration Pending' : 'Submit Campaign'}
                                             </button>
@@ -4372,7 +4372,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             onChange={e => handleSmsChange('senderName', e.target.value)}
                                             className={inputCn} placeholder="Grace Church"
                                         />
-                                        <p className="text-[9px] text-slate-400 mt-1.5">Used in the app to identify who sent the message. On carrier-delivered SMS, recipients see your phone number — carriers do not pass a display name.</p>
+                                        <p className="text-[11px] text-slate-400 mt-1.5">Used in the app to identify who sent the message. On carrier-delivered SMS, recipients see your phone number — carriers do not pass a display name.</p>
                                     </div>
 
                                     <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
@@ -4398,7 +4398,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             onChange={e => handleSmsChange('messageFooter', e.target.value)}
                                             className={inputCn} placeholder="Reply STOP to unsubscribe"
                                         />
-                                        <p className="text-[9px] text-slate-400 mt-1.5">If set, this text is automatically appended to every outbound message. The TCPA requires opt-out instructions on marketing messages. Leave blank to manage manually.</p>
+                                        <p className="text-[11px] text-slate-400 mt-1.5">If set, this text is automatically appended to every outbound message. The TCPA requires opt-out instructions on marketing messages. Leave blank to manage manually.</p>
                                     </div>
                                 </div>
                             </div>
@@ -4605,7 +4605,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             <button
                                                 onClick={handleCheckRegistrationStatus}
                                                 disabled={isCheckingStatus}
-                                                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
+                                                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold text-[10px] uppercase tracking-wide hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
                                                 title="Check and refresh assignment status"
                                             >
                                                 {isCheckingStatus ? '↻ Syncing...' : '↻ Refresh Status'}
@@ -4617,7 +4617,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                 }}
                                                 disabled={!profileApproved}
                                                 title={!profileApproved ? 'A Twilio-approved Customer Profile is required before requesting a phone number.' : 'Request a new phone number'}
-                                                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${
+                                                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-wide transition-all ${
                                                     profileApproved
                                                         ? 'bg-violet-600 hover:bg-violet-700 text-white shadow-lg shadow-violet-200 dark:shadow-violet-900/30'
                                                         : 'bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed'
@@ -4773,12 +4773,12 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                                         </span>
                                                                     )}
                                                                     {num.isDefault && (
-                                                                        <span className="text-[9px] font-black uppercase tracking-widest bg-violet-600 text-white px-2 py-0.5 rounded-full">
+                                                                        <span className="text-[11px] font-bold uppercase tracking-wide bg-violet-600 text-white px-2 py-0.5 rounded-full">
                                                                             Default
                                                                         </span>
                                                                     )}
                                                                     {isRestricted && (
-                                                                        <span className="text-[9px] font-black uppercase tracking-widest bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800 px-2 py-0.5 rounded-full">
+                                                                        <span className="text-[11px] font-bold uppercase tracking-wide bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800 px-2 py-0.5 rounded-full">
                                                                             🔒 {restrictedToIds.length} user{restrictedToIds.length !== 1 ? 's' : ''}
                                                                         </span>
                                                                     )}
@@ -4820,7 +4820,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                                                         }
                                                                                     } catch { setNumError('Request failed'); }
                                                                                 }}
-                                                                                className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border border-amber-400 dark:border-amber-600 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition"
+                                                                                className="text-[11px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full border border-amber-400 dark:border-amber-600 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition"
                                                                             >
                                                                                 Mark Active ✓
                                                                             </button>
@@ -4845,7 +4845,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                             <div className="flex items-center gap-2 shrink-0">
                                                                 <button
                                                                     onClick={() => setExpandedNumId(isExpanded ? null : num.id)}
-                                                                    className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border transition-all ${
+                                                                    className={`text-[10px] font-black uppercase tracking-wide px-3 py-1.5 rounded-full border transition-all ${
                                                                         isExpanded
                                                                             ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-300 dark:border-indigo-700 text-indigo-600 dark:text-indigo-400'
                                                                             : 'border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:border-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-400'
@@ -4856,7 +4856,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                                 {!num.isDefault && (
                                                                     <button
                                                                         onClick={() => handleSetDefault(num.id)}
-                                                                        className="text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:border-violet-400 hover:text-violet-600 dark:hover:text-violet-400 transition-all"
+                                                                        className="text-[10px] font-bold uppercase tracking-wide px-3 py-1.5 rounded-full border border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:border-violet-400 hover:text-violet-600 dark:hover:text-violet-400 transition-all"
                                                                     >
                                                                         Set Default
                                                                     </button>
@@ -4867,7 +4867,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                                     title={num.isDefault && smsNumbers.length > 1
                                                                         ? 'Set another number as default before releasing this one'
                                                                         : `Release ${num.phoneNumber}`}
-                                                                    className="text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border transition-all disabled:cursor-not-allowed disabled:opacity-40 border-rose-200 dark:border-rose-800 text-rose-500 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 hover:border-rose-400"
+                                                                    className="text-[10px] font-bold uppercase tracking-wide px-3 py-1.5 rounded-full border transition-all disabled:cursor-not-allowed disabled:opacity-40 border-rose-200 dark:border-rose-800 text-rose-500 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 hover:border-rose-400"
                                                                 >
                                                                     {num.isDefault && smsNumbers.length > 1 ? '🔒 Release' : '🗑 Release'}
                                                                 </button>
@@ -4888,11 +4888,11 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                                          <div className="flex gap-2 shrink-0">
                                                                              <button
                                                                                  onClick={() => setSmsNumbers((prev: any[]) => prev.map(n => n.id === num.id ? { ...n, allowedUserIds: [] } : n))}
-                                                                                 className="text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-indigo-600 transition"
+                                                                                 className="text-[11px] font-bold uppercase tracking-wide px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-indigo-600 transition"
                                                                              >Select All</button>
                                                                              <button
                                                                                  onClick={() => setSmsNumbers((prev: any[]) => prev.map(n => n.id === num.id ? { ...n, allowedUserIds: ['_none_'] } : n))}
-                                                                                 className="text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-rose-600 transition"
+                                                                                 className="text-[11px] font-bold uppercase tracking-wide px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-rose-600 transition"
                                                                              >Clear</button>
                                                                          </div>
                                                                      </div>
@@ -4912,7 +4912,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                                                      </div>
                                                                                      <div className="min-w-0 flex-1" onClick={() => toggleAllowedUser(u.id)}>
                                                                                          <p className="text-xs font-bold text-slate-800 dark:text-white truncate">{u.name}</p>
-                                                                                         <p className="text-[9px] text-slate-400 truncate">{u.email}</p>
+                                                                                         <p className="text-[11px] text-slate-400 truncate">{u.email}</p>
                                                                                      </div>
                                                                                  </label>
                                                                              );
@@ -4921,7 +4921,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                                              <p className="text-[10px] text-slate-400 col-span-2">No users found.</p>
                                                                          )}
                                                                      </div>
-                                                                     <p className="text-[9px] text-slate-400 mt-2">Restrict visibility for any user by unchecking them above.</p>
+                                                                     <p className="text-[11px] text-slate-400 mt-2">Restrict visibility for any user by unchecking them above.</p>
                                                                  </div>
  
                                                                  {/* Section 2: Feature-level permissions */}
@@ -4936,16 +4936,16 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                                              <table className="w-full text-xs">
                                                                                  <thead className="bg-slate-50 dark:bg-slate-800">
                                                                                      <tr>
-                                                                                         <th className="px-4 py-3 text-left font-black text-slate-500 dark:text-slate-400 text-[10px] uppercase tracking-widest">User</th>
+                                                                                         <th className="px-4 py-3 text-left font-bold text-slate-500 dark:text-slate-400 text-[10px] uppercase tracking-wide">User</th>
                                                                                          {FEATURES.map(f => (
-                                                                                             <th key={f.key} className="px-3 py-3 text-center font-black text-slate-500 dark:text-slate-400 text-[10px] uppercase tracking-widest whitespace-nowrap" title={f.desc}>
+                                                                                             <th key={f.key} className="px-3 py-3 text-center font-bold text-slate-500 dark:text-slate-400 text-[10px] uppercase tracking-wide whitespace-nowrap" title={f.desc}>
                                                                                                  <span className="mr-1">{f.icon}</span>{f.label}
                                                                                              </th>
                                                                                          ))}
                                                                                      </tr>
                                                                                      <tr className="border-t border-slate-200 dark:border-slate-700 bg-slate-100/50 dark:bg-slate-800/80">
                                                                                          <td className="px-4 py-1.5">
-                                                                                             <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Toggle All</span>
+                                                                                             <span className="text-[11px] font-bold uppercase text-slate-400 tracking-wide">Toggle All</span>
                                                                                          </td>
                                                                                          {FEATURES.map(f => {
                                                                                              const featureIds: string[] = (num.permissions || {})[f.key] || [];
@@ -4954,7 +4954,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                                                                  <td key={f.key} className="px-3 py-1.5 text-center">
                                                                                                      <button
                                                                                                          onClick={() => setAllFeatureUsers(f.key, allSelected ? ['_none_'] : [])}
-                                                                                                         className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border transition-all ${
+                                                                                                         className={`text-[11px] font-black uppercase tracking-wide px-2 py-0.5 rounded-full border transition-all ${
                                                                                                              allSelected
                                                                                                                  ? 'bg-indigo-100 dark:bg-indigo-900/30 border-indigo-300 dark:border-indigo-700 text-indigo-600 dark:text-indigo-400'
                                                                                                                  : 'border-slate-300 dark:border-slate-600 text-slate-400 hover:border-indigo-300 hover:text-indigo-500'
@@ -4972,7 +4972,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                                                         <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                                                                                             <td className="px-4 py-3">
                                                                                                 <p className="font-bold text-slate-800 dark:text-white text-xs">{u.name}</p>
-                                                                                                <p className="text-[9px] text-slate-400 truncate max-w-[160px]">{u.email}</p>
+                                                                                                <p className="text-[11px] text-slate-400 truncate max-w-[160px]">{u.email}</p>
                                                                                             </td>
                                                                                             {FEATURES.map(f => {
                                                                                                 const featureIds: string[] = (num.permissions || {})[f.key] || [];
@@ -5006,7 +5006,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                                             </table>
                                                                         </div>
                                                                     )}
-                                                                    <p className="text-[9px] text-slate-400 mt-2">
+                                                                    <p className="text-[11px] text-slate-400 mt-2">
                                                                         <span className="inline-flex items-center gap-1 mr-3"><span className="w-3 h-3 rounded border-2 bg-emerald-100 border-emerald-400 inline-block align-middle"></span> Green = all users allowed (no restriction set)</span>
                                                                         <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded border-2 bg-indigo-600 border-indigo-600 inline-block align-middle"></span> Indigo = explicitly granted</span>
                                                                     </p>
@@ -5029,7 +5029,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                                         <button
                                                                             onClick={() => handleSavePermissions(num)}
                                                                             disabled={numPermSaving}
-                                                                            className="px-5 py-2 text-xs font-black uppercase tracking-widest bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl transition-all shadow-sm"
+                                                                            className="px-5 py-2 text-xs font-bold uppercase tracking-wide bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl transition-all shadow-sm"
                                                                         >
                                                                             {numPermSaving ? 'Saving…' : 'Save Access'}
                                                                         </button>
@@ -5069,7 +5069,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                         <button
                                                             key={m}
                                                             onClick={() => { setAddNumMode(m); setNumError(''); }}
-                                                            className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all ${
+                                                            className={`px-4 py-2 text-[10px] font-black uppercase tracking-wide transition-all ${
                                                                 addNumMode === m
                                                                     ? 'bg-violet-600 text-white'
                                                                     : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50'
@@ -5121,7 +5121,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                 <button
                                                     onClick={handleSearch}
                                                     disabled={addNumBusy}
-                                                    className="bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all"
+                                                    className="bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white px-6 py-2.5 rounded-xl font-bold text-[10px] uppercase tracking-wide transition-all"
                                                 >
                                                     {addNumBusy ? 'Searching…' : addNumMode === 'ported' ? 'Verify Ported Number' : 'Search Available Numbers'}
                                                 </button>
@@ -5159,7 +5159,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                                             <input type="text" value={addNumLabel}
                                                                 onChange={e => setAddNumLabel(e.target.value)}
                                                                 className={inputCn} placeholder="Youth Ministry" />
-                                                            <p className="text-[9px] text-slate-400 mt-1">Displayed in the inbox switcher.</p>
+                                                            <p className="text-[11px] text-slate-400 mt-1">Displayed in the inbox switcher.</p>
                                                         </div>
                                                         <div>
                                                             <label className={labelCn}>Sender Name</label>
@@ -5228,10 +5228,10 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                     <div className="mb-8 flex items-center justify-between flex-wrap gap-4">
                         <div>
                             <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tighter">Grow Integration</h3>
-                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Discipleship app email sending</p>
+                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wide mt-1">Discipleship app email sending</p>
                         </div>
                         {isConnected && (
-                            <span className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 px-3 py-1.5 rounded-full">
+                            <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 px-3 py-1.5 rounded-full">
                                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                                 Connected
                             </span>
@@ -5262,13 +5262,13 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                             <button
                                                 onClick={handleGrowApprove}
                                                 disabled={growApproving}
-                                                className="bg-emerald-600 text-white px-5 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all disabled:opacity-50 shadow-sm"
+                                                className="bg-emerald-600 text-white px-5 py-2 rounded-xl font-bold text-[10px] uppercase tracking-wide hover:bg-emerald-700 transition-all disabled:opacity-50 shadow-sm"
                                             >
                                                 {growApproving ? 'Approving…' : '✓ Approve'}
                                             </button>
                                             <button
                                                 onClick={handleGrowReject}
-                                                className="bg-white dark:bg-slate-800 border border-rose-200 dark:border-rose-800 text-rose-600 dark:text-rose-400 px-5 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-all"
+                                                className="bg-white dark:bg-slate-800 border border-rose-200 dark:border-rose-800 text-rose-600 dark:text-rose-400 px-5 py-2 rounded-xl font-bold text-[10px] uppercase tracking-wide hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-all"
                                             >
                                                 ✕ Reject
                                             </button>
@@ -5303,14 +5303,14 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                             </div>
                             <div className="space-y-3">
                                 <div>
-                                    <label className="block text-[10px] font-bold text-indigo-900/70 dark:text-indigo-300/70 mb-1 uppercase tracking-widest">Your Tenant ID (Church ID)</label>
+                                    <label className="block text-[10px] font-bold text-indigo-900/70 dark:text-indigo-300/70 mb-1 uppercase tracking-wide">Your Tenant ID (Church ID)</label>
                                     <div className="flex items-center gap-2">
                                         <code className="px-3 py-2 bg-white dark:bg-slate-900 border border-indigo-100 dark:border-indigo-800 rounded-lg text-xs font-mono text-slate-700 dark:text-slate-300 flex-1 truncate">{churchId}</code>
                                         <button onClick={() => navigator.clipboard.writeText(churchId)} className="shrink-0 px-3 py-2 bg-indigo-100 hover:bg-indigo-200 dark:bg-indigo-800 dark:hover:bg-indigo-700 text-indigo-700 dark:text-indigo-300 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-colors">Copy</button>
                                     </div>
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-bold text-indigo-900/70 dark:text-indigo-300/70 mb-1 uppercase tracking-widest">Daily Email Endpoint</label>
+                                    <label className="block text-[10px] font-bold text-indigo-900/70 dark:text-indigo-300/70 mb-1 uppercase tracking-wide">Daily Email Endpoint</label>
                                     <div className="flex items-center gap-2">
                                         <code className="px-3 py-2 bg-white dark:bg-slate-900 border border-indigo-100 dark:border-indigo-800 rounded-lg text-xs font-mono text-slate-700 dark:text-slate-300 flex-1 truncate">https://pastoralcare.barnabassoftware.com/api/integrations/grow/daily-email</code>
                                         <button onClick={() => navigator.clipboard.writeText('https://pastoralcare.barnabassoftware.com/api/integrations/grow/daily-email')} className="shrink-0 px-3 py-2 bg-indigo-100 hover:bg-indigo-200 dark:bg-indigo-800 dark:hover:bg-indigo-700 text-indigo-700 dark:text-indigo-300 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-colors">Copy</button>
@@ -5318,17 +5318,17 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                 </div>
                                 {isConnected && (
                                     <div>
-                                        <label className="block text-[10px] font-bold text-indigo-900/70 dark:text-indigo-300/70 mb-1 uppercase tracking-widest">PASTORAL_CARE_API_SECRET</label>
+                                        <label className="block text-[10px] font-bold text-indigo-900/70 dark:text-indigo-300/70 mb-1 uppercase tracking-wide">PASTORAL_CARE_API_SECRET</label>
                                         <div className="flex items-center gap-2">
                                             <code className="px-3 py-2 bg-white dark:bg-slate-900 border border-indigo-100 dark:border-indigo-800 rounded-lg text-xs font-mono text-slate-700 dark:text-slate-300 flex-1 truncate">{'•'.repeat(32)}</code>
                                             <button onClick={() => navigator.clipboard.writeText(church.growSettings?.growIntegrationSecret || '')} className="shrink-0 px-3 py-2 bg-indigo-100 hover:bg-indigo-200 dark:bg-indigo-800 dark:hover:bg-indigo-700 text-indigo-700 dark:text-indigo-300 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-colors">Copy</button>
                                         </div>
-                                        <p className="text-[9px] text-indigo-500 dark:text-indigo-400 mt-1">Secret is masked for security. Use the Copy button to paste it into the Grow App.</p>
+                                        <p className="text-[11px] text-indigo-500 dark:text-indigo-400 mt-1">Secret is masked for security. Use the Copy button to paste it into the Grow App.</p>
                                     </div>
                                 )}
                                 {isConnected && (
                                     <div className="pt-2 border-t border-indigo-200 dark:border-indigo-800">
-                                        <button onClick={handleGrowRevoke} className="text-[10px] font-bold text-rose-500 hover:text-rose-700 uppercase tracking-widest transition-colors">
+                                        <button onClick={handleGrowRevoke} className="text-[10px] font-bold text-rose-500 hover:text-rose-700 uppercase tracking-wide transition-colors">
                                             ⚠ Revoke Access
                                         </button>
                                     </div>
@@ -5368,7 +5368,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
 
                         {/* ── Feature Toggles ───────────────────────────────── */}
                         <div className="space-y-3">
-                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Feature Toggles</p>
+                            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Feature Toggles</p>
                             {([
                                 { key: 'growTracksEnabled', label: 'Grow Tracks', desc: 'Enable structured growth tracks for members.' },
                                 { key: 'bibleStudiesEnabled', label: 'Bible Studies', desc: 'Allow creation and participation in Bible studies.' },
@@ -5508,7 +5508,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                     alert('Failed to initiate connection: ' + e.message);
                                 }
                             }}
-                            className="bg-[#00c4cc] text-white px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-[#00b3ba] transition-all shadow-sm hover:shadow active:scale-95"
+                            className="bg-[#00c4cc] text-white px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-wide hover:bg-[#00b3ba] transition-all shadow-sm hover:shadow active:scale-95"
                         >
                             Connect Canva
                         </button>
@@ -5523,7 +5523,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                                     alert('Failed to disconnect: ' + e.message);
                                 }
                             }}
-                            className="bg-white dark:bg-slate-800 text-red-600 px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-red-50 dark:hover:bg-red-900/20 transition-all border border-red-200 dark:border-red-900 shadow-sm active:scale-95"
+                            className="bg-white dark:bg-slate-800 text-red-600 px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-wide hover:bg-red-50 dark:hover:bg-red-900/20 transition-all border border-red-200 dark:border-red-900 shadow-sm active:scale-95"
                         >
                             Disconnect
                         </button>

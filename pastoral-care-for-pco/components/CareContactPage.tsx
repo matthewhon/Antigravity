@@ -43,7 +43,7 @@ const StatusBadge: React.FC<{ status: OutreachSlot['status'] }> = ({ status }) =
         released:   { label: 'Released',   cls: 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400' },
     }[status] ?? { label: status, cls: 'bg-slate-100 text-slate-500' };
     return (
-        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wide whitespace-nowrap ${cfg.cls}`}>
+        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wide whitespace-nowrap ${cfg.cls}`}>
             {cfg.label}
         </span>
     );
@@ -112,7 +112,7 @@ const SessionSummaryModal: React.FC<{ stats: CloseStats; onClose: () => void }> 
                             <CheckCircle2 size={20} className="text-white" />
                         </div>
                         <div>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-violet-200">Session Closed</p>
+                            <p className="text-[10px] font-bold uppercase tracking-wide text-violet-200">Session Closed</p>
                             <h2 className="text-xl font-black leading-tight">{stats.sessionName}</h2>
                         </div>
                     </div>
@@ -159,7 +159,7 @@ const SessionSummaryModal: React.FC<{ stats: CloseStats; onClose: () => void }> 
                             },
                         ].map(tile => (
                             <div key={tile.label} className={`${tile.color} rounded-2xl p-4`}>
-                                <div className="flex items-center gap-1.5 mb-2">{tile.icon}<p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{tile.label}</p></div>
+                                <div className="flex items-center gap-1.5 mb-2">{tile.icon}<p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{tile.label}</p></div>
                                 <p className={`text-2xl font-black ${tile.text}`}>{tile.value}</p>
                                 <p className="text-[10px] text-slate-400 mt-0.5">{tile.sub}</p>
                             </div>
@@ -174,7 +174,7 @@ const SessionSummaryModal: React.FC<{ stats: CloseStats; onClose: () => void }> 
                             </div>
                             <div>
                                 <p className="text-xl font-black text-amber-600 dark:text-amber-400">{stats.callerCount}</p>
-                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Volunteers</p>
+                                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Volunteers</p>
                             </div>
                         </div>
 
@@ -186,7 +186,7 @@ const SessionSummaryModal: React.FC<{ stats: CloseStats; onClose: () => void }> 
                                 <p className="text-xl font-black text-sky-600 dark:text-sky-400">
                                     {stats.avgHandleSeconds !== null ? fmtDuration(stats.avgHandleSeconds) : '—'}
                                 </p>
-                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Avg. Handle Time</p>
+                                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Avg. Handle Time</p>
                             </div>
                         </div>
 
@@ -197,7 +197,7 @@ const SessionSummaryModal: React.FC<{ stats: CloseStats; onClose: () => void }> 
                                 </div>
                                 <div className="min-w-0">
                                     <p className="text-sm font-black text-violet-600 dark:text-violet-400 truncate">{topCaller.name || topCaller.phone}</p>
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
                                         Top Caller &bull; {topCaller.contacted} reached
                                     </p>
                                 </div>
@@ -208,18 +208,18 @@ const SessionSummaryModal: React.FC<{ stats: CloseStats; onClose: () => void }> 
                     {/* Caller leaderboard */}
                     {stats.callers.length > 0 && (
                         <div>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3 flex items-center gap-1.5">
+                            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-3 flex items-center gap-1.5">
                                 <Star size={10} className="text-amber-400" /> Volunteer Leaderboard
                             </p>
                             <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl overflow-hidden">
                                 <table className="w-full text-left">
                                     <thead>
                                         <tr className="border-b border-slate-100 dark:border-slate-700">
-                                            <th className="px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">#</th>
-                                            <th className="px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">Volunteer</th>
-                                            <th className="px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400 text-center">Reached</th>
-                                            <th className="px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400 text-center">No Answer</th>
-                                            <th className="px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400 text-center">Total</th>
+                                            <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-400">#</th>
+                                            <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-400">Volunteer</th>
+                                            <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-400 text-center">Reached</th>
+                                            <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-400 text-center">No Answer</th>
+                                            <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-400 text-center">Total</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -265,7 +265,7 @@ const SessionSummaryModal: React.FC<{ stats: CloseStats; onClose: () => void }> 
 
                     <button
                         onClick={onClose}
-                        className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg transition-all"
+                        className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3.5 rounded-2xl font-bold uppercase tracking-wide text-xs shadow-lg transition-all"
                     >
                         Done
                     </button>
@@ -341,7 +341,7 @@ const SessionModal: React.FC<SessionModalProps> = ({ groups = [], memberStatuses
                 <div className="space-y-5">
                     {/* Name */}
                     <div>
-                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">Session Name</label>
+                        <label className="text-[10px] font-bold uppercase tracking-wide text-slate-400 block mb-1.5">Session Name</label>
                         <input
                             value={name}
                             onChange={e => setName(e.target.value)}
@@ -352,7 +352,7 @@ const SessionModal: React.FC<SessionModalProps> = ({ groups = [], memberStatuses
 
                     {/* Risk Categories */}
                     <div>
-                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Include Risk Categories</label>
+                        <label className="text-[10px] font-bold uppercase tracking-wide text-slate-400 block mb-2">Include Risk Categories</label>
                         <div className="flex flex-wrap gap-2">
                             {RISK_CATEGORIES.map(cat => {
                                 const active = riskCats.includes(cat);
@@ -375,7 +375,7 @@ const SessionModal: React.FC<SessionModalProps> = ({ groups = [], memberStatuses
                     {/* Membership Filter */}
                     {memberStatuses.length > 0 && (
                         <div>
-                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">
+                            <label className="text-[10px] font-bold uppercase tracking-wide text-slate-400 block mb-2">
                                 Filter by Membership <span className="font-medium text-slate-300">(empty = all)</span>
                             </label>
                             <div className="flex flex-wrap gap-2">
@@ -397,7 +397,7 @@ const SessionModal: React.FC<SessionModalProps> = ({ groups = [], memberStatuses
                     {/* Absentee Group Filter */}
                     {groups?.length > 0 && (
                         <div>
-                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">
+                            <label className="text-[10px] font-bold uppercase tracking-wide text-slate-400 block mb-2">
                                 Filter by Group Absentees <span className="font-medium text-slate-300">(empty = all)</span>
                             </label>
                             <div className="flex flex-wrap gap-2 mb-3">
@@ -415,7 +415,7 @@ const SessionModal: React.FC<SessionModalProps> = ({ groups = [], memberStatuses
                             </div>
                             {absenteeGroupIds.length > 0 && (
                                 <div>
-                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">Absent Since (Optional)</label>
+                                    <label className="text-[10px] font-bold uppercase tracking-wide text-slate-400 block mb-1.5">Absent Since (Optional)</label>
                                     <input
                                         type="date"
                                         value={absenteeSinceDate}
@@ -432,7 +432,7 @@ const SessionModal: React.FC<SessionModalProps> = ({ groups = [], memberStatuses
                 <button
                     onClick={handleSave}
                     disabled={!name.trim() || riskCats.length === 0}
-                    className="mt-6 w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg transition-all"
+                    className="mt-6 w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white py-3.5 rounded-2xl font-bold uppercase tracking-wide text-xs shadow-lg transition-all"
                 >
                     {initial ? 'Save Changes' : 'Create Session'}
                 </button>
@@ -458,7 +458,7 @@ const LiveBoard: React.FC<{ slots: OutreachSlot[]; totalCount: number }> = ({ sl
             {/* Progress Header */}
             <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-100 dark:border-slate-800">
                 <div className="flex items-center justify-between mb-3">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Session Progress</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Session Progress</p>
                     <div className="flex items-center gap-1 text-[10px] text-emerald-500 font-black">
                         <Activity size={11} className="animate-pulse" />
                         LIVE
@@ -471,7 +471,7 @@ const LiveBoard: React.FC<{ slots: OutreachSlot[]; totalCount: number }> = ({ sl
                 <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 mb-3 overflow-hidden">
                     <div className="bg-indigo-500 h-2 rounded-full transition-all duration-700" style={{ width: `${pct}%` }} />
                 </div>
-                <div className="flex gap-4 text-[10px] font-black uppercase tracking-wide">
+                <div className="flex gap-4 text-[10px] font-bold uppercase tracking-wide">
                     <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
                         <Check size={10} /> {contacted} Contacted
                     </div>
@@ -496,11 +496,11 @@ const LiveBoard: React.FC<{ slots: OutreachSlot[]; totalCount: number }> = ({ sl
                     <table className="w-full text-left">
                         <thead>
                             <tr className="border-b border-slate-100 dark:border-slate-800">
-                                <th className="p-3 text-[9px] font-black uppercase tracking-widest text-slate-400">Volunteer</th>
-                                <th className="p-3 text-[9px] font-black uppercase tracking-widest text-slate-400">Person</th>
-                                <th className="p-3 text-[9px] font-black uppercase tracking-widest text-slate-400 text-center">Status</th>
-                                <th className="p-3 text-[9px] font-black uppercase tracking-widest text-slate-400">Time</th>
-                                <th className="p-3 text-[9px] font-black uppercase tracking-widest text-slate-400">Notes</th>
+                                <th className="p-3 text-[11px] font-bold uppercase tracking-wide text-slate-400">Volunteer</th>
+                                <th className="p-3 text-[11px] font-bold uppercase tracking-wide text-slate-400">Person</th>
+                                <th className="p-3 text-[11px] font-bold uppercase tracking-wide text-slate-400 text-center">Status</th>
+                                <th className="p-3 text-[11px] font-bold uppercase tracking-wide text-slate-400">Time</th>
+                                <th className="p-3 text-[11px] font-bold uppercase tracking-wide text-slate-400">Notes</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -521,7 +521,7 @@ const LiveBoard: React.FC<{ slots: OutreachSlot[]; totalCount: number }> = ({ sl
                                                         {maskPhone(slot.volunteerPhone)}
                                                     </span>
                                                     {isStale && (
-                                                        <span className="ml-1 text-[9px] font-black uppercase text-amber-600 bg-amber-100 dark:bg-amber-900/40 rounded px-1">Stale</span>
+                                                        <span className="ml-1 text-[11px] font-bold uppercase text-amber-600 bg-amber-100 dark:bg-amber-900/40 rounded px-1">Stale</span>
                                                     )}
                                                 </div>
                                             </div>
@@ -535,7 +535,7 @@ const LiveBoard: React.FC<{ slots: OutreachSlot[]; totalCount: number }> = ({ sl
                                         <td className="p-3 text-center">
                                             <StatusBadge status={slot.status} />
                                             {slot.status === 'no-answer' && slot.noAnswerUntil && (
-                                                <p className="text-[9px] text-slate-400 mt-1 whitespace-nowrap">
+                                                <p className="text-[11px] text-slate-400 mt-1 whitespace-nowrap">
                                                     Re-queue: {formatDateTime(slot.noAnswerUntil)}
                                                 </p>
                                             )}
@@ -1124,7 +1124,7 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                 </div>
                 <button
                     onClick={() => setIsModalOpen(true)}
-                    className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg transition-all"
+                    className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wide shadow-lg transition-all"
                 >
                     <Plus size={14} /> New Session
                 </button>
@@ -1139,7 +1139,7 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                     </p>
                     <button
                         onClick={() => setIsModalOpen(true)}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg transition-all"
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-wide shadow-lg transition-all"
                     >
                         Create First Session
                     </button>
@@ -1149,7 +1149,7 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
 
                     {/* Left: Session List */}
                     <div className="lg:col-span-1 space-y-2">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Sessions</p>
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 px-1">Sessions</p>
                         {sessions.map(s => {
                             const isSelected = selectedId === s.id;
                             const isClosed   = !!s.closedAt;
@@ -1180,7 +1180,7 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                             }
                                         </p>
                                     </div>
-                                    <span className={`shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase ${
+                                    <span className={`shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[11px] font-black uppercase ${
                                         isClosed
                                             ? 'bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400'
                                             : s.isActive
@@ -1193,7 +1193,7 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                 {/* Filter tags */}
                                 <div className="flex flex-wrap gap-1 mt-2">
                                     {s.filters.riskCategories.map(cat => (
-                                        <span key={cat} className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400">
+                                        <span key={cat} className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400">
                                             {cat}
                                         </span>
                                     ))}
@@ -1208,11 +1208,11 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                             />
                                         </div>
                                         <div className="flex items-center gap-1.5 shrink-0">
-                                            <span className="inline-flex items-center gap-0.5 text-[9px] font-black text-emerald-600 dark:text-emerald-400">
+                                            <span className="inline-flex items-center gap-0.5 text-[11px] font-black text-emerald-600 dark:text-emerald-400">
                                                 <Check size={9} /> {contacted}
                                             </span>
-                                            <span className="text-slate-300 text-[9px]">·</span>
-                                            <span className="inline-flex items-center gap-0.5 text-[9px] font-black text-rose-500">
+                                            <span className="text-slate-300 text-[11px]">·</span>
+                                            <span className="inline-flex items-center gap-0.5 text-[11px] font-black text-rose-500">
                                                 <PhoneOff size={9} /> {noAnswer}
                                             </span>
                                         </div>
@@ -1233,7 +1233,7 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                     <h3 className="text-base font-black dark:text-white flex items-center gap-2">
                                         {selectedSession.name}
                                         {selectedSession.closedAt && (
-                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400">
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold uppercase bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400">
                                                 <LockKeyhole size={9} /> Closed
                                             </span>
                                         )}
@@ -1252,7 +1252,7 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                             onClick={handleExportCsv}
                                             disabled={isExporting}
                                             title="Download all contact outcomes as a CSV file"
-                                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wide text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/20 transition-all border border-emerald-200 dark:border-emerald-800 disabled:opacity-50"
+                                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wide text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/20 transition-all border border-emerald-200 dark:border-emerald-800 disabled:opacity-50"
                                         >
                                             <Download size={12} /> {isExporting ? 'Exporting…' : 'Export CSV'}
                                         </button>
@@ -1267,7 +1267,7 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                             <button
                                                 onClick={handleRefreshQueue}
                                                 title="Re-sync the eligible people list from current risk data"
-                                                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wide text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-900/20 transition-all border border-indigo-200 dark:border-indigo-800"
+                                                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wide text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-900/20 transition-all border border-indigo-200 dark:border-indigo-800"
                                             >
                                                 <RefreshCw size={12} /> Refresh Queue
                                             </button>
@@ -1287,12 +1287,12 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                                 onClick={() => handleCloseSession(selectedSession)}
                                                 disabled={isClosing}
                                                 title="Close this session — releases pending slots and makes it read-only"
-                                                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wide text-violet-600 hover:bg-violet-50 dark:text-violet-400 dark:hover:bg-violet-900/20 transition-all border border-violet-200 dark:border-violet-800 disabled:opacity-50"
+                                                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wide text-violet-600 hover:bg-violet-50 dark:text-violet-400 dark:hover:bg-violet-900/20 transition-all border border-violet-200 dark:border-violet-800 disabled:opacity-50"
                                             >
                                                 <CheckCircle2 size={12} /> {isClosing ? 'Closing…' : 'Close Session'}
                                             </button>
                                             <div className="flex items-center gap-1.5 shrink-0 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-1.5">
-                                                <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 whitespace-nowrap">Batch</label>
+                                                <label className="text-[11px] font-bold uppercase tracking-wide text-slate-400 whitespace-nowrap">Batch</label>
                                                 <input
                                                     type="number"
                                                     min={1}
@@ -1302,7 +1302,7 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                                     className="w-10 bg-transparent text-[11px] font-black text-center text-slate-700 dark:text-slate-200 outline-none"
                                                     title="Pre-assign this many contacts per volunteer at once (1–10)"
                                                 />
-                                                <label className="text-[9px] font-black uppercase tracking-widest text-slate-400">/ caller</label>
+                                                <label className="text-[11px] font-bold uppercase tracking-wide text-slate-400">/ caller</label>
                                             </div>
                                         </>
                                     )}
@@ -1310,7 +1310,7 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                     {/* Delete — always available */}
                                     <button
                                         onClick={() => handleDeleteSession(selectedSession.id)}
-                                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wide text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-all border border-transparent hover:border-rose-200 dark:hover:border-rose-800"
+                                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wide text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-all border border-transparent hover:border-rose-200 dark:hover:border-rose-800"
                                     >
                                         <Trash2 size={12} /> Delete
                                     </button>
@@ -1351,7 +1351,7 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                                     <div>
                                                         <div className="flex items-center gap-2 mb-1">
                                                             <LockKeyhole size={13} className="text-violet-200" />
-                                                            <p className="text-[10px] font-black uppercase tracking-widest text-violet-200">Session Closed</p>
+                                                            <p className="text-[10px] font-bold uppercase tracking-wide text-violet-200">Session Closed</p>
                                                         </div>
                                                         <p className="text-xs text-violet-200">{closedDate} &bull; Ran {durationStr}</p>
                                                     </div>
@@ -1360,13 +1360,13 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                                         <button
                                                             onClick={handleExportCsv}
                                                             disabled={isExporting}
-                                                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wide bg-white/20 hover:bg-white/30 text-white transition-all border border-white/20 disabled:opacity-50"
+                                                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wide bg-white/20 hover:bg-white/30 text-white transition-all border border-white/20 disabled:opacity-50"
                                                         >
                                                             <Download size={12} /> {isExporting ? 'Exporting…' : 'Export CSV'}
                                                         </button>
                                                         <button
                                                             onClick={() => handleReopenSession(selectedSession)}
-                                                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wide bg-white text-indigo-700 hover:bg-indigo-50 transition-all"
+                                                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wide bg-white text-indigo-700 hover:bg-indigo-50 transition-all"
                                                         >
                                                             <RotateCcw size={12} /> Reopen
                                                         </button>
@@ -1376,7 +1376,7 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                                 {/* Progress bar */}
                                                 <div className="mt-4">
                                                     <div className="flex items-center justify-between mb-1.5">
-                                                        <span className="text-[10px] font-black uppercase tracking-widest text-violet-200">Coverage</span>
+                                                        <span className="text-[10px] font-bold uppercase tracking-wide text-violet-200">Coverage</span>
                                                         <span className="text-[10px] font-black text-white">{coverageRate}% attempted</span>
                                                     </div>
                                                     <div className="bg-white/20 rounded-full h-2 overflow-hidden">
@@ -1397,9 +1397,9 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                                     { label: 'Volunteers', value: callers.length, sub: 'made calls', icon: <Award size={12} className="text-violet-500" />, color: 'text-violet-600 dark:text-violet-400' },
                                                 ].map(tile => (
                                                     <div key={tile.label} className="px-5 py-4">
-                                                        <div className="flex items-center gap-1.5 mb-1">{tile.icon}<p className="text-[9px] font-black uppercase tracking-widest text-slate-400">{tile.label}</p></div>
+                                                        <div className="flex items-center gap-1.5 mb-1">{tile.icon}<p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">{tile.label}</p></div>
                                                         <p className={`text-2xl font-black ${tile.color}`}>{tile.value}</p>
-                                                        <p className="text-[9px] text-slate-400 mt-0.5">{tile.sub}</p>
+                                                        <p className="text-[11px] text-slate-400 mt-0.5">{tile.sub}</p>
                                                     </div>
                                                 ))}
                                             </div>
@@ -1407,7 +1407,7 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                             {/* Volunteer leaderboard */}
                                             {callers.length > 0 && (
                                                 <div className="px-5 py-4">
-                                                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-3 flex items-center gap-1.5">
+                                                    <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-3 flex items-center gap-1.5">
                                                         <Star size={9} className="text-amber-400" /> Volunteer Results
                                                     </p>
                                                     <div className="space-y-1.5">
@@ -1458,7 +1458,7 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                         </div>
                                         <button
                                             onClick={handleDownloadQr}
-                                            className="mt-2 text-[10px] font-black uppercase tracking-wide text-indigo-200 hover:text-white transition-colors flex items-center gap-1 w-full justify-center"
+                                            className="mt-2 text-[10px] font-bold uppercase tracking-wide text-indigo-200 hover:text-white transition-colors flex items-center gap-1 w-full justify-center"
                                         >
                                             <QrCode size={10} /> Download QR
                                         </button>
@@ -1466,7 +1466,7 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
 
                                     {/* Link */}
                                     <div className="flex-1 min-w-[200px]">
-                                        <p className="text-[10px] font-black uppercase tracking-widest text-indigo-200 mb-1">Share Link</p>
+                                        <p className="text-[10px] font-bold uppercase tracking-wide text-indigo-200 mb-1">Share Link</p>
                                         <p className="text-lg font-black leading-tight mb-3">{selectedSession.name}</p>
                                         <p className="text-xs text-indigo-100 mb-4">
                                             Share this link or QR code with your volunteers. They'll enter their phone number and be automatically assigned someone to contact.
@@ -1480,7 +1480,7 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                         <div className="flex gap-2">
                                             <button
                                                 onClick={handleCopyLink}
-                                                className="flex-1 flex items-center justify-center gap-2 bg-white text-indigo-700 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-indigo-50 transition-all"
+                                                className="flex-1 flex items-center justify-center gap-2 bg-white text-indigo-700 py-2.5 rounded-xl text-[11px] font-bold uppercase tracking-wide hover:bg-indigo-50 transition-all"
                                             >
                                                 {copied ? <Check size={13} /> : <Copy size={13} />}
                                                 {copied ? 'Copied!' : 'Copy Link'}
@@ -1489,7 +1489,7 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
 
                                         {/* Follow-up link */}
                                         <div className="mt-4 bg-white/10 rounded-xl px-3 py-2.5">
-                                            <p className="text-[10px] font-black uppercase tracking-widest text-indigo-200 mb-1.5">📝 Follow-Up Link</p>
+                                            <p className="text-[10px] font-bold uppercase tracking-wide text-indigo-200 mb-1.5">📝 Follow-Up Link</p>
                                             <p className="text-[10px] text-indigo-200 mb-2">Share after the session so volunteers can add notes for people who call back.</p>
                                             <div className="flex items-center gap-2">
                                                 <span className="text-[10px] font-mono text-white/70 truncate flex-1">{publicUrl}/followup</span>
@@ -1513,7 +1513,7 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
 
                             {/* Live Contact Board — directly under share panel */}
                             <div>
-                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3 flex items-center gap-1.5">
+                                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-3 flex items-center gap-1.5">
                                     <Activity size={11} className="text-emerald-500 animate-pulse" /> Session Progress
                                 </p>
                                 <LiveBoard slots={liveSlots} totalCount={filteredPeople.length} />
@@ -1524,7 +1524,7 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                 <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex-wrap gap-2">
                                     <div className="flex items-center gap-2">
                                         <Users size={14} className="text-indigo-500" />
-                                        <p className="text-xs font-black uppercase tracking-widest text-slate-600 dark:text-slate-300">
+                                        <p className="text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">
                                             Queue Preview ({filteredPeople.length} people)
                                         </p>
                                     </div>
@@ -1532,12 +1532,12 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                         {/* Filter tags */}
                                         <div className="flex flex-wrap gap-1">
                                             {selectedSession.filters.riskCategories.map(cat => (
-                                                <span key={cat} className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
+                                                <span key={cat} className="text-[11px] font-bold uppercase px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
                                                     {cat}
                                                 </span>
                                             ))}
                                             {selectedSession.filters.membershipStatuses.map(s => (
-                                                <span key={s} className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                                                <span key={s} className="text-[11px] font-bold uppercase px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                                                     {s}
                                                 </span>
                                             ))}
@@ -1560,7 +1560,7 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                                     {countdown}
                                                 </span>
                                             </div>
-                                            <label className="text-[9px] font-black uppercase tracking-wide text-slate-400 whitespace-nowrap">Refresh every</label>
+                                            <label className="text-[11px] font-bold uppercase tracking-wide text-slate-400 whitespace-nowrap">Refresh every</label>
                                             <input
                                                 type="number"
                                                 min={10}
@@ -1572,7 +1572,7 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                                 }}
                                                 className="w-14 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-[10px] font-black text-center text-slate-700 dark:text-slate-200 outline-none focus:ring-1 focus:ring-indigo-400"
                                             />
-                                            <label className="text-[9px] font-black uppercase tracking-wide text-slate-400">sec</label>
+                                            <label className="text-[11px] font-bold uppercase tracking-wide text-slate-400">sec</label>
                                         </div>
                                     </div>
                                 </div>
@@ -1585,14 +1585,14 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                         <table className="w-full text-left">
                                             <thead className="sticky top-0 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800">
                                                 <tr>
-                                                    <th className="p-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">#</th>
-                                                    <th className="p-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">Name</th>
-                                                    <th className="p-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">Status</th>
-                                                    <th className="p-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">Risk</th>
-                                                    <th className="p-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">Last Contact</th>
-                                                    <th className="p-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">Phone</th>
-                                                    <th className="p-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">Email</th>
-                                                    <th className="p-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400">Membership</th>
+                                                    <th className="p-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-400">#</th>
+                                                    <th className="p-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-400">Name</th>
+                                                    <th className="p-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-400">Status</th>
+                                                    <th className="p-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-400">Risk</th>
+                                                    <th className="p-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-400">Last Contact</th>
+                                                    <th className="p-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-400">Phone</th>
+                                                    <th className="p-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-400">Email</th>
+                                                    <th className="p-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-400">Membership</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -1620,23 +1620,23 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                                         '';
 
                                                     const statusBadge = isContacted ? (
-                                                        <span className="inline-flex items-center gap-1 text-[9px] font-black text-emerald-600 bg-emerald-100 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded-full">
+                                                        <span className="inline-flex items-center gap-1 text-[11px] font-black text-emerald-600 bg-emerald-100 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded-full">
                                                             <Check size={8} /> Contacted
                                                         </span>
                                                     ) : isPending ? (
-                                                        <span className="inline-flex items-center gap-1 text-[9px] font-black text-blue-600 bg-blue-100 dark:bg-blue-900/30 px-1.5 py-0.5 rounded-full">
+                                                        <span className="inline-flex items-center gap-1 text-[11px] font-black text-blue-600 bg-blue-100 dark:bg-blue-900/30 px-1.5 py-0.5 rounded-full">
                                                             <Activity size={8} className="animate-pulse" /> In Progress
                                                         </span>
                                                     ) : onCooldown ? (
-                                                        <span className="inline-flex items-center gap-1 text-[9px] font-black text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded-full">
+                                                        <span className="inline-flex items-center gap-1 text-[11px] font-black text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded-full">
                                                             <Clock size={8} /> Cooldown
                                                         </span>
                                                     ) : reQueued ? (
-                                                        <span className="inline-flex items-center gap-1 text-[9px] font-black text-amber-600 bg-amber-100 dark:bg-amber-900/30 px-1.5 py-0.5 rounded-full">
+                                                        <span className="inline-flex items-center gap-1 text-[11px] font-black text-amber-600 bg-amber-100 dark:bg-amber-900/30 px-1.5 py-0.5 rounded-full">
                                                             <PhoneOff size={8} /> Re-queued
                                                         </span>
                                                     ) : (
-                                                        <span className="inline-flex items-center gap-1 text-[9px] font-black text-slate-400 px-1.5 py-0.5">
+                                                        <span className="inline-flex items-center gap-1 text-[11px] font-black text-slate-400 px-1.5 py-0.5">
                                                             — New
                                                         </span>
                                                     );
@@ -1658,7 +1658,7 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                                                     {person.avatar ? (
                                                                         <img src={person.avatar} alt={person.name} className="w-6 h-6 rounded-full" />
                                                                     ) : (
-                                                                        <div className="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 text-[9px] font-black flex items-center justify-center uppercase">
+                                                                        <div className="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 text-[11px] font-bold flex items-center justify-center uppercase">
                                                                             {person.name.slice(0, 2)}
                                                                         </div>
                                                                     )}
@@ -1670,7 +1670,7 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                                             <td className="p-2.5">{statusBadge}</td>
                                                             <td className="p-2.5">
                                                                 <span className={`text-[10px] font-black uppercase ${catColor}`}>{cat}</span>
-                                                                <span className="text-[9px] text-slate-400 ml-1">({person.riskProfile?.score ?? 0})</span>
+                                                                <span className="text-[11px] text-slate-400 ml-1">({person.riskProfile?.score ?? 0})</span>
                                                             </td>
                                                             {/* Last Contact — all-time */}
                                                             <td className="p-2.5 text-[10px] font-medium whitespace-nowrap">
@@ -1679,7 +1679,7 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                                                         <span className="text-emerald-600">
                                                                             {timeSince(mostRecent.completedAt ?? mostRecent.assignedAt)}
                                                                         </span>
-                                                                        <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 text-[8px] font-black" title={`${history.length} total contact attempt${history.length !== 1 ? 's' : ''}`}>
+                                                                        <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 text-[10px] font-black" title={`${history.length} total contact attempt${history.length !== 1 ? 's' : ''}`}>
                                                                             {history.length}
                                                                         </span>
                                                                         <ChevronDown size={10} className={`text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
@@ -1697,7 +1697,7 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                                             <tr className="border-b border-slate-100 dark:border-slate-800">
                                                                 <td colSpan={8} className="p-0">
                                                                     <div className="bg-slate-50 dark:bg-slate-800/40 px-6 py-3 space-y-2">
-                                                                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2">Contact History ({history.length} attempt{history.length !== 1 ? 's' : ''})</p>
+                                                                        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-2">Contact History ({history.length} attempt{history.length !== 1 ? 's' : ''})</p>
                                                                         {history.map(h => (
                                                                             <div key={h.id} className="flex items-start gap-3 text-[10px]">
                                                                                 <span className={`shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full font-black ${h.status === 'contacted' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400'}`}>

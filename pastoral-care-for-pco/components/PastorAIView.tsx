@@ -137,11 +137,11 @@ export const PastorAIView: React.FC<PastorAIViewProps> = ({
                 </div>
                 <div>
                     <h2 className="text-xl font-black text-slate-900 tracking-tight">Pastor AI</h2>
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Virtual Administrator</p>
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">Virtual Administrator</p>
                 </div>
                 <div className="ml-auto flex items-center gap-2 px-3 py-1.5 bg-white rounded-lg border border-slate-100">
                     <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                    <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Online & Context Aware</span>
+                    <span className="text-[10px] font-bold uppercase text-slate-500 tracking-wide">Online & Context Aware</span>
                 </div>
             </div>
 
@@ -168,7 +168,7 @@ export const PastorAIView: React.FC<PastorAIViewProps> = ({
                                     __html: msg.text.replace(/\n/g, '<br/>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') 
                                 }} 
                             />
-                            <p className={`text-[9px] mt-2 font-bold uppercase tracking-widest ${msg.role === 'user' ? 'text-slate-300' : 'text-indigo-300'}`}>
+                            <p className={`text-[11px] mt-2 font-bold uppercase tracking-wide ${msg.role === 'user' ? 'text-slate-300' : 'text-indigo-300'}`}>
                                 {msg.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                             </p>
                         </div>
@@ -220,7 +220,7 @@ export const PastorAIView: React.FC<PastorAIViewProps> = ({
                         <span className="text-lg">↑</span>
                     </button>
                 </div>
-                <p className="text-[9px] text-center text-slate-300 font-bold uppercase tracking-widest mt-3">
+                <p className="text-[11px] text-center text-slate-300 font-bold uppercase tracking-wide mt-3">
                     AI generated responses may vary. Always verify key metrics in the dashboard.
                 </p>
             </div>

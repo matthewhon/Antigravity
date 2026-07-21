@@ -106,12 +106,12 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ user, church, onClo
 
         <div className="mb-6">
             <h3 className="text-2xl font-black text-slate-900 tracking-tight">Edit Profile</h3>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Update your account details</p>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mt-1">Update your account details</p>
         </div>
 
         <div className="mb-6 p-4 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-between">
             <div>
-                <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Organization</p>
+                <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wide">Organization</p>
                 <p className="text-sm font-bold text-slate-900">{church.name}</p>
             </div>
             <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-black text-xs">
@@ -128,7 +128,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ user, church, onClo
 
         <form onSubmit={handleSave} className="space-y-5">
             <div>
-                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Full Name</label>
+                <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">Full Name</label>
                 <input 
                     type="text" 
                     value={name} 
@@ -139,7 +139,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ user, church, onClo
             </div>
 
             <div>
-                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Email Address</label>
+                <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">Email Address</label>
                 <input 
                     type="email" 
                     value={email} 
@@ -150,7 +150,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ user, church, onClo
             </div>
 
             <div>
-                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">New Password (Optional)</label>
+                <label className="block text-[10px] font-bold uppercase text-slate-400 tracking-wide mb-2">New Password (Optional)</label>
                 <input 
                     type="password" 
                     value={newPassword} 
@@ -162,7 +162,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ user, church, onClo
 
             {(email.toLowerCase().trim() !== user.email.toLowerCase().trim() || newPassword.length > 0) && (
                 <div className="pt-4 border-t border-slate-100 animate-in fade-in slide-in-from-top-2">
-                    <label className="block text-[10px] font-black uppercase text-slate-500 tracking-widest mb-2">Current Password (Required)</label>
+                    <label className="block text-[10px] font-bold uppercase text-slate-500 tracking-wide mb-2">Current Password (Required)</label>
                     <input 
                         type="password" 
                         value={currentPassword} 
@@ -173,7 +173,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ user, church, onClo
                 </div>
             )}
 
-            <button type="submit" disabled={loading} className="w-full bg-indigo-600 text-white font-black text-xs uppercase tracking-widest py-4 rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 mt-4 disabled:opacity-50">
+            <button type="submit" disabled={loading} className="w-full bg-indigo-600 text-white font-bold text-xs uppercase tracking-wide py-4 rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 mt-4 disabled:opacity-50">
                 {loading ? 'Saving...' : 'Save Changes'}
             </button>
         </form>

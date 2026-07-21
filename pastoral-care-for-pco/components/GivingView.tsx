@@ -876,14 +876,14 @@ export const GivingView: React.FC<GivingViewProps> = ({
                       onRemove={() => handleRemoveWidget(id)}
                       source="PCO & Budgets"
                       headerControl={
-                          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">{activeYear}</span>
+                          <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">{activeYear}</span>
                       }
                   >
                       <div className="space-y-5">
                           {/* Overall summary bar */}
                           <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 space-y-2">
                               <div className="flex items-center justify-between">
-                                  <span className="text-xs font-black text-slate-700 dark:text-slate-200 uppercase tracking-wider">Overall {activeYear} Budget</span>
+                                  <span className="text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider">Overall {activeYear} Budget</span>
                                   <span className={`text-sm font-black px-2 py-0.5 rounded-full ${
                                       paceRatio >= 90 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400' :
                                       paceRatio >= 80 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400' :
@@ -943,7 +943,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
                                                       <div className="gv-pace-marker bg-slate-400/50" style={{ '--marker-left': `${fundExpectedPct}%` } as React.CSSProperties} />
                                                   )}
                                               </div>
-                                              <div className="flex justify-between text-[9px] text-slate-400 dark:text-slate-500">
+                                              <div className="flex justify-between text-[11px] text-slate-400 dark:text-slate-500">
                                                   <span>${actual.toLocaleString(undefined, { maximumFractionDigits: 0 })} raised</span>
                                                   <span>${budget.totalAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })} goal</span>
                                               </div>
@@ -961,11 +961,11 @@ export const GivingView: React.FC<GivingViewProps> = ({
                       <div className="flex flex-col h-full justify-between gap-4">
                           <div className="flex items-center justify-between">
                               <div>
-                                  <p className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Total Giving</p>
+                                  <p className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide">Total Giving</p>
                                   <p className="text-5xl font-black text-emerald-600 dark:text-emerald-400 tracking-tighter mt-2">${analytics.totalGiving.toLocaleString()}</p>
                               </div>
                               <div className="text-right">
-                                  <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Growth</p>
+                                  <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide">Growth</p>
                                   <div className={`text-xl font-black flex items-center justify-end gap-1 ${analytics.totalGiving >= analytics.previousTotalGiving ? 'text-emerald-500' : 'text-rose-500'}`}>
                                       {analytics.totalGiving >= analytics.previousTotalGiving ? '↗' : '↘'}
                                       {analytics.previousTotalGiving > 0 
@@ -977,7 +977,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
                           
                           <div className="grid grid-cols-3 gap-4 pt-6 border-t border-slate-100 dark:border-slate-800">
                               <div>
-                                  <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Unique Donors</p>
+                                  <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-1">Unique Donors</p>
                                   <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400">{analytics.contributingPeople.toLocaleString()}</p>
                                   <div className={`text-[11px] font-bold flex items-center gap-0.5 mt-1 ${analytics.contributingPeople >= analytics.previousContributingPeople ? 'text-emerald-500' : 'text-rose-500'}`}>
                                       {analytics.contributingPeople >= analytics.previousContributingPeople ? '↑' : '↓'}
@@ -987,7 +987,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
                                   </div>
                               </div>
                               <div className="border-l border-slate-100 dark:border-slate-800 pl-4">
-                                  <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Recurring</p>
+                                  <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-1">Recurring</p>
                                   <p className="text-2xl font-black text-cyan-600 dark:text-cyan-400">{analytics.recurringGivers.toLocaleString()}</p>
                                   <div className={`text-[11px] font-bold flex items-center gap-0.5 mt-1 ${analytics.recurringGivers >= analytics.previousRecurringGivers ? 'text-emerald-500' : 'text-rose-500'}`}>
                                       {analytics.recurringGivers >= analytics.previousRecurringGivers ? '↑' : '↓'}
@@ -997,7 +997,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
                                   </div>
                               </div>
                               <div className="border-l border-slate-100 dark:border-slate-800 pl-4">
-                                  <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Avg Gift</p>
+                                  <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-1">Avg Gift</p>
                                   <p className="text-2xl font-black text-violet-600 dark:text-violet-400">${Math.round(analytics.averageGift).toLocaleString()}</p>
                                   <div className={`text-[11px] font-bold flex items-center gap-0.5 mt-1 ${analytics.averageGift >= analytics.previousAverageGift ? 'text-emerald-500' : 'text-rose-500'}`}>
                                       {analytics.averageGift >= analytics.previousAverageGift ? '↑' : '↓'}
@@ -1039,7 +1039,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
                               {/* Total hero */}
                               <div className="p-4 rounded-xl bg-gradient-to-br from-indigo-50 to-emerald-50 dark:from-indigo-900/20 dark:to-emerald-900/20 flex flex-col justify-center space-y-1">
                                   <div className="flex items-center justify-between">
-                                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                                      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">
                                           {analytics.currentLabel || "Current Total"}
                                       </p>
                                       <div className={`text-[11px] font-bold flex items-center gap-0.5 ${currentTotal >= previousTotal ? 'text-emerald-500' : 'text-rose-500'}`}>
@@ -1109,7 +1109,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
                           <div className="space-y-4">
                               {/* Total hero */}
                               <div className="p-4 rounded-xl bg-gradient-to-br from-indigo-50 to-emerald-50 dark:from-indigo-900/20 dark:to-emerald-900/20 flex items-center justify-between">
-                                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Total Giving</p>
+                                  <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">Total Giving</p>
                                   <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400">${analytics.totalGiving.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
                               </div>
                               {/* Per-fund rows */}
@@ -1313,7 +1313,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
                           <div className="space-y-4">
                               {/* Week total hero */}
                               <div className="p-4 rounded-xl bg-gradient-to-br from-indigo-50 to-emerald-50 dark:from-indigo-900/20 dark:to-emerald-900/20 flex items-center justify-between">
-                                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Week Total</p>
+                                  <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">Week Total</p>
                                   <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400">${weekTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
                               </div>
                               {/* Per-fund rows */}
@@ -1365,7 +1365,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
                           <div className="space-y-5">
                               {/* Hero total */}
                               <div className="flex items-center justify-between px-1">
-                                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Total Given This Period</p>
+                                  <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">Total Given This Period</p>
                                   <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400">${ageTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
                               </div>
                               {/* Bar chart rows */}
@@ -1450,7 +1450,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
                           <div className="space-y-4">
                               {/* Period total hero */}
                               <div className="flex items-center justify-between px-1 mb-2">
-                                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Total Given This Period</p>
+                                  <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">Total Given This Period</p>
                                   <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400">${total.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
                               </div>
                               {/* Status rows */}
@@ -1520,7 +1520,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
                     {/* Hero */}
                     <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-50 to-violet-50 dark:from-indigo-900/20 dark:to-violet-900/20 flex items-center justify-between">
                       <div>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-1">12-Wk Avg / Week (All Funds)</p>
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1">12-Wk Avg / Week (All Funds)</p>
                         <p className="text-3xl font-black text-indigo-600 dark:text-indigo-400">
                           ${overallAvg.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                         </p>
@@ -1531,13 +1531,13 @@ export const GivingView: React.FC<GivingViewProps> = ({
                           {trendIcon(overallTrend)}
                           {overallTrendPct !== null ? ` ${Math.abs(Math.round(overallTrendPct))}%` : ''}
                         </span>
-                        <span className="text-[9px] text-slate-400 dark:text-slate-500">wks 7–12 vs 1–6</span>
+                        <span className="text-[11px] text-slate-400 dark:text-slate-500">wks 7–12 vs 1–6</span>
                       </div>
                     </div>
 
                     {/* Per-fund rows */}
                     <div className="space-y-3">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Avg / Week by Fund</p>
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">Avg / Week by Fund</p>
                       {fundData
                         .slice()
                         .sort((a, b) => b.avg - a.avg)
@@ -1585,12 +1585,12 @@ export const GivingView: React.FC<GivingViewProps> = ({
   const renderFilterControls = () => (
       <div className="flex justify-end mb-8 animate-in fade-in slide-in-from-top-2 no-print">
           <div className="flex items-center gap-2 bg-white dark:bg-slate-800 p-2 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm">
-              <span className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest pl-3">Time Range</span>
+              <span className="text-[10px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide pl-3">Time Range</span>
               <select 
                   aria-label="Time range filter"
                   value={filter} 
                   onChange={(e) => onFilterChange(e.target.value as GivingFilter)}
-                  className="bg-slate-100 dark:bg-slate-900 border-none text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 rounded-xl py-2 px-4 cursor-pointer outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="bg-slate-100 dark:bg-slate-900 border-none text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 rounded-xl py-2 px-4 cursor-pointer outline-none focus:ring-2 focus:ring-indigo-500"
               >
                   <option value="Week">Last 7 Days</option>
                   <option value="This Week">This Week</option>
@@ -1628,7 +1628,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
                       <button 
                           onClick={handleSmartGivingSync}
                           disabled={isSyncing}
-                          className="bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 border-none text-[10px] font-black uppercase tracking-widest rounded-xl py-2 px-4 transition-colors disabled:opacity-50"
+                          className="bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 border-none text-[10px] font-bold uppercase tracking-wide rounded-xl py-2 px-4 transition-colors disabled:opacity-50"
                       >
                           {isSyncing ? 'Syncing...' : 'Giving Sync'}
                       </button>
@@ -1643,7 +1643,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 no-print">
             <div>
             <h3 className="text-4xl font-black tracking-tighter text-slate-900 dark:text-white">Giving Analytics</h3>
-            <p className="text-slate-400 dark:text-slate-500 font-medium uppercase text-[10px] tracking-widest mt-1">Financial Health & Donor Stewardship</p>
+            <p className="text-slate-400 dark:text-slate-500 font-medium uppercase text-[10px] tracking-wide mt-1">Financial Health & Donor Stewardship</p>
             </div>
             
             <div className="flex items-center gap-4">
@@ -1651,7 +1651,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
                     <button 
                         onClick={onSync}
                         disabled={isSyncing}
-                        className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 font-black text-[10px] uppercase tracking-widest hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors disabled:opacity-50"
+                        className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 font-bold text-[10px] uppercase tracking-wide hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors disabled:opacity-50"
                     >
                         <span className={isSyncing ? 'animate-spin' : ''}>↻</span>
                         <span>{isSyncing ? 'Syncing...' : 'Refresh from PCO'}</span>
@@ -1660,7 +1660,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
                 {activeTab !== 'reports' && (
                     <button 
                         onClick={handleDownloadCSV}
-                        className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                        className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold text-[10px] uppercase tracking-wide hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
                     >
                         <span>⬇ Download CSV</span>
                     </button>
@@ -1735,9 +1735,9 @@ export const GivingView: React.FC<GivingViewProps> = ({
                             <div className="flex bg-white/10 rounded-xl p-1"><button onClick={() => setBudgetYear(budgetYear - 1)} className="px-3 py-1 hover:bg-white/20 rounded-lg transition-colors">←</button><span className="px-4 py-1 font-black text-sm">{budgetYear}</span><button onClick={() => setBudgetYear(budgetYear + 1)} className="px-3 py-1 hover:bg-white/20 rounded-lg transition-colors">→</button></div>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                            <div><p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Total Annual Budget</p><p className="text-4xl font-black">${budgetMetrics.totalAnnualBudget.toLocaleString()}</p></div>
-                            <div><p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">YTD Budget Goal</p><p className="text-4xl font-black">${budgetMetrics.totalYtdBudget.toLocaleString()}</p></div>
-                            <div><p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">YTD Actual Giving</p><p className={`text-4xl font-black ${budgetMetrics.totalYtdActual >= budgetMetrics.totalYtdBudget ? 'text-emerald-400' : 'text-rose-400'}`}>${budgetMetrics.totalYtdActual.toLocaleString()}</p></div>
+                            <div><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Total Annual Budget</p><p className="text-4xl font-black">${budgetMetrics.totalAnnualBudget.toLocaleString()}</p></div>
+                            <div><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">YTD Budget Goal</p><p className="text-4xl font-black">${budgetMetrics.totalYtdBudget.toLocaleString()}</p></div>
+                            <div><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">YTD Actual Giving</p><p className={`text-4xl font-black ${budgetMetrics.totalYtdActual >= budgetMetrics.totalYtdBudget ? 'text-emerald-400' : 'text-rose-400'}`}>${budgetMetrics.totalYtdActual.toLocaleString()}</p></div>
                         </div>
                     </div>
                 </div>
@@ -1746,11 +1746,11 @@ export const GivingView: React.FC<GivingViewProps> = ({
                     <table className="w-full text-left">
                         <thead className="bg-slate-50 dark:bg-slate-900/50">
                             <tr>
-                                <th className="p-6 text-xs font-black text-slate-400 uppercase tracking-widest">Fund Name</th>
-                                <th className="p-6 text-right text-xs font-black text-slate-400 uppercase tracking-widest">Annual Budget</th>
-                                <th className="p-6 text-right text-xs font-black text-slate-400 uppercase tracking-widest">YTD Budget</th>
-                                <th className="p-6 text-right text-xs font-black text-slate-400 uppercase tracking-widest">YTD Actual</th>
-                                <th className="p-6 text-right text-xs font-black text-slate-400 uppercase tracking-widest">Action</th>
+                                <th className="p-6 text-xs font-bold text-slate-400 uppercase tracking-wide">Fund Name</th>
+                                <th className="p-6 text-right text-xs font-bold text-slate-400 uppercase tracking-wide">Annual Budget</th>
+                                <th className="p-6 text-right text-xs font-bold text-slate-400 uppercase tracking-wide">YTD Budget</th>
+                                <th className="p-6 text-right text-xs font-bold text-slate-400 uppercase tracking-wide">YTD Actual</th>
+                                <th className="p-6 text-right text-xs font-bold text-slate-400 uppercase tracking-wide">Action</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
@@ -1831,7 +1831,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
                     <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-4">
                         <div className="flex items-end gap-3">
                              <div className="flex-1">
-                                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Total Annual Budget</label>
+                                <label className="text-[10px] font-bold uppercase text-slate-400 tracking-wide">Total Annual Budget</label>
                                 <div className="relative mt-1">
                                     <span className="absolute left-3 top-2.5 text-slate-400 font-bold">$</span>
                                     <input 
@@ -1852,13 +1852,13 @@ export const GivingView: React.FC<GivingViewProps> = ({
                                         monthlyAmounts: new Array(12).fill(monthly)
                                     });
                                 }}
-                                className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-200 dark:hover:bg-slate-700 transition-all border border-slate-200 dark:border-slate-700 h-[46px]"
+                                className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-wide hover:bg-slate-200 dark:hover:bg-slate-700 transition-all border border-slate-200 dark:border-slate-700 h-[46px]"
                                 title="Divide total evenly by 12"
                              >
                                 Spread Evenly
                              </button>
                         </div>
-                        <button onClick={() => handleSaveBudgetInternal(editingBudget)} className="bg-slate-900 dark:bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-800 dark:hover:bg-indigo-700 transition-all shadow-lg w-full">Save Budget</button>
+                        <button onClick={() => handleSaveBudgetInternal(editingBudget)} className="bg-slate-900 dark:bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-wide hover:bg-slate-800 dark:hover:bg-indigo-700 transition-all shadow-lg w-full">Save Budget</button>
                     </div>
                 </div>
             </div>

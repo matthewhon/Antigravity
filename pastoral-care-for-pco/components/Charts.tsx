@@ -205,7 +205,7 @@ export const DashboardCharts: React.FC<ChartProps> = ({ attendance, giving, demo
                         <div className="flex justify-between items-center mb-1">
                             <div className="flex items-center gap-2">
                                 <span className={`text-sm font-bold ${textClass}`}>{indicator.label}</span>
-                                <span className="text-[9px] font-bold opacity-60 uppercase bg-white/50 px-1.5 rounded text-slate-500">Weight: {indicator.weight}</span>
+                                <span className="text-[11px] font-bold opacity-60 uppercase bg-white/50 px-1.5 rounded text-slate-500">Weight: {indicator.weight}</span>
                             </div>
                             <span className={`text-sm font-black ${textClass}`}>{indicator.value.toFixed(1)}%</span>
                         </div>

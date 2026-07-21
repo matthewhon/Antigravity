@@ -92,7 +92,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ churchId, onCl
 
         <div className="mb-8">
             <h3 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Add Team Member</h3>
-            <p className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1">Create a new account for your organization</p>
+            <p className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide mt-1">Create a new account for your organization</p>
         </div>
 
         {error && (
@@ -105,7 +105,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ churchId, onCl
         <form onSubmit={handleSubmit} className="space-y-5">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
-                    <label htmlFor="create-name" className="block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-2">Full Name</label>
+                    <label htmlFor="create-name" className="block text-[10px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide mb-2">Full Name</label>
                     <input 
                         id="create-name"
                         type="text" 
@@ -117,7 +117,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ churchId, onCl
                     />
                 </div>
                 <div>
-                    <label htmlFor="create-email" className="block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-2">Email Address</label>
+                    <label htmlFor="create-email" className="block text-[10px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide mb-2">Email Address</label>
                     <input 
                         id="create-email"
                         type="email" 
@@ -132,7 +132,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ churchId, onCl
             </div>
 
             <div>
-                <label htmlFor="create-password" className="block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-2">Initial Password</label>
+                <label htmlFor="create-password" className="block text-[10px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide mb-2">Initial Password</label>
                 <div className="relative">
                     <input 
                         id="create-password"
@@ -156,7 +156,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ churchId, onCl
             </div>
 
             <div>
-                <label className="block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-3">Assign Roles</label>
+                <label className="block text-[10px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide mb-3">Assign Roles</label>
                 <div className="flex flex-wrap gap-2">
                     {AVAILABLE_ROLES.map(role => {
                         const isSelected = roles.includes(role);
@@ -181,7 +181,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ churchId, onCl
             {/* Campus Selection (Multi-Campus Only) */}
             {church?.multiCampusEnabled && campuses && campuses.length > 0 && (
                 <div>
-                    <label className="block text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-3">Campus Permissions</label>
+                    <label className="block text-[10px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wide mb-3">Campus Permissions</label>
                     {roles.includes('Church Admin') ? (
                         <p className="text-[10px] text-slate-400 dark:text-slate-500 italic">Church Admins always have access to all campuses.</p>
                     ) : (
@@ -214,7 +214,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ churchId, onCl
                 </div>
             )}
 
-            <button type="submit" disabled={loading} className="w-full bg-indigo-600 text-white font-black text-xs uppercase tracking-widest py-4 rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 dark:shadow-indigo-900/50 mt-4 disabled:opacity-50">
+            <button type="submit" disabled={loading} className="w-full bg-indigo-600 text-white font-bold text-xs uppercase tracking-wide py-4 rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 dark:shadow-indigo-900/50 mt-4 disabled:opacity-50">
                 {loading ? 'Creating Account...' : 'Create Account'}
             </button>
         </form>

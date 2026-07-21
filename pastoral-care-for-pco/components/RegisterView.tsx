@@ -121,7 +121,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({ onCancel }) => {
 
             <button 
                 onClick={onCancel}
-                className="w-full bg-slate-900 dark:bg-indigo-600 text-white px-6 py-4 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 dark:hover:bg-indigo-700 transition-all shadow-lg"
+                className="w-full bg-slate-900 dark:bg-indigo-600 text-white px-6 py-4 rounded-xl font-bold text-xs uppercase tracking-wide hover:bg-slate-800 dark:hover:bg-indigo-700 transition-all shadow-lg"
             >
                 Go to Login Now
             </button>
@@ -139,7 +139,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({ onCancel }) => {
         
         <div className="text-center mb-8">
             <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Create Organization</h2>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-2">Start your new tenant workspace</p>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mt-2">Start your new tenant workspace</p>
         </div>
 
         {error && (
@@ -157,7 +157,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({ onCancel }) => {
                 </div>
                 
                 <div>
-                    <label htmlFor="reg-name" className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Your Name</label>
+                    <label htmlFor="reg-name" className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-2">Your Name</label>
                     <input 
                         id="reg-name"
                         type="text" 
@@ -171,7 +171,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({ onCancel }) => {
                 </div>
 
                 <div>
-                    <label htmlFor="reg-email" className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Email Address</label>
+                    <label htmlFor="reg-email" className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-2">Email Address</label>
                     <input 
                         id="reg-email"
                         type="email" 
@@ -186,7 +186,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({ onCancel }) => {
                 </div>
 
                 <div>
-                    <label htmlFor="reg-password" className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Password</label>
+                    <label htmlFor="reg-password" className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-2">Password</label>
                     <div className="relative">
                         <input 
                             id="reg-password"
@@ -215,7 +215,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({ onCancel }) => {
                 </div>
 
                 <div className="col-span-1 md:col-span-2">
-                    <label htmlFor="reg-churchname" className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Church / Organization Name</label>
+                    <label htmlFor="reg-churchname" className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-2">Church / Organization Name</label>
                     <input 
                         id="reg-churchname"
                         type="text" 
@@ -229,7 +229,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({ onCancel }) => {
                 </div>
 
                 <div className="col-span-1 md:col-span-2">
-                    <label htmlFor="reg-address" className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Street Address</label>
+                    <label htmlFor="reg-address" className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-2">Street Address</label>
                     <input 
                         id="reg-address"
                         type="text" 
@@ -242,7 +242,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({ onCancel }) => {
                 </div>
 
                 <div>
-                    <label htmlFor="reg-city" className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">City</label>
+                    <label htmlFor="reg-city" className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-2">City</label>
                     <input 
                         id="reg-city"
                         type="text" 
@@ -256,7 +256,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({ onCancel }) => {
                 </div>
 
                 <div>
-                    <label htmlFor="reg-state" className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">State</label>
+                    <label htmlFor="reg-state" className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-2">State</label>
                     <input 
                         id="reg-state"
                         type="text" 
@@ -270,7 +270,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({ onCancel }) => {
                 </div>
 
                 <div>
-                    <label htmlFor="reg-zip" className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Zip Code</label>
+                    <label htmlFor="reg-zip" className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-2">Zip Code</label>
                     <input 
                         id="reg-zip"
                         type="text" 
@@ -284,7 +284,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({ onCancel }) => {
                 </div>
 
                 <div>
-                    <label htmlFor="reg-phone" className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Phone</label>
+                    <label htmlFor="reg-phone" className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-2">Phone</label>
                     <input 
                         id="reg-phone"
                         type="tel" 
@@ -298,7 +298,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({ onCancel }) => {
                 </div>
 
                 <div className="col-span-1 md:col-span-2">
-                    <label htmlFor="reg-website" className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Website</label>
+                    <label htmlFor="reg-website" className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-2">Website</label>
                     <input 
                         id="reg-website"
                         type="url" 
@@ -321,7 +321,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({ onCancel }) => {
             <button 
                 type="submit" 
                 disabled={loading}
-                className="w-full bg-indigo-600 text-white py-4 rounded-xl font-black uppercase tracking-widest text-xs hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 dark:shadow-none disabled:opacity-50 mt-4"
+                className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold uppercase tracking-wide text-xs hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 dark:shadow-none disabled:opacity-50 mt-4"
             >
                 {loading ? 'Creating Tenant...' : 'Create Account'}
             </button>

@@ -169,10 +169,10 @@ export const AttendancePredictionWidget: React.FC<AttendancePredictionWidgetProp
                     <span className="text-2xl drop-shadow-lg">☁️</span>
                     <div>
                         <h3 className="text-sm font-black text-white tracking-tight">Attendance Forecast</h3>
-                        <p className="text-[9px] text-indigo-300/60 font-medium uppercase tracking-widest mt-0.5">Powered by weather data</p>
+                        <p className="text-[11px] text-indigo-300/60 font-medium uppercase tracking-wide mt-0.5">Powered by weather data</p>
                     </div>
                 </div>
-                <span className="text-[9px] font-bold text-indigo-400/50 uppercase tracking-widest">Next {predictions.length} Services</span>
+                <span className="text-[11px] font-bold text-indigo-400/50 uppercase tracking-wide">Next {predictions.length} Services</span>
             </div>
 
             {/* Prediction Grid */}
@@ -193,7 +193,7 @@ export const AttendancePredictionWidget: React.FC<AttendancePredictionWidgetProp
                                 {/* Date header */}
                                 <div className="flex items-center justify-between mb-4">
                                     <div>
-                                        <p className="text-[10px] font-black text-indigo-300/80 uppercase tracking-widest">
+                                        <p className="text-[10px] font-bold text-indigo-300/80 uppercase tracking-wide">
                                             {date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
                                         </p>
                                     </div>
@@ -233,7 +233,7 @@ export const AttendancePredictionWidget: React.FC<AttendancePredictionWidgetProp
                                         {pred.factors.slice(0, 3).map((factor, fIdx) => (
                                             <span
                                                 key={fIdx}
-                                                className={`text-[8px] font-bold px-2 py-0.5 rounded-full border ${factorBadgeStyle(factor)} truncate max-w-full`}
+                                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${factorBadgeStyle(factor)} truncate max-w-full`}
                                                 title={factor}
                                             >
                                                 {factor.length > 35 ? factor.slice(0, 32) + '…' : factor}

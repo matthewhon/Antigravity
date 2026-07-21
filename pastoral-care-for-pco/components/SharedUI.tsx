@@ -159,10 +159,10 @@ export const DonorListWidget: React.FC<{ title: string; donors: LifecycleDonor[]
         <div className="bg-white dark:bg-slate-800 p-8 print:p-4 rounded-3xl print:rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm print:shadow-none relative group hover:border-indigo-100 dark:hover:border-slate-600 transition-colors flex flex-col h-full print:break-inside-avoid">
             <div className="flex justify-between items-center mb-6 print:mb-2">
                 <div className="flex items-center gap-3">
-                    <h4 className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">{title}</h4>
-                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${theme} print:border print:bg-white`}>{donors.length}</span>
+                    <h4 className={EYEBROW}>{title}</h4>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${theme} print:border print:bg-white`}>{donors.length}</span>
                 </div>
-                <button onClick={onRemove} title="Remove widget" className="text-slate-300 dark:text-slate-600 hover:text-rose-500 transition-colors print:hidden">
+                <button onClick={onRemove} title="Remove widget" aria-label="Remove widget" className="text-slate-300 dark:text-slate-600 hover:text-rose-500 transition-colors print:hidden">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                 </button>
             </div>
@@ -188,10 +188,10 @@ export const DonorListWidget: React.FC<{ title: string; donors: LifecycleDonor[]
                                             />
                                         )}
                                     </p>
-                                    <p className="text-[9px] text-slate-400">Avg/mo: ${Math.round(d.avgMonthlyAmount).toLocaleString()}</p>
+                                    <p className="text-[11px] text-slate-400">Avg/mo: ${Math.round(d.avgMonthlyAmount).toLocaleString()}</p>
                                 </div>
                             </div>
-                            <span className="text-[9px] font-mono text-slate-400">{new Date(d.lastGiftDate).toLocaleDateString()}</span>
+                            <span className="text-[11px] font-mono text-slate-400">{new Date(d.lastGiftDate).toLocaleDateString()}</span>
                         </div>
                     ))
                 ) : (
@@ -226,10 +226,10 @@ export const PersonList: React.FC<{ people: PcoPerson[]; type: string }> = ({ pe
                 {p.name}
             </button>
             <div className="flex flex-wrap gap-2 items-center mt-0.5">
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest truncate">{p.membership || 'Guest'}</p>
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wide truncate">{p.membership || 'Guest'}</p>
                 
                 {p.riskProfile && (
-                    <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded tracking-wider ${
+                    <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded tracking-wide ${
                         p.riskProfile.category === 'Healthy' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400' :
                         p.riskProfile.category === 'At Risk' ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' :
                         'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400'
@@ -239,7 +239,7 @@ export const PersonList: React.FC<{ people: PcoPerson[]; type: string }> = ({ pe
                 )}
 
                 {p.checkInCount !== undefined && p.checkInCount > 0 && (
-                    <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest truncate hidden sm:block">
+                    <p className="text-[11px] font-semibold text-emerald-500 uppercase tracking-wide truncate hidden sm:block">
                         • {p.checkInCount} Visits
                     </p>
                 )}
@@ -247,7 +247,7 @@ export const PersonList: React.FC<{ people: PcoPerson[]; type: string }> = ({ pe
           </div>
         </div>
         <div className="text-right flex-shrink-0 flex flex-col items-end gap-1">
-          <span className="text-[9px] font-black text-indigo-500 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 print:bg-transparent print:border print:border-slate-200 px-2 py-1 rounded-lg uppercase tracking-widest">
+          <span className="text-[10px] font-bold text-indigo-500 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 print:bg-transparent print:border print:border-slate-200 px-2 py-1 rounded-lg uppercase tracking-wide">
             {type === 'birthday' ? (p.birthdate?.split('-').slice(1).join('/') || 'Upcoming') : 
              type === 'anniversary' ? (p.anniversary?.split('-').slice(1).join('/') || 'Soon') : 
              type === 'recent' ? (new Date(p.createdAt).toLocaleDateString(undefined, {month:'short', day:'numeric'})) :
@@ -257,7 +257,7 @@ export const PersonList: React.FC<{ people: PcoPerson[]; type: string }> = ({ pe
             const bd = p.birthdate ? parseISO(p.birthdate) : null;
             const age = bd && isValid(bd) ? differenceInYears(new Date(), bd) : null;
             return age !== null && age < 18 ? (
-              <span className="text-[8px] font-black bg-rose-500 text-white px-1.5 py-0.5 rounded-full uppercase tracking-wider">
+              <span className="text-[10px] font-bold bg-rose-500 text-white px-1.5 py-0.5 rounded-full uppercase tracking-wide">
                 Age {age + 1}
               </span>
             ) : null;
@@ -290,21 +290,21 @@ export const CareNoteCard: React.FC<{
             )}
             <div className="flex justify-between items-start mb-4">
                 <div className="flex items-center gap-3">
-                    <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded tracking-widest border ${typeColors[note.type] || typeColors.Note}`}>
+                    <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded tracking-wide border ${typeColors[note.type] || typeColors.Note}`}>
                         {note.type}
                     </span>
-                    <span className="text-[10px] font-bold text-slate-400">{new Date(note.date).toLocaleDateString()}</span>
+                    <span className="text-[11px] font-medium text-slate-400">{new Date(note.date).toLocaleDateString()}</span>
                 </div>
                 <div className="flex flex-col items-end text-right">
                     <button
                         onClick={() => window.dispatchEvent(new CustomEvent('openPersonProfile', { detail: note.personId }))}
-                        className="text-[10px] font-black text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 hover:underline cursor-pointer truncate max-w-[150px] transition-colors"
+                        className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 hover:underline cursor-pointer truncate max-w-[150px] transition-colors"
                         title="Open profile"
                     >
                         {note.personName}
                     </button>
                     {(phone || email) ? (
-                        <div className="text-[9px] text-slate-400 dark:text-slate-500 mt-0.5 flex flex-col items-end gap-0.5">
+                        <div className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5 flex flex-col items-end gap-0.5">
                             {phone && (
                                 <a href={`tel:${phone}`} className="hover:underline hover:text-slate-600 dark:hover:text-slate-300">
                                     {phone}
@@ -317,20 +317,20 @@ export const CareNoteCard: React.FC<{
                             )}
                         </div>
                     ) : (
-                        <span className="text-[9px] text-slate-300 dark:text-slate-600 italic mt-0.5">No contact info</span>
+                        <span className="text-[11px] text-slate-300 dark:text-slate-600 italic mt-0.5">No contact info</span>
                     )}
                 </div>
             </div>
             <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed mb-4">{note.content}</p>
             <div className="flex justify-between items-center pt-4 border-t border-slate-50 dark:border-slate-800">
                 <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-[8px] font-black">
+                    <div className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-[10px] font-black">
                         {note.authorName.charAt(0)}
                     </div>
-                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{note.authorName}</span>
+                    <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">{note.authorName}</span>
                 </div>
                 {note.followUpDate && (
-                    <span className="text-[9px] font-black text-rose-500 uppercase tracking-widest flex items-center gap-1">
+                    <span className="text-[11px] font-semibold text-rose-500 uppercase tracking-wide flex items-center gap-1">
                         <span className="text-xs">📅</span> {new Date(note.followUpDate).toLocaleDateString()}
                     </span>
                 )}
@@ -347,28 +347,28 @@ export const PrayerRequestCard: React.FC<{ request: PrayerRequest; onUpdateStatu
             )}
             <div className="flex justify-between items-start mb-4">
                 <div className="flex items-center gap-3">
-                    <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded tracking-widest border ${
+                    <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded tracking-wide border ${
                         request.status === 'Active' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
                         request.status === 'Answered' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-slate-50 text-slate-400 border-slate-100'
                     }`}>
                         {request.status}
                     </span>
-                    <span className="text-[10px] font-bold text-slate-400">{new Date(request.date).toLocaleDateString()}</span>
+                    <span className="text-[11px] font-medium text-slate-400">{new Date(request.date).toLocaleDateString()}</span>
                 </div>
-                <span className="text-[10px] font-black text-slate-900 dark:text-white truncate max-w-[120px]">{request.personName}</span>
+                <span className="text-[11px] font-bold text-slate-900 dark:text-white truncate max-w-[120px]">{request.personName}</span>
             </div>
             <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed mb-4 italic">"{request.request}"</p>
             
             <div className="flex justify-between items-center pt-4 border-t border-slate-50 dark:border-slate-800">
                 <div className="flex gap-2">
                     {request.status === 'Active' && onUpdateStatus && (
-                        <button onClick={() => onUpdateStatus('Answered')} className="text-[9px] font-black uppercase tracking-widest text-indigo-500 hover:text-indigo-600 transition-colors">Mark Answered</button>
+                        <button onClick={() => onUpdateStatus('Answered')} className="text-[11px] font-semibold uppercase tracking-wide text-indigo-500 hover:text-indigo-600 transition-colors">Mark Answered</button>
                     )}
                     {request.status !== 'Archived' && onUpdateStatus && (
-                        <button onClick={() => onUpdateStatus('Archived')} className="text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-500 transition-colors">Archive</button>
+                        <button onClick={() => onUpdateStatus('Archived')} className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 hover:text-slate-500 transition-colors">Archive</button>
                     )}
                 </div>
-                {request.isPublic && <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest">Public</span>}
+                {request.isPublic && <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-wide">Public</span>}
             </div>
         </div>
     );

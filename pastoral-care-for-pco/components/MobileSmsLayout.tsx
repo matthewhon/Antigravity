@@ -209,7 +209,7 @@ const ShareSheet: React.FC<{
                 <div className="px-5 pt-5 pb-6 space-y-5">
                     {/* Tab picker */}
                     <div>
-                        <p className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-2">Section</p>
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-2">Section</p>
                         <div className="grid grid-cols-2 gap-2">
                             {visibleTabs.map(t => (
                                 <button
@@ -233,7 +233,7 @@ const ShareSheet: React.FC<{
                     {/* Number picker — only when multi-number */}
                     {visibleNumbers.length > 1 && (
                         <div>
-                            <p className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-2">Phone Line</p>
+                            <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-2">Phone Line</p>
                             <div className="space-y-1.5">
                                 <button
                                     onClick={() => setSelectedNumber('')}

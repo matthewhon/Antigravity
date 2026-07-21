@@ -120,7 +120,7 @@ const WelcomeLayoutModal: React.FC<WelcomeLayoutModalProps> = ({
                         </div>
                     ) : (
                         <div className="bg-slate-50 dark:bg-slate-800/60 rounded-2xl p-4 space-y-3 max-h-60 overflow-y-auto custom-scrollbar mb-6">
-                            <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">
+                            <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-2">
                                 Your suggested widgets
                             </p>
                             {PREVIEW_VIEWS.map(viewKey => {
@@ -128,7 +128,7 @@ const WelcomeLayoutModal: React.FC<WelcomeLayoutModalProps> = ({
                                 if (!widgetIds || widgetIds.length === 0) return null;
                                 return (
                                     <div key={viewKey}>
-                                        <p className="text-[10px] font-black uppercase tracking-wider text-indigo-500 dark:text-indigo-400 mb-1">
+                                        <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-500 dark:text-indigo-400 mb-1">
                                             {VIEW_LABELS[viewKey] || viewKey}
                                         </p>
                                         <div className="flex flex-wrap gap-1.5">

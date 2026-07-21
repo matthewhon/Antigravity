@@ -240,7 +240,7 @@ export const GroupAbsenteesReport: React.FC<GroupAbsenteesReportProps> = ({ grou
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     {/* Group filter */}
                     <div>
-                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">
+                        <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-2">
                             Group
                         </label>
                         <div className="relative">
@@ -260,7 +260,7 @@ export const GroupAbsenteesReport: React.FC<GroupAbsenteesReportProps> = ({ grou
 
                     {/* PCO List filter */}
                     <div>
-                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">
+                        <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-2">
                             PCO List Filter
                         </label>
                         <div className="relative">
@@ -285,7 +285,7 @@ export const GroupAbsenteesReport: React.FC<GroupAbsenteesReportProps> = ({ grou
 
                     {/* Date preset */}
                     <div>
-                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">
+                        <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-2">
                             Date Range
                         </label>
                         <div className="relative">
@@ -307,7 +307,7 @@ export const GroupAbsenteesReport: React.FC<GroupAbsenteesReportProps> = ({ grou
 
                     {/* Search */}
                     <div>
-                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">
+                        <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-2">
                             Search
                         </label>
                         <div className="relative">
@@ -327,7 +327,7 @@ export const GroupAbsenteesReport: React.FC<GroupAbsenteesReportProps> = ({ grou
                 {datePreset === 'custom' && (
                     <div className="grid grid-cols-2 gap-4 mt-4">
                         <div>
-                            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">From</label>
+                            <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2">From</label>
                             <input
                                 type="date"
                                 value={customFrom}
@@ -336,7 +336,7 @@ export const GroupAbsenteesReport: React.FC<GroupAbsenteesReportProps> = ({ grou
                             />
                         </div>
                         <div>
-                            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">To</label>
+                            <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2">To</label>
                             <input
                                 type="date"
                                 value={customTo}
@@ -361,7 +361,7 @@ export const GroupAbsenteesReport: React.FC<GroupAbsenteesReportProps> = ({ grou
                         </div>
                         <div>
                             <p className={`text-2xl font-black ${s.color}`}>{s.value}</p>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{s.label}</p>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{s.label}</p>
                         </div>
                     </div>
                 ))}
@@ -381,7 +381,7 @@ export const GroupAbsenteesReport: React.FC<GroupAbsenteesReportProps> = ({ grou
                         <thead className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-100 dark:border-slate-700">
                             <tr>
                                 {['Member', 'Group', 'Events', 'Attended', 'Missed', 'Absence Rate', 'Last Attended'].map(col => (
-                                    <th key={col} className="px-4 py-3 text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 whitespace-nowrap">
+                                    <th key={col} className="px-4 py-3 text-[11px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 whitespace-nowrap">
                                         {col}
                                     </th>
                                 ))}

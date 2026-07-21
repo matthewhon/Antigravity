@@ -37,13 +37,13 @@ const Shell: React.FC<{
                     </div>
                     <div>
                         {churchName && <p className="text-sm font-black text-slate-900 leading-tight">{churchName}</p>}
-                        {sessionName && <p className="text-[10px] text-indigo-500 font-black uppercase tracking-widest">{sessionName}</p>}
+                        {sessionName && <p className="text-[10px] text-indigo-500 font-bold uppercase tracking-wide">{sessionName}</p>}
                     </div>
                 </div>
                 {onEnd && (
                     <button
                         onClick={onEnd}
-                        className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wide text-slate-400 hover:text-rose-500 transition-colors px-3 py-2 rounded-xl hover:bg-rose-50"
+                        className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-400 hover:text-rose-500 transition-colors px-3 py-2 rounded-xl hover:bg-rose-50"
                     >
                         <LogOut size={13} /> End Session
                     </button>
@@ -102,7 +102,7 @@ const PhoneStep: React.FC<{ sessionName: string; onSubmit: (phone: string) => vo
 
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">
+                    <label className="text-[10px] font-bold uppercase tracking-wide text-slate-400 block mb-2">
                         Your Cell Phone Number
                     </label>
                     <input
@@ -112,7 +112,7 @@ const PhoneStep: React.FC<{ sessionName: string; onSubmit: (phone: string) => vo
                         value={phone}
                         onChange={e => setPhone(e.target.value)}
                         placeholder="(555) 000-0000"
-                        className="w-full text-2xl font-black text-slate-900 tracking-widest text-center bg-slate-50 border-2 border-slate-200 focus:border-indigo-500 rounded-2xl px-4 py-4 outline-none transition-colors placeholder:text-slate-300 placeholder:font-normal placeholder:text-xl"
+                        className="w-full text-2xl font-black text-slate-900 tracking-wide text-center bg-slate-50 border-2 border-slate-200 focus:border-indigo-500 rounded-2xl px-4 py-4 outline-none transition-colors placeholder:text-slate-300 placeholder:font-normal placeholder:text-xl"
                     />
                     <p className="text-[10px] text-slate-400 text-center mt-2 font-medium">
                         Your number is only visible to the session coordinator.
@@ -122,7 +122,7 @@ const PhoneStep: React.FC<{ sessionName: string; onSubmit: (phone: string) => vo
                 <button
                     type="submit"
                     disabled={normalizePhone(phone).length < 10 || isLoading}
-                    className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-sm shadow-lg shadow-indigo-200 transition-all flex items-center justify-center gap-2"
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white py-4 rounded-2xl font-bold uppercase tracking-wide text-sm shadow-lg shadow-indigo-200 transition-all flex items-center justify-center gap-2"
                 >
                     {isLoading ? <Loader2 size={18} className="animate-spin" /> : <ChevronRight size={18} />}
                     {isLoading ? 'Finding your assignment…' : 'Get My Assignment'}
@@ -192,7 +192,7 @@ const ContactCard: React.FC<ContactCardProps> = ({ slot, onComplete }) => {
                 <div className="h-2 bg-gradient-to-r from-indigo-500 to-violet-500" />
 
                 <div className="p-8">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-3">Your Contact</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-indigo-400 mb-3">Your Contact</p>
 
                     {/* Avatar & Name */}
                     <div className="flex items-center gap-4 mb-6">
@@ -216,7 +216,7 @@ const ContactCard: React.FC<ContactCardProps> = ({ slot, onComplete }) => {
                                     <Phone size={18} className="text-white" />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-0.5">Call</p>
+                                    <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-600 mb-0.5">Call</p>
                                     <p className="text-base font-black text-slate-900 tracking-wide">{formatPhone(slot.assignedPersonPhone)}</p>
                                 </div>
                                 <ArrowRight size={16} className="text-emerald-400 group-hover:translate-x-1 transition-transform" />
@@ -227,7 +227,7 @@ const ContactCard: React.FC<ContactCardProps> = ({ slot, onComplete }) => {
                                     <Phone size={18} className="text-slate-400" />
                                 </div>
                                 <div>
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Call</p>
+                                    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-0.5">Call</p>
                                     <p className="text-sm font-bold text-slate-400">No phone on file</p>
                                 </div>
                             </div>
@@ -243,7 +243,7 @@ const ContactCard: React.FC<ContactCardProps> = ({ slot, onComplete }) => {
                                     <MessageSquare size={18} className="text-white" />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-violet-600 mb-0.5">Text</p>
+                                    <p className="text-[10px] font-bold uppercase tracking-wide text-violet-600 mb-0.5">Text</p>
                                     <p className="text-base font-black text-slate-900 tracking-wide">{formatPhone(slot.assignedPersonPhone)}</p>
                                 </div>
                                 <ArrowRight size={16} className="text-violet-400 group-hover:translate-x-1 transition-transform" />
@@ -259,7 +259,7 @@ const ContactCard: React.FC<ContactCardProps> = ({ slot, onComplete }) => {
                                     <Mail size={18} className="text-white" />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-indigo-600 mb-0.5">Email</p>
+                                    <p className="text-[10px] font-bold uppercase tracking-wide text-indigo-600 mb-0.5">Email</p>
                                     <p className="text-sm font-black text-slate-900 truncate">{slot.assignedPersonEmail}</p>
                                 </div>
                                 <ArrowRight size={16} className="text-indigo-400 group-hover:translate-x-1 transition-transform" />
@@ -270,7 +270,7 @@ const ContactCard: React.FC<ContactCardProps> = ({ slot, onComplete }) => {
                                     <Mail size={18} className="text-slate-400" />
                                 </div>
                                 <div>
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Email</p>
+                                    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-0.5">Email</p>
                                     <p className="text-sm font-bold text-slate-400">No email on file</p>
                                 </div>
                             </div>
@@ -279,7 +279,7 @@ const ContactCard: React.FC<ContactCardProps> = ({ slot, onComplete }) => {
 
                     {/* Notes */}
                     <div>
-                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">
+                        <label className="text-[10px] font-bold uppercase tracking-wide text-slate-400 block mb-2">
                             Notes <span className="font-medium text-slate-300">(Optional)</span>
                         </label>
                         <textarea
@@ -295,7 +295,7 @@ const ContactCard: React.FC<ContactCardProps> = ({ slot, onComplete }) => {
 
             {/* Outcome Selection */}
             <div className="space-y-2">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">What happened?</p>
+                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 px-1">What happened?</p>
 
                 <button
                     onClick={() => setSelectedOutcome(selectedOutcome === 'contacted' ? null : 'contacted')}
@@ -345,7 +345,7 @@ const ContactCard: React.FC<ContactCardProps> = ({ slot, onComplete }) => {
                 <button
                     onClick={handleConfirm}
                     disabled={confirmed}
-                    className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-sm shadow-lg transition-all flex items-center justify-center gap-2 ${
+                    className={`w-full py-4 rounded-2xl font-black uppercase tracking-wide text-sm shadow-lg transition-all flex items-center justify-center gap-2 ${
                         selectedOutcome === 'contacted'
                             ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-200'
                             : 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-200'
@@ -373,19 +373,19 @@ const StatsStrip: React.FC<{
         <div className="flex items-center gap-3">
             <div className="text-center">
                 <p className="text-2xl font-black text-emerald-600">{myContacted}</p>
-                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Reached</p>
+                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Reached</p>
             </div>
             <div className="w-px h-8 bg-slate-100" />
             <div className="text-center">
                 <p className="text-2xl font-black text-rose-500">{myNoAnswer}</p>
-                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">No Answer</p>
+                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">No Answer</p>
             </div>
         </div>
         {sessionTotal > 0 && (
             <div className="flex-1 max-w-[140px]">
                 <div className="flex items-center justify-between mb-1">
-                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Session</p>
-                    <p className="text-[9px] font-black text-indigo-600">{Math.round(sessionContacted / sessionTotal * 100)}%</p>
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Session</p>
+                    <p className="text-[11px] font-black text-indigo-600">{Math.round(sessionContacted / sessionTotal * 100)}%</p>
                 </div>
                 <div className="bg-slate-100 rounded-full h-1.5 overflow-hidden">
                     <div
@@ -393,7 +393,7 @@ const StatsStrip: React.FC<{
                         style={{ width: `${Math.min(100, Math.round(sessionContacted / sessionTotal * 100))}%` }}
                     />
                 </div>
-                <p className="text-[9px] text-slate-400 mt-1 text-right">{sessionContacted}/{sessionTotal} attempted</p>
+                <p className="text-[11px] text-slate-400 mt-1 text-right">{sessionContacted}/{sessionTotal} attempted</p>
             </div>
         )}
     </div>
@@ -434,17 +434,17 @@ const AllDoneCard: React.FC<AllDoneCardProps> = ({
                 </p>
             </div>
             <div className="bg-white rounded-[2rem] shadow-xl border border-slate-100 p-6">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4 flex items-center gap-1.5">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-4 flex items-center gap-1.5">
                     <Award size={11} className="text-indigo-500" /> Your Contribution
                 </p>
                 <div className="grid grid-cols-2 gap-4 mb-4">
                     <div className="bg-emerald-50 rounded-2xl p-4 text-center">
                         <p className="text-4xl font-black text-emerald-600 mb-1">{myContacted}</p>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-emerald-500">✅ Reached</p>
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-500">✅ Reached</p>
                     </div>
                     <div className="bg-rose-50 rounded-2xl p-4 text-center">
                         <p className="text-4xl font-black text-rose-500 mb-1">{myNoAnswer}</p>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-rose-400">📵 No Answer</p>
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-rose-400">📵 No Answer</p>
                     </div>
                 </div>
                 {myTotal > 0 && (
@@ -457,7 +457,7 @@ const AllDoneCard: React.FC<AllDoneCardProps> = ({
             </div>
             {sessionTotal > 0 && (
                 <div className="bg-white rounded-[2rem] shadow-xl border border-slate-100 p-6">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4 flex items-center gap-1.5">
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-4 flex items-center gap-1.5">
                         <TrendingUp size={11} className="text-indigo-500" /> Session Progress
                     </p>
                     <div className="flex items-center justify-between mb-2">
@@ -473,11 +473,11 @@ const AllDoneCard: React.FC<AllDoneCardProps> = ({
                     <div className="grid grid-cols-2 gap-3">
                         <div className="text-center">
                             <p className="text-xl font-black text-emerald-600">{sessionContacted}</p>
-                            <p className="text-[9px] uppercase font-black text-slate-400 tracking-widest">Total Reached</p>
+                            <p className="text-[11px] uppercase font-bold text-slate-400 tracking-wide">Total Reached</p>
                         </div>
                         <div className="text-center">
                             <p className="text-xl font-black text-rose-500">{sessionNoAnswer}</p>
-                            <p className="text-[9px] uppercase font-black text-slate-400 tracking-widest">No Answer</p>
+                            <p className="text-[11px] uppercase font-bold text-slate-400 tracking-wide">No Answer</p>
                         </div>
                     </div>
                 </div>
@@ -515,7 +515,7 @@ const ClosedCard: React.FC<{ sessionName: string; sessionId: string }> = ({ sess
                 <p className="text-xs text-slate-400 mb-3">Need to add follow-up notes for someone who called back?</p>
                 <a
                     href={followUpUrl}
-                    className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-2xl text-sm font-black uppercase tracking-wide shadow-lg shadow-indigo-200 transition-all"
+                    className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-2xl text-sm font-bold uppercase tracking-wide shadow-lg shadow-indigo-200 transition-all"
                 >
                     <Edit3 size={15} />
                     Open Follow-Up Notes
@@ -700,7 +700,7 @@ const FollowUpView: React.FC<{ sessionId: string }> = ({ sessionId }) => {
                                             <div>
                                                 <p className="font-black text-slate-900 leading-tight">{slot.assignedPersonName}</p>
                                                 <div className="flex items-center gap-2 mt-0.5">
-                                                    <span className={`inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wide px-2 py-0.5 rounded-full ${
+                                                    <span className={`inline-flex items-center gap-1 text-[11px] font-black uppercase tracking-wide px-2 py-0.5 rounded-full ${
                                                         slot.status === 'contacted'
                                                             ? 'bg-emerald-100 text-emerald-700'
                                                             : 'bg-rose-100 text-rose-700'
@@ -708,7 +708,7 @@ const FollowUpView: React.FC<{ sessionId: string }> = ({ sessionId }) => {
                                                         {slot.status === 'contacted' ? '✅ Reached' : '📵 No Answer'}
                                                     </span>
                                                     {slot.completedAt && (
-                                                        <span className="text-[9px] text-slate-400">
+                                                        <span className="text-[11px] text-slate-400">
                                                             {new Date(slot.completedAt).toLocaleDateString()}
                                                         </span>
                                                     )}
@@ -720,7 +720,7 @@ const FollowUpView: React.FC<{ sessionId: string }> = ({ sessionId }) => {
                                     {/* Original notes */}
                                     {slot.notes && (
                                         <div className="bg-slate-50 rounded-xl px-4 py-2.5 mb-3">
-                                            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Original Notes</p>
+                                            <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-1">Original Notes</p>
                                             <p className="text-sm text-slate-600">{slot.notes}</p>
                                         </div>
                                     )}
@@ -732,8 +732,8 @@ const FollowUpView: React.FC<{ sessionId: string }> = ({ sessionId }) => {
                                                 <div key={i} className="bg-indigo-50 rounded-xl px-4 py-2.5">
                                                     <div className="flex items-center gap-1.5 mb-1">
                                                         <Edit3 size={10} className="text-indigo-500" />
-                                                        <p className="text-[9px] font-black uppercase tracking-widest text-indigo-500">Follow-Up</p>
-                                                        <span className="text-[9px] text-slate-400 ml-auto">
+                                                        <p className="text-[11px] font-bold uppercase tracking-wide text-indigo-500">Follow-Up</p>
+                                                        <span className="text-[11px] text-slate-400 ml-auto">
                                                             {new Date(fn.addedAt).toLocaleDateString()}
                                                         </span>
                                                     </div>
@@ -766,7 +766,7 @@ const FollowUpView: React.FC<{ sessionId: string }> = ({ sessionId }) => {
                                                 <button
                                                     onClick={() => handleSaveNote(slot)}
                                                     disabled={!noteText.trim() || saving}
-                                                    className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white py-2.5 rounded-xl text-xs font-black uppercase tracking-wide shadow-md shadow-indigo-200 transition-all"
+                                                    className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white py-2.5 rounded-xl text-xs font-bold uppercase tracking-wide shadow-md shadow-indigo-200 transition-all"
                                                 >
                                                     {saving
                                                         ? <><Loader2 size={14} className="animate-spin" /> Saving…</>
@@ -783,7 +783,7 @@ const FollowUpView: React.FC<{ sessionId: string }> = ({ sessionId }) => {
                                     ) : (
                                         <button
                                             onClick={() => { setExpandedSlotId(slot.id); setNoteText(''); }}
-                                            className="w-full flex items-center justify-center gap-2 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 py-3 rounded-xl text-xs font-black uppercase tracking-wide transition-all"
+                                            className="w-full flex items-center justify-center gap-2 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 py-3 rounded-xl text-xs font-bold uppercase tracking-wide transition-all"
                                         >
                                             <Edit3 size={14} />
                                             Add Follow-Up Note
@@ -1054,7 +1054,7 @@ export const PublicContactView: React.FC<{ sessionId: string; mode?: 'followup' 
                             }`}
                         />
                     ))}
-                    <span className="text-[9px] font-black text-slate-400 whitespace-nowrap">
+                    <span className="text-[11px] font-black text-slate-400 whitespace-nowrap">
                         {batchProgress.current}/{batchProgress.total}
                     </span>
                 </div>

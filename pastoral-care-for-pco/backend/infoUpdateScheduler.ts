@@ -80,14 +80,11 @@ async function processCampaign(db: any, log: any, campaign: any): Promise<void> 
     const windowStart = schedule?.sendWindowStart || '09:00';
     const windowEnd   = schedule?.sendWindowEnd   || '21:00';
 
-    // 1. Check kickoff start date in the church's local timezone
+    // 1. Check kickoff start date (YYYY-MM-DD comparison in current date string)
     if (schedule?.startDate) {
-        // Construct ISO string for kickoff date at the start of the send window in local time (e.g. 2026-07-25T09:00:00)
-        const kickoffDateTimeStr = `${schedule.startDate}T${windowStart}:00`;
-        const kickoffMs = new Date(kickoffDateTimeStr).getTime();
-
-        if (now < kickoffMs) {
-            log.info(`[InfoUpdateScheduler] Campaign ${campaignId} kickoff not yet reached (scheduled for ${schedule.startDate} at ${windowStart} in ${timeZone})`, 'system', { churchId }, churchId);
+        const todayLocalStr = new Date().toISOString().split('T')[0];
+        if (todayLocalStr < schedule.startDate) {
+            log.info(`[InfoUpdateScheduler] Campaign ${campaignId} kickoff not yet reached (scheduled for ${schedule.startDate})`, 'system', { churchId }, churchId);
             return;
         }
     }
