@@ -76,13 +76,26 @@ async function processCampaign(db: any, log: any, campaign: any): Promise<void> 
     const churchName = church.name || 'Our Church';
     const timeZone = church.timezone || 'America/Chicago';
 
-    // Check send window
     const now = Date.now();
     const windowStart = schedule?.sendWindowStart || '09:00';
     const windowEnd   = schedule?.sendWindowEnd   || '21:00';
+
+    // 1. Check kickoff start date in the church's local timezone
+    if (schedule?.startDate) {
+        // Construct ISO string for kickoff date at the start of the send window in local time (e.g. 2026-07-25T09:00:00)
+        const kickoffDateTimeStr = `${schedule.startDate}T${windowStart}:00`;
+        const kickoffMs = new Date(kickoffDateTimeStr).getTime();
+
+        if (now < kickoffMs) {
+            log.info(`[InfoUpdateScheduler] Campaign ${campaignId} kickoff not yet reached (scheduled for ${schedule.startDate} at ${windowStart} in ${timeZone})`, 'system', { churchId }, churchId);
+            return;
+        }
+    }
+
+    // 2. Check current send window (start & end hour) in local time
     const { allowed } = getNextAllowedSmsTime(now, timeZone, windowStart, windowEnd);
     if (!allowed) {
-        log.info(`[InfoUpdateScheduler] Outside send window for campaign ${campaignId}`, 'system', { churchId }, churchId);
+        log.info(`[InfoUpdateScheduler] Outside send window for campaign ${campaignId} (${windowStart}–${windowEnd} ${timeZone})`, 'system', { churchId }, churchId);
         return;
     }
 

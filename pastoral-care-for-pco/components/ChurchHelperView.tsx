@@ -48,7 +48,7 @@ interface InfoCampaign {
     fieldBehavior?: 'confirm_all' | 'only_blank';
     existingFieldValues?: Record<string, Record<string, string>>;
     channels: { sms: boolean; email: boolean; smsNumberId?: string };
-    schedule: { intervalDays: number; maxAttempts: number; sendWindowStart: string; sendWindowEnd: string };
+    schedule: { startDate?: string; intervalDays: number; maxAttempts: number; sendWindowStart: string; sendWindowEnd: string };
     messaging?: { introMessage?: string };
     stats: { total: number; pending: number; inProgress: number; complete: number; maxAttempts: number };
     createdAt: number;
@@ -221,6 +221,7 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
     const [fieldBehavior, setFieldBehavior] = useState<'confirm_all' | 'only_blank'>(existing?.fieldBehavior || 'confirm_all');
     const [smsEnabled, setSmsEnabled] = useState(existing?.channels?.sms ?? true);
     const [emailEnabled, setEmailEnabled] = useState(existing?.channels?.email ?? true);
+    const [startDate, setStartDate] = useState(existing?.schedule?.startDate || new Date().toISOString().split('T')[0]);
     const [intervalDays, setIntervalDays] = useState(existing?.schedule?.intervalDays ?? 3);
     const [maxAttempts, setMaxAttempts] = useState(existing?.schedule?.maxAttempts ?? 3);
     const [sendWindowStart, setSendWindowStart] = useState(existing?.schedule?.sendWindowStart || '09:00');
@@ -309,7 +310,7 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
                 fieldsToCollect: FIELD_CATALOG.filter(f => selectedFields.includes(f.key)),
                 fieldBehavior,
                 channels: { sms: smsEnabled, email: emailEnabled },
-                schedule: { intervalDays, maxAttempts, sendWindowStart, sendWindowEnd },
+                schedule: { startDate, intervalDays, maxAttempts, sendWindowStart, sendWindowEnd },
                 messaging: introMessage ? { introMessage } : undefined,
             });
         } catch (e: any) {
@@ -457,10 +458,19 @@ function CampaignForm({ churchId, church, existing, onSave, onCancel }: Campaign
                 </div>
             </div>
 
-            {/* Schedule */}
+            {/* Schedule & Kickoff */}
             <div className="space-y-3">
-                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Retry Schedule</label>
-                <div className="grid grid-cols-3 gap-3">
+                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Schedule & Kickoff</label>
+                <div className="grid grid-cols-4 gap-3">
+                    <div className="space-y-1">
+                        <p className="text-xs text-slate-500 dark:text-slate-400">Kickoff Date</p>
+                        <input
+                            type="date"
+                            value={startDate}
+                            onChange={e => setStartDate(e.target.value)}
+                            className="w-full px-2 py-1.5 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                    </div>
                     <div className="space-y-1">
                         <p className="text-xs text-slate-500 dark:text-slate-400">Retry after</p>
                         <div className="flex items-center gap-1.5">
@@ -764,6 +774,16 @@ export function ChurchHelperView({ churchId, church, currentUser }: {
         await loadCampaigns();
     };
 
+    const handleStartCampaign = async (campaign: InfoCampaign, e: React.MouseEvent) => {
+        e.stopPropagation();
+        const todayStr = new Date().toISOString().split('T')[0];
+        await firestore.updateInfoCampaign(campaign.id, {
+            status: 'active',
+            'schedule.startDate': todayStr,
+        });
+        await loadCampaigns();
+    };
+
     const handlePauseResume = async (campaign: InfoCampaign, e: React.MouseEvent) => {
         e.stopPropagation();
         const newStatus = campaign.status === 'active' ? 'paused' : 'active';
@@ -867,12 +887,22 @@ export function ChurchHelperView({ churchId, church, currentUser }: {
                                         </p>
                                     </div>
                                     <div className="flex items-center gap-2 ml-4" onClick={e => e.stopPropagation()}>
-                                        <button
-                                            onClick={(e) => handlePauseResume(campaign, e)}
-                                            className="text-xs px-3 py-1.5 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 transition font-medium"
-                                        >
-                                            {campaign.status === 'active' ? 'Pause' : 'Resume'}
-                                        </button>
+                                        {campaign.status !== 'active' && (
+                                            <button
+                                                onClick={(e) => handleStartCampaign(campaign, e)}
+                                                className="text-xs px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition font-semibold flex items-center gap-1 shadow-sm"
+                                            >
+                                                ▶ Start Now
+                                            </button>
+                                        )}
+                                        {campaign.status === 'active' && (
+                                            <button
+                                                onClick={(e) => handlePauseResume(campaign, e)}
+                                                className="text-xs px-3 py-1.5 border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 hover:bg-amber-100 transition font-medium rounded-lg"
+                                            >
+                                                Pause
+                                            </button>
+                                        )}
                                         <button
                                             onClick={(e) => { e.stopPropagation(); setEditingCampaign(campaign); }}
                                             className="text-xs px-3 py-1.5 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 transition font-medium"
