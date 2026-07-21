@@ -300,7 +300,7 @@ async function saveMetricsToFirestore(churchId: string, result: YoutubeSyncResul
                 dashboardOrder: [],
                 // Merge in existing settings
                 ...(await firestore.getChurch(churchId))?.metricsSettings,
-                youtubeChannelId: result.channelName,
+                youtubeChannelId: (await firestore.getChurch(churchId))?.metricsSettings?.youtubeChannelId || result.channelName,
                 youtubeChannelName: result.channelName,
                 youtubeChannelAvatar: result.avatarUrl,
                 youtubeSubscribers: result.subscribers,

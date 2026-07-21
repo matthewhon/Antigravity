@@ -1478,7 +1478,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
               ...prev,
               metricsSettings: {
                   ...prev.metricsSettings,
-                  youtubeChannelId: result.channelName,
+                  youtubeChannelId: channelVal,
                   youtubeChannelName: result.channelName,
                   youtubeChannelAvatar: result.avatarUrl,
                   youtubeSubscribers: result.subscribers,
@@ -1493,7 +1493,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
               onUpdateChurch({
                   metricsSettings: {
                       ...church.metricsSettings,
-                      youtubeChannelId: result.channelName,
+                      youtubeChannelId: channelVal,
                       youtubeChannelName: result.channelName,
                       youtubeChannelAvatar: result.avatarUrl,
                       youtubeSubscribers: result.subscribers,
