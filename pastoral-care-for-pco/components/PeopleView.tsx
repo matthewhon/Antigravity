@@ -255,6 +255,86 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
     return count > 0 ? Math.round(total / count) : null;
   }, [data.allPeople]);
 
+  // --- Assimilation / Connection Rate ---
+  // Base = "active people" (members OR anyone with attendance activity). Of those,
+  // how many are plugged into a group and/or a serving team in the last 90 days.
+  const connection = useMemo(() => {
+    const people = data.allPeople || [];
+    const isConnectedToGroup = (p: typeof people[number]) => (p.groupIds?.length || 0) > 0;
+    const isServing = (p: typeof people[number]) => (p.servingStats?.last90DaysCount || 0) > 0;
+
+    const activePeople = people.filter(p => p.membership === 'Member' || (p.checkInCount || 0) > 0);
+    // Fallback: if attendance/membership data is sparse, use the whole directory as the base
+    const base = activePeople.length > 0 ? activePeople : people;
+    const total = base.length;
+
+    const inGroup = base.filter(isConnectedToGroup).length;
+    const serving = base.filter(isServing).length;
+    const both = base.filter(p => isConnectedToGroup(p) && isServing(p)).length;
+    const connected = base.filter(p => isConnectedToGroup(p) || isServing(p)).length;
+    const unconnected = total - connected;
+
+    const pct = (n: number) => (total > 0 ? Math.round((n / total) * 100) : 0);
+
+    return {
+      total,
+      connected,
+      unconnected,
+      connectedPct: pct(connected),
+      inGroupPct: pct(inGroup),
+      servingPct: pct(serving),
+      bothPct: pct(both),
+      donut: [
+        { name: 'Connected', value: connected },
+        { name: 'Unconnected', value: unconnected },
+      ],
+    };
+  }, [data.allPeople]);
+
+  // --- Engagement Status (Core / Regular / Sporadic / Inactive) ---
+  const engagementStatusData = useMemo(() => {
+    const order = ['Core', 'Regular', 'Sporadic', 'Inactive'];
+    const counts: Record<string, number> = { Core: 0, Regular: 0, Sporadic: 0, Inactive: 0 };
+    (data.allPeople || []).forEach(p => {
+      const s = p.engagementStatus && counts[p.engagementStatus] !== undefined ? p.engagementStatus : 'Inactive';
+      counts[s]++;
+    });
+    return order.map(name => ({ name, value: counts[name] }));
+  }, [data.allPeople]);
+
+  // --- Data Completeness (contactability / directory hygiene) ---
+  const completeness = useMemo(() => {
+    const people = data.allPeople || [];
+    const total = people.length || 1;
+    const hasEmail = people.filter(p => !!p.email).length;
+    const hasPhone = people.filter(p => !!(p.e164Phone || p.phone)).length;
+    const hasAddress = people.filter(p => (p.addresses || []).some(a => a?.city || a?.street || a?.zip)).length;
+    const hasBirthdate = people.filter(p => !!p.birthdate).length;
+    const pct = (n: number) => Math.round((n / total) * 100);
+    return {
+      total: people.length,
+      rows: [
+        { label: 'Email', count: hasEmail, pct: pct(hasEmail) },
+        { label: 'Phone', count: hasPhone, pct: pct(hasPhone) },
+        { label: 'Address', count: hasAddress, pct: pct(hasAddress) },
+        { label: 'Birthdate', count: hasBirthdate, pct: pct(hasBirthdate) },
+      ],
+    };
+  }, [data.allPeople]);
+
+  // --- Campus Breakdown (multi-site) ---
+  const campusData = useMemo(() => {
+    const counts = new Map<string, number>();
+    (data.allPeople || []).forEach(p => {
+      const name = p.primaryCampusName;
+      if (!name) return;
+      counts.set(name, (counts.get(name) || 0) + 1);
+    });
+    return Array.from(counts.entries())
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+  }, [data.allPeople]);
+
   const renderWidget = (id: string) => {
     const gridColor = currentTheme === 'dark' ? '#334155' : '#f1f5f9';
     const axisColor = currentTheme === 'dark' ? '#94a3b8' : '#94a3b8';
@@ -270,6 +350,130 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
                         <StatCard label="Households" value={data.stats.households.toLocaleString()} color="amber" source="Planning Center" />
                         <StatCard label="Avg Age" value={avgAge !== null ? `${avgAge} yrs` : '—'} color="rose" source="w/ Birthdate" />
                     </div>
+                </div>
+            );
+        case 'assimilation_rate':
+            return (
+                <div key="assimilation_rate" className="col-span-1 lg:col-span-2">
+                    <WidgetWrapper title="Connection Rate" onRemove={() => handleRemoveWidget(id)} source="Groups & Serving (90d)">
+                        <div className="h-64 grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+                            {/* Donut: connected vs unconnected */}
+                            <div className="relative h-full">
+                                <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={1}>
+                                    <PieChart>
+                                        <Pie data={connection.donut} innerRadius={55} outerRadius={78} paddingAngle={4} dataKey="value" startAngle={90} endAngle={-270}>
+                                            <Cell fill="#10b981" />
+                                            <Cell fill="#e2e8f0" />
+                                        </Pie>
+                                        <Tooltip contentStyle={TOOLTIP_STYLE} itemStyle={{ color: '#fff' }} />
+                                    </PieChart>
+                                </ResponsiveContainer>
+                                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                    <span className="text-4xl font-black tracking-tighter text-slate-900 dark:text-white">{connection.connectedPct}%</span>
+                                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Connected</span>
+                                </div>
+                            </div>
+                            {/* Breakdown bars */}
+                            <div className="flex flex-col justify-center gap-4 pr-2">
+                                {[
+                                    { label: 'In a Group', pct: connection.inGroupPct, color: 'bg-indigo-500' },
+                                    { label: 'Serving', pct: connection.servingPct, color: 'bg-violet-500' },
+                                    { label: 'Group + Serving', pct: connection.bothPct, color: 'bg-emerald-500' },
+                                ].map(row => (
+                                    <div key={row.label}>
+                                        <div className="flex justify-between text-[10px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                                            <span>{row.label}</span>
+                                            <span className="tabular-nums">{row.pct}%</span>
+                                        </div>
+                                        <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2">
+                                            <div className={`${row.color} h-2 rounded-full transition-all`} style={{ width: `${row.pct}%` }}></div>
+                                        </div>
+                                    </div>
+                                ))}
+                                <p className="text-[10px] text-slate-400 mt-1">
+                                    <span className="font-black text-rose-500">{connection.unconnected.toLocaleString()}</span> of {connection.total.toLocaleString()} active people are unconnected
+                                </p>
+                            </div>
+                        </div>
+                    </WidgetWrapper>
+                </div>
+            );
+        case 'engagement_status':
+            return (
+                <div key="engagement_status" className="col-span-1">
+                    <WidgetWrapper title="Engagement Status" onRemove={() => handleRemoveWidget(id)} source="Check-in Frequency (90d)">
+                        <div className="h-64">
+                            <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={1}>
+                                <BarChart data={engagementStatusData} layout="vertical" margin={{ left: 10 }}>
+                                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={gridColor} />
+                                    <XAxis type="number" hide />
+                                    <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 700, fill: axisColor }} width={64} />
+                                    <Tooltip cursor={{ fill: currentTheme === 'dark' ? '#334155' : '#f8fafc' }} contentStyle={TOOLTIP_STYLE} itemStyle={{ color: '#fff' }} />
+                                    <Bar dataKey="value" radius={[0, 10, 10, 0]} barSize={26}>
+                                        {engagementStatusData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={ENGAGEMENT_COLORS[entry.name] || '#94a3b8'} />
+                                        ))}
+                                    </Bar>
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </WidgetWrapper>
+                </div>
+            );
+        case 'data_completeness':
+            return (
+                <div key="data_completeness" className="col-span-1">
+                    <WidgetWrapper title="Data Completeness" onRemove={() => handleRemoveWidget(id)} source="Directory Hygiene">
+                        <div className="h-64 flex flex-col justify-center gap-5 px-1">
+                            {completeness.rows.map(row => {
+                                const barColor = row.pct >= 80 ? 'bg-emerald-500' : row.pct >= 50 ? 'bg-amber-500' : 'bg-rose-500';
+                                return (
+                                    <div key={row.label}>
+                                        <div className="flex justify-between text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                                            <span>{row.label}</span>
+                                            <span className="tabular-nums">{row.pct}% <span className="text-slate-400 font-medium">({row.count.toLocaleString()})</span></span>
+                                        </div>
+                                        <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2.5">
+                                            <div className={`${barColor} h-2.5 rounded-full transition-all`} style={{ width: `${row.pct}%` }}></div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                            <p className="text-[10px] text-slate-400 text-right mt-1">Across {completeness.total.toLocaleString()} profiles</p>
+                        </div>
+                    </WidgetWrapper>
+                </div>
+            );
+        case 'campus_breakdown':
+            return (
+                <div key="campus_breakdown" className="col-span-1">
+                    <WidgetWrapper title="Campus Breakdown" onRemove={() => handleRemoveWidget(id)} source="PCO Primary Campus">
+                        {campusData.length >= 2 ? (
+                            <div className="h-64">
+                                <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={1}>
+                                    <BarChart data={campusData} layout="vertical" margin={{ left: 10 }}>
+                                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={gridColor} />
+                                        <XAxis type="number" hide />
+                                        <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: axisColor }} width={90} />
+                                        <Tooltip cursor={{ fill: currentTheme === 'dark' ? '#334155' : '#f8fafc' }} contentStyle={TOOLTIP_STYLE} itemStyle={{ color: '#fff' }} />
+                                        <Bar dataKey="value" radius={[0, 10, 10, 0]} barSize={20}>
+                                            {campusData.map((entry, index) => (
+                                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                            ))}
+                                        </Bar>
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                        ) : (
+                            <div className="h-64 flex flex-col items-center justify-center text-center p-6 space-y-3">
+                                <div className="text-4xl grayscale opacity-30">🏢</div>
+                                <p className="text-xs font-bold text-slate-400 dark:text-slate-500">Single-campus church</p>
+                                <p className="text-[10px] text-slate-400 max-w-xs">
+                                    Enable multi-campus in Settings and assign a primary campus to people in Planning Center to see a breakdown here.
+                                </p>
+                            </div>
+                        )}
+                    </WidgetWrapper>
                 </div>
             );
         case 'people_engagement':
@@ -890,7 +1094,7 @@ export const PeopleView: React.FC<PeopleViewProps> = ({
             if (id === 'people_stats' || id === 'householdSummary') return renderWidget(id);
             
             let spanClass = "col-span-1";
-          if (id === 'map' || id === 'riskDistribution' || id === 'atRiskList' || id === 'householdList' || id === 'risk_factors' || id === 'benchmark_age' || id === 'upcoming_registrations') spanClass = "col-span-1 lg:col-span-2";
+          if (id === 'map' || id === 'riskDistribution' || id === 'atRiskList' || id === 'householdList' || id === 'risk_factors' || id === 'benchmark_age' || id === 'upcoming_registrations' || id === 'assimilation_rate') spanClass = "col-span-1 lg:col-span-2";
           if (id === 'people_directory') spanClass = "col-span-1 lg:col-span-4";
           
           return (

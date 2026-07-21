@@ -37,6 +37,7 @@ import { handleFileProxy } from './backend/fileProxy';
 import { videoProcessingQueue } from './services/jobQueue.js';
 import { listForms, saveForm, deleteForm, getPublicForm, submitForm, syncAllSubmissions } from './backend/pcoForms.js';
 import { emailServicePlan } from './backend/servicePlanEmail.js';
+import { startInfoUpdateScheduler } from './backend/infoUpdateScheduler';
 
 // Fix for bundled CJS environment
 const __dirname = process.cwd();
@@ -341,6 +342,71 @@ async function startServer() {
     app.delete('/api/forms/:churchId/:formId', deleteForm);
     app.get('/api/public/form/:churchId/:formId', getPublicForm);
     app.post('/api/public/form/:churchId/:formId/submit', express.json(), submitForm);
+
+    // ─── Church Helper — Info Update Campaigns & Sessions ────────────
+    app.get('/api/info-update-campaigns', async (req: any, res: any) => {
+        const db = getDb(); const { churchId } = req.query;
+        if (!churchId) return res.status(400).json({ error: 'Missing churchId' });
+        try {
+            const snap = await (db as any).collection('people_info_campaigns').where('churchId', '==', churchId).orderBy('createdAt', 'desc').get();
+            res.json(snap.docs.map((d: any) => ({ id: d.id, ...d.data() })));
+        } catch (e: any) { res.status(500).json({ error: e.message }); }
+    });
+    app.post('/api/info-update-campaigns', express.json(), async (req: any, res: any) => {
+        const db = getDb(); const body = req.body;
+        if (!body?.churchId || !body?.pcoListId) return res.status(400).json({ error: 'Missing churchId or pcoListId' });
+        try {
+            const id = `pic_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+            const campaign = { id, ...body, status: body.status || 'active', createdAt: Date.now(), stats: { total: 0, pending: 0, inProgress: 0, complete: 0, failed: 0, maxAttempts: 0 } };
+            await (db as any).collection('people_info_campaigns').doc(id).set(campaign);
+            res.json(campaign);
+        } catch (e: any) { res.status(500).json({ error: e.message }); }
+    });
+    app.get('/api/info-update-campaigns/:id', async (req: any, res: any) => {
+        const db = getDb();
+        try {
+            const snap = await (db as any).collection('people_info_campaigns').doc(req.params.id).get();
+            if (!snap.exists) return res.status(404).json({ error: 'Not found' });
+            res.json({ id: snap.id, ...snap.data() });
+        } catch (e: any) { res.status(500).json({ error: e.message }); }
+    });
+    app.patch('/api/info-update-campaigns/:id', express.json(), async (req: any, res: any) => {
+        const db = getDb();
+        try {
+            await (db as any).collection('people_info_campaigns').doc(req.params.id).update(req.body);
+            res.json({ success: true });
+        } catch (e: any) { res.status(500).json({ error: e.message }); }
+    });
+    app.delete('/api/info-update-campaigns/:id', async (req: any, res: any) => {
+        const db = getDb();
+        try {
+            await (db as any).collection('people_info_campaigns').doc(req.params.id).delete();
+            res.json({ success: true });
+        } catch (e: any) { res.status(500).json({ error: e.message }); }
+    });
+    app.get('/api/info-update-sessions', async (req: any, res: any) => {
+        const db = getDb(); const { campaignId } = req.query;
+        if (!campaignId) return res.status(400).json({ error: 'Missing campaignId' });
+        try {
+            const snap = await (db as any).collection('people_info_sessions').where('campaignId', '==', campaignId).get();
+            res.json(snap.docs.map((d: any) => ({ id: d.id, ...d.data() })));
+        } catch (e: any) { res.status(500).json({ error: e.message }); }
+    });
+    app.get('/api/info-update-sessions/:id', async (req: any, res: any) => {
+        const db = getDb();
+        try {
+            const snap = await (db as any).collection('people_info_sessions').doc(req.params.id).get();
+            if (!snap.exists) return res.status(404).json({ error: 'Not found' });
+            res.json({ id: snap.id, ...snap.data() });
+        } catch (e: any) { res.status(500).json({ error: e.message }); }
+    });
+    app.post('/api/info-update-sessions/:id/retry', async (req: any, res: any) => {
+        const db = getDb();
+        try {
+            await (db as any).collection('people_info_sessions').doc(req.params.id).update({ status: 'pending', nextScheduledAt: 0 });
+            res.json({ success: true });
+        } catch (e: any) { res.status(500).json({ error: e.message }); }
+    });
     app.post('/api/forms/:churchId/:formId/sync-all', syncAllSubmissions);
 
     // ─── File Proxy & Egress Tracking ───────────────────────────────
@@ -1614,6 +1680,7 @@ Return ONLY the JSON object, no markdown, no explanation:`;
         startBillingScheduler(db as any);
         startSmsCampaignScheduler(db as any);
         startServicesReminderScheduler(db as any);
+        startInfoUpdateScheduler(db as any, log);
       } catch (e) {
         console.warn('[SmsScheduler] Could not start scheduler:', e);
       }

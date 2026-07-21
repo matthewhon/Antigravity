@@ -109,6 +109,7 @@ const App: React.FC = () => {
      if (path.startsWith('/tools/sms/analytics')) return 'tools-sms-analytics';
      if (path.startsWith('/tools/sms/permissions')) return 'tools-sms-permissions';
      if (path.startsWith('/tools/sms/agent')) return 'tools-sms-agent';
+     if (path.startsWith('/tools/church-helper')) return 'tools-church-helper';
      if (path.startsWith('/tools/sms')) return 'tools-sms-inbox';
      if (path.startsWith('/tools')) return 'tools';
      return 'dashboard';
@@ -643,7 +644,8 @@ const App: React.FC = () => {
               'tools-bulletin': '/tools/bulletin',
               'tools-website': '/tools/website',
               'tools-qrcodes': '/tools/qrcodes',
-              'tools-unsubscribers': '/tools/unsubscribers'
+              'tools-unsubscribers': '/tools/unsubscribers',
+              'tools-church-helper': '/tools/church-helper'
           };
           
           const navPath = viewToPath[resolvedView] || '/';

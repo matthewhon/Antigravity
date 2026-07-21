@@ -214,6 +214,57 @@
         { "fieldPath": "status",        "order": "ASCENDING" },
         { "fieldPath": "completedAt",   "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "people_info_campaigns",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "churchId", "order": "ASCENDING" },
+        { "fieldPath": "status",   "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "people_info_campaigns",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "churchId",   "order": "ASCENDING" },
+        { "fieldPath": "createdAt",  "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "people_info_sessions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "campaignId", "order": "ASCENDING" },
+        { "fieldPath": "status",     "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "people_info_sessions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "churchId",        "order": "ASCENDING" },
+        { "fieldPath": "status",          "order": "ASCENDING" },
+        { "fieldPath": "nextScheduledAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "people_info_sessions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "churchId",   "order": "ASCENDING" },
+        { "fieldPath": "phoneE164",  "order": "ASCENDING" },
+        { "fieldPath": "status",     "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "people_info_sessions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "churchId",      "order": "ASCENDING" },
+        { "fieldPath": "emailAddress",  "order": "ASCENDING" },
+        { "fieldPath": "status",        "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [

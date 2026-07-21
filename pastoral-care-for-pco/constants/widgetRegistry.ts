@@ -20,9 +20,13 @@ export const DASHBOARD_WIDGETS: WidgetDefinition[] = [
 
 export const PEOPLE_OVERVIEW_WIDGETS: WidgetDefinition[] = [
     { id: 'people_stats', label: 'Key Stats', icon: '📊' },
+    { id: 'assimilation_rate', label: 'Connection Rate', icon: '🔗' },
+    { id: 'engagement_status', label: 'Engagement Status', icon: '🔥' },
     { id: 'people_engagement', label: 'Risk Profiles', icon: '📈' },
     { id: 'gender', label: 'Gender Dist', icon: '🚻' },
     { id: 'age', label: 'Age Dist', icon: '🎂' },
+    { id: 'data_completeness', label: 'Data Completeness', icon: '✅' },
+    { id: 'campus_breakdown', label: 'Campus Breakdown', icon: '🏢' },
     { id: 'community_age_comparison', label: 'Community Age Gap', icon: '🏘️' },
     { id: 'benchmark_age', label: 'Age Benchmark', icon: '⚖️' },
     { id: 'benchmark_gender', label: 'Gender Benchmark', icon: '⚖️' },
@@ -200,8 +204,8 @@ export const getRoleBasedDefaults = (roles: string[]): Record<string, string[]> 
         dashboard,
         // People
         people: isPeople || isPastor
-            ? ['people_stats', 'people_engagement', 'gender', 'age', 'riskDistribution', 'map', 'birthdays']
-            : ['people_stats', 'people_engagement', 'gender', 'age', 'map'],
+            ? ['people_stats', 'assimilation_rate', 'engagement_status', 'people_engagement', 'gender', 'age', 'riskDistribution', 'map', 'birthdays']
+            : ['people_stats', 'assimilation_rate', 'people_engagement', 'gender', 'age', 'map'],
         people_households: ['householdSummary', 'householdComp', 'householdSize'],
         people_risk: isPeople || isPastor
             ? ['riskDistribution', 'atRiskList', 'riskChanges', 'people_directory']
@@ -242,7 +246,7 @@ export const getRoleBasedDefaults = (roles: string[]): Record<string, string[]> 
 export const getDefaultWidgets = (view: string): string[] => {
     switch (view) {
         case 'dashboard': return ['onboarding_tasks', 'ai_insights', 'church_progress', 'last_week_stats', 'people_stats', 'keyMetrics', 'groups_stats', 'services_stats', 'churchRisk'];
-        case 'people': return ['people_stats', 'people_engagement', 'gender', 'age', 'community_age_comparison', 'map'];
+        case 'people': return ['people_stats', 'assimilation_rate', 'engagement_status', 'people_engagement', 'gender', 'age', 'community_age_comparison', 'map'];
         case 'people_households': return ['householdSummary', 'householdComp', 'householdSize'];
         case 'people_risk': return ['riskDistribution', 'atRiskList'];
         case 'groups': return ['groups_ai_agent', 'groups_health', 'groups_stats', 'event_attendance', 'groups_gender'];
