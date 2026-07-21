@@ -129,6 +129,11 @@ const Layout: React.FC<LayoutProps> = ({ children, church, allChurches, onSwitch
                 path="/settings"
               />
             )}
+            <NavItem 
+              icon="🧰" 
+              label="Tools" 
+              path="/tools/church-helper"
+            />
         </nav>
 
         {/* Right: User & Actions */}
