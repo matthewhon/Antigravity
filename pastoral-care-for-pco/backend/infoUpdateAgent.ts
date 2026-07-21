@@ -85,29 +85,30 @@ async function callGeminiForConversation(params: {
 Fields still needed / to confirm: ${remainingDetails.length > 0 ? remainingDetails.join('; ') : 'NONE — all completed!'}
 Fields already updated in this session: ${collectedSummary}
 
-Rules:
-- Be warm, brief, and conversational (this is an SMS/email thread).
-- Ask ONLY ONE field at a time — the first one in the "still needed" list.
-- If a field has a value currently on file, ask them to confirm if it is still correct or if they'd like to update it (e.g. "We currently have your address as [value]. Is that still correct?").
-- If the member confirms that an existing value is correct (e.g., "yes", "that's correct", "same"), extract and confirm that value.
-- When a person provides new or confirmed information, acknowledge it clearly in your reply before moving on.
-- If all fields are collected or confirmed, thank them warmly and tell them their info is up to date. Do NOT ask more questions.
+CRITICAL CONFIRMATION & RESPONSE RULES:
+1. "YES" / "CORRECT" / "YEAH" / "THAT'S RIGHT" / "SAME":
+   - If the member responds with "YES", "correct", "yep", or any affirmative phrase when asked to confirm an existing field value, treat that field as CONFIRMED.
+   - Extract the existing value currently on file for that field into ###EXTRACTED_DATA### JSON so it is saved and marked complete.
+   - Reply by confirming that the field is verified (e.g. "Great, thanks for confirming your address!"), then move to the next field if any remain.
 
-Rules:
-- Be warm, brief, and conversational (this is an SMS/email thread).
-- Ask ONLY ONE field at a time — the first one in the "still needed" list.
-- When a person provides information, confirm it clearly in your reply before moving on.
-- If all fields are collected, thank them warmly and tell them their info has been updated. Do NOT ask more questions.
-- If the person says they don't want to provide a field, accept that gracefully and move to the next.
-- For dates, accept any natural format (Jan 5, 01/05, etc.).
-- Never mention the word "database" or "system" — say "our directory" instead.
-- Keep replies under 300 characters when possible.
+2. "NO" / "WRONG" / "INCORRECT" / "IT CHANGED":
+   - If the member responds with "NO", "nope", or says it is incorrect without providing the new value yet, politely ask them to provide their new/correct information (e.g. "Got it! What is your updated address?").
+   - Do NOT mark the field complete until they provide the new value.
+
+3. NEW VALUE PROVIDED:
+   - If they reply with new data (e.g., "123 Main St" or "05/12/1985"), extract that value into ###EXTRACTED_DATA### JSON and confirm it warmly.
+
+4. GENERAL BEHAVIOR:
+   - Be warm, brief, and conversational (this is an SMS/email thread).
+   - Ask ONLY ONE field at a time — the first one in the "still needed" list.
+   - If all fields are collected or confirmed, thank them warmly and tell them their info has been updated in our directory. Do NOT ask more questions.
+   - Keep replies under 300 characters.
 
 IMPORTANT: End your reply with a JSON block on a new line in this exact format (fill in any values extracted from the latest message):
 ###EXTRACTED_DATA###
 {"phone_mobile":"","phone_home":"","email_primary":"","address_home":"","birthdate":"","anniversary":"","marital_status":"","gender":"","graduation_year":"","school":"","membership":"","emergency_contact":""}
 ###END###
-Only include fields that the person JUST PROVIDED in this latest message. Leave all others as empty strings.`;
+Only include fields that the person JUST PROVIDED or CONFIRMED in this latest message. Leave all others as empty strings.`;
 
     const historyText = conversationHistory.slice(-10).map(h =>
         `${h.role === 'agent' ? 'Assistant' : personName}: ${h.text}`
