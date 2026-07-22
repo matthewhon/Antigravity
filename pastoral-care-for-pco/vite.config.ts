@@ -20,7 +20,13 @@ export default defineConfig(({ mode }) => {
         rollupOptions: {
           output: {
             manualChunks(id) {
-              if (id.includes('node_modules/firebase') || id.includes('node_modules/@firebase')) {
+              // NOTE: match the Firebase *web* SDK only. The bare `node_modules/firebase`
+              // prefix also matches `firebase-admin`, which would drag the Node-only
+              // admin SDK (google-gax / grpc / google-logging-utils, which reads
+              // `process` at module load) into this eagerly-loaded chunk and crash the
+              // browser with "process is not defined" before React mounts. The trailing
+              // slash keeps `firebase-admin` out — it stays in its lazy dynamic-import chunk.
+              if (id.includes('node_modules/firebase/') || id.includes('node_modules/@firebase/')) {
                 return 'firebase';
               }
               if (id.includes('node_modules/recharts') || id.includes('node_modules/lucide-react')) {
