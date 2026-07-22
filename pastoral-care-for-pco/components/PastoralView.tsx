@@ -6,6 +6,7 @@ import {
     DetailedDonation, ServicesDashboardData, PcoCheckInRecord,
     SmsConversation, SmsTag, CareFollowUpLog
 } from '../types';
+import { db } from '../services/firebase';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, Cell, PieChart, Pie, Legend
@@ -518,7 +519,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
           firestore.getCareFollowUpLog(church.id).then(setFollowUpLog);
 
           // Fetch SMS conversations + tags for Recommended Follow-Ups (prayer detection signal)
-          Promise.all([import('firebase/firestore'), import('../services/firebase')]).then(([{ collection, query, where, getDocs }, { db }]) => {
+          import('firebase/firestore').then(({ collection, query, where, getDocs }) => {
               getDocs(query(collection(db, 'smsConversations'), where('churchId', '==', church.id)))
                   .then(snap => setSmsConversations(snap.docs.map(d => d.data() as SmsConversation)))
                   .catch(() => {});
