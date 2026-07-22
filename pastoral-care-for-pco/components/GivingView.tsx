@@ -67,7 +67,7 @@ const TOOLTIP_STYLE = {
 };
 
 const getWidgetSpan = (id: string) => {
-    if (['keyMetrics', 'trends', 'fundPerformance', 'cumulativeYTD', 'donorLifecycle', 'trendsComparison', 'benchmark_giving_avg', 'budgetProgress', 'givingVsBudget', 'givingByStatus', 'givingAgeDemographics', 'averageGiving', 'donorAcquisition', 'payment_methods', 'gift_size_distribution'].includes(id)) return 'col-span-1 md:col-span-2 lg:col-span-2';
+    if (['keyMetrics', 'trends', 'fundPerformance', 'cumulativeYTD', 'donorLifecycle', 'trendsComparison', 'benchmark_giving_avg', 'budgetProgress', 'givingVsBudget', 'givingByStatus', 'givingAgeDemographics', 'averageGiving', 'donorAcquisition', 'payment_methods', 'gift_size_distribution', 'giving_seasonality'].includes(id)) return 'col-span-1 md:col-span-2 lg:col-span-2';
     return 'col-span-1';
 };
 
@@ -914,6 +914,77 @@ export const GivingView: React.FC<GivingViewProps> = ({
       return Array.from(map.values()).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   }, [donations]);
 
+  // ── Giving Tier 2 analytics ─────────────────────────────────────────────────
+  // Household giving — roll donations up to households (dedupe couples), current period
+  const householdGiving = useMemo(() => {
+      const { startDate, endDate } = getDateRangeForFilter(filter);
+      const s = toDateStr(startDate), e = toDateStr(endDate);
+      const peopleMap = new Map<string, PcoPerson>(people.map(p => [p.id, p] as [string, PcoPerson]));
+      const households = new Map<string, { name: string; amount: number; donorIds: Set<string> }>();
+      const donorSet = new Set<string>();
+      donations.forEach(d => {
+          const ds = (d.date || '').slice(0, 10);
+          if (ds < s || ds > e) return;
+          donorSet.add(d.donorId);
+          const person = peopleMap.get(d.donorId);
+          const hid = person?.householdId || `solo-${d.donorId}`;
+          const hname = person?.householdName || d.donorName;
+          if (!households.has(hid)) households.set(hid, { name: hname, amount: 0, donorIds: new Set() });
+          const h = households.get(hid)!;
+          h.amount += d.amount;
+          h.donorIds.add(d.donorId);
+      });
+      const rows = Array.from(households.values())
+          .map(h => ({ name: h.name, amount: h.amount, donors: h.donorIds.size }))
+          .sort((a, b) => b.amount - a.amount);
+      const total = rows.reduce((sum, r) => sum + r.amount, 0);
+      return { rows, householdCount: rows.length, donorCount: donorSet.size, avgPerHousehold: rows.length ? total / rows.length : 0 };
+  }, [donations, people, filter, dateRange]);
+
+  // Giving consistency — per-donor cadence over the last 12 months
+  const givingConsistency = useMemo(() => {
+      const cutoff = Date.now() - 365 * 24 * 60 * 60 * 1000;
+      const perDonor = new Map<string, number>();
+      donations.forEach(d => {
+          const t = new Date(d.date).getTime();
+          if (isNaN(t) || t < cutoff) return;
+          perDonor.set(d.donorId, (perDonor.get(d.donorId) || 0) + 1);
+      });
+      const dist = { Weekly: 0, Monthly: 0, Occasional: 0 };
+      perDonor.forEach(count => {
+          if (count >= 40) dist.Weekly++;
+          else if (count >= 10) dist.Monthly++;
+          else dist.Occasional++;
+      });
+      return { dist, total: perDonor.size };
+  }, [donations]);
+
+  // Seasonality — giving by calendar month, current year vs prior year
+  const givingSeasonality = useMemo(() => {
+      const year = new Date().getFullYear();
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const cur = new Array(12).fill(0);
+      const prev = new Array(12).fill(0);
+      donations.forEach(d => {
+          const ds = (d.date || '').slice(0, 10);
+          const y = parseInt(ds.slice(0, 4), 10);
+          const m = parseInt(ds.slice(5, 7), 10) - 1;
+          if (isNaN(m) || m < 0 || m > 11) return;
+          if (y === year) cur[m] += d.amount;
+          else if (y === year - 1) prev[m] += d.amount;
+      });
+      return { data: months.map((mn, i) => ({ month: mn, curr: cur[i], prev: prev[i] })), year, hasPrev: prev.some(v => v > 0) };
+  }, [donations]);
+
+  // Lapsed $ at risk — annualized value of lapsed donors (win-back priority)
+  const lapsedAtRisk = useMemo(() => {
+      const lapsed = analytics?.lists?.lapsed || [];
+      const rows = lapsed
+          .map(d => ({ id: d.id, name: d.name, avatar: d.avatar || null, annualized: (d.avgMonthlyAmount || 0) * 12, lastGiftDate: d.lastGiftDate }))
+          .sort((a, b) => b.annualized - a.annualized);
+      return { rows, total: rows.reduce((sum, r) => sum + r.annualized, 0) };
+  }, [analytics?.lists?.lapsed]);
+
   const renderWidget = (id: string) => {
       if (!analytics) return null;
 
@@ -1077,6 +1148,134 @@ export const GivingView: React.FC<GivingViewProps> = ({
                       )}
                   </WidgetWrapper>
               );
+          case 'household_giving': {
+              const h = householdGiving;
+              return (
+                  <WidgetWrapper
+                      title="Household Giving"
+                      onRemove={() => handleRemoveWidget(id)}
+                      source="PCO Giving"
+                      headerControl={<span className="text-[11px] font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400 tabular-nums">{h.householdCount} units</span>}
+                  >
+                      {h.rows.length > 0 ? (
+                          <div className="flex flex-col h-full gap-3">
+                              <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                      <p className="text-2xl font-black text-slate-900 dark:text-white tabular-nums">{h.householdCount}</p>
+                                      <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mt-1">Giving Households</p>
+                                  </div>
+                                  <div className="text-right">
+                                      <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400 tabular-nums">{money(h.avgPerHousehold)}</p>
+                                      <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mt-1">Avg / Household</p>
+                                  </div>
+                              </div>
+                              <p className="text-[11px] font-medium text-slate-400">{h.donorCount} individual donors → {h.householdCount} households</p>
+                              <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+                                  {h.rows.slice(0, 30).map((r, i) => (
+                                      <div key={i} className="flex justify-between items-center p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
+                                          <div className="min-w-0">
+                                              <p className="text-xs font-bold text-slate-800 dark:text-white truncate">{r.name}</p>
+                                              {r.donors > 1 && <p className="text-[11px] text-slate-400">{r.donors} givers</p>}
+                                          </div>
+                                          <span className="text-sm font-black text-emerald-600 dark:text-emerald-400 tabular-nums shrink-0 ml-2">{money(r.amount)}</span>
+                                      </div>
+                                  ))}
+                              </div>
+                          </div>
+                      ) : (
+                          <div className="h-full flex items-center justify-center text-slate-400 text-xs font-bold">No giving in this period.</div>
+                      )}
+                  </WidgetWrapper>
+              );
+          }
+          case 'giving_consistency': {
+              const c = givingConsistency;
+              const pie = [
+                  { name: 'Weekly',     value: c.dist.Weekly,     color: '#10b981' },
+                  { name: 'Monthly',    value: c.dist.Monthly,    color: '#6366f1' },
+                  { name: 'Occasional', value: c.dist.Occasional, color: '#f59e0b' },
+              ].filter(x => x.value > 0);
+              return (
+                  <WidgetWrapper title="Giving Consistency" onRemove={() => handleRemoveWidget(id)} source="Cadence · 12mo">
+                      <div className="h-64 relative">
+                          {c.total > 0 ? (
+                              <>
+                                  <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={1}>
+                                      <PieChart>
+                                          <Pie data={pie} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                                              {pie.map((x, i) => <Cell key={`gc-${i}`} fill={x.color} />)}
+                                          </Pie>
+                                          <Tooltip contentStyle={TOOLTIP_STYLE} itemStyle={{ color: '#fff' }} formatter={(v: number) => [`${v} donors`]} />
+                                          <Legend layout="vertical" verticalAlign="middle" align="right" iconType="circle" wrapperStyle={{ fontSize: '11px', fontWeight: 'bold' }} />
+                                      </PieChart>
+                                  </ResponsiveContainer>
+                                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pr-24">
+                                      <span className="text-3xl font-black text-slate-900 dark:text-white tabular-nums">{c.total}</span>
+                                      <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Donors</span>
+                                  </div>
+                              </>
+                          ) : (
+                              <div className="h-full flex items-center justify-center text-slate-400 text-xs font-bold">No giving in the last 12 months.</div>
+                          )}
+                      </div>
+                  </WidgetWrapper>
+              );
+          }
+          case 'giving_seasonality':
+              return (
+                  <WidgetWrapper title="Giving Seasonality" onRemove={() => handleRemoveWidget(id)} source="Monthly · YoY">
+                      <div className="h-64">
+                          <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={1}>
+                              <BarChart data={givingSeasonality.data}>
+                                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={currentTheme === 'dark' ? '#334155' : '#f1f5f9'} />
+                                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94a3b8' }} />
+                                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94a3b8' }} tickFormatter={(v: number) => v >= 1000 ? `$${Math.round(v / 1000)}k` : `$${v}`} />
+                                  <Tooltip cursor={{ fill: currentTheme === 'dark' ? '#334155' : '#f8fafc' }} contentStyle={TOOLTIP_STYLE} itemStyle={{ color: '#fff' }} formatter={(v: number) => money(v)} />
+                                  <Legend iconType="circle" wrapperStyle={{ fontSize: '11px', fontWeight: 'bold' }} />
+                                  {givingSeasonality.hasPrev && <Bar dataKey="prev" name={String(givingSeasonality.year - 1)} fill="#cbd5e1" radius={[4, 4, 0, 0]} />}
+                                  <Bar dataKey="curr" name={String(givingSeasonality.year)} fill="#6366f1" radius={[4, 4, 0, 0]} />
+                              </BarChart>
+                          </ResponsiveContainer>
+                      </div>
+                  </WidgetWrapper>
+              );
+          case 'lapsed_at_risk': {
+              const l = lapsedAtRisk;
+              return (
+                  <WidgetWrapper
+                      title="Lapsed $ at Risk"
+                      onRemove={() => handleRemoveWidget(id)}
+                      source="Annualized value"
+                      headerControl={<span className="text-[11px] font-bold px-2 py-0.5 rounded bg-rose-50 text-rose-600 dark:bg-rose-900/20 dark:text-rose-400 tabular-nums">{money(l.total)}/yr</span>}
+                  >
+                      {l.rows.length > 0 ? (
+                          <div className="space-y-2 max-h-72 overflow-y-auto custom-scrollbar pr-1">
+                              {l.rows.slice(0, 40).map(r => (
+                                  <button
+                                      key={r.id}
+                                      onClick={() => window.dispatchEvent(new CustomEvent('openPersonProfile', { detail: r.id }))}
+                                      className="w-full flex items-center gap-3 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 hover:border-indigo-200 dark:hover:border-indigo-800 transition-colors text-left"
+                                  >
+                                      <div className="w-8 h-8 shrink-0 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-black text-slate-400">
+                                          {r.avatar ? <img src={r.avatar} alt="" className="w-full h-full object-cover" /> : r.name.charAt(0)}
+                                      </div>
+                                      <div className="min-w-0 flex-1">
+                                          <p className="text-xs font-bold text-slate-800 dark:text-white truncate">{r.name}</p>
+                                          <p className="text-[11px] text-slate-400">last gift {r.lastGiftDate ? new Date(r.lastGiftDate).toLocaleDateString() : '—'}</p>
+                                      </div>
+                                      <span className="text-sm font-black text-rose-500 tabular-nums shrink-0">{money(r.annualized)}<span className="text-[11px] font-medium text-slate-400">/yr</span></span>
+                                  </button>
+                              ))}
+                          </div>
+                      ) : (
+                          <div className="h-full flex flex-col items-center justify-center text-center py-10">
+                              <div className="text-3xl mb-2">💚</div>
+                              <p className="text-xs font-bold text-slate-500 dark:text-slate-400">No lapsed donors.</p>
+                          </div>
+                      )}
+                  </WidgetWrapper>
+              );
+          }
           case 'budgetProgress': {
               const now = new Date();
               const activeYear = budgetYear;
