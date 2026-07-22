@@ -111,7 +111,21 @@ export async function processCampaign(db: any, log: any, campaign: any): Promise
             const data = await fetchFromPco(churchId, nextUrl);
             const people = data?.data || [];
             const included = data?.included || [];
-            allPeople = [...allPeople, ...people.map((p: any) => ({ ...p, _included: included }))];
+
+            for (const person of people) {
+                // Find all phone_numbers, emails, addresses linked in relationships for this specific person
+                const phoneIds = (person.relationships?.phone_numbers?.data || []).map((r: any) => r.id);
+                const emailIds = (person.relationships?.emails?.data || []).map((r: any) => r.id);
+                const addrIds  = (person.relationships?.addresses?.data || []).map((r: any) => r.id);
+
+                const personIncluded = included.filter((inc: any) =>
+                    (inc.type === 'PhoneNumber' && phoneIds.includes(inc.id)) ||
+                    (inc.type === 'Email' && emailIds.includes(inc.id)) ||
+                    (inc.type === 'Address' && addrIds.includes(inc.id))
+                );
+
+                allPeople.push({ ...person, _included: personIncluded.length > 0 ? personIncluded : included });
+            }
             nextUrl = data?.links?.next || null;
         } catch (e: any) {
             log.warn(`[InfoUpdateScheduler] PCO list fetch failed for campaign ${campaignId}: ${e.message}`, 'system', { churchId, campaignId }, churchId);
@@ -154,8 +168,8 @@ async function processPersonForCampaign(
     const included    = pcoPerson._included || [];
 
     // Resolve phone and email from PCO includes
-    const phones = included.filter((i: any) => i.type === 'PhoneNumber' && (!pcoPerson.relationships?.phone_numbers?.data || pcoPerson.relationships.phone_numbers.data.some((r: any) => r.id === i.id)));
-    const emails  = included.filter((i: any) => i.type === 'Email' && (!pcoPerson.relationships?.emails?.data || pcoPerson.relationships.emails.data.some((r: any) => r.id === i.id)));
+    const phones = included.filter((i: any) => i.type === 'PhoneNumber');
+    const emails  = included.filter((i: any) => i.type === 'Email');
     const mobilePhone = phones.find((p: any) => p.attributes?.location === 'Mobile') || phones[0];
     const primaryEmail = emails.find((e: any) => e.attributes?.primary) || emails[0];
 
