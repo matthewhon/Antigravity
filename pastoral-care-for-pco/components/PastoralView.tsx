@@ -518,7 +518,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
           firestore.getCareFollowUpLog(church.id).then(setFollowUpLog);
 
           // Fetch SMS conversations + tags for Recommended Follow-Ups (prayer detection signal)
-          import('firebase/firestore').then(({ collection, query, where, getDocs }) => {
+          Promise.all([import('firebase/firestore'), import('../services/firebase')]).then(([{ collection, query, where, getDocs }, { db }]) => {
               getDocs(query(collection(db, 'smsConversations'), where('churchId', '==', church.id)))
                   .then(snap => setSmsConversations(snap.docs.map(d => d.data() as SmsConversation)))
                   .catch(() => {});
