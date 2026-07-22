@@ -473,6 +473,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
       const digitalOf = (t: any) => t.digitalCheckins || 0;
 
       let recentTotal = 0, priorTotal = 0, recentGuests = 0, priorGuests = 0, recentDigital = 0, recentInPerson = 0;
+      let recentVolunteers = 0, recentWorship = 0;
       const weekly: { weeksAgo: number; label: string; total: number }[] = [];
       for (let w = 7; w >= 0; w--) weekly.push({ weeksAgo: w, label: w === 0 ? 'This wk' : `${w}w`, total: 0 });
 
@@ -484,6 +485,8 @@ const ServicesView: React.FC<ServicesViewProps> = ({
           if (ageDays >= 0 && ageDays < 30) {
               recentTotal += total; recentGuests += (t.guests || 0);
               recentDigital += digitalOf(t); recentInPerson += inPersonOf(t);
+              recentVolunteers += (t.volunteers || 0);
+              recentWorship += (t.regulars || 0) + (t.guests || 0);
           } else if (ageDays >= 30 && ageDays < 60) {
               priorTotal += total; priorGuests += (t.guests || 0);
           }
@@ -500,9 +503,63 @@ const ServicesView: React.FC<ServicesViewProps> = ({
           guestPct: recentTotal > 0 ? (recentGuests / recentTotal) * 100 : 0,
           recentDigital, recentInPerson,
           digitalPct: (recentDigital + recentInPerson) > 0 ? (recentDigital / (recentDigital + recentInPerson)) * 100 : 0,
+          recentVolunteers, recentWorship,
           weekly,
       };
   }, [data?.checkIns?.trends]);
+
+  // Confirmation health — Confirmed / Pending / Declined across all upcoming plans
+  const confirmationHealth = useMemo(() => {
+      const counts = { Confirmed: 0, Pending: 0, Declined: 0 };
+      (data?.futurePlans || []).forEach(p => (p.teamMembers || []).forEach(m => {
+          const s = (m.status || '').toLowerCase();
+          if (s === 'confirmed' || s === 'c') counts.Confirmed++;
+          else if (s === 'declined' || s === 'd') counts.Declined++;
+          else counts.Pending++;
+      }));
+      const total = counts.Confirmed + counts.Pending + counts.Declined;
+      return { ...counts, total, rate: total > 0 ? (counts.Confirmed / total) * 100 : 0 };
+  }, [data?.futurePlans]);
+
+  // Attendance breakdown — total check-ins by category / room over the last 90 days
+  const attendanceBreakdown = useMemo(() => {
+      const trends = (data?.checkIns?.trends || []) as any[];
+      const cutoff = Date.now() - 90 * 24 * 60 * 60 * 1000;
+      const cats = new Map<string, number>();
+      const add = (name: string, val: number) => { if (val > 0) cats.set(name, (cats.get(name) || 0) + val); };
+      trends.forEach(t => {
+          if (new Date(t.isoDate || t.date).getTime() < cutoff) return;
+          add('Regulars', t.regulars || 0);
+          add('Guests', t.guests || 0);
+          add('Volunteers', t.volunteers || 0);
+          add('Digital', t.digitalCheckins || 0);
+          (t.customHeadcounts || []).forEach((c: any) => add(c.name, c.total || 0));
+      });
+      const arr = Array.from(cats.entries()).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
+      return { arr, total: arr.reduce((s, x) => s + x.value, 0) };
+  }, [data?.checkIns?.trends]);
+
+  // Staffing forecast — open positions per week for the next 6 weeks
+  const staffingForecast = useMemo(() => {
+      const plans = data?.futurePlans || [];
+      const now = new Date();
+      const weeks: { start: number; end: number; label: string; Open: number; plans: number }[] = [];
+      for (let i = 0; i < 6; i++) {
+          const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i * 7);
+          const end = new Date(start); end.setDate(start.getDate() + 7);
+          weeks.push({ start: start.getTime(), end: end.getTime(), label: start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }), Open: 0, plans: 0 });
+      }
+      plans.forEach(p => {
+          const d = (p.planTimes?.[0]?.startsAt ? new Date(p.planTimes[0].startsAt) : new Date(p.sortDate)).getTime();
+          const wk = weeks.find(w => d >= w.start && d < w.end);
+          if (!wk) return;
+          wk.plans++;
+          const declared = (p.neededPositions || []).reduce((s, np) => s + (np.quantity || 0), 0);
+          const fallback = Math.max(0, (p.positionsNeeded || 0) - (p.positionsFilled || 0));
+          wk.Open += declared > 0 ? declared : fallback;
+      });
+      return weeks.map(w => ({ label: w.label, Open: w.Open, plans: w.plans }));
+  }, [data?.futurePlans]);
 
   // Volunteer health & serving frequency (from per-person servingStats)
   const volunteerStats = useMemo(() => {
@@ -1678,6 +1735,116 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                     </WidgetWrapper>
                 </div>
             );
+        case 'volunteer_ratio': {
+            const a = attendanceAnalytics;
+            const ratio = a.recentVolunteers > 0 ? a.recentWorship / a.recentVolunteers : 0;
+            return (
+                <div key="volunteer_ratio" className="col-span-1">
+                    <WidgetWrapper title="Volunteer Ratio" onRemove={() => handleRemoveWidget('volunteer_ratio')} source="Check-Ins · 30d">
+                        <div className="flex flex-col h-full justify-center gap-4">
+                            <div className="text-center">
+                                <span className="text-5xl font-black text-slate-900 dark:text-white tracking-tighter tabular-nums">1 : {a.recentVolunteers > 0 ? Math.round(ratio) : '—'}</span>
+                                <p className="text-[11px] font-medium text-slate-400 mt-2">volunteer : attendees served</p>
+                            </div>
+                            <div className="flex justify-between pt-3 border-t border-slate-100 dark:border-slate-800">
+                                <div>
+                                    <p className="text-xl font-black text-indigo-600 dark:text-indigo-400 tabular-nums">{a.recentVolunteers.toLocaleString()}</p>
+                                    <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Volunteers</p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-xl font-black text-slate-700 dark:text-slate-200 tabular-nums">{a.recentWorship.toLocaleString()}</p>
+                                    <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Attendees</p>
+                                </div>
+                            </div>
+                        </div>
+                    </WidgetWrapper>
+                </div>
+            );
+        }
+        case 'confirmation_health': {
+            const c = confirmationHealth;
+            const pie = [
+                { name: 'Confirmed', value: c.Confirmed, color: '#10b981' },
+                { name: 'Pending',   value: c.Pending,   color: '#f59e0b' },
+                { name: 'Declined',  value: c.Declined,  color: '#f43f5e' },
+            ].filter(x => x.value > 0);
+            return (
+                <div key="confirmation_health" className="col-span-1">
+                    <WidgetWrapper title="Confirmation Health" onRemove={() => handleRemoveWidget('confirmation_health')} source="Upcoming Plans">
+                        <div className="h-64 relative">
+                            {c.total > 0 ? (
+                                <>
+                                    <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={1}>
+                                        <PieChart>
+                                            <Pie data={pie} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                                                {pie.map((x, i) => <Cell key={`c-${i}`} fill={x.color} />)}
+                                            </Pie>
+                                            <Tooltip contentStyle={TOOLTIP_STYLE} itemStyle={{ color: '#fff' }} />
+                                            <Legend layout="vertical" verticalAlign="middle" align="right" iconType="circle" wrapperStyle={{ fontSize: '11px', fontWeight: 'bold', color: axisColor }} />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pr-24">
+                                        <span className="text-3xl font-black text-emerald-500 tabular-nums">{Math.round(c.rate)}%</span>
+                                        <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Confirmed</span>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="h-full flex items-center justify-center text-slate-400 text-xs font-bold">No upcoming assignments.</div>
+                            )}
+                        </div>
+                    </WidgetWrapper>
+                </div>
+            );
+        }
+        case 'attendance_breakdown': {
+            const b = attendanceBreakdown;
+            const PALETTE = ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ec4899', '#f43f5e', '#14b8a6'];
+            return (
+                <div key="attendance_breakdown" className="col-span-1 lg:col-span-2">
+                    <WidgetWrapper title="Attendance Breakdown" onRemove={() => handleRemoveWidget('attendance_breakdown')} source="Check-Ins · 90d">
+                        {b.total > 0 ? (
+                            <div className="space-y-3 max-h-80 overflow-y-auto custom-scrollbar pr-1">
+                                {b.arr.map((cat, i) => {
+                                    const pct = b.total > 0 ? (cat.value / b.total) * 100 : 0;
+                                    return (
+                                        <div key={cat.name}>
+                                            <div className="flex justify-between items-center mb-1.5">
+                                                <span className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">{cat.name}</span>
+                                                <span className="text-[11px] font-medium text-slate-400 shrink-0 ml-2 tabular-nums">{cat.value.toLocaleString()} · {pct.toFixed(0)}%</span>
+                                            </div>
+                                            <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2.5 overflow-hidden">
+                                                <div className="h-full rounded-full transition-all duration-700 ease-out" style={{ width: `${pct}%`, backgroundColor: PALETTE[i % PALETTE.length] }}></div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <div className="h-full flex items-center justify-center text-slate-400 text-xs font-bold">No check-in data.</div>
+                        )}
+                    </WidgetWrapper>
+                </div>
+            );
+        }
+        case 'staffing_forecast':
+            return (
+                <div key="staffing_forecast" className="col-span-1 lg:col-span-2">
+                    <WidgetWrapper title="Staffing Forecast" onRemove={() => handleRemoveWidget('staffing_forecast')} source="Next 6 Weeks">
+                        <div className="h-64">
+                            <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={1}>
+                                <BarChart data={staffingForecast}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
+                                    <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: axisColor }} />
+                                    <YAxis axisLine={false} tickLine={false} allowDecimals={false} tick={{ fontSize: 11, fill: axisColor }} />
+                                    <Tooltip cursor={{ fill: currentTheme === 'dark' ? '#334155' : '#f8fafc' }} contentStyle={TOOLTIP_STYLE} itemStyle={{ color: '#fff' }} formatter={(v: number) => [`${v} open`]} />
+                                    <Bar dataKey="Open" fill="#f59e0b" radius={[4, 4, 0, 0]} barSize={36} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                        <p className="text-[11px] font-medium text-slate-400 mt-2 text-center">Open volunteer positions still needed per week</p>
+                    </WidgetWrapper>
+                </div>
+            );
         default: return null;
     }
   }
@@ -1777,7 +1944,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                 if (id === 'services_stats') return null;
                 let spanClass = "col-span-1";
                 if (['services_stats', 'checkin_history', 'teams', 'services_teams_list'].includes(id)) spanClass = "col-span-1 md:col-span-2 lg:col-span-4";
-                else if (['staffing_needs', 'upcoming_plans_list', 'top_songs', 'positions', 'events', 'team_roster', 'burnout_watchlist', 'serving_frequency', 'team_fill_rate'].includes(id)) spanClass = "col-span-1 lg:col-span-2";
+                else if (['staffing_needs', 'upcoming_plans_list', 'top_songs', 'positions', 'events', 'team_roster', 'burnout_watchlist', 'serving_frequency', 'team_fill_rate', 'attendance_breakdown', 'staffing_forecast'].includes(id)) spanClass = "col-span-1 lg:col-span-2";
                 
                 return (
                     <div

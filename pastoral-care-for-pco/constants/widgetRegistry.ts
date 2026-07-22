@@ -91,6 +91,9 @@ export const SERVICES_OVERVIEW_WIDGETS: WidgetDefinition[] = [
     { id: 'staffing_needs', label: 'Staffing Needs', icon: '🚨' },
     { id: 'serving_frequency', label: 'Serving Frequency', icon: '🔁' },
     { id: 'unscheduled_volunteers', label: 'Unscheduled Volunteers', icon: '🪑' },
+    { id: 'volunteer_ratio', label: 'Volunteer Ratio', icon: '⚖️' },
+    { id: 'confirmation_health', label: 'Confirmation Health', icon: '✔️' },
+    { id: 'staffing_forecast', label: 'Staffing Forecast', icon: '🔮' },
     { id: 'top_songs', label: 'Top Songs', icon: '🎵' },
     { id: 'positions', label: 'Positions', icon: '🪑' },
     { id: 'checkin_history', label: 'Check-ins', icon: '✅' },
@@ -101,6 +104,8 @@ export const SERVICES_ATTENDANCE_WIDGETS: WidgetDefinition[] = [
     { id: 'attendance_growth', label: 'Attendance Growth', icon: '📈' },
     { id: 'first_time_guests', label: 'First-Time Guests', icon: '🙌' },
     { id: 'digital_vs_physical', label: 'Digital vs In-Person', icon: '💻' },
+    { id: 'attendance_breakdown', label: 'Attendance Breakdown', icon: '🧮' },
+    { id: 'volunteer_ratio', label: 'Volunteer Ratio', icon: '⚖️' },
     { id: 'events', label: 'Events', icon: '📅' },
     { id: 'services_stats', label: 'Services Stats', icon: '📊' },
 ];
@@ -113,6 +118,8 @@ export const SERVICES_TEAMS_WIDGETS: WidgetDefinition[] = [
     { id: 'serving_frequency', label: 'Serving Frequency', icon: '🔁' },
     { id: 'unscheduled_volunteers', label: 'Unscheduled Volunteers', icon: '🪑' },
     { id: 'team_fill_rate', label: 'Team Fill Rate', icon: '🪑' },
+    { id: 'confirmation_health', label: 'Confirmation Health', icon: '✔️' },
+    { id: 'staffing_forecast', label: 'Staffing Forecast', icon: '🔮' },
 ];
 
 export const GIVING_WIDGETS: WidgetDefinition[] = [
