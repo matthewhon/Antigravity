@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ChurchNote } from '../types';
+import { ChurchNote, TemplateSettings } from '../types';
+import { firestore } from '../services/firestoreService';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -105,7 +106,6 @@ export const PublicNoteView: React.FC<{ noteId: string }> = ({ noteId }) => {
   useEffect(() => {
     const loadNote = async () => {
       try {
-        const { firestore } = await import('../services/firestoreService');
         const data = await firestore.getNote(noteId);
         if (!data) {
           setLoadState('not_found');

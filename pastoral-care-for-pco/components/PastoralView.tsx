@@ -519,14 +519,12 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
 
           // Fetch SMS conversations + tags for Recommended Follow-Ups (prayer detection signal)
           import('firebase/firestore').then(({ collection, query, where, getDocs }) => {
-              import('../services/firebase').then(({ db }) => {
-                  getDocs(query(collection(db, 'smsConversations'), where('churchId', '==', church.id)))
-                      .then(snap => setSmsConversations(snap.docs.map(d => d.data() as SmsConversation)))
-                      .catch(() => {});
-                  getDocs(query(collection(db, 'smsTags'), where('churchId', '==', church.id)))
-                      .then(snap => setSmsTags(snap.docs.map(d => d.data() as SmsTag)))
-                      .catch(() => {});
-              });
+              getDocs(query(collection(db, 'smsConversations'), where('churchId', '==', church.id)))
+                  .then(snap => setSmsConversations(snap.docs.map(d => d.data() as SmsConversation)))
+                  .catch(() => {});
+              getDocs(query(collection(db, 'smsTags'), where('churchId', '==', church.id)))
+                  .then(snap => setSmsTags(snap.docs.map(d => ({ id: d.id, ...d.data() }) as SmsTag)))
+                  .catch(() => {});
           });
       }
   }, [activeTab, church.id]);

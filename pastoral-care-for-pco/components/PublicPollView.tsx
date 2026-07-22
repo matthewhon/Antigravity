@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Star, CheckCircle, Loader2, ChevronRight, AlertCircle, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { Poll, PollQuestion, PollResponse } from '../types';
+import { firestore } from '../services/firestoreService';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -295,7 +296,6 @@ export const PublicPollView: React.FC<PublicPollViewProps> = ({ pollId }) => {
         // Try to fetch church name
         if (data.churchId) {
           try {
-            const { firestore } = await import('../services/firestoreService');
             const church = await firestore.getChurch(data.churchId);
             if (church?.name) setChurchName(church.name);
           } catch { /* ignore */ }

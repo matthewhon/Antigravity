@@ -4,6 +4,7 @@ import { EmailPreview } from './EmailPreview';
 import { EmailBlock } from './EmailBuilder';
 import { TemplateSettings } from '../types';
 import { PublicFormView } from './PublicFormView';
+import { firestore } from '../services/firestoreService';
 
 // ─── Default template settings ────────────────────────────────────────────────
 
@@ -114,7 +115,6 @@ const EmbeddedNote: React.FC<{ itemId: string }> = ({ itemId }) => {
   useEffect(() => {
     const load = async () => {
       try {
-        const { firestore } = await import('../services/firestoreService');
         const data = await firestore.getNote(itemId);
         setNote(data);
       } catch { /* non-fatal */ } finally {
@@ -163,7 +163,6 @@ const EmbeddedPoll: React.FC<{ itemId: string }> = ({ itemId }) => {
   useEffect(() => {
     const load = async () => {
       try {
-        const { firestore } = await import('../services/firestoreService');
         const data = await firestore.getPoll(itemId);
         setPoll(data);
       } catch { /* non-fatal */ } finally {
@@ -178,7 +177,6 @@ const EmbeddedPoll: React.FC<{ itemId: string }> = ({ itemId }) => {
     if (!poll) return;
     setSubmitting(true);
     try {
-      const { firestore } = await import('../services/firestoreService');
       const response = {
         id: `resp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
         pollId: poll.id,
@@ -408,7 +406,6 @@ export const PublicBulletinView: React.FC<{ bulletinId?: string; latestForChurch
   useEffect(() => {
     const load = async () => {
       try {
-        const { firestore } = await import('../services/firestoreService');
         let data: DigitalBulletin | null = null;
         if (latestForChurchId) {
           data = await firestore.getLatestPublishedBulletin(latestForChurchId);
