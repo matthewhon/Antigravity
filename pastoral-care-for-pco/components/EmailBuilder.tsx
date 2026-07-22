@@ -12,6 +12,7 @@ import { pcoService } from '../services/pcoService';
 import { generateEmailContent } from '../services/geminiService';
 import { AnalyticsWidgetBlock, AnalyticsWidgetId } from './DataChartSelector';
 import { CanvaPickerModal } from './CanvaPickerModal';
+import { Poll, ChurchNote } from '../types';
 import {
   Type, Heading as HeadingIcon, Image as ImageIcon, MousePointerClick, File,
   Minus, Video, Code, Users, Calendar, ClipboardList, GripVertical, Trash2,
@@ -1435,7 +1436,7 @@ const SidebarSection: React.FC<{ title: string; icon: React.ReactNode; children:
 
 // ─── PCO Quick Picker (inline, single-item) ──────────────────────────────────
 
-type PcoPickType = 'pco_registration' | 'pco_group' | 'pco_event' | 'pco_service_plan';
+type PcoPickType = 'pco_registration' | 'pco_group' | 'pco_event' | 'pco_service_plan' | 'pco_form';
 
 const PCO_PICK_CONFIG: Record<PcoPickType, {
   label: string;
@@ -2313,7 +2314,7 @@ export const EmailBuilder: React.FC<EmailBuilderProps> = ({
                   {BLOCK_DEFS.map(def => (
                     <button
                       key={def.type}
-                      onClick={() => { addBlock(def.type); setAddingBlockAtIndex(null); }}
+                      onClick={() => { addBlock(def); setAddingBlockAtIndex(null); }}
                       className="flex flex-col items-center gap-1.5 p-2 rounded-lg bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-700 dark:hover:text-indigo-300 text-slate-600 dark:text-slate-400 transition"
                     >
                       {def.icon} <span className="text-[10px] font-medium">{def.label}</span>

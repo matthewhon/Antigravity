@@ -439,6 +439,7 @@ export interface ServicesDashboardData {
     checkIns: { totalCheckIns: number, uniqueAttendees: number, breakdown: any, trends: any[] };
     futurePlans: ServicePlanSnapshot[];
     recentPlans?: ServicePlanSnapshot[];
+    plans?: ServicePlanSnapshot[];
     progressStats?: ProgressStats;
 }
 
@@ -662,12 +663,15 @@ export interface SystemSettings {
 
 export interface TemplateSettings {
     primaryColor: string;
-    textColor: string;
-    backgroundColor: string;
-    linkColor: string;
-    fontFamily: string;
-    header: string;
-    footer: string;
+    textColor?: string;
+    backgroundColor?: string;
+    linkColor?: string;
+    fontFamily?: string;
+    font?: string;
+    header?: string;
+    headerText?: string;
+    footer?: string;
+    footerText?: string;
     // Church logo (shown in email header)
     /** Whether to display the church logo in the email header. Defaults to true when logoUrl is present. */
     showLogo?: boolean;
@@ -768,8 +772,8 @@ export interface LogEntry {
     churchId: string;
     timestamp: number;
     level: 'info' | 'warn' | 'error';
-    /** Which subsystem generated this log: sync, webhook, proxy, auth, app, system */
-    source?: 'sync' | 'webhook' | 'proxy' | 'auth' | 'app' | 'system';
+    /** Which subsystem generated this log: sync, webhook, proxy, auth, app, system, forms */
+    source?: 'sync' | 'webhook' | 'proxy' | 'auth' | 'app' | 'system' | 'forms';
     message: string;
     /** JSON-serialized context object for quick display */
     details?: string;

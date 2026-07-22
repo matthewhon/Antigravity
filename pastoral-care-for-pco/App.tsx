@@ -876,7 +876,7 @@ const App: React.FC = () => {
 
   const visibleDonations = useMemo(() => {
     if (!church?.multiCampusEnabled || selectedCampusId === 'all') return donations;
-    const peopleMap = new Map(people.map(p => [p.id, p]));
+    const peopleMap = new Map<string, PcoPerson>(people.map(p => [p.id, p]));
     return donations.filter(d => {
       if (!d.donorId || d.donorId === 'anonymous') return false;
       const person = peopleMap.get(d.donorId);
@@ -891,7 +891,7 @@ const App: React.FC = () => {
 
   const visibleRecentRiskChanges = useMemo(() => {
     if (!church?.multiCampusEnabled || selectedCampusId === 'all') return recentRiskChanges;
-    const peopleMap = new Map(people.map(p => [p.id, p]));
+    const peopleMap = new Map<string, PcoPerson>(people.map(p => [p.id, p]));
     return recentRiskChanges.filter(rc => {
       const person = peopleMap.get(rc.personId);
       return person?.primaryCampusId === selectedCampusId;
@@ -900,7 +900,7 @@ const App: React.FC = () => {
 
   const visibleRecentStatusChanges = useMemo(() => {
     if (!church?.multiCampusEnabled || selectedCampusId === 'all') return recentStatusChanges;
-    const peopleMap = new Map(people.map(p => [p.id, p]));
+    const peopleMap = new Map<string, PcoPerson>(people.map(p => [p.id, p]));
     return recentStatusChanges.filter(sc => {
       const person = peopleMap.get(sc.personId);
       return person?.primaryCampusId === selectedCampusId;

@@ -1450,7 +1450,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ settings
                             try {
                                 setMessage({ type: 'success', text: 'Disconnecting Canva...' });
                                 const churchId = churches[0].id;
-                                await firestore.db.collection('churches').doc(churchId).collection('integrations').doc('canva').delete();
+                                await firestore.disconnectCanva(churchId);
                                 setMessage({ type: 'success', text: 'Successfully disconnected Canva.' });
                             } catch (e: any) {
                                 setMessage({ type: 'error', text: 'Failed to disconnect: ' + e.message });

@@ -199,7 +199,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ activePeopleCount,
 
       switch(id) {
           case 'onboarding_tasks':
-              return <OnboardingTaskWidget key={id} onRemove={() => handleRemoveWidget(id)} />;
+              return <OnboardingTaskWidget onRemove={() => handleRemoveWidget(id)} />;
           case 'ai_insights':
               return (
                   <div className="bg-white dark:bg-slate-800 p-8 rounded-3xl border border-indigo-100 dark:border-slate-700 shadow-sm h-full flex flex-col justify-between group relative overflow-hidden">

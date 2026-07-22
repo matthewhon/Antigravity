@@ -630,8 +630,8 @@ export const BulletinManager: React.FC<BulletinManagerProps> = ({
               <div className="flex-1 overflow-y-auto p-4">
                 <DataChartSelector
                   churchId={churchId}
-                  onInsert={(...args) => {
-                    handleInsertDataChart(...args);
+                  onInsert={(block) => {
+                    handleInsertDataChart(block);
                     setShowDataChart(false);
                   }}
                   onClose={() => setShowDataChart(false)}
