@@ -113,18 +113,28 @@ export async function processCampaign(db: any, log: any, campaign: any): Promise
             const included = data?.included || [];
 
             for (const person of people) {
-                // Find all phone_numbers, emails, addresses linked in relationships for this specific person
+                // Fetch individual person with includes if list payload doesn't embed relationships
                 const phoneIds = (person.relationships?.phone_numbers?.data || []).map((r: any) => r.id);
                 const emailIds = (person.relationships?.emails?.data || []).map((r: any) => r.id);
                 const addrIds  = (person.relationships?.addresses?.data || []).map((r: any) => r.id);
 
-                const personIncluded = included.filter((inc: any) =>
+                let personIncluded = included.filter((inc: any) =>
                     (inc.type === 'PhoneNumber' && phoneIds.includes(inc.id)) ||
                     (inc.type === 'Email' && emailIds.includes(inc.id)) ||
                     (inc.type === 'Address' && addrIds.includes(inc.id))
                 );
 
-                allPeople.push({ ...person, _included: personIncluded.length > 0 ? personIncluded : included });
+                // If list endpoint didn't provide relationship links for this person, fetch individual person record with includes directly
+                if (personIncluded.length === 0) {
+                    try {
+                        const personDetail = await fetchFromPco(churchId, `https://api.planningcenteronline.com/people/v2/people/${person.id}?include=phone_numbers,emails,addresses`);
+                        if (personDetail?.included) {
+                            personIncluded = personDetail.included;
+                        }
+                    } catch { /* ignore fallback */ }
+                }
+
+                allPeople.push({ ...person, _included: personIncluded });
             }
             nextUrl = data?.links?.next || null;
         } catch (e: any) {
