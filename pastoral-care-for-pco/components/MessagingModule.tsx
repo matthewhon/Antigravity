@@ -2108,6 +2108,7 @@ const SmsInbox: React.FC<{
         });
     };
     const [replyMediaUrl, setReplyMediaUrl] = useState('');
+    const [viewingImageUrl, setViewingImageUrl] = useState<string | null>(null);
     const [replyUploading, setReplyUploading] = useState(false);
     const [replyUploadPct, setReplyUploadPct] = useState(0);
     const replyFileRef = useRef<HTMLInputElement>(null);
@@ -2971,20 +2972,26 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                                         || url.includes('storage.googleapis.com')
                                                         || /image\//i.test(url);
                                                     return isImage ? (
-                                                        <a key={i} href={url} target="_blank" rel="noopener noreferrer" title="View full image" className="block w-24 h-24 sm:w-32 sm:h-32 overflow-hidden rounded-xl border border-white/20 dark:border-slate-600 bg-slate-100 dark:bg-slate-900 shrink-0">
+                                                        <button
+                                                            key={i}
+                                                            type="button"
+                                                            onClick={() => setViewingImageUrl(url)}
+                                                            title="Click to expand image"
+                                                            className="block relative max-w-[240px] sm:max-w-[300px] rounded-xl overflow-hidden border border-slate-200/50 dark:border-slate-700/50 bg-slate-900/5 hover:opacity-95 transition-all shadow-sm text-left shrink-0 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                                        >
                                                             <img
                                                                 src={url}
                                                                 alt={`MMS attachment ${i + 1}`}
-                                                                className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                                                                className="w-full max-h-60 object-cover cursor-pointer"
                                                                 onError={(e) => {
-                                                                    const parent = (e.target as HTMLImageElement).closest('a');
+                                                                    const parent = (e.target as HTMLImageElement).closest('button');
                                                                     if (parent) {
                                                                         parent.textContent = `📎 Media ${i + 1}`;
-                                                                        parent.className = 'block text-xs underline opacity-70 w-auto h-auto border-0 bg-transparent';
+                                                                        parent.className = 'block text-xs underline opacity-70 border-0 bg-transparent';
                                                                     }
                                                                 }}
                                                             />
-                                                        </a>
+                                                        </button>
                                                     ) : (
                                                         <a key={i} href={url} target="_blank" rel="noopener noreferrer"
                                                             className="flex items-center gap-1 text-xs underline opacity-80 hover:opacity-100">
@@ -3014,6 +3021,42 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                         {/* Scroll anchor ... always at bottom of message list */}
                         <div ref={messagesEndRef} aria-hidden="true" />
                     </div>
+
+                    {/* Image Lightbox Modal */}
+                    {viewingImageUrl && (
+                        <div
+                            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200"
+                            onClick={() => setViewingImageUrl(null)}
+                        >
+                            <div className="relative max-w-4xl max-h-[90vh] overflow-hidden flex flex-col items-center">
+                                <button
+                                    type="button"
+                                    onClick={() => setViewingImageUrl(null)}
+                                    className="absolute top-2 right-2 p-2 rounded-full bg-black/60 hover:bg-black/90 text-white transition shadow-lg z-10"
+                                    title="Close"
+                                >
+                                    <X size={20} />
+                                </button>
+                                <img
+                                    src={viewingImageUrl}
+                                    alt="Expanded attachment"
+                                    className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl"
+                                    onClick={(e) => e.stopPropagation()}
+                                />
+                                <div className="mt-3 flex gap-3">
+                                    <a
+                                        href={viewingImageUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="px-4 py-1.5 bg-white/20 hover:bg-white/30 text-white rounded-full text-xs font-semibold backdrop-blur-md transition flex items-center gap-1.5"
+                                    >
+                                        Open Original ↗
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Reply box */}
                     <div className="shrink-0 p-4 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
