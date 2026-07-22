@@ -236,6 +236,12 @@ async function processPersonForCampaign(
 
         if (session.status === 'complete' || session.status === 'max_attempts') return;
 
+        // If session was created as 'pending' but attemptCount is 0, send initial outreach now!
+        if (session.status === 'pending' || session.attemptCount === 0) {
+            await sendOutreach(db, log, campaign, sessionId, session, churchName, phoneE164, emailAddr);
+            return;
+        }
+
         // Check if retry is due
         const maxAttempts = schedule?.maxAttempts || 3;
         if (session.attemptCount >= maxAttempts) {
