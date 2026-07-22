@@ -7,8 +7,8 @@ import {
 import { GIVING_WIDGETS } from '../constants/widgetRegistry';
 import { WidgetWrapper, StatCard, DonorListWidget } from './SharedUI';
 import WidgetsController from './WidgetsController';
-import { 
-    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LineChart, Line, ComposedChart, Cell 
+import {
+    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LineChart, Line, ComposedChart, Cell, PieChart, Pie
 } from 'recharts';
 import { calculateGivingAnalytics } from '../services/analyticsService';
 import { firestore } from '../services/firestoreService';
@@ -17,6 +17,7 @@ import { DonationReport } from './DonationReport';
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 const toDateStr = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const money = (n: number) => '$' + Math.round(n).toLocaleString();
 
 interface GivingViewProps {
   analytics: GivingAnalytics | null;
@@ -66,7 +67,7 @@ const TOOLTIP_STYLE = {
 };
 
 const getWidgetSpan = (id: string) => {
-    if (['keyMetrics', 'trends', 'fundPerformance', 'cumulativeYTD', 'donorLifecycle', 'trendsComparison', 'benchmark_giving_avg', 'budgetProgress', 'givingVsBudget', 'givingByStatus', 'givingAgeDemographics', 'averageGiving', 'donorAcquisition'].includes(id)) return 'col-span-1 md:col-span-2 lg:col-span-2';
+    if (['keyMetrics', 'trends', 'fundPerformance', 'cumulativeYTD', 'donorLifecycle', 'trendsComparison', 'benchmark_giving_avg', 'budgetProgress', 'givingVsBudget', 'givingByStatus', 'givingAgeDemographics', 'averageGiving', 'donorAcquisition', 'payment_methods', 'gift_size_distribution'].includes(id)) return 'col-span-1 md:col-span-2 lg:col-span-2';
     return 'col-span-1';
 };
 
@@ -807,10 +808,275 @@ export const GivingView: React.FC<GivingViewProps> = ({
   const gridColor = currentTheme === 'dark' ? '#334155' : '#f1f5f9';
   const axisColor = currentTheme === 'dark' ? '#94a3b8' : '#94a3b8';
 
+  // ── Giving Tier 1 analytics ─────────────────────────────────────────────────
+  // Recurring vs one-time revenue for the selected period
+  const recurringRevenue = useMemo(() => {
+      const { startDate, endDate } = getDateRangeForFilter(filter);
+      const s = toDateStr(startDate), e = toDateStr(endDate);
+      let recurring = 0, oneTime = 0;
+      donations.forEach(d => {
+          const ds = (d.date || '').slice(0, 10);
+          if (ds < s || ds > e) return;
+          if (d.isRecurring) recurring += d.amount; else oneTime += d.amount;
+      });
+      const total = recurring + oneTime;
+      return { recurring, oneTime, total, recurringPct: total > 0 ? (recurring / total) * 100 : 0 };
+  }, [donations, filter, dateRange]);
+
+  // Giving by payment method + estimated processing fees (selected period)
+  const paymentMethods = useMemo(() => {
+      const { startDate, endDate } = getDateRangeForFilter(filter);
+      const s = toDateStr(startDate), e = toDateStr(endDate);
+      // Estimated processing-fee rate by source (fraction of amount). PCO does not
+      // expose net deposits, so these are industry-standard estimates.
+      const feeRate = (src: string) => {
+          const k = (src || '').toLowerCase();
+          if (k.includes('cash') || k.includes('check')) return 0;
+          if (k.includes('ach') || k.includes('bank')) return 0.008;
+          if (k.includes('card') || k.includes('credit') || k.includes('debit')) return 0.029;
+          return 0.025; // unknown / other online
+      };
+      const map = new Map<string, { source: string; amount: number; fee: number }>();
+      donations.forEach(d => {
+          const ds = (d.date || '').slice(0, 10);
+          if (ds < s || ds > e) return;
+          const src = d.paymentSource || 'Unknown';
+          if (!map.has(src)) map.set(src, { source: src, amount: 0, fee: 0 });
+          const ent = map.get(src)!;
+          ent.amount += d.amount;
+          ent.fee += d.amount * feeRate(src);
+      });
+      const rows = Array.from(map.values()).sort((a, b) => b.amount - a.amount);
+      const totalAmount = rows.reduce((sum, r) => sum + r.amount, 0);
+      const totalFee = rows.reduce((sum, r) => sum + r.fee, 0);
+      const cardAmount = rows.filter(r => /card|credit|debit/i.test(r.source)).reduce((sum, r) => sum + r.amount, 0);
+      const achSavings = cardAmount * (0.029 - 0.008);
+      return { rows, totalAmount, totalFee, achSavings };
+  }, [donations, filter, dateRange]);
+
+  // Gift size distribution (individual gifts in the selected period)
+  const giftSizeDist = useMemo(() => {
+      const { startDate, endDate } = getDateRangeForFilter(filter);
+      const s = toDateStr(startDate), e = toDateStr(endDate);
+      const tiers = [
+          { range: '≤$50',     max: 50,       count: 0, amount: 0 },
+          { range: '$51–100',  max: 100,      count: 0, amount: 0 },
+          { range: '$101–250', max: 250,      count: 0, amount: 0 },
+          { range: '$251–500', max: 500,      count: 0, amount: 0 },
+          { range: '$501–1k',  max: 1000,     count: 0, amount: 0 },
+          { range: '$1k+',     max: Infinity, count: 0, amount: 0 },
+      ];
+      donations.forEach(d => {
+          const ds = (d.date || '').slice(0, 10);
+          if (ds < s || ds > e) return;
+          const t = tiers.find(t => d.amount <= t.max);
+          if (t) { t.count++; t.amount += d.amount; }
+      });
+      return tiers.map(t => ({ range: t.range, count: t.count, amount: t.amount }));
+  }, [donations, filter, dateRange]);
+
+  // Year-end giving forecast vs budget (seasonality-adjusted via prior year)
+  const givingForecast = useMemo(() => {
+      const now = new Date();
+      const year = now.getFullYear();
+      const dayMs = 24 * 60 * 60 * 1000;
+      const startOfYear = new Date(year, 0, 1);
+      const endOfYear = new Date(year, 11, 31);
+      const daysElapsed = Math.max(1, Math.floor((now.getTime() - startOfYear.getTime()) / dayMs) + 1);
+      const daysInYear = Math.floor((endOfYear.getTime() - startOfYear.getTime()) / dayMs) + 1;
+      const ytd = donations.filter(d => (d.date || '').slice(0, 10) >= `${year}-01-01`).reduce((sum, d) => sum + d.amount, 0);
+
+      let projected = ytd / daysElapsed * daysInYear; // linear fallback
+      const pyDonations = donations.filter(d => { const ds = (d.date || '').slice(0, 10); return ds >= `${year - 1}-01-01` && ds <= `${year - 1}-12-31`; });
+      const pyTotal = pyDonations.reduce((sum, d) => sum + d.amount, 0);
+      if (pyTotal > 0) {
+          const cutoff = new Date(year - 1, now.getMonth(), now.getDate()).getTime();
+          const pyToDate = pyDonations.filter(d => new Date(d.date).getTime() <= cutoff).reduce((sum, d) => sum + d.amount, 0);
+          const fraction = pyToDate > 0 ? pyToDate / pyTotal : daysElapsed / daysInYear;
+          if (fraction > 0) projected = ytd / fraction; // seasonality-adjusted
+      }
+      const annualBudget = budgets.filter(b => b.year === year && b.isActive).reduce((sum, b) => sum + b.totalAmount, 0);
+      return { year, ytd, projected, annualBudget, hasBudget: annualBudget > 0, hasPriorYear: pyTotal > 0, vsBudgetPct: annualBudget > 0 ? (projected / annualBudget) * 100 : 0 };
+  }, [donations, budgets]);
+
+  // Recent deposit batches (for treasury reconciliation)
+  const batchSummary = useMemo(() => {
+      const map = new Map<string, { name: string; total: number; count: number; date: string }>();
+      donations.forEach(d => {
+          if (!d.batchId && !d.batchName) return;
+          const key = d.batchId || d.batchName!;
+          if (!map.has(key)) map.set(key, { name: d.batchName || 'Batch', total: 0, count: 0, date: d.date });
+          const b = map.get(key)!;
+          b.total += d.amount;
+          b.count++;
+          if ((d.date || '') > (b.date || '')) b.date = d.date;
+      });
+      return Array.from(map.values()).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  }, [donations]);
+
   const renderWidget = (id: string) => {
       if (!analytics) return null;
 
       switch(id) {
+          case 'recurring_revenue': {
+              const r = recurringRevenue;
+              const pie = [
+                  { name: 'Recurring', value: r.recurring, color: '#10b981' },
+                  { name: 'One-Time',  value: r.oneTime,   color: '#6366f1' },
+              ].filter(x => x.value > 0);
+              return (
+                  <WidgetWrapper title="Recurring vs One-Time" onRemove={() => handleRemoveWidget(id)} source="PCO Giving">
+                      <div className="h-64 relative">
+                          {r.total > 0 ? (
+                              <>
+                                  <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={1}>
+                                      <PieChart>
+                                          <Pie data={pie} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                                              {pie.map((x, i) => <Cell key={`rr-${i}`} fill={x.color} />)}
+                                          </Pie>
+                                          <Tooltip contentStyle={TOOLTIP_STYLE} itemStyle={{ color: '#fff' }} formatter={(v: number) => money(v)} />
+                                          <Legend layout="vertical" verticalAlign="middle" align="right" iconType="circle" wrapperStyle={{ fontSize: '11px', fontWeight: 'bold' }} />
+                                      </PieChart>
+                                  </ResponsiveContainer>
+                                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pr-24">
+                                      <span className="text-3xl font-black text-emerald-500 tabular-nums">{Math.round(r.recurringPct)}%</span>
+                                      <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Recurring</span>
+                                  </div>
+                              </>
+                          ) : (
+                              <div className="h-full flex items-center justify-center text-slate-400 text-xs font-bold">No giving in this period.</div>
+                          )}
+                      </div>
+                  </WidgetWrapper>
+              );
+          }
+          case 'payment_methods': {
+              const p = paymentMethods;
+              return (
+                  <WidgetWrapper title="Payment Methods & Fees" onRemove={() => handleRemoveWidget(id)} source="PCO Giving · est. fees">
+                      {p.totalAmount > 0 ? (
+                          <div className="flex flex-col h-full gap-4">
+                              <div className="grid grid-cols-3 gap-4">
+                                  <div>
+                                      <p className="text-2xl font-black text-slate-900 dark:text-white tabular-nums">{money(p.totalAmount)}</p>
+                                      <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mt-1">Total</p>
+                                  </div>
+                                  <div>
+                                      <p className="text-2xl font-black text-rose-500 tabular-nums">{money(p.totalFee)}</p>
+                                      <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mt-1">Est. Fees</p>
+                                  </div>
+                                  <div>
+                                      <p className="text-2xl font-black text-emerald-500 tabular-nums">{money(p.achSavings)}</p>
+                                      <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mt-1">ACH Savings</p>
+                                  </div>
+                              </div>
+                              <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+                                  {p.rows.map(r => {
+                                      const pct = p.totalAmount > 0 ? (r.amount / p.totalAmount) * 100 : 0;
+                                      return (
+                                          <div key={r.source}>
+                                              <div className="flex justify-between items-center mb-1">
+                                                  <span className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">{r.source}</span>
+                                                  <span className="text-[11px] text-slate-400 tabular-nums ml-2 shrink-0">{money(r.amount)} · {pct.toFixed(0)}% · fee {money(r.fee)}</span>
+                                              </div>
+                                              <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2 overflow-hidden">
+                                                  <div className="h-full rounded-full bg-indigo-500" style={{ width: `${pct}%` }}></div>
+                                              </div>
+                                          </div>
+                                      );
+                                  })}
+                              </div>
+                              <p className="text-[11px] font-medium text-slate-400">Fees estimated (card ~2.9%, ACH ~0.8%) — PCO does not expose actual net.</p>
+                          </div>
+                      ) : (
+                          <div className="h-full flex items-center justify-center text-slate-400 text-xs font-bold">No giving in this period.</div>
+                      )}
+                  </WidgetWrapper>
+              );
+          }
+          case 'giving_forecast': {
+              const f = givingForecast;
+              const over = f.vsBudgetPct >= 100;
+              return (
+                  <WidgetWrapper title="Year-End Forecast" onRemove={() => handleRemoveWidget(id)} source={`Projected ${f.year}`}>
+                      <div className="flex flex-col h-full justify-center gap-4">
+                          <div>
+                              <span className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter tabular-nums">{money(f.projected)}</span>
+                              <p className="text-[11px] font-medium text-slate-400 mt-1">projected {f.year} · {f.hasPriorYear ? 'seasonality-adjusted' : 'run-rate'}</p>
+                          </div>
+                          <div className="flex justify-between pt-3 border-t border-slate-100 dark:border-slate-800">
+                              <div>
+                                  <p className="text-xl font-black text-indigo-600 dark:text-indigo-400 tabular-nums">{money(f.ytd)}</p>
+                                  <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">YTD Actual</p>
+                              </div>
+                              {f.hasBudget && (
+                                  <div className="text-right">
+                                      <p className="text-xl font-black text-slate-700 dark:text-slate-200 tabular-nums">{money(f.annualBudget)}</p>
+                                      <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Annual Budget</p>
+                                  </div>
+                              )}
+                          </div>
+                          {f.hasBudget && (
+                              <div>
+                                  <div className="flex justify-between items-center mb-1">
+                                      <span className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Projected vs Budget</span>
+                                      <span className={`text-sm font-black tabular-nums ${over ? 'text-emerald-500' : 'text-amber-500'}`}>{Math.round(f.vsBudgetPct)}%</span>
+                                  </div>
+                                  <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2.5 overflow-hidden">
+                                      <div className="h-full rounded-full transition-all duration-700 ease-out" style={{ width: `${Math.min(100, f.vsBudgetPct)}%`, backgroundColor: over ? '#10b981' : '#f59e0b' }}></div>
+                                  </div>
+                              </div>
+                          )}
+                      </div>
+                  </WidgetWrapper>
+              );
+          }
+          case 'gift_size_distribution':
+              return (
+                  <WidgetWrapper title="Gift Size Distribution" onRemove={() => handleRemoveWidget(id)} source="PCO Giving">
+                      <div className="h-64">
+                          <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={1}>
+                              <BarChart data={giftSizeDist}>
+                                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={currentTheme === 'dark' ? '#334155' : '#f1f5f9'} />
+                                  <XAxis dataKey="range" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94a3b8' }} />
+                                  <YAxis axisLine={false} tickLine={false} allowDecimals={false} tick={{ fontSize: 11, fill: '#94a3b8' }} />
+                                  <Tooltip
+                                      cursor={{ fill: currentTheme === 'dark' ? '#334155' : '#f8fafc' }}
+                                      contentStyle={TOOLTIP_STYLE}
+                                      itemStyle={{ color: '#fff' }}
+                                      formatter={(v: number, _n: any, entry: any) => [`${v} gifts · ${money(entry?.payload?.amount || 0)}`, 'Gifts']}
+                                  />
+                                  <Bar dataKey="count" fill="#6366f1" radius={[4, 4, 0, 0]} barSize={44} />
+                              </BarChart>
+                          </ResponsiveContainer>
+                      </div>
+                      <p className="text-[11px] font-medium text-slate-400 text-center mt-2">Number of gifts by size, current period</p>
+                  </WidgetWrapper>
+              );
+          case 'batch_summary':
+              return (
+                  <WidgetWrapper title="Recent Deposits" onRemove={() => handleRemoveWidget(id)} source="PCO Batches">
+                      {batchSummary.length > 0 ? (
+                          <div className="space-y-2 max-h-72 overflow-y-auto custom-scrollbar pr-1">
+                              {batchSummary.slice(0, 40).map((b, i) => (
+                                  <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
+                                      <div className="min-w-0">
+                                          <p className="text-xs font-bold text-slate-800 dark:text-white truncate">{b.name}</p>
+                                          <p className="text-[11px] text-slate-400">{b.count} gift{b.count > 1 ? 's' : ''} · {new Date(b.date).toLocaleDateString()}</p>
+                                      </div>
+                                      <span className="text-sm font-black text-emerald-600 dark:text-emerald-400 tabular-nums shrink-0 ml-2">{money(b.total)}</span>
+                                  </div>
+                              ))}
+                          </div>
+                      ) : (
+                          <div className="h-full flex flex-col items-center justify-center text-center py-10 gap-1">
+                              <span className="text-3xl grayscale opacity-30">🧾</span>
+                              <p className="text-xs font-bold text-slate-400 dark:text-slate-500">No batch data</p>
+                              <p className="text-[11px] text-slate-400 max-w-[200px]">Batch names appear after a giving sync that includes batches.</p>
+                          </div>
+                      )}
+                  </WidgetWrapper>
+              );
           case 'budgetProgress': {
               const now = new Date();
               const activeYear = budgetYear;

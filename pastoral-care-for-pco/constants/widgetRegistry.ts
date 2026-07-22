@@ -126,6 +126,11 @@ export const SERVICES_TEAMS_WIDGETS: WidgetDefinition[] = [
 
 export const GIVING_WIDGETS: WidgetDefinition[] = [
     { id: 'keyMetrics', label: 'Key Financial Overview', icon: '💰' },
+    { id: 'recurring_revenue', label: 'Recurring vs One-Time', icon: '🔄' },
+    { id: 'payment_methods', label: 'Payment Methods & Fees', icon: '💳' },
+    { id: 'giving_forecast', label: 'Year-End Forecast', icon: '🔮' },
+    { id: 'gift_size_distribution', label: 'Gift Size Distribution', icon: '📊' },
+    { id: 'batch_summary', label: 'Recent Deposits', icon: '🧾' },
     { id: 'budgetProgress', label: 'Budget Progress', icon: '🌡️' },
     { id: 'trendsComparison', label: 'Trends Comp', icon: '📉' },
     { id: 'funds', label: 'Funds', icon: '🏦' },
@@ -258,8 +263,8 @@ export const getRoleBasedDefaults = (roles: string[]): Record<string, string[]> 
             : ['services_teams_list', 'volunteer_health'],
         // Giving
         giving_overview: isGiving || isPastor
-            ? ['keyMetrics', 'budgetProgress', 'trendsComparison', 'funds', 'topGivers', 'donorLifecycle', 'givingByStatus', 'averageGiving']
-            : ['keyMetrics', 'trendsComparison', 'funds', 'givingByStatus', 'averageGiving'],
+            ? ['keyMetrics', 'recurring_revenue', 'giving_forecast', 'budgetProgress', 'trendsComparison', 'payment_methods', 'funds', 'topGivers', 'donorLifecycle', 'givingByStatus', 'averageGiving']
+            : ['keyMetrics', 'recurring_revenue', 'trendsComparison', 'funds', 'givingByStatus', 'averageGiving'],
         giving_donors: isGiving
             ? ['topGivers', 'demographics', 'donorLifecycle', 'lifecycleNew', 'lifecycleLapsed']
             : ['topGivers', 'demographics'],
@@ -289,7 +294,7 @@ export const getDefaultWidgets = (view: string): string[] => {
         case 'services_attendance': return ['checkin_history', 'attendance_growth', 'first_time_guests', 'digital_vs_physical', 'events', 'services_stats'];
         case 'services_teams': return ['services_teams_list', 'volunteer_health', 'burnout_watchlist', 'serving_frequency', 'team_roster'];
         case 'giving': return ['keyMetrics', 'trendsComparison', 'funds'];
-        case 'giving_overview': return ['keyMetrics', 'trendsComparison', 'funds', 'givingByStatus', 'averageGiving'];
+        case 'giving_overview': return ['keyMetrics', 'recurring_revenue', 'giving_forecast', 'trendsComparison', 'payment_methods', 'funds', 'givingByStatus', 'averageGiving'];
         case 'giving_donor': return ['topGivers', 'demographics', 'donorLifecycle'];
         case 'pastoral': return ['church_growth_stats', 'church_spiritual_stats', 'member_headline_stats', 'member_map'];
         case 'pastoral_care': return ['care_log', 'prayer_requests', 'follow_ups', 'care_ai_agent', 'care_people_list'];
