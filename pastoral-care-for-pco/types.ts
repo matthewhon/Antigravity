@@ -12,6 +12,8 @@ export interface User {
     theme?: 'traditional' | 'dark';
     allowedCampuses?: string[];
     primaryCampusId?: string | null;
+    /** Timestamp the user completed (or skipped) the first-run guided tour. */
+    onboardingTourCompletedAt?: number;
 }
 
 export interface RiskSettings {
@@ -795,6 +797,13 @@ export interface WidgetDefinition {
     id: string;
     label: string;
     icon: string;
+    /**
+     * Layout width in the shared 4-column widget grid.
+     * sm = 1 col, md/lg = 2 cols, full = 4 cols. Defaults to `md` when omitted.
+     */
+    size?: 'sm' | 'md' | 'lg' | 'full';
+    /** One-line explanation shown in the welcome modal and Customize Layout drawer. */
+    description?: string;
 }
 
 export interface CareFollowUpLog {

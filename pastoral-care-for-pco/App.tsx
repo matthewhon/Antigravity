@@ -28,6 +28,52 @@ import { GlobalAdminManager } from './components/GlobalAdminManager';
 import { PastorAIView } from './components/PastorAIView';
 import { MetricsView } from './components/MetricsView';
 import WelcomeLayoutModal from './components/WelcomeLayoutModal';
+import GuidedTour, { TourStep } from './components/GuidedTour';
+
+// Steps for the first-run guided tour, shown once on the dashboard after a new
+// user accepts their suggested layout. Targets are `data-tour` anchors; steps
+// whose target is absent (e.g. Planning Center already connected) fall back to a
+// centered card automatically.
+const FIRST_RUN_TOUR_STEPS: TourStep[] = [
+    {
+        title: 'Welcome to your dashboard 👋',
+        body: "This is your home base — a quick pulse on your whole church. Let's take 30 seconds to show you around.",
+    },
+    {
+        target: 'setup-guide',
+        title: 'Start here: Setup Guide',
+        body: 'This checklist walks you through connecting Planning Center and finishing setup. Working through it is the fastest way to bring your data to life.',
+    },
+    {
+        target: 'connect-pco',
+        title: 'Connect Planning Center',
+        body: 'Most widgets fill with real numbers once Planning Center is connected. This button stays here until you do.',
+    },
+    {
+        target: 'dashboard-widgets',
+        title: 'These are your widgets',
+        body: "Each card is a widget. Drag any card to rearrange it, and hover to remove one you don't need.",
+    },
+    {
+        target: 'customize-layout',
+        title: 'Add or remove widgets',
+        body: "Not sure which widgets you need? Open this to browse the full library — every widget has a description — or hit “Reset to recommended” for the set we suggest for your role.",
+    },
+    {
+        target: 'ai-toggle',
+        title: 'Ask the AI assistant',
+        body: 'Toggle the assistant to ask questions about your people, giving, groups, and services in plain English.',
+    },
+    {
+        target: 'main-nav',
+        title: 'Explore every ministry',
+        body: 'Use the navigation to dive into People, Groups, Services, Giving, and Care. Each has its own dashboards you can customize the same way.',
+    },
+    {
+        title: "You're all set ✨",
+        body: 'Every layout is yours to change anytime with “Customize Layout.” Welcome aboard!',
+    },
+];
 import { PublicPollView } from './components/PublicPollView';
 import { PollProjectorView } from './components/PollProjectorView';
 import { PublicNoteView } from './components/PublicNoteView';
@@ -174,6 +220,9 @@ const App: React.FC = () => {
   // First-login layout suggestion
   const [layoutSuggestion, setLayoutSuggestion] = useState<Record<string, string[]> | null>(null);
   const [isGeneratingLayout, setIsGeneratingLayout] = useState(false);
+  // First-run guided tour (shown after the welcome layout modal on the very first login)
+  const [showTour, setShowTour] = useState(false);
+  const [pendingTour, setPendingTour] = useState(false);
 
   const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
   
@@ -267,6 +316,8 @@ const App: React.FC = () => {
             // First login detection: no lastLogin + no widgetPreferences saved
             const isFirstLogin = !userProfile.lastLogin && !userProfile.widgetPreferences;
             if (isFirstLogin) {
+                // Queue the guided tour to run once the welcome layout modal is dismissed.
+                if (!userProfile.onboardingTourCompletedAt) setPendingTour(true);
                 setIsGeneratingLayout(true);
                 // Show the modal immediately (spinner state) then populate
                 setLayoutSuggestion({});
@@ -670,12 +721,28 @@ const App: React.FC = () => {
       // Apply dashboard widgets immediately
       if (layout['dashboard']) setWidgets(layout['dashboard']);
       setLayoutSuggestion(null);
+      // Kick off the first-run guided tour on the dashboard now that widgets are in place.
+      if (pendingTour) {
+          setPendingTour(false);
+          navigate('/');
+          // Let the dashboard mount before the tour measures its anchors.
+          setTimeout(() => setShowTour(true), 400);
+      }
   };
 
   const handleCustomizeLayout = (layout: Record<string, string[]>) => {
       // Save the suggestion first so it isn't lost, then close modal
       handleAcceptLayout(layout);
       // The user will use the WidgetsController drawer to further adjust
+  };
+
+  const handleFinishTour = () => {
+      setShowTour(false);
+      if (user) {
+          const ts = Date.now();
+          firestore.updateUserTourCompleted(user.id, ts);
+          setUser({ ...user, onboardingTourCompletedAt: ts });
+      }
   };
 
   const handleSync = async () => {
@@ -1022,6 +1089,10 @@ const App: React.FC = () => {
             onAccept={handleAcceptLayout}
             onCustomize={handleCustomizeLayout}
         />
+    )}
+
+    {showTour && (
+        <GuidedTour onClose={handleFinishTour} steps={FIRST_RUN_TOUR_STEPS} />
     )}
     
         <TenantDataProvider value={{

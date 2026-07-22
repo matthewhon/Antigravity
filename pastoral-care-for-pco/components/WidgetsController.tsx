@@ -8,14 +8,17 @@ interface WidgetsControllerProps {
   currentTheme?: 'traditional' | 'dark';
   onUpdate?: (newVisibleWidgets: string[]) => void;
   onUpdateTheme?: (theme: 'traditional' | 'dark') => void;
+  /** When provided, shows a "Reset to recommended" button that applies these widget IDs. */
+  recommendedWidgets?: string[];
 }
 
-const WidgetsController: React.FC<WidgetsControllerProps> = ({ 
-  availableWidgets, 
-  visibleWidgets, 
+const WidgetsController: React.FC<WidgetsControllerProps> = ({
+  availableWidgets,
+  visibleWidgets,
   currentTheme,
   onUpdate,
-  onUpdateTheme
+  onUpdateTheme,
+  recommendedWidgets
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'library' | 'organize'>('library');
@@ -165,27 +168,46 @@ const WidgetsController: React.FC<WidgetsControllerProps> = ({
                     {/* LIBRARY TAB: Directory with Toggles */}
                     {activeTab === 'library' && (
                         <div className="space-y-3">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-4">Available Widgets Directory</p>
+                            <div className="flex items-center justify-between mb-4">
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Available Widgets Directory</p>
+                                {recommendedWidgets && onUpdate && (
+                                    <button
+                                        onClick={() => onUpdate(recommendedWidgets)}
+                                        className="text-[10px] font-black uppercase tracking-wider text-indigo-600 dark:text-indigo-400 hover:underline"
+                                        title="Restore the recommended widgets for your role"
+                                    >
+                                        ↺ Reset to recommended
+                                    </button>
+                                )}
+                            </div>
                             {availableWidgets.map((widget) => {
                                 const isEnabled = visibleWidgets.includes(widget.id);
+                                const isRecommended = recommendedWidgets?.includes(widget.id);
                                 return (
-                                    <div 
+                                    <div
                                         key={widget.id}
                                         onClick={() => toggleWidget(widget.id)}
-                                        className={`flex items-center justify-between p-4 rounded-2xl border cursor-pointer transition-all group ${isEnabled ? 'bg-indigo-50/30 dark:bg-indigo-900/10 border-indigo-100 dark:border-indigo-900/50 hover:bg-indigo-50 dark:hover:bg-indigo-900/20' : 'bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'}`}
+                                        className={`flex items-center justify-between gap-3 p-4 rounded-2xl border cursor-pointer transition-all group ${isEnabled ? 'bg-indigo-50/30 dark:bg-indigo-900/10 border-indigo-100 dark:border-indigo-900/50 hover:bg-indigo-50 dark:hover:bg-indigo-900/20' : 'bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'}`}
                                     >
-                                        <div className="flex items-center gap-4">
-                                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg shadow-sm transition-colors ${isEnabled ? 'bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300' : 'bg-slate-100 dark:bg-slate-700 text-slate-400'}`}>
+                                        <div className="flex items-center gap-4 min-w-0">
+                                            <div className={`w-10 h-10 flex-shrink-0 rounded-xl flex items-center justify-center text-lg shadow-sm transition-colors ${isEnabled ? 'bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300' : 'bg-slate-100 dark:bg-slate-700 text-slate-400'}`}>
                                                 {widget.icon}
                                             </div>
-                                            <div>
-                                                <p className={`text-sm font-bold ${isEnabled ? 'text-indigo-900 dark:text-indigo-300' : 'text-slate-700 dark:text-slate-300'}`}>{widget.label}</p>
-                                                <p className="text-[10px] text-slate-400 font-medium">Click to {isEnabled ? 'remove' : 'add'}</p>
+                                            <div className="min-w-0">
+                                                <div className="flex items-center gap-2">
+                                                    <p className={`text-sm font-bold truncate ${isEnabled ? 'text-indigo-900 dark:text-indigo-300' : 'text-slate-700 dark:text-slate-300'}`}>{widget.label}</p>
+                                                    {isRecommended && (
+                                                        <span className="flex-shrink-0 text-[8px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded-full">Recommended</span>
+                                                    )}
+                                                </div>
+                                                <p className="text-[11px] text-slate-400 dark:text-slate-500 font-medium leading-snug mt-0.5">
+                                                    {widget.description || `Click to ${isEnabled ? 'remove' : 'add'}`}
+                                                </p>
                                             </div>
                                         </div>
-                                        
+
                                         {/* Toggle Switch Visual */}
-                                        <div className={`w-12 h-7 rounded-full p-1 transition-colors duration-300 ${isEnabled ? 'bg-emerald-500' : 'bg-slate-200 dark:bg-slate-600'}`}>
+                                        <div className={`w-12 h-7 flex-shrink-0 rounded-full p-1 transition-colors duration-300 ${isEnabled ? 'bg-emerald-500' : 'bg-slate-200 dark:bg-slate-600'}`}>
                                             <div className={`w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-300 ${isEnabled ? 'translate-x-5' : 'translate-x-0'}`}></div>
                                         </div>
                                     </div>

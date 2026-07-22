@@ -12,7 +12,7 @@ import {
     BarChart, Bar, Cell, PieChart, Pie, Legend
 } from 'recharts';
 import WidgetsController from './WidgetsController';
-import { DASHBOARD_WIDGETS } from '../constants/widgetRegistry';
+import { DASHBOARD_WIDGETS, getWidgetSpan, getRoleBasedDefaults } from '../constants/widgetRegistry';
 import { WidgetWrapper, StatCard, EYEBROW, Eyebrow, Meta } from './SharedUI';
 import { RiskDistributionWidget } from './RiskWidgets';
 import { calculateChurchRisk, DEFAULT_CHURCH_RISK_SETTINGS, calculateAggregateGroupHealth } from '../services/riskService';
@@ -174,10 +174,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ activePeopleCount,
           groupRiskSettings
       );
   }, [groupRiskSettings, groupsData?.allGroups, peopleData?.allPeople]);
-
-  const fixedWidgetsConfig = ['people_stats', 'services_timeline'];
-  const activeFixedWidgets = safeVisibleWidgets.filter(w => fixedWidgetsConfig.includes(w));
-  const safeVisibleDraggableWidgets = safeVisibleWidgets.filter(w => !fixedWidgetsConfig.includes(w));
 
   const renderWidget = (id: string) => {
       const currentTheme = user.theme;
@@ -675,7 +671,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ activePeopleCount,
           </div>
           <div className="flex items-center gap-4">
               {!pcoConnected && (
-                  <button 
+                  <button
+                      data-tour="connect-pco"
                       onClick={onConnectPco}
                       className="bg-amber-500 hover:bg-amber-600 text-white px-6 py-2.5 rounded-xl font-bold text-[10px] uppercase tracking-wide transition-all shadow-lg shadow-amber-200 dark:shadow-amber-900/20"
                   >
@@ -684,6 +681,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ activePeopleCount,
               )}
               {isPastorAIEnabled && (
               <button
+                  data-tour="ai-toggle"
                   onClick={toggleShowAI}
                   title={showAI ? 'Hide AI Assistant' : 'Show AI Assistant'}
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-[10px] font-bold uppercase tracking-wide transition-all border shadow-sm ${
@@ -696,52 +694,41 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ activePeopleCount,
                   <span>{showAI ? 'Hide AI' : 'Show AI'}</span>
               </button>
               )}
-              <WidgetsController 
-                  availableWidgets={availableWidgets} 
-                  visibleWidgets={safeVisibleWidgets} 
-                  onUpdate={onUpdateWidgets} 
-                  onUpdateTheme={onUpdateTheme}
-                  currentTheme={user.theme}
-              />
+              <div data-tour="customize-layout">
+                <WidgetsController
+                    availableWidgets={availableWidgets}
+                    visibleWidgets={safeVisibleWidgets}
+                    onUpdate={onUpdateWidgets}
+                    onUpdateTheme={onUpdateTheme}
+                    currentTheme={user.theme}
+                    recommendedWidgets={getRoleBasedDefaults(user.roles as string[]).dashboard}
+                />
+              </div>
           </div>
         </header>
 
-        <div className="flex flex-col lg:flex-row gap-6 items-start">
-            {/* Fixed Column */}
-            {activeFixedWidgets.length > 0 && (
-                <div className="w-full lg:w-1/3 flex flex-col gap-6">
-                    {activeFixedWidgets.map(id => (
-                        <div key={id} className="w-full">
-                            {renderWidget(id)}
-                        </div>
-                    ))}
+        {/* Unified widget grid — each widget's width comes from its registry `size` */}
+        <div data-tour="dashboard-widgets" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 grid-flow-row-dense items-start">
+            {safeVisibleWidgets.map((id) => (
+                <div
+                    key={id}
+                    data-tour={id === 'onboarding_tasks' ? 'setup-guide' : undefined}
+                    className={`${getWidgetSpan('dashboard', id)} cursor-grab active:cursor-grabbing transition-opacity`}
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, id)}
+                    onDragEnter={(e) => handleDragEnter(e, id)}
+                    onDragEnd={handleDragEnd}
+                    onDragOver={handleDragOver}
+                >
+                    {renderWidget(id)}
+                </div>
+            ))}
+            {safeVisibleWidgets.length === 0 && (
+                <div className="col-span-full py-20 text-center bg-slate-50 dark:bg-slate-900 rounded-3xl border border-dashed border-slate-200 dark:border-slate-700">
+                    <p className="text-slate-400 dark:text-slate-500 font-bold">Dashboard is empty.</p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">Use the "Customize Layout" button to add widgets.</p>
                 </div>
             )}
-
-            {/* Draggable Grid */}
-            <div className={`w-full ${activeFixedWidgets.length > 0 ? 'lg:w-2/3' : ''} grid grid-cols-1 md:grid-cols-2 gap-6 grid-flow-row-dense content-start`}>
-                {safeVisibleDraggableWidgets.map((id) => {
-                    return (
-                        <div
-                            key={id}
-                            className="break-inside-avoid cursor-grab active:cursor-grabbing transition-opacity w-full inline-block"
-                            draggable
-                            onDragStart={(e) => handleDragStart(e, id)}
-                            onDragEnter={(e) => handleDragEnter(e, id)}
-                            onDragEnd={handleDragEnd}
-                            onDragOver={handleDragOver}
-                        >
-                            {renderWidget(id)}
-                        </div>
-                    );
-                })}
-                {safeVisibleWidgets.length === 0 && (
-                    <div className="col-span-1 md:col-span-2 py-20 text-center bg-slate-50 dark:bg-slate-900 rounded-3xl border border-dashed border-slate-200 dark:border-slate-700 break-inside-avoid w-full inline-block">
-                        <p className="text-slate-400 dark:text-slate-500 font-bold">Dashboard is empty.</p>
-                        <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">Use the "Customize Layout" button to add widgets.</p>
-                    </div>
-                )}
-            </div>
         </div>
       </div>
 

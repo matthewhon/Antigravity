@@ -55,6 +55,11 @@ const getWidgetLabel = (viewKey: string, widgetId: string): string => {
     return widgets.find(w => w.id === widgetId)?.label || widgetId;
 };
 
+const getWidgetDescription = (viewKey: string, widgetId: string): string | undefined => {
+    const widgets = ALL_WIDGETS[viewKey] || [];
+    return widgets.find(w => w.id === widgetId)?.description;
+};
+
 // Prioritized views to show in the preview (skip empty/trivial views)
 const PREVIEW_VIEWS = [
     'dashboard',
@@ -131,16 +136,35 @@ const WelcomeLayoutModal: React.FC<WelcomeLayoutModalProps> = ({
                                         <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-500 dark:text-indigo-400 mb-1">
                                             {VIEW_LABELS[viewKey] || viewKey}
                                         </p>
-                                        <div className="flex flex-wrap gap-1.5">
-                                            {widgetIds.map(id => (
-                                                <span
-                                                    key={id}
-                                                    className="px-2 py-0.5 rounded-full bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-[11px] font-semibold text-slate-600 dark:text-slate-300"
-                                                >
-                                                    {getWidgetLabel(viewKey, id)}
-                                                </span>
-                                            ))}
-                                        </div>
+                                        {viewKey === 'dashboard' ? (
+                                            // Landing view: show what each widget is so a first-time user knows the layout
+                                            <div className="space-y-1.5">
+                                                {widgetIds.map(id => (
+                                                    <div key={id} className="flex items-baseline gap-2">
+                                                        <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200 whitespace-nowrap">
+                                                            {getWidgetLabel(viewKey, id)}
+                                                        </span>
+                                                        {getWidgetDescription(viewKey, id) && (
+                                                            <span className="text-[10px] text-slate-400 dark:text-slate-500 leading-snug">
+                                                                — {getWidgetDescription(viewKey, id)}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {widgetIds.map(id => (
+                                                    <span
+                                                        key={id}
+                                                        title={getWidgetDescription(viewKey, id)}
+                                                        className="px-2 py-0.5 rounded-full bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-[11px] font-semibold text-slate-600 dark:text-slate-300 cursor-default"
+                                                    >
+                                                        {getWidgetLabel(viewKey, id)}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                 );
                             })}

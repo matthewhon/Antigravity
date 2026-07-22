@@ -11,11 +11,12 @@ import {
   BarChart, Bar, Cell, PieChart, Pie, Legend
 } from 'recharts';
 import WidgetsController from './WidgetsController';
-import { 
-    PASTORAL_CHURCH_WIDGETS, 
-    PASTORAL_MEMBERSHIP_WIDGETS, 
+import {
+    PASTORAL_CHURCH_WIDGETS,
+    PASTORAL_MEMBERSHIP_WIDGETS,
     PASTORAL_COMMUNITY_WIDGETS,
-    PASTORAL_CARE_WIDGETS
+    PASTORAL_CARE_WIDGETS,
+    getWidgetSpan
 } from '../constants/widgetRegistry';
 import { 
     WidgetWrapper, StatCard, CensusCard, 
@@ -341,6 +342,11 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
   checkIns = []
 }) => {
   const activeTab = activePage ?? 'Church';
+  // View key used to resolve each widget's width from the shared registry sizing system.
+  const pastoralViewKey =
+      activeTab === 'Church' ? 'pastoral_church' :
+      activeTab === 'Membership' ? 'pastoral_membership' :
+      activeTab === 'Community' ? 'pastoral_community' : 'pastoral_care';
   const [locationCensusMap, setLocationCensusMap] = useState<Record<string, CensusStats>>({});
   const [locationErrorMap, setLocationErrorMap] = useState<Record<string, string>>({});
   const [isFetchingAllCensus, setIsFetchingAllCensus] = useState(false);
@@ -1865,14 +1871,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                       const loc = church.communityLocations?.find(l => l.id === selectedLocationId);
                       if (!loc) return null;
                       return safeVisibleWidgets.map((id, index) => {
-                          let spanClass = "col-span-1";
-                          if (['church_growth_stats', 'member_headline_stats', 'member_map', 'care_people_list', 'care_recommended_followups'].includes(id)) {
-                              spanClass = "col-span-1 md:col-span-2 lg:col-span-4";
-                          } else if (['church_spiritual_stats', 'censusHero', 'community_ai_agent', 'member_geo_list', 'ministrySignals', 'care_ai_agent', 'member_attrition_chart'].includes(id)) {
-                              spanClass = "col-span-1 lg:col-span-2";
-                          } else if (['care_log', 'prayer_requests'].includes(id)) {
-                              spanClass = "col-span-1 lg:col-span-2";
-                          }
+                          const spanClass = getWidgetSpan(pastoralViewKey, id);
                           
                           return (
                               <div
@@ -1891,15 +1890,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
                   })()
               ) : (
                   safeVisibleWidgets.map((id, index) => {
-                      // Special Full Width Handling
-                      let spanClass = "col-span-1";
-                      if (['church_growth_stats', 'member_headline_stats', 'member_map', 'care_people_list', 'care_recommended_followups'].includes(id)) {
-                          spanClass = "col-span-1 md:col-span-2 lg:col-span-4";
-                      } else if (['church_spiritual_stats', 'censusHero', 'community_ai_agent', 'member_geo_list', 'ministrySignals', 'care_ai_agent', 'member_attrition_chart'].includes(id)) {
-                          spanClass = "col-span-1 lg:col-span-2";
-                      } else if (['care_log', 'prayer_requests'].includes(id)) {
-                          spanClass = "col-span-1 lg:col-span-2";
-                      }
+                      const spanClass = getWidgetSpan(pastoralViewKey, id);
                       
                       return (
                           <div

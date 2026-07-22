@@ -299,6 +299,7 @@ const Layout: React.FC<LayoutProps> = ({
               />
               <nav
                 ref={navRef}
+                data-tour="main-nav"
                 className="flex-1 flex items-center gap-1.5 overflow-x-auto no-scrollbar mask-linear-fade px-2"
               >
                 {navEntries.map(entry =>

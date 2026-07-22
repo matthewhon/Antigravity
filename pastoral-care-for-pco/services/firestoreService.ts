@@ -394,6 +394,14 @@ class FirestoreService {
       }
   }
 
+  async updateUserTourCompleted(uid: string, timestamp: number = Date.now()) {
+      try {
+          await updateDoc(doc(db, 'users', uid), { onboardingTourCompletedAt: timestamp });
+      } catch (e) {
+          // non-critical; ignore
+      }
+  }
+
   async updateUserTheme(uid: string, theme: 'traditional' | 'dark') {
       try {
           await updateDoc(doc(db, 'users', uid), { theme });

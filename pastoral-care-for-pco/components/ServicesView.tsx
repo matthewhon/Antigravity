@@ -9,7 +9,7 @@ import {
     BarChart, Bar, XAxis, YAxis, Legend
 } from 'recharts';
 import WidgetsController from './WidgetsController';
-import { SERVICES_OVERVIEW_WIDGETS, SERVICES_ATTENDANCE_WIDGETS, SERVICES_TEAMS_WIDGETS } from '../constants/widgetRegistry';
+import { SERVICES_OVERVIEW_WIDGETS, SERVICES_ATTENDANCE_WIDGETS, SERVICES_TEAMS_WIDGETS, getWidgetSpan } from '../constants/widgetRegistry';
 import { WidgetWrapper, StatCard } from './SharedUI';
 import { syncServicesData, syncCheckInsData } from '../services/pcoSyncService'; 
 import ServicesRemindersTab from './ServicesRemindersTab';
@@ -1990,10 +1990,9 @@ const ServicesView: React.FC<ServicesViewProps> = ({
             {safeVisibleWidgets.includes('services_stats') && renderWidget('services_stats')}
             {safeVisibleWidgets.map((id, index) => {
                 if (id === 'services_stats') return null;
-                let spanClass = "col-span-1";
-                if (['services_stats', 'checkin_history', 'teams', 'services_teams_list'].includes(id)) spanClass = "col-span-1 md:col-span-2 lg:col-span-4";
-                else if (['staffing_needs', 'upcoming_plans_list', 'top_songs', 'positions', 'events', 'team_roster', 'burnout_watchlist', 'serving_frequency', 'team_fill_rate', 'attendance_breakdown', 'staffing_forecast', 'song_rotation'].includes(id)) spanClass = "col-span-1 lg:col-span-2";
-                
+                const viewKey = activeTab === 'Overview' ? 'services_overview' : activeTab === 'Attendance' ? 'services_attendance' : 'services_teams';
+                const spanClass = getWidgetSpan(viewKey, id);
+
                 return (
                     <div
                         key={id}

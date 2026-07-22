@@ -4,7 +4,7 @@ import {
     GivingAnalytics, GivingFilter, BudgetRecord, PcoFund, DetailedDonation, 
     Church, PcoPerson, GlobalStats, DonorLifecycleSettings 
 } from '../types';
-import { GIVING_WIDGETS } from '../constants/widgetRegistry';
+import { GIVING_WIDGETS, getWidgetSpan as resolveWidgetSpan } from '../constants/widgetRegistry';
 import { WidgetWrapper, StatCard, DonorListWidget } from './SharedUI';
 import WidgetsController from './WidgetsController';
 import {
@@ -66,10 +66,8 @@ const TOOLTIP_STYLE = {
     boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
 };
 
-const getWidgetSpan = (id: string) => {
-    if (['keyMetrics', 'trends', 'fundPerformance', 'cumulativeYTD', 'donorLifecycle', 'trendsComparison', 'benchmark_giving_avg', 'budgetProgress', 'givingVsBudget', 'givingByStatus', 'givingAgeDemographics', 'averageGiving', 'donorAcquisition', 'payment_methods', 'gift_size_distribution', 'giving_seasonality'].includes(id)) return 'col-span-1 md:col-span-2 lg:col-span-2';
-    return 'col-span-1';
-};
+// Widget width now comes from the shared registry sizing system.
+const getWidgetSpan = (id: string) => resolveWidgetSpan('giving_overview', id);
 
 export const GivingView: React.FC<GivingViewProps> = ({ 
   analytics, 
@@ -106,6 +104,7 @@ export const GivingView: React.FC<GivingViewProps> = ({
   const [gvbFilter, setGvbFilter] = useState<GivingFilter>('Year');
   const [gvbFund, setGvbFund] = useState<string>('');
   const [cumulativeFundFilter, setCumulativeFundFilter] = useState<string>('');
+  const [forecastFund, setForecastFund] = useState<string>('');
   
   // Budget Editor State
   const [isEditingBudget, setIsEditingBudget] = useState(false);
@@ -884,10 +883,15 @@ export const GivingView: React.FC<GivingViewProps> = ({
       const endOfYear = new Date(year, 11, 31);
       const daysElapsed = Math.max(1, Math.floor((now.getTime() - startOfYear.getTime()) / dayMs) + 1);
       const daysInYear = Math.floor((endOfYear.getTime() - startOfYear.getTime()) / dayMs) + 1;
-      const ytd = donations.filter(d => (d.date || '').slice(0, 10) >= `${year}-01-01`).reduce((sum, d) => sum + d.amount, 0);
+      
+      const filteredDonations = forecastFund 
+          ? donations.filter(d => d.fundName === forecastFund || d.fundId === forecastFund)
+          : donations;
+
+      const ytd = filteredDonations.filter(d => (d.date || '').slice(0, 10) >= `${year}-01-01`).reduce((sum, d) => sum + d.amount, 0);
 
       let projected = ytd / daysElapsed * daysInYear; // linear fallback
-      const pyDonations = donations.filter(d => { const ds = (d.date || '').slice(0, 10); return ds >= `${year - 1}-01-01` && ds <= `${year - 1}-12-31`; });
+      const pyDonations = filteredDonations.filter(d => { const ds = (d.date || '').slice(0, 10); return ds >= `${year - 1}-01-01` && ds <= `${year - 1}-12-31`; });
       const pyTotal = pyDonations.reduce((sum, d) => sum + d.amount, 0);
       if (pyTotal > 0) {
           const cutoff = new Date(year - 1, now.getMonth(), now.getDate()).getTime();
@@ -895,9 +899,11 @@ export const GivingView: React.FC<GivingViewProps> = ({
           const fraction = pyToDate > 0 ? pyToDate / pyTotal : daysElapsed / daysInYear;
           if (fraction > 0) projected = ytd / fraction; // seasonality-adjusted
       }
-      const annualBudget = budgets.filter(b => b.year === year && b.isActive).reduce((sum, b) => sum + b.totalAmount, 0);
+      const annualBudget = budgets
+          .filter(b => b.year === year && b.isActive && (!forecastFund || b.fundName === forecastFund || b.fundId === forecastFund))
+          .reduce((sum, b) => sum + b.totalAmount, 0);
       return { year, ytd, projected, annualBudget, hasBudget: annualBudget > 0, hasPriorYear: pyTotal > 0, vsBudgetPct: annualBudget > 0 ? (projected / annualBudget) * 100 : 0 };
-  }, [donations, budgets]);
+  }, [donations, budgets, forecastFund]);
 
   // Recent deposit batches (for treasury reconciliation)
   const batchSummary = useMemo(() => {
@@ -1069,7 +1075,25 @@ export const GivingView: React.FC<GivingViewProps> = ({
               const f = givingForecast;
               const over = f.vsBudgetPct >= 100;
               return (
-                  <WidgetWrapper title="Year-End Forecast" onRemove={() => handleRemoveWidget(id)} source={`Projected ${f.year}`}>
+                  <WidgetWrapper 
+                      title="Year-End Forecast" 
+                      onRemove={() => handleRemoveWidget(id)} 
+                      source={`Projected ${f.year}`}
+                      controls={
+                          <select
+                              value={forecastFund}
+                              onChange={(e) => setForecastFund(e.target.value)}
+                              className="text-xs border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-medium"
+                          >
+                              <option value="">All Funds</option>
+                              {funds.map((fund) => (
+                                  <option key={fund.id || fund.name} value={fund.name}>
+                                      {fund.name}
+                                  </option>
+                              ))}
+                          </select>
+                      }
+                  >
                       <div className="flex flex-col h-full justify-center gap-4">
                           <div>
                               <span className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter tabular-nums">{money(f.projected)}</span>

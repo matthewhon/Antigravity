@@ -6,7 +6,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, ReferenceLine
 } from 'recharts';
 import WidgetsController from './WidgetsController';
-import { GROUPS_WIDGETS } from '../constants/widgetRegistry';
+import { GROUPS_WIDGETS, getWidgetSpan } from '../constants/widgetRegistry';
 import { WidgetWrapper, StatCard } from './SharedUI';
 import { generateGroupsStrategy, generateGroupRiskAnalysis } from '../services/geminiService';
 import { calculateGroupHealth, DEFAULT_GROUP_RISK_SETTINGS } from '../services/riskService';
@@ -1664,13 +1664,8 @@ const GroupsView: React.FC<GroupsViewProps> = ({
           {safeVisibleWidgets.includes('groups_stats') && renderWidget('groups_stats')}
           {safeVisibleWidgets.map((id, index) => {
               if (id === 'groups_stats') return null;
-              let spanClass = "col-span-1";
-              if (id === 'groups_stats') spanClass = "col-span-1 md:col-span-2 lg:col-span-4";
-              if (id === 'groups_ai_agent' || id === 'groups_risk_agent' || id === 'event_attendance' || id === 'groups_age_demographics'
-                  || id === 'groups_action_center' || id === 'groups_size_distribution' || id === 'groups_net_growth' || id === 'groups_meeting_days'
-                  || id === 'groups_type_performance' || id === 'groups_by_campus') spanClass = "col-span-1 lg:col-span-2";
-              if (id === 'group_info') spanClass = "col-span-1 lg:col-span-4";
-              
+              const spanClass = getWidgetSpan('groups', id);
+
               return (
                   <div
                       key={id}
