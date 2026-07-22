@@ -32,6 +32,17 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
   const [visibleFormIds, setVisibleFormIds] = useState<Set<string>>(new Set());
   const [formsLoaded, setFormsLoaded] = useState(false);
 
+  // Single Event specifics
+  const [singleEventId, setSingleEventId] = useState('');
+  const [singleEventSource, setSingleEventSource] = useState<'calendar' | 'registrations'>('calendar');
+  const [singleEventStyle, setSingleEventStyle] = useState<'hero' | 'card' | 'compact'>('card');
+  const [singleEventCtaText, setSingleEventCtaText] = useState('Register Now');
+  const [singleEventShowCountdown, setSingleEventShowCountdown] = useState(true);
+  const [singleEventShowLocation, setSingleEventShowLocation] = useState(true);
+  const [singleEvents, setSingleEvents] = useState<any[]>([]);
+  const [singleEventsLoading, setSingleEventsLoading] = useState(false);
+  const [singleEventsLoaded, setSingleEventsLoaded] = useState(false);
+
   // Popup specifics
   const [popupUrl, setPopupUrl] = useState('');
   const [popupText, setPopupText] = useState('Open Form');
@@ -54,6 +65,29 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
         .catch(console.error);
     }
   }, [type, churchId, formsLoaded]);
+
+  React.useEffect(() => {
+    if (type === 'single_event') {
+      setSingleEventsLoading(true);
+      const apiBaseUrl = process.env.NODE_ENV === 'production' 
+        ? 'https://pastoralcare.barnabassoftware.com' 
+        : 'http://localhost:8080';
+      const endpoint = singleEventSource === 'calendar' ? 'events' : 'registrations';
+      fetch(`${apiBaseUrl}/api/public/${endpoint}/${churchId}`)
+        .then(r => r.json())
+        .then(data => {
+          if (Array.isArray(data)) {
+            setSingleEvents(data);
+            setSingleEventsLoaded(true);
+            if (data.length > 0 && !singleEventId) {
+              setSingleEventId(data[0].id);
+            }
+          }
+        })
+        .catch(console.error)
+        .finally(() => setSingleEventsLoading(false));
+    }
+  }, [type, churchId, singleEventSource]);
 
   const toggleFormVisibility = (id: string) => {
     setVisibleFormIds(prev => {
@@ -81,7 +115,7 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
       const res = await fetch(`${apiBaseUrl}/pco/sync`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ churchId, area: type === 'calendar' ? 'events' : type })
+        body: JSON.stringify({ churchId, area: (type === 'calendar' || type === 'single_event') ? 'events' : type })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -114,6 +148,7 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
       + (type === 'groups' ? `&showTags=${showTags}` : '')
       + (type === 'registrations' ? `&dateFilter=${dateFilter}&tagFilter=${encodeURIComponent(tagFilter)}&includeArchived=${includeArchived}` : '')
       + (type === 'forms' && formsLoaded && !allFormsVisible ? `&visibleFormIds=${encodeURIComponent(visibleFormIdsArray.join(','))}` : '')
+      + (type === 'single_event' ? `&eventId=${singleEventId}&eventSource=${singleEventSource}&eventStyle=${singleEventStyle}&ctaText=${encodeURIComponent(singleEventCtaText)}&showCountdown=${singleEventShowCountdown}&showLocation=${singleEventShowLocation}` : '')
       + `&imageRatio=${imageRatio}`
       + (autoHeight ? `&autoHeight=true` : '')
       + (scale !== 1 ? `&scale=${scale}` : '')
@@ -180,6 +215,7 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
                 { id: 'groups', label: 'Small Groups' },
                 { id: 'registrations', label: 'Registrations' },
                 { id: 'events', label: 'Calendar/Events' },
+                { id: 'single_event', label: 'Featured Single Event' },
                 { id: 'forms', label: 'Forms' },
                 { id: 'popup', label: 'Pop Up Form' }
               ].map(opt => (
@@ -188,6 +224,7 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
                   onClick={() => {
                     setType(opt.id);
                     if (opt.id === 'events') setLayout('month');
+                    else if (opt.id === 'single_event') setLayout('card');
                     else if (layout === 'month') setLayout('grid');
                   }}
                   className={`text-left px-4 py-2.5 rounded-lg border text-sm font-semibold transition ${type === opt.id ? 'bg-indigo-50 dark:bg-indigo-900/30 border-indigo-200 text-indigo-700 dark:text-indigo-400 dark:border-indigo-800' : 'bg-transparent border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-slate-300'}`}
@@ -416,6 +453,105 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
               {visibleFormIds.size === 0 && forms.length > 0 && (
                 <p className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold">⚠ No forms selected — the widget will show nothing.</p>
               )}
+            </div>
+          )}
+
+          {type === 'single_event' && (
+            <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Event Source</label>
+                <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-xl">
+                  <button 
+                    onClick={() => { setSingleEventSource('calendar'); setSingleEventId(''); }}
+                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition ${singleEventSource==='calendar'?'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white':'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                  >
+                    Calendar
+                  </button>
+                  <button 
+                    onClick={() => { setSingleEventSource('registrations'); setSingleEventId(''); }}
+                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition ${singleEventSource==='registrations'?'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white':'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                  >
+                    Registrations
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Select Event</label>
+                {singleEventsLoading ? (
+                  <div className="flex items-center gap-2 text-xs text-slate-400 py-2">
+                    <Loader2 size={14} className="animate-spin text-indigo-500" /> Loading events...
+                  </div>
+                ) : singleEvents.length === 0 ? (
+                  <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 p-2.5 rounded-lg border border-amber-200 dark:border-amber-800">
+                    No active {singleEventSource === 'calendar' ? 'calendar events' : 'registrations'} found in Planning Center.
+                  </p>
+                ) : (
+                  <select
+                    value={singleEventId}
+                    onChange={e => setSingleEventId(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-medium"
+                  >
+                    {singleEvents.map(ev => (
+                      <option key={ev.id} value={ev.id}>
+                        {ev.name || 'Unnamed Event'} {ev.startsAt ? `(${new Date(ev.startsAt).toLocaleDateString()})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Card Style</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: 'hero', label: 'Hero' },
+                    { id: 'card', label: 'Card' },
+                    { id: 'compact', label: 'Compact' },
+                  ].map(st => (
+                    <button
+                      key={st.id}
+                      onClick={() => setSingleEventStyle(st.id as any)}
+                      className={`py-2 px-1 text-xs font-bold rounded-lg border text-center transition ${singleEventStyle === st.id ? 'bg-indigo-50 dark:bg-indigo-900/30 border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 font-bold' : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-slate-300'}`}
+                    >
+                      {st.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Button Text</label>
+                <input
+                  type="text"
+                  value={singleEventCtaText}
+                  onChange={e => setSingleEventCtaText(e.target.value)}
+                  placeholder="e.g. Register Now, Learn More"
+                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                />
+              </div>
+
+              <div className="space-y-3 pt-2">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={singleEventShowCountdown} 
+                    onChange={e => setSingleEventShowCountdown(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+                  />
+                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Show Countdown Ticker</span>
+                </label>
+
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={singleEventShowLocation} 
+                    onChange={e => setSingleEventShowLocation(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+                  />
+                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Show Location / Address</span>
+                </label>
+              </div>
             </div>
           )}
 
