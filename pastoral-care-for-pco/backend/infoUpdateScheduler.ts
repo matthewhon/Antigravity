@@ -112,8 +112,8 @@ export async function processCampaign(db: any, log: any, campaign: any): Promise
             const people = data?.data || [];
             const included = data?.included || [];
 
-            for (const person of people) {
-                // Fetch individual person with includes if list payload doesn't embed relationships
+            // Parallelize PCO profile fetches across list batch so ALL members are prepared simultaneously
+            const batchPromises = people.map(async (person: any) => {
                 const phoneIds = (person.relationships?.phone_numbers?.data || []).map((r: any) => r.id);
                 const emailIds = (person.relationships?.emails?.data || []).map((r: any) => r.id);
                 const addrIds  = (person.relationships?.addresses?.data || []).map((r: any) => r.id);
@@ -124,7 +124,6 @@ export async function processCampaign(db: any, log: any, campaign: any): Promise
                     (inc.type === 'Address' && addrIds.includes(inc.id))
                 );
 
-                // If list endpoint didn't provide relationship links for this person, fetch individual person record with includes directly
                 if (personIncluded.length === 0) {
                     try {
                         const personDetail = await fetchFromPco(churchId, `https://api.planningcenteronline.com/people/v2/people/${person.id}?include=phone_numbers,emails,addresses`);
@@ -134,8 +133,11 @@ export async function processCampaign(db: any, log: any, campaign: any): Promise
                     } catch { /* ignore fallback */ }
                 }
 
-                allPeople.push({ ...person, _included: personIncluded });
-            }
+                return { ...person, _included: personIncluded };
+            });
+
+            const resolvedBatch = await Promise.all(batchPromises);
+            allPeople = [...allPeople, ...resolvedBatch];
             nextUrl = data?.links?.next || null;
         } catch (e: any) {
             log.warn(`[InfoUpdateScheduler] PCO list fetch failed for campaign ${campaignId}: ${e.message}`, 'system', { churchId, campaignId }, churchId);
@@ -145,9 +147,10 @@ export async function processCampaign(db: any, log: any, campaign: any): Promise
 
     log.info(`[InfoUpdateScheduler] Campaign ${campaignId} — ${allPeople.length} people in PCO list`, 'system', { churchId, campaignId }, churchId);
 
-    for (const person of allPeople) {
-        await processPersonForCampaign(db, log, campaign, person, churchName, timeZone);
-    }
+    // Process all list members simultaneously so outreach dispatches to ALL people at once
+    await Promise.all(
+        allPeople.map((person: any) => processPersonForCampaign(db, log, campaign, person, churchName, timeZone))
+    );
 
     // Check if campaign is fully complete
     const remaining = await db.collection('people_info_sessions')
