@@ -661,8 +661,14 @@ function SingleEventWidget({
   const cleanDescription = event.description?.replace(/<[^>]+>/g, '').replace(/&amp;nbsp;|&nbsp;/g, ' ').trim() || '';
   const eventDateStr = event.startsAt ? format(new Date(event.startsAt), 'EEEE, MMMM d, yyyy') : '';
   const eventTimeStr = event.startsAt ? format(new Date(event.startsAt), 'h:mm a') : '';
-  const buttonLabel = ctaText || 'Register Now';
-  const publicUrl = event.publicUrl || event.churchCenterUrl || '#';
+  
+  const rawPublicUrl = event.publicUrl || event.churchCenterUrl || '';
+  const hasPublicUrl = Boolean(rawPublicUrl && rawPublicUrl !== '#' && rawPublicUrl !== 'null');
+  const publicUrl = hasPublicUrl ? rawPublicUrl : '#';
+
+  // Smart button label default: if ctaText is empty or generic Register Now for calendar event, use Learn More
+  const defaultLabel = eventSource === 'calendar' ? 'Learn More' : 'Register Now';
+  const buttonLabel = (ctaText && ctaText !== 'Register Now') ? ctaText : (eventSource === 'calendar' ? 'Learn More' : (ctaText || 'Register Now'));
 
   // 1. HERO STYLE
   if (eventStyle === 'hero') {
@@ -724,14 +730,20 @@ function SingleEventWidget({
           )}
 
           <div className="pt-2">
-            <a
-              href={publicUrl}
-              target="_blank"
-              rel="noreferrer"
-              className={`inline-flex items-center gap-2.5 px-6 py-3.5 rounded-xl font-extrabold text-white text-base shadow-lg hover:shadow-2xl transition transform hover:-translate-y-0.5 ${activeTheme.bg} ${activeTheme.hoverBg}`}
-            >
-              {buttonLabel} <ArrowRight size={18} />
-            </a>
+            {hasPublicUrl ? (
+              <a
+                href={publicUrl}
+                target="_blank"
+                rel="noreferrer"
+                className={`inline-flex items-center gap-2.5 px-6 py-3.5 rounded-xl font-extrabold text-white text-base shadow-lg hover:shadow-2xl transition transform hover:-translate-y-0.5 ${activeTheme.bg} ${activeTheme.hoverBg}`}
+              >
+                {buttonLabel} <ArrowRight size={18} />
+              </a>
+            ) : (
+              <span className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-extrabold bg-white/10 backdrop-blur-md border border-white/20 text-slate-200">
+                No Registration Required
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -770,14 +782,20 @@ function SingleEventWidget({
               <span>{timeLeft.days}d</span>:<span>{String(timeLeft.hours).padStart(2, '0')}h</span>:<span>{String(timeLeft.minutes).padStart(2, '0')}m</span>
             </div>
           )}
-          <a
-            href={publicUrl}
-            target="_blank"
-            rel="noreferrer"
-            className={`inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-bold text-white transition ${activeTheme.bg} ${activeTheme.hoverBg} shadow-sm whitespace-nowrap`}
-          >
-            {buttonLabel} <ArrowRight size={14} />
-          </a>
+          {hasPublicUrl ? (
+            <a
+              href={publicUrl}
+              target="_blank"
+              rel="noreferrer"
+              className={`inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-bold text-white transition ${activeTheme.bg} ${activeTheme.hoverBg} shadow-sm whitespace-nowrap`}
+            >
+              {buttonLabel} <ArrowRight size={14} />
+            </a>
+          ) : (
+            <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 whitespace-nowrap">
+              No Signup Needed
+            </span>
+          )}
         </div>
       </div>
     );
@@ -840,14 +858,20 @@ function SingleEventWidget({
         )}
 
         <div className="mt-auto pt-2">
-          <a
-            href={publicUrl}
-            target="_blank"
-            rel="noreferrer"
-            className={`w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-bold text-white text-sm shadow-md hover:shadow-lg transition ${activeTheme.bg} ${activeTheme.hoverBg}`}
-          >
-            {buttonLabel} <ArrowRight size={16} />
-          </a>
+          {hasPublicUrl ? (
+            <a
+              href={publicUrl}
+              target="_blank"
+              rel="noreferrer"
+              className={`w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-bold text-white text-sm shadow-md hover:shadow-lg transition ${activeTheme.bg} ${activeTheme.hoverBg}`}
+            >
+              {buttonLabel} <ArrowRight size={16} />
+            </a>
+          ) : (
+            <div className="w-full text-center px-4 py-3 rounded-xl font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/80 text-sm">
+              No Registration Required
+            </div>
+          )}
         </div>
       </div>
     </div>

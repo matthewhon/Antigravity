@@ -462,13 +462,21 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
                 <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Event Source</label>
                 <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-xl">
                   <button 
-                    onClick={() => { setSingleEventSource('calendar'); setSingleEventId(''); }}
+                    onClick={() => { 
+                      setSingleEventSource('calendar'); 
+                      setSingleEventId(''); 
+                      if (singleEventCtaText === 'Register Now') setSingleEventCtaText('Learn More');
+                    }}
                     className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition ${singleEventSource==='calendar'?'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white':'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                   >
                     Calendar
                   </button>
                   <button 
-                    onClick={() => { setSingleEventSource('registrations'); setSingleEventId(''); }}
+                    onClick={() => { 
+                      setSingleEventSource('registrations'); 
+                      setSingleEventId(''); 
+                      if (singleEventCtaText === 'Learn More') setSingleEventCtaText('Register Now');
+                    }}
                     className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition ${singleEventSource==='registrations'?'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white':'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                   >
                     Registrations
@@ -487,17 +495,31 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
                     No active {singleEventSource === 'calendar' ? 'calendar events' : 'registrations'} found in Planning Center.
                   </p>
                 ) : (
-                  <select
-                    value={singleEventId}
-                    onChange={e => setSingleEventId(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-medium"
-                  >
-                    {singleEvents.map(ev => (
-                      <option key={ev.id} value={ev.id}>
-                        {ev.name || 'Unnamed Event'} {ev.startsAt ? `(${new Date(ev.startsAt).toLocaleDateString()})` : ''}
-                      </option>
-                    ))}
-                  </select>
+                  <>
+                    <select
+                      value={singleEventId}
+                      onChange={e => setSingleEventId(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-medium"
+                    >
+                      {singleEvents.map(ev => (
+                        <option key={ev.id} value={ev.id}>
+                          {ev.name || 'Unnamed Event'} {ev.startsAt ? `(${new Date(ev.startsAt).toLocaleDateString()})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    {(() => {
+                      const sel = singleEvents.find(e => String(e.id) === String(singleEventId)) || singleEvents[0];
+                      const hasUrl = Boolean(sel?.publicUrl || sel?.churchCenterUrl);
+                      if (sel && !hasUrl) {
+                        return (
+                          <p className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 mt-1.5 flex items-center gap-1">
+                            ℹ Note: This event has no public URL in Planning Center. The widget will display "No Registration Required".
+                          </p>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </>
                 )}
               </div>
 
