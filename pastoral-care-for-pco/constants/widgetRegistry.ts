@@ -66,6 +66,7 @@ export const GROUPS_WIDGETS: WidgetDefinition[] = [
     { id: 'groups_size_distribution', label: 'Size Distribution', icon: '📏' },
     { id: 'groups_net_growth', label: 'Net Group Growth', icon: '📈' },
     { id: 'groups_meeting_days', label: 'Meeting Days', icon: '📆' },
+    { id: 'groups_new_members', label: 'New Members', icon: '🌱' },
     { id: 'groups_unconnected', label: 'Unconnected People', icon: '🧩' },
     { id: 'groups_health_factors', label: 'Health Factors', icon: '🧭' },
     { id: 'groups_type_performance', label: 'Type Performance', icon: '🏆' },
@@ -95,6 +96,7 @@ export const SERVICES_OVERVIEW_WIDGETS: WidgetDefinition[] = [
     { id: 'confirmation_health', label: 'Confirmation Health', icon: '✔️' },
     { id: 'staffing_forecast', label: 'Staffing Forecast', icon: '🔮' },
     { id: 'top_songs', label: 'Top Songs', icon: '🎵' },
+    { id: 'song_rotation', label: 'Song Rotation', icon: '🎶' },
     { id: 'positions', label: 'Positions', icon: '🪑' },
     { id: 'checkin_history', label: 'Check-ins', icon: '✅' },
 ];

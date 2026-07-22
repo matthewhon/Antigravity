@@ -303,6 +303,8 @@ export interface PcoGroup {
     lastUpdated: number;
     leaderIds?: string[];
     memberIds?: string[];
+    /** Per-member join dates (YYYY-MM-DD) from PCO GroupMembership.joined_at — for tenure/new-member analytics. */
+    memberJoins?: { id: string, joinedAt: string }[];
     attendanceHistory?: { eventId: string, date: string, count: number, members: number, visitors: number, attendeeIds: string[] }[];
     campusId?: string | null;
     campusName?: string | null;
@@ -427,6 +429,9 @@ export interface SongUsage {
 export interface ServicesDashboardData {
     stats: { totalPlans: number, uniqueVolunteers: number, positionsFilled: number, positionsOpen: number, fillRate: number };
     topSongs: SongUsage[];
+    /** Full song rotation (capped at 50), most-used first — for the Song Rotation widget. */
+    allSongs?: SongUsage[];
+    songStats?: { uniqueSongs: number, totalPlays: number, avgRepeats: number, top5Share: number, singles: number };
     teamStats: any;
     teams: ServicesTeam[];
     checkIns: { totalCheckIns: number, uniqueAttendees: number, breakdown: any, trends: any[] };

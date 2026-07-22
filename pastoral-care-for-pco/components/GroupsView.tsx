@@ -393,6 +393,27 @@ const GroupsView: React.FC<GroupsViewProps> = ({
           .sort((a, b) => b.groups - a.groups);
   }, [activeGroups]);
 
+  // New group members — people who joined a group recently (from memberJoins / joined_at)
+  const newMemberStats = useMemo(() => {
+      const now = Date.now();
+      const c30 = now - 30 * 24 * 60 * 60 * 1000;
+      const c90 = now - 90 * 24 * 60 * 60 * 1000;
+      const peopleMap = new Map<string, PcoPerson>((peopleData?.allPeople || []).map(p => [p.id, p] as [string, PcoPerson]));
+      const list: { personId: string; name: string; avatar: string | null; groupName: string; joinedAt: string; ts: number }[] = [];
+      let count90 = 0;
+      activeGroups.forEach(g => (g.memberJoins || []).forEach(mj => {
+          const t = new Date(mj.joinedAt).getTime();
+          if (isNaN(t)) return;
+          if (t >= c90) count90++;
+          if (t >= c30) {
+              const person = peopleMap.get(mj.id);
+              list.push({ personId: mj.id, name: person?.name || 'Member', avatar: person?.avatar || null, groupName: g.name, joinedAt: mj.joinedAt, ts: t });
+          }
+      }));
+      list.sort((a, b) => b.ts - a.ts);
+      return { list, count30: list.length, count90 };
+  }, [activeGroups, peopleData]);
+
   const handleGenerateRiskAnalysis = async () => {
       if (!enrichedGroups.length) return;
       setIsAnalyzingRisk(true);
@@ -1184,6 +1205,49 @@ const GroupsView: React.FC<GroupsViewProps> = ({
                   </div>
               );
           }
+          case 'groups_new_members':
+              return (
+                  <div key="groups_new_members" className="col-span-1">
+                      <WidgetWrapper
+                          title="New Members"
+                          onRemove={() => handleRemoveWidget(id)}
+                          source="Joined · 30d"
+                          headerControl={
+                              <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400 tabular-nums">{newMemberStats.count30}</span>
+                          }
+                      >
+                          {newMemberStats.list.length > 0 ? (
+                              <>
+                                  <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar pr-1">
+                                      {newMemberStats.list.slice(0, 50).map((m, i) => (
+                                          <button
+                                              key={`${m.personId}-${i}`}
+                                              onClick={() => window.dispatchEvent(new CustomEvent('openPersonProfile', { detail: m.personId }))}
+                                              className="w-full flex items-center gap-3 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 hover:border-indigo-200 dark:hover:border-indigo-800 transition-colors text-left"
+                                          >
+                                              <div className="w-8 h-8 shrink-0 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-black text-slate-400">
+                                                  {m.avatar ? <img src={m.avatar} alt="" className="w-full h-full object-cover" /> : m.name.charAt(0)}
+                                              </div>
+                                              <div className="min-w-0 flex-1">
+                                                  <p className="text-xs font-bold text-slate-800 dark:text-white truncate">{m.name}</p>
+                                                  <p className="text-[11px] text-slate-400 truncate">{m.groupName}</p>
+                                              </div>
+                                              <span className="text-[11px] font-medium text-slate-400 shrink-0">{new Date(m.joinedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+                                          </button>
+                                      ))}
+                                  </div>
+                                  <p className="text-[11px] font-medium text-slate-400 mt-3">{newMemberStats.count90} joined in the last 90 days</p>
+                              </>
+                          ) : (
+                              <div className="h-full flex flex-col items-center justify-center text-center py-10 gap-1">
+                                  <span className="text-3xl grayscale opacity-30">🌱</span>
+                                  <p className="text-xs font-bold text-slate-400 dark:text-slate-500">No new members in 30 days</p>
+                                  <p className="text-[11px] text-slate-400 max-w-[210px]">Join dates populate after the next Groups sync.</p>
+                              </div>
+                          )}
+                      </WidgetWrapper>
+                  </div>
+              );
           case 'event_attendance':
               const totalMembers = eventAttendanceData.reduce((acc, curr) => acc + curr.Members, 0);
               const totalVisitors = eventAttendanceData.reduce((acc, curr) => acc + curr.Visitors, 0);

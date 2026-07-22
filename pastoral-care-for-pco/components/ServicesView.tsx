@@ -1845,6 +1845,54 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                     </WidgetWrapper>
                 </div>
             );
+        case 'song_rotation': {
+            const ss = data.songStats;
+            const songs = data.allSongs || [];
+            return (
+                <div key="song_rotation" className="col-span-1 lg:col-span-2">
+                    <WidgetWrapper title="Song Rotation" onRemove={() => handleRemoveWidget('song_rotation')} source="Service Plans">
+                        {ss && ss.uniqueSongs > 0 ? (
+                            <div className="flex flex-col h-full gap-5">
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div>
+                                        <p className="text-3xl font-black text-slate-900 dark:text-white tabular-nums">{ss.uniqueSongs}</p>
+                                        <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mt-1">Unique Songs</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-3xl font-black text-indigo-600 dark:text-indigo-400 tabular-nums">{ss.avgRepeats.toFixed(1)}×</p>
+                                        <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mt-1">Avg Repeats</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-3xl font-black text-amber-500 tabular-nums">{Math.round(ss.top5Share)}%</p>
+                                        <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mt-1">Top-5 Share</p>
+                                    </div>
+                                </div>
+                                <div className="flex-1 min-h-0">
+                                    <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-2">Most Repeated</p>
+                                    <div className="space-y-2 max-h-52 overflow-y-auto custom-scrollbar pr-1">
+                                        {songs.slice(0, 8).map(s => {
+                                            const overused = s.count >= 6;
+                                            return (
+                                                <div key={s.id} className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
+                                                    <div className="min-w-0">
+                                                        <p className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">{s.title}</p>
+                                                        <p className="text-[11px] text-slate-400 truncate">{s.author}</p>
+                                                    </div>
+                                                    <span className={`text-[11px] font-black px-2 py-0.5 rounded tabular-nums shrink-0 ml-2 ${overused ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'}`}>{s.count}×</span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                                <p className="text-[11px] font-medium text-slate-400">{ss.singles} song{ss.singles === 1 ? '' : 's'} sung only once · amber = 6+ repeats</p>
+                            </div>
+                        ) : (
+                            <div className="h-full flex items-center justify-center text-slate-400 text-xs font-bold">No song data in this period.</div>
+                        )}
+                    </WidgetWrapper>
+                </div>
+            );
+        }
         default: return null;
     }
   }
@@ -1944,7 +1992,7 @@ const ServicesView: React.FC<ServicesViewProps> = ({
                 if (id === 'services_stats') return null;
                 let spanClass = "col-span-1";
                 if (['services_stats', 'checkin_history', 'teams', 'services_teams_list'].includes(id)) spanClass = "col-span-1 md:col-span-2 lg:col-span-4";
-                else if (['staffing_needs', 'upcoming_plans_list', 'top_songs', 'positions', 'events', 'team_roster', 'burnout_watchlist', 'serving_frequency', 'team_fill_rate', 'attendance_breakdown', 'staffing_forecast'].includes(id)) spanClass = "col-span-1 lg:col-span-2";
+                else if (['staffing_needs', 'upcoming_plans_list', 'top_songs', 'positions', 'events', 'team_roster', 'burnout_watchlist', 'serving_frequency', 'team_fill_rate', 'attendance_breakdown', 'staffing_forecast', 'song_rotation'].includes(id)) spanClass = "col-span-1 lg:col-span-2";
                 
                 return (
                     <div

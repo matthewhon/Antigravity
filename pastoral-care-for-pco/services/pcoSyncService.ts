@@ -745,12 +745,22 @@ export const syncGroupsData = async (churchId: string) => {
             
             // Extract IDs
             const memberIds = allMembers.map((m: any) => m.relationships?.person?.data?.id).filter(Boolean);
-            
+
             // Filter for Leaders
             const leaderIds = allMembers
                 .filter((m: any) => m.attributes.role === 'leader')
                 .map((m: any) => m.relationships?.person?.data?.id)
                 .filter(Boolean);
+
+            // Capture per-member join dates (PCO GroupMembership.joined_at) — enables
+            // tenure / new-member analytics. Stored as YYYY-MM-DD to match other dates.
+            const memberJoins = allMembers
+                .map((m: any) => {
+                    const pid = m.relationships?.person?.data?.id;
+                    const joinedAt = m.attributes?.joined_at;
+                    return pid && joinedAt ? { id: String(pid), joinedAt: String(joinedAt).split('T')[0] } : null;
+                })
+                .filter(Boolean) as { id: string; joinedAt: string }[];
 
             // B. Fetch All Events (History)
             // Used for Attendance Chart and Group Info Widget
@@ -845,6 +855,7 @@ export const syncGroupsData = async (churchId: string) => {
                 ...group,
                 leaderIds,
                 memberIds, // Store all members for demographics
+                memberJoins, // Per-member join dates for tenure analytics
                 membersCount: allMembers.length, // Use authoritative count from memberships endpoint
                 attendanceHistory
             });

@@ -639,7 +639,18 @@ export const calculateServicesAnalytics = (
         volunteers: checkInTrends.reduce((sum, t) => sum + t.volunteers, 0)
     };
 
-    const topSongs = Array.from(songUsage.values()).sort((a,b) => b.count - a.count).slice(0, 5);
+    const allSongsSorted = Array.from(songUsage.values()).sort((a,b) => b.count - a.count);
+    const topSongs = allSongsSorted.slice(0, 5);
+    const totalSongPlays = allSongsSorted.reduce((s, x) => s + x.count, 0);
+    const uniqueSongs = allSongsSorted.length;
+    const top5Plays = topSongs.reduce((s, x) => s + x.count, 0);
+    const songStats = {
+        uniqueSongs,
+        totalPlays: totalSongPlays,
+        avgRepeats: uniqueSongs > 0 ? totalSongPlays / uniqueSongs : 0,
+        top5Share: totalSongPlays > 0 ? (top5Plays / totalSongPlays) * 100 : 0,
+        singles: allSongsSorted.filter(s => s.count === 1).length,
+    };
 
     // Open positions is basically just Total Capacity - Filled, or simple sum of open slots.
     const openPositions = Math.max(0, totalPositions - filledPositions);
@@ -653,6 +664,8 @@ export const calculateServicesAnalytics = (
             fillRate: totalPositions > 0 ? (filledPositions / totalPositions) * 100 : 0
         },
         topSongs,
+        allSongs: allSongsSorted.slice(0, 50),
+        songStats,
         teamStats: {
             totalFilled: filledPositions,
             totalNeeded: totalPositions,
