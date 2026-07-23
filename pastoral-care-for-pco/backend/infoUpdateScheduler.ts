@@ -61,7 +61,7 @@ function buildIntroMessage(campaign: any, personName: string, churchName: string
 
     let message = rawTemplate;
     for (const [tag, val] of Object.entries(tagMap)) {
-        const re = new RegExp(`\\{\\{${tag}\\\}\\`, 'gi');
+        const re = new RegExp(`\\{\\{${tag}\\}\\}`, 'gi');
         message = message.replace(re, val);
     }
 
