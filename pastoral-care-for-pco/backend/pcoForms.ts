@@ -136,6 +136,83 @@ export async function getPublicForm(req: any, res: any) {
   const { churchId, formId } = req.params;
   try {
     const db = getDb();
+    
+    // Check if this is an Info Update session link
+    if (formId.startsWith('ius_')) {
+      const sessionSnap = await db.collection('people_info_sessions').doc(formId).get();
+      if (!sessionSnap.exists || sessionSnap.data()?.churchId !== churchId) {
+        return res.status(404).json({ error: 'Session not found or inactive' });
+      }
+      
+      const session = sessionSnap.data()!;
+      const campaignSnap = await db.collection('people_info_campaigns').doc(session.campaignId).get();
+      if (!campaignSnap.exists) {
+        return res.status(404).json({ error: 'Campaign not found' });
+      }
+      
+      const campaign = campaignSnap.data()!;
+      
+      // Synthesize custom fields from campaign.fieldsToCollect
+      const customFields: any[] = [];
+      (campaign.fieldsToCollect || []).forEach((f: any) => {
+        if (f.key === 'address_home') {
+          customFields.push({ id: 'heading_address', type: 'section_heading', label: 'Home Address', required: false, mapToPco: 'none' });
+          customFields.push({ id: 'street', type: 'text', label: 'Street Address', mapToPco: 'street' });
+          customFields.push({ id: 'city', type: 'text', label: 'City', mapToPco: 'city' });
+          customFields.push({ id: 'state', type: 'text', label: 'State', mapToPco: 'state' });
+          customFields.push({ id: 'zip', type: 'text', label: 'ZIP Code', mapToPco: 'zip' });
+        } else {
+          let type = 'text';
+          let options: string[] | undefined;
+          let mapToPco = f.key;
+          
+          if (f.key === 'phone_mobile') mapToPco = 'phone';
+          else if (f.key === 'phone_home') mapToPco = 'phone';
+          else if (f.key === 'email_primary') mapToPco = 'email';
+          else if (f.key === 'birthdate') { type = 'date'; mapToPco = 'birthday'; }
+          else if (f.key === 'anniversary') { type = 'date'; mapToPco = 'anniversary'; }
+          else if (f.key === 'gender') { type = 'select'; options = ['Male', 'Female']; mapToPco = 'gender'; }
+          else if (f.key === 'marital_status') { type = 'select'; options = ['Single', 'Married', 'Divorced', 'Widowed', 'Separated']; mapToPco = 'maritalStatus'; }
+          else if (f.key === 'emergency_contact' || f.key === 'school' || f.key === 'membership' || f.key === 'graduation_year') {
+             type = f.key === 'emergency_contact' ? 'paragraph' : 'text';
+             mapToPco = 'notes';
+          }
+          
+          customFields.push({
+            id: f.key,
+            type,
+            label: f.label,
+            required: false,
+            options,
+            mapToPco
+          });
+        }
+      });
+
+      let churchLogoUrl = null;
+      try {
+        const churchSnap = await db.collection('churches').doc(churchId).get();
+        if (churchSnap.exists) {
+          churchLogoUrl = churchSnap.data()?.logoUrl || null;
+        }
+      } catch (err) {}
+
+      return res.json({
+        id: formId,
+        churchId,
+        name: `Update Info for ${session.personName}`,
+        description: `Please take a moment to confirm or update your details.`,
+        customFields,
+        churchLogoUrl,
+        styles: {
+          primaryColor: '#059669', // emerald-600 to match Church Helper
+          backgroundColor: '#FFFFFF',
+          textColor: '#1F2937',
+          buttonTextColor: '#FFFFFF'
+        }
+      });
+    }
+
     const docSnap = await db.collection('pco_forms').doc(formId).get();
     
     if (!docSnap.exists || docSnap.data()?.churchId !== churchId || !docSnap.data()?.isActive) {
@@ -187,11 +264,68 @@ export async function submitForm(req: any, res: any) {
 
   try {
     // 1. Fetch form config
-    const formDoc = await db.collection('pco_forms').doc(formId).get();
-    if (!formDoc.exists || formDoc.data()?.churchId !== churchId) {
-      return res.status(404).json({ error: 'Form not found' });
+    let formConfig: any = {};
+    if (formId.startsWith('ius_')) {
+      const sessionSnap = await db.collection('people_info_sessions').doc(formId).get();
+      if (!sessionSnap.exists || sessionSnap.data()?.churchId !== churchId) {
+        return res.status(404).json({ error: 'Session not found' });
+      }
+      
+      const session = sessionSnap.data()!;
+      const campaignSnap = await db.collection('people_info_campaigns').doc(session.campaignId).get();
+      if (!campaignSnap.exists) {
+        return res.status(404).json({ error: 'Campaign not found' });
+      }
+      const campaign = campaignSnap.data()!;
+      
+      const customFields: any[] = [];
+      (campaign.fieldsToCollect || []).forEach((f: any) => {
+        if (f.key === 'address_home') {
+          customFields.push({ id: 'heading_address', type: 'section_heading', label: 'Home Address', required: false, mapToPco: 'none' });
+          customFields.push({ id: 'street', type: 'text', label: 'Street Address', mapToPco: 'street' });
+          customFields.push({ id: 'city', type: 'text', label: 'City', mapToPco: 'city' });
+          customFields.push({ id: 'state', type: 'text', label: 'State', mapToPco: 'state' });
+          customFields.push({ id: 'zip', type: 'text', label: 'ZIP Code', mapToPco: 'zip' });
+        } else {
+          let type = 'text';
+          let options: string[] | undefined;
+          let mapToPco = f.key;
+          
+          if (f.key === 'phone_mobile' || f.key === 'phone_home') mapToPco = 'phone';
+          else if (f.key === 'email_primary') mapToPco = 'email';
+          else if (f.key === 'birthdate') { type = 'date'; mapToPco = 'birthday'; }
+          else if (f.key === 'anniversary') { type = 'date'; mapToPco = 'anniversary'; }
+          else if (f.key === 'gender') { type = 'select'; options = ['Male', 'Female']; mapToPco = 'gender'; }
+          else if (f.key === 'marital_status') { type = 'select'; options = ['Single', 'Married', 'Divorced', 'Widowed', 'Separated']; mapToPco = 'maritalStatus'; }
+          else if (f.key === 'emergency_contact' || f.key === 'school' || f.key === 'membership' || f.key === 'graduation_year') {
+             type = f.key === 'emergency_contact' ? 'paragraph' : 'text';
+             mapToPco = 'notes';
+          }
+          
+          customFields.push({
+            id: f.key,
+            type,
+            label: f.label,
+            required: false,
+            options,
+            mapToPco
+          });
+        }
+      });
+      
+      formConfig = {
+        name: `Info Update: ${session.personName}`,
+        customFields,
+        settings: { syncToPco: true },
+        actions: {}
+      };
+    } else {
+      const formDoc = await db.collection('pco_forms').doc(formId).get();
+      if (!formDoc.exists || formDoc.data()?.churchId !== churchId) {
+        return res.status(404).json({ error: 'Form not found' });
+      }
+      formConfig = formDoc.data()!;
     }
-    const formConfig = formDoc.data()!;
 
     // Save initial submission record as pending
     await db.collection('pco_form_submissions').doc(submissionId).set({
@@ -477,6 +611,26 @@ export async function submitForm(req: any, res: any) {
       isNewPerson,
       status: 'success'
     });
+
+    if (formId.startsWith('ius_')) {
+      const sessionRef = db.collection('people_info_sessions').doc(formId);
+      const sessionDoc = await sessionRef.get();
+      if (sessionDoc.exists) {
+        const history = sessionDoc.data()?.conversationHistory || [];
+        history.push({
+          role: 'system',
+          content: 'Form submitted successfully via web link.',
+          timestamp: Date.now()
+        });
+        await sessionRef.update({
+          status: 'complete',
+          lastActionAt: Date.now(),
+          conversationHistory: history,
+          pcoPersonId: personId || sessionDoc.data()?.pcoPersonId
+        });
+        log.info(`Marked session ${formId} as complete after web form submission`, 'forms', { formId }, churchId);
+      }
+    }
 
     res.json({ success: true, personId, isNewPerson });
   } catch (e: any) {
