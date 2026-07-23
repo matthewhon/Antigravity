@@ -652,13 +652,27 @@ async function runWorkflowStepExecutor(db: any): Promise<void> {
                 }
 
                 // ── Claim this enrollment before sending ─────────────────────
-                // Push nextSendAt 5 minutes into the future so that any
-                // concurrent 60-second tick whose query runs before our final
-                // update at the end of this block won't re-pick and re-send
-                // the same step (the root cause of duplicate messages).
-                await db.collection('smsWorkflowEnrollments').doc(enrollId).update({
-                    nextSendAt: now + 5 * 60 * 1000,
+                // Use a transaction to ensure only one concurrent Cloud Run instance
+                // claims this enrollment, preventing duplicate SMS sends.
+                const claimed = await db.runTransaction(async (t: any) => {
+                    const docRef = db.collection('smsWorkflowEnrollments').doc(enrollId);
+                    const doc = await t.get(docRef);
+                    if (!doc.exists) return false;
+                    const data = doc.data();
+                    
+                    // If another instance already pushed nextSendAt into the future, we abort
+                    if (data.nextSendAt > now) {
+                        return false;
+                    }
+                    
+                    t.update(docRef, { nextSendAt: now + 5 * 60 * 1000 });
+                    return true;
                 });
+
+                if (!claimed) {
+                    log.info(`[WorkflowExecutor] Enrollment ${enrollId} already claimed by another worker. Skipping.`, 'system', { enrollId }, churchId);
+                    return; // Skip execution
+                }
 
                 // Resolve registration event link placeholders {eventLink} or {registrationLink}
                 let bodyText = step.message || '';
