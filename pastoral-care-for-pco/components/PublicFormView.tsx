@@ -188,11 +188,11 @@ export const PublicFormView: React.FC<PublicFormViewProps> = ({ churchId, formId
       fieldsToProcess.forEach((f: any) => {
         if (f.type === 'section_heading' || f.type === 'text_block') return;
         if (f.type === 'checkboxes') {
-          initialInputs[f.id] = [];
+          initialInputs[f.id] = f.defaultValue !== undefined ? f.defaultValue : [];
         } else if (f.type === 'checkbox_single') {
-          initialInputs[f.id] = false;
+          initialInputs[f.id] = f.defaultValue !== undefined ? f.defaultValue : false;
         } else {
-          initialInputs[f.id] = '';
+          initialInputs[f.id] = f.defaultValue !== undefined ? f.defaultValue : '';
         }
       });
       setInputs(initialInputs);

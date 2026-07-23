@@ -214,6 +214,10 @@ async function processPersonForCampaign(
         const addr = addresses[0].attributes || {};
         const fullAddr = [addr.street, addr.city, addr.state, addr.zip].filter(Boolean).join(', ');
         if (fullAddr) pcoValues['address_home'] = fullAddr;
+        if (addr.street) pcoValues['street'] = addr.street;
+        if (addr.city) pcoValues['city'] = addr.city;
+        if (addr.state) pcoValues['state'] = addr.state;
+        if (addr.zip) pcoValues['zip'] = addr.zip;
     }
 
     // Determine initial remaining fields based on campaign fieldBehavior ('confirm_all' vs 'only_blank')

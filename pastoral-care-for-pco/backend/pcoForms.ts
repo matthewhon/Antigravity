@@ -154,13 +154,22 @@ export async function getPublicForm(req: any, res: any) {
       
       // Synthesize custom fields from campaign.fieldsToCollect
       const customFields: any[] = [];
+      const requestedKeys = (campaign.fieldsToCollect || []).map((f: any) => f.key);
+      
+      if (!requestedKeys.includes('first_name')) {
+          customFields.push({ id: 'first_name', type: 'text', label: 'First Name', required: true, mapToPco: 'firstName', defaultValue: session.existingPcoData?.first_name || '' });
+      }
+      if (!requestedKeys.includes('last_name')) {
+          customFields.push({ id: 'last_name', type: 'text', label: 'Last Name', required: true, mapToPco: 'lastName', defaultValue: session.existingPcoData?.last_name || '' });
+      }
+
       (campaign.fieldsToCollect || []).forEach((f: any) => {
         if (f.key === 'address_home') {
           customFields.push({ id: 'heading_address', type: 'section_heading', label: 'Home Address', required: false, mapToPco: 'none' });
-          customFields.push({ id: 'street', type: 'text', label: 'Street Address', mapToPco: 'street' });
-          customFields.push({ id: 'city', type: 'text', label: 'City', mapToPco: 'city' });
-          customFields.push({ id: 'state', type: 'text', label: 'State', mapToPco: 'state' });
-          customFields.push({ id: 'zip', type: 'text', label: 'ZIP Code', mapToPco: 'zip' });
+          customFields.push({ id: 'street', type: 'text', label: 'Street Address', mapToPco: 'street', defaultValue: session.existingPcoData?.street || '' });
+          customFields.push({ id: 'city', type: 'text', label: 'City', mapToPco: 'city', defaultValue: session.existingPcoData?.city || '' });
+          customFields.push({ id: 'state', type: 'text', label: 'State', mapToPco: 'state', defaultValue: session.existingPcoData?.state || '' });
+          customFields.push({ id: 'zip', type: 'text', label: 'ZIP Code', mapToPco: 'zip', defaultValue: session.existingPcoData?.zip || '' });
         } else {
           let type = 'text';
           let options: string[] | undefined;
@@ -184,7 +193,8 @@ export async function getPublicForm(req: any, res: any) {
             label: f.label,
             required: false,
             options,
-            mapToPco
+            mapToPco,
+            defaultValue: session.existingPcoData?.[f.key] || ''
           });
         }
       });
@@ -317,7 +327,8 @@ export async function submitForm(req: any, res: any) {
         name: `Info Update: ${session.personName}`,
         customFields,
         settings: { syncToPco: true },
-        actions: {}
+        actions: {},
+        forcedPersonId: session.pcoPersonId
       };
     } else {
       const formDoc = await db.collection('pco_forms').doc(formId).get();
@@ -415,9 +426,9 @@ export async function submitForm(req: any, res: any) {
       }
     });
 
-    let matchedPersonId: string | null = null;
+    let matchedPersonId: string | null = formConfig.forcedPersonId || null;
 
-    if (email) {
+    if (!matchedPersonId && email) {
       const emailQuery = `https://api.planningcenteronline.com/people/v2/emails?where[address]=${encodeURIComponent(email)}`;
       const searchRes = await pcoRequest(churchId, emailQuery, 'GET');
       if (searchRes.data && searchRes.data.length > 0) {
