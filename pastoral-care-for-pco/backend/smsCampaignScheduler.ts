@@ -750,7 +750,7 @@ async function runWorkflowStepExecutor(db: any): Promise<void> {
                 } else if (channelType === 'staff_sms') {
                     const { sendBulkInternal } = await import('./smsSend.js');
                     const staffTargetType = step.staffTargetType || 'individuals';
-                    const staffPhones: string[] = [];
+                    const staffPhonesSet = new Set<string>();
                     
                     if (staffTargetType === 'individuals') {
                         const recs = step.staffRecipients || [];
@@ -758,7 +758,7 @@ async function runWorkflowStepExecutor(db: any): Promise<void> {
                             if (r.phone) {
                                 const digits = r.phone.replace(/\D/g, '');
                                 const e164 = digits.length === 10 ? `+1${digits}` : digits.length === 11 ? `+${digits}` : '';
-                                if (e164) staffPhones.push(e164);
+                                if (e164) staffPhonesSet.add(e164);
                             }
                         }
                     } else if ((staffTargetType === 'list' && step.staffListId) || (staffTargetType === 'group' && step.staffGroupId)) {
@@ -772,10 +772,12 @@ async function runWorkflowStepExecutor(db: any): Promise<void> {
                                 staffTargetType === 'group' ? step.staffGroupId : null
                             );
                             for (const p of persons) {
-                                if (p.e164) staffPhones.push(p.e164);
+                                if (p.e164) staffPhonesSet.add(p.e164);
                             }
                         }
                     }
+
+                    const staffPhones = Array.from(staffPhonesSet);
                     
                     if (staffPhones.length > 0) {
                         const pMap: any = {};
