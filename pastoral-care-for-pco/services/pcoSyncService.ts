@@ -240,6 +240,13 @@ export const syncAllData = async (churchId: string) => {
         await syncPeopleData(churchId);
     } catch (e: any) { logger.error('Sync People failed', 'sync', { error: e?.message }, churchId); }
 
+    // Reconcile SMS conversation documents against the freshly-synced people collection.
+    // This fixes stale personId/personName on conversations where a phone number has
+    // moved to a different person in Planning Center since the conversation was first created.
+    try {
+        await reconcileSmsConversations(churchId);
+    } catch (e: any) { logger.warn('SMS conversation reconciliation failed (non-fatal)', 'sync', { error: e?.message }, churchId); }
+
     // Geocode new/updated addresses — runs after people are stored so we can read & update them
     try {
         await geocodePeopleAddresses(churchId);
@@ -516,6 +523,136 @@ export const syncPeopleData = async (churchId: string) => {
         await firestore.upsertPeople(people);
     }
     logger.info(`People sync complete`, 'sync', { churchId, count: people.length }, churchId);
+};
+
+/**
+ * After a people sync, walk every smsConversation document for this church that
+ * has a personId set and verify it still matches the e164Phone in the people
+ * collection.  If the phone number has moved to a different person in PCO (or
+ * the name / avatar changed), update the conversation document in place.
+ *
+ * This prevents the inbox from permanently showing the wrong name after a phone
+ * number is re-assigned in Planning Center.
+ *
+ * Safe to run after every sync — it only writes documents that have actually
+ * changed, and it never touches conversations without a personId.
+ */
+export const reconcileSmsConversations = async (churchId: string): Promise<void> => {
+    try {
+        const { getDb } = await import('../backend/firebase.js');
+        const db = getDb();
+
+        // 1. Load all smsConversation docs for this church that are already linked
+        //    to a PCO person (i.e. personId is set).  Unlinked conversations are
+        //    handled at inbound-message time by matchPersonByPhone, not here.
+        const convSnap = await db.collection('smsConversations')
+            .where('churchId', '==', churchId)
+            .where('personId', '!=', null)
+            .get();
+
+        if (convSnap.empty) {
+            logger.info('SMS reconcile: no linked conversations to check', 'sync', { churchId }, churchId);
+            return;
+        }
+
+        // 2. Build a phone → person map from the freshly-synced people collection.
+        //    We only need people who have an e164Phone on file.
+        const peopleSnap = await db.collection('people')
+            .where('churchId', '==', churchId)
+            .where('e164Phone', '!=', null)
+            .get();
+
+        // phone → { personId, personName, personAvatar }
+        const phoneMap = new Map<string, { personId: string; personName: string; personAvatar: string | null }>();
+        for (const doc of peopleSnap.docs) {
+            const p = doc.data();
+            if (p.e164Phone) {
+                phoneMap.set(p.e164Phone, {
+                    personId: p.id,
+                    personName: p.name || '',
+                    personAvatar: p.avatar || null,
+                });
+            }
+        }
+
+        // 3. For each linked conversation, check if personId / personName / personAvatar
+        //    still matches what the people collection says for that phone number.
+        let updatedCount = 0;
+        let clearedCount = 0;
+        const batch = db.batch();
+        let batchSize = 0;
+        const MAX_BATCH = 400; // Firestore batch limit is 500; stay well under it
+
+        const flush = async () => {
+            if (batchSize > 0) {
+                await batch.commit();
+                batchSize = 0;
+            }
+        };
+
+        for (const convDoc of convSnap.docs) {
+            const conv = convDoc.data();
+            const phone: string = conv.phoneNumber;
+            if (!phone) continue;
+
+            const correctPerson = phoneMap.get(phone);
+
+            if (correctPerson) {
+                // Phone is still in the people collection — check for drift.
+                const nameChanged   = conv.personName   !== correctPerson.personName;
+                const idChanged     = conv.personId     !== correctPerson.personId;
+                const avatarChanged = conv.personAvatar !== correctPerson.personAvatar;
+
+                if (nameChanged || idChanged || avatarChanged) {
+                    batch.update(convDoc.ref, {
+                        personId:     correctPerson.personId,
+                        personName:   correctPerson.personName,
+                        personAvatar: correctPerson.personAvatar,
+                    });
+                    batchSize++;
+                    updatedCount++;
+
+                    logger.info(
+                        `SMS reconcile: updated conversation ${convDoc.id} ` +
+                        `(was "${conv.personName}" / ${conv.personId}, ` +
+                        `now "${correctPerson.personName}" / ${correctPerson.personId})`,
+                        'sync', { churchId, convId: convDoc.id }, churchId
+                    );
+                }
+            } else {
+                // The phone number is no longer associated with any known person
+                // in the freshly-synced people collection.  Clear the stale link
+                // so the next inbound message can re-resolve it.
+                batch.update(convDoc.ref, {
+                    personId:     null,
+                    personName:   null,
+                    personAvatar: null,
+                });
+                batchSize++;
+                clearedCount++;
+
+                logger.info(
+                    `SMS reconcile: cleared stale person link on conversation ${convDoc.id} ` +
+                    `(phone ${phone} no longer matched to any PCO person)`,
+                    'sync', { churchId, convId: convDoc.id }, churchId
+                );
+            }
+
+            if (batchSize >= MAX_BATCH) {
+                await flush();
+            }
+        }
+
+        await flush();
+
+        logger.info(
+            `SMS reconcile complete — ${updatedCount} updated, ${clearedCount} cleared ` +
+            `(of ${convSnap.size} linked conversations)`,
+            'sync', { churchId, updatedCount, clearedCount }, churchId
+        );
+    } catch (e: any) {
+        logger.warn(`SMS conversation reconciliation error: ${e.message}`, 'sync', { churchId }, churchId);
+    }
 };
 
 /**

@@ -576,6 +576,11 @@ async function runWorkflowStepExecutor(db: any): Promise<void> {
             const enrollId   = enrollDoc.id;
             const { workflowId, churchId, phoneNumber, currentStep, personId, personName } = enrollment;
 
+            // Hoist these above the try/catch so the catch block can read them
+            // when deciding whether to retry or advance past the current step.
+            let messageSent = false;
+            let wf: any = null;
+
             try {
                 // Load workflow
                 const wfDoc = await db.collection('smsWorkflows').doc(workflowId).get();
@@ -584,7 +589,7 @@ async function runWorkflowStepExecutor(db: any): Promise<void> {
                     await db.collection('smsWorkflowEnrollments').doc(enrollId).update({ completed: true });
                     return;
                 }
-                const wf = wfDoc.data() as any;
+                wf = wfDoc.data() as any;
                 if (!wf.isActive) return; // workflow paused
 
                 // SMS Sending Hours check
@@ -714,6 +719,13 @@ async function runWorkflowStepExecutor(db: any): Promise<void> {
                 }
 
                 // ── Fire the step ─────────────────────────────────────────────
+                // Track whether the message was actually dispatched so the catch
+                // block can decide whether to retry (messageSent=false) or advance
+                // past this step (messageSent=true).  Without this flag, a Firestore
+                // write failure after a successful send would reset nextSendAt=now and
+                // replay the same SMS/email on the next 60-second tick.
+                // NOTE: messageSent is declared above the try block so the catch can read it.
+
                 if (channelType === 'sms' || channelType === 'mms') {
                     const { sendBulkInternal } = await import('./smsSend.js');
                     await sendBulkInternal({
@@ -726,6 +738,7 @@ async function runWorkflowStepExecutor(db: any): Promise<void> {
                         personMap:      { [phoneNumber]: personInfo },
                         twilioNumberId: wf.twilioNumberId || null,
                     });
+                    messageSent = true;
 
                 } else if (channelType === 'email') {
                     // Build minimal email campaign payload and call sendEmail
@@ -746,6 +759,7 @@ async function runWorkflowStepExecutor(db: any): Promise<void> {
                         } as any;
                         await sendEmail(fakeReq, fakeRes);
                     }
+                    messageSent = true;
 
                 } else if (channelType === 'staff_sms') {
                     const { sendBulkInternal } = await import('./smsSend.js');
@@ -799,6 +813,7 @@ async function runWorkflowStepExecutor(db: any): Promise<void> {
                     } else {
                         log.warn(`[WorkflowExecutor] staff_sms step skipped - no valid phone numbers found for target staff`, 'system', { enrollId }, churchId);
                     }
+                    messageSent = true;
 
                 } else if (channelType === 'staff_email') {
                     const { sendEmail } = await import('./sendEmail.js');
@@ -854,6 +869,7 @@ async function runWorkflowStepExecutor(db: any): Promise<void> {
                     } else {
                         log.warn(`[WorkflowExecutor] staff_email step skipped - no valid email addresses found for target staff`, 'system', { enrollId }, churchId);
                     }
+                    messageSent = true;
                 }
 
                 // ── Advance to next step ─────────────────────────────────────
@@ -885,16 +901,37 @@ async function runWorkflowStepExecutor(db: any): Promise<void> {
                 );
 
             } catch (e: any) {
-                // Restore nextSendAt to now so the enrollment stays
-                // immediately retryable — it won't be stuck behind the
-                // 5-minute claim window we set before the send attempt.
-                await db.collection('smsWorkflowEnrollments').doc(enrollId).update({
-                    nextSendAt: now,
-                }).catch(() => {});
-                log.warn(
-                    `[WorkflowExecutor] Error on enrollment ${enrollId}: ${e.message}`,
-                    'system', { enrollId, workflowId, churchId }, churchId
-                );
+                if (messageSent) {
+                    // The message was already dispatched — do NOT reset nextSendAt to now
+                    // or the same step will fire again on the next tick.  Instead, force
+                    // the enrollment to advance past this step so the duplicate is avoided.
+                    // The step-advance write will be retried here; if it also fails the
+                    // enrollment will be stuck behind the 5-minute claim window, which is
+                    // the safest possible outcome (one missed advance vs. a duplicate send).
+                    const nextStep = currentStep + 1;
+                    const isComplete = nextStep >= (wf?.steps?.length ?? 0);
+                    const nextSendAt = isComplete ? now : calcNextSendAt((wf?.steps ?? [])[nextStep], now);
+                    await db.collection('smsWorkflowEnrollments').doc(enrollId).update({
+                        currentStep:    nextStep,
+                        nextSendAt,
+                        completed:      isComplete,
+                        lastStepSentAt: now,
+                    }).catch(() => {});
+                    log.warn(
+                        `[WorkflowExecutor] Send succeeded but post-send write failed for enrollment ${enrollId} step ${currentStep}. ` +
+                        `Forced step advance to ${nextStep} to prevent duplicate send. Error: ${e.message}`,
+                        'system', { enrollId, workflowId, churchId, step: currentStep }, churchId
+                    );
+                } else {
+                    // Message was never sent — safe to reset so it is retried next tick.
+                    await db.collection('smsWorkflowEnrollments').doc(enrollId).update({
+                        nextSendAt: now,
+                    }).catch(() => {});
+                    log.warn(
+                        `[WorkflowExecutor] Error on enrollment ${enrollId} (message not sent, will retry): ${e.message}`,
+                        'system', { enrollId, workflowId, churchId }, churchId
+                    );
+                }
             }
         }));
 
@@ -989,8 +1026,10 @@ export async function runEventRegistrationScanner(db: any): Promise<void> {
 
                     if (!personId) continue; // can't resolve a phone without a person
 
-                    // 3. Check for an existing enrollment — skip if already enrolled
-                    const enrollId = wf.allowReentry
+                    // 3. Check for an existing enrollment — skip if already enrolled.
+                    // Default allowReentry to false — only skip re-enrollment when explicitly true.
+                    const allowReentryEvent = wf.allowReentry === true;
+                    const enrollId = allowReentryEvent
                         ? `${wfId}_${personId}_${attDoc.id}`
                         : `${wfId}_${personId}`;
                     const existing = await db.collection('smsWorkflowEnrollments').doc(enrollId).get();

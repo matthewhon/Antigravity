@@ -240,8 +240,12 @@ export async function workflowEnrollList(req: any, res: any): Promise<void> {
 
                 if (existingDoc) {
                     const data = existingDoc.data();
+                    // Default allowReentry to false — an unset or undefined field must
+                    // NOT re-enroll completed members.  Only explicitly setting
+                    // allowReentry: true on the workflow should enable re-entry.
+                    const allowReentry = wf.allowReentry === true;
                     // Skip if active, OR if completed and re-entry is not allowed
-                    if (!data.completed || !wf.allowReentry) {
+                    if (!data.completed || !allowReentry) {
                         const updates: any = {};
                         if (person.personId && data.personId !== person.personId) {
                             updates.personId = person.personId;
@@ -279,7 +283,11 @@ export async function workflowEnrollList(req: any, res: any): Promise<void> {
                 const baseId = person.personId
                     ? `${workflowId}_${person.personId}`
                     : `${workflowId}_${person.e164.replace(/\+/g, '')}`;
-                const enrollId = wf.allowReentry
+                // Use a time-stamped ID only when allowReentry is explicitly true;
+                // otherwise always use the stable baseId so a second .set() call
+                // is a no-op rather than creating a duplicate enrollment document.
+                const allowReentry = wf.allowReentry === true;
+                const enrollId = allowReentry
                     ? `${baseId}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
                     : baseId;
 
