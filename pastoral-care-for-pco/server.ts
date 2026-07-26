@@ -22,7 +22,7 @@ import { generateBillingReport } from './backend/billingReportService';
 import { handleGeminiProxy } from './backend/geminiProxy';
 import { provisionSubuser, authenticateDomain, verifyDomain, diagnoseDomain } from './backend/emailProvisioning';
 import { handlePostmarkWebhook } from './backend/postmarkWebhook';
-import { getPublicGroups, getPublicRegistrations, getPublicEvents, serveWidgetScript, getPublicForms } from './backend/publicApi.js';
+import { getPublicGroups, getPublicRegistrations, getPublicEvents, serveWidgetScript, getPublicForms, setFeaturedEvent, getFeaturedEvent } from './backend/publicApi.js';
 import { getAvailableNumbers, provisionSmsNumber, releaseSpecificNumber, addSmsNumber, updateNumberSettings, setDefaultNumber, registerSmsBrand, registerSmsCampaign, getSmsRegistrationStatus, handleCampaignStatusWebhook, handleAssignmentStatusWebhook } from './backend/smsProvisioning';
 import { handleInboundSms } from './backend/smsInbound';
 import { sendIndividual, sendBulk } from './backend/smsSend';
@@ -335,6 +335,8 @@ async function startServer() {
     app.get('/api/public/registrations/:churchId', getPublicRegistrations);
     app.get('/api/public/events/:churchId', getPublicEvents);
     app.get('/api/public/forms/:churchId', getPublicForms);
+    app.get('/api/public/featured-event/:churchId', getFeaturedEvent);
+    app.post('/api/public/featured-event/:churchId', express.json(), setFeaturedEvent);
     app.get('/widget.js', serveWidgetScript);
 
     // ─── PCO Web Forms Endpoints ─────────────────────────────────────

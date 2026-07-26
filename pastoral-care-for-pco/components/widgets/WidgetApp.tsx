@@ -597,21 +597,40 @@ function SingleEventWidget({
   const [timeLeft, setTimeLeft] = useState<{ days: number; hours: number; minutes: number; seconds: number } | null>(null);
 
   useEffect(() => {
-    const endpoint = eventSource === 'registrations' ? 'registrations' : 'events';
-    const queryStr = window.location.search.includes('refresh=true') ? '?refresh=true' : '';
-    fetch(`${apiBaseUrl}/api/public/${endpoint}/${churchId}${queryStr}`)
-      .then(r => r.json().then(data => ({ status: r.status, ok: r.ok, data })))
-      .then(({ ok, data }) => {
-        if (!ok || data.error) throw new Error(data.error || 'Failed to fetch event');
+    const fetchData = async () => {
+      try {
+        let activeEventId = eventId;
+        let activeEventSource = eventSource;
+
+        if (eventId === 'dynamic') {
+          const featRes = await fetch(`${apiBaseUrl}/api/public/featured-event/${churchId}`);
+          if (featRes.ok) {
+            const featData = await featRes.json();
+            if (featData.eventId) {
+              activeEventId = featData.eventId;
+              activeEventSource = featData.eventSource || 'calendar';
+            }
+          }
+        }
+
+        const endpoint = activeEventSource === 'registrations' ? 'registrations' : 'events';
+        const queryStr = window.location.search.includes('refresh=true') ? '?refresh=true' : '';
+        const res = await fetch(`${apiBaseUrl}/api/public/${endpoint}/${churchId}${queryStr}`);
+        const data = await res.json();
+        
+        if (!res.ok || data.error) throw new Error(data.error || 'Failed to fetch event');
+        
         const list = Array.isArray(data) ? data : [];
-        const found = eventId ? list.find((e: any) => String(e.id) === String(eventId)) : list[0];
+        const found = activeEventId && activeEventId !== 'dynamic' ? list.find((e: any) => String(e.id) === String(activeEventId)) : list[0];
         setEvent(found || list[0] || null);
         setLoading(false);
-      })
-      .catch(e => {
+      } catch (e: any) {
         setError(e.message);
         setLoading(false);
-      });
+      }
+    };
+
+    fetchData();
   }, [churchId, eventId, eventSource]);
 
   // Live countdown timer calculation

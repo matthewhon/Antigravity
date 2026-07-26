@@ -42,6 +42,8 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
   const [singleEvents, setSingleEvents] = useState<any[]>([]);
   const [singleEventsLoading, setSingleEventsLoading] = useState(false);
   const [singleEventsLoaded, setSingleEventsLoaded] = useState(false);
+  const [singleEventIsDynamic, setSingleEventIsDynamic] = useState(false);
+  const [isSavingDynamic, setIsSavingDynamic] = useState(false);
 
   // Popup specifics
   const [popupUrl, setPopupUrl] = useState('');
@@ -148,7 +150,7 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
       + (type === 'groups' ? `&showTags=${showTags}` : '')
       + (type === 'registrations' ? `&dateFilter=${dateFilter}&tagFilter=${encodeURIComponent(tagFilter)}&includeArchived=${includeArchived}` : '')
       + (type === 'forms' && formsLoaded && !allFormsVisible ? `&visibleFormIds=${encodeURIComponent(visibleFormIdsArray.join(','))}` : '')
-      + (type === 'single_event' ? `&eventId=${singleEventId}&eventSource=${singleEventSource}&eventStyle=${singleEventStyle}&ctaText=${encodeURIComponent(singleEventCtaText)}&showCountdown=${singleEventShowCountdown}&showLocation=${singleEventShowLocation}` : '')
+      + (type === 'single_event' ? `&eventId=${singleEventIsDynamic ? 'dynamic' : singleEventId}&eventSource=${singleEventSource}&eventStyle=${singleEventStyle}&ctaText=${encodeURIComponent(singleEventCtaText)}&showCountdown=${singleEventShowCountdown}&showLocation=${singleEventShowLocation}` : '')
       + `&imageRatio=${imageRatio}`
       + (autoHeight ? `&autoHeight=true` : '')
       + (scale !== 1 ? `&scale=${scale}` : '')
@@ -499,7 +501,7 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
                     <select
                       value={singleEventId}
                       onChange={e => setSingleEventId(e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-medium"
+                      className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-medium mb-3"
                     >
                       {singleEvents.map(ev => (
                         <option key={ev.id} value={ev.id}>
@@ -507,12 +509,48 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
                         </option>
                       ))}
                     </select>
+
+                    <label className="flex items-center gap-3 cursor-pointer mb-3">
+                      <input 
+                        type="checkbox" 
+                        checked={singleEventIsDynamic} 
+                        onChange={e => setSingleEventIsDynamic(e.target.checked)}
+                        className="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+                      />
+                      <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Dynamic Embed (Updates automatically)</span>
+                    </label>
+                    {singleEventIsDynamic && (
+                       <button
+                          onClick={async () => {
+                             setIsSavingDynamic(true);
+                             try {
+                                const apiBaseUrl = process.env.NODE_ENV === 'production' ? 'https://pastoralcare.barnabassoftware.com' : 'http://localhost:8080';
+                                const res = await fetch(`${apiBaseUrl}/api/public/featured-event/${churchId}`, {
+                                   method: 'POST',
+                                   headers: { 'Content-Type': 'application/json' },
+                                   body: JSON.stringify({ eventId: singleEventId, eventSource: singleEventSource })
+                                });
+                                if (!res.ok) throw new Error('Failed to save');
+                                showToast('Saved as Featured Event! Website widgets using Dynamic Embed will now show this event.');
+                             } catch (e) {
+                                showToast('Error saving featured event.');
+                             } finally {
+                                setIsSavingDynamic(false);
+                             }
+                          }}
+                          disabled={isSavingDynamic}
+                          className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-sm transition disabled:opacity-50"
+                       >
+                          {isSavingDynamic ? 'Saving...' : 'Set as Featured Event'}
+                       </button>
+                    )}
+
                     {(() => {
                       const sel = singleEvents.find(e => String(e.id) === String(singleEventId)) || singleEvents[0];
                       const hasUrl = Boolean(sel?.publicUrl || sel?.churchCenterUrl);
                       if (sel && !hasUrl) {
                         return (
-                          <p className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 mt-1.5 flex items-center gap-1">
+                          <p className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 mt-2 flex items-center gap-1">
                             ℹ Note: This event has no public URL in Planning Center. The widget will display "No Registration Required".
                           </p>
                         );

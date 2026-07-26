@@ -198,6 +198,41 @@ export async function getPublicForms(req: any, res: any) {
   }
 }
 
+export async function setFeaturedEvent(req: any, res: any) {
+  const { churchId } = req.params;
+  const { eventId, eventSource } = req.body;
+  if (!eventId || !eventSource) return res.status(400).json({ error: 'Missing eventId or eventSource' });
+
+  try {
+    const db = getDb();
+    await db.collection('churches').doc(churchId).update({
+      featuredEventId: eventId,
+      featuredEventSource: eventSource,
+    });
+    res.json({ success: true });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+}
+
+export async function getFeaturedEvent(req: any, res: any) {
+  const { churchId } = req.params;
+  try {
+    const db = getDb();
+    const churchDoc = await db.collection('churches').doc(churchId).get();
+    if (!churchDoc.exists) return res.status(404).json({ error: 'Church not found' });
+    
+    const data = churchDoc.data();
+    res.json({ 
+      eventId: data?.featuredEventId || null,
+      eventSource: data?.featuredEventSource || 'calendar'
+    });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+}
+
+
 export async function serveWidgetScript(req: any, res: any) {
   res.setHeader('Content-Type', 'application/javascript');
   
