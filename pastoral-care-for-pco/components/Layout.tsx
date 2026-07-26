@@ -201,6 +201,7 @@ const Layout: React.FC<LayoutProps> = ({
           { view: 'services-teams',      icon: UserIcon,  label: 'Teams'      },
           { view: 'services-plans',      icon: Calendar,  label: 'Plans'      },
           ...(smsEnabled ? [{ view: 'services-reminders', icon: Smartphone, label: 'Reminders' }] : []),
+          { view: 'services-reports',    icon: FileText,  label: 'Reports'    },
         ],
       });
     }

@@ -660,6 +660,7 @@ const App: React.FC = () => {
               'services-teams': '/services/teams',
               'services-reminders': '/services/reminders',
               'services-plans': '/services/plans',
+              'services-reports': '/services/reports',
               'giving': '/giving',
               'giving-donor': '/giving/donor',
               'giving-budgets': '/giving/budgets',

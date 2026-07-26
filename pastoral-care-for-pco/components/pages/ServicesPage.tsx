@@ -1,6 +1,7 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
 import ServicesView from '../ServicesView';
+import { ServicesReportsTab } from '../ServicesReportsTab';
 import { useTenantData } from '../../contexts/TenantDataContext';
 import { User, Church } from '../../types';
 import { firestore } from '../../services/firestoreService';
@@ -28,9 +29,23 @@ export const ServicesPage: React.FC<ServicesPageProps> = ({
         subpath === 'teams'      ? 'Teams'      :
         subpath === 'reminders'  ? 'Reminders'  :
         subpath === 'plans'      ? 'Plans'      :
+        subpath === 'reports'    ? 'Reports'    :
         'Overview';
 
     if (!user || !church) return null;
+
+    if (activePage === 'Reports') {
+        return (
+            <div className="space-y-6">
+                <ServicesReportsTab
+                    servicesData={servicesData}
+                    people={people}
+                    churchId={church.id}
+                    pcoConnected={church.pcoConnected}
+                />
+            </div>
+        );
+    }
 
     return (
         <ServicesView 
@@ -70,3 +85,4 @@ export const ServicesPage: React.FC<ServicesPageProps> = ({
         />
     );
 };
+
