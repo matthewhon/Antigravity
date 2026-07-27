@@ -254,6 +254,7 @@ export async function serveWidgetScript(req: any, res: any) {
       var churchId = iframeParams.get('churchId');
       var bubbleMode = iframeParams.get('bubbleMode') || 'text';
       var bubbleText = iframeParams.get('bubbleText') || 'Plan a Visit';
+      var bubbleHoverText = iframeParams.get('bubbleHoverText');
       var bubbleIcon = iframeParams.get('bubbleIcon') || '👋';
       var bubblePosition = iframeParams.get('bubblePosition') || 'right';
       
@@ -286,6 +287,31 @@ export async function serveWidgetScript(req: any, res: any) {
         #pco-bubble-btn:hover {
           transform: scale(1.05);
           box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        }
+        #pco-bubble-btn[data-tooltip]::after {
+          content: attr(data-tooltip);
+          position: absolute;
+          \${bubblePosition === 'left' ? 'left: 100%; margin-left: 16px;' : 'right: 100%; margin-right: 16px;'}
+          top: 50%;
+          transform: translateY(-50%);
+          background: #1e293b;
+          color: white;
+          padding: 8px 16px;
+          border-radius: 8px;
+          font-size: 14px;
+          white-space: nowrap;
+          pointer-events: none;
+          opacity: 0;
+          transition: opacity 0.2s;
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+          visibility: hidden;
+        }
+        #pco-bubble-btn[data-tooltip]:hover::after {
+          opacity: 1;
+          visibility: visible;
+        }
+        #pco-bubble-btn.pco-bubble-open-btn::after {
+          display: none;
         }
         #pco-bubble-container {
           position: fixed;
@@ -330,15 +356,20 @@ export async function serveWidgetScript(req: any, res: any) {
       var btn = document.createElement('button');
       btn.id = 'pco-bubble-btn';
       btn.innerHTML = bubbleMode === 'icon' ? bubbleIcon : bubbleText;
+      if (bubbleHoverText) {
+        btn.setAttribute('data-tooltip', bubbleHoverText);
+      }
       
       var isOpen = false;
       btn.addEventListener('click', function() {
         isOpen = !isOpen;
         if (isOpen) {
           container.classList.add('pco-bubble-open');
+          btn.classList.add('pco-bubble-open-btn');
           btn.innerHTML = bubbleMode === 'icon' ? '✕' : 'Close';
         } else {
           container.classList.remove('pco-bubble-open');
+          btn.classList.remove('pco-bubble-open-btn');
           setTimeout(function() {
             if (!isOpen) container.style.display = 'none';
           }, 300);

@@ -55,6 +55,7 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
   const [bubbleFormId, setBubbleFormId] = useState('');
   const [bubbleMode, setBubbleMode] = useState<'text' | 'icon'>('text');
   const [bubbleText, setBubbleText] = useState('Plan a Visit');
+  const [bubbleHoverText, setBubbleHoverText] = useState('Plan a Visit with us!');
   const [bubbleIcon, setBubbleIcon] = useState('👋');
   const [bubblePosition, setBubblePosition] = useState<'right' | 'left'>('right');
   const [customForms, setCustomForms] = useState<any[]>([]);
@@ -182,7 +183,7 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
       + (type === 'registrations' ? `&dateFilter=${dateFilter}&tagFilter=${encodeURIComponent(tagFilter)}&includeArchived=${includeArchived}` : '')
       + (type === 'forms' && formsLoaded && !allFormsVisible ? `&visibleFormIds=${encodeURIComponent(visibleFormIdsArray.join(','))}` : '')
       + (type === 'single_event' ? `&eventId=${singleEventIsDynamic ? 'dynamic' : singleEventId}&eventSource=${singleEventSource}&eventStyle=${singleEventStyle}&ctaText=${encodeURIComponent(singleEventCtaText)}&showCountdown=${singleEventShowCountdown}&showLocation=${singleEventShowLocation}` : '')
-      + (type === 'bubble_form' ? `&formId=${bubbleFormId}&bubbleMode=${bubbleMode}&bubbleText=${encodeURIComponent(bubbleText)}&bubbleIcon=${encodeURIComponent(bubbleIcon)}&bubblePosition=${bubblePosition}` : '')
+      + (type === 'bubble_form' ? `&formId=${bubbleFormId}&bubbleMode=${bubbleMode}&bubbleText=${encodeURIComponent(bubbleText)}&bubbleHoverText=${encodeURIComponent(bubbleHoverText)}&bubbleIcon=${encodeURIComponent(bubbleIcon)}&bubblePosition=${bubblePosition}` : '')
       + `&imageRatio=${imageRatio}`
       + (autoHeight ? `&autoHeight=true` : '')
       + (scale !== 1 ? `&scale=${scale}` : '')
@@ -765,6 +766,18 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
               )}
 
               <div>
+                 <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Hover Tooltip Text</label>
+                 <input 
+                    type="text"
+                    placeholder="Plan a Visit with us!" 
+                    value={bubbleHoverText}
+                    onChange={e => setBubbleHoverText(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                 />
+                 <p className="text-[10px] text-slate-400 mt-1">This text appears when visitors hover over the button.</p>
+              </div>
+
+              <div>
                 <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Screen Position</label>
                 <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-xl">
                   <button 
@@ -825,6 +838,7 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
                            </div>
                            <div 
                              className={`absolute bottom-6 ${bubblePosition === 'left' ? 'left-6' : 'right-6'} flex items-center justify-center shadow-2xl cursor-pointer`}
+                             title={bubbleHoverText}
                              style={{ 
                                backgroundColor: btnColor, 
                                color: '#ffffff', 
