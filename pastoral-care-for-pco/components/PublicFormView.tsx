@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Loader2, CheckCircle, AlertCircle, FileUp, ChevronDown } from 'lucide-react';
+import { Loader2, CheckCircle, AlertCircle, FileUp, ChevronDown, X } from 'lucide-react';
 import { storage } from '../services/firebase';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
@@ -349,10 +349,21 @@ export const PublicFormView: React.FC<PublicFormViewProps> = ({ churchId, formId
       style={{ backgroundColor: isEmbedded ? 'transparent' : themeStyles.backgroundColor + '1A', color: themeStyles.textColor }}
     >
       <div 
-        className={isEmbedded ? "w-full relative overflow-hidden transition-colors" : "w-full max-w-2xl border border-slate-200/80 dark:border-slate-800 rounded-3xl p-8 lg:p-10 shadow-xl relative overflow-hidden transition-colors"}
+        className={isEmbedded ? "w-full relative overflow-hidden transition-colors p-6 sm:p-8" : "w-full max-w-2xl border border-slate-200/80 dark:border-slate-800 rounded-3xl p-8 lg:p-10 shadow-xl relative overflow-hidden transition-colors"}
         style={{ backgroundColor: isEmbedded ? 'transparent' : themeStyles.backgroundColor, color: themeStyles.textColor }}
       >
         {!isEmbedded && <div className="absolute top-0 left-0 right-0 h-1.5" style={{ backgroundColor: themeStyles.primaryColor }} />}
+
+        {isEmbedded && (
+          <button
+            type="button"
+            onClick={() => window.parent.postMessage('close-pco-bubble', '*')}
+            className="absolute top-4 right-4 p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 z-10"
+            title="Close"
+          >
+            <X size={20} />
+          </button>
+        )}
 
         {themeStyles.showLogo && (themeStyles.logoUrl || config?.churchLogoUrl) && (
           <div className="flex justify-center mt-4 mb-6">

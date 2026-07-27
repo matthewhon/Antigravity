@@ -361,7 +361,7 @@ export async function serveWidgetScript(req: any, res: any) {
       }
       
       var isOpen = false;
-      btn.addEventListener('click', function() {
+      function toggleBubble() {
         isOpen = !isOpen;
         if (isOpen) {
           container.classList.add('pco-bubble-open');
@@ -376,6 +376,14 @@ export async function serveWidgetScript(req: any, res: any) {
           container.style.opacity = '0';
           container.style.transform = 'translateY(20px)';
           btn.innerHTML = bubbleMode === 'icon' ? bubbleIcon : bubbleText;
+        }
+      }
+      
+      btn.addEventListener('click', toggleBubble);
+      
+      window.addEventListener('message', function(event) {
+        if (event.data === 'close-pco-bubble' && isOpen) {
+          toggleBubble();
         }
       });
       
