@@ -987,7 +987,8 @@ const App: React.FC = () => {
   // ── Public Form Route (no auth required) ──────────────────────────────────
   const formMatch = window.location.pathname.match(/^\/form\/([^/]+)\/([^/]+)/);
   if (formMatch) {
-    return <PublicFormView churchId={formMatch[1]} formId={formMatch[2]} />;
+    const isEmbedded = window.location.search.includes('embedded=true');
+    return <PublicFormView churchId={formMatch[1]} formId={formMatch[2]} isEmbedded={isEmbedded} />;
   }
 
   // ── Public Bulletin Route (no auth required) ───────────────────────────

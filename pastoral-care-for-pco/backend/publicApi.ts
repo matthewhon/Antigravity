@@ -245,30 +245,136 @@ export async function serveWidgetScript(req: any, res: any) {
   }
   
   var scriptUrl = new URL(currentScript.src);
-  var iframe = document.createElement('iframe');
-  var iframeId = 'pco-widget-' + Math.random().toString(36).substr(2, 9);
-  
-  // Forward all query parameters from the script URL to the iframe dynamically
   var iframeParams = new URLSearchParams(scriptUrl.search);
-  iframeParams.set('widget', 'true');
-  iframeParams.set('iframeId', iframeId);
+  var widgetType = iframeParams.get('type');
   
-  iframe.id = iframeId;
-  iframe.src = scriptUrl.origin + '/?' + iframeParams.toString();
-  iframe.style.width = '100%';
-  iframe.style.height = '600px'; 
-  iframe.style.border = 'none';
-  iframe.style.borderRadius = '12px';
-  iframe.style.overflow = 'hidden';
-  iframe.allow = 'clipboard-write';
-  
-  window.addEventListener('message', function(e) {
-    if (e.data && e.data.type === 'pco-widget-resize' && e.data.iframeId === iframeId) {
-      iframe.style.height = e.data.height + 'px';
-    }
-  });
+  if (widgetType === 'bubble_form') {
+      var color = iframeParams.get('color') || 'indigo';
+      var formId = iframeParams.get('formId');
+      var churchId = iframeParams.get('churchId');
+      var bubbleMode = iframeParams.get('bubbleMode') || 'text';
+      var bubbleText = iframeParams.get('bubbleText') || 'Plan a Visit';
+      var bubbleIcon = iframeParams.get('bubbleIcon') || '👋';
+      var bubblePosition = iframeParams.get('bubblePosition') || 'right';
+      
+      var colorMap = {
+          'indigo': '#4F46E5', 'blue': '#2563EB', 'emerald': '#10B981', 'amber': '#F59E0B',
+          'red': '#EF4444', 'violet': '#8B5CF6', 'fuchsia': '#D946EF', 'rose': '#F43F5E'
+      };
+      var btnColor = colorMap[color] || '#4F46E5';
+      
+      var style = document.createElement('style');
+      style.innerHTML = \`
+        #pco-bubble-btn {
+          position: fixed;
+          bottom: 24px;
+          \${bubblePosition === 'left' ? 'left: 24px;' : 'right: 24px;'}
+          background-color: \${btnColor};
+          color: white;
+          border: none;
+          \${bubbleMode === 'icon' ? 'border-radius: 50%; width: 60px; height: 60px; font-size: 28px; padding: 0;' : 'border-radius: 24px; padding: 12px 24px; font-size: 16px;'}
+          box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+          cursor: pointer;
+          font-family: sans-serif;
+          font-weight: bold;
+          z-index: 999999;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: transform 0.2s, box-shadow 0.2s;
+        }
+        #pco-bubble-btn:hover {
+          transform: scale(1.05);
+          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        }
+        #pco-bubble-container {
+          position: fixed;
+          bottom: 90px;
+          \${bubblePosition === 'left' ? 'left: 24px;' : 'right: 24px;'}
+          width: 400px;
+          max-width: calc(100vw - 48px);
+          height: 600px;
+          max-height: calc(100vh - 120px);
+          background: white;
+          border-radius: 16px;
+          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+          z-index: 999999;
+          display: none;
+          overflow: hidden;
+          opacity: 0;
+          transform: translateY(20px);
+          transition: opacity 0.3s, transform 0.3s;
+        }
+        #pco-bubble-container.pco-bubble-open {
+          display: block;
+          opacity: 1;
+          transform: translateY(0);
+        }
+        #pco-bubble-iframe {
+          width: 100%;
+          height: 100%;
+          border: none;
+        }
+      \`;
+      document.head.appendChild(style);
+      
+      var container = document.createElement('div');
+      container.id = 'pco-bubble-container';
+      
+      var iframe = document.createElement('iframe');
+      iframe.id = 'pco-bubble-iframe';
+      iframe.src = scriptUrl.origin + '/form/' + churchId + '/' + formId + '?embedded=true';
+      iframe.allow = 'clipboard-write';
+      container.appendChild(iframe);
+      
+      var btn = document.createElement('button');
+      btn.id = 'pco-bubble-btn';
+      btn.innerHTML = bubbleMode === 'icon' ? bubbleIcon : bubbleText;
+      
+      var isOpen = false;
+      btn.addEventListener('click', function() {
+        isOpen = !isOpen;
+        if (isOpen) {
+          container.classList.add('pco-bubble-open');
+          btn.innerHTML = bubbleMode === 'icon' ? '✕' : 'Close';
+        } else {
+          container.classList.remove('pco-bubble-open');
+          setTimeout(function() {
+            if (!isOpen) container.style.display = 'none';
+          }, 300);
+          container.style.opacity = '0';
+          container.style.transform = 'translateY(20px)';
+          btn.innerHTML = bubbleMode === 'icon' ? bubbleIcon : bubbleText;
+        }
+      });
+      
+      document.body.appendChild(container);
+      document.body.appendChild(btn);
 
-  currentScript.parentNode.insertBefore(iframe, currentScript.nextSibling);
+  } else {
+      var iframe = document.createElement('iframe');
+      var iframeId = 'pco-widget-' + Math.random().toString(36).substr(2, 9);
+      
+      iframeParams.set('widget', 'true');
+      iframeParams.set('iframeId', iframeId);
+      
+      iframe.id = iframeId;
+      iframe.src = scriptUrl.origin + '/?' + iframeParams.toString();
+      iframe.style.width = '100%';
+      iframe.style.height = '600px'; 
+      iframe.style.border = 'none';
+      iframe.style.borderRadius = '12px';
+      iframe.style.overflow = 'hidden';
+      iframe.allow = 'clipboard-write';
+      
+      window.addEventListener('message', function(e) {
+        if (e.data && e.data.type === 'pco-widget-resize' && e.data.iframeId === iframeId) {
+          iframe.style.height = e.data.height + 'px';
+        }
+      });
+
+      currentScript.parentNode.insertBefore(iframe, currentScript.nextSibling);
+  }
 })();
   `;
   res.send(scriptContent);

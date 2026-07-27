@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Loader2, RefreshCw, Copy, CheckCircle, Globe, Code, LayoutGrid, MonitorPlay, Eye, EyeOff } from 'lucide-react';
+import { db } from '../services/firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
 interface WebsiteWidgetsManagerProps {
   churchId: string;
@@ -45,9 +47,38 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
   const [singleEventIsDynamic, setSingleEventIsDynamic] = useState(false);
   const [isSavingDynamic, setIsSavingDynamic] = useState(false);
 
-  // Popup specifics
+  // Popup specifics (legacy Church Center popup)
   const [popupUrl, setPopupUrl] = useState('');
   const [popupText, setPopupText] = useState('Open Form');
+
+  // Bubble Popup specifics (new)
+  const [bubbleFormId, setBubbleFormId] = useState('');
+  const [bubbleMode, setBubbleMode] = useState<'text' | 'icon'>('text');
+  const [bubbleText, setBubbleText] = useState('Plan a Visit');
+  const [bubbleIcon, setBubbleIcon] = useState('👋');
+  const [bubblePosition, setBubblePosition] = useState<'right' | 'left'>('right');
+  const [customForms, setCustomForms] = useState<any[]>([]);
+  const [customFormsLoaded, setCustomFormsLoaded] = useState(false);
+
+  React.useEffect(() => {
+    if (type === 'bubble_form' && !customFormsLoaded) {
+      const fetchCustomForms = async () => {
+        try {
+          const q = query(collection(db, 'pco_forms'), where('churchId', '==', churchId));
+          const snapshot = await getDocs(q);
+          const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          setCustomForms(list);
+          if (list.length > 0 && !bubbleFormId) {
+            setBubbleFormId(list[0].id);
+          }
+          setCustomFormsLoaded(true);
+        } catch (error) {
+          console.error('Failed to fetch custom forms for bubble widget', error);
+        }
+      };
+      fetchCustomForms();
+    }
+  }, [type, churchId, customFormsLoaded, bubbleFormId]);
 
   React.useEffect(() => {
     if ((type === 'forms' || type === 'popup') && !formsLoaded) {
@@ -151,6 +182,7 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
       + (type === 'registrations' ? `&dateFilter=${dateFilter}&tagFilter=${encodeURIComponent(tagFilter)}&includeArchived=${includeArchived}` : '')
       + (type === 'forms' && formsLoaded && !allFormsVisible ? `&visibleFormIds=${encodeURIComponent(visibleFormIdsArray.join(','))}` : '')
       + (type === 'single_event' ? `&eventId=${singleEventIsDynamic ? 'dynamic' : singleEventId}&eventSource=${singleEventSource}&eventStyle=${singleEventStyle}&ctaText=${encodeURIComponent(singleEventCtaText)}&showCountdown=${singleEventShowCountdown}&showLocation=${singleEventShowLocation}` : '')
+      + (type === 'bubble_form' ? `&formId=${bubbleFormId}&bubbleMode=${bubbleMode}&bubbleText=${encodeURIComponent(bubbleText)}&bubbleIcon=${encodeURIComponent(bubbleIcon)}&bubblePosition=${bubblePosition}` : '')
       + `&imageRatio=${imageRatio}`
       + (autoHeight ? `&autoHeight=true` : '')
       + (scale !== 1 ? `&scale=${scale}` : '')
@@ -219,7 +251,8 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
                 { id: 'events', label: 'Calendar/Events' },
                 { id: 'single_event', label: 'Featured Single Event' },
                 { id: 'forms', label: 'Forms' },
-                { id: 'popup', label: 'Pop Up Form' }
+                { id: 'bubble_form', label: 'Bubble Popup Form' },
+                { id: 'popup', label: 'Legacy Pop Up Form' }
               ].map(opt => (
                 <button 
                   key={opt.id}
@@ -237,7 +270,7 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
             </div>
           </div>
 
-          {type !== 'popup' && (
+          {type !== 'popup' && type !== 'bubble_form' && (
             <div>
                <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Theme Mode</label>
                <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-xl">
@@ -247,7 +280,7 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
             </div>
           )}
 
-          {type !== 'popup' && (
+          {type !== 'popup' && type !== 'bubble_form' && (
             <div>
                <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Layout</label>
                <div className="flex gap-2">
@@ -275,7 +308,7 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
             </div>
           )}
 
-          {type !== 'popup' && (
+          {type !== 'popup' && type !== 'bubble_form' && (
             <>
               <div>
                  <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Display Mode</label>
@@ -328,7 +361,7 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
             </>
           )}
 
-          {type !== 'popup' && layout === 'grid' && (
+          {type !== 'popup' && type !== 'bubble_form' && layout === 'grid' && (
             <div>
                <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Grid Columns</label>
                <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-xl">
@@ -339,7 +372,7 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
             </div>
           )}
 
-          {type !== 'popup' && (layout === 'grid' || layout === 'list') && (
+          {type !== 'popup' && type !== 'bubble_form' && (layout === 'grid' || layout === 'list') && (
             <div>
                <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Image Ratio</label>
                <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-xl">
@@ -662,6 +695,95 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
             </div>
           )}
 
+          {type === 'bubble_form' && (
+            <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+              <div>
+                 <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Select a Custom Form</label>
+                 {!customFormsLoaded ? (
+                   <div className="flex items-center gap-2 text-xs text-slate-400 py-2">
+                     <Loader2 size={12} className="animate-spin" /> Loading custom forms...
+                   </div>
+                 ) : customForms.length === 0 ? (
+                   <p className="text-xs text-slate-400 italic">No custom forms found. Create one in the Forms tab.</p>
+                 ) : (
+                   <select 
+                      value={bubbleFormId}
+                      onChange={e => setBubbleFormId(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                   >
+                      {customForms.map(f => (
+                        <option key={f.id} value={f.id}>{f.name}</option>
+                      ))}
+                   </select>
+                 )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Display Mode</label>
+                <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-xl">
+                  <button 
+                    onClick={() => setBubbleMode('text')} 
+                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition ${bubbleMode === 'text' ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                  >
+                    Text Label
+                  </button>
+                  <button 
+                    onClick={() => setBubbleMode('icon')} 
+                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition ${bubbleMode === 'icon' ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                  >
+                    Icon Only
+                  </button>
+                </div>
+              </div>
+
+              {bubbleMode === 'text' ? (
+                <div>
+                   <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Button Text</label>
+                   <input 
+                      type="text"
+                      placeholder="Plan a Visit" 
+                      value={bubbleText}
+                      onChange={e => setBubbleText(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                   />
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Select Icon</label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {['👋', '⛪️', '✝️', '☕️', '💬', '📅', '✨', '📝'].map(icon => (
+                      <button
+                        key={icon}
+                        onClick={() => setBubbleIcon(icon)}
+                        className={`py-2 text-xl rounded-lg border transition ${bubbleIcon === icon ? 'bg-indigo-50 dark:bg-indigo-900/30 border-indigo-300 dark:border-indigo-600' : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:border-slate-300'}`}
+                      >
+                        {icon}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Screen Position</label>
+                <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-xl">
+                  <button 
+                    onClick={() => setBubblePosition('left')} 
+                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition ${bubblePosition === 'left' ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                  >
+                    Bottom Left
+                  </button>
+                  <button 
+                    onClick={() => setBubblePosition('right')} 
+                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition ${bubblePosition === 'right' ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                  >
+                    Bottom Right
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div>
              <label className="block text-xs font-bold text-slate-500 tracking-wider uppercase mb-2">Accent Color</label>
              <div className="flex flex-wrap gap-2">
@@ -696,6 +818,28 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
                             </a>
                             <p className="mt-6 max-w-sm mx-auto text-xs text-slate-400">Note: The popup won't trigger in this dashboard. When added to your real website, clicking this will dim the background and securely open the form inside a Church Center modal.</p>
                         </div>
+                    ) : type === 'bubble_form' ? (
+                        <div className="w-full h-full relative bg-slate-50 dark:bg-slate-900 border-none rounded-xl">
+                           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-slate-400 text-sm">
+                             (Website Content Preview)
+                           </div>
+                           <div 
+                             className={`absolute bottom-6 ${bubblePosition === 'left' ? 'left-6' : 'right-6'} flex items-center justify-center shadow-2xl cursor-pointer`}
+                             style={{ 
+                               backgroundColor: btnColor, 
+                               color: '#ffffff', 
+                               borderRadius: bubbleMode === 'icon' ? '50%' : '24px',
+                               padding: bubbleMode === 'icon' ? '0' : '12px 24px',
+                               width: bubbleMode === 'icon' ? '60px' : 'auto',
+                               height: bubbleMode === 'icon' ? '60px' : 'auto',
+                               fontSize: bubbleMode === 'icon' ? '28px' : '16px',
+                               fontWeight: 'bold',
+                               fontFamily: 'sans-serif'
+                             }}
+                           >
+                             {bubbleMode === 'icon' ? bubbleIcon : bubbleText || 'Plan a Visit'}
+                           </div>
+                        </div>
                     ) : (
                         <iframe 
                           id="widget-preview"
@@ -723,6 +867,24 @@ export const WebsiteWidgetsManager: React.FC<WebsiteWidgetsManagerProps> = ({ ch
                     </div>
                     <button 
                         onClick={() => copyToClipboard(popupHtml, true)}
+                        className="absolute bottom-4 right-4 p-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition"
+                    >
+                        {copiedScript ? <CheckCircle size={16} className="text-emerald-400" /> : <Copy size={16} />}
+                    </button>
+                </div>
+              ) : type === 'bubble_form' ? (
+                <div className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-4 rounded-xl relative group">
+                    <span className="absolute top-0 right-0 -translate-y-1/2 translate-x-2 bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-400 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide">Recommended</span>
+                    <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2 mb-2">
+                        <Code size={16} className="text-slate-400" />
+                        Bubble Script Embed
+                    </h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Add this script to the <code>&lt;body&gt;</code> of your website. It will automatically create the floating button and handle the form popup.</p>
+                    <div className="bg-slate-900 p-3 rounded-lg break-all text-[11px] text-slate-300 font-mono">
+                        {scriptEmbedCode}
+                    </div>
+                    <button 
+                        onClick={() => copyToClipboard(scriptEmbedCode, true)}
                         className="absolute bottom-4 right-4 p-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition"
                     >
                         {copiedScript ? <CheckCircle size={16} className="text-emerald-400" /> : <Copy size={16} />}
