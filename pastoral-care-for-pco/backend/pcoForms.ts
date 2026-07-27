@@ -1,6 +1,7 @@
 import { getDb } from './firebase.js';
 import type { DocumentData } from 'firebase-admin/firestore';
 import { createServerLogger } from '../services/logService.js';
+import { sendIndividualInternal } from './smsSend.js';
 
 // Helper to make authenticated/refreshed PCO requests
 async function pcoRequest(
@@ -640,6 +641,29 @@ export async function submitForm(req: any, res: any) {
           pcoPersonId: personId || sessionDoc.data()?.pcoPersonId
         });
         log.info(`Marked session ${formId} as complete after web form submission`, 'forms', { formId }, churchId);
+      }
+    }
+
+    if (formConfig.actions?.sendSmsAlertTo) {
+      try {
+        const fullName = `${firstName} ${lastName}`.trim();
+        let smsBody = `New submission for ${formConfig.name}`;
+        if (fullName) smsBody += ` from ${fullName}`;
+        if (email) smsBody += `\nEmail: ${email}`;
+        if (phone) smsBody += `\nPhone: ${phone}`;
+        
+        await sendIndividualInternal({
+          db,
+          log,
+          churchId,
+          toPhone: formConfig.actions.sendSmsAlertTo,
+          body: smsBody,
+          sentBy: 'system',
+          sentByName: 'Form Alert'
+        });
+        log.info(`Sent SMS alert for form ${formId} to ${formConfig.actions.sendSmsAlertTo}`, 'forms', { formId }, churchId);
+      } catch (smsErr: any) {
+        log.warn(`Failed to send SMS alert for form ${formId}: ${smsErr.message}`, 'forms', { formId }, churchId);
       }
     }
 

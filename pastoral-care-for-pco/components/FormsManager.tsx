@@ -202,7 +202,8 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
   const [actions, setActions] = useState({
     addToGroupId: '',
     enrollInWorkflowId: '',
-    noteCategoryId: ''
+    noteCategoryId: '',
+    sendSmsAlertTo: ''
   });
   const [isActive, setIsActive] = useState(true);
   const [syncToPco, setSyncToPco] = useState(true);
@@ -502,7 +503,8 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
     setActions({
       addToGroupId: '',
       enrollInWorkflowId: '',
-      noteCategoryId: ''
+      noteCategoryId: '',
+      sendSmsAlertTo: ''
     });
     setIsActive(true);
     setSyncToPco(true);
@@ -1644,6 +1646,19 @@ export const FormsManager: React.FC<FormsManagerProps> = ({ churchId, currentUse
                         Database-only Mode. Submissions are saved locally and not synced to PCO.
                       </div>
                     )}
+
+                    <div className="pt-2 mt-2 border-t border-slate-100 dark:border-slate-800">
+                      <label className="block text-[10px] font-bold text-slate-550 uppercase mb-1">Send SMS Alert To</label>
+                      <input
+                        type="tel"
+                        placeholder="e.g. +1234567890"
+                        className="w-full text-xs border border-slate-250 dark:border-slate-800 rounded-lg px-2.5 py-2 bg-white dark:bg-slate-900"
+                        value={actions.sendSmsAlertTo || ''}
+                        onChange={e => setActions({ ...actions, sendSmsAlertTo: e.target.value })}
+                      />
+                      <p className="text-[9px] text-slate-400 mt-1 leading-tight">Optional. Send a text message to this number when a form is submitted.</p>
+                    </div>
+
                   </div>
 
                   {/* Share & Embed Options */}
