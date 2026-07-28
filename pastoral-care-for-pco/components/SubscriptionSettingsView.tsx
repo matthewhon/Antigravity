@@ -355,7 +355,8 @@ export const SubscriptionSettingsView: React.FC<SubscriptionSettingsViewProps> =
 
             {/* ── SMS Quota Card (Growth plan) ── */}
             {currentPlanId === 'growth' && (() => {
-                const SMS_QUOTA = 1500;
+                const limits = getEffectiveSmsLimits(church);
+                const SMS_QUOTA = limits.maxSmsPerMonth;
                 const nowDate = new Date();
                 const monthKey = `${nowDate.getFullYear()}-${String(nowDate.getMonth() + 1).padStart(2, '0')}`;
                 const usedSegments = church.smsUsage?.[monthKey] ?? 0;
