@@ -625,6 +625,36 @@ export async function sendBulkInternal(params: {
             const to = normaliseE164(rawPhone);
             if (await isOptedOut(db, churchId, to)) { optedOut++; return; }
 
+            // ── Workflow step dedup check ─────────────────────────────────────
+            // Defense-in-depth: if another Cloud Run instance already sent this
+            // workflow step to this phone in the last 10 minutes, skip the send.
+            if (campaignId && campaignId.startsWith('wf_')) {
+                const dedupeConvId = numberId
+                    ? `${churchId}_${numberId}_${to.replace(/\+/g, '')}`
+                    : `${churchId}_${to.replace(/\+/g, '')}`;
+                const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
+                try {
+                    const recentSnap = await db
+                        .collection('smsConversations')
+                        .doc(dedupeConvId)
+                        .collection('messages')
+                        .where('campaignId', '==', campaignId)
+                        .where('createdAt', '>=', tenMinutesAgo)
+                        .limit(1)
+                        .get();
+                    if (!recentSnap.empty) {
+                        log.warn(
+                            `[BulkSend] Dedup: ${campaignId} already sent to ${to} in the last 10 min — skipping duplicate.`,
+                            'system', { campaignId, to }, churchId
+                        );
+                        skipped++;
+                        return;
+                    }
+                } catch (_: any) {
+                    // Dedup check failed — proceed with sending to avoid silent drop
+                }
+            }
+
             const resolved = resolveMergeTags(body, (personMap as any)[to] || {}, church);
             const segments = isMms ? 1 : countSegments(resolved);
 

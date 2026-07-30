@@ -2,6 +2,15 @@ import { createServerLogger } from '../services/logService';
 import type { PersonInfo } from './smsSend';
 import { runListWorkflowReSyncScanner } from './workflowEnrollEndpoint.js';
 
+// ─── In-process duplicate-send guards ────────────────────────────────────────
+// Tracks enrollment IDs currently being processed by THIS server instance.
+// Prevents the same enrollment being fired twice concurrently (e.g. when a
+// slow send overlaps with the next 60-second tick on the same process).
+const processingEnrollments = new Set<string>();
+
+// Prevents overlapping workflow executor ticks on the same instance.
+let workflowTickRunning = false;
+
 // ─── SMS Campaign Scheduler ───────────────────────────────────────────────────
 // Polls Firestore every 60 seconds for SmsCampaigns with status='scheduled'
 // and scheduledAt <= now. Resolves PCO List/Group members, then fires sendBulk.
@@ -555,6 +564,12 @@ function calcNextSendAt(step: any, fromMs: number): number {
  * Fire the pending step, then advance to the next step (or mark complete).
  */
 async function runWorkflowStepExecutor(db: any): Promise<void> {
+    // ── Overlap guard: skip this tick if the previous one is still running ────
+    if (workflowTickRunning) {
+        return;
+    }
+    workflowTickRunning = true;
+
     const log = createServerLogger(db as any);
 
     try {
@@ -567,21 +582,63 @@ async function runWorkflowStepExecutor(db: any): Promise<void> {
             .limit(50)
             .get();
 
-        if (enrollSnap.empty) return;
+        if (enrollSnap.empty) { workflowTickRunning = false; return; }
 
         log.info(`[WorkflowExecutor] ${enrollSnap.size} enrollment(s) ready`, 'system', {}, '');
 
         await Promise.all(enrollSnap.docs.map(async (enrollDoc: any) => {
-            const enrollment = enrollDoc.data() as any;
-            const enrollId   = enrollDoc.id;
-            const { workflowId, churchId, phoneNumber, currentStep, personId, personName } = enrollment;
+            const initialData = enrollDoc.data() as any;
+            const enrollId    = enrollDoc.id;
+
+            // ── In-process guard: skip if this instance is already processing ─────
+            // This prevents the same enrollment from being sent twice when a slow
+            // send overlaps with the next tick on the same server process.
+            if (processingEnrollments.has(enrollId)) {
+                log.info(`[WorkflowExecutor] Enrollment ${enrollId} already in-flight on this instance. Skipping.`, 'system', { enrollId }, initialData.churchId);
+                return;
+            }
+            processingEnrollments.add(enrollId);
 
             // Hoist these above the try/catch so the catch block can read them
             // when deciding whether to retry or advance past the current step.
             let messageSent = false;
             let wf: any = null;
+            let currentStep = initialData.currentStep ?? 0;
 
             try {
+                // ── Claim this enrollment before doing ANY work ───────────────────
+                // Use a transaction to ensure only one concurrent worker/tick
+                // claims this enrollment, preventing duplicate SMS/email sends.
+                // This guards against cross-instance races (multiple Cloud Run pods).
+                const claimed = await db.runTransaction(async (t: any) => {
+                    const docRef = db.collection('smsWorkflowEnrollments').doc(enrollId);
+                    const docSnap = await t.get(docRef);
+                    if (!docSnap.exists) return false;
+                    const data = docSnap.data();
+
+                    // If completed or another worker pushed nextSendAt into the future, abort
+                    if (data.completed || data.nextSendAt > now) {
+                        return false;
+                    }
+
+                    // Temporarily lock by moving nextSendAt 5 minutes into the future
+                    t.update(docRef, { nextSendAt: now + 5 * 60 * 1000 });
+                    return true;
+                });
+
+                if (!claimed) {
+                    log.info(`[WorkflowExecutor] Enrollment ${enrollId} already claimed by another worker. Skipping.`, 'system', { enrollId }, initialData.churchId);
+                    processingEnrollments.delete(enrollId);
+                    return; // Skip execution
+                }
+
+                // Load fresh enrollment snapshot after claim
+                const freshEnrollSnap = await db.collection('smsWorkflowEnrollments').doc(enrollId).get();
+                if (!freshEnrollSnap.exists) return;
+                const enrollment = freshEnrollSnap.data() as any;
+                const { workflowId, churchId, phoneNumber, personId, personName } = enrollment;
+                currentStep = enrollment.currentStep ?? 0;
+
                 // Load workflow
                 const wfDoc = await db.collection('smsWorkflows').doc(workflowId).get();
                 if (!wfDoc.exists) {
@@ -654,29 +711,6 @@ async function runWorkflowStepExecutor(db: any): Promise<void> {
                         personInfo.city         = p.city  || personInfo.city;
                         personInfo.state        = p.state || personInfo.state;
                     }
-                }
-
-                // ── Claim this enrollment before sending ─────────────────────
-                // Use a transaction to ensure only one concurrent Cloud Run instance
-                // claims this enrollment, preventing duplicate SMS sends.
-                const claimed = await db.runTransaction(async (t: any) => {
-                    const docRef = db.collection('smsWorkflowEnrollments').doc(enrollId);
-                    const doc = await t.get(docRef);
-                    if (!doc.exists) return false;
-                    const data = doc.data();
-                    
-                    // If another instance already pushed nextSendAt into the future, we abort
-                    if (data.nextSendAt > now) {
-                        return false;
-                    }
-                    
-                    t.update(docRef, { nextSendAt: now + 5 * 60 * 1000 });
-                    return true;
-                });
-
-                if (!claimed) {
-                    log.info(`[WorkflowExecutor] Enrollment ${enrollId} already claimed by another worker. Skipping.`, 'system', { enrollId }, churchId);
-                    return; // Skip execution
                 }
 
                 // Resolve registration event link placeholders {eventLink} or {registrationLink}
@@ -901,6 +935,8 @@ async function runWorkflowStepExecutor(db: any): Promise<void> {
                 );
 
             } catch (e: any) {
+                const targetWfId = wf?.id || initialData.workflowId;
+                const targetChurchId = initialData.churchId;
                 if (messageSent) {
                     // The message was already dispatched — do NOT reset nextSendAt to now
                     // or the same step will fire again on the next tick.  Instead, force
@@ -920,7 +956,7 @@ async function runWorkflowStepExecutor(db: any): Promise<void> {
                     log.warn(
                         `[WorkflowExecutor] Send succeeded but post-send write failed for enrollment ${enrollId} step ${currentStep}. ` +
                         `Forced step advance to ${nextStep} to prevent duplicate send. Error: ${e.message}`,
-                        'system', { enrollId, workflowId, churchId, step: currentStep }, churchId
+                        'system', { enrollId, workflowId: targetWfId, churchId: targetChurchId, step: currentStep }, targetChurchId
                     );
                 } else {
                     // Message was never sent — safe to reset so it is retried next tick.
@@ -929,14 +965,19 @@ async function runWorkflowStepExecutor(db: any): Promise<void> {
                     }).catch(() => {});
                     log.warn(
                         `[WorkflowExecutor] Error on enrollment ${enrollId} (message not sent, will retry): ${e.message}`,
-                        'system', { enrollId, workflowId, churchId }, churchId
+                        'system', { enrollId, workflowId: targetWfId, churchId: targetChurchId }, targetChurchId
                     );
                 }
+            } finally {
+                // Always release the in-process lock regardless of outcome.
+                processingEnrollments.delete(enrollId);
             }
         }));
 
     } catch (e: any) {
         console.error('[WorkflowExecutor] Tick error:', e?.message);
+    } finally {
+        workflowTickRunning = false;
     }
 }
 
