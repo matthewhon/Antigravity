@@ -107,8 +107,8 @@ export async function getPublicRegistrations(req: any, res: any) {
 
   try {
     const url = includeArchived 
-      ? 'https://api.planningcenteronline.com/registrations/v2/signups?per_page=100'
-      : 'https://api.planningcenteronline.com/registrations/v2/signups?per_page=100&filter=unarchived';
+      ? 'https://api.planningcenteronline.com/registrations/v2/events?per_page=100'
+      : 'https://api.planningcenteronline.com/registrations/v2/events?per_page=100&filter=unarchived';
       
     const data = await fetchFromPco(churchId, url);
     
