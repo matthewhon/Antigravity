@@ -124,8 +124,9 @@ export async function getPublicRegistrations(req: any, res: any) {
       description: e.attributes.description,
       logoUrl: e.attributes.logo_url || null,
       signupsCount: e.attributes.signups_count || 0,
-      startsAt: e.attributes.starts_at || null,
-      publicUrl: e.attributes.church_center_url || e.attributes.public_url || null,
+      startsAt: e.attributes.starts_at || e.attributes.event_time || null,
+      location: e.attributes.location || e.attributes.location_name || null,
+      publicUrl: e.attributes.church_center_url || e.attributes.public_url || e.attributes.public_church_center_web_url || null,
     }));
     cache[cacheKey] = { data: events, timestamp: Date.now() };
     res.json(events);
