@@ -164,24 +164,48 @@ type Outcome = 'contacted' | 'no-answer';
 
 interface ContactCardProps {
     slot: OutreachSlot;
+    sessionName?: string;
+    volunteerName?: string | null;
     onComplete: (outcome: Outcome, notes: string, category?: string, isUrgent?: boolean) => void;
 }
 
-const ContactCard: React.FC<ContactCardProps> = ({ slot, onComplete }) => {
+const ContactCard: React.FC<ContactCardProps> = ({ slot, sessionName, volunteerName, onComplete }) => {
     const [notes, setNotes] = useState('');
     const [category, setCategory] = useState('General Check-in');
     const [isUrgent, setIsUrgent] = useState(false);
     const [selectedOutcome, setSelectedOutcome] = useState<Outcome | null>(null);
     const [confirmed, setConfirmed] = useState(false);
+    const [showScript, setShowScript] = useState(true);
 
-    // Reset internal state when the slot changes (next person in batch)
+    const firstName = slot.assignedPersonName.split(' ')[0];
+    const volunteerFirstName = volunteerName ? volunteerName.split(' ')[0] : '';
+    const smsMessage = `Hi ${firstName}! This is ${volunteerFirstName || 'a volunteer'} from ${sessionName || 'church'}. Just wanted to check in and see how you're doing today!`;
+    const smsHref = slot.assignedPersonPhone
+        ? `sms:${slot.assignedPersonPhone.replace(/\D/g, '').replace(/^(\d{10})$/, '+1$1')}?&body=${encodeURIComponent(smsMessage)}`
+        : '#';
+
+    const [pastNotes, setPastNotes] = useState<any[]>([]);
+    const [loadingPastNotes, setLoadingPastNotes] = useState(false);
+    const [showPastNotes, setShowPastNotes] = useState(false);
+
+    // Reset internal state & fetch past notes when the slot changes (next person in batch)
     useEffect(() => {
         setNotes('');
         setCategory('General Check-in');
         setIsUrgent(false);
         setSelectedOutcome(null);
         setConfirmed(false);
-    }, [slot.id]);
+        setPastNotes([]);
+        setShowPastNotes(false);
+
+        if (slot.assignedPersonId) {
+            setLoadingPastNotes(true);
+            firestore.getPersonPastoralNotes(slot.assignedPersonId, 5).then(res => {
+                setPastNotes(res || []);
+                setLoadingPastNotes(false);
+            }).catch(() => setLoadingPastNotes(false));
+        }
+    }, [slot.id, slot.assignedPersonId]);
 
     const handleConfirm = () => {
         if (!selectedOutcome || confirmed) return;
@@ -198,6 +222,36 @@ const ContactCard: React.FC<ContactCardProps> = ({ slot, onComplete }) => {
                 <div className="h-2 bg-gradient-to-r from-indigo-500 to-violet-500" />
 
                 <div className="p-8">
+                    {/* Collapsible Call Script & Talking Points */}
+                    <div className="bg-indigo-50/70 border border-indigo-100/80 rounded-2xl p-4 mb-6 transition-all">
+                        <button
+                            type="button"
+                            onClick={() => setShowScript(!showScript)}
+                            className="w-full flex items-center justify-between text-left text-xs font-bold text-indigo-900"
+                        >
+                            <span className="flex items-center gap-1.5">
+                                <MessageSquare size={14} className="text-indigo-600" />
+                                Recommended Call Script
+                            </span>
+                            <span className="text-[10px] font-black uppercase text-indigo-500 bg-indigo-100 px-2 py-0.5 rounded-full">
+                                {showScript ? 'Hide' : 'View Script'}
+                            </span>
+                        </button>
+                        {showScript && (
+                            <div className="mt-3 text-xs text-indigo-950 space-y-2 border-t border-indigo-100/80 pt-2.5 leading-relaxed font-medium">
+                                <p>
+                                    <span className="font-bold text-indigo-700">Greeting:</span> "Hi {firstName}, this is {volunteerFirstName || 'a volunteer'} from {sessionName || 'church'}!"
+                                </p>
+                                <p>
+                                    <span className="font-bold text-indigo-700">Check-in:</span> "We're reaching out to check in on our church family, see how you're doing, and ask if there's anything we can pray with you about today."
+                                </p>
+                                <p className="text-[11px] text-indigo-600 italic">
+                                    💡 Tip: If they don't answer, tap <span className="font-bold text-violet-700">Text</span> below to automatically send a pre-filled warm check-in message!
+                                </p>
+                            </div>
+                        )}
+                    </div>
+
                     <p className="text-[10px] font-bold uppercase tracking-wide text-indigo-400 mb-3">Your Contact</p>
 
                     {/* Avatar & Name */}
@@ -210,6 +264,38 @@ const ContactCard: React.FC<ContactCardProps> = ({ slot, onComplete }) => {
                             <p className="text-[11px] text-slate-400 font-medium mt-0.5">Reach out and check in on them</p>
                         </div>
                     </div>
+
+                    {/* Past Contact Notes Accordion */}
+                    {pastNotes.length > 0 && (
+                        <div className="bg-slate-50 border border-slate-200/70 rounded-2xl p-4 mb-6">
+                            <button
+                                type="button"
+                                onClick={() => setShowPastNotes(!showPastNotes)}
+                                className="w-full flex items-center justify-between text-left text-xs font-bold text-slate-800"
+                            >
+                                <span className="flex items-center gap-1.5">
+                                    <ClockIcon size={14} className="text-slate-500" />
+                                    Past Contact Notes ({pastNotes.length})
+                                </span>
+                                <span className="text-[10px] font-bold uppercase text-slate-500 bg-slate-200/80 px-2 py-0.5 rounded-full">
+                                    {showPastNotes ? 'Hide' : 'View History'}
+                                </span>
+                            </button>
+                            {showPastNotes && (
+                                <div className="mt-3 space-y-2 border-t border-slate-200/70 pt-2.5">
+                                    {pastNotes.map((pn, i) => (
+                                        <div key={pn.id || i} className="bg-white border border-slate-100 rounded-xl p-3 shadow-xs">
+                                            <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 mb-1">
+                                                <span>{pn.authorName || 'Volunteer'} • {pn.type || 'Note'}</span>
+                                                <span className="text-slate-400 font-normal">{pn.date}</span>
+                                            </div>
+                                            <p className="text-xs text-slate-700 whitespace-pre-line leading-relaxed">{pn.content}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* Contact Links */}
                     <div className="space-y-2 mb-6">
@@ -239,17 +325,17 @@ const ContactCard: React.FC<ContactCardProps> = ({ slot, onComplete }) => {
                             </div>
                         )}
 
-                        {/* Text / SMS */}
+                        {/* Text / SMS with warm pre-filled template */}
                         {slot.assignedPersonPhone && (
                             <a
-                                href={`sms:${slot.assignedPersonPhone.replace(/\D/g, '').replace(/^(\d{10})$/, '+1$1')}`}
+                                href={smsHref}
                                 className="flex items-center gap-3 bg-violet-50 hover:bg-violet-100 border border-violet-100 rounded-2xl px-5 py-4 transition-all group"
                             >
                                 <div className="w-10 h-10 rounded-xl bg-violet-500 flex items-center justify-center shadow-md shadow-violet-200 group-hover:scale-110 transition-transform">
                                     <MessageSquare size={18} className="text-white" />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <p className="text-[10px] font-bold uppercase tracking-wide text-violet-600 mb-0.5">Text</p>
+                                    <p className="text-[10px] font-bold uppercase tracking-wide text-violet-600 mb-0.5">Text (Pre-filled Warm Check-in)</p>
                                     <p className="text-base font-black text-slate-900 tracking-wide">{formatPhone(slot.assignedPersonPhone)}</p>
                                 </div>
                                 <ArrowRight size={16} className="text-violet-400 group-hover:translate-x-1 transition-transform" />
@@ -1109,7 +1195,7 @@ export const PublicContactView: React.FC<{ sessionId: string; mode?: 'followup' 
                 </div>
             )}
             {viewState === 'contact' && currentSlot && (
-                <ContactCard slot={currentSlot} onComplete={handleComplete} />
+                <ContactCard slot={currentSlot} sessionName={sessionName} volunteerName={volunteerName} onComplete={handleComplete} />
             )}
             {isDone && (
                 <AllDoneCard

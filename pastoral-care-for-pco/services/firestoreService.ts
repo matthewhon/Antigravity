@@ -1936,6 +1936,23 @@ class FirestoreService {
       await deleteDoc(doc(db, 'digital_bulletins', bulletinId));
     } catch (e) { this.handleFirestoreError(e); }
   }
+
+  async getPersonPastoralNotes(personId: string, limitCount: number = 5): Promise<PastoralNote[]> {
+    try {
+      const q = query(
+        collection(db, 'pastoral_notes'),
+        where('personId', '==', personId),
+        limit(limitCount)
+      );
+      const snap = await getDocs(q);
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }) as PastoralNote);
+      list.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+      return list;
+    } catch (e) {
+      console.warn('[FirestoreService] getPersonPastoralNotes failed:', e);
+      return [];
+    }
+  }
 }
 
 export interface SermonVerseRecord {
