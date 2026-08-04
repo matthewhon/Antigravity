@@ -155,6 +155,15 @@ export const PublicVolunteerHistoryView: React.FC<{ churchId: string }> = ({ chu
             slots: OutreachSlot[];
         }>();
         for (const slot of slots) {
+            let slotContactTime = slot.completedAt ?? 0;
+            if (slot.followUpNotes && slot.followUpNotes.length > 0) {
+                for (const fn of slot.followUpNotes) {
+                    if (fn.addedAt > slotContactTime) {
+                        slotContactTime = fn.addedAt;
+                    }
+                }
+            }
+
             const existing = map.get(slot.assignedPersonId);
             if (!existing) {
                 map.set(slot.assignedPersonId, {
@@ -162,14 +171,14 @@ export const PublicVolunteerHistoryView: React.FC<{ churchId: string }> = ({ chu
                     personName: slot.assignedPersonName,
                     personPhone: slot.assignedPersonPhone,
                     personEmail: slot.assignedPersonEmail,
-                    lastContactedAt: slot.completedAt ?? 0,
+                    lastContactedAt: slotContactTime,
                     volunteerName: slot.volunteerName,
                     slots: [slot]
                 });
             } else {
                 existing.slots.push(slot);
-                if ((slot.completedAt ?? 0) > existing.lastContactedAt) {
-                    existing.lastContactedAt = slot.completedAt ?? 0;
+                if (slotContactTime > existing.lastContactedAt) {
+                    existing.lastContactedAt = slotContactTime;
                 }
             }
         }
