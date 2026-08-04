@@ -297,7 +297,18 @@ export const PublicVolunteerHistoryView: React.FC<{ churchId: string }> = ({ chu
                                                 {contact.personName.slice(0, 1).toUpperCase()}
                                             </div>
                                             <div>
-                                                <p className="font-black text-slate-900 leading-tight">{contact.personName}</p>
+                                                <div className="flex items-center gap-2">
+                                                    <p className="font-black text-slate-900 leading-tight">{contact.personName}</p>
+                                                    {contact.slots.some(s => s.status === 'contacted') ? (
+                                                        <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wide px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                                                            ✅ Reached
+                                                        </span>
+                                                    ) : (
+                                                        <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wide px-2 py-0.5 rounded-full bg-rose-100 text-rose-700">
+                                                            📵 No Answer
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 <p className="text-[11px] text-slate-400 mt-0.5">
                                                     Last contact: {contact.lastContactedAt ? new Date(contact.lastContactedAt).toLocaleDateString() : 'Unknown'}
                                                 </p>
@@ -326,6 +337,22 @@ export const PublicVolunteerHistoryView: React.FC<{ churchId: string }> = ({ chu
                                         )}
                                     </div>
 
+                                    {/* Original session notes */}
+                                    {contact.slots.filter(s => s.notes && s.notes.trim()).map((s, idx) => (
+                                        <div key={`orig-${s.id}-${idx}`} className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 mb-3">
+                                            <div className="flex items-center gap-1.5 mb-1">
+                                                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Original Session Note</p>
+                                                {s.completedAt && (
+                                                    <span className="text-[10px] text-slate-400 ml-auto">
+                                                        {new Date(s.completedAt).toLocaleDateString()}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="text-sm text-slate-600">{s.notes}</p>
+                                        </div>
+                                    ))}
+
+                                    {/* Follow-up notes */}
                                     {contact.slots.flatMap(s => s.followUpNotes || []).length > 0 && (
                                         <div className="space-y-2 mb-3">
                                             {contact.slots.flatMap(s => s.followUpNotes || []).sort((a, b) => a.addedAt - b.addedAt).map((fn, i) => (
