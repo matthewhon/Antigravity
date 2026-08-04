@@ -1747,6 +1747,28 @@ class FirestoreService {
     }
   }
 
+  /**
+   * Returns 'contacted' and 'no-answer' slots across ALL sessions for a given volunteer phone in a church.
+   * Used for the Volunteer History view.
+   */
+  async getAllVolunteerSlotsForChurch(churchId: string, volunteerPhone: string): Promise<OutreachSlot[]> {
+    try {
+      const q = query(
+        collection(db, 'outreach_slots'),
+        where('churchId', '==', churchId),
+        where('volunteerPhone', '==', volunteerPhone),
+        where('status', 'in', ['contacted', 'no-answer'])
+      );
+      const snap = await getDocs(q);
+      const slots = snap.docs.map(d => d.data() as OutreachSlot);
+      // Sort client-side: most recent first
+      return slots.sort((a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0));
+    } catch (e) {
+      console.warn('getAllVolunteerSlotsForChurch error:', e);
+      return [];
+    }
+  }
+
   async getPersonOutreachSlots(churchId: string, personId: string): Promise<OutreachSlot[]> {
     try {
       const q = query(

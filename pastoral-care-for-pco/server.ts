@@ -716,6 +716,59 @@ async function startServer() {
       }
     });
 
+    app.post('/api/outreach/volunteer-note', express.json(), async (req: any, res: any) => {
+      const { churchId, personId, personName, followUpNote, volunteerPhone, volunteerName } = req.body || {};
+      if (!churchId || !personId || !followUpNote?.trim() || !volunteerPhone) {
+        return res.status(400).json({ error: 'Missing required fields' });
+      }
+      try {
+        const db = getDb();
+
+        const dateStr = new Date().toLocaleString('en-US', {
+          month: 'short', day: 'numeric', year: 'numeric',
+          hour: 'numeric', minute: '2-digit', hour12: true, timeZoneName: 'short'
+        });
+        const noteContent = [
+          `📝 Volunteer History Note`,
+          `Added by: ${volunteerName || volunteerPhone}`,
+          `Date: ${dateStr}`,
+          '',
+          '---',
+          followUpNote.trim(),
+        ].join('\n');
+
+        const { writePcoNote } = await import('./backend/pcoNotes.js') as any;
+        const { createServerLogger } = await import('./services/logService.js') as any;
+        const log = createServerLogger(db);
+
+        // Fire-and-forget PCO note
+        writePcoNote({ db, log, churchId, personId, noteContent })
+          .catch(() => { /* already logged inside writePcoNote */ });
+
+        // Write pastoral_notes Firestore document
+        const noteId = `volunteer_history_${personId}_${Date.now()}`;
+        const todayIso = new Date().toISOString().split('T')[0];
+        await db.collection('pastoral_notes').doc(noteId).set({
+          id: noteId,
+          churchId,
+          personId,
+          personName: personName || 'Unknown',
+          authorId:   'volunteer_system',
+          authorName: volunteerName || volunteerPhone,
+          date:       todayIso,
+          type:       'Note',
+          content:    noteContent,
+          isCompleted: true,
+          tags: ['volunteer-history', 'follow-up'],
+        }, { merge: true });
+
+        return res.json({ success: true, personId });
+      } catch (e: any) {
+        console.error('[outreach/volunteer-note]', e.message);
+        return res.status(500).json({ error: e.message });
+      }
+    });
+
     // ─── Web Push Notifications ─────────────────────────────────────────────────
     app.get('/push/vapid-public-key',  getVapidPublicKey);
     app.post('/push/subscribe',        express.json(), savePushSubscription);

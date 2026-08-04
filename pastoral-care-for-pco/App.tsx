@@ -80,6 +80,7 @@ import { PublicNoteView } from './components/PublicNoteView';
 import { PublicFormView } from './components/PublicFormView';
 import { PublicCalendarView } from './components/PublicCalendarView';
 import { PublicContactView } from './components/PublicContactView';
+import { PublicVolunteerHistoryView } from './components/PublicVolunteerHistoryView';
 import { PublicBulletinView } from './components/PublicBulletinView';
 import { ToolsView } from './components/ToolsView';
 import { SmsWorkflowsManager } from './components/MessagingModule';
@@ -1016,6 +1017,12 @@ const App: React.FC = () => {
   const contactMatch = window.location.pathname.match(/^\/contact\/([^/]+)$/);
   if (contactMatch) {
     return <PublicContactView sessionId={contactMatch[1]} />;
+  }
+
+  // ─── Public Volunteer History Route (no auth required) ───────────────────────
+  const volunteerHistoryMatch = window.location.pathname.match(/^\/volunteer-history\/([^/]+)$/);
+  if (volunteerHistoryMatch) {
+    return <PublicVolunteerHistoryView churchId={volunteerHistoryMatch[1]} />;
   }
 
   if (loading) {
