@@ -77,6 +77,9 @@ export const PublicVolunteerHistoryView: React.FC<{ churchId: string }> = ({ chu
     const [saving, setSaving] = useState(false);
     const [savedPersonId, setSavedPersonId] = useState<string | null>(null);
 
+    const [filterHasNotes, setFilterHasNotes] = useState(false);
+    const [filterStatus, setFilterStatus] = useState<'all' | 'contacted' | 'no-answer'>('all');
+
     useEffect(() => {
         const stored = sessionStorage.getItem(VOLUNTEER_STORAGE_KEY(churchId));
         if (stored) {
@@ -174,14 +177,23 @@ export const PublicVolunteerHistoryView: React.FC<{ churchId: string }> = ({ chu
     }, [slots]);
 
     const filteredContacts = useMemo(() => {
-        if (!searchQuery.trim()) return groupedContacts;
-        const q = searchQuery.toLowerCase();
-        const qDigits = q.replace(/\D/g, '');
-        return groupedContacts.filter(c =>
-            c.personName.toLowerCase().includes(q) ||
-            (qDigits && c.personPhone?.replace(/\D/g, '').includes(qDigits))
-        );
-    }, [groupedContacts, searchQuery]);
+        let result = groupedContacts;
+        if (filterHasNotes) {
+            result = result.filter(c => c.slots.some(s => (s.followUpNotes && s.followUpNotes.length > 0) || (s.notes && s.notes.trim().length > 0)));
+        }
+        if (filterStatus !== 'all') {
+            result = result.filter(c => c.slots.some(s => s.status === filterStatus));
+        }
+        if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase();
+            const qDigits = q.replace(/\D/g, '');
+            result = result.filter(c =>
+                c.personName.toLowerCase().includes(q) ||
+                (qDigits && c.personPhone?.replace(/\D/g, '').includes(qDigits))
+            );
+        }
+        return result;
+    }, [groupedContacts, searchQuery, filterHasNotes, filterStatus]);
 
     return (
         <Shell>
@@ -211,16 +223,41 @@ export const PublicVolunteerHistoryView: React.FC<{ churchId: string }> = ({ chu
                             </div>
                         </div>
 
-                        {groupedContacts.length > 3 && (
-                            <div className="relative">
-                                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" />
-                                <input
-                                    type="text"
-                                    value={searchQuery}
-                                    onChange={e => setSearchQuery(e.target.value)}
-                                    placeholder="Search by name or phone…"
-                                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 placeholder:text-slate-300 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-colors"
-                                />
+                        {groupedContacts.length > 0 && (
+                            <div className="flex flex-col gap-3">
+                                {groupedContacts.length > 3 && (
+                                    <div className="relative">
+                                        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" />
+                                        <input
+                                            type="text"
+                                            value={searchQuery}
+                                            onChange={e => setSearchQuery(e.target.value)}
+                                            placeholder="Search by name or phone…"
+                                            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 placeholder:text-slate-300 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-colors"
+                                        />
+                                    </div>
+                                )}
+                                <div className="flex flex-wrap items-center gap-4">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={filterHasNotes}
+                                            onChange={e => setFilterHasNotes(e.target.checked)}
+                                            className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500"
+                                        />
+                                        <span className="text-sm text-slate-600 font-medium">Show only with notes</span>
+                                    </label>
+                                    
+                                    <select
+                                        value={filterStatus}
+                                        onChange={e => setFilterStatus(e.target.value as any)}
+                                        className="bg-slate-50 border border-slate-200 text-slate-600 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2 outline-none"
+                                    >
+                                        <option value="all">Any Status</option>
+                                        <option value="contacted">Answered</option>
+                                        <option value="no-answer">No Answer</option>
+                                    </select>
+                                </div>
                             </div>
                         )}
                     </div>
