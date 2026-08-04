@@ -561,7 +561,7 @@ async function startServer() {
     // 2. Also creates a pastoral_notes Firestore document so the contact appears
     //    in Care & Reports under "Has Notes" without any extra pastoral staff work.
     app.post('/api/outreach/log-contact', express.json(), async (req: any, res: any) => {
-      const { sessionId, slotId, outcome, notes, volunteerName } = req.body || {};
+      const { sessionId, slotId, outcome, notes, volunteerName, category, isUrgent } = req.body || {};
       if (!sessionId || !slotId) return res.status(400).json({ error: 'Missing sessionId or slotId' });
       try {
         const db = getDb();
@@ -585,8 +585,10 @@ async function startServer() {
           month: 'short', day: 'numeric', year: 'numeric',
           hour: 'numeric', minute: '2-digit', hour12: true, timeZoneName: 'short'
         });
+        const urgentBanner = isUrgent ? `🚨 URGENT: PASTORAL STAFF ATTENTION REQUESTED\n` : '';
+        const categoryStr = category ? ` (${category})` : '';
         const noteLines: string[] = [
-          `${outcomeEmoji} Pastoral Outreach — ${outcomeLabel}`,
+          `${urgentBanner}${outcomeEmoji} Pastoral Outreach — ${outcomeLabel}${categoryStr}`,
           `Session: ${sessionName}`,
           ...(volunteerName ? [`Contacted by: ${volunteerName}`] : []),
           `Date: ${dateStr}`,
@@ -603,9 +605,12 @@ async function startServer() {
 
         // Write a pastoral_notes Firestore document so this contact appears
         // in Care & Reports ("Has Notes" filter, Last Contact column, etc.)
-        // Note type: 'Call' for both contacted and no-answer (it was a phone call attempt).
         const noteId = `outreach_${slotId}`;
         const todayIso = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+        const tags = ['outreach', outcome === 'contacted' ? 'reached' : 'no-answer'];
+        if (category) tags.push(category.toLowerCase().replace(/\s+/g, '-'));
+        if (isUrgent) tags.push('urgent', 'pastoral-escalation');
+
         await db.collection('pastoral_notes').doc(noteId).set({
           id: noteId,
           churchId,
@@ -614,10 +619,11 @@ async function startServer() {
           authorId:   'outreach_system',
           authorName: volunteerName || 'Outreach Volunteer',
           date:       todayIso,
-          type:       'Call',
+          type:       isUrgent ? 'Urgent Pastoral Call' : (category || 'Call'),
           content:    noteContent,
           isCompleted: true,
-          tags: ['outreach', outcome === 'contacted' ? 'reached' : 'no-answer'],
+          isUrgent:   !!isUrgent,
+          tags,
         }, { merge: true });
 
         return res.json({ success: true, personId });

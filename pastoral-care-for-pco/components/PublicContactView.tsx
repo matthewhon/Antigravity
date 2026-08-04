@@ -4,8 +4,10 @@ import { firestore } from '../services/firestoreService';
 import {
     Phone, Mail, CheckCircle2, PhoneOff, ArrowRight, LogOut,
     Loader2, Heart, Users, ChevronRight, Award, TrendingUp, MessageSquare,
-    Search, Edit3, Send, Clock as ClockIcon
+    Search, Edit3, Send, Clock as ClockIcon, AlertTriangle
 } from 'lucide-react';
+
+const NOTE_CATEGORIES = ['General Check-in', 'Prayer Request', 'Life Event', 'Needs Pastoral Visit'];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -162,17 +164,21 @@ type Outcome = 'contacted' | 'no-answer';
 
 interface ContactCardProps {
     slot: OutreachSlot;
-    onComplete: (outcome: Outcome, notes: string) => void;
+    onComplete: (outcome: Outcome, notes: string, category?: string, isUrgent?: boolean) => void;
 }
 
 const ContactCard: React.FC<ContactCardProps> = ({ slot, onComplete }) => {
     const [notes, setNotes] = useState('');
+    const [category, setCategory] = useState('General Check-in');
+    const [isUrgent, setIsUrgent] = useState(false);
     const [selectedOutcome, setSelectedOutcome] = useState<Outcome | null>(null);
     const [confirmed, setConfirmed] = useState(false);
 
     // Reset internal state when the slot changes (next person in batch)
     useEffect(() => {
         setNotes('');
+        setCategory('General Check-in');
+        setIsUrgent(false);
         setSelectedOutcome(null);
         setConfirmed(false);
     }, [slot.id]);
@@ -180,7 +186,7 @@ const ContactCard: React.FC<ContactCardProps> = ({ slot, onComplete }) => {
     const handleConfirm = () => {
         if (!selectedOutcome || confirmed) return;
         setConfirmed(true); // disable button immediately
-        onComplete(selectedOutcome, notes);
+        onComplete(selectedOutcome, notes, category, isUrgent);
         // Parent advances instantly; React will unmount this or swap slot.id
     };
 
@@ -275,6 +281,44 @@ const ContactCard: React.FC<ContactCardProps> = ({ slot, onComplete }) => {
                                 </div>
                             </div>
                         )}
+                    </div>
+
+                    {/* Category Selection */}
+                    <div className="mb-4">
+                        <label className="text-[10px] font-bold uppercase tracking-wide text-slate-400 block mb-1.5">Note Category</label>
+                        <div className="flex flex-wrap gap-1.5">
+                            {NOTE_CATEGORIES.map(cat => (
+                                <button
+                                    key={cat}
+                                    type="button"
+                                    onClick={() => setCategory(cat)}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                        category === cat
+                                            ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-200'
+                                            : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                                    }`}
+                                >
+                                    {cat}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Pastoral Escalation Checkbox */}
+                    <div className="mb-4">
+                        <label className="flex items-center gap-2.5 bg-rose-50 border border-rose-200/80 p-3 rounded-xl cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={isUrgent}
+                                onChange={e => setIsUrgent(e.target.checked)}
+                                className="w-4 h-4 text-rose-600 border-rose-300 rounded focus:ring-rose-500"
+                            />
+                            <AlertTriangle size={16} className="text-rose-600 shrink-0" />
+                            <div>
+                                <p className="text-xs font-bold text-rose-800 leading-none">Flag for Pastoral Staff</p>
+                                <p className="text-[10px] text-rose-600 font-medium mt-0.5">Request urgent pastoral visit or staff review</p>
+                            </div>
+                        </label>
                     </div>
 
                     {/* Notes */}
@@ -948,12 +992,15 @@ export const PublicContactView: React.FC<{ sessionId: string; mode?: 'followup' 
         setViewState('contact');
     };
 
-    const handleComplete = async (outcome: Outcome, notes: string) => {
+    const handleComplete = async (outcome: Outcome, notes: string, category?: string, isUrgent?: boolean) => {
         if (!currentSlot || !session) return;
 
         // 1. Firestore slot update — fire-and-forget
         const now = Date.now();
-        const updates: any = { status: outcome, notes, completedAt: now };
+        const formattedNotes = category && category !== 'General Check-in' 
+            ? `[${category}] ${notes}`
+            : notes;
+        const updates: any = { status: outcome, notes: formattedNotes, completedAt: now };
         if (outcome === 'no-answer') updates.noAnswerUntil = now + 24 * 60 * 60 * 1000;
         firestore.updateOutreachSlot(currentSlot.id, updates);
 
@@ -966,6 +1013,8 @@ export const PublicContactView: React.FC<{ sessionId: string; mode?: 'followup' 
                 slotId: currentSlot.id,
                 outcome,
                 notes: notes?.trim() || '',
+                category,
+                isUrgent,
                 volunteerName,
             }),
         }).catch(() => { /* non-blocking */ });
