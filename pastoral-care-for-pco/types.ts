@@ -2017,6 +2017,11 @@ export interface OutreachSession {
         lastUpdatedAt: number;
     };
     /**
+     * Optional custom call script & talking points configured by church admins.
+     * Displayed to volunteers on the live Outreach Contact view.
+     */
+    customScript?: string;
+    /**
      * How many contacts to pre-assign to each volunteer at once.
      * Higher = fewer round trips, less responsive queue for other volunteers.
      * Default: 3

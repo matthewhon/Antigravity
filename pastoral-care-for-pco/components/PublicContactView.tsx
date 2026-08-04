@@ -165,11 +165,12 @@ type Outcome = 'contacted' | 'no-answer';
 interface ContactCardProps {
     slot: OutreachSlot;
     sessionName?: string;
+    customScript?: string;
     volunteerName?: string | null;
     onComplete: (outcome: Outcome, notes: string, category?: string, isUrgent?: boolean) => void;
 }
 
-const ContactCard: React.FC<ContactCardProps> = ({ slot, sessionName, volunteerName, onComplete }) => {
+const ContactCard: React.FC<ContactCardProps> = ({ slot, sessionName, customScript, volunteerName, onComplete }) => {
     const [notes, setNotes] = useState('');
     const [category, setCategory] = useState('General Check-in');
     const [isUrgent, setIsUrgent] = useState(false);
@@ -239,13 +240,19 @@ const ContactCard: React.FC<ContactCardProps> = ({ slot, sessionName, volunteerN
                         </button>
                         {showScript && (
                             <div className="mt-3 text-xs text-indigo-950 space-y-2 border-t border-indigo-100/80 pt-2.5 leading-relaxed font-medium">
-                                <p>
-                                    <span className="font-bold text-indigo-700">Greeting:</span> "Hi {firstName}, this is {volunteerFirstName || 'a volunteer'} from {sessionName || 'church'}!"
-                                </p>
-                                <p>
-                                    <span className="font-bold text-indigo-700">Check-in:</span> "We're reaching out to check in on our church family, see how you're doing, and ask if there's anything we can pray with you about today."
-                                </p>
-                                <p className="text-[11px] text-indigo-600 italic">
+                                {customScript ? (
+                                    <p className="whitespace-pre-line leading-relaxed">{customScript}</p>
+                                ) : (
+                                    <>
+                                        <p>
+                                            <span className="font-bold text-indigo-700">Greeting:</span> "Hi {firstName}, this is {volunteerFirstName || 'a volunteer'} from {sessionName || 'church'}!"
+                                        </p>
+                                        <p>
+                                            <span className="font-bold text-indigo-700">Check-in:</span> "We're reaching out to check in on our church family, see how you're doing, and ask if there's anything we can pray with you about today."
+                                        </p>
+                                    </>
+                                )}
+                                <p className="text-[11px] text-indigo-600 italic border-t border-indigo-100/60 pt-2 mt-2">
                                     💡 Tip: If they don't answer, tap <span className="font-bold text-violet-700">Text</span> below to automatically send a pre-filled warm check-in message!
                                 </p>
                             </div>
@@ -1195,7 +1202,7 @@ export const PublicContactView: React.FC<{ sessionId: string; mode?: 'followup' 
                 </div>
             )}
             {viewState === 'contact' && currentSlot && (
-                <ContactCard slot={currentSlot} sessionName={sessionName} volunteerName={volunteerName} onComplete={handleComplete} />
+                <ContactCard slot={currentSlot} sessionName={sessionName} customScript={session?.customScript} volunteerName={volunteerName} onComplete={handleComplete} />
             )}
             {isDone && (
                 <AllDoneCard

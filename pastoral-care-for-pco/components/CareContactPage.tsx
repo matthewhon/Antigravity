@@ -4,7 +4,7 @@ import {
     Phone, QrCode, Link2, Plus, Trash2, Copy, Check, ChevronDown,
     Users, Activity, PhoneOff, RefreshCw, Eye, EyeOff, X, ToggleLeft, ToggleRight,
     Clock, Shield, Download, LockKeyhole, RotateCcw, CheckCircle2,
-    Star, Timer, Award, BarChart3
+    Star, Timer, Award, BarChart3, FileText
 } from 'lucide-react';
 import { OutreachSession, OutreachSlot, PcoPerson, User, Church, PcoGroup } from '../types';
 import { firestore } from '../services/firestoreService';
@@ -276,15 +276,16 @@ const SessionSummaryModal: React.FC<{ stats: CloseStats; onClose: () => void }> 
 };
 
 interface SessionModalProps {
-    groups: PcoGroup[];
+    groups?: PcoGroup[];
     memberStatuses: string[];
-    onSave: (draft: Pick<OutreachSession, 'name' | 'filters'>) => void;
+    onSave: (draft: Pick<OutreachSession, 'name' | 'filters' | 'customScript'>) => void;
     onClose: () => void;
-    initial?: Pick<OutreachSession, 'name' | 'filters'>;
+    initial?: Pick<OutreachSession, 'name' | 'filters' | 'customScript'>;
 }
 
 const SessionModal: React.FC<SessionModalProps> = ({ groups = [], memberStatuses, onSave, onClose, initial }) => {
     const [name, setName] = useState(initial?.name ?? '');
+    const [customScript, setCustomScript] = useState(initial?.customScript ?? '');
     const [riskCats, setRiskCats] = useState<OutreachSession['filters']['riskCategories']>(
         initial?.filters.riskCategories ?? ['Disconnected', 'At Risk']
     );
@@ -324,7 +325,8 @@ const SessionModal: React.FC<SessionModalProps> = ({ groups = [], memberStatuses
         }
         onSave({ 
             name: name.trim(), 
-            filters
+            filters,
+            customScript: customScript.trim() || undefined
         });
     };
 
@@ -348,6 +350,24 @@ const SessionModal: React.FC<SessionModalProps> = ({ groups = [], memberStatuses
                             placeholder="e.g. June At-Risk Outreach"
                             className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none dark:text-white"
                         />
+                    </div>
+
+                    {/* Recommended Call Script (Optional) */}
+                    <div>
+                        <label className="text-[10px] font-bold uppercase tracking-wide text-slate-400 block mb-1.5 flex items-center justify-between">
+                            <span>Recommended Call Script</span>
+                            <span className="text-slate-400 font-normal lowercase">(optional)</span>
+                        </label>
+                        <textarea
+                            value={customScript}
+                            onChange={e => setCustomScript(e.target.value)}
+                            placeholder="e.g. Hi! This is a volunteer from church checking in to see how you are doing today..."
+                            rows={3}
+                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none dark:text-white leading-relaxed resize-none"
+                        />
+                        <p className="text-[10px] text-slate-400 mt-1">
+                            Volunteers will see this script on their calling screen when reaching out to assigned contacts.
+                        </p>
                     </div>
 
                     {/* Risk Categories */}
@@ -662,6 +682,15 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
         [sessions, selectedId]
     );
 
+    // Recommended Call Script Editor state
+    const [editingScript, setEditingScript] = useState(false);
+    const [scriptText, setScriptText]       = useState('');
+
+    useEffect(() => {
+        setScriptText(selectedSession?.customScript ?? '');
+        setEditingScript(false);
+    }, [selectedSession?.id]);
+
     // Build public URL
     const publicUrl = useMemo(() => {
         if (!selectedSession) return '';
@@ -862,13 +891,14 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
         return map;
     }, [allTimeSlots, liveSlots]);
 
-    const handleCreateSession = async (draft: Pick<OutreachSession, 'name' | 'filters'>) => {
+    const handleCreateSession = async (draft: Pick<OutreachSession, 'name' | 'filters' | 'customScript'>) => {
         const id = `os_${church.id}_${Date.now()}`;
         const eligible = buildEligiblePeople(people, groups, draft.filters, allTimeSlots);
         const memberDirectory = buildMemberDirectory(people);
         const newSession: OutreachSession = {
             id, churchId: church.id,
             name: draft.name, filters: draft.filters,
+            customScript: draft.customScript,
             eligiblePeople: eligible,
             memberDirectory,
             batchSize: 3, // default
@@ -878,6 +908,12 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
         setSessions(prev => [newSession, ...prev]);
         setSelectedId(id);
         setIsModalOpen(false);
+    };
+
+    const handleUpdateScript = async (session: OutreachSession, newScript: string) => {
+        const customScript = newScript.trim() || undefined;
+        await firestore.updateOutreachSession(session.id, { customScript });
+        setSessions(prev => prev.map(s => s.id === session.id ? { ...s, customScript } : s));
     };
 
     const handleRefreshQueue = async () => {
@@ -1517,6 +1553,66 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                     <div className="mt-4 bg-amber-400/20 border border-amber-300/30 rounded-xl px-4 py-3 text-xs font-bold text-amber-100 flex items-center gap-2">
                                         <Shield size={14} /> This session is paused. Volunteers who visit the link will see a &ldquo;Session Paused&rdquo; message.
                                     </div>
+                                )}
+                            </div>
+
+                            {/* Recommended Call Script Editor Card for Admins */}
+                            <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-100 dark:border-slate-800 shadow-xs">
+                                <div className="flex items-center justify-between mb-3">
+                                    <div className="flex items-center gap-2">
+                                        <FileText size={16} className="text-indigo-500" />
+                                        <h4 className="text-xs font-black uppercase tracking-wide text-slate-800 dark:text-white">Recommended Call Script & Talking Points</h4>
+                                    </div>
+                                    {!editingScript ? (
+                                        <button
+                                            onClick={() => setEditingScript(true)}
+                                            className="text-[10px] font-bold uppercase tracking-wide text-indigo-600 dark:text-indigo-400 hover:underline"
+                                        >
+                                            {selectedSession.customScript ? 'Edit Script' : '+ Customize Script'}
+                                        </button>
+                                    ) : (
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={() => {
+                                                    setScriptText(selectedSession.customScript ?? '');
+                                                    setEditingScript(false);
+                                                }}
+                                                className="text-[10px] font-bold uppercase tracking-wide text-slate-400 hover:text-slate-600"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    handleUpdateScript(selectedSession, scriptText);
+                                                    setEditingScript(false);
+                                                }}
+                                                className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide shadow-xs"
+                                            >
+                                                Save Script
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {editingScript ? (
+                                    <div>
+                                        <textarea
+                                            value={scriptText}
+                                            onChange={e => setScriptText(e.target.value)}
+                                            placeholder="Enter custom call script for volunteers (e.g. Hi! This is a volunteer from church checking in on you to see how you are doing...)"
+                                            rows={3}
+                                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none dark:text-white leading-relaxed resize-none"
+                                        />
+                                        <p className="text-[10px] text-slate-400 mt-1">
+                                            This custom script will be shown on all volunteer calling screens for this session.
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-medium bg-slate-50 dark:bg-slate-800/60 p-3.5 rounded-xl border border-slate-100 dark:border-slate-800">
+                                        {selectedSession.customScript || (
+                                            <span className="text-slate-400 italic">Using standard default warm greeting call script. Click "+ Customize Script" to customize what callers see on their phone.</span>
+                                        )}
+                                    </p>
                                 )}
                             </div>
 
