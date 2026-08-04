@@ -4,7 +4,7 @@ import { firestore } from '../services/firestoreService';
 import {
     Phone, Mail, CheckCircle2,
     Loader2, Heart, Users, ChevronRight,
-    Search, Edit3, Send
+    Search, Edit3, Send, AlertTriangle, Award, TrendingUp
 } from 'lucide-react';
 
 const VOLUNTEER_STORAGE_KEY = (churchId: string) => `volunteer_history_phone_${churchId}`;
@@ -77,6 +77,7 @@ export const PublicVolunteerHistoryView: React.FC<{ churchId: string }> = ({ chu
     const [expandedPersonId, setExpandedPersonId] = useState<string | null>(null);
     const [noteText, setNoteText] = useState('');
     const [noteCategory, setNoteCategory] = useState('General Check-in');
+    const [isUrgent, setIsUrgent] = useState(false);
     const [saving, setSaving] = useState(false);
     const [savedPersonId, setSavedPersonId] = useState<string | null>(null);
 
@@ -112,6 +113,7 @@ export const PublicVolunteerHistoryView: React.FC<{ churchId: string }> = ({ chu
                     personName,
                     followUpNote: noteText.trim(),
                     category: noteCategory,
+                    isUrgent,
                     volunteerPhone,
                     volunteerName: volunteerName || ''
                 }),
@@ -130,9 +132,12 @@ export const PublicVolunteerHistoryView: React.FC<{ churchId: string }> = ({ chu
                     const idx = updated.findIndex(s => s.id === latestSlot.id);
                     if (idx !== -1) {
                         const newSlot = { ...updated[idx] };
-                        const formattedNote = noteCategory && noteCategory !== 'General Check-in' 
+                        let formattedNote = noteCategory && noteCategory !== 'General Check-in' 
                             ? `[${noteCategory}] ${noteText.trim()}`
                             : noteText.trim();
+                        if (isUrgent) {
+                            formattedNote = `🚨 URGENT: ${formattedNote}`;
+                        }
                         newSlot.followUpNotes = [...(newSlot.followUpNotes || []), { note: formattedNote, addedAt: Date.now() }];
                         updated[idx] = newSlot;
                     }
@@ -142,6 +147,7 @@ export const PublicVolunteerHistoryView: React.FC<{ churchId: string }> = ({ chu
             
             setNoteText('');
             setNoteCategory('General Check-in');
+            setIsUrgent(false);
             setExpandedPersonId(null);
             setSavedPersonId(personId);
             setTimeout(() => setSavedPersonId(null), 3000);
@@ -212,6 +218,13 @@ export const PublicVolunteerHistoryView: React.FC<{ churchId: string }> = ({ chu
         return result;
     }, [groupedContacts, searchQuery, filterHasNotes, filterStatus]);
 
+    const stats = useMemo(() => {
+        const totalPeople = groupedContacts.length;
+        const reachedCount = groupedContacts.filter(c => c.slots.some(s => s.status === 'contacted')).length;
+        const totalNotes = slots.reduce((acc, s) => acc + (s.notes ? 1 : 0) + (s.followUpNotes?.length || 0), 0);
+        return { totalPeople, reachedCount, totalNotes };
+    }, [groupedContacts, slots]);
+
     return (
         <Shell>
             {viewState === 'loading' && (
@@ -227,6 +240,27 @@ export const PublicVolunteerHistoryView: React.FC<{ churchId: string }> = ({ chu
             
             {viewState === 'list' && (
                 <div className="space-y-4">
+                    {/* Volunteer Impact Summary Banner */}
+                    <div className="bg-gradient-to-r from-indigo-600 to-indigo-800 rounded-[2rem] shadow-xl p-6 text-white flex items-center justify-between">
+                        <div>
+                            <p className="text-[11px] font-bold uppercase tracking-wider text-indigo-200 flex items-center gap-1.5 mb-1">
+                                <Award size={14} /> Volunteer Impact Summary
+                            </p>
+                            <h3 className="text-xl font-black">Thank you for serving!</h3>
+                        </div>
+                        <div className="flex gap-4 text-right">
+                            <div>
+                                <p className="text-2xl font-black">{stats.reachedCount}</p>
+                                <p className="text-[10px] text-indigo-200 uppercase font-bold tracking-wide">Reached</p>
+                            </div>
+                            <div className="w-px bg-indigo-500/40" />
+                            <div>
+                                <p className="text-2xl font-black">{stats.totalNotes}</p>
+                                <p className="text-[10px] text-indigo-200 uppercase font-bold tracking-wide">Notes</p>
+                            </div>
+                        </div>
+                    </div>
+
                     <div className="bg-white rounded-[2rem] shadow-xl border border-slate-100 p-6">
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
                             <div className="flex items-center gap-3">
@@ -406,6 +440,22 @@ export const PublicVolunteerHistoryView: React.FC<{ churchId: string }> = ({ chu
                                                     ))}
                                                 </div>
                                             </div>
+
+                                            {/* Pastoral Escalation Checkbox */}
+                                            <label className="flex items-center gap-2.5 bg-rose-50 border border-rose-200/80 p-3 rounded-xl cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isUrgent}
+                                                    onChange={e => setIsUrgent(e.target.checked)}
+                                                    className="w-4 h-4 text-rose-600 border-rose-300 rounded focus:ring-rose-500"
+                                                />
+                                                <AlertTriangle size={16} className="text-rose-600 shrink-0" />
+                                                <div>
+                                                    <p className="text-xs font-bold text-rose-800 leading-none">Flag for Pastoral Staff</p>
+                                                    <p className="text-[10px] text-rose-600 font-medium mt-0.5">Request urgent pastoral visit or staff review</p>
+                                                </div>
+                                            </label>
+
                                             <textarea
                                                 value={noteText}
                                                 onChange={e => setNoteText(e.target.value)}

@@ -717,7 +717,7 @@ async function startServer() {
     });
 
     app.post('/api/outreach/volunteer-note', express.json(), async (req: any, res: any) => {
-      const { churchId, personId, personName, followUpNote, volunteerPhone, volunteerName, category } = req.body || {};
+      const { churchId, personId, personName, followUpNote, volunteerPhone, volunteerName, category, isUrgent } = req.body || {};
       if (!churchId || !personId || !followUpNote?.trim() || !volunteerPhone) {
         return res.status(400).json({ error: 'Missing required fields' });
       }
@@ -728,9 +728,10 @@ async function startServer() {
           month: 'short', day: 'numeric', year: 'numeric',
           hour: 'numeric', minute: '2-digit', hour12: true, timeZoneName: 'short'
         });
+        const urgentBanner = isUrgent ? `🚨 URGENT: PASTORAL STAFF ATTENTION REQUESTED\n` : '';
         const noteHeader = category ? `📝 Volunteer Note (${category})` : `📝 Volunteer History Note`;
         const noteContent = [
-          noteHeader,
+          urgentBanner + noteHeader,
           `Added by: ${volunteerName || volunteerPhone}`,
           `Date: ${dateStr}`,
           '',
@@ -753,6 +754,9 @@ async function startServer() {
         if (category) {
           tags.push(category.toLowerCase().replace(/\s+/g, '-'));
         }
+        if (isUrgent) {
+          tags.push('urgent', 'pastoral-escalation');
+        }
 
         await db.collection('pastoral_notes').doc(noteId).set({
           id: noteId,
@@ -762,9 +766,10 @@ async function startServer() {
           authorId:   'volunteer_system',
           authorName: volunteerName || volunteerPhone,
           date:       todayIso,
-          type:       category || 'Note',
+          type:       isUrgent ? 'Urgent Pastoral Note' : (category || 'Note'),
           content:    noteContent,
           isCompleted: true,
+          isUrgent:   !!isUrgent,
           tags,
         }, { merge: true });
 
