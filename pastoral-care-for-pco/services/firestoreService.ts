@@ -27,7 +27,8 @@ import {
     PcoRegistrationAttendee, PcoRegistrationCampus, PcoCampus,
     Poll, PollResponse, RiskChangeRecord, ChurchNote, StatusChangeRecord,
     WeatherRecord, PcoCheckInRecord, CareFollowUpLog,
-    OutreachSession, OutreachSlot, DigitalBulletin
+    OutreachSession, OutreachSlot, DigitalBulletin,
+    GroupCareSession, GroupCareSlot
 } from '../types';
 import { calculateServicesAnalytics, calculateAggregatedStats } from './analyticsService';
 
@@ -1726,6 +1727,24 @@ class FirestoreService {
   }
 
   /**
+   * Fetch all slots across every session for a church.
+   * Used for comprehensive outreach reporting.
+   */
+  async getAllChurchOutreachSlots(churchId: string): Promise<OutreachSlot[]> {
+    try {
+      const q = query(
+        collection(db, 'outreach_slots'),
+        where('churchId', '==', churchId)
+      );
+      const snap = await getDocs(q);
+      return snap.docs.map(d => d.data() as OutreachSlot);
+    } catch (e) {
+      console.warn('getAllChurchOutreachSlots error:', e);
+      return this.getChurchOutreachSlots(churchId);
+    }
+  }
+
+  /**
    * Fetch all completed slots for a specific volunteer (by phone) within a session.
    * Returns only 'contacted' and 'no-answer' slots — used by the follow-up view.
    */
@@ -1782,6 +1801,301 @@ class FirestoreService {
     } catch (e) {
       console.warn('getPersonOutreachSlots error:', e);
       return [];
+    }
+  }
+
+  // ─── Group Care ──────────────────────────────────────────────────────────────
+
+  async createGroupCareSession(session: GroupCareSession): Promise<void> {
+    try {
+      await setDoc(doc(db, 'group_care_sessions', session.id), session, { merge: true });
+    } catch (e) {
+      this.handleFirestoreError(e);
+      throw e;
+    }
+  }
+
+  async updateGroupCareSession(sessionId: string, updates: Partial<GroupCareSession>): Promise<void> {
+    try {
+      await updateDoc(doc(db, 'group_care_sessions', sessionId), updates as any);
+    } catch (e) {
+      this.handleFirestoreError(e);
+      throw e;
+    }
+  }
+
+  async deleteGroupCareSession(sessionId: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, 'group_care_sessions', sessionId));
+    } catch (e) {
+      this.handleFirestoreError(e);
+      throw e;
+    }
+  }
+
+  async closeGroupCareSession(sessionId: string, closedBy: string): Promise<void> {
+    try {
+      await updateDoc(doc(db, 'group_care_sessions', sessionId), {
+        isActive: false,
+        closedAt: Date.now(),
+        closedBy,
+      });
+
+      const pendingQ = query(
+        collection(db, 'group_care_slots'),
+        where('sessionId', '==', sessionId),
+        where('status', '==', 'pending')
+      );
+      const pendingSnap = await getDocs(pendingQ);
+      if (!pendingSnap.empty) {
+        const batch = writeBatch(db);
+        const now = Date.now();
+        pendingSnap.docs.forEach(d =>
+          batch.update(d.ref, { status: 'released', completedAt: now })
+        );
+        await batch.commit();
+      }
+    } catch (e) {
+      this.handleFirestoreError(e);
+      throw e;
+    }
+  }
+
+  async reopenGroupCareSession(sessionId: string): Promise<void> {
+    try {
+      await updateDoc(doc(db, 'group_care_sessions', sessionId), {
+        isActive: true,
+        closedAt: null,
+        closedBy: null,
+      });
+
+      const noAnswerQ = query(
+        collection(db, 'group_care_slots'),
+        where('sessionId', '==', sessionId),
+        where('status', '==', 'no-answer')
+      );
+      const noAnswerSnap = await getDocs(noAnswerQ);
+      if (!noAnswerSnap.empty) {
+        const batch = writeBatch(db);
+        noAnswerSnap.docs.forEach(d =>
+          batch.update(d.ref, { noAnswerUntil: null })
+        );
+        await batch.commit();
+      }
+    } catch (e) {
+      this.handleFirestoreError(e);
+      throw e;
+    }
+  }
+
+  async getGroupCareSessions(churchId: string): Promise<GroupCareSession[]> {
+    try {
+      const q = query(
+        collection(db, 'group_care_sessions'),
+        where('churchId', '==', churchId)
+      );
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(d => d.data() as GroupCareSession);
+    } catch (e) {
+      console.warn('getGroupCareSessions error:', e);
+      return [];
+    }
+  }
+
+  async getGroupCareSession(sessionId: string): Promise<GroupCareSession | null> {
+    try {
+      const snap = await getDoc(doc(db, 'group_care_sessions', sessionId));
+      return snap.exists() ? (snap.data() as GroupCareSession) : null;
+    } catch (e) {
+      console.warn('getGroupCareSession error:', e);
+      return null;
+    }
+  }
+
+  subscribeToGroupCareSlots(
+    sessionId: string,
+    callback: (slots: GroupCareSlot[]) => void
+  ): () => void {
+    const q = query(
+      collection(db, 'group_care_slots'),
+      where('sessionId', '==', sessionId)
+    );
+    return onSnapshot(q, snap => {
+      callback(snap.docs.map(d => d.data() as GroupCareSlot));
+    });
+  }
+
+  subscribeToActiveGroupCareSlot(
+    sessionId: string,
+    volunteerPhone: string,
+    callback: (slot: GroupCareSlot | null) => void
+  ): () => void {
+    const q = query(
+      collection(db, 'group_care_slots'),
+      where('sessionId', '==', sessionId),
+      where('volunteerPhone', '==', volunteerPhone),
+      where('status', '==', 'pending')
+    );
+    return onSnapshot(q, snap => {
+      callback(snap.empty ? null : (snap.docs[0].data() as GroupCareSlot));
+    });
+  }
+
+  async getGroupCareSlots(sessionId: string): Promise<GroupCareSlot[]> {
+    try {
+      const q = query(
+        collection(db, 'group_care_slots'),
+        where('sessionId', '==', sessionId)
+      );
+      const snap = await getDocs(q);
+      return snap.docs.map(d => d.data() as GroupCareSlot);
+    } catch (e) {
+      console.warn('getGroupCareSlots error:', e);
+      return [];
+    }
+  }
+
+  async getChurchGroupCareSlots(churchId: string): Promise<GroupCareSlot[]> {
+    try {
+      const q = query(
+        collection(db, 'group_care_slots'),
+        where('churchId', '==', churchId)
+      );
+      const snap = await getDocs(q);
+      return snap.docs.map(d => d.data() as GroupCareSlot);
+    } catch (e) {
+      console.warn('getChurchGroupCareSlots error:', e);
+      return [];
+    }
+  }
+
+  async claimGroupCareBatch(
+    session: GroupCareSession,
+    volunteerPhone: string,
+    eligiblePeople: { id: string; name: string; phone?: string | null; email?: string | null; groupId: string; groupName: string }[],
+    batchSize: number,
+    volunteerName?: string | null
+  ): Promise<GroupCareSlot[]> {
+    try {
+      const now = Date.now();
+      const slotsRef = collection(db, 'group_care_slots');
+
+      const q = query(slotsRef, where('sessionId', '==', session.id));
+      const snap = await getDocs(q);
+      const existing = snap.docs.map(d => d.data() as GroupCareSlot);
+
+      const blocked = new Set<string>();
+      const countMap = new Map<string, number>();
+
+      for (const slot of existing) {
+        countMap.set(slot.assignedPersonId, (countMap.get(slot.assignedPersonId) || 0) + 1);
+
+        if (slot.status === 'pending' || slot.status === 'contacted') {
+          blocked.add(slot.assignedPersonId);
+        } else if (slot.status === 'no-answer') {
+          if (slot.noAnswerUntil && slot.noAnswerUntil > now) {
+            blocked.add(slot.assignedPersonId);
+          }
+        }
+      }
+
+      const candidateList = eligiblePeople.filter(p => !blocked.has(p.id));
+      const candidateCount = Math.min(candidateList.length, batchSize * 2);
+      const candidates = candidateList.slice(0, candidateCount);
+
+      const newSlots = await runTransaction(db, async (txn) => {
+        const docRefs = candidates.map(person => {
+          const attemptIndex = countMap.get(person.id) || 0;
+          return {
+            person,
+            attemptIndex,
+            ref: doc(db, 'group_care_slots', `slot_${session.id}_${person.id}_${attemptIndex}`)
+          };
+        });
+
+        const snaps = await Promise.all(docRefs.map(item => txn.get(item.ref)));
+        const created: GroupCareSlot[] = [];
+        const localBlocked = new Set<string>(blocked);
+
+        for (let i = 0; i < docRefs.length; i++) {
+          if (created.length >= batchSize) break;
+          const { person, ref, attemptIndex } = docRefs[i];
+          const snap = snaps[i];
+
+          if (localBlocked.has(person.id)) continue;
+
+          if (snap.exists()) {
+            const slotData = snap.data() as GroupCareSlot;
+            if (slotData.status === 'pending' || slotData.status === 'contacted') {
+              localBlocked.add(person.id);
+              continue;
+            } else if (slotData.status === 'no-answer') {
+              if (slotData.noAnswerUntil && slotData.noAnswerUntil > now) {
+                localBlocked.add(person.id);
+                continue;
+              }
+            }
+          }
+
+          const slotId = `slot_${session.id}_${person.id}_${attemptIndex}`;
+          const newSlot: GroupCareSlot = {
+            id: slotId,
+            sessionId: session.id,
+            churchId: session.churchId,
+            groupId: person.groupId,
+            groupName: person.groupName,
+            volunteerPhone,
+            volunteerName: volunteerName ?? null,
+            assignedPersonId: person.id,
+            assignedPersonName: person.name,
+            assignedPersonPhone: person.phone ?? null,
+            assignedPersonEmail: person.email ?? null,
+            assignedAt: now + created.length,
+            status: 'pending',
+            notes: '',
+            completedAt: null,
+            noAnswerUntil: null,
+          };
+
+          txn.set(ref, newSlot);
+          localBlocked.add(person.id);
+          created.push(newSlot);
+        }
+
+        return created;
+      });
+
+      return newSlots;
+    } catch (e) {
+      console.error('claimGroupCareBatch error:', e);
+      return [];
+    }
+  }
+
+  async releasePendingGroupCareSlots(sessionId: string, volunteerPhone: string): Promise<void> {
+    try {
+      const q = query(
+        collection(db, 'group_care_slots'),
+        where('sessionId', '==', sessionId),
+        where('volunteerPhone', '==', volunteerPhone),
+        where('status', '==', 'pending')
+      );
+      const snap = await getDocs(q);
+      if (snap.empty) return;
+      const batch = writeBatch(db);
+      snap.docs.forEach(d => batch.update(d.ref, { status: 'released', completedAt: Date.now() }));
+      await batch.commit();
+    } catch (e) {
+      console.warn('releasePendingGroupCareSlots error:', e);
+    }
+  }
+
+  async updateGroupCareSlot(slotId: string, updates: Partial<GroupCareSlot>): Promise<void> {
+    try {
+      await updateDoc(doc(db, 'group_care_slots', slotId), updates as any);
+    } catch (e) {
+      this.handleFirestoreError(e);
+      throw e;
     }
   }
 

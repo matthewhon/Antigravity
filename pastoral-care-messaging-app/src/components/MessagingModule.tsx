@@ -503,13 +503,7 @@ const CampaignComposer: React.FC<ComposerProps> = ({
             const suggestion = await getSmsAiSuggestion(local.body);
             setAiSuggestion(suggestion);
         } catch {
-            setAiSuggestion('Unable to get AI suggestion. Please try again.');
-        } finally {
-            setAiLoading(false);
-        }
-    };
- 
-    useEffect(() => {
+            setAiSuggestion('Unable to get AI s    useEffect(() => {
         setPcoError(null);
         setLoadingLists(true);
         pcoService.getPeopleLists(churchId).then((raw: any[]) => {
@@ -530,15 +524,15 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                 accessMap: church?.broadcastPermissions?.allowedAccess || {},
                 timestamp: new Date().toISOString()
             }).catch(() => {});
- 
+
             setLoadingLists(false);
         }).catch((err) => {
             console.error('Failed to load PCO lists', err);
             setPcoError(err.message || 'Failed to load Planning Center lists');
             setLoadingLists(false);
         });
-    }, [churchId, church, currentUser]);
- 
+    }, [churchId, currentUser?.id, church?.pcoConnected]);
+
     useEffect(() => {
         if (toTab === 'groups' && pcoGroups.length === 0) {
             setPcoError(null);
@@ -554,6 +548,9 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                 console.error('Failed to load PCO groups', err);
                 setPcoError(err.message || 'Failed to load Planning Center groups');
                 setLoadingGroups(false);
+            });
+        }
+    }, [toTab, churchId, pcoGroups.length, currentUser?.id, church?.pcoConnected]);oups(false);
             });
         }
     }, [toTab, churchId, pcoGroups.length, church, currentUser]);
@@ -713,12 +710,14 @@ const CampaignComposer: React.FC<ComposerProps> = ({
                         </div>
 
                         {pcoError ? (
-                            <div className="flex items-start gap-3 p-4 bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800/50 rounded-2xl text-rose-800 dark:text-rose-200">
-                                <AlertTriangle size={18} className="shrink-0 mt-0.5 text-rose-500" />
+                            <div className={`flex items-start gap-3 p-4 border rounded-2xl ${pcoError.toLowerCase().includes('rate limit') ? 'bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800/50 text-amber-800 dark:text-amber-200' : 'bg-rose-50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-800/50 text-rose-800 dark:text-rose-200'}`}>
+                                <AlertTriangle size={18} className={`shrink-0 mt-0.5 ${pcoError.toLowerCase().includes('rate limit') ? 'text-amber-500' : 'text-rose-500'}`} />
                                 <div className="flex-1 text-xs space-y-1">
-                                    <p className="font-bold">Planning Center Connection Failed</p>
+                                    <p className="font-bold">{pcoError.toLowerCase().includes('rate limit') ? 'Planning Center Rate Limit Reached' : 'Planning Center Connection Failed'}</p>
                                     <p className="opacity-90">{pcoError}</p>
-                                    <p className="text-[10px] text-rose-600/80 dark:text-rose-400/80 mt-1.5 font-medium">Please reconnect your Planning Center account in Settings.</p>
+                                    {!pcoError.toLowerCase().includes('rate limit') && (
+                                        <p className="text-[10px] text-rose-600/80 dark:text-rose-400/80 mt-1.5 font-medium">Please reconnect your Planning Center account in Settings.</p>
+                                    )}
                                 </div>
                             </div>
                         ) : toTab === 'lists' ? (
@@ -1700,12 +1699,14 @@ const NewMessageComposer: React.FC<{
                         <div>
                             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Select Planning Center List</label>
                             {pcoError ? (
-                                <div className="flex items-start gap-3 p-4 bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800/50 rounded-2xl text-rose-800 dark:text-rose-200">
-                                    <AlertTriangle size={18} className="shrink-0 mt-0.5 text-rose-500" />
+                                <div className={`flex items-start gap-3 p-4 border rounded-2xl ${pcoError.toLowerCase().includes('rate limit') ? 'bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800/50 text-amber-800 dark:text-amber-200' : 'bg-rose-50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-800/50 text-rose-800 dark:text-rose-200'}`}>
+                                    <AlertTriangle size={18} className={`shrink-0 mt-0.5 ${pcoError.toLowerCase().includes('rate limit') ? 'text-amber-500' : 'text-rose-500'}`} />
                                     <div className="flex-1 text-xs space-y-1">
-                                        <p className="font-bold">Planning Center Connection Failed</p>
+                                        <p className="font-bold">{pcoError.toLowerCase().includes('rate limit') ? 'Planning Center Rate Limit Reached' : 'Planning Center Connection Failed'}</p>
                                         <p className="opacity-90">{pcoError}</p>
-                                        <p className="text-[10px] text-rose-600/80 dark:text-rose-400/80 mt-1.5 font-medium">Please reconnect your Planning Center account in Settings.</p>
+                                        {!pcoError.toLowerCase().includes('rate limit') && (
+                                            <p className="text-[10px] text-rose-600/80 dark:text-rose-400/80 mt-1.5 font-medium">Please reconnect your Planning Center account in Settings.</p>
+                                        )}
                                     </div>
                                 </div>
                             ) : selectedList ? (
@@ -1750,12 +1751,14 @@ const NewMessageComposer: React.FC<{
                         <div>
                             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Select Planning Center Group</label>
                             {pcoError ? (
-                                <div className="flex items-start gap-3 p-4 bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800/50 rounded-2xl text-rose-800 dark:text-rose-200">
-                                    <AlertTriangle size={18} className="shrink-0 mt-0.5 text-rose-500" />
+                                <div className={`flex items-start gap-3 p-4 border rounded-2xl ${pcoError.toLowerCase().includes('rate limit') ? 'bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800/50 text-amber-800 dark:text-amber-200' : 'bg-rose-50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-800/50 text-rose-800 dark:text-rose-200'}`}>
+                                    <AlertTriangle size={18} className={`shrink-0 mt-0.5 ${pcoError.toLowerCase().includes('rate limit') ? 'text-amber-500' : 'text-rose-500'}`} />
                                     <div className="flex-1 text-xs space-y-1">
-                                        <p className="font-bold">Planning Center Connection Failed</p>
+                                        <p className="font-bold">{pcoError.toLowerCase().includes('rate limit') ? 'Planning Center Rate Limit Reached' : 'Planning Center Connection Failed'}</p>
                                         <p className="opacity-90">{pcoError}</p>
-                                        <p className="text-[10px] text-rose-600/80 dark:text-rose-400/80 mt-1.5 font-medium">Please reconnect your Planning Center account in Settings.</p>
+                                        {!pcoError.toLowerCase().includes('rate limit') && (
+                                            <p className="text-[10px] text-rose-600/80 dark:text-rose-400/80 mt-1.5 font-medium">Please reconnect your Planning Center account in Settings.</p>
+                                        )}
                                     </div>
                                 </div>
                             ) : selectedGroup ? (

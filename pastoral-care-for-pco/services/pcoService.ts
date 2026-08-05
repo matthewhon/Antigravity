@@ -90,7 +90,38 @@ const MOCK_MEMBERS = [
 
 const getProxyUrl = () => '/pco/proxy';
 
-const pcoFetch = async (churchId: string, url: string, method = 'GET', body: any = null): Promise<any> => {
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+interface CacheEntry<T> {
+    data: T;
+    timestamp: number;
+}
+const pcoCache: Record<string, CacheEntry<any>> = {};
+const pendingPcoRequests: Record<string, Promise<any>> = {};
+const CACHE_TTL_MS = 60 * 1000; // 60s cache for lists/groups
+
+async function fetchWithPcoCache<T>(key: string, fetcher: () => Promise<T>, ttlMs = CACHE_TTL_MS): Promise<T> {
+    const cached = pcoCache[key];
+    if (cached && (Date.now() - cached.timestamp < ttlMs)) {
+        return cached.data;
+    }
+    if (pendingPcoRequests[key]) {
+        return pendingPcoRequests[key];
+    }
+    const promise = (async () => {
+        try {
+            const data = await fetcher();
+            pcoCache[key] = { data, timestamp: Date.now() };
+            return data;
+        } finally {
+            delete pendingPcoRequests[key];
+        }
+    })();
+    pendingPcoRequests[key] = promise;
+    return promise;
+}
+
+const pcoFetch = async (churchId: string, url: string, method = 'GET', body: any = null, retriesLeft = 2): Promise<any> => {
     const response = await fetch(getProxyUrl(), {
         method: 'POST',
         headers: { 
@@ -104,8 +135,13 @@ const pcoFetch = async (churchId: string, url: string, method = 'GET', body: any
         try {
             const errBody = await response.json();
 
-            // 429 — PCO rate limit. Give a user-friendly message.
+            // 429 — PCO rate limit. Retry automatically before throwing.
             if (response.status === 429 || errBody?.pcoStatus === 429) {
+                if (retriesLeft > 0) {
+                    const waitSec = errBody?.retryAfter ? Math.min(errBody.retryAfter, 5) : (3 - retriesLeft) * 1.5;
+                    await sleep(waitSec * 1000);
+                    return await pcoFetch(churchId, url, method, body, retriesLeft - 1);
+                }
                 const wait = errBody?.retryAfter ? ` (wait ~${errBody.retryAfter}s)` : '';
                 throw new Error(`Planning Center rate limit reached${wait}. Please wait a moment before trying again.`);
             }
@@ -149,8 +185,10 @@ export const pcoService = {
         if (isSimulated(churchId)) {
             return MOCK_PCO_GROUPS;
         }
-        const data = await pcoFetch(churchId, `https://api.planningcenteronline.com/groups/v2/groups?per_page=100`);
-        return safeData(data);
+        return fetchWithPcoCache(`groups_${churchId}`, async () => {
+            const data = await pcoFetch(churchId, `https://api.planningcenteronline.com/groups/v2/groups?per_page=100`);
+            return safeData(data);
+        });
     },
     async getForms(churchId: string): Promise<any[]> {
         if (isSimulated(churchId)) {
@@ -295,12 +333,10 @@ export const pcoService = {
         if (isSimulated(churchId)) {
             return MOCK_PCO_LISTS;
         }
-        try {
+        return fetchWithPcoCache(`people_lists_${churchId}`, async () => {
             const data = await pcoFetch(churchId, `https://api.planningcenteronline.com/people/v2/lists?per_page=100&order=name`);
             return safeData(data);
-        } catch {
-            return [];
-        }
+        });
     },
 
     /**

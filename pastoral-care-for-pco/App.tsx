@@ -80,6 +80,7 @@ import { PublicNoteView } from './components/PublicNoteView';
 import { PublicFormView } from './components/PublicFormView';
 import { PublicCalendarView } from './components/PublicCalendarView';
 import { PublicContactView } from './components/PublicContactView';
+import { PublicGroupCareView } from './components/PublicGroupCareView';
 import { PublicVolunteerHistoryView } from './components/PublicVolunteerHistoryView';
 import { PublicBulletinView } from './components/PublicBulletinView';
 import { ToolsView } from './components/ToolsView';
@@ -130,6 +131,7 @@ const App: React.FC = () => {
      if (path.startsWith('/care/community')) return 'pastoral-community';
      if (path.startsWith('/care/calendar')) return 'pastoral-calendar';
      if (path.startsWith('/care/contact')) return 'pastoral-contact';
+     if (path.startsWith('/care/group-care')) return 'pastoral-group-care';
      if (path.startsWith('/care/care')) return 'pastoral-care';
      if (path.startsWith('/care/reports')) return 'pastoral-reports';
      if (path.startsWith('/care')) return 'pastoral';
@@ -580,7 +582,7 @@ const App: React.FC = () => {
       // ── Starter plan gate: block Calling (pastoral-contact), Polls, Workflows, Forms, Notes ──
       // (SMS routes remain accessible so ToolsView can show the upgrade prompt)
       if (isStarterPlan) {
-          if (v === 'pastoral-contact') return false;
+          if (v === 'pastoral-contact' || v === 'pastoral-group-care') return false;
           if (v === 'tools-polls') return false;
           if (v === 'tools-workflows') return false;
           if (v === 'tools-forms') return false;
@@ -589,7 +591,7 @@ const App: React.FC = () => {
       }
       
       // ── pastoral-contact role check (non-Starter) ──
-      if (v === 'pastoral-contact') return user.roles.includes('Pastor') || user.roles.includes('Pastoral Care');
+      if (v === 'pastoral-contact' || v === 'pastoral-group-care') return user.roles.includes('Pastor') || user.roles.includes('Pastoral Care') || user.roles.includes('Groups');
       
       const roleMap: Record<string, string> = {
           'people': 'People',
@@ -673,6 +675,7 @@ const App: React.FC = () => {
               'pastoral-care': '/care/care',
               'pastoral-calendar': '/care/calendar',
               'pastoral-contact': '/care/contact',
+              'pastoral-group-care': '/care/group-care',
               'pastoral-reports': '/care/reports',
               'metrics': '/metrics',
               'metrics-input': '/metrics/input',
@@ -1017,6 +1020,12 @@ const App: React.FC = () => {
   const contactMatch = window.location.pathname.match(/^\/contact\/([^/]+)$/);
   if (contactMatch) {
     return <PublicContactView sessionId={contactMatch[1]} />;
+  }
+
+  // ─── Public Group Care Route (no auth required) ──────────────────────────────
+  const groupCareMatch = window.location.pathname.match(/^\/group-care\/([^/]+)$/);
+  if (groupCareMatch) {
+    return <PublicGroupCareView sessionId={groupCareMatch[1]} />;
   }
 
   // ─── Public Volunteer History Route (no auth required) ───────────────────────

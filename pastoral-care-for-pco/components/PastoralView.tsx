@@ -1845,6 +1845,7 @@ export const PastoralView: React.FC<PastoralViewProps> = ({
               notes={notes}
               followUpLog={followUpLog}
               riskSettings={church.riskSettings}
+              church={church}
               onAddNote={handleAddNoteForPerson}
               onMarkFollowedUp={handleMarkFollowedUp}
               onDismiss={handleDismiss}

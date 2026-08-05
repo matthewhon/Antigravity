@@ -226,7 +226,10 @@ const Layout: React.FC<LayoutProps> = ({
           { view: 'pastoral-care',       icon: HeartHandshake, label: 'Care'      },
           { view: 'pastoral-calendar',   icon: Calendar,      label: 'Calendar'   },
           // Calling (Contact) is hidden for Starter plan subscribers
-          ...(isStarter ? [] : [{ view: 'pastoral-contact', icon: Phone, label: 'Contact' }]),
+          ...(isStarter ? [] : [
+            { view: 'pastoral-contact', icon: Phone, label: 'Contact' },
+            { view: 'pastoral-group-care', icon: Users, label: 'Group Care' }
+          ]),
           { view: 'pastoral-reports',    icon: ClipboardList, label: 'Reports'    },
         ],
       });

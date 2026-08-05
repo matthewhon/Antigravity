@@ -2077,6 +2077,85 @@ export interface OutreachSlot {
     followUpNotes?: { note: string; addedAt: number }[];
 }
 
+// ─── Group Care ───────────────────────────────────────────────────────────────
+
+/**
+ * A saved group care campaign created by an admin or group coordinator.
+ * Targeted at specific PCO Groups so group leaders can reach out to members.
+ */
+export interface GroupCareSession {
+    id: string;
+    churchId: string;
+    /** Human-readable campaign name, e.g. "Fall Small Group Check-in" */
+    name: string;
+    /** Targeted PCO Group IDs */
+    groupIds: string[];
+    /** Denormalized summary of target groups */
+    groupDetails?: { id: string; name: string; leaderIds: string[] }[];
+    /**
+     * Denormalized list of eligible group members for this session.
+     * Stored in Firestore so unauthenticated leaders can read it.
+     */
+    eligiblePeople?: {
+        id: string;
+        name: string;
+        phone?: string | null;
+        email?: string | null;
+        groupId: string;
+        groupName: string;
+        isLeader?: boolean;
+    }[];
+    /**
+     * Phone-number → leader info lookup for group leaders.
+     * Key is normalized E.164 digits string.
+     */
+    leaderDirectory?: { phone: string; name: string; personId: string; groupIds: string[] }[];
+    /** Persisted stats snapshot */
+    stats?: {
+        contactedCount: number;
+        noAnswerCount: number;
+        pendingCount: number;
+        totalEligible: number;
+        lastUpdatedAt: number;
+    };
+    /** Talking points & call script configured by church admin */
+    customScript?: string;
+    /** How many group members to pre-assign to leader at once (default 3) */
+    batchSize?: number;
+    createdAt: number;
+    createdBy: string;
+    isActive: boolean;
+    closedAt?: number | null;
+    closedBy?: string | null;
+}
+
+/**
+ * A single group leader's contact attempt within a GroupCareSession.
+ */
+export interface GroupCareSlot {
+    id: string;
+    sessionId: string;
+    churchId: string;
+    groupId: string;
+    groupName: string;
+    /** Leader's phone number */
+    volunteerPhone: string;
+    /** Resolved name of the leader */
+    volunteerName?: string | null;
+    /** The group member being contacted */
+    assignedPersonId: string;
+    assignedPersonName: string;
+    assignedPersonPhone?: string | null;
+    assignedPersonEmail?: string | null;
+    assignedAt: number;
+    /** pending | contacted | no-answer | released */
+    status: 'pending' | 'contacted' | 'no-answer' | 'released';
+    notes: string;
+    completedAt?: number | null;
+    noAnswerUntil?: number | null;
+    followUpNotes?: { note: string; addedAt: number }[];
+}
+
 // ─── Digital Bulletin ──────────────────────────────────────────────────────────
 
 export type BulletinStatus = 'draft' | 'published';

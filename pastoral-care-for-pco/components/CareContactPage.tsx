@@ -1160,6 +1160,12 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                 </div>
                 <div className="flex items-center gap-2">
                     <a
+                        href="/care/reports?tab=sessions"
+                        className="flex items-center gap-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:hover:bg-indigo-900/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wide transition-all"
+                    >
+                        <BarChart3 size={14} /> View Reports
+                    </a>
+                    <a
                         href={`/volunteer-history/${church.id}`}
                         target="_blank" rel="noreferrer"
                         className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wide transition-all"
