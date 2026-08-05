@@ -1198,11 +1198,12 @@ const CampaignList: React.FC<{
     onDuplicate: (c: SmsCampaign) => void;
     onCreate: () => void;
 }> = ({ campaigns, isLoading, onOpen, onDelete, onDuplicate, onCreate }) => {
-    const [tab, setTab] = useState<'all' | 'draft' | 'sent'>('all');
-    const filtered = tab === 'all' ? campaigns : campaigns.filter(c => tab === 'sent' ? c.status === 'sent' : (c.status === 'draft' || c.status === 'scheduled'));
+    const [tab, setTab] = useState<'all' | 'draft' | 'scheduled' | 'sent'>('all');
+    const filtered = tab === 'all' ? campaigns : campaigns.filter(c => c.status === tab);
     const counts = {
         all: campaigns.length,
-        draft: campaigns.filter(c => c.status === 'draft' || c.status === 'scheduled').length,
+        draft: campaigns.filter(c => c.status === 'draft').length,
+        scheduled: campaigns.filter(c => c.status === 'scheduled').length,
         sent: campaigns.filter(c => c.status === 'sent').length,
     };
 
@@ -1223,13 +1224,13 @@ const CampaignList: React.FC<{
 
             {/* Tabs */}
             <div className="flex gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl mb-5 w-fit">
-                {(['all', 'draft', 'sent'] as const).map(t => (
+                {(['all', 'draft', 'scheduled', 'sent'] as const).map(t => (
                     <button
                         key={t}
                         onClick={() => setTab(t)}
                         className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-semibold transition ${tab === t ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}
                     >
-                        {t === 'all' ? 'All' : t === 'draft' ? 'Drafts' : 'Sent'}
+                        {t === 'all' ? 'All' : t === 'draft' ? 'Drafts' : t === 'scheduled' ? 'Scheduled' : 'Sent'}
                         <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${tab === t ? 'bg-violet-100 dark:bg-violet-900/40 text-violet-600 dark:text-violet-300' : 'bg-slate-200 dark:bg-slate-700 text-slate-500'}`}>{counts[t]}</span>
                     </button>
                 ))}

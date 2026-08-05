@@ -300,11 +300,12 @@ interface CampaignListViewProps {
 const CampaignListView: React.FC<CampaignListViewProps & { setIsQuickSendOpen: (v: boolean) => void }> = ({
   churchId, church, campaigns, isLoading, onOpen, onPreview, onDelete, onDuplicate, onCreate, setIsQuickSendOpen
 }) => {
-  const [tab, setTab] = React.useState<'all' | 'draft' | 'sent'>('draft');
+  const [tab, setTab] = React.useState<'all' | 'draft' | 'scheduled' | 'sent'>('draft');
   const filtered = tab === 'all' ? campaigns : campaigns.filter(c => c.status === tab);
   const counts = {
     all: campaigns.length,
-    draft: campaigns.filter(c => c.status === 'draft' || c.status === 'scheduled').length,
+    draft: campaigns.filter(c => c.status === 'draft').length,
+    scheduled: campaigns.filter(c => c.status === 'scheduled').length,
     sent: campaigns.filter(c => c.status === 'sent').length,
   };
 
@@ -349,7 +350,7 @@ const CampaignListView: React.FC<CampaignListViewProps & { setIsQuickSendOpen: (
         <div className="flex-1 w-full min-w-0">
           {/* Tabs */}
           <div className="flex gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl mb-5 w-fit">
-            {(['all', 'draft', 'sent'] as const).map(t => (
+            {(['all', 'draft', 'scheduled', 'sent'] as const).map(t => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -359,7 +360,7 @@ const CampaignListView: React.FC<CampaignListViewProps & { setIsQuickSendOpen: (
                 : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
             }`}
           >
-            {t === 'all' ? 'All' : t === 'draft' ? 'Drafts' : 'Sent'}
+            {t === 'all' ? 'All' : t === 'draft' ? 'Drafts' : t === 'scheduled' ? 'Scheduled' : 'Sent'}
             <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${
               tab === t ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-300' : 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
             }`}>{counts[t]}</span>
@@ -376,7 +377,7 @@ const CampaignListView: React.FC<CampaignListViewProps & { setIsQuickSendOpen: (
         <div className="text-center py-20 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
           <Mail size={40} className="mx-auto text-slate-300 dark:text-slate-600 mb-3" />
           <p className="text-slate-600 dark:text-slate-400 font-medium">
-            {tab === 'sent' ? 'No sent emails yet' : tab === 'draft' ? 'No drafts' : 'No email campaigns yet'}
+            {tab === 'sent' ? 'No sent emails yet' : tab === 'scheduled' ? 'No scheduled emails' : tab === 'draft' ? 'No drafts' : 'No email campaigns yet'}
           </p>
           {tab !== 'sent' && (
             <>
