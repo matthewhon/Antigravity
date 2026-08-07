@@ -615,7 +615,7 @@ export const handleInboundSms = async (req: any, res: any) => {
                 churchId,
                 phoneNumber: from,
                 lastMessageAt: now,
-                lastMessageBody: latestBody,
+                lastMessageBody: latestBody || (mediaUrls.length > 0 ? '📷 Photo' : ''),
                 lastMessageDirection: 'inbound',
                 unreadCount: 1,
                 isOptedOut: false,
@@ -633,7 +633,7 @@ export const handleInboundSms = async (req: any, res: any) => {
         } else {
             const updateData: any = {
                 lastMessageAt: now,
-                lastMessageBody: latestBody,
+                lastMessageBody: latestBody || (mediaUrls.length > 0 ? '📷 Photo' : ''),
                 lastMessageDirection: 'inbound',
                 unreadCount: (convSnap.data()?.unreadCount || 0) + 1,
             };

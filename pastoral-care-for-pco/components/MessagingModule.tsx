@@ -2654,8 +2654,8 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
         setReplyUploading(true);
         setReplyUploadPct(0);
         try {
-            const compressedFile = await compressSmsImage(file) as File;
-            const url = await uploadReplyImage(compressedFile);
+            const fileToUpload = file.type.startsWith('image/') ? await compressSmsImage(file) as File : file;
+            const url = await uploadReplyImage(fileToUpload);
             setReplyMediaUrl(url);
         } catch {
             showInboxToast('Image upload failed. Please try again.', 'error');
@@ -3221,9 +3221,9 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                 <input
                                     ref={replyFileRef}
                                     type="file"
-                                    accept="image/jpeg,image/png,image/gif,image/webp"
+                                    accept="image/jpeg,image/png,image/gif,image/webp,video/*,audio/*,application/pdf"
                                     className="hidden"
-                                    title="Attach image"
+                                    title="Attach file"
                                     onChange={handleReplyFileChange}
                                 />
                                 <div className="flex items-end gap-2">
@@ -3277,7 +3277,7 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                     <button
                                         onClick={() => replyFileRef.current?.click()}
                                         disabled={replyUploading || isSending}
-                                        title="Attach image (sends as MMS)"
+                                        title="Attach file (sends as MMS)"
                                         className={`flex items-center justify-center w-10 h-10 shrink-0 rounded-xl border transition disabled:opacity-50 ${replyMediaUrl
                                                 ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 border-blue-300 dark:border-blue-700'
                                                 : 'bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-500 hover:border-blue-300'
