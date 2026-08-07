@@ -2069,6 +2069,44 @@ const NewMessageComposer: React.FC<{
     );
 };
 
+const ThreadImageAttachment: React.FC<{
+    index: number;
+    targetUrl: string;
+    rawUrl: string;
+    onExpand: () => void;
+}> = ({ index, targetUrl, rawUrl, onExpand }) => {
+    const [hasError, setHasError] = useState(false);
+
+    if (hasError) {
+        return (
+            <a
+                href={targetUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:opacity-90 transition"
+            >
+                📎 Media {index + 1} ↗
+            </a>
+        );
+    }
+
+    return (
+        <button
+            type="button"
+            onClick={onExpand}
+            title="Click to expand image"
+            className="block relative max-w-[240px] sm:max-w-[300px] rounded-xl overflow-hidden border border-slate-200/50 dark:border-slate-700/50 bg-slate-900/5 hover:opacity-95 transition-all shadow-sm text-left shrink-0 focus:outline-none focus:ring-2 focus:ring-violet-500"
+        >
+            <img
+                src={targetUrl}
+                alt={`MMS attachment ${index + 1}`}
+                className="w-full max-h-60 object-cover cursor-pointer"
+                onError={() => setHasError(true)}
+            />
+        </button>
+    );
+};
+
 // --- Inbox --------------------------------------------------------------------
 
 const SmsInbox: React.FC<{
@@ -2962,47 +3000,77 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                         ) : messages.length === 0 ? (
                             <div className="text-center py-12 text-slate-400 text-sm">No messages yet</div>
                         ) : (
-                            messages.map(msg => (
-                                <div key={msg.id} className={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}>
-                                    <div className={`max-w-[75%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${msg.direction === 'outbound' ? 'bg-violet-600 text-white rounded-br-sm' : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-bl-sm'}`}>
-                                        <p className="whitespace-pre-wrap break-words">{msg.body}</p>
-                                        {msg.mediaUrls && msg.mediaUrls.length > 0 && (
-                                            <div className="mt-2 flex flex-wrap gap-2">
-                                                {msg.mediaUrls.map((url, i) => {
-                                                    const isImage = /\.(jpg|jpeg|png|gif|webp|heic)(\?|$)/i.test(url)
-                                                        || url.includes('storage.googleapis.com')
-                                                        || /image\//i.test(url);
-                                                    return isImage ? (
-                                                        <button
-                                                            key={i}
-                                                            type="button"
-                                                            onClick={() => setViewingImageUrl(url)}
-                                                            title="Click to expand image"
-                                                            className="block relative max-w-[240px] sm:max-w-[300px] rounded-xl overflow-hidden border border-slate-200/50 dark:border-slate-700/50 bg-slate-900/5 hover:opacity-95 transition-all shadow-sm text-left shrink-0 focus:outline-none focus:ring-2 focus:ring-violet-500"
-                                                        >
-                                                            <img
-                                                                src={url}
-                                                                alt={`MMS attachment ${i + 1}`}
-                                                                className="w-full max-h-60 object-cover cursor-pointer"
-                                                                onError={(e) => {
-                                                                    const parent = (e.target as HTMLImageElement).closest('button');
-                                                                    if (parent) {
-                                                                        parent.textContent = `📎 Media ${i + 1}`;
-                                                                        parent.className = 'block text-xs underline opacity-70 border-0 bg-transparent';
-                                                                    }
-                                                                }}
-                                                            />
-                                                        </button>
-                                                    ) : (
-                                                        <a key={i} href={url} target="_blank" rel="noopener noreferrer"
-                                                            className="flex items-center gap-1 text-xs underline opacity-80 hover:opacity-100">
-                                                            📎 Attachment {i + 1}
-                                                        </a>
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
-                                        <div className={`text-[10px] mt-1 flex items-center gap-1 flex-wrap ${msg.direction === 'outbound' ? 'text-violet-200' : 'text-slate-400'}`}>
+                            messages.map(msg => {
+                                const attachmentUrls: string[] = Array.isArray(msg.mediaUrls) && msg.mediaUrls.length > 0
+                                    ? msg.mediaUrls
+                                    : typeof (msg as any).mediaUrl === 'string' && (msg as any).mediaUrl
+                                    ? [(msg as any).mediaUrl]
+                                    : Array.isArray((msg as any).mediaUrl) && (msg as any).mediaUrl.length > 0
+                                    ? (msg as any).mediaUrl
+                                    : Array.isArray((msg as any).attachmentUrls) && (msg as any).attachmentUrls.length > 0
+                                    ? (msg as any).attachmentUrls
+                                    : Array.isArray((msg as any).attachments) && (msg as any).attachments.length > 0
+                                    ? (msg as any).attachments
+                                    : [];
+
+                                return (
+                                    <div key={msg.id} className={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}>
+                                        <div className={`max-w-[75%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${msg.direction === 'outbound' ? 'bg-violet-600 text-white rounded-br-sm' : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-bl-sm'}`}>
+                                            <p className="whitespace-pre-wrap break-words">{msg.body}</p>
+                                            {attachmentUrls.length > 0 && (
+                                                <div className="mt-2 flex flex-wrap gap-2">
+                                                    {attachmentUrls.map((rawUrl, i) => {
+                                                        const targetUrl = (rawUrl.includes('signalwire.com/api/laml') || rawUrl.includes('files.signalwire.com'))
+                                                            ? `${API_BASE}/api/messaging/media-proxy?url=${encodeURIComponent(rawUrl)}`
+                                                            : rawUrl;
+
+                                                        const isPdf = /\.pdf(\?|$)/i.test(rawUrl) || rawUrl.includes('application/pdf');
+                                                        const isVcard = /\.vcf(\?|$)/i.test(rawUrl) || rawUrl.includes('vcard');
+                                                        const isAudio = /\.(mp3|wav|ogg|m4a)(\?|$)/i.test(rawUrl);
+                                                        const isVideo = /\.(mp4|mov|webm)(\?|$)/i.test(rawUrl);
+
+                                                        const isImage = !isPdf && !isVcard && !isAudio && !isVideo && (
+                                                            /\.(jpg|jpeg|png|gif|webp|heic|svg)(\?|$)/i.test(rawUrl)
+                                                            || rawUrl.includes('storage.googleapis.com')
+                                                            || rawUrl.includes('firebasestorage.googleapis.com')
+                                                            || /image\//i.test(rawUrl)
+                                                        );
+
+                                                        if (isImage) {
+                                                            return (
+                                                                <ThreadImageAttachment
+                                                                    key={i}
+                                                                    index={i}
+                                                                    targetUrl={targetUrl}
+                                                                    rawUrl={rawUrl}
+                                                                    onExpand={() => setViewingImageUrl(targetUrl)}
+                                                                />
+                                                            );
+                                                        }
+
+                                                        return (
+                                                            <a
+                                                                key={i}
+                                                                href={targetUrl}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold border transition shadow-sm ${
+                                                                    msg.direction === 'outbound'
+                                                                        ? 'bg-violet-700/60 border-violet-500 text-white hover:bg-violet-700/80'
+                                                                        : 'bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800'
+                                                                }`}
+                                                            >
+                                                                <span className="text-base">{isVcard ? '🎴' : isPdf ? '📄' : isAudio ? '🎵' : isVideo ? '🎬' : '📎'}</span>
+                                                                <div className="flex flex-col truncate max-w-[200px]">
+                                                                    <span className="truncate">{isVcard ? 'Contact Card (.vcf)' : isPdf ? 'Document (.pdf)' : `Attachment ${i + 1}`}</span>
+                                                                    <span className="text-[10px] opacity-75">Click to view/download ↗</span>
+                                                                </div>
+                                                            </a>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                            <div className={`text-[10px] mt-1 flex items-center gap-1 flex-wrap ${msg.direction === 'outbound' ? 'text-violet-200' : 'text-slate-400'}`}>
                                             {new Date(msg.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                                             {msg.direction === 'outbound' && msg.sentByName && ` • ${msg.sentByName}`}
                                             {msg.direction === 'outbound' && msg.status && (() => {
@@ -3017,7 +3085,8 @@ CHURCH FACTS:\n${kbText || 'No facts provided.'}`;
                                         </div>
                                     </div>
                                 </div>
-                            ))
+                            );
+                        })
                         )}
                         {/* Scroll anchor ... always at bottom of message list */}
                         <div ref={messagesEndRef} aria-hidden="true" />

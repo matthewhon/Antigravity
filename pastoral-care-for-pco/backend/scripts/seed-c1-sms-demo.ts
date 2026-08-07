@@ -466,7 +466,7 @@ async function seed() {
                 sentByName: msg.sentByName ?? null,
                 sentBy: null,
                 campaignId: null,
-                mediaUrls: [],
+                mediaUrls: msg.mediaUrls ?? (msg.mediaUrl ? [msg.mediaUrl] : []),
                 messageSid: `SM_demo_${msgId}`,
                 createdAt: msg.createdAt,
                 deliveredAt: msg.direction === 'outbound' ? msg.createdAt + 5000 : null,

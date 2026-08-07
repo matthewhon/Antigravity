@@ -25,6 +25,7 @@ import { handlePostmarkWebhook } from './backend/postmarkWebhook';
 import { getPublicGroups, getPublicRegistrations, getPublicEvents, serveWidgetScript, getPublicForms, setFeaturedEvent, getFeaturedEvent } from './backend/publicApi.js';
 import { getAvailableNumbers, provisionSmsNumber, releaseSpecificNumber, addSmsNumber, updateNumberSettings, setDefaultNumber, registerSmsBrand, registerSmsCampaign, getSmsRegistrationStatus, handleCampaignStatusWebhook, handleAssignmentStatusWebhook } from './backend/smsProvisioning';
 import { handleInboundSms } from './backend/smsInbound';
+import { fetchSignalWireMedia } from './backend/signalwireClient';
 import { sendIndividual, sendBulk } from './backend/smsSend';
 import { handleStatusCallback } from './backend/smsWebhookStatus';
 import { startSmsCampaignScheduler } from './backend/smsCampaignScheduler';
@@ -815,6 +816,24 @@ async function startServer() {
         return res.send(vcard);
       } catch (e: any) {
         return res.status(500).send('Error generating vCard');
+      }
+    });
+
+    // Media proxy endpoint for SignalWire MMS attachments (avoids 401 Unauthorized errors in browser)
+    app.get('/api/messaging/media-proxy', async (req: any, res: any) => {
+      const mediaUrl = req.query.url as string;
+      if (!mediaUrl) return res.status(400).send('Missing url query parameter');
+      try {
+        if (mediaUrl.includes('signalwire.com')) {
+          const { buffer, contentType } = await fetchSignalWireMedia(mediaUrl);
+          res.set('Content-Type', contentType || 'application/octet-stream');
+          res.set('Cache-Control', 'public, max-age=86400');
+          return res.send(buffer);
+        }
+        return res.redirect(mediaUrl);
+      } catch (e: any) {
+        console.error(`[Media Proxy] Failed to fetch media (${mediaUrl}):`, e.message);
+        return res.status(500).send('Failed to fetch proxy media');
       }
     });
 
