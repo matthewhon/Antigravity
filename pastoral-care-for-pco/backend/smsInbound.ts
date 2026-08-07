@@ -760,8 +760,8 @@ export const handleInboundSms = async (req: any, res: any) => {
                 .catch(() => { /* already logged inside */ });
         }
 
-        // 5. Check for "Who Is This" contact card request
-        const isWhoIsThis = /^WHO IS THIS\??$/i.test(latestBody.trim());
+        // 5. Check for "Who Is This" / contact card request
+        const isWhoIsThis = /^(who is this|whose number is this|who are you|who dis)\??$/i.test(latestBody.trim());
         let whoIsThisReplyMessage: string | null = null;
         let whoIsThisMediaUrl: string | null = null;
 
