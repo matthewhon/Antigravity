@@ -309,7 +309,11 @@ export async function fetchSignalWireMedia(
     // Step 2: Follow redirect (302 → files.signalwire.com/.../*.smil or direct image)
     if ((result.statusCode === 301 || result.statusCode === 302) && result.location) {
         const redirectUrl = result.location;
-        result = await fetchRaw(redirectUrl, false);
+        try {
+            result = await fetchRaw(redirectUrl, false);
+        } catch (e: any) {
+            result = await fetchRaw(redirectUrl, true);
+        }
 
         // Step 3: If the redirect target is a SMIL playlist, parse out the actual image URL
         if (result.contentType.includes('smil') || redirectUrl.endsWith('.smil')) {
@@ -323,7 +327,11 @@ export async function fetchSignalWireMedia(
             // Resolve relative to the SMIL URL's directory
             const smilBase = redirectUrl.substring(0, redirectUrl.lastIndexOf('/') + 1);
             const actualUrl = srcMatch[1].startsWith('http') ? srcMatch[1] : smilBase + srcMatch[1];
-            result = await fetchRaw(actualUrl, false);
+            try {
+                result = await fetchRaw(actualUrl, false);
+            } catch (e: any) {
+                result = await fetchRaw(actualUrl, true);
+            }
         }
     }
 
