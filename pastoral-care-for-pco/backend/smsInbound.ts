@@ -410,11 +410,18 @@ export const handleInboundSms = async (req: any, res: any) => {
             try {
                 let { buffer, contentType } = await fetchSignalWireMedia(srcUrl);
 
-                // Guard: if SignalWire returned an HTML error page instead of media
-                // (e.g. a 401 auth-redirect that wasn't caught), bail out immediately
-                // so we don't store garbage in Firebase Storage.
-                if (contentType.startsWith('text/html') || contentType.startsWith('text/plain')) {
-                    throw new Error(`SignalWire returned "${contentType}" — likely an auth error page, not media`);
+                // Guard: if SignalWire returned an HTML auth error page instead of media
+                const textHead = buffer.slice(0, 500).toString('utf8').trim();
+                if (contentType.startsWith('text/html') || (contentType.startsWith('text/plain') && (textHead.startsWith('<!DOCTYPE') || textHead.startsWith('<html')))) {
+                    throw new Error(`SignalWire returned "${contentType}" — auth error page, not media`);
+                }
+
+                // If content is plain text (non-HTML text media attachment), skip saving as binary file
+                if (contentType.startsWith('text/plain') && buffer.length < 500) {
+                    if (textHead && !latestBody.includes(textHead)) {
+                        latestBody = latestBody ? `${latestBody}\n${textHead}` : textHead;
+                    }
+                    continue;
                 }
 
                 // If content-type is missing or generic, detect from magic bytes
@@ -434,7 +441,7 @@ export const handleInboundSms = async (req: any, res: any) => {
                     'video/mp4': '.mp4',  'video/quicktime': '.mov', 'audio/mpeg': '.mp3',
                     'audio/ogg': '.ogg',  'application/pdf': '.pdf',
                 };
-                const ext  = extMap[contentType] || '';
+                const ext  = extMap[contentType] || '.jpg';
                 const name = `sms-media/${churchId}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}${ext}`;
                 const file = bucket.file(name);
                 await file.save(buffer, { metadata: { contentType }, resumable: false });
@@ -520,7 +527,7 @@ export const handleInboundSms = async (req: any, res: any) => {
 
         // 2. Handle STOP / HELP / START (carrier compliance)
         const upperBody = body.trim().toUpperCase();
-        const latestBody = extractLatestMessage(body);
+        let latestBody = extractLatestMessage(body);
         // Conv ID is scoped per number so each inbox number has separate threads.
         // smsNumberId is known here because the number lookup already resolved above.
         const convIdKeyword = smsNumberId
