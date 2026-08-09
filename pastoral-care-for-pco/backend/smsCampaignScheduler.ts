@@ -828,9 +828,23 @@ async function runWorkflowStepExecutor(db: any): Promise<void> {
                     const staffPhones = Array.from(staffPhonesSet);
                     
                     if (staffPhones.length > 0) {
+                        // Build a merge-tag context that intentionally omits pcoPersonId and avatar.
+                        // If pcoPersonId were included, sendBulkInternal would overwrite each staff
+                        // member's conversation record in Firestore with the birthday/anniversary
+                        // person's identity — making the inbox show that person as the recipient.
+                        const staffMergeContext = {
+                            personName:  personInfo.personName,
+                            phone:       personInfo.phone,
+                            email:       personInfo.email,
+                            birthday:    personInfo.birthday,
+                            anniversary: personInfo.anniversary,
+                            city:        personInfo.city,
+                            state:       personInfo.state,
+                            // pcoPersonId and avatar intentionally omitted
+                        };
                         const pMap: any = {};
                         for (const sp of staffPhones) {
-                            pMap[sp] = personInfo;
+                            pMap[sp] = staffMergeContext;
                         }
                         
                         await sendBulkInternal({
@@ -880,9 +894,21 @@ async function runWorkflowStepExecutor(db: any): Promise<void> {
                     }
                     
                     if (staffEmails.length > 0) {
+                        // Same as staff_sms: omit pcoPersonId so the email send does not
+                        // write a PCO activity note or corrupt identity on the birthday person's record.
+                        const staffMergeContext = {
+                            personName:  personInfo.personName,
+                            phone:       personInfo.phone,
+                            email:       personInfo.email,
+                            birthday:    personInfo.birthday,
+                            anniversary: personInfo.anniversary,
+                            city:        personInfo.city,
+                            state:       personInfo.state,
+                            // pcoPersonId and avatar intentionally omitted
+                        };
                         const pMap: any = {};
                         for (const se of staffEmails) {
-                            pMap[se] = personInfo;
+                            pMap[se] = staffMergeContext;
                         }
                         const fakeReq = {
                             body: {
