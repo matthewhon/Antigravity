@@ -406,7 +406,13 @@ export const handleInboundSms = async (req: any, res: any) => {
 
 
         // 4. Save the inbound message
-        const messageId = `msg_${now}_${Math.random().toString(36).slice(2, 8)}`;
+        // Use twilioSid as the document ID so duplicate webhook deliveries
+        // (Twilio retries when it doesn't receive a timely 200) are idempotent:
+        // a retry with the same SID overwrites the same document rather than
+        // creating a second copy. Fall back to a random ID only if no SID is present.
+        const messageId = smsSid
+            ? `msg_sid_${smsSid.replace(/-/g, '')}`
+            : `msg_${now}_${Math.random().toString(36).slice(2, 8)}`;
         await db.collection('smsConversations').doc(convId)
             .collection('messages').doc(messageId).set({
                 id:             messageId,
@@ -421,11 +427,14 @@ export const handleInboundSms = async (req: any, res: any) => {
             });
 
         // 4-0. Record inbound SMS usage
+        // Keyed by SID so duplicate webhooks don't double-count usage.
         const segmentsStr = req.body.NumSegments || '1';
         const segments = parseInt(segmentsStr, 10) || 1;
         const isMms = mediaUrls.length > 0;
         const costUsd = isMms ? 0.02 : segments * 0.0079;
-        const usageId = `usage_inbound_${now}_${Math.random().toString(36).slice(2, 8)}`;
+        const usageId = smsSid
+            ? `usage_inbound_sid_${smsSid.replace(/-/g, '')}`
+            : `usage_inbound_${now}_${Math.random().toString(36).slice(2, 8)}`;
         const d = new Date();
         const currentMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
         
@@ -441,7 +450,7 @@ export const handleInboundSms = async (req: any, res: any) => {
             direction: 'inbound',
             twilioSid: smsSid || null,
             createdAt: now,
-        });
+        }, { merge: true });
 
         await db.collection('churches').doc(churchId).set({
             smsUsage: {
