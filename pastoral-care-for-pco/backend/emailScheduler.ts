@@ -806,6 +806,19 @@ async function fetchWidgetData(
 const MAX_RETRIES = 5;
 
 /**
+ * How fresh PCO data must be to skip the pre-send sync.
+ *
+ * `syncAllData` is a multi-hundred-request crawl of the whole PCO org. Running it
+ * unconditionally per due campaign, on every tick, across every server instance
+ * saturates PCO's rate limit and makes the crawls fail — which is how giving data
+ * ended up mislabeled. Campaign analytics do not need minute-fresh data.
+ */
+const PRE_SEND_SYNC_MAX_AGE_MS = 60 * 60 * 1000; // 1 hour
+
+/** A campaign claimed for longer than this is assumed to belong to a dead instance. */
+const STALE_CLAIM_MS = 30 * 60 * 1000; // 30 minutes
+
+/**
  * Starts the email scheduler.  Call once on server startup.
  * Polls Firestore every 60 seconds for campaigns due to send.
  */
@@ -815,6 +828,23 @@ export function startEmailScheduler(db: any): void {
     const tick = async () => {
         try {
             const now = Date.now();
+
+            // Release claims from instances that died mid-send, so a crash doesn't
+            // wedge a campaign in 'sending' forever.
+            try {
+                const stale = await db.collection('email_campaigns')
+                    .where('status', '==', 'sending')
+                    .where('claimedAt', '<=', now - STALE_CLAIM_MS)
+                    .get();
+                if (!stale.empty) {
+                    await Promise.all(stale.docs.map((d: any) =>
+                        d.ref.update({ status: 'scheduled', updatedAt: Date.now() })
+                    ));
+                    log.warn(`[Scheduler] Released ${stale.size} stale campaign claim(s)`, 'system', {}, '');
+                }
+            } catch (staleErr: any) {
+                console.warn('[EmailScheduler] Stale claim sweep failed:', staleErr?.message);
+            }
 
             // Find campaigns that are scheduled and due
             const snap = await db.collection('email_campaigns')
@@ -831,6 +861,22 @@ export function startEmailScheduler(db: any): void {
                 const campaignId = docSnap.id;
                 const churchId   = campaign.churchId;
                 const retryCount = campaign.retryCount || 0;
+
+                // Claim the campaign atomically. Multiple server instances each run
+                // this scheduler, so without a claim they all process the same due
+                // campaign on every tick — each one kicking off its own full PCO sync.
+                const claimed = await db.runTransaction(async (tx: any) => {
+                    const ref = db.collection('email_campaigns').doc(campaignId);
+                    const fresh = await tx.get(ref);
+                    if (!fresh.exists || fresh.data().status !== 'scheduled') return false;
+                    tx.update(ref, { status: 'sending', claimedAt: Date.now(), updatedAt: Date.now() });
+                    return true;
+                });
+
+                if (!claimed) {
+                    // Another instance got there first.
+                    return;
+                }
 
                 if (retryCount >= MAX_RETRIES) {
                     // Give up — mark failed permanently
@@ -857,13 +903,21 @@ export function startEmailScheduler(db: any): void {
 
                     let finalBlocks = blocks;
                     if (hasRefreshable) {
-                        log.info(`[Scheduler] Syncing PCO data before refreshing dynamic blocks for campaign ${campaignId}`, 'system', { campaignId }, churchId);
-                        
-                        try {
-                            await syncAllData(churchId);
-                            log.info(`[Scheduler] Successfully synced PCO data for campaign ${campaignId}`, 'system', { campaignId }, churchId);
-                        } catch (syncErr: any) {
-                            log.warn(`[Scheduler] PCO sync failed before refreshing blocks for campaign ${campaignId}: ${syncErr.message}`, 'system', { campaignId }, churchId);
+                        // Only sync if the tenant's PCO data is actually stale.
+                        const churchSnap = await db.collection('churches').doc(churchId).get();
+                        const lastSync = churchSnap.data()?.lastSyncTimestamp || 0;
+                        const age = Date.now() - lastSync;
+
+                        if (age > PRE_SEND_SYNC_MAX_AGE_MS) {
+                            log.info(`[Scheduler] PCO data is ${Math.round(age / 60000)}m old — syncing before refreshing blocks for campaign ${campaignId}`, 'system', { campaignId }, churchId);
+                            try {
+                                await syncAllData(churchId);
+                                log.info(`[Scheduler] Successfully synced PCO data for campaign ${campaignId}`, 'system', { campaignId }, churchId);
+                            } catch (syncErr: any) {
+                                log.warn(`[Scheduler] PCO sync failed before refreshing blocks for campaign ${campaignId}: ${syncErr.message}`, 'system', { campaignId }, churchId);
+                            }
+                        } else {
+                            log.info(`[Scheduler] Skipping pre-send sync for campaign ${campaignId} — PCO data is ${Math.round(age / 60000)}m old`, 'system', { campaignId }, churchId);
                         }
 
                         log.info(`[Scheduler] Refreshing dynamic blocks for campaign ${campaignId}`, 'system', { campaignId }, churchId);
@@ -917,11 +971,21 @@ export function startEmailScheduler(db: any): void {
                     if (isRecurring) {
                         const nowTime = Date.now();
                         const d = new Date(campaign.scheduledAt || nowTime);
-                        if (campaign.recurringFrequency === 'daily') d.setDate(d.getDate() + 1);
-                        else if (campaign.recurringFrequency === 'weekly') d.setDate(d.getDate() + 7);
-                        else if (campaign.recurringFrequency === 'monthly') d.setMonth(d.getMonth() + 1);
-                        else d.setDate(d.getDate() + 1); // fallback
-                        
+
+                        // Advance until the next occurrence is in the future. Adding a
+                        // single interval to a schedule that has fallen behind leaves it
+                        // still due, so the campaign re-sends on every tick until it
+                        // catches up — one send per tick, each with its own PCO sync.
+                        const advance = () => {
+                            if (campaign.recurringFrequency === 'daily') d.setDate(d.getDate() + 1);
+                            else if (campaign.recurringFrequency === 'weekly') d.setDate(d.getDate() + 7);
+                            else if (campaign.recurringFrequency === 'monthly') d.setMonth(d.getMonth() + 1);
+                            else d.setDate(d.getDate() + 1); // fallback
+                        };
+                        advance();
+                        let guard = 0;
+                        while (d.getTime() <= nowTime && guard++ < 1000) advance();
+
                         const nextEpoch = d.getTime();
                         const history = campaign.sentHistory || [];
                         history.push({ sentAt: nowTime, recipientCount: result.recipientCount });

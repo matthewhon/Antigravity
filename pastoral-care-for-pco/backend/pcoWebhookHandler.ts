@@ -3,9 +3,16 @@ import * as crypto from 'crypto';
 import admin from 'firebase-admin';
 import { getDb } from './firebase';
 import { createServerLogger } from '../services/logService';
+import { pcoRequest } from './pcoApi';
 
 const db = getDb();
 const log = createServerLogger(db);
+
+/**
+ * Placeholder for a donation with no resolvable fund. Must match syncGiving.ts —
+ * never a real-sounding name like 'General', which collides with actual funds.
+ */
+const UNKNOWN_FUND = 'Unspecified';
 
 // ─── Entry Point ─────────────────────────────────────────────────────────────
 
@@ -206,13 +213,76 @@ async function handleHouseholdEvent(eventName: string, data: any, churchId: stri
 
 // ─── Giving ───────────────────────────────────────────────────────────────────
 
+/**
+ * A PCO Donation has NO `fund` relationship — funds hang off its Designations
+ * (`Designation.relationships.fund`). A donation split across three funds is three
+ * designations. The sync service therefore stores one row per designation under
+ * doc id `${donationId}_${index}`, and this handler must use the same shape or it
+ * writes a duplicate, wrongly-funded row alongside the synced ones.
+ */
+async function resolveDesignations(donationId: string, data: any, included: any[], churchId: string) {
+    const refs: any[] = data.relationships?.designations?.data || [];
+
+    // Prefer designations already present in the webhook payload.
+    let designations = (included || []).filter((i: any) =>
+        i.type === 'Designation' &&
+        (refs.length === 0 || refs.some((r: any) => String(r.id) === String(i.id)))
+    );
+
+    // PCO webhook payloads don't reliably carry `included`, so fall back to the API.
+    if (designations.length === 0) {
+        try {
+            const res = await pcoRequest(
+                churchId,
+                `https://api.planningcenteronline.com/giving/v2/donations/${donationId}?include=designations`
+            );
+            designations = (res?.included || []).filter((i: any) => i.type === 'Designation');
+        } catch (e: any) {
+            log.warn(
+                `Could not fetch designations for donation ${donationId}: ${e?.message}`,
+                'webhook', { donationId, churchId }, churchId
+            );
+        }
+    }
+
+    return designations;
+}
+
+/** Fund name for a fund id, from the webhook payload or the synced funds cache. */
+async function resolveFundName(fundId: string | undefined, included: any[], cache: Map<string, string>) {
+    if (!fundId) return null;
+    if (cache.has(fundId)) return cache.get(fundId)!;
+
+    const fundResource = (included || []).find((i: any) => i.type === 'Fund' && String(i.id) === String(fundId));
+    let name: string | null = fundResource?.attributes?.name || null;
+
+    if (!name) {
+        // `funds` docs are keyed by the raw PCO fund id (see syncGiving.upsertFunds).
+        const fundDoc = await db.collection('funds').doc(fundId).get();
+        name = fundDoc.exists ? (fundDoc.data()?.name || null) : null;
+    }
+
+    if (name) cache.set(fundId, name);
+    return name;
+}
+
 async function handleDonationEvent(eventName: string, data: any, included: any[], churchId: string) {
     const donationId = data.id;
     const attrs = data.attributes;
 
     if (eventName.endsWith('.destroyed')) {
-        // Remove from detailed_donations
+        // Remove every row for this donation. The sync writes `${donationId}_${index}`;
+        // a legacy un-suffixed doc may also exist from before this handler was fixed.
         await db.collection('detailed_donations').doc(donationId).delete();
+        const rows = await db.collection('detailed_donations')
+            .where(admin.firestore.FieldPath.documentId(), '>=', `${donationId}_`)
+            .where(admin.firestore.FieldPath.documentId(), '<', `${donationId}_\uf8ff`)
+            .get();
+        if (!rows.empty) {
+            const delBatch = db.batch();
+            rows.docs.forEach(d => delBatch.delete(d.ref));
+            await delBatch.commit();
+        }
 
         // Reverse-decrement the giving aggregation
         const donationDate = new Date(attrs.created_at || Date.now());
@@ -230,22 +300,6 @@ async function handleDonationEvent(eventName: string, data: any, included: any[]
         return;
     }
 
-    // Resolve fund name from included resources
-    const fundId = data.relationships?.fund?.data?.id;
-    let fundName = 'General';
-    if (fundId) {
-        const fundResource = included?.find((i: any) => i.type === 'Fund' && i.id === fundId);
-        if (fundResource?.attributes?.name) {
-            fundName = fundResource.attributes.name;
-        } else {
-            // Fall back to Firestore cache
-            const fundDoc = await db.collection('funds').doc(fundId).get();
-            if (fundDoc.exists) {
-                fundName = fundDoc.data()?.name || 'General';
-            }
-        }
-    }
-
     const personId = data.relationships?.person?.data?.id;
     let donorName = 'Unknown';
     if (personId) {
@@ -254,34 +308,82 @@ async function handleDonationEvent(eventName: string, data: any, included: any[]
     }
 
     const isRecurring = !!(data.relationships?.recurring_donation?.data?.id);
+    // `received_at` is what the sync service stores; `created_at` is when the record
+    // was keyed into PCO and can be days later.
+    const date = attrs.received_at || attrs.created_at || new Date().toISOString();
 
-    const donation = {
-        id: donationId,
-        churchId,
-        amount: (attrs.amount_cents || 0) / 100,
-        date: attrs.created_at || new Date().toISOString(),
-        fundName,
-        fundId: fundId || null,
-        donorId: personId || 'anonymous',
-        donorName,
-        isRecurring,
-        lastUpdated: Date.now(),
-    };
+    const designations = await resolveDesignations(donationId, data, included, churchId);
+    const fundNameCache = new Map<string, string>();
 
-    await db.collection('detailed_donations').doc(donationId).set(donation, { merge: true });
+    // One row per designation, matching the sync service's `${donationId}_${index}`
+    // doc-id scheme so the two writers update the same documents instead of
+    // producing duplicates that double-count in giving totals.
+    const rows = designations.length > 0
+        ? await Promise.all(designations.map(async (des: any, index: number) => {
+            const fundId = des.relationships?.fund?.data?.id
+                ? String(des.relationships.fund.data.id)
+                : undefined;
+            const fundName = await resolveFundName(fundId, included, fundNameCache);
+            if (fundId && !fundName) {
+                log.warn(
+                    `Fund ${fundId} on donation ${donationId} is not in the funds cache`,
+                    'webhook', { donationId, fundId, churchId }, churchId
+                );
+            }
+            return {
+                id: `${donationId}_${index}`,
+                churchId,
+                amount: (des.attributes?.amount_cents || 0) / 100,
+                date,
+                fundName: fundName || UNKNOWN_FUND,
+                fundId: fundId || null,
+                donorId: personId || 'anonymous',
+                donorName,
+                isRecurring,
+                lastUpdated: Date.now(),
+            };
+        }))
+        : [{
+            // No designations resolvable — record the donation total with no fund
+            // attribution rather than inventing one.
+            id: `${donationId}_0`,
+            churchId,
+            amount: (attrs.amount_cents || 0) / 100,
+            date,
+            fundName: UNKNOWN_FUND,
+            fundId: null,
+            donorId: personId || 'anonymous',
+            donorName,
+            isRecurring,
+            lastUpdated: Date.now(),
+        }];
+
+    const writeBatch = db.batch();
+    rows.forEach(row => {
+        writeBatch.set(db.collection('detailed_donations').doc(row.id), row, { merge: true });
+    });
+    await writeBatch.commit();
 
     // Write-time aggregation (only increment on .created — .updated adjusts the existing record)
     if (eventName.endsWith('.created')) {
         try {
-            const donationDate = new Date(donation.date);
+            const donationDate = new Date(date);
             const monthKey = `${donationDate.getFullYear()}_${String(donationDate.getMonth() + 1).padStart(2, '0')}`;
             const aggRef = db.collection('analytics_giving').doc(`${churchId}_${monthKey}`);
+            // Sum per fund first — two designations can share a fund, and a second
+            // increment for the same key would replace the first, not add to it.
+            const perFund = new Map<string, number>();
+            rows.forEach(row => perFund.set(row.fundName, (perFund.get(row.fundName) || 0) + row.amount));
+            const fundTotals: Record<string, any> = {};
+            perFund.forEach((amount, fundName) => {
+                fundTotals[`funds.${fundName}`] = admin.firestore.FieldValue.increment(amount);
+            });
             await aggRef.set({
                 churchId,
                 month: monthKey,
-                totalAmount: admin.firestore.FieldValue.increment(donation.amount),
+                totalAmount: admin.firestore.FieldValue.increment((attrs.amount_cents || 0) / 100),
                 donationCount: admin.firestore.FieldValue.increment(1),
-                [`funds.${fundName}`]: admin.firestore.FieldValue.increment(donation.amount),
+                ...fundTotals,
                 lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
             }, { merge: true });
         } catch (aggErr: any) {
@@ -289,7 +391,12 @@ async function handleDonationEvent(eventName: string, data: any, included: any[]
         }
     }
 
-    log.info(`Donation synced via webhook (${eventName})`, 'webhook', { donationId, amount: donation.amount, fund: fundName, churchId }, churchId);
+    log.info(
+        `Donation synced via webhook (${eventName})`,
+        'webhook',
+        { donationId, rows: rows.length, funds: rows.map(r => r.fundName), churchId },
+        churchId
+    );
 }
 
 async function handleRecurringDonationEvent(eventName: string, data: any, churchId: string) {

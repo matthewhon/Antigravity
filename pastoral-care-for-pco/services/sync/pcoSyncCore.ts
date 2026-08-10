@@ -92,7 +92,8 @@ export const pcoFetch = async (
             if (retryCount < 5) {
                 logger.warn(`PCO Rate Limit 429 — retrying`, 'sync', { endpoint, retryCount, waitTimeMs: Math.round(waitTime) }, churchId);
                 await delay(waitTime);
-                return pcoFetch(churchId, endpoint, retryCount + 1);
+                // Preserve method/body — a rate-limited POST must not retry as a GET.
+                return pcoFetch(churchId, endpoint, retryCount + 1, method, body);
             } else {
                 logger.error('PCO API Rate Limit Exceeded: Max retries reached', 'sync', { endpoint }, churchId);
                 throw new Error('PCO API Rate Limit Exceeded: Max retries reached.');
@@ -115,11 +116,27 @@ export const pcoFetch = async (
     }
 };
 
+export interface FetchAllPagesOptions {
+    /**
+     * Throw instead of silently returning a partial result when a page fetch
+     * fails or pagination hits the safety limit.
+     *
+     * The default (false) is the historic behaviour: log a warning, stop
+     * paginating, and return whatever was collected so far. That is fine for
+     * best-effort data, but dangerous for anything used as a lookup table —
+     * an empty map silently turns into wrong values written over good ones.
+     * Use `strict: true` whenever a truncated result would corrupt data
+     * rather than merely leave it stale.
+     */
+    strict?: boolean;
+}
+
 export const fetchAllPages = async (
     churchId: string,
     endpoint: string,
     mapFn: (item: any, included?: any[]) => any,
-    limitPerPage = 100
+    limitPerPage = 100,
+    options: FetchAllPagesOptions = {}
 ) => {
     let allItems: any[] = [];
     let nextUrl = `${endpoint}${endpoint.includes('?') ? '&' : '?'}per_page=${limitPerPage}`;
@@ -138,12 +155,22 @@ export const fetchAllPages = async (
             pageCount++;
             await delay(200);
         } catch (e: any) {
+            if (options.strict) {
+                throw new Error(
+                    `PCO fetch failed on page ${pageCount} of ${endpoint}: ${e?.message || e}`
+                );
+            }
             logger.warn(`Error fetching page ${pageCount}`, 'sync', { endpoint, page: pageCount, error: e?.message });
             nextUrl = null;
         }
     }
 
     if (pageCount >= SAFETY_MAX_PAGES) {
+        if (options.strict) {
+            throw new Error(
+                `PCO pagination hit the ${SAFETY_MAX_PAGES}-page safety limit on ${endpoint} — result is truncated`
+            );
+        }
         logger.warn(`Sync hit safety page limit — data may be incomplete`, 'sync', { endpoint, pages: SAFETY_MAX_PAGES });
     }
 
