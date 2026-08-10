@@ -418,9 +418,6 @@ export const handleInboundSms = async (req: any, res: any) => {
 
                 // If content is plain text (non-HTML text media attachment), skip saving as binary file
                 if (contentType.startsWith('text/plain') && buffer.length < 500) {
-                    if (textHead && !latestBody.includes(textHead)) {
-                        latestBody = latestBody ? `${latestBody}\n${textHead}` : textHead;
-                    }
                     continue;
                 }
 

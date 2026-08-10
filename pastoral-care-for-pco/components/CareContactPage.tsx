@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { OutreachSession, OutreachSlot, PcoPerson, User, Church, PcoGroup } from '../types';
 import { firestore } from '../services/firestoreService';
+import { getAiRecommendedCallScript, getAiRecommendedCallScriptByStatus } from '../constants/callScript';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -276,6 +277,7 @@ const SessionSummaryModal: React.FC<{ stats: CloseStats; onClose: () => void }> 
 };
 
 interface SessionModalProps {
+    churchName?: string;
     groups?: PcoGroup[];
     memberStatuses: string[];
     onSave: (draft: Pick<OutreachSession, 'name' | 'filters' | 'customScript'>) => void;
@@ -283,9 +285,10 @@ interface SessionModalProps {
     initial?: Pick<OutreachSession, 'name' | 'filters' | 'customScript'>;
 }
 
-const SessionModal: React.FC<SessionModalProps> = ({ groups = [], memberStatuses, onSave, onClose, initial }) => {
+const SessionModal: React.FC<SessionModalProps> = ({ churchName, groups = [], memberStatuses, onSave, onClose, initial }) => {
+    const defaultAiScript = getAiRecommendedCallScript(churchName);
     const [name, setName] = useState(initial?.name ?? '');
-    const [customScript, setCustomScript] = useState(initial?.customScript ?? '');
+    const [customScript, setCustomScript] = useState(initial?.customScript ?? defaultAiScript);
     const [riskCats, setRiskCats] = useState<OutreachSession['filters']['riskCategories']>(
         initial?.filters.riskCategories ?? ['Disconnected', 'At Risk']
     );
@@ -355,18 +358,24 @@ const SessionModal: React.FC<SessionModalProps> = ({ groups = [], memberStatuses
                     {/* Recommended Call Script (Optional) */}
                     <div>
                         <label className="text-[10px] font-bold uppercase tracking-wide text-slate-400 block mb-1.5 flex items-center justify-between">
-                            <span>Recommended Call Script</span>
-                            <span className="text-slate-400 font-normal lowercase">(optional)</span>
+                            <span>Recommended Call Script & Talking Points</span>
+                            <button
+                                type="button"
+                                onClick={() => setCustomScript(getAiRecommendedCallScript(churchName))}
+                                className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold hover:underline"
+                            >
+                                ✨ Reset to AI Script
+                            </button>
                         </label>
                         <textarea
                             value={customScript}
                             onChange={e => setCustomScript(e.target.value)}
-                            placeholder="e.g. Hi! This is a volunteer from church checking in to see how you are doing today..."
-                            rows={3}
+                            placeholder={defaultAiScript}
+                            rows={4}
                             className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none dark:text-white leading-relaxed resize-none"
                         />
                         <p className="text-[10px] text-slate-400 mt-1">
-                            Volunteers will see this script on their calling screen when reaching out to assigned contacts.
+                            AI recommended script uses tenant church name (<span className="font-semibold text-slate-600 dark:text-slate-300">{churchName || 'Church'}</span>), caller & contact names, and asks about prayer needs.
                         </p>
                     </div>
 
@@ -897,6 +906,7 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
         const memberDirectory = buildMemberDirectory(people);
         const newSession: OutreachSession = {
             id, churchId: church.id,
+            churchName: church.name,
             name: draft.name, filters: draft.filters,
             customScript: draft.customScript,
             eligiblePeople: eligible,
@@ -1564,20 +1574,33 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
 
                             {/* Recommended Call Script Editor Card for Admins */}
                             <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-100 dark:border-slate-800 shadow-xs">
-                                <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
                                     <div className="flex items-center gap-2">
                                         <FileText size={16} className="text-indigo-500" />
                                         <h4 className="text-xs font-black uppercase tracking-wide text-slate-800 dark:text-white">Recommended Call Script & Talking Points</h4>
+                                        <span className="bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 text-[10px] font-bold px-2 py-0.5 rounded-full border border-indigo-100 dark:border-indigo-800">
+                                            AI Recommended
+                                        </span>
                                     </div>
                                     {!editingScript ? (
                                         <button
-                                            onClick={() => setEditingScript(true)}
+                                            onClick={() => {
+                                                setScriptText(selectedSession.customScript ?? getAiRecommendedCallScript(church.name));
+                                                setEditingScript(true);
+                                            }}
                                             className="text-[10px] font-bold uppercase tracking-wide text-indigo-600 dark:text-indigo-400 hover:underline"
                                         >
                                             {selectedSession.customScript ? 'Edit Script' : '+ Customize Script'}
                                         </button>
                                     ) : (
                                         <div className="flex items-center gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setScriptText(getAiRecommendedCallScript(church.name))}
+                                                className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
+                                            >
+                                                ✨ Use AI Script
+                                            </button>
                                             <button
                                                 onClick={() => {
                                                     setScriptText(selectedSession.customScript ?? '');
@@ -1605,20 +1628,47 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
                                         <textarea
                                             value={scriptText}
                                             onChange={e => setScriptText(e.target.value)}
-                                            placeholder="Enter custom call script for volunteers (e.g. Hi! This is a volunteer from church checking in on you to see how you are doing...)"
-                                            rows={3}
+                                            placeholder={getAiRecommendedCallScript(church.name)}
+                                            rows={4}
                                             className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none dark:text-white leading-relaxed resize-none"
                                         />
                                         <p className="text-[10px] text-slate-400 mt-1">
-                                            This custom script will be shown on all volunteer calling screens for this session.
+                                            Custom script overrides the default for all members. Use <code className="text-indigo-600 dark:text-indigo-400">[Person Name]</code>, <code className="text-indigo-600 dark:text-indigo-400">[Caller Name]</code>, and <code className="text-indigo-600 dark:text-indigo-400">[Church Name]</code> for dynamic names.
                                         </p>
                                     </div>
                                 ) : (
-                                    <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-medium bg-slate-50 dark:bg-slate-800/60 p-3.5 rounded-xl border border-slate-100 dark:border-slate-800">
-                                        {selectedSession.customScript || (
-                                            <span className="text-slate-400 italic">Using standard default warm greeting call script. Click "+ Customize Script" to customize what callers see on their phone.</span>
+                                    <div className="bg-slate-50 dark:bg-slate-800/60 p-3.5 rounded-xl border border-slate-100 dark:border-slate-800 space-y-3">
+                                        <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-indigo-500 flex-wrap gap-2">
+                                            <span>{selectedSession.customScript ? 'Customized Script' : 'AI Recommended Call Script & Talking Points'}</span>
+                                            {!selectedSession.customScript && <span className="italic text-slate-400 lowercase font-normal">(active status-adapted default)</span>}
+                                        </div>
+
+                                        {!selectedSession.customScript && (
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 pt-1">
+                                                {(['Healthy', 'At Risk', 'Disconnected'] as const).map(st => {
+                                                    const info = getAiRecommendedCallScriptByStatus(st, church.name);
+                                                    return (
+                                                        <div key={st} className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200/60 dark:border-slate-700/60 space-y-1.5 shadow-xs">
+                                                            <div className="flex items-center justify-between">
+                                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${info.badgeBg}`}>
+                                                                    {info.badgeText}
+                                                                </span>
+                                                            </div>
+                                                            <p className="text-[11px] text-slate-700 dark:text-slate-300 leading-relaxed italic">
+                                                                &ldquo;{info.fullScript}&rdquo;
+                                                            </p>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
                                         )}
-                                    </p>
+
+                                        {selectedSession.customScript && (
+                                            <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-medium whitespace-pre-line">
+                                                {selectedSession.customScript}
+                                            </p>
+                                        )}
+                                    </div>
                                 )}
                             </div>
 
@@ -1850,6 +1900,7 @@ export const CareContactPage: React.FC<CareContactPageProps> = ({ church, user, 
             {/* Create Session Modal */}
             {isModalOpen && (
                 <SessionModal
+                    churchName={church.name}
                     groups={groups}
                     memberStatuses={memberStatuses}
                     onSave={handleCreateSession}

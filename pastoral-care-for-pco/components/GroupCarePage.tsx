@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { GroupCareSession, GroupCareSlot, PcoPerson, User, Church, PcoGroup } from '../types';
 import { firestore } from '../services/firestoreService';
+import { getAiRecommendedCallScript } from '../constants/callScript';
 import { 
   Users, Plus, Phone, Search, Copy, Check, QrCode, Play, Square, 
   Trash2, RefreshCw, ChevronRight, AlertCircle, MessageSquare, Clock,
@@ -47,6 +48,7 @@ const StatusBadge: React.FC<{ status: GroupCareSlot['status'] }> = ({ status }) 
 // ─── Modal: Create / Edit Group Care Session ───────────────────────────────────
 
 interface CreateSessionModalProps {
+  churchName?: string;
   groups: PcoGroup[];
   people: PcoPerson[];
   onClose: () => void;
@@ -54,10 +56,11 @@ interface CreateSessionModalProps {
   initial?: Partial<GroupCareSession>;
 }
 
-const CreateSessionModal: React.FC<CreateSessionModalProps> = ({ groups, people, onClose, onSave, initial }) => {
+const CreateSessionModal: React.FC<CreateSessionModalProps> = ({ churchName, groups, people, onClose, onSave, initial }) => {
+  const defaultAiScript = getAiRecommendedCallScript(churchName);
   const [name, setName] = useState(initial?.name || '');
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>(initial?.groupIds || []);
-  const [customScript, setCustomScript] = useState(initial?.customScript || 'Hi! Checking in on how you are doing and how our group can pray for you this week.');
+  const [customScript, setCustomScript] = useState(initial?.customScript || defaultAiScript);
   const [batchSize, setBatchSize] = useState(initial?.batchSize || 3);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -188,15 +191,24 @@ const CreateSessionModal: React.FC<CreateSessionModalProps> = ({ groups, people,
           </div>
 
           <div>
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block mb-2">
-              Leader Talking Points & Script
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
+                Leader Talking Points & Script
+              </label>
+              <button
+                type="button"
+                onClick={() => setCustomScript(getAiRecommendedCallScript(churchName))}
+                className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold hover:underline"
+              >
+                ✨ Reset to AI Script
+              </button>
+            </div>
             <textarea
-              rows={3}
+              rows={4}
               value={customScript}
               onChange={e => setCustomScript(e.target.value)}
-              placeholder="Script provided to group leaders when contacting members..."
-              className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white text-xs focus:ring-2 focus:ring-indigo-500 outline-none font-medium"
+              placeholder={defaultAiScript}
+              className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white text-xs focus:ring-2 focus:ring-indigo-500 outline-none font-medium leading-relaxed"
             />
           </div>
 
@@ -700,6 +712,7 @@ export const GroupCarePage: React.FC<GroupCarePageProps> = ({ church, user, peop
       {/* Modals */}
       {showCreateModal && (
         <CreateSessionModal
+          churchName={church.name}
           groups={groups}
           people={people}
           onClose={() => setShowCreateModal(false)}

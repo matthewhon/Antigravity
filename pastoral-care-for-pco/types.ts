@@ -2001,7 +2001,7 @@ export interface OutreachSession {
      * Stored in Firestore so unauthenticated volunteers can read it.
      * Sorted: primary (never-contacted) by risk score asc, then by name.
      */
-    eligiblePeople?: { id: string; name: string; phone?: string | null; email?: string | null; riskScore: number }[];
+    eligiblePeople?: { id: string; name: string; phone?: string | null; email?: string | null; riskScore: number; riskCategory?: 'Healthy' | 'At Risk' | 'Disconnected' }[];
     /**
      * Phone-number → member-name lookup for all non-inactive church members.
      * Allows unauthenticated volunteer pages to resolve a phone number to a name.
@@ -2021,6 +2021,8 @@ export interface OutreachSession {
      * Displayed to volunteers on the live Outreach Contact view.
      */
     customScript?: string;
+    /** Optional tenant church name for dynamic script template population */
+    churchName?: string;
     /**
      * How many contacts to pre-assign to each volunteer at once.
      * Higher = fewer round trips, less responsive queue for other volunteers.
@@ -2057,6 +2059,7 @@ export interface OutreachSlot {
     assignedPersonName: string;
     assignedPersonPhone?: string | null;
     assignedPersonEmail?: string | null;
+    assignedPersonRiskCategory?: 'Healthy' | 'At Risk' | 'Disconnected';
     assignedAt: number;
     /**
      * pending   = pre-assigned, volunteer has this in their batch

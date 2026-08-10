@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { OutreachSession, OutreachSlot } from '../types';
 import { firestore } from '../services/firestoreService';
+import { renderCallScript, getAiRecommendedCallScriptByStatus } from '../constants/callScript';
 import {
     Phone, Mail, CheckCircle2, PhoneOff, ArrowRight, LogOut,
     Loader2, Heart, Users, ChevronRight, Award, TrendingUp, MessageSquare,
@@ -165,12 +166,13 @@ type Outcome = 'contacted' | 'no-answer';
 interface ContactCardProps {
     slot: OutreachSlot;
     sessionName?: string;
+    churchName?: string;
     customScript?: string;
     volunteerName?: string | null;
     onComplete: (outcome: Outcome, notes: string, category?: string, isUrgent?: boolean) => void;
 }
 
-const ContactCard: React.FC<ContactCardProps> = ({ slot, sessionName, customScript, volunteerName, onComplete }) => {
+const ContactCard: React.FC<ContactCardProps> = ({ slot, sessionName, churchName, customScript, volunteerName, onComplete }) => {
     const [notes, setNotes] = useState('');
     const [category, setCategory] = useState('General Check-in');
     const [isUrgent, setIsUrgent] = useState(false);
@@ -180,7 +182,34 @@ const ContactCard: React.FC<ContactCardProps> = ({ slot, sessionName, customScri
 
     const firstName = slot.assignedPersonName.split(' ')[0];
     const volunteerFirstName = volunteerName ? volunteerName.split(' ')[0] : '';
-    const smsMessage = `Hi ${firstName}! This is ${volunteerFirstName || 'a volunteer'} from ${sessionName || 'church'}. Just wanted to check in and see how you're doing today!`;
+    const activeChurchName = churchName || sessionName || 'church';
+    const callerDisplayName = volunteerFirstName || 'a volunteer';
+    const contactDisplayName = firstName || 'friend';
+
+    const personStatus = slot.assignedPersonRiskCategory || 'At Risk';
+    const [selectedStatus, setSelectedStatus] = useState<string>(personStatus);
+
+    useEffect(() => {
+        setSelectedStatus(slot.assignedPersonRiskCategory || 'At Risk');
+    }, [slot.id, slot.assignedPersonRiskCategory]);
+
+    const activeStatusDetails = getAiRecommendedCallScriptByStatus(selectedStatus, activeChurchName);
+
+    const renderedScript = customScript
+        ? renderCallScript(customScript, {
+            churchName: activeChurchName,
+            callerName: callerDisplayName,
+            personName: contactDisplayName,
+            status: selectedStatus,
+          })
+        : renderCallScript(null, {
+            churchName: activeChurchName,
+            callerName: callerDisplayName,
+            personName: contactDisplayName,
+            status: selectedStatus,
+          });
+
+    const smsMessage = `Hi ${contactDisplayName}! This is ${callerDisplayName} from ${activeChurchName}. Reaching out to check in on you and see if you have any prayer needs today!`;
     const smsHref = slot.assignedPersonPhone
         ? `sms:${slot.assignedPersonPhone.replace(/\D/g, '').replace(/^(\d{10})$/, '+1$1')}?&body=${encodeURIComponent(smsMessage)}`
         : '#';
@@ -223,35 +252,72 @@ const ContactCard: React.FC<ContactCardProps> = ({ slot, sessionName, customScri
                 <div className="h-2 bg-gradient-to-r from-indigo-500 to-violet-500" />
 
                 <div className="p-8">
-                    {/* Collapsible Call Script & Talking Points */}
+                    {/* Collapsible Call Script & Status Talking Points */}
                     <div className="bg-indigo-50/70 border border-indigo-100/80 rounded-2xl p-4 mb-6 transition-all">
-                        <button
-                            type="button"
-                            onClick={() => setShowScript(!showScript)}
-                            className="w-full flex items-center justify-between text-left text-xs font-bold text-indigo-900"
-                        >
-                            <span className="flex items-center gap-1.5">
+                        <div className="flex items-center justify-between text-xs font-bold text-indigo-900 mb-2">
+                            <button
+                                type="button"
+                                onClick={() => setShowScript(!showScript)}
+                                className="flex items-center gap-1.5 hover:text-indigo-700"
+                            >
                                 <MessageSquare size={14} className="text-indigo-600" />
-                                Recommended Call Script
-                            </span>
-                            <span className="text-[10px] font-black uppercase text-indigo-500 bg-indigo-100 px-2 py-0.5 rounded-full">
-                                {showScript ? 'Hide' : 'View Script'}
-                            </span>
-                        </button>
+                                Recommended Script & Talking Points
+                            </button>
+                            <div className="flex items-center gap-2">
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${activeStatusDetails.badgeBg}`}>
+                                    {activeStatusDetails.badgeText}
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowScript(!showScript)}
+                                    className="text-[10px] font-black uppercase text-indigo-500 bg-indigo-100 px-2 py-0.5 rounded-full"
+                                >
+                                    {showScript ? 'Hide' : 'View'}
+                                </button>
+                            </div>
+                        </div>
+
                         {showScript && (
-                            <div className="mt-3 text-xs text-indigo-950 space-y-2 border-t border-indigo-100/80 pt-2.5 leading-relaxed font-medium">
-                                {customScript ? (
-                                    <p className="whitespace-pre-line leading-relaxed">{customScript}</p>
-                                ) : (
-                                    <>
-                                        <p>
-                                            <span className="font-bold text-indigo-700">Greeting:</span> "Hi {firstName}, this is {volunteerFirstName || 'a volunteer'} from {sessionName || 'church'}!"
-                                        </p>
-                                        <p>
-                                            <span className="font-bold text-indigo-700">Check-in:</span> "We're reaching out to check in on our church family, see how you're doing, and ask if there's anything we can pray with you about today."
-                                        </p>
-                                    </>
-                                )}
+                            <div className="mt-3 text-xs text-indigo-950 space-y-3 border-t border-indigo-100/80 pt-2.5 leading-relaxed font-medium">
+                                {/* Status Selector Tabs */}
+                                <div className="flex items-center gap-1.5 bg-white/80 p-1 rounded-xl border border-indigo-100/60 overflow-x-auto">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-400 px-2 whitespace-nowrap">Status Script:</span>
+                                    {(['Healthy', 'At Risk', 'Disconnected'] as const).map(st => (
+                                        <button
+                                            key={st}
+                                            type="button"
+                                            onClick={() => setSelectedStatus(st)}
+                                            className={`text-[10px] font-bold px-2.5 py-1 rounded-lg transition-all whitespace-nowrap ${
+                                                selectedStatus === st
+                                                    ? 'bg-indigo-600 text-white shadow-xs'
+                                                    : 'text-indigo-600 hover:bg-indigo-50'
+                                            }`}
+                                        >
+                                            {st === 'Healthy' ? '💚 Healthy' : st === 'At Risk' ? '⚠️ Warning' : '🔴 Disconnected'}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {/* Status Talking Points */}
+                                <div className="bg-white/60 p-3 rounded-xl border border-indigo-100/60 space-y-1">
+                                    <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 mb-1">
+                                        💡 Key Talking Points ({activeStatusDetails.statusLabel}):
+                                    </p>
+                                    <ul className="space-y-1 list-disc list-inside text-[11px] text-indigo-900">
+                                        {activeStatusDetails.talkingPoints.map((tp, i) => (
+                                            <li key={i}>{tp}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+
+                                {/* Script Text */}
+                                <div>
+                                    <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-500 mb-1">Call Script:</p>
+                                    <p className="whitespace-pre-line leading-relaxed text-slate-800 bg-white/80 p-3 rounded-xl border border-indigo-100/60 font-normal">
+                                        {renderedScript}
+                                    </p>
+                                </div>
+
                                 <p className="text-[11px] text-indigo-600 italic border-t border-indigo-100/60 pt-2 mt-2">
                                     💡 Tip: If they don't answer, tap <span className="font-bold text-violet-700">Text</span> below to automatically send a pre-filled warm check-in message!
                                 </p>
@@ -973,8 +1039,14 @@ export const PublicContactView: React.FC<{ sessionId: string; mode?: 'followup' 
     // Load session on mount
     useEffect(() => {
         if (!sessionId) { setViewState('not-found'); return; }
-        firestore.getOutreachSession(sessionId).then(s => {
+        firestore.getOutreachSession(sessionId).then(async s => {
             if (!s) { setViewState('not-found'); return; }
+            if (!s.churchName && s.churchId) {
+                try {
+                    const c = await firestore.getChurch(s.churchId);
+                    if (c?.name) s.churchName = c.name;
+                } catch { /* non-blocking */ }
+            }
             setSession(s);
             const stored = sessionStorage.getItem(STORAGE_KEY(sessionId));
             if (stored) setVolunteerPhone(stored);
@@ -1202,7 +1274,7 @@ export const PublicContactView: React.FC<{ sessionId: string; mode?: 'followup' 
                 </div>
             )}
             {viewState === 'contact' && currentSlot && (
-                <ContactCard slot={currentSlot} sessionName={sessionName} customScript={session?.customScript} volunteerName={volunteerName} onComplete={handleComplete} />
+                <ContactCard slot={currentSlot} sessionName={sessionName} churchName={session?.churchName} customScript={session?.customScript} volunteerName={volunteerName} onComplete={handleComplete} />
             )}
             {isDone && (
                 <AllDoneCard

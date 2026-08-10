@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { GroupCareSession, GroupCareSlot } from '../types';
 import { firestore } from '../services/firestoreService';
+import { renderCallScript } from '../constants/callScript';
 import {
   Phone, Mail, CheckCircle2, PhoneOff, ArrowRight, LogOut,
   Loader2, Heart, Users, ChevronRight, Award, TrendingUp, MessageSquare,
@@ -309,13 +310,19 @@ export const PublicGroupCareView: React.FC<{ sessionId: string }> = ({ sessionId
               )}
             </div>
 
-            {/* Custom Call Script */}
-            {session.customScript && (
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 mb-6">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Talking Points / Script</p>
-                <p className="text-xs text-slate-700 leading-relaxed font-medium">"{session.customScript}"</p>
-              </div>
-            )}
+            {/* Call Script & Talking Points */}
+            <div className="p-4 bg-indigo-50/70 border border-indigo-100 rounded-2xl mb-6">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-500 mb-1 flex items-center gap-1.5">
+                <MessageSquare size={12} className="text-indigo-600" /> Recommended Call Script & Talking Points
+              </p>
+              <p className="text-xs text-indigo-950 leading-relaxed font-medium whitespace-pre-line">
+                {renderCallScript(session.customScript, {
+                  churchName: session.churchName,
+                  callerName: volunteerName || 'Group Leader',
+                  personName: activeSlot.assignedPersonName.split(' ')[0],
+                })}
+              </p>
+            </div>
 
             {/* Note & Outcome Form */}
             <div className="space-y-4 pt-2 border-t border-slate-100">

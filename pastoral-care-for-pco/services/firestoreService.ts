@@ -1634,6 +1634,7 @@ class FirestoreService {
             assignedPersonName: person.name,
             assignedPersonPhone: person.phone ?? null,
             assignedPersonEmail: person.email ?? null,
+            assignedPersonRiskCategory: (person as any).riskCategory ?? null,
             assignedAt: now + created.length, // stagger by 1ms so order is deterministic
             status: 'pending',
             notes: '',
