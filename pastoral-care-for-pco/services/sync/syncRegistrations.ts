@@ -57,6 +57,8 @@ export const syncRegistrationsData = async (churchId: string) => {
         campuses.forEach(c => campusMap.set(c.pcoId, c.name));
 
         // ── 2. Signups ───────────────────────────────────────────────────────────
+        // STRICT: this is a full-replace sync. A truncated signup list would wipe
+        // every registration below and restore only the subset that came back.
         const rawSignups = await fetchAllPages(
             churchId,
             'registrations/v2/signups?include=signup_times',
@@ -107,16 +109,15 @@ export const syncRegistrationsData = async (churchId: string) => {
                     canceledCount: 0,
                     lastSynced: now,
                 } as PcoRegistrationEvent;
-            }
+            },
+            100,
+            { strict: true }
         );
 
         const events = rawSignups.filter(Boolean) as PcoRegistrationEvent[];
         logger.info(`Fetched ${events.length} registration signups`, 'sync', { churchId }, churchId);
 
-        // ── 3. Clear existing data AFTER fetch succeeds ──────────────────────
-        await firestore.clearRegistrations(churchId);
-
-        // ── 4. Attendees for each signup ─────────────────────────────────────
+        // ── 3. Attendees for each signup ─────────────────────────────────────
         const allAttendees: PcoRegistrationAttendee[] = [];
 
         for (const event of events) {
@@ -187,6 +188,11 @@ export const syncRegistrationsData = async (churchId: string) => {
             }
             await delay(150);
         }
+
+        // ── 4. Replace: clear only once every fetch has succeeded ────────────
+        // Doing this any earlier leaves a window where a failed attendee fetch (or a
+        // crash) drops the tenant's registrations with nothing to restore them from.
+        await firestore.clearRegistrations(churchId);
 
         // ── 5. Persist to Firestore ──────────────────────────────────────────
         if (events.length > 0) await firestore.upsertRegistrations(events);

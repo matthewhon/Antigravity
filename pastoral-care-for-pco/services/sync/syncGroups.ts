@@ -14,7 +14,7 @@ export const syncGroupsData = async (churchId: string) => {
     const campusMap = new Map<string, string>();
     campuses.forEach(c => campusMap.set(c.pcoId, c.name));
 
-    const groups = await fetchAllPages(churchId, 'groups/v2/groups?include=group_type,campus', (g: any, included: any[] = []) => {
+    const mapGroup = (g: any, included: any[] = []) => {
         const typeId = g.relationships?.group_type?.data?.id;
         const typeObj = included?.find(i => i.type === 'GroupType' && i.id === typeId);
         const groupTypeName = typeObj?.attributes?.name || 'Small Group';
@@ -39,22 +39,63 @@ export const syncGroupsData = async (churchId: string) => {
             campusId,
             campusName
         } as PcoGroup;
-    });
+    };
 
-    logger.info(`Found ${groups.length} groups — starting deep scan`, 'sync', { churchId, count: groups.length }, churchId);
+    // STRICT: an empty/truncated result here makes every local group look deleted,
+    // and the reconciliation below would archive them all. Fail loudly instead.
+    const groups = await fetchAllPages(
+        churchId,
+        'groups/v2/groups?include=group_type,campus',
+        mapGroup,
+        100,
+        { strict: true }
+    );
+
+    // The unfiltered endpoint omits archived groups, so fetch them separately.
+    // Without this, archived groups are only ever detected by their *absence*, and
+    // get stamped with the sync time instead of the date PCO actually archived them.
+    let pcoArchivedGroups: PcoGroup[] = [];
+    try {
+        pcoArchivedGroups = await fetchAllPages(
+            churchId,
+            'groups/v2/groups?filter=archived&include=group_type,campus',
+            mapGroup,
+            100,
+            { strict: true }
+        );
+    } catch (e: any) {
+        // Non-fatal: we fall back to absence-detection below, same as before.
+        logger.warn('Archived groups fetch failed — archive dates may be approximate',
+            'sync', { churchId, error: e?.message }, churchId);
+    }
+
+    logger.info(
+        `Found ${groups.length} active and ${pcoArchivedGroups.length} archived groups — starting deep scan`,
+        'sync', { churchId, active: groups.length, archived: pcoArchivedGroups.length }, churchId
+    );
 
     const localGroups = await firestore.getGroups(churchId);
-    const fetchedGroupIds = new Set(groups.map(g => g.id));
+    const localById = new Map(localGroups.map(lg => [lg.id, lg]));
+    const knownInPco = new Set([...groups, ...pcoArchivedGroups].map(g => g.id));
 
+    // Archived in PCO: keep the real archived_at, but merge onto whatever we already
+    // hold so a merge-write doesn't blank out memberIds/attendanceHistory that the
+    // deep scan collected while the group was still active.
+    const archivedGroups = pcoArchivedGroups.map(g => {
+        const existing = localById.get(g.id);
+        return existing ? { ...existing, ...g, memberIds: existing.memberIds ?? g.memberIds, leaderIds: existing.leaderIds ?? g.leaderIds, attendanceHistory: existing.attendanceHistory ?? g.attendanceHistory } : g;
+    });
+
+    // Gone from PCO entirely (deleted, or no longer visible to our token). PCO has no
+    // date to give us here, so the sync time is the best marker available.
     const missingLocalGroups = localGroups
-        .filter(lg => !fetchedGroupIds.has(lg.id))
+        .filter(lg => !knownInPco.has(lg.id))
         .map(lg => ({
             ...lg,
             archivedAt: lg.archivedAt || new Date().toISOString()
         }));
 
     const activeGroups = groups.filter(g => !g.archivedAt);
-    const archivedGroups = groups.filter(g => g.archivedAt);
     const enrichedGroups: PcoGroup[] = [];
 
     for (const group of activeGroups) {

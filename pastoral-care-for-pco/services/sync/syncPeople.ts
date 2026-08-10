@@ -8,22 +8,36 @@ import { PcoPerson, PcoCampus, StatusChangeRecord } from '../../types';
 import { logger, fetchAllPages, delay } from './pcoSyncCore.ts';
 
 export const syncCampusesData = async (churchId: string): Promise<PcoCampus[]> => {
+    logger.info('Syncing campuses...', 'sync', { churchId }, churchId);
+    const now = Date.now();
+
     const campuses = await fetchAllPages(
         churchId,
         'people/v2/campuses',
-        (c: any) => ({
-            id: `${churchId}_${c.id}`,
-            pcoId: c.id,
-            churchId,
-            name: c.attributes.name,
-        } as PcoCampus)
+        (c: any) => {
+            // Guard: a throw inside the mapper is caught by fetchAllPages as a *page*
+            // error, so one malformed campus would silently truncate the whole list.
+            if (!c) return null;
+            const attrs = c.attributes || {};
+            return {
+                id: `${churchId}_${c.id}`,
+                pcoId: c.id,
+                churchId,
+                name: attrs.name || 'Unnamed Campus',
+                active: attrs.active ?? true,
+                createdAt: attrs.created_at || null,
+                updatedAt: attrs.updated_at || null,
+                lastSynced: now,
+            } as PcoCampus;
+        }
     );
 
-    if (campuses.length > 0) {
-        await firestore.upsertCampuses(campuses);
-        logger.info(`Synced ${campuses.length} campuses`, 'sync', { churchId, count: campuses.length }, churchId);
+    const filtered = campuses.filter(Boolean) as PcoCampus[];
+    if (filtered.length > 0) {
+        await firestore.upsertCampuses(filtered);
     }
-    return campuses;
+    logger.info('Campuses synced', 'sync', { churchId, count: filtered.length }, churchId);
+    return filtered;
 };
 
 export const syncPeopleData = async (churchId: string) => {
@@ -266,13 +280,16 @@ export const reconcileSmsConversations = async (churchId: string): Promise<void>
 
         let updatedCount = 0;
         let clearedCount = 0;
-        const batch = db.batch();
+        // A WriteBatch is single-use — it must be replaced after every commit, or the
+        // next update() throws 'Cannot modify a WriteBatch that has been committed'.
+        let batch = db.batch();
         let batchSize = 0;
         const MAX_BATCH = 400;
 
         const flush = async () => {
             if (batchSize > 0) {
                 await batch.commit();
+                batch = db.batch();
                 batchSize = 0;
             }
         };

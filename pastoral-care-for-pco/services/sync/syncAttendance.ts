@@ -28,7 +28,7 @@ export const syncCheckInCounts = async (churchId: string) => {
     try {
         const checkIns = await fetchAllPages(
             churchId,
-            `check-ins/v2/check_ins?where[created_at][gte]=${sinceStr}&per_page=100`,
+            `check-ins/v2/check_ins?where[created_at][gte]=${sinceStr}`,
             (ci: any) => {
                 const campusId = ci.relationships?.campus?.data?.id || null;
                 const campusName = campusId ? (campusMap.get(campusId) ?? null) : null;

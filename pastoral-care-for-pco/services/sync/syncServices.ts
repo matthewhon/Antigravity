@@ -58,14 +58,16 @@ export const syncServicesData = async (churchId: string) => {
             const batch = teams.slice(i, i + BATCH_SIZE);
             await Promise.all(batch.map(async (team) => {
                 try {
+                    // pcoFetch returns null on 404 — optional-chain it, or a missing
+                    // team_leaders endpoint throws and costs us the members fetch too.
                     const leaderRes = await pcoFetch(churchId, `services/v2/teams/${team.id}/team_leaders`);
-                    if (leaderRes.data) {
+                    if (leaderRes?.data) {
                         const lIds = leaderRes.data.map((l: any) => l.relationships?.person?.data?.id).filter(Boolean);
                         team.leaderPersonIds = lIds;
                         team.leaderCount = lIds.length;
                     }
                     const membersRes = await pcoFetch(churchId, `services/v2/teams/${team.id}/people?per_page=100`);
-                    if (membersRes.data) {
+                    if (membersRes?.data) {
                         const mIds = membersRes.data.map((p: any) => p.id).filter(Boolean);
                         team.memberIds = mIds;
                     }
@@ -160,11 +162,11 @@ export const syncServicesData = async (churchId: string) => {
 
         try {
             const membersData = await pcoFetch(churchId, membersUrl);
-            const members = (membersData.data || []).map((m: any) => {
+            const members = (membersData?.data || []).map((m: any) => {
                 const teamId = m.relationships?.team?.data?.id;
                 let teamName = null;
                 if (teamId) {
-                    const teamObj = (membersData.included || []).find((inc: any) => inc.type === 'Team' && String(inc.id) === String(teamId));
+                    const teamObj = (membersData?.included || []).find((inc: any) => inc.type === 'Team' && String(inc.id) === String(teamId));
                     if (teamObj) teamName = teamObj.attributes?.name || null;
                     if (!teamName) {
                         const team = teams.find(t => String(t.id) === String(teamId));
@@ -207,12 +209,12 @@ export const syncServicesData = async (churchId: string) => {
             });
 
             const neededData = await pcoFetch(churchId, neededUrl);
-            const neededPositions = (neededData.data || []).map((np: any) => {
+            const neededPositions = (neededData?.data || []).map((np: any) => {
                 let teamName = np.attributes.team_name;
                 const teamId = np.relationships?.team?.data?.id;
                 if (!teamName || teamName === 'Unknown') {
                     if (teamId) {
-                        const teamObj = (neededData.included || []).find((inc: any) => inc.type === 'Team' && String(inc.id) === String(teamId));
+                        const teamObj = (neededData?.included || []).find((inc: any) => inc.type === 'Team' && String(inc.id) === String(teamId));
                         if (teamObj) teamName = teamObj.attributes?.name || null;
                         if (!teamName) {
                             const team = teams.find(t => String(t.id) === String(teamId));
@@ -228,12 +230,12 @@ export const syncServicesData = async (churchId: string) => {
             try {
                 const itemsData = await pcoFetch(churchId, itemsUrl);
                 const includedSongs = new Map<string, { title: string; author: string }>();
-                (itemsData.included || []).forEach((inc: any) => {
+                (itemsData?.included || []).forEach((inc: any) => {
                     if (inc.type === 'Song') {
                         includedSongs.set(inc.id, { title: inc.attributes.title || 'Unknown', author: inc.attributes.author || '' });
                     }
                 });
-                items = (itemsData.data || [])
+                items = (itemsData?.data || [])
                     .map((item: any) => {
                         const songId = item.relationships?.song?.data?.id;
                         const songDetail = songId ? includedSongs.get(songId) : null;
