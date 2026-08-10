@@ -269,10 +269,18 @@ export async function fetchSignalWireMedia(
 
     const authHeader = 'Basic ' + Buffer.from(`${projectId}:${apiToken}`).toString('base64');
 
-    /** Fetch a URL, optionally with auth. Returns { buffer, contentType, location? } */
-    function fetchRaw(url: string, withAuth: boolean): Promise<{ buffer: Buffer; contentType: string; statusCode: number; location?: string }> {
-        return new Promise((resolve, reject) => {
-            const urlObj = new URL(url);
+    async function fetchFollowRedirects(currentUrl: string, depth = 0): Promise<{ buffer: Buffer; contentType: string }> {
+        if (depth > 5) {
+            throw new Error(`Too many redirects fetching SignalWire media (${currentUrl})`);
+        }
+
+        const urlObj = new URL(currentUrl);
+        // Only send Basic Auth to SignalWire LAML API endpoints (api.signalwire.com or *.signalwire.com/api/laml)
+        // NEVER send Authorization header to CDN / S3 pre-signed storage hosts (files.*.signalwire.com, s3.amazonaws.com, etc.)
+        const isLamlApi = urlObj.pathname.includes('/api/laml/') || (urlObj.hostname.endsWith('.signalwire.com') && !urlObj.hostname.startsWith('files.'));
+        const withAuth = isLamlApi;
+
+        const res = await new Promise<{ statusCode: number; contentType: string; location?: string; buffer: Buffer }>((resolve, reject) => {
             const req = https.request({
                 hostname: urlObj.hostname,
                 path:     urlObj.pathname + urlObj.search,
@@ -283,59 +291,57 @@ export async function fetchSignalWireMedia(
                 const contentType = ((res.headers['content-type'] || 'application/octet-stream').split(';')[0]).trim();
                 const location = res.headers.location as string | undefined;
 
-                if (statusCode === 301 || statusCode === 302) {
+                if (statusCode === 301 || statusCode === 302 || statusCode === 307 || statusCode === 308) {
                     res.resume();
-                    resolve({ buffer: Buffer.alloc(0), contentType, statusCode, location });
+                    const nextUrl = location
+                        ? (location.startsWith('http') ? location : new URL(location, currentUrl).href)
+                        : null;
+                    if (!nextUrl) {
+                        return reject(new Error(`Redirect HTTP ${statusCode} without location header`));
+                    }
+                    resolve({ statusCode, contentType, location: nextUrl, buffer: Buffer.alloc(0) });
                     return;
                 }
+
                 if (statusCode >= 400) {
                     res.resume();
-                    reject(new Error(`HTTP ${statusCode} fetching ${url}`));
-                    return;
+                    return reject(new Error(`HTTP ${statusCode} fetching ${currentUrl}`));
                 }
+
                 const chunks: Buffer[] = [];
                 res.on('data', (c: Buffer) => chunks.push(c));
-                res.on('end', () => resolve({ buffer: Buffer.concat(chunks), contentType, statusCode }));
+                res.on('end', () => resolve({ statusCode, contentType, buffer: Buffer.concat(chunks) }));
                 res.on('error', reject);
             });
             req.on('error', reject);
             req.end();
         });
-    }
 
-    // Step 1: Authenticated fetch of the SignalWire API media URL
-    let result = await fetchRaw(mediaUrl, true);
-
-    // Step 2: Follow redirect (302 → files.signalwire.com/.../*.smil or direct image)
-    if ((result.statusCode === 301 || result.statusCode === 302) && result.location) {
-        const redirectUrl = result.location;
-        try {
-            result = await fetchRaw(redirectUrl, false);
-        } catch (e: any) {
-            result = await fetchRaw(redirectUrl, true);
+        if (res.location) {
+            return fetchFollowRedirects(res.location, depth + 1);
         }
 
-        // Step 3: If the redirect target is a SMIL playlist, parse out the actual image URL
-        if (result.contentType.includes('smil') || redirectUrl.endsWith('.smil')) {
-            const smilText = result.buffer.toString('utf8');
-            // Extract src attribute: <img src="filename.JPG" .../>
+        // If the fetched file is a SMIL playlist XML, parse out the actual media URL
+        if (res.contentType.includes('smil') || currentUrl.endsWith('.smil')) {
+            const smilText = res.buffer.toString('utf8');
             const srcMatch = smilText.match(/<img[^>]+src="([^"]+)"/i)
-                          || smilText.match(/<video[^>]+src="([^"]+)"/i);
+                          || smilText.match(/<video[^>]+src="([^"]+)"/i)
+                          || smilText.match(/<audio[^>]+src="([^"]+)"/i)
+                          || smilText.match(/<ref[^>]+src="([^"]+)"/i);
             if (!srcMatch) {
                 throw new Error(`Could not parse media URL from SMIL: ${smilText.slice(0, 200)}`);
             }
-            // Resolve relative to the SMIL URL's directory
-            const smilBase = redirectUrl.substring(0, redirectUrl.lastIndexOf('/') + 1);
-            const actualUrl = srcMatch[1].startsWith('http') ? srcMatch[1] : smilBase + srcMatch[1];
-            try {
-                result = await fetchRaw(actualUrl, false);
-            } catch (e: any) {
-                result = await fetchRaw(actualUrl, true);
-            }
+            const actualUrl = srcMatch[1].startsWith('http')
+                ? srcMatch[1]
+                : new URL(srcMatch[1], currentUrl).href;
+
+            return fetchFollowRedirects(actualUrl, depth + 1);
         }
+
+        return { buffer: res.buffer, contentType: res.contentType };
     }
 
-    return { buffer: result.buffer, contentType: result.contentType };
+    return fetchFollowRedirects(mediaUrl);
 }
 
 

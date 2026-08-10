@@ -106,7 +106,7 @@ async function fetchWithPcoCache<T>(key: string, fetcher: () => Promise<T>, ttlM
     if (cached && (Date.now() - cached.timestamp < ttlMs)) {
         return cached.data;
     }
-    if (pendingPcoRequests[key]) {
+    if (key in pendingPcoRequests) {
         return pendingPcoRequests[key];
     }
     const promise = (async () => {
