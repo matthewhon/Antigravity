@@ -104,34 +104,58 @@ export const TrendStrip: React.FC<TrendStripProps> = ({
                 >
                     {series.map(s => {
                         const windowedPoints = s.points.slice(-selectedOption.weeks);
-                        const latest = windowedPoints.length ? windowedPoints[windowedPoints.length - 1].value : 0;
-                        const pct = changeAcross(windowedPoints);
+                        const hasPoints = windowedPoints.length > 0;
+                        const lastPoint = hasPoints ? windowedPoints[windowedPoints.length - 1] : null;
+                        const prevPoint = windowedPoints.length >= 2 ? windowedPoints[windowedPoints.length - 2] : null;
+
+                        // If the latest week bucket is 0 (e.g. current week before Sunday services), fall back to latest completed week
+                        const isCurrentWeekEmpty = !!(lastPoint && lastPoint.value === 0 && prevPoint && prevPoint.value > 0);
+                        const displayPoint = isCurrentWeekEmpty ? prevPoint! : (lastPoint || { weekStart: '', value: 0 });
+
+                        // Compute change percentage over completed weeks to prevent partial mid-week zeros from skewing to -100%
+                        const evalPoints = isCurrentWeekEmpty ? windowedPoints.slice(0, -1) : windowedPoints;
+                        const pct = changeAcross(evalPoints);
+
+                        const periodTotal = windowedPoints.reduce((sum, p) => sum + p.value, 0);
+                        const avgPerWeek = windowedPoints.length > 0 ? periodTotal / windowedPoints.length : 0;
+
                         return (
-                            <Card key={s.id} className="p-6 print:p-3">
-                                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                                    {s.label}
-                                </p>
-                                <div className="flex items-baseline gap-2 mt-2 mb-3">
-                                    <p className="text-2xl font-black tracking-tighter tabular-nums text-slate-900 dark:text-white">
-                                        {fmtValue(latest, s.isCurrency)}
-                                    </p>
-                                    {pct !== null && pct !== 0 && (
-                                        <span
-                                            className={
-                                                'text-[11px] font-black tabular-nums ' +
-                                                (pct > 0
-                                                    ? 'text-emerald-600 dark:text-emerald-400'
-                                                    : 'text-rose-500 dark:text-rose-400')
-                                            }
-                                        >
-                                            {pct > 0 ? '+' : ''}{pct}%
+                            <Card key={s.id} className="p-6 print:p-3 flex flex-col justify-between">
+                                <div>
+                                    <div className="flex items-center justify-between gap-2">
+                                        <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                                            {s.label}
+                                        </p>
+                                        <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 font-mono">
+                                            Total: {fmtValue(periodTotal, s.isCurrency)}
                                         </span>
-                                    )}
+                                    </div>
+                                    <div className="flex items-baseline gap-2 mt-2 mb-3">
+                                        <p className="text-2xl font-black tracking-tighter tabular-nums text-slate-900 dark:text-white">
+                                            {fmtValue(displayPoint.value, s.isCurrency)}
+                                        </p>
+                                        {pct !== null && pct !== 0 && (
+                                            <span
+                                                className={
+                                                    'text-[11px] font-black tabular-nums ' +
+                                                    (pct > 0
+                                                        ? 'text-emerald-600 dark:text-emerald-400'
+                                                        : 'text-rose-500 dark:text-rose-400')
+                                                }
+                                            >
+                                                {pct > 0 ? '+' : ''}{pct}%
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
-                                <Sparkline points={windowedPoints} slot={SERIES_SLOT[s.id] ?? 0} isCurrency={s.isCurrency} showEndDot height={56} />
-                                <p className="text-[10px] font-medium text-slate-300 dark:text-slate-600 mt-1">
-                                    latest week · {selectedOption.caption}
-                                </p>
+
+                                <div>
+                                    <Sparkline points={windowedPoints} slot={SERIES_SLOT[s.id] ?? 0} isCurrency={s.isCurrency} showEndDot height={56} />
+                                    <div className="flex items-center justify-between text-[10px] font-medium text-slate-400 dark:text-slate-500 mt-2 pt-2 border-t border-slate-100 dark:border-slate-800/60">
+                                        <span>{isCurrentWeekEmpty ? 'latest completed week' : 'latest week'}</span>
+                                        <span>avg {fmtValue(Math.round(avgPerWeek), s.isCurrency)}/wk</span>
+                                    </div>
+                                </div>
                             </Card>
                         );
                     })}
