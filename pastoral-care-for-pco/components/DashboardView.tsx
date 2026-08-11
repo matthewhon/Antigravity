@@ -171,7 +171,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     const sections: Record<string, React.ReactNode> = {
         needs_attention: <NeedsAttention rows={overview.needsAttention} {...ctl('needs_attention')} />,
         this_week: <WeekComparison rows={overview.thisWeek} {...ctl('this_week')} />,
-        trends: <TrendStrip series={overview.trends} {...ctl('trends')} />,
+        trends: (
+            <TrendStrip
+                series={overview.trends}
+                lookback={(preferences?.trendsLookback as any) || '30d'}
+                onLookbackChange={next => onUpdatePreferences?.({ ...preferences, trendsLookback: next })}
+                {...ctl('trends')}
+            />
+        ),
         areas: <AreaBands areas={overview.areas} {...ctl('areas')} />,
         timeline: (
             <Section

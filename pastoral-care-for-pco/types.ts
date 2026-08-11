@@ -35,6 +35,8 @@ export interface DashboardPreferences {
     order?: string[];
     /** Section ids the user has collapsed. */
     collapsed?: string[];
+    /** Preferred lookback period for trends section. */
+    trendsLookback?: string;
 }
 
 export interface RiskSettings {
