@@ -18,7 +18,7 @@ interface DonationReportProps {
 type IntervalType = 'Weekly' | 'Monthly' | 'Quarterly' | 'YTD';
 type SortField = 'totalAmount' | 'name' | 'lastGiftDate';
 type SortDirection = 'asc' | 'desc';
-type ReportTab = 'donors' | 'giving_by_fund' | 'age_trends' | 'status_trends' | 'avg_giving' | 'giving_by_label';
+type ReportTab = 'donors' | 'giving_by_fund' | 'age_trends' | 'status_trends' | 'avg_giving' | 'giving_by_label' | 'fund_label_pivot';
 
 interface FilterState {
     startDate: string;
@@ -127,6 +127,8 @@ function getBucketLabel(key: string, interval: IntervalType): string {
 // ── Main Component ─────────────────────────────────────────────────────────────
 export const DonationReport: React.FC<DonationReportProps> = ({ donations, people }) => {
     const [activeTab, setActiveTab] = useState<ReportTab>('donors');
+    const [pivotPrimary, setPivotPrimary] = useState<'fund' | 'label'>('fund');
+    const [pivotViewMode, setPivotViewMode] = useState<'nested' | 'matrix'>('nested');
     const [filters, setFilters] = useState<FilterState>({
         startDate: format(startOfYear(new Date()), 'yyyy-MM-dd'),
         endDate:   format(new Date(getYear(new Date()), 11, 31), 'yyyy-MM-dd'),
@@ -474,6 +476,117 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
         return { fundData, overallTotal, chartData };
     }, [filteredDonations, buckets, filters.interval]);
 
+    // 7. Fund & Label Pivot — Cross-tabulation & bi-directional mapping between funds and labels
+    const fundLabelPivotData = useMemo(() => {
+        const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#06b6d4', '#8b5cf6', '#f43f5e', '#ec4899', '#14b8a6', '#3b82f6', '#10b981'];
+
+        const overallTotal = filteredDonations.reduce((s, d) => s + d.amount, 0);
+
+        // Collect all distinct fund names
+        const fundsList = Array.from(new Set(filteredDonations.map(d => d.fundName || 'General'))).sort();
+
+        // Collect all distinct labels (including '(Unlabeled)' if any donation has no labels)
+        const labelsSet = new Set<string>();
+        let hasUnlabeled = false;
+        filteredDonations.forEach(d => {
+            if (d.labels && d.labels.length > 0) {
+                d.labels.forEach(l => labelsSet.add(l));
+            } else {
+                hasUnlabeled = true;
+            }
+        });
+        const labelsList = Array.from(labelsSet).sort();
+        if (hasUnlabeled) {
+            labelsList.push('(Unlabeled)');
+        }
+
+        // Matrix mapping: [fundName][labelName] -> { amount, txCount, givers: Set<string> }
+        const matrixMap = new Map<string, Map<string, { amount: number; txCount: number; givers: Set<string> }>>();
+        
+        fundsList.forEach((f: string) => {
+            const rowMap = new Map<string, { amount: number; txCount: number; givers: Set<string> }>();
+            labelsList.forEach((l: string) => {
+                rowMap.set(l, { amount: 0, txCount: 0, givers: new Set() });
+            });
+            matrixMap.set(f, rowMap);
+        });
+
+        filteredDonations.forEach(d => {
+            const fName = d.fundName || 'General';
+            const tags = d.labels && d.labels.length > 0 ? d.labels : ['(Unlabeled)'];
+            
+            tags.forEach((tag: string) => {
+                const cell = matrixMap.get(fName)?.get(tag);
+                if (cell) {
+                    cell.amount += d.amount;
+                    cell.txCount += 1;
+                    if (d.donorId) cell.givers.add(d.donorId);
+                }
+            });
+        });
+
+        // 1. Grouped by Fund (Fund -> Labels)
+        const byFund = fundsList.map((fundName: string, idx: number) => {
+            const color = COLORS[idx % COLORS.length];
+            const fundDonations = filteredDonations.filter(d => (d.fundName || 'General') === fundName);
+            const totalGiven = fundDonations.reduce((s, d) => s + d.amount, 0);
+            const txCount = fundDonations.length;
+            const donorCount = new Set(fundDonations.map(d => d.donorId)).size;
+            const pctOfTotal = overallTotal > 0 ? (totalGiven / overallTotal) * 100 : 0;
+
+            const labelBreakdown = labelsList.map((labelName: string) => {
+                const cell = matrixMap.get(fundName)?.get(labelName);
+                const amount = cell ? cell.amount : 0;
+                const cellTx = cell ? cell.txCount : 0;
+                const cellGivers = cell ? cell.givers.size : 0;
+                const pctOfFund = totalGiven > 0 ? (amount / totalGiven) * 100 : 0;
+                return { labelName, amount, txCount: cellTx, giversCount: cellGivers, pctOfFund };
+            }).filter(item => item.amount > 0).sort((a, b) => b.amount - a.amount);
+
+            return { fundName, color, totalGiven, txCount, donorCount, pctOfTotal, labelBreakdown };
+        }).sort((a, b) => b.totalGiven - a.totalGiven);
+
+        // 2. Grouped by Label (Label -> Funds)
+        const byLabel = labelsList.map((labelName: string, idx: number) => {
+            const color = COLORS[idx % COLORS.length];
+            let labelDonations = filteredDonations;
+            if (labelName === '(Unlabeled)') {
+                labelDonations = filteredDonations.filter(d => !d.labels || d.labels.length === 0);
+            } else {
+                labelDonations = filteredDonations.filter(d => d.labels?.includes(labelName));
+            }
+
+            const totalGiven = labelDonations.reduce((s, d) => s + d.amount, 0);
+            const txCount = labelDonations.length;
+            const donorCount = new Set(labelDonations.map(d => d.donorId)).size;
+            const pctOfTotal = overallTotal > 0 ? (totalGiven / overallTotal) * 100 : 0;
+
+            const fundBreakdown = fundsList.map((fundName: string) => {
+                const cell = matrixMap.get(fundName)?.get(labelName);
+                const amount = cell ? cell.amount : 0;
+                const cellTx = cell ? cell.txCount : 0;
+                const cellGivers = cell ? cell.givers.size : 0;
+                const pctOfLabel = totalGiven > 0 ? (amount / totalGiven) * 100 : 0;
+                return { fundName, amount, txCount: cellTx, giversCount: cellGivers, pctOfLabel };
+            }).filter(item => item.amount > 0).sort((a, b) => b.amount - a.amount);
+
+            return { labelName, color, totalGiven, txCount, donorCount, pctOfTotal, fundBreakdown };
+        }).sort((a, b) => b.totalGiven - a.totalGiven);
+
+        // Find labels spanning multiple funds
+        const multiFundLabels = byLabel.filter(l => l.fundBreakdown.length > 1);
+
+        return {
+            fundsList,
+            labelsList,
+            matrixMap,
+            byFund,
+            byLabel,
+            overallTotal,
+            multiFundLabels,
+        };
+    }, [filteredDonations]);
+
     // 5. Avg Giving by Fund — total given per fund ÷ weeks in period
     const avgGivingByQuarter = useMemo(() => {
         const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#06b6d4', '#f43f5e', '#8b5cf6', '#ec4899', '#14b8a6'];
@@ -653,6 +766,40 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
             ].join(','));
             csv = [header.join(','), ...rows].join('\n');
             filename = `giving_by_fund_${format(new Date(), 'yyyy-MM-dd')}.csv`;
+        } else if (activeTab === 'fund_label_pivot') {
+            if (pivotPrimary === 'fund') {
+                const header = ['Fund Name', 'Total Given', ...fundLabelPivotData.labelsList.map(escapeCsv), 'Total Givers'];
+                const rows = fundLabelPivotData.byFund.map(f => {
+                    const labelAmounts = fundLabelPivotData.labelsList.map(lbl => {
+                        const cell = fundLabelPivotData.matrixMap.get(f.fundName)?.get(lbl);
+                        return (cell?.amount || 0).toFixed(2);
+                    });
+                    return [
+                        escapeCsv(f.fundName),
+                        f.totalGiven.toFixed(2),
+                        ...labelAmounts,
+                        f.donorCount
+                    ].join(',');
+                });
+                csv = [header.join(','), ...rows].join('\n');
+                filename = `fund_label_pivot_by_fund_${format(new Date(), 'yyyy-MM-dd')}.csv`;
+            } else {
+                const header = ['Label Name', 'Total Given', ...fundLabelPivotData.fundsList.map(escapeCsv), 'Total Givers'];
+                const rows = fundLabelPivotData.byLabel.map(l => {
+                    const fundAmounts = fundLabelPivotData.fundsList.map(fnd => {
+                        const cell = fundLabelPivotData.matrixMap.get(fnd)?.get(l.labelName);
+                        return (cell?.amount || 0).toFixed(2);
+                    });
+                    return [
+                        escapeCsv(l.labelName),
+                        l.totalGiven.toFixed(2),
+                        ...fundAmounts,
+                        l.donorCount
+                    ].join(',');
+                });
+                csv = [header.join(','), ...rows].join('\n');
+                filename = `fund_label_pivot_by_label_${format(new Date(), 'yyyy-MM-dd')}.csv`;
+            }
         }
 
         if (!csv) return;
@@ -817,6 +964,7 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                 {([
                     { id: 'donors',          label: '👤 Donor Report' },
                     { id: 'giving_by_fund',  label: '🏛️ Giving by Fund' },
+                    { id: 'fund_label_pivot', label: '🔄 Fund & Label Pivot' },
                     { id: 'age_trends',      label: '🎂 Age Demographics' },
                     { id: 'status_trends',   label: '🏷️ Giving By Status' },
                     { id: 'avg_giving',      label: '📊 Avg Giving by Fund' },
@@ -1569,6 +1717,264 @@ export const DonationReport: React.FC<DonationReportProps> = ({ donations, peopl
                                             </table>
                                         </div>
                                     </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                );
+            })()}
+
+            {/* ── Fund & Label Pivot Report ─────────────────────────────────── */}
+            {activeTab === 'fund_label_pivot' && (() => {
+                const { fundsList, labelsList, matrixMap, byFund, byLabel, overallTotal, multiFundLabels } = fundLabelPivotData;
+                const hasData = filteredDonations.length > 0;
+
+                return (
+                    <div className="space-y-6">
+                        <div className="bg-white dark:bg-slate-800 rounded-[2rem] border border-slate-100 dark:border-slate-700 shadow-sm p-8 space-y-8">
+                            {/* Header & Controls */}
+                            <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                                <div>
+                                    <h3 className="text-lg font-black text-slate-900 dark:text-white">Fund & Label Pivot Analysis</h3>
+                                    <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide mt-1">
+                                        Cross-analyze giving by Fund and Label to spot miscategorizations
+                                    </p>
+                                    <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">{filters.startDate} – {filters.endDate}</p>
+                                </div>
+
+                                {/* Controls: Primary Pivot Switcher & View Mode Toggle */}
+                                {hasData && (
+                                    <div className="flex flex-wrap items-center gap-3">
+                                        {/* Primary Grouping Toggle */}
+                                        <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-900 p-1 rounded-xl">
+                                            <button
+                                                type="button"
+                                                onClick={() => setPivotPrimary('fund')}
+                                                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                                                    pivotPrimary === 'fund'
+                                                        ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                                                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-800'
+                                                }`}
+                                            >
+                                                Fund → Labels
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setPivotPrimary('label')}
+                                                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                                                    pivotPrimary === 'label'
+                                                        ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                                                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-800'
+                                                }`}
+                                            >
+                                                Label → Funds (Reverse)
+                                            </button>
+                                        </div>
+
+                                        {/* View Mode Toggle */}
+                                        <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-900 p-1 rounded-xl">
+                                            <button
+                                                type="button"
+                                                onClick={() => setPivotViewMode('nested')}
+                                                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                                                    pivotViewMode === 'nested'
+                                                        ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                                                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-800'
+                                                }`}
+                                            >
+                                                Breakdown Cards
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setPivotViewMode('matrix')}
+                                                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                                                    pivotViewMode === 'matrix'
+                                                        ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                                                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-800'
+                                                }`}
+                                            >
+                                                2D Matrix Table
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {!hasData ? (
+                                <div className="flex flex-col items-center justify-center h-48 text-center gap-3">
+                                    <span className="text-4xl opacity-20">🔄</span>
+                                    <p className="text-xs font-bold text-slate-400">No pivot data available for the selected filters</p>
+                                    <p className="text-[10px] text-slate-400">Adjust the filters above to inspect Fund & Label relationships.</p>
+                                </div>
+                            ) : (
+                                <>
+                                    {/* Multi-Fund Label Warning Alert */}
+                                    {multiFundLabels.length > 0 && (
+                                        <div className="p-4 rounded-2xl bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/40 flex items-start gap-3">
+                                            <span className="text-lg">💡</span>
+                                            <div className="space-y-1">
+                                                <p className="text-xs font-bold text-indigo-900 dark:text-indigo-300 uppercase tracking-wider">
+                                                    Cross-Fund Label Observations ({multiFundLabels.length} Label{multiFundLabels.length === 1 ? '' : 's'} span multiple funds)
+                                                </p>
+                                                <p className="text-xs text-indigo-800 dark:text-indigo-300/80 leading-relaxed">
+                                                    The following labels appear across more than one fund: {multiFundLabels.map(m => m.labelName).join(', ')}. Inspect the pivot matrix below to confirm whether donations were properly designated or if funds were misassigned.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* ── View 1: Nested Breakdown Cards ── */}
+                                    {pivotViewMode === 'nested' && (
+                                        <div className="space-y-6">
+                                            {(pivotPrimary === 'fund' ? byFund : byLabel).map(primary => {
+                                                const title = pivotPrimary === 'fund' ? primary.fundName : primary.labelName;
+                                                const breakdown = pivotPrimary === 'fund' ? primary.labelBreakdown : primary.fundBreakdown;
+
+                                                return (
+                                                    <div key={title} className="p-6 rounded-2xl bg-slate-50/70 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800/80 space-y-4">
+                                                        {/* Primary Header */}
+                                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200/60 dark:border-slate-800 pb-3">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: primary.color }} />
+                                                                <span className="text-base font-black text-slate-900 dark:text-white">{title}</span>
+                                                                <span className="text-xs font-bold text-slate-400 font-mono">({primary.pctOfTotal.toFixed(1)}% of total)</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-4 text-xs font-mono">
+                                                                <span className="font-black text-indigo-600 dark:text-indigo-400 text-sm">
+                                                                    ${primary.totalGiven.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                                </span>
+                                                                <span className="text-slate-400 font-medium">
+                                                                    {primary.donorCount} Giver{primary.donorCount === 1 ? '' : 's'} · {primary.txCount} Gift{primary.txCount === 1 ? '' : 's'}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Secondary Items list */}
+                                                        {breakdown.length === 0 ? (
+                                                            <p className="text-xs italic text-slate-400">No secondary items attached.</p>
+                                                        ) : (
+                                                            <div className="space-y-3 pt-1">
+                                                                {breakdown.map(sec => {
+                                                                    const secTitle = pivotPrimary === 'fund' ? (sec as any).labelName : (sec as any).fundName;
+                                                                    const pctVal = pivotPrimary === 'fund' ? (sec as any).pctOfFund : (sec as any).pctOfLabel;
+
+                                                                    return (
+                                                                        <div key={secTitle} className="space-y-1.5">
+                                                                            <div className="flex items-center justify-between text-xs font-bold">
+                                                                                <span className="text-slate-700 dark:text-slate-300">{secTitle}</span>
+                                                                                <div className="flex items-center gap-3 font-mono">
+                                                                                    <span className="text-slate-900 dark:text-white">
+                                                                                        ${sec.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                                                    </span>
+                                                                                    <span className="text-indigo-600 dark:text-indigo-400 text-[11px]">
+                                                                                        {pctVal.toFixed(1)}%
+                                                                                    </span>
+                                                                                </div>
+                                                                            </div>
+                                                                            <div className="h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                                                                <div className="h-full rounded-full transition-all duration-300 bg-indigo-500" style={{ width: `${pctVal}%` }} />
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+
+                                    {/* ── View 2: 2D Matrix Table ── */}
+                                    {pivotViewMode === 'matrix' && (
+                                        <div className="space-y-4">
+                                            <div className="flex items-center justify-between">
+                                                <h4 className="text-xs font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                                                    Cross-Tabulation Matrix ({pivotPrimary === 'fund' ? 'Rows: Fund, Columns: Label' : 'Rows: Label, Columns: Fund'})
+                                                </h4>
+                                            </div>
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-left border-collapse">
+                                                    <thead>
+                                                        <tr className="border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/30">
+                                                            <th className="p-3 text-[10px] font-bold uppercase tracking-wide text-slate-400 min-w-[150px]">
+                                                                {pivotPrimary === 'fund' ? 'Fund Name ↓ / Label →' : 'Label Name ↓ / Fund →'}
+                                                            </th>
+                                                            {(pivotPrimary === 'fund' ? labelsList : fundsList).map((col: string) => (
+                                                                <th key={col} className="p-3 text-[10px] font-bold uppercase tracking-wide text-slate-400 text-right whitespace-nowrap min-w-[100px]">
+                                                                    {col}
+                                                                </th>
+                                                            ))}
+                                                            <th className="p-3 text-[10px] font-bold uppercase tracking-wide text-emerald-500 text-right whitespace-nowrap min-w-[120px]">
+                                                                Total Row
+                                                            </th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
+                                                        {(pivotPrimary === 'fund' ? fundsList : labelsList).map((rowItem: string) => {
+                                                            const rowTotal = (pivotPrimary === 'fund' ? labelsList : fundsList).reduce((sum: number, colItem: string) => {
+                                                                const fName = pivotPrimary === 'fund' ? rowItem : colItem;
+                                                                const lName = pivotPrimary === 'fund' ? colItem : rowItem;
+                                                                const cell = matrixMap.get(fName)?.get(lName);
+                                                                return sum + (cell?.amount || 0);
+                                                            }, 0);
+
+                                                            return (
+                                                                <tr key={rowItem} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                                                                    <td className="p-3 text-xs font-bold text-slate-900 dark:text-white whitespace-nowrap">
+                                                                        {rowItem}
+                                                                    </td>
+                                                                    {(pivotPrimary === 'fund' ? labelsList : fundsList).map((colItem: string) => {
+                                                                        const fName = pivotPrimary === 'fund' ? rowItem : colItem;
+                                                                        const lName = pivotPrimary === 'fund' ? colItem : rowItem;
+                                                                        const cell = matrixMap.get(fName)?.get(lName);
+                                                                        const amount = cell?.amount || 0;
+                                                                        const tx = cell?.txCount || 0;
+
+                                                                        return (
+                                                                            <td key={colItem} className={`p-3 text-xs font-mono text-right ${amount > 0 ? 'text-slate-900 dark:text-white font-bold' : 'text-slate-300 dark:text-slate-600'}`}>
+                                                                                {amount > 0 ? (
+                                                                                    <div>
+                                                                                        <span>${amount.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                                                                                        <p className="text-[9px] font-medium text-slate-400 font-sans">{tx} gift{tx === 1 ? '' : 's'}</p>
+                                                                                    </div>
+                                                                                ) : '—'}
+                                                                            </td>
+                                                                        );
+                                                                    })}
+                                                                    <td className="p-3 text-xs font-black text-indigo-600 dark:text-indigo-400 text-right font-mono">
+                                                                        ${rowTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        })}
+                                                    </tbody>
+                                                    <tfoot>
+                                                        <tr className="border-t-2 border-slate-200 dark:border-slate-700 font-bold bg-slate-50/80 dark:bg-slate-900/60">
+                                                            <td className="p-3 text-xs font-black text-slate-900 dark:text-white uppercase tracking-wide">Total Column</td>
+                                                            {(pivotPrimary === 'fund' ? labelsList : fundsList).map((colItem: string) => {
+                                                                const colTotal = (pivotPrimary === 'fund' ? fundsList : labelsList).reduce((sum: number, rowItem: string) => {
+                                                                    const fName = pivotPrimary === 'fund' ? rowItem : colItem;
+                                                                    const lName = pivotPrimary === 'fund' ? colItem : rowItem;
+                                                                    const cell = matrixMap.get(fName)?.get(lName);
+                                                                    return sum + (cell?.amount || 0);
+                                                                }, 0);
+
+                                                                return (
+                                                                    <td key={colItem} className="p-3 text-xs font-black text-emerald-600 dark:text-emerald-400 text-right font-mono">
+                                                                        ${colTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                                                    </td>
+                                                                );
+                                                            })}
+                                                            <td className="p-3 text-xs font-black text-emerald-600 dark:text-emerald-400 text-right font-mono">
+                                                                ${overallTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                                            </td>
+                                                        </tr>
+                                                    </tfoot>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    )}
                                 </>
                             )}
                         </div>
