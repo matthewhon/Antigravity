@@ -1,6 +1,6 @@
 import React from 'react';
 import { DashboardOverview } from '../../services/dashboardService';
-import { Card, Section, fmtAgo, fmtNumber } from './DashboardPrimitives';
+import { Card, Section, SectionControls, fmtAgo, fmtNumber } from './DashboardPrimitives';
 
 /**
  * Operational state of the tenant itself — admin only.
@@ -11,7 +11,7 @@ import { Card, Section, fmtAgo, fmtNumber } from './DashboardPrimitives';
 export const TenantHealth: React.FC<{
     health: NonNullable<DashboardOverview['tenantHealth']>;
     pcoConnected: boolean;
-}> = ({ health, pcoConnected }) => {
+} & SectionControls> = ({ health, pcoConnected, ...controls }) => {
     const syncAge = health.lastSyncAt ? Date.now() - health.lastSyncAt : null;
     const syncStale = syncAge === null || syncAge > 24 * 60 * 60 * 1000;
 
@@ -47,7 +47,7 @@ export const TenantHealth: React.FC<{
     ];
 
     return (
-        <Section title="Tenant health" caption="visible to church admins only">
+        <Section title="Tenant health" caption="visible to church admins only" {...controls}>
             <Card className="p-6 print:p-3">
                 <div
                     className="grid gap-6"

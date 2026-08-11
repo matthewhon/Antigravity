@@ -1,6 +1,6 @@
 import React from 'react';
 import { TrendSeries } from '../../services/dashboardService';
-import { Card, EmptyNote, Section, Sparkline, fmtValue } from './DashboardPrimitives';
+import { Card, EmptyNote, Section, SectionControls, Sparkline, fmtValue } from './DashboardPrimitives';
 
 /**
  * Twelve weeks of movement, one sparkline per series.
@@ -26,8 +26,8 @@ const changeAcross = (points: TrendSeries['points']): number | null => {
     return Math.round(((last - first) / first) * 100);
 };
 
-export const TrendStrip: React.FC<{ series: TrendSeries[] }> = ({ series }) => (
-    <Section title="Trends" caption="last 12 weeks">
+export const TrendStrip: React.FC<{ series: TrendSeries[] } & SectionControls> = ({ series, ...controls }) => (
+    <Section title="Trends" caption="last 12 weeks" {...controls}>
         {series.length === 0 ? (
             <Card className="px-8 py-6">
                 <EmptyNote>No trend data available yet.</EmptyNote>

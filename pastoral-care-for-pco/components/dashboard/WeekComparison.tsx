@@ -1,6 +1,6 @@
 import React from 'react';
 import { DeltaRow } from '../../services/dashboardService';
-import { Card, DeltaChip, EmptyNote, Section, fmtValue } from './DashboardPrimitives';
+import { Card, DeltaChip, EmptyNote, Section, SectionControls, fmtValue } from './DashboardPrimitives';
 
 /**
  * Last seven days against the seven before.
@@ -8,8 +8,8 @@ import { Card, DeltaChip, EmptyNote, Section, fmtValue } from './DashboardPrimit
  * Rows arrive pre-filtered by role, so a user without Giving simply has fewer
  * lines rather than blanked-out ones.
  */
-export const WeekComparison: React.FC<{ rows: DeltaRow[] }> = ({ rows }) => (
-    <Section title="This week" caption="vs. the previous seven days">
+export const WeekComparison: React.FC<{ rows: DeltaRow[] } & SectionControls> = ({ rows, ...controls }) => (
+    <Section title="This week" caption="vs. the previous seven days" {...controls}>
         <Card className="px-8 py-3 print:px-4">
             {rows.length === 0 ? (
                 <EmptyNote>No comparable activity in the last two weeks.</EmptyNote>

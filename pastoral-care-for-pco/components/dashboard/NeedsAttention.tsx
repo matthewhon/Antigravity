@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { AttentionRow, Severity } from '../../services/dashboardService';
-import { Card, Section, fmtNumber } from './DashboardPrimitives';
+import { Card, Section, SectionControls, fmtNumber } from './DashboardPrimitives';
 
 /**
  * The section that makes the page worth opening daily.
@@ -26,8 +26,8 @@ const SEVERITY_STYLES: Record<Severity, { dot: string; count: string }> = {
     },
 };
 
-export const NeedsAttention: React.FC<{ rows: AttentionRow[] }> = ({ rows }) => (
-    <Section title="Needs attention">
+export const NeedsAttention: React.FC<{ rows: AttentionRow[] } & SectionControls> = ({ rows, ...controls }) => (
+    <Section title="Needs attention" {...controls}>
         <Card className="px-8 py-3 print:px-4">
             {rows.length === 0 ? (
                 <div className="flex items-center gap-3 py-6">

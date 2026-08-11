@@ -1,22 +1,11 @@
 
 import { WidgetDefinition } from '../types';
 
-export const DASHBOARD_WIDGETS: WidgetDefinition[] = [
-    { id: 'onboarding_tasks', label: 'Setup Guide', icon: '🚀', size: 'full', description: 'Checklist of setup steps to get your church fully connected.' },
-    { id: 'censusHero', label: 'Census Hero', icon: '🏛️', size: 'full', description: 'Community census snapshot around your church.' },
-    { id: 'ai_insights', label: 'AI Insights', icon: '✨', size: 'full', description: "AI-written summary of what's notable across your church this week." },
-    { id: 'people_stats', label: 'People Stats', icon: '👥', size: 'lg', description: 'Headline people counts — total, active, new, and at-risk.' },
-    { id: 'keyMetrics', label: 'Giving Metrics', icon: '💰', size: 'lg', description: 'Giving totals and key financial indicators at a glance.' },
-    { id: 'groups_stats', label: 'Groups Stats', icon: '📂', size: 'lg', description: 'Group counts, health, and connection summary.' },
-    { id: 'services_stats', label: 'Services Stats', icon: '🎹', size: 'lg', description: 'Weekend attendance and serving-team headline numbers.' },
-    { id: 'services_timeline', label: 'Church Timeline', icon: '🗓️', size: 'full', description: 'Upcoming services and events on a single timeline.' },
-    { id: 'churchRisk', label: 'Church Health', icon: '🏥', size: 'lg', description: 'Overall church health score and its biggest risk drivers.' },
-    { id: 'church_progress', label: 'Church Progress', icon: '📈', size: 'lg', description: 'Growth and momentum trends over time.' },
-    { id: 'people_engagement', label: 'Risk Profiles', icon: '📊', size: 'md', description: 'Distribution of people across engagement and risk levels.' },
-    { id: 'gender', label: 'Gender', icon: '🚻', size: 'md', description: 'Gender breakdown of your congregation.' },
-    { id: 'age', label: 'Age', icon: '🎂', size: 'md', description: 'Age distribution of your congregation.' },
-    { id: 'last_week_stats', label: 'Last Week Stats', icon: '📅', size: 'full', description: 'Key numbers from the past week across ministries.' },
-];
+/**
+ * The dashboard no longer uses widgets — it is a designed, role-composed page
+ * (see components/DashboardView.tsx and constants/dashboardSections.ts).
+ * Every other analytics view still uses this registry.
+ */
 
 export const PEOPLE_OVERVIEW_WIDGETS: WidgetDefinition[] = [
     { id: 'people_stats', label: 'Key Stats', icon: '📊', size: 'full', description: 'Headline people counts and trends.' },
@@ -207,7 +196,6 @@ export const PASTORAL_CARE_WIDGETS: WidgetDefinition[] = [
 ];
 
 export const ALL_WIDGETS: Record<string, WidgetDefinition[]> = {
-    dashboard: DASHBOARD_WIDGETS,
     people: PEOPLE_OVERVIEW_WIDGETS,
     people_households: PEOPLE_HOUSEHOLD_WIDGETS,
     people_risk: PEOPLE_RISK_WIDGETS,
@@ -263,16 +251,8 @@ export const getRoleBasedDefaults = (roles: string[]): Record<string, string[]> 
     const isGroups  = has('Groups') || isAdmin;
     const isCare    = has('Pastoral Care') || isPastor;
 
-    // Dashboard — everyone sees it; tailor by primary role
-    let dashboard = ['onboarding_tasks', 'ai_insights', 'people_stats', 'last_week_stats'];
-    if (isPastor)   dashboard = ['onboarding_tasks', 'ai_insights', 'church_progress', 'last_week_stats', 'people_stats', 'churchRisk', 'keyMetrics', 'groups_stats', 'services_stats'];
-    else if (isGiving)  dashboard = ['onboarding_tasks', 'keyMetrics', 'people_stats', 'trends', 'groups_stats', 'last_week_stats'];
-    else if (isServices) dashboard = ['onboarding_tasks', 'services_stats', 'people_stats', 'ai_insights', 'last_week_stats'];
-    else if (isPeople)  dashboard = ['onboarding_tasks', 'people_stats', 'churchRisk', 'ai_insights', 'last_week_stats'];
-    else if (isGroups)  dashboard = ['onboarding_tasks', 'groups_stats', 'people_stats', 'ai_insights', 'last_week_stats'];
 
     return {
-        dashboard,
         // People
         people: isPeople || isPastor
             ? ['people_stats', 'assimilation_rate', 'engagement_status', 'people_engagement', 'gender', 'age', 'riskDistribution', 'map', 'birthdays']
@@ -316,7 +296,6 @@ export const getRoleBasedDefaults = (roles: string[]): Record<string, string[]> 
 
 export const getDefaultWidgets = (view: string): string[] => {
     switch (view) {
-        case 'dashboard': return ['onboarding_tasks', 'ai_insights', 'church_progress', 'last_week_stats', 'people_stats', 'keyMetrics', 'groups_stats', 'services_stats', 'churchRisk'];
         case 'people': return ['people_stats', 'assimilation_rate', 'engagement_status', 'people_engagement', 'gender', 'age', 'community_age_comparison', 'map'];
         case 'people_households': return ['householdSummary', 'householdComp', 'householdSize'];
         case 'people_risk': return ['riskDistribution', 'atRiskList'];

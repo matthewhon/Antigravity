@@ -708,6 +708,12 @@ const App: React.FC = () => {
       }
   };
 
+  const handleUpdateDashboardPreferences = (next: import('./types').DashboardPreferences) => {
+      if (!user) return;
+      firestore.updateDashboardPreferences(user.id, next);
+      setUser({ ...user, dashboardPreferences: next });
+  };
+
   const handleAcceptLayout = (layout: Record<string, string[]>) => {
       if (!user) return;
       firestore.updateUserPreferences(user.id, layout);
@@ -1137,6 +1143,7 @@ const App: React.FC = () => {
             <Routes>
                 <Route path="/" element={
                     <DashboardPage
+                        onUpdateDashboardPreferences={handleUpdateDashboardPreferences}
                         onConnectPco={() => { setSettingsTab('Planning Center'); handleNavigate('settings'); }}
                         globalInsights={globalInsights}
                         isGeneratingInsights={isGeneratingInsights}

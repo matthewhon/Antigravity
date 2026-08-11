@@ -39,7 +39,13 @@ export const fmtAgo = (ms: number | null): string => {
 
 // ─── Section shell ────────────────────────────────────────────────────────────
 
-interface SectionProps {
+/** Collapse wiring every section accepts and forwards to `Section`. */
+export interface SectionControls {
+    isCollapsed?: boolean;
+    onToggleCollapse?: () => void;
+}
+
+interface SectionProps extends SectionControls {
     title: string;
     /** Optional short line under the title. */
     caption?: React.ReactNode;
@@ -48,20 +54,48 @@ interface SectionProps {
     children: React.ReactNode;
 }
 
-export const Section: React.FC<SectionProps> = ({ title, caption, action, children }) => (
-    <section className="mb-10 print:mb-6 print:break-inside-avoid">
-        <div className="flex items-baseline justify-between gap-4 mb-4 flex-wrap">
-            <div className="flex items-baseline gap-3 flex-wrap">
-                <h3 className={EYEBROW}>{title}</h3>
-                {caption && (
-                    <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500">{caption}</span>
-                )}
-            </div>
-            {action}
+export const Section: React.FC<SectionProps> = ({
+    title, caption, action, onToggleCollapse, isCollapsed = false, children,
+}) => {
+    const heading = (
+        <div className="flex items-baseline gap-3 flex-wrap">
+            <h3 className={EYEBROW}>{title}</h3>
+            {caption && !isCollapsed && (
+                <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500">{caption}</span>
+            )}
         </div>
-        {children}
-    </section>
-);
+    );
+
+    return (
+        <section className="mb-10 print:mb-6 print:break-inside-avoid">
+            <div className="flex items-baseline justify-between gap-4 mb-4 flex-wrap">
+                {onToggleCollapse ? (
+                    <button
+                        type="button"
+                        onClick={onToggleCollapse}
+                        aria-expanded={!isCollapsed}
+                        className="flex items-baseline gap-2 group focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 rounded print:hidden"
+                    >
+                        <span
+                            aria-hidden="true"
+                            className={
+                                'text-slate-300 dark:text-slate-600 group-hover:text-indigo-500 transition-all text-[10px] ' +
+                                (isCollapsed ? '-rotate-90' : '')
+                            }
+                        >
+                            ▼
+                        </span>
+                        {heading}
+                    </button>
+                ) : (
+                    heading
+                )}
+                {!isCollapsed && action}
+            </div>
+            {!isCollapsed && children}
+        </section>
+    );
+};
 
 /** The standard card surface used across the page. */
 export const Card: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (

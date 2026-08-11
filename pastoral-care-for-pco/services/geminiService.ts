@@ -882,7 +882,6 @@ ${catalog}
 
 Return ONLY a valid JSON object (no markdown, no explanation) with this exact shape:
 {
-  "dashboard": [...],
   "people": [...],
   "people_households": [...],
   "people_risk": [...],

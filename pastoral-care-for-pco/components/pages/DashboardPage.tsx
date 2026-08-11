@@ -18,6 +18,7 @@ const STALE_THRESHOLD_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 interface DashboardPageProps {
     onConnectPco: () => void;
+    onUpdateDashboardPreferences: (next: import('../../types').DashboardPreferences) => void;
     globalInsights: string;
     isGeneratingInsights: boolean;
     onGenerateInsights: () => void;
@@ -27,7 +28,7 @@ interface DashboardPageProps {
 }
 
 export const DashboardPage: React.FC<DashboardPageProps> = ({
-    onConnectPco, globalInsights,
+    onConnectPco, onUpdateDashboardPreferences, globalInsights,
     isGeneratingInsights, onGenerateInsights, givingFilter, givingDateRange, censusData
 }) => {
     const {
@@ -115,6 +116,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             user={user}
             overview={overview}
             sectionOrder={getSectionOrder(user.roles as string[])}
+            preferences={user.dashboardPreferences}
+            onUpdatePreferences={onUpdateDashboardPreferences}
             campusName={campusName}
             peopleData={peopleDashboardData}
             givingAnalytics={givingAnalyticsData}

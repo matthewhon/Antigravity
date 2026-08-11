@@ -387,6 +387,13 @@ class FirestoreService {
       }
   }
 
+  /** Persists the user's dashboard section order / collapsed set. */
+  async updateDashboardPreferences(userId: string, prefs: import('../types').DashboardPreferences): Promise<void> {
+      try {
+          await updateDoc(doc(db, 'users', userId), { dashboardPreferences: prefs } as any);
+      } catch (e) { this.handleFirestoreError(e); }
+  }
+
   async updateUserPreferences(uid: string, preferences: Record<string, string[]>) {
       try {
           await updateDoc(doc(db, 'users', uid), { widgetPreferences: preferences });

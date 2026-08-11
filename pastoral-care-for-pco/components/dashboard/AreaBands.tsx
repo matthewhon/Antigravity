@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { DashboardOverview } from '../../services/dashboardService';
-import { Card, Section, fmtCurrency, fmtNumber } from './DashboardPrimitives';
+import { Card, Section, SectionControls, fmtCurrency, fmtNumber } from './DashboardPrimitives';
 
 /**
  * One compact band per ministry area the user can read.
@@ -116,12 +116,12 @@ const buildBands = (areas: DashboardOverview['areas']): Band[] => {
     return bands;
 };
 
-export const AreaBands: React.FC<{ areas: DashboardOverview['areas'] }> = ({ areas }) => {
+export const AreaBands: React.FC<{ areas: DashboardOverview['areas'] } & SectionControls> = ({ areas, ...controls }) => {
     const bands = buildBands(areas);
     if (bands.length === 0) return null;
 
     return (
-        <Section title="By area">
+        <Section title="By area" {...controls}>
             <div className="flex flex-col gap-4">
                 {bands.map(band => (
                     <Card key={band.id} className="p-6 print:p-3">

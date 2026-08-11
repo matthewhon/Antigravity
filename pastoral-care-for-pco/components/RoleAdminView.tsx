@@ -11,6 +11,7 @@ import RiskSettingsView from './RiskSettingsView';
 import ChurchRiskSettingsView from './ChurchRiskSettingsView';
 import GroupRiskSettingsView from './GroupRiskSettingsView';
 import DonorLifecycleSettingsView from './DonorLifecycleSettingsView';
+import NeedsAttentionSettingsView from './NeedsAttentionSettingsView';
 import { SubscriptionSettingsView } from './SubscriptionSettingsView';
 import { ALL_WIDGETS } from '../constants/widgetRegistry';
 import { PLANS } from '../services/stripeService';
@@ -985,7 +986,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
   const { campuses } = useTenantData();
   const [users, setUsers] = useState<User[]>([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'Team' | 'Organization' | 'Planning Center' | 'Community' | 'Widget Directory' | 'Risk Profiles' | 'Subscription' | 'Mail Settings' | 'SMS' | 'Grow Integration' | 'Canva'>('Team');
+  const [activeTab, setActiveTab] = useState<'Team' | 'Organization' | 'Planning Center' | 'Community' | 'Dashboard' | 'Widget Directory' | 'Risk Profiles' | 'Subscription' | 'Mail Settings' | 'SMS' | 'Grow Integration' | 'Canva'>('Team');
 
   // Delete Organization modal state
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -1777,7 +1778,7 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
             </div>
             
             <div className="flex flex-row lg:flex-col gap-2 overflow-x-auto lg:overflow-visible pb-4 lg:pb-0 no-scrollbar border-b lg:border-b-0 border-slate-200 dark:border-slate-800">
-                {['Team', 'Organization', 'Planning Center', 'Community', 'Mail Settings', 'SMS', 'Grow Integration', 'Canva', 'Widget Directory', 'Risk Profiles', 'Subscription'].map(tab => (
+                {['Team', 'Organization', 'Planning Center', 'Community', 'Mail Settings', 'SMS', 'Grow Integration', 'Canva', 'Dashboard', 'Widget Directory', 'Risk Profiles', 'Subscription'].map(tab => (
                     <button 
                         key={tab}
                         onClick={() => setActiveTab(tab as any)}
@@ -2758,6 +2759,27 @@ const RoleAdminView: React.FC<RoleAdminViewProps> = ({
                         }}
                     />
                 )}
+            </div>
+        )}
+
+        {activeTab === 'Dashboard' && (
+            <div className="space-y-8">
+                <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] border border-slate-100 dark:border-slate-800 shadow-sm">
+                    <h3 className="text-xl font-black text-slate-900 dark:text-white">Dashboard</h3>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wide mt-1">
+                        What everyone sees when they open the app
+                    </p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-4 max-w-2xl">
+                        The dashboard composes itself from each person's roles — someone without access
+                        to Giving never sees giving figures anywhere on the page. Ordering follows their
+                        primary role. What you can configure here is the "Needs Attention" list.
+                    </p>
+                </div>
+
+                <NeedsAttentionSettingsView
+                    settings={church.needsAttentionSettings}
+                    onSave={(s) => onUpdateChurch && onUpdateChurch({ needsAttentionSettings: s })}
+                />
             </div>
         )}
 

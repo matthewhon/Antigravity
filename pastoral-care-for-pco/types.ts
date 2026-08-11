@@ -8,12 +8,33 @@ export interface User {
     email: string;
     roles: UserRole[];
     lastLogin?: number;
+    /**
+     * Per-view widget selections for the analytics views.
+     * The `dashboard` key is no longer read — that page is a fixed, role-composed
+     * layout now. Existing values are left in place so a rollback is trivial.
+     */
     widgetPreferences?: Record<string, string[]>;
+    /** Per-user tweaks to the dashboard overview page. */
+    dashboardPreferences?: DashboardPreferences;
     theme?: 'traditional' | 'dark';
     allowedCampuses?: string[];
     primaryCampusId?: string | null;
     /** Timestamp the user completed (or skipped) the first-run guided tour. */
     onboardingTourCompletedAt?: number;
+}
+
+/**
+ * What a user may change about their own dashboard.
+ *
+ * Deliberately not widget selection: sections are determined by role, and
+ * nobody should be able to hide "Needs Attention". Reordering and collapsing
+ * cover the reasons people actually rearranged widgets.
+ */
+export interface DashboardPreferences {
+    /** Section ids in the user's preferred order. Unknown ids are ignored. */
+    order?: string[];
+    /** Section ids the user has collapsed. */
+    collapsed?: string[];
 }
 
 export interface RiskSettings {

@@ -62,7 +62,6 @@ const getWidgetDescription = (viewKey: string, widgetId: string): string | undef
 
 // Prioritized views to show in the preview (skip empty/trivial views)
 const PREVIEW_VIEWS = [
-    'dashboard',
     'people',
     'people_households',
     'people_risk',
